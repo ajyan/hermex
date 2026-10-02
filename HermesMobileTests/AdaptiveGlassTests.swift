@@ -106,7 +106,7 @@ final class AdaptiveGlassTests: XCTestCase {
 
 @MainActor
 final class ChatNavigationBackgroundTests: XCTestCase {
-    func testChatNavigationHasMaterialAtScrollEdge() async throws {
+    func testChatNavigationHasBackgroundAtScrollEdge() async throws {
         try await checkBackground(reduceTransparency: false)
     }
 
@@ -146,13 +146,13 @@ final class ChatNavigationBackgroundTests: XCTestCase {
         let item = try XCTUnwrap(navigation.topViewController?.navigationItem)
         let appearance = item.scrollEdgeAppearance ?? navigation.navigationBar.scrollEdgeAppearance
             ?? navigation.navigationBar.standardAppearance
-        if reduceTransparency {
-            XCTAssertEqual(appearance.backgroundColor?.resolvedColor(with: host.traitCollection),
-                           UIColor.systemBackground.resolvedColor(with: host.traitCollection),
-                           "Reduce Transparency must cover the navigation and status-bar region with an opaque background")
-        } else {
+        if #available(iOS 26, *), !reduceTransparency {
             XCTAssertTrue(appearance.backgroundEffect is UIBlurEffect,
                           "Chat must request a native material behind the title even at the scroll edge")
+        } else {
+            XCTAssertEqual(appearance.backgroundColor?.resolvedColor(with: host.traitCollection),
+                           UIColor.systemBackground.resolvedColor(with: host.traitCollection),
+                           "Reduce Transparency and older systems must cover the navigation and status-bar region with an opaque background")
         }
     }
 
