@@ -6,6 +6,9 @@ import SwiftUI
     @State private var reader: BotRoomReader
     @State private var revision = UUID()
     @State private var showingProfile = false
+    @State private var selectedThread: String?
+    @State private var threadSequence: Int?
+    let threadID: String?
     @State private var visible = false
     @State private var owner = UUID()
     @State private var followLatch = ChatScrollPolicy.FollowLatch()
@@ -20,17 +23,17 @@ import SwiftUI
     /// Leaves the room for the inbox's sign-in form, after the host refused the password.
     let onUpdateSignIn: () -> Void
 
-    init(reader: BotRoomReader, roster: [BotProfile], avatars: [String: UIImage], onUpdateSignIn: @escaping () -> Void = {}) {
+    init(reader: BotRoomReader, roster: [BotProfile], avatars: [String: UIImage], threadID: String? = nil, sequence: Int? = nil, onUpdateSignIn: @escaping () -> Void = {}) {
         _reader = State(initialValue: reader); self.roster = roster; self.avatars = avatars
-        self.onUpdateSignIn = onUpdateSignIn
-        _pendingSequence = State(initialValue: reader.initialSequence)
+        self.onUpdateSignIn = onUpdateSignIn; self.threadID = threadID
+        _pendingSequence = State(initialValue: sequence ?? (threadID == nil ? reader.initialSequence : nil))
     }
 
     var body: some View {
         ScrollViewReader { proxy in
-            let start = window.start(in: reader.events, keeping: pendingSequence)
+            let start = window.start(in: transcriptEvents, keeping: pendingSequence)
             let hasHiddenEvents = start > 0
-            let showsWelcome = reader.showsWelcome
+            let showsWelcome = threadID == nil && reader.showsWelcome
             ScrollView {
                 // At least as tall as the visible transcript while a new room shows
                 // its welcome, which centres it; taller, and scrolling, only when
@@ -42,28 +45,47 @@ import SwiftUI
                     // from an estimate, so the jump to a search hit missed on a cold
                     // open (issue #553). The window keeps the build to the newest page.
                     VStack(spacing: 16) {
-                        if hasHiddenEvents || reader.hasEarlier {
+                        if !showsThreadOverview && (hasHiddenEvents || reader.hasEarlier) {
                             Button("Load earlier") { loadEarlier(proxy: proxy) }
                                 .disabled(!hasHiddenEvents && (reader.loadingEarlier || reader.link != .live))
                         }
                         if reader.foreignAuthority {
                             Text("Managed by another Hermes").font(.caption).foregroundStyle(.secondary)
                         }
-                        let gapStarts = BotRoomEvent.gapStarts(in: reader.events[start...])
-                        ForEach(reader.events[start...]) { event in
-                            // One view per event, so a search hit's scroll lands on the event.
+                        if threadID != nil, reader.threads.first(where: { $0.id == threadID })?.root == nil {
+                            Text("Earlier messages not loaded").font(.caption).foregroundStyle(.secondary)
+                        }
+                        let gapStarts = showsThreadOverview ? Set<Int>() : BotRoomEvent.gapStarts(in: transcriptEvents[start...])
+                        let rows = Array(transcriptEvents[start...])
+                        ForEach((showsThreadOverview ? Array(rows.reversed()) : rows).map {
+                            BotRoomTranscriptRow(event: $0, isOverview: threadID == nil)
+                        }) { row in
+                            let event = row.event
+                            // Thread identity survives new replies and activity reordering.
                             VStack(spacing: 16) {
                                 if gapStarts.contains(event.seq), let timestamp = event.timestamp {
                                     TranscriptTimeSeparator(timestamp: timestamp)
                                 }
-                                BotRoomEventView(
-                                    event: event,
-                                    room: reader.room,
-                                    roster: roster,
-                                    avatars: avatars,
-                                    transcriptMediaCacheNamespace: "\(reader.key.server.absoluteString)|bot-room:\(reader.room.id)"
-                                )
+                                if threadID == nil, let thread = reader.threads.first(where: { $0.latest.seq == event.seq }) {
+                                    Button { selectedThread = thread.id } label: {
+                                        BotRoomThreadPreview(thread: thread, room: reader.room)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityIdentifier("room-thread-\(thread.id)")
+                                } else {
+                                    BotRoomEventView(
+                                        event: event,
+                                        room: reader.room,
+                                        roster: roster,
+                                        avatars: avatars,
+                                        transcriptMediaCacheNamespace: "\(reader.key.server.absoluteString)|bot-room:\(reader.room.id)"
+                                    )
+                                }
                             }
+                        }
+                        if showsThreadOverview && (hasHiddenEvents || reader.hasEarlier) {
+                            Button("Load earlier") { loadEarlier(proxy: proxy) }
+                                .disabled(!hasHiddenEvents && (reader.loadingEarlier || reader.link != .live))
                         }
                         if showsWelcome {
                             BotRoomWelcomeView(room: reader.room, roster: roster, avatars: avatars,
@@ -88,25 +110,36 @@ import SwiftUI
             .scrollDismissesKeyboard(.interactively)
             .contentShape(Rectangle())
             .simultaneousGesture(TapGesture().onEnded { dismissKeyboard() })
-            .defaultScrollAnchor(.bottom, for: .initialOffset)
+            .defaultScrollAnchor(showsThreadOverview ? .top : .bottom, for: .initialOffset)
             .defaultScrollAnchor(ChatScrollPolicy.sizeChangeAnchor(shouldFollowLatestMessage: followsLatest), for: .sizeChanges)
-            .onChange(of: pendingSequence.flatMap { sequence in
-                reader.events.contains(where: { $0.seq == sequence }) ? sequence : nil
-            }, initial: true) { _, sequence in
-                if let sequence {
-                    handleFollowEvent(.userScrollBegin)
-                    window.reveal(sequence, in: reader.events)
-                    proxy.scrollTo(sequence, anchor: .center); pendingSequence = nil
+            .onChange(of: availableSearchSequence, initial: true) { _, sequence in
+                guard threadID == nil, let sequence else { return }
+                if let target = reader.events.first(where: { $0.seq == sequence })?.threadID {
+                    threadSequence = sequence; selectedThread = target; pendingSequence = nil
+                    return
                 }
+                handleFollowEvent(.userScrollBegin)
+                window.reveal(sequence, in: transcriptEvents)
+                proxy.scrollTo(BotRoomTranscriptRow.ID.event(sequence), anchor: .center); pendingSequence = nil
             }
-            .onChange(of: reader.events.last?.seq, initial: true) { seedWindow() }
+            .task(id: threadID == nil ? nil : availableSearchSequence) {
+                guard threadID != nil, let sequence = availableSearchSequence else { return }
+                window.reveal(sequence, in: transcriptEvents)
+                // A pushed destination lays out after the overview's synchronous
+                // search callback. Wait for those materialized rows before jumping.
+                await Task.yield()
+                guard !Task.isCancelled else { return }
+                handleFollowEvent(.userScrollBegin)
+                proxy.scrollTo(BotRoomTranscriptRow.ID.event(sequence), anchor: .center); pendingSequence = nil
+            }
+            .onChange(of: transcriptEvents.last?.seq, initial: true) { seedWindow() }
             .onChange(of: reader.link) { seedWindow() }
-            .onChange(of: reader.events.last?.seq) {
-                if pendingSequence == nil && followsLatest { proxy.scrollTo("room-bottom", anchor: .bottom) }
+            .onChange(of: transcriptEvents.last?.seq) {
+                if !showsThreadOverview && pendingSequence == nil && followsLatest { proxy.scrollTo("room-bottom", anchor: .bottom) }
             }
             .onChange(of: showRequestID) { proxy.scrollTo("room-actions", anchor: .top) }
             .overlay(alignment: .bottom) {
-                if !isNearBottom && !reader.events.isEmpty {
+                if !showsThreadOverview && !isNearBottom && !transcriptEvents.isEmpty {
                     ChatScrollToBottomButton(bottomPadding: 12) {
                         handleFollowEvent(.reset); proxy.scrollTo("room-bottom", anchor: .bottom)
                     }
@@ -119,9 +152,9 @@ import SwiftUI
                     BotComposerPillView(pill: pill, onReconnect: { revision = UUID() }, onUpdateSignIn: onUpdateSignIn,
                         onShowRequest: { showRequestID = UUID() }, onCancelUpload: {},
                         onDismissError: { if let text = pill.errorText { dismissedErrors.insert(text) } },
-                        onRetrySend: { Task { await reader.send(retry: true) } })
+                        onRetrySend: { Task { await reader.send(retry: true, threadID: threadID) } })
                 }
-                if reader.showsComposer { BotRoomComposerView(reader: reader, roster: roster, avatars: avatars) }
+                if reader.showsComposer { BotRoomComposerView(reader: reader, threadID: threadID, roster: roster, avatars: avatars) }
             }
             .frame(maxWidth: ChatReadingWidth.maximumWidth(horizontalPadding: 16))
         }
@@ -139,7 +172,10 @@ import SwiftUI
                 Button { showingProfile = true } label: {
                     HStack(spacing: 8) {
                         BotRoomAvatars(room: reader.room, roster: roster, avatars: avatars, size: 30)
-                        Text(reader.room.name).font(.headline).lineLimit(1)
+                        VStack(alignment: .leading, spacing: 0) {
+                            if threadID != nil { Text("Thread").font(.headline) }
+                            Text(reader.room.name).font(threadID == nil ? .headline : .caption).lineLimit(1)
+                        }
                     }
                     .modifier(BotChatTitlePillFallback())
                 }
@@ -150,43 +186,66 @@ import SwiftUI
         .navigationDestination(isPresented: $showingProfile) {
             BotRoomProfileView(reader: reader, roster: roster, avatars: avatars, onUpdateSignIn: onUpdateSignIn)
         }
+        .navigationDestination(item: $selectedThread) { selected in
+            BotRoomView(reader: reader, roster: roster, avatars: avatars, threadID: selected,
+                        sequence: threadSequence, onUpdateSignIn: onUpdateSignIn)
+        }
+        .onChange(of: selectedThread) { _, selected in
+            if selected == nil { threadSequence = nil }
+        }
         .task(id: revision) {
             visible = true
-            if scenePhase == .active { await reader.open(owner: owner) }
+            if scenePhase == .active { await reader.open(owner: owner, preservingLoadedHistory: true) }
         }
         .onChange(of: scenePhase) {
             // Control Center and banners (`.inactive`) keep the room live (#902); the
             // background stops it (#533), and only a stopped room reopens.
             guard visible else { return }
             switch scenePhase {
-            case .background: reader.leave(owner: owner)
+            case .background: reader.leave(owner: owner, preservingLoadedHistory: true)
             case .active where reader.link == .idle: revision = UUID()
             default: break
             }
         }
-        .onDisappear { visible = false; reader.leave(owner: owner) }
+        .onDisappear { visible = false; reader.leave(owner: owner, preservingLoadedHistory: true) }
         .onChange(of: reader.feedback) { _, feedback in
             if let feedback { ChatHaptics.botFeedback(feedback.event, isEnabled: isHapticsEnabled) }
         }
         .transcriptLinks()
     }
 
+    private var availableSearchSequence: Int? {
+        pendingSequence.flatMap { sequence in reader.events.contains { $0.seq == sequence } ? sequence : nil }
+    }
+
+    private var showsThreadOverview: Bool { threadID == nil && !reader.threads.isEmpty }
+
+    /// Thread previews stand in for their latest event. Unthreaded history remains
+    /// readable, but never gains a fabricated reply target.
+    private var transcriptEvents: [BotRoomEvent] {
+        if let threadID { return reader.threads.first { $0.id == threadID }?.events ?? [] }
+        return (reader.events.filter { $0.threadID == nil } + reader.threads.map(\.latest))
+            .sorted { $0.seq < $1.seq }
+    }
+
     func dismissKeyboard() {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
-    private func seedWindow() { window.seed(reader.events, live: reader.link == .live) }
+    private func seedWindow() { window.seed(transcriptEvents, live: reader.link == .live) }
 
     /// Reveals a page of events already in memory, or fetches one from the room
     /// when none are hidden, then keeps the event the reader was on at the top,
     /// since the new rows push everything below them down.
     private func loadEarlier(proxy: ScrollViewProxy) {
         handleFollowEvent(.userScrollBegin)
-        let firstShown = reader.events.isEmpty ? nil : reader.events[window.start(in: reader.events)].seq
+        let firstEvent = showsThreadOverview ? transcriptEvents.last
+            : (transcriptEvents.isEmpty ? nil : transcriptEvents[window.start(in: transcriptEvents)])
+        let firstShown = firstEvent.map { BotRoomTranscriptRow(event: $0, isOverview: threadID == nil).id }
         Task {
-            if !window.showEarlier(in: reader.events) {
+            if !window.showEarlier(in: transcriptEvents) {
                 await reader.loadEarlier()
-                guard window.showEarlier(in: reader.events) else { return }
+                guard window.showEarlier(in: transcriptEvents) else { return }
             }
             guard let firstShown else { return }
             await Task.yield()
@@ -214,8 +273,61 @@ import SwiftUI
 
     private var pill: BotComposerPill? {
         BotComposerPill.room(link: reader.link, blocked: reader.status.blocked,
-            hasActions: !reader.status.actions.isEmpty, mayRetry: reader.mayResend, needsSignIn: reader.needsSignIn,
+            hasActions: !reader.status.actions.isEmpty, mayRetry: reader.mayResend(in: threadID), needsSignIn: reader.needsSignIn,
             errorText: errorTexts.first { !dismissedErrors.contains($0) })
+    }
+}
+
+/// Stable thread identities in the overview, exact sequence identities in detail
+/// and unthreaded history. A reply must not replace its overview row's identity.
+struct BotRoomTranscriptRow: Identifiable {
+    enum ID: Hashable { case thread(String), event(Int) }
+    let event: BotRoomEvent
+    let isOverview: Bool
+    var id: ID {
+        if isOverview, let thread = event.threadID { return .thread(thread) }
+        return .event(event.seq)
+    }
+}
+
+private struct BotRoomThreadPreview: View {
+    let thread: BotRoomThread
+    let room: BotGroupRoom
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ViewThatFits(in: .horizontal) {
+                HStack { author; Spacer(); activity }
+                VStack(alignment: .leading) { author; activity }
+            }
+            .font(.caption).foregroundStyle(.secondary)
+            if let root = thread.root {
+                Text(root.payload["text"].text ?? "").lineLimit(2)
+            } else {
+                Text("Earlier messages not loaded").foregroundStyle(.secondary)
+            }
+            HStack {
+                if thread.root == nil {
+                    Text("Loaded replies: \(thread.replyCount)")
+                } else {
+                    Text("Replies: \(thread.replyCount)")
+                }
+                Spacer()
+                Image(systemName: "chevron.forward").accessibilityHidden(true)
+            }
+            .font(.caption).foregroundStyle(.secondary)
+        }
+        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+        .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 12))
+        .contentShape(Rectangle()).accessibilityElement(children: .combine)
+    }
+    @ViewBuilder private var author: some View {
+        if let root = thread.root { Text(root.kind == "message.user" ? String(localized: "You") : root.sender(in: room)) }
+        else { Text("Thread") }
+    }
+    @ViewBuilder private var activity: some View {
+        if let time = thread.latest.timestamp, time.isFinite, time > 0 {
+            Text(Date(timeIntervalSince1970: time), style: .relative)
+        }
     }
 }
 
