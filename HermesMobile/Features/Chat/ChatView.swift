@@ -266,6 +266,8 @@ struct ChatView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppHaptics.isEnabledKey) private var isHapticsEnabled = true
     @AppStorage(AppHaptics.streamingPulseIsEnabledKey) private var isStreamingPulseEnabled = false
+    @AppStorage(SessionChatPreferences.dismissKeyboardKey) private var dismissKeyboardAfterSend = false
+    @AppStorage(SessionChatPreferences.completionPositionKey) private var completionPositionRawValue = SessionChatPreferences.CompletionPosition.latest.rawValue
     @AppStorage(StreamingSendBehavior.storageKey) private var streamingSendBehaviorRawValue = StreamingSendBehavior.steer.rawValue
     @AppStorage(ResponseCompletionNotifications.isEnabledKey) private var isResponseCompletionNotificationsEnabled = false
     @AppStorage(AgentRunLiveActivityPrivacy.showsResponseExcerptsKey) private var showsLiveActivityResponseExcerpts = false
@@ -300,6 +302,9 @@ struct ChatView: View {
     @State private var draftQuotes: [ComposerQuote] = []
     @State private var draftRevision = 0
     @State private var isScrolledNearBottom = true
+    @State private var completionScrollPolicy = ChatCompletionScrollPolicy()
+    @State private var completedResponseRenderID: String?
+    @State private var composerFocusRevision = 0
     @State private var followLatch = ChatScrollPolicy.FollowLatch()
     @State private var followScrollGeneration = 0
     /// While true the transcript's bottom size-change anchor and follow-driven
@@ -435,7 +440,13 @@ struct ChatView: View {
         MessageComposerView(
             draftMessage: $draftMessage,
             quotes: persistedQuotesBinding,
-            isFocused: $composerIsFocused,
+            isFocused: Binding(
+                get: { composerIsFocused },
+                set: { value in
+                    if composerIsFocused != value { composerFocusRevision += 1 }
+                    composerIsFocused = value
+                }
+            ),
             isSending: viewModel.isStartingChat || viewModel.isSendingVoiceNote,
             isCompressingSession: viewModel.isCompressingSession,
             isWaitingForStream: viewModel.activeStreamID != nil,
@@ -829,6 +840,8 @@ struct ChatView: View {
             }
             .onDisappear {
                 isOnScreen = false
+                composerFocusRevision += 1
+                completionScrollPolicy.readerDidInteract()
                 parkQueuedMessages()
                 flushDraftsBestEffort()
                 appearanceTask?.cancel()
@@ -1453,6 +1466,7 @@ struct ChatView: View {
             activeStreamID: viewModel.activeStreamID,
             streamingScrollTrigger: { viewModel.streamingScrollTrigger },
             transcriptRelayoutScrollToken: viewModel.transcriptRelayoutScrollToken,
+            completedResponseRenderID: completedResponseRenderID,
             bottomAnchorID: bottomAnchorID,
             transcriptSpacing: transcriptSpacing,
             transcriptBottomInsetHeight: transcriptBottomInsetHeight,
@@ -1973,6 +1987,17 @@ struct ChatView: View {
         )
         let submittedDraftRevision = draftRevision
         let shouldRestoreFocusAfterSend = composerIsFocused
+        let submittedFocusRevision = composerFocusRevision
+        let applySubmissionFocus = {
+            if isOnScreen, let focus = ChatSendFocusPolicy.focusAfterSubmission(
+                succeeded: true, dismissKeyboard: dismissKeyboardAfterSend,
+                wasFocused: shouldRestoreFocusAfterSend,
+                submittedRevision: submittedFocusRevision, currentRevision: composerFocusRevision,
+                hasNewDraft: draftRevision != submittedDraftRevision
+            ), !focus || canFocusComposer {
+                composerIsFocused = focus
+            }
+        }
 
         if submittedContent.quotes.isEmpty,
            submittedDraft.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("/") {
@@ -2002,6 +2027,14 @@ struct ChatView: View {
             )
 
             if result != .sendAsMessage {
+                if result.isSuccessfulSubmission {
+                    switch parsedCommand?.handler {
+                    case .serverSide(.queue), .serverSide(.steer), .serverSide(.interrupt):
+                        applySubmissionFocus()
+                    default:
+                        break
+                    }
+                }
                 if let lastError = viewModel.lastError {
                     onAPIError(lastError)
                 }
@@ -2033,11 +2066,7 @@ struct ChatView: View {
 
         if didStart {
             ChatHaptics.messageSent(isEnabled: isHapticsEnabled)
-            if shouldRestoreFocusAfterSend {
-                requestComposerFocusIfPossible()
-            } else {
-                composerIsFocused = false
-            }
+            applySubmissionFocus()
         }
 
         if let lastError = viewModel.lastError {
@@ -2856,6 +2885,8 @@ struct ChatView: View {
             expandedTurnKeys.remove(previousTurnKey)
         }
 
+        completionScrollPolicy.begin(streamID: activeStreamID, isFollowing: shouldFollowLatestMessage)
+        completedResponseRenderID = nil
         startActiveStreamStatusRefreshTask(streamID: activeStreamID)
     }
 
@@ -2899,13 +2930,27 @@ struct ChatView: View {
         }
         let outcome = viewModel.runEndOutcome
         let runEndTrigger = viewModel.runEndTrigger
+        let completion = viewModel.successfulResponseCompletion
 
         Task { @MainActor in
-            if outcome == .completed, viewModel.responseCompletionNeedsTranscriptRefresh {
+            if outcome == .completed, completion?.needsTranscriptRefresh == true {
                 await loadMessages()
             }
 
             let isLatestRunEnd = { viewModel.runEndTrigger == runEndTrigger }
+            if isOnScreen, scenePhase == .active, isLatestRunEnd(),
+               outcome == .completed, viewModel.activeStreamID == nil,
+               viewModel.errorMessage == nil, let completion,
+               let finalRenderID = ChatCompletionScrollPolicy.finalResponseRenderID(
+                   in: displayedTranscriptMessages, terminalReplyRenderIDs: terminalReplyRenderIDs
+               ),
+               completionScrollPolicy.consumeCompletion(
+                   streamID: completion.streamID,
+                   enabled: SessionChatPreferences.CompletionPosition.storedValue(completionPositionRawValue) == .beginning
+               ) {
+                followLatch.isFollowing = false
+                completedResponseRenderID = finalRenderID
+            }
             await ResponseCompletionNotificationService.scheduleRunEndedIfAllowed(
                 outcome,
                 sessionID: session.sessionId,
@@ -3095,6 +3140,15 @@ struct ChatView: View {
     }
 
     private func handleFollowEvent(_ event: ChatScrollPolicy.FollowEvent) {
+        completionScrollPolicy.observe(event)
+        switch event {
+        case .userScrollBegin, .reset:
+            completedResponseRenderID = nil
+        case .contentScrolled(_, let isUserScrolling, let movedAway, _):
+            if isUserScrolling || movedAway { completedResponseRenderID = nil }
+        default:
+            break
+        }
         let resolved = ChatScrollPolicy.resolveFollow(current: followLatch, event: event)
         if resolved != followLatch {
             followLatch = resolved
@@ -3106,6 +3160,8 @@ struct ChatView: View {
     /// untouched, so the next streaming trigger catches up once the toggle has
     /// settled.
     private func handleDisclosureToggle() {
+        completionScrollPolicy.readerDidInteract()
+        completedResponseRenderID = nil
         ChatHaptics.disclosureToggled(isEnabled: isHapticsEnabled)
         suspendBottomAnchorForDisclosure()
     }

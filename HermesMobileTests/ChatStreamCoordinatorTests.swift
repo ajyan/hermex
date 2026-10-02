@@ -1869,6 +1869,26 @@ final class ChatStreamCoordinatorTests: APIClientTestCase {
     }
 
     @MainActor
+    func testSuccessfulCompletionRetainsOwnerAndHydrationAcrossDuplicateDoneAndTeardown() {
+        let streamClient = CoordinatorSpySSEStreamingClient()
+        let delegate = CoordinatorDelegateSpy()
+        let coordinator = makeCoordinator(streamClient: streamClient, delegate: delegate)
+        coordinator.start(streamID: "owned-run")
+        XCTAssertNil(coordinator.successfulResponseCompletion)
+        streamClient.emit(.done(DoneStreamEvent()))
+        XCTAssertEqual(coordinator.successfulResponseCompletion?.streamID, "owned-run")
+        XCTAssertEqual(coordinator.successfulResponseCompletion?.needsTranscriptRefresh, true)
+        streamClient.emit(.done(DoneStreamEvent()))
+        streamClient.emit(.streamEnd)
+        XCTAssertEqual(coordinator.successfulResponseCompletion?.streamID, "owned-run")
+        XCTAssertEqual(coordinator.successfulResponseCompletion?.needsTranscriptRefresh, true)
+        coordinator.start(streamID: "new-run")
+        XCTAssertNil(coordinator.successfulResponseCompletion)
+        streamClient.emit(.error("failed"))
+        XCTAssertNil(coordinator.successfulResponseCompletion)
+    }
+
+    @MainActor
     func testRunEndingRecordsEachRunAndNeverLeaksAStopIntoTheNextCompletion() async throws {
         let streamClient = CoordinatorSpySSEStreamingClient()
         let liveActivityManager = CoordinatorSpyLiveActivityManager()

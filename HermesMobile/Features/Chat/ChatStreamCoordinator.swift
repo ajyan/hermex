@@ -125,12 +125,20 @@ final class ChatStreamCoordinator {
     private let isNetworkAvailable: @MainActor () -> Bool
     private var showsLiveActivityResponseExcerpts: Bool
 
+    /// Retains hydration requirements through transport teardown, which can arrive
+    /// before SwiftUI observes the successful completion.
+    struct SuccessfulResponseCompletion {
+        let streamID: String
+        let needsTranscriptRefresh: Bool
+    }
+    private(set) var successfulResponseCompletion: SuccessfulResponseCompletion?
     private(set) var activeStreamID: String? {
         didSet {
             guard activeStreamID != oldValue else { return }
             activeRunStartedAt = activeStreamID == nil ? nil : Date()
             if activeStreamID != nil {
                 latestRunEnding = nil
+                successfulResponseCompletion = nil
             }
         }
     }
@@ -1023,6 +1031,11 @@ final class ChatStreamCoordinator {
         delegate?.streamCoordinatorRemoveSnapshot(streamID: activeStreamID)
         delegate?.streamCoordinatorStopAuxiliaryMonitoring(clearPrompt: true)
         recordRunEndingIfRunning(.completed)
+        if let activeStreamID {
+            successfulResponseCompletion = SuccessfulResponseCompletion(
+                streamID: activeStreamID, needsTranscriptRefresh: needsTranscriptRefresh
+            )
+        }
         activeStreamID = nil
         hasInMemorySnapshotForActiveStream = false
         lastEventID = nil
