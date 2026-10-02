@@ -70,7 +70,10 @@ final class VoiceCallController {
     /// Finals that arrive after a turn was sent (or while Atlas talks) belong to
     /// speech already handled; drop them until the next speech starts.
     @ObservationIgnored private var discardFinals = false
-    @ObservationIgnored private var bargeInRunStart: TimeInterval?
+    /// Words Atlas has said this reply; hearing them back is echo, not the user.
+    @ObservationIgnored private var spokenWords: Set<String> = []
+    /// A turn has ended with only a partial transcript; waiting briefly for the final one.
+    @ObservationIgnored private var awaitingFinalSince: TimeInterval?
     @ObservationIgnored private var isHeld = false
 
     // Reply
@@ -192,6 +195,10 @@ final class VoiceCallController {
     func tick() {
         let time = now()
         switch state {
+        case .listening:
+            if let awaitingFinalSince, time - awaitingFinalSince >= VoiceCallTiming.finalTranscriptWait {
+                submitTurn()
+            }
         case .connecting:
             if let connectingSince, time - connectingSince >= VoiceCallTiming.connectTimeout {
                 startError = .callDidNotConnect
@@ -218,6 +225,7 @@ final class VoiceCallController {
     // MARK: - Listener
 
     private func handlePartial(_ text: String) {
+        if checkTalkOver(text) { return }
         guard isHearing, !discardFinals else { return }
         partial = text
         publishTranscript()
@@ -225,12 +233,46 @@ final class VoiceCallController {
     }
 
     private func handleFinal(_ text: String) {
+        if checkTalkOver(text) { return }
         guard isHearing, !discardFinals else { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty { finals.append(trimmed) }
         partial = ""
         publishTranscript()
         decideApprovalIfReady()
+        if state == .listening, awaitingFinalSince != nil { submitTurn() }
+    }
+
+    /// While Atlas talks, the mic also hears Atlas. Only words Atlas isn't saying
+    /// (enough of them, or "stop"/"wait") mean the user is talking over it.
+    /// Returns true when `heard` was consumed as talk-over (or echo).
+    private func checkTalkOver(_ heard: String) -> Bool {
+        guard !isMuted, !isHeld else { return false }
+        let isReadBack: Bool
+        switch state {
+        case .speaking: isReadBack = false
+        case .awaitingApproval where approvalListenStart == nil: isReadBack = true
+        default: return false
+        }
+        let novel = Self.words(in: heard).filter { !spokenWords.contains($0) }
+        guard novel.count >= VoiceCallTiming.bargeInNovelWords || novel.contains(where: Self.stopWords.contains) else {
+            return true
+        }
+        speaker.stopNow()
+        if isReadBack {
+            beginApprovalListening(seed: heard)
+        } else {
+            bargeIn(seed: heard)
+        }
+        return true
+    }
+
+    private static let stopWords: Set<String> = ["stop", "wait"]
+
+    static func words(in text: String) -> [String] {
+        text.lowercased()
+            .split { !($0.isLetter || $0.isNumber || $0 == "'") }
+            .map(String.init)
     }
 
     /// True when speech is turned into a turn: listening, or answering an approval.
@@ -259,34 +301,11 @@ final class VoiceCallController {
         switch state {
         case .listening:
             observeTurn(isSpeech, at: time)
-        case .awaitingApproval:
-            if approvalListenStart != nil {
-                observeTurn(isSpeech, at: time)
-            } else if sustainedVoice(isSpeech, at: time) != nil {
-                // Talking over the read-back answers it.
-                speaker.stopNow()
-                beginApprovalListening(speechFrom: bargeInRunStart ?? time, to: time)
-            }
-        case .speaking:
-            if let start = sustainedVoice(isSpeech, at: time) {
-                bargeIn(speechFrom: start, to: time)
-            }
+        case .awaitingApproval where approvalListenStart != nil:
+            observeTurn(isSpeech, at: time)
         default:
-            bargeInRunStart = nil
+            break
         }
-    }
-
-    /// The start of a voice run once it has lasted long enough to be the user, not echo.
-    private func sustainedVoice(_ isSpeech: Bool, at time: TimeInterval) -> TimeInterval? {
-        guard isSpeech else {
-            bargeInRunStart = nil
-            return nil
-        }
-        let start = bargeInRunStart ?? time
-        bargeInRunStart = start
-        guard time - start >= VoiceCallTiming.bargeInSpeech - 0.0001 else { return nil }
-        bargeInRunStart = nil
-        return start
     }
 
     private func observeTurn(_ isSpeech: Bool, at time: TimeInterval) {
@@ -294,35 +313,45 @@ final class VoiceCallController {
         case .speechStarted:
             discardFinals = false
             lastSentTurn = nil
+            awaitingFinalSince = nil
         case .endOfTurn:
             if case .awaitingApproval = state {
                 approvalTurnEnded = true
                 decideApprovalIfReady()
-            } else {
+            } else if partial.isEmpty {
                 submitTurn()
+            } else {
+                // The recognizer is still finishing the last words; give it a moment.
+                awaitingFinalSince = time
             }
         case nil:
             break
         }
     }
 
-    /// Keeps the speech that interrupted, as the start of the next turn.
-    private func restartTurn(speechFrom start: TimeInterval, to time: TimeInterval) {
+    /// Starts a turn already in progress, keeping the words that interrupted.
+    private func restartTurn(seed: String) {
         lastSentTurn = nil
+        awaitingFinalSince = nil
+        let time = now()
         turnDetector.reset()
-        _ = turnDetector.observe(isSpeech: true, at: start)
+        _ = turnDetector.observe(isSpeech: true, at: time - VoiceCallTiming.minimumTurnSpeech)
         _ = turnDetector.observe(isSpeech: true, at: time)
         discardFinals = false
-        clearTranscript()
+        finals = []
+        partial = seed
+        publishTranscript()
     }
 
     // MARK: - Turns
 
     private func submitTurn() {
         guard state == .listening else { return }
+        awaitingFinalSince = nil
         let text = partialTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         state = .thinking
+        spokenWords = []
         lastSentTurn = text
         discardFinals = true
         clearTranscript()
@@ -337,20 +366,19 @@ final class VoiceCallController {
             guard !sent, let self, self.replyActive, self.state == .thinking else { return }
             self.replyActive = false
             self.setCue(false)
-            self.speaker.enqueue(VoiceCallPhrases.sendFailed)
+            self.say(VoiceCallPhrases.sendFailed)
             self.state = .speaking
             self.runFinished = true
         }
     }
 
-    private func bargeIn(speechFrom start: TimeInterval, to time: TimeInterval) {
-        speaker.stopNow()
+    private func bargeIn(seed: String) {
         if replyActive, lastIsStreaming, !runFinished {
             lastChatTask = Task { [chat] in _ = await chat.cancelActiveStream() }
         }
         replyActive = false
         state = .listening
-        restartTurn(speechFrom: start, to: time)
+        restartTurn(seed: seed)
     }
 
     private func returnToListening() {
@@ -358,7 +386,7 @@ final class VoiceCallController {
         turnDetector.reset()
         clearTranscript()
         discardFinals = true
-        bargeInRunStart = nil
+        awaitingFinalSince = nil
     }
 
     private func setCue(_ on: Bool) {
@@ -393,7 +421,7 @@ final class VoiceCallController {
             if state != .reconnecting, replyActive, pendingApproval == nil {
                 state = .reconnecting
                 reconnectSince = now()
-                speaker.enqueue(VoiceCallPhrases.reconnecting)
+                say(VoiceCallPhrases.reconnecting)
             }
             return
         }
@@ -419,7 +447,13 @@ final class VoiceCallController {
     }
 
     private func speak(_ sentences: [String]) {
-        for sentence in sentences { speaker.enqueue(sentence) }
+        for sentence in sentences { say(sentence) }
+    }
+
+    /// Everything the call speaks goes through here, so its words are known as echo.
+    private func say(_ sentence: String) {
+        spokenWords.formUnion(Self.words(in: sentence))
+        speaker.enqueue(sentence)
     }
 
     private func finishReply() {
@@ -439,7 +473,7 @@ final class VoiceCallController {
         }
         switch state {
         case .awaitingApproval where approvalListenStart == nil:
-            beginApprovalListening(speechFrom: nil, to: now())
+            beginApprovalListening(seed: nil)
         case .speaking where runFinished:
             finishReply()
         default:
@@ -457,14 +491,14 @@ final class VoiceCallController {
         setCue(false)
         let action = approval.pending.description ?? approval.pending.command ?? "run a command"
         state = .awaitingApproval(action)
-        speaker.enqueue(VoiceCallPhrases.approvalReadBack(action))
+        say(VoiceCallPhrases.approvalReadBack(action))
     }
 
-    private func beginApprovalListening(speechFrom start: TimeInterval?, to time: TimeInterval) {
-        approvalListenStart = time
+    private func beginApprovalListening(seed: String?) {
+        approvalListenStart = now()
         approvalTurnEnded = false
-        if let start {
-            restartTurn(speechFrom: start, to: time)
+        if let seed {
+            restartTurn(seed: seed)
         } else {
             turnDetector.reset()
             discardFinals = false
@@ -483,7 +517,7 @@ final class VoiceCallController {
         guard let approval = pendingApproval else { return }
         handledApprovalIDs.insert(approval.id)
         lastChatTask = Task { [chat] in _ = await chat.respondToApproval(choice) }
-        speaker.enqueue(choice == .once ? VoiceCallPhrases.approved : VoiceCallPhrases.denied)
+        say(choice == .once ? VoiceCallPhrases.approved : VoiceCallPhrases.denied)
         resumeAfterApproval()
     }
 
@@ -522,7 +556,7 @@ final class VoiceCallController {
         isMuted = muted
         if muted {
             listener.stop()
-            bargeInRunStart = nil
+            awaitingFinalSince = nil
             turnDetector.reset()
         } else {
             restartListener()

@@ -8,8 +8,10 @@ enum VoiceCallTiming {
     static let minimumTurnSpeech: TimeInterval = 0.3
     /// A turn is forced to end this long after it started, so a stuck mic can't hang the call.
     static let monologueCap: TimeInterval = 10
-    /// Continuous voice needed while Atlas speaks before it counts as an interruption.
-    static let bargeInSpeech: TimeInterval = 0.25
+    /// Words, not in what Atlas is saying, that must be heard before talking over Atlas interrupts it.
+    static let bargeInNovelWords = 2
+    /// After a turn ends, how long to wait for the recognizer's final text before sending the partial.
+    static let finalTranscriptWait: TimeInterval = 1.0
     /// Wait without a reply token before the thinking cue plays.
     static let thinkingCueDelay: TimeInterval = 1.5
     /// How long to listen for an approval answer before denying.

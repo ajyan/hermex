@@ -229,26 +229,89 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(controller.state, .speaking)
 
         voice(true, for: 0.4)
+        listener.onPartial?("hold on a")
         await controller.lastChatTask?.value
         XCTAssertEqual(speaker.stopCount, 1)
         XCTAssertEqual(chat.cancelCount, 1)
         XCTAssertEqual(controller.state, .listening)
+        XCTAssertEqual(controller.partialTranscript, "hold on a")
 
         // More text from the cancelled run is not spoken, and the new speech is kept.
         update(text: "First sentence. Second sentence. Third.")
         XCTAssertEqual(speaker.spoken, ["First sentence."])
-        listener.onFinal?("wait stop")
+        voice(true, for: 0.3)
+        listener.onFinal?("hold on a second")
         voice(false, for: 0.9)
         await controller.lastChatTask?.value
-        XCTAssertEqual(chat.sent, ["[voice] hello", "[voice] wait stop"])
+        XCTAssertEqual(chat.sent, ["[voice] hello", "[voice] hold on a second"])
         XCTAssertEqual(chat.cancelCount, 1)
+    }
+
+    func testEchoOfOwnReplyDoesNotInterrupt() async {
+        await startSpeaking()
+        voice(true, for: 1.0)
+        listener.onPartial?("First sentence")
+        listener.onFinal?("first sentence.")
+        XCTAssertEqual(controller.state, .speaking)
+        XCTAssertEqual(speaker.stopCount, 0)
+        XCTAssertEqual(chat.cancelCount, 0)
+    }
+
+    func testStopWordAloneInterrupts() async {
+        await startSpeaking()
+        voice(true, for: 0.3)
+        listener.onPartial?("stop")
+        await controller.lastChatTask?.value
+        XCTAssertEqual(speaker.stopCount, 1)
+        XCTAssertEqual(controller.state, .listening)
+    }
+
+    func testTurnWaitsForFinalTranscriptBeforeSending() async {
+        await controller.start()
+        voice(true, for: 0.6)
+        listener.onPartial?("Hi, can you rec")
+        voice(false, for: 0.9)
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.sent, [])
+        listener.onFinal?("Hi, can you recall my journal?")
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.sent, ["[voice] Hi, can you recall my journal?"])
+    }
+
+    func testTurnSendsPartialWhenFinalNeverComes() async {
+        await controller.start()
+        voice(true, for: 0.6)
+        listener.onPartial?("what time is it")
+        voice(false, for: 0.9)
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.sent, [])
+        clock += 0.9
+        controller.tick()
+        XCTAssertEqual(chat.sent, [])
+        clock += 0.2
+        controller.tick()
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.sent, ["[voice] what time is it"])
+    }
+
+    func testSpeakingAgainWhileWaitingForFinalContinuesTheTurn() async {
+        await controller.start()
+        voice(true, for: 0.6)
+        listener.onPartial?("Hi, can you")
+        voice(false, for: 0.9)
+        voice(true, for: 0.5)
+        listener.onFinal?("Hi, can you recall my journal?")
+        voice(false, for: 0.9)
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.sent, ["[voice] Hi, can you recall my journal?"])
     }
 
     func testBargeInIgnoredWhileSpeakerEchoBelowThreshold() async {
         await startSpeaking()
-        voice(true, for: 0.2)
+        // Sound with no recognized words is never an interruption.
+        voice(true, for: 1.0)
         voice(false, for: 0.3)
-        voice(true, for: 0.2)
+        voice(true, for: 0.6)
         voice(false, for: 0.3)
         XCTAssertEqual(controller.state, .speaking)
         XCTAssertEqual(speaker.stopCount, 0)
