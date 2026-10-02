@@ -121,7 +121,17 @@ private struct ActivityRow: View {
                 .foregroundStyle(.hxTextSecondary)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                Text(event.summary).font(.subheadline).lineLimit(3)
+                Text(ActivityPresentation.toolTitle(event.toolName))
+                    .font(.subheadline.weight(.semibold))
+                Text(event.summary)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.hxTextSecondary)
+                    .lineLimit(2)
+                if let ruleID = event.ruleID, event.outcome == .blocked || event.outcome == .denied {
+                    Text("Rule: \(ruleID)")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ActivityPresentation.outcomeStyle(event.outcome))
+                }
                 HStack(spacing: 8) {
                     Text(ActivityPresentation.sourceLabel(event.source))
                     HStack(spacing: 4) {

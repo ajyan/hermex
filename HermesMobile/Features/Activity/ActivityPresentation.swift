@@ -54,10 +54,16 @@ enum ActivityPresentation {
         return "wrench.and.screwdriver"
     }
 
+    /// "browser_snapshot" -> "Browser snapshot": the sidecar reports raw tool ids.
+    static func toolTitle(_ toolName: String) -> String {
+        let words = toolName.replacingOccurrences(of: "_", with: " ")
+        return words.prefix(1).uppercased() + words.dropFirst()
+    }
+
     static func filterTitle(_ filter: AtlasActivityFilter) -> String {
         switch filter {
         case .all: String(localized: "All")
-        case .attention: String(localized: "Needs attention")
+        case .attention: String(localized: "Attention")
         case .cron: String(localized: "Scheduled")
         case .spending: String(localized: "Spending")
         }
