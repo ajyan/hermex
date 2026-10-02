@@ -259,7 +259,7 @@ import SwiftUI
                                     .font(.system(size: 9, weight: .bold))
                                     .foregroundStyle(.black)
                                     .frame(minWidth: 15, minHeight: 15)
-                                    .background(.green, in: Capsule())
+                                    .background(Color.hxSuccess, in: Capsule())
                                     .offset(x: 7, y: -7)
                             }
                     }

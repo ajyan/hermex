@@ -85,7 +85,7 @@ struct GitActionToastOverlay: View {
                 ) {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(.white, .green)
+                        .foregroundStyle(.white, Color.hxSuccess)
                         .symbolRenderingMode(.palette)
                 }
                 .id(success.id)

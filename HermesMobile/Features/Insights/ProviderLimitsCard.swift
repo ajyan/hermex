@@ -241,9 +241,9 @@ private struct ProviderLimitRowView: View {
         case .normal:
             .accentColor
         case .warning:
-            .orange
+            .hxWarning
         case .critical:
-            .red
+            .hxDanger
         }
     }
 
@@ -286,9 +286,9 @@ private struct ProviderLimitBar: View {
         case .normal:
             .accentColor
         case .warning:
-            .orange
+            .hxWarning
         case .critical:
-            .red
+            .hxDanger
         }
     }
 }
