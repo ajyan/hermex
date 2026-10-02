@@ -733,6 +733,21 @@ import XCTest
 }
 
 final class BotRoomTranscriptWindowTests: XCTestCase {
+    func testExpandedOverviewSurvivesOldestThreadReceivingAReply() {
+        var window = BotRoomTranscriptWindow()
+        let original = Self.events(1...100)
+        window.seed(original, live: true, overview: true)
+        XCTAssertTrue(window.showEarlier(in: original, overview: true))
+        XCTAssertEqual(window.start(in: original, overview: true), 0)
+
+        // Thread 1 moves to the front of the descending overview at sequence 101.
+        let reordered = Self.events(2...101)
+        XCTAssertEqual(window.start(in: reordered, overview: true), 0,
+                       "Incoming activity must not hide the 50 previously revealed threads")
+        window.seed(reordered, live: true, overview: true)
+        XCTAssertEqual(window.start(in: reordered, overview: true), 0)
+    }
+
     func testOverviewRowIdentitySurvivesThreadActivityWhileDetailTargetsStayDistinct() throws {
         func event(_ seq: Int) -> BotRoomEvent {
             var value = RoomFixture.event(seq).fields!

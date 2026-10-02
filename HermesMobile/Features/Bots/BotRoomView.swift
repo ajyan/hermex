@@ -31,7 +31,7 @@ import SwiftUI
 
     var body: some View {
         ScrollViewReader { proxy in
-            let start = window.start(in: transcriptEvents, keeping: pendingSequence)
+            let start = window.start(in: transcriptEvents, keeping: pendingSequence, overview: showsThreadOverview)
             let hasHiddenEvents = start > 0
             let showsWelcome = threadID == nil && reader.showsWelcome
             ScrollView {
@@ -111,7 +111,7 @@ import SwiftUI
             .contentShape(Rectangle())
             .simultaneousGesture(TapGesture().onEnded { dismissKeyboard() })
             .defaultScrollAnchor(showsThreadOverview ? .top : .bottom, for: .initialOffset)
-            .defaultScrollAnchor(ChatScrollPolicy.sizeChangeAnchor(shouldFollowLatestMessage: followsLatest), for: .sizeChanges)
+            .defaultScrollAnchor(showsThreadOverview ? nil : ChatScrollPolicy.sizeChangeAnchor(shouldFollowLatestMessage: followsLatest), for: .sizeChanges)
             .onChange(of: availableSearchSequence, initial: true) { _, sequence in
                 guard threadID == nil, let sequence else { return }
                 if let target = reader.events.first(where: { $0.seq == sequence })?.threadID {
@@ -119,12 +119,12 @@ import SwiftUI
                     return
                 }
                 handleFollowEvent(.userScrollBegin)
-                window.reveal(sequence, in: transcriptEvents)
+                window.reveal(sequence, in: transcriptEvents, overview: showsThreadOverview)
                 proxy.scrollTo(BotRoomTranscriptRow.ID.event(sequence), anchor: .center); pendingSequence = nil
             }
             .task(id: threadID == nil ? nil : availableSearchSequence) {
                 guard threadID != nil, let sequence = availableSearchSequence else { return }
-                window.reveal(sequence, in: transcriptEvents)
+                window.reveal(sequence, in: transcriptEvents, overview: showsThreadOverview)
                 // A pushed destination lays out after the overview's synchronous
                 // search callback. Wait for those materialized rows before jumping.
                 await Task.yield()
@@ -232,20 +232,20 @@ import SwiftUI
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
-    private func seedWindow() { window.seed(transcriptEvents, live: reader.link == .live) }
+    private func seedWindow() { window.seed(transcriptEvents, live: reader.link == .live, overview: showsThreadOverview) }
 
     /// Reveals a page of events already in memory, or fetches one from the room
-    /// when none are hidden, then keeps the event the reader was on at the top,
-    /// since the new rows push everything below them down.
+    /// when none are hidden. Chronological detail preserves its first row;
+    /// descending overview appends below the reader without changing the offset.
     private func loadEarlier(proxy: ScrollViewProxy) {
         handleFollowEvent(.userScrollBegin)
-        let firstEvent = showsThreadOverview ? transcriptEvents.last
-            : (transcriptEvents.isEmpty ? nil : transcriptEvents[window.start(in: transcriptEvents)])
+        let firstEvent = showsThreadOverview ? nil
+            : (transcriptEvents.isEmpty ? nil : transcriptEvents[window.start(in: transcriptEvents, overview: showsThreadOverview)])
         let firstShown = firstEvent.map { BotRoomTranscriptRow(event: $0, isOverview: threadID == nil).id }
         Task {
-            if !window.showEarlier(in: transcriptEvents) {
+            if !window.showEarlier(in: transcriptEvents, overview: showsThreadOverview) {
                 await reader.loadEarlier()
-                guard window.showEarlier(in: transcriptEvents) else { return }
+                guard window.showEarlier(in: transcriptEvents, overview: showsThreadOverview) else { return }
             }
             guard let firstShown else { return }
             await Task.yield()
@@ -339,15 +339,18 @@ private struct BotRoomThreadPreview: View {
 struct BotRoomTranscriptWindow: Equatable {
     static let pageSize = 50
     private var oldestShown: Int?
+    // Overview rows reorder when threads receive replies, so their expansion
+    // cannot be anchored to a latest-event sequence that can disappear.
+    private var overviewCount = Self.pageSize
 
     /// Index of the first shown event in `events`, which are sorted by sequence.
     /// An anchor outside the events (a reconnect restored a trimmed transcript,
     /// or the room restarted) falls back to the newest page. `keeping` widens the
     /// window to a search hit that is present, so its row is built by the time
     /// the jump runs (#553).
-    func start(in events: [BotRoomEvent], keeping sequence: Int? = nil) -> Int {
+    func start(in events: [BotRoomEvent], keeping sequence: Int? = nil, overview: Bool = false) -> Int {
         let newestPage = max(0, events.count - Self.pageSize)
-        let start = oldestShown.flatMap { oldest in
+        let start = overview ? max(0, events.count - overviewCount) : oldestShown.flatMap { oldest in
             Self.contains(oldest, in: events) ? events.firstIndex { $0.seq >= oldest } : nil
         } ?? newestPage
         guard let sequence, let hit = events.firstIndex(where: { $0.seq == sequence }) else { return start }
@@ -358,8 +361,9 @@ struct BotRoomTranscriptWindow: Equatable {
     /// after the room empties (closed) or its events no longer cover the anchor.
     /// Until then `start` follows the newest page, so the open-time catch-up
     /// after a stale cache restore is not built in full.
-    mutating func seed(_ events: [BotRoomEvent], live: Bool) {
-        guard !events.isEmpty else { oldestShown = nil; return }
+    mutating func seed(_ events: [BotRoomEvent], live: Bool, overview: Bool = false) {
+        guard !events.isEmpty else { oldestShown = nil; overviewCount = Self.pageSize; return }
+        guard !overview else { return }
         guard live else { return }
         if !(oldestShown.map { Self.contains($0, in: events) } ?? false) {
             oldestShown = events[max(0, events.count - Self.pageSize)].seq
@@ -372,16 +376,24 @@ struct BotRoomTranscriptWindow: Equatable {
     }
 
     /// Keeps a search hit shown after its jump lands.
-    mutating func reveal(_ sequence: Int, in events: [BotRoomEvent]) {
+    mutating func reveal(_ sequence: Int, in events: [BotRoomEvent], overview: Bool = false) {
         guard !events.isEmpty else { return }
-        oldestShown = min(events[start(in: events)].seq, sequence)
+        if overview {
+            overviewCount = events.count - start(in: events, keeping: sequence, overview: true)
+        } else {
+            oldestShown = min(events[start(in: events)].seq, sequence)
+        }
     }
 
     /// Shows up to one more page of hidden events; false when none are hidden.
-    mutating func showEarlier(in events: [BotRoomEvent]) -> Bool {
-        let start = start(in: events)
+    mutating func showEarlier(in events: [BotRoomEvent], overview: Bool = false) -> Bool {
+        let start = start(in: events, overview: overview)
         guard start > 0 else { return false }
-        oldestShown = events[max(0, start - Self.pageSize)].seq
+        if overview {
+            overviewCount = events.count - max(0, start - Self.pageSize)
+        } else {
+            oldestShown = events[max(0, start - Self.pageSize)].seq
+        }
         return true
     }
 }
