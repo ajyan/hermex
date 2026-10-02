@@ -79,6 +79,11 @@ final class HermexColorsTests: XCTestCase {
         }
     }
 
+    func testPaletteDarkAccentMatchesAccentAsset() throws {
+        let accent = try XCTUnwrap(UIColor(named: "AccentColor"))
+        XCTAssertEqual(rgba(HermexPalette.uiColor(HermexPalette.accentDark), .dark), rgba(accent, .dark))
+    }
+
     // MARK: - Helpers
 
     func rgba(_ color: UIColor, _ style: UIUserInterfaceStyle) -> UInt32 {

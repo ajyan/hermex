@@ -447,13 +447,19 @@ private struct AgentRunElapsedTimerText: View {
 }
 
 private enum AgentRunLiveActivityTheme {
-    static let background = Color(red: 0.025, green: 0.028, blue: 0.038)
+    static let background = darkToken(.canvas)
     static let primaryText = Color.white
     static let secondaryText = Color.white.opacity(0.68)
     static let stroke = Color.white.opacity(0.13)
     static let pillBackground = Color.white.opacity(0.08)
     static let railBackground = Color.white.opacity(0.14)
-    static let liveDot = Color(red: 0.35, green: 0.95, blue: 0.7)
+    static let liveDot = darkToken(.success)
+
+    /// The Lock Screen surface is always dark, so it reads the dark token values directly.
+    static func darkToken(_ token: HermexToken) -> Color {
+        Color(uiColor: HermexPalette.uiColor(HermexPalette.dark[token] ?? 0))
+    }
+    static let accent = Color(uiColor: HermexPalette.uiColor(HermexPalette.accentDark))
 }
 
 private enum AgentRunStatusStyle {
@@ -463,24 +469,14 @@ private enum AgentRunStatusStyle {
         }
 
         switch status {
-        case .starting, .thinking, .responding:
-            return Color(red: 1.0, green: 0.82, blue: 0.18)
-        case .usingTool:
-            return Color(red: 0.50, green: 0.72, blue: 1.0)
-        case .searchingFiles:
-            return Color(red: 0.22, green: 0.92, blue: 0.95)
-        case .readingFiles:
-            return Color(red: 0.58, green: 0.78, blue: 1.0)
-        case .runningCommand:
-            return Color(red: 0.76, green: 0.55, blue: 1.0)
-        case .waiting, .waitingForApproval:
-            return Color(red: 1.0, green: 0.58, blue: 0.24)
-        case .waitingForClarification:
-            return Color(red: 1.0, green: 0.65, blue: 0.30)
+        case .starting, .thinking, .responding, .usingTool, .searchingFiles, .readingFiles, .runningCommand:
+            return AgentRunLiveActivityTheme.accent
+        case .waiting, .waitingForApproval, .waitingForClarification:
+            return AgentRunLiveActivityTheme.darkToken(.warning)
         case .complete:
-            return Color(red: 0.35, green: 0.95, blue: 0.55)
+            return AgentRunLiveActivityTheme.darkToken(.success)
         case .failed:
-            return Color(red: 1.0, green: 0.32, blue: 0.32)
+            return AgentRunLiveActivityTheme.darkToken(.danger)
         case .cancelled:
             return Color.white.opacity(0.56)
         }

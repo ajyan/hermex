@@ -28,6 +28,9 @@ enum HermexPalette {
         .success: 0x55A583FF, .warning: 0xD29922FF, .danger: 0xF85149FF
     ]
 
+    /// Dark-appearance accent, for surfaces outside the app's asset catalog (the Live Activity).
+    static let accentDark: UInt32 = 0x4A84FEFF
+
     static func uiColor(_ rgba: UInt32) -> UIColor {
         UIColor(
             red: CGFloat((rgba >> 24) & 0xFF) / 255,
