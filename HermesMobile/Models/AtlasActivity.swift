@@ -39,6 +39,16 @@ struct AtlasActivityEvent: Decodable, Identifiable, Equatable, Sendable {
     let ruleID: String?
     let outcome: AtlasOutcome
     let durationMs: Int?
+
+    // The decoder's `.convertFromSnakeCase` yields `sessionId` / `ruleId`, so
+    // the acronym properties need their converted spelling as the key.
+    private enum CodingKeys: String, CodingKey {
+        case id, ts, source, summary, outcome
+        case sessionID = "sessionId"
+        case toolName
+        case ruleID = "ruleId"
+        case durationMs
+    }
 }
 
 /// One page of activity events, plus the cursor for the next (older) page.
