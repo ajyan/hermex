@@ -268,6 +268,7 @@ final class ChatAttachmentCoordinator {
 
     func removePendingAttachment(id: UUID) {
         pendingAttachments.removeAll { $0.id == id }
+        refreshAttachmentSlots()
     }
 
     func setUploadAttachmentError(_ message: String?) {

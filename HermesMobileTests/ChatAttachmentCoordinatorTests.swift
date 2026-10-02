@@ -520,6 +520,38 @@ final class ChatAttachmentCoordinatorTests: APIClientTestCase {
         XCTAssertEqual(saves, ["saved-1-tenth"])
     }
 
+    func testRemovalReleasesSlotForAnotherComposerOnSameDraft() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let files = ChatDraftAttachmentStore(directoryURL: directory)
+        let drafts = ChatDraftStore(persistence: ChatDraftFilePersistence(directoryURL: directory), attachmentStore: files)
+        var requests = 0
+        let client = makeClient { request in
+            requests += 1
+            return apiTestJSONResponse(#"{"path":"/uploads/file","mime":"text/plain"}"#, for: request)
+        }
+        let first = makeCoordinator(client: client, attachmentStore: files, draftStore: drafts)
+        let second = makeCoordinator(client: client, attachmentStore: files, draftStore: drafts)
+        let key = ChatDraftKey(serverID: "server", context: .newChat)
+        first.protectDraft(key)
+        second.protectDraft(key)
+        for index in 0..<10 {
+            _ = await first.uploadAttachment(data: Data([1]), filename: "file-\(index).txt")
+        }
+        XCTAssertEqual(first.pendingAttachments.count, 10)
+        let removed = try XCTUnwrap(first.pendingAttachments.first)
+        first.removePendingAttachment(id: removed.id)
+        await first.deleteDraftCopy(named: try XCTUnwrap(removed.draftFileName), attachmentID: removed.id)
+        let replacement = await second.uploadAttachment(data: Data([2]), filename: "replacement.txt")
+        XCTAssertEqual(replacement?.name, "replacement.txt")
+        XCTAssertEqual(first.pendingAttachments.count, 9)
+        XCTAssertEqual(second.pendingAttachments.map(\.name), ["replacement.txt"])
+        XCTAssertEqual(requests, 11)
+        let inventory = try await files.retainedFileBytes()
+        XCTAssertEqual(inventory.count, 10)
+        withExtendedLifetime(first) {}
+    }
+
     func testBudgetRefusalHasNoNetworkOrNewFileSideEffects() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
