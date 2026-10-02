@@ -120,13 +120,15 @@ actor APIClient {
         endpoint: Endpoint,
         method: String,
         encodedBody: Data?,
-        timeout: TimeInterval? = nil
+        timeout: TimeInterval? = nil,
+        extraHeaders: [String: String] = [:]
     ) async throws -> Data {
         try await sendDataReturningResponse(
             endpoint: endpoint,
             method: method,
             encodedBody: encodedBody,
-            timeout: timeout
+            timeout: timeout,
+            extraHeaders: extraHeaders
         ).0
     }
 
@@ -141,7 +143,8 @@ actor APIClient {
         method: String,
         encodedBody: Data?,
         timeout: TimeInterval? = nil,
-        accept: String = "application/json"
+        accept: String = "application/json",
+        extraHeaders: [String: String] = [:]
     ) async throws -> (Data, HTTPURLResponse) {
         var request = URLRequest(url: endpoint.url(relativeTo: baseURL))
         request.httpMethod = method
@@ -152,6 +155,9 @@ actor APIClient {
         // Custom headers first, then built-ins so Accept/Content-Type always win.
         customHeaderProvider().apply(to: &request)
         request.setValue(accept, forHTTPHeaderField: "Accept")
+        for (name, value) in extraHeaders {
+            request.setValue(value, forHTTPHeaderField: name)
+        }
 
         if let encodedBody {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")

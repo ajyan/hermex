@@ -104,6 +104,8 @@ final class APIClientAtlasActivityTests: APIClientTestCase {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "GET")
             XCTAssertEqual(request.url?.path, "/api/extensions/atlas-activity/sidecar/rules")
+            // hermes-webui rejects sidecar proxy calls without browser provenance.
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Origin"), "https://example.test")
 
             return apiTestJSONResponse("""
             {

@@ -22,7 +22,10 @@ struct ActivityView: View {
                     }
                 }
             }
-            .safeAreaInset(edge: .top) { filterChips }
+            .safeAreaInset(edge: .top, spacing: 0) { filterPicker }
+            .onChange(of: viewModel.filter) {
+                Task { await viewModel.reload() }
+            }
             .task {
                 await viewModel.reload()
                 await viewModel.loadRules()
@@ -95,32 +98,15 @@ struct ActivityView: View {
         .foregroundStyle(.hxWarning)
     }
 
-    private var filterChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(AtlasActivityFilter.allCases) { filter in
-                    Button {
-                        guard viewModel.filter != filter else { return }
-                        viewModel.filter = filter
-                        Task { await viewModel.reload() }
-                    } label: {
-                        Text(ActivityPresentation.filterTitle(filter))
-                            .font(.subheadline.weight(.medium))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(
-                                viewModel.filter == filter ? Color.accentColor : Color.hxSeparator.opacity(0.4),
-                                in: Capsule()
-                            )
-                            .foregroundStyle(viewModel.filter == filter ? Color.hxOnAccent : Color.hxTextPrimary)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(viewModel.filter == filter ? .isSelected : [])
-                }
+    private var filterPicker: some View {
+        Picker("Filter", selection: $viewModel.filter) {
+            ForEach(AtlasActivityFilter.allCases) { filter in
+                Text(ActivityPresentation.filterTitle(filter)).tag(filter)
             }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
         }
+        .pickerStyle(.segmented)
+        .padding(.horizontal)
+        .padding(.vertical, 8)
         .background(.bar)
     }
 }
