@@ -127,9 +127,14 @@ struct VoiceCallView: View {
         )
         self.controller = controller
         await controller.start()
-        if case .recognitionUnavailable(let language) = controller.startError {
+        switch controller.startError {
+        case .recognitionUnavailable(let language):
             let name = Locale.current.localizedString(forIdentifier: language) ?? language
             startMessage = String(localized: "On-device speech recognition for \(name) isn't installed.")
+        case .callDidNotConnect:
+            startMessage = String(localized: "The call couldn't connect. Try again.")
+        case .permissionDenied, nil:
+            break
         }
     }
 

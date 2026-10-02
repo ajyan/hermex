@@ -625,9 +625,7 @@ extension MessageBubbleView {
     /// A user message as shown: a call's leading `[voice] ` marker is hidden.
     /// Display-only; the stored and copied text keep it.
     static func displayText(forUserMessage content: String) -> String {
-        if content == "[voice]" { return "" }
-        guard content.hasPrefix(VoiceCallPhrases.voicePrefix) else { return content }
-        return String(content.dropFirst(VoiceCallPhrases.voicePrefix.count))
+        VoiceCallPhrases.withoutVoiceTag(content)
     }
 }
 

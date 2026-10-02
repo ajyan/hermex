@@ -5884,7 +5884,9 @@ final class ChatViewModel {
     }
 
     private static func displayTitle(from title: String?) -> String {
-        let trimmedTitle = title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        // A call's sessions are titled from the first spoken turn; hide its tag.
+        let trimmedTitle = title.map { VoiceCallPhrases.withoutVoiceTag($0.trimmingCharacters(in: .whitespacesAndNewlines)) }?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         guard let trimmedTitle, !trimmedTitle.isEmpty else {
             return String(localized: "Untitled Session")
         }

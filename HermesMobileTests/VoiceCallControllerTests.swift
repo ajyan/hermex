@@ -78,8 +78,15 @@ private final class FakeBridge: CallSystemBridging {
     var startCount = 0
     var endCount = 0
     var muteRequests: [Bool] = []
+    /// When set, `startCall` waits here, like a call whose audio never activates.
+    var pendingStart: CheckedContinuation<Void, Error>?
+    var holdsStart = false
 
-    func startCall() async throws { startCount += 1 }
+    func startCall() async throws {
+        startCount += 1
+        guard holdsStart else { return }
+        try await withCheckedThrowingContinuation { pendingStart = $0 }
+    }
     func endCall() { endCount += 1 }
     func setMuted(_ muted: Bool) { muteRequests.append(muted) }
 }
@@ -381,6 +388,29 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(controller.startError, .permissionDenied)
         XCTAssertEqual(controller.state, .ended(nil))
         XCTAssertEqual(bridge.endCount, 1)
+    }
+
+    func testCallThatNeverConnectsEndsAfterTimeout() async {
+        bridge.holdsStart = true
+        let starting = Task { await controller.start() }
+        while bridge.pendingStart == nil { await Task.yield() }
+        XCTAssertEqual(controller.state, .connecting)
+
+        clock += 9.9
+        controller.tick()
+        XCTAssertEqual(controller.state, .connecting)
+        clock += 0.2
+        controller.tick()
+        XCTAssertEqual(controller.startError, .callDidNotConnect)
+        XCTAssertEqual(controller.state, .ended(nil))
+        XCTAssertEqual(bridge.endCount, 1)
+        XCTAssertEqual(listener.startCount, 0)
+
+        // CallKit then reports the end; start() unwinds without restarting anything.
+        bridge.pendingStart?.resume(throwing: CallSystemBridge.BridgeError.ended)
+        await starting.value
+        XCTAssertEqual(listener.startCount, 0)
+        XCTAssertEqual(controller.startError, .callDidNotConnect)
     }
 
     func testMuteStopsListeningNotSpeaking() async {

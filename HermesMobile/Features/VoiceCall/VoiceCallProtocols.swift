@@ -49,4 +49,6 @@ protocol CallSystemBridging: AnyObject {
 enum VoiceCallStartError: Error, Equatable {
     case permissionDenied
     case recognitionUnavailable(language: String)
+    /// The system call never connected its audio.
+    case callDidNotConnect
 }

@@ -926,6 +926,9 @@ struct ChatView: View {
             .navigationDestination(item: $pushedSession) { session in
                 ChatView(session: session, server: server, onAPIError: onAPIError)
             }
+            .onChange(of: isVoiceCallPresented) { _, presented in
+                if presented { dismissKeyboard() }
+            }
             .fullScreenCover(isPresented: $isVoiceCallPresented) {
                 VoiceCallView(chat: viewModel) { isVoiceCallPresented = false }
             }

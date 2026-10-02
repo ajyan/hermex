@@ -14,6 +14,8 @@ enum VoiceCallTiming {
     static let thinkingCueDelay: TimeInterval = 1.5
     /// How long to listen for an approval answer before denying.
     static let approvalListenTimeout: TimeInterval = 8
+    /// How long the system call may take to connect its audio before the call gives up.
+    static let connectTimeout: TimeInterval = 10
     /// How long to wait for a dropped stream to come back before ending the call.
     static let reconnectGiveUp: TimeInterval = 30
 }

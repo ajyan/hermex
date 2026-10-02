@@ -22,6 +22,13 @@ enum VoiceCallPhrases {
     static let approved = "Approved."
     static let denied = "Denied."
 
+    /// `text` without a call's leading `[voice] ` tag, for display.
+    static func withoutVoiceTag(_ text: String) -> String {
+        if text == voicePrefix.trimmingCharacters(in: .whitespaces) { return "" }
+        guard text.hasPrefix(voicePrefix) else { return text }
+        return String(text.dropFirst(voicePrefix.count))
+    }
+
     static func approvalReadBack(_ action: String) -> String {
         "Atlas wants to \(action). Say approve, or deny."
     }
@@ -115,15 +122,16 @@ final class VoiceCallController {
     func start() async {
         guard state == .idle else { return }
         state = .connecting
+        connectingSince = now()
+        startTicker()
         do {
             try await bridge.startCall()
             guard state == .connecting else { return }
             try await listener.start()
             guard state == .connecting else { return }
             state = .listening
-            startTicker()
         } catch {
-            startError = error as? VoiceCallStartError
+            if startError == nil { startError = error as? VoiceCallStartError }
             tearDown(endSystemCall: true, message: nil)
         }
     }
@@ -165,6 +173,7 @@ final class VoiceCallController {
     }
 
     @ObservationIgnored private var pendingSystemEnd = false
+    @ObservationIgnored private var connectingSince: TimeInterval?
 
     private func startTicker() {
         guard let tickInterval else { return }
@@ -181,6 +190,11 @@ final class VoiceCallController {
     func tick() {
         let time = now()
         switch state {
+        case .connecting:
+            if let connectingSince, time - connectingSince >= VoiceCallTiming.connectTimeout {
+                startError = .callDidNotConnect
+                tearDown(endSystemCall: true, message: nil)
+            }
         case .thinking:
             if !replyStarted, let thinkingSince, time - thinkingSince >= VoiceCallTiming.thinkingCueDelay,
                !suppressThinkingCue() {
