@@ -16,7 +16,8 @@ final class HermexColorsTests: XCTestCase {
             .inlineCodeBackground: (0x1414140D, 0xFFFFFF12),
             .success: (0x1F8A65FF, 0x55A583FF),
             .warning: (0x9A6700FF, 0xD29922FF),
-            .danger: (0xCF222EFF, 0xF85149FF)
+            .danger: (0xCF222EFF, 0xF85149FF),
+            .onAccent: (0xFFFFFFFF, 0x161616FF)
         ]
         XCTAssertEqual(Set(expected.keys), Set(HermexToken.allCases))
         for token in HermexToken.allCases {
@@ -82,6 +83,13 @@ final class HermexColorsTests: XCTestCase {
     func testPaletteDarkAccentMatchesAccentAsset() throws {
         let accent = try XCTUnwrap(UIColor(named: "AccentColor"))
         XCTAssertEqual(rgba(HermexPalette.uiColor(HermexPalette.accentDark), .dark), rgba(accent, .dark))
+    }
+
+    func testOnAccentTextMeetsAAOnAccent() throws {
+        let accent = try XCTUnwrap(UIColor(named: "AccentColor"))
+        for style in [UIUserInterfaceStyle.light, .dark] {
+            XCTAssertGreaterThanOrEqual(contrast(UIColor(Color(hermexToken: .onAccent)), accent, style), 4.5, "\(style.rawValue)")
+        }
     }
 
     // MARK: - Helpers

@@ -93,7 +93,7 @@ struct TipJarCard: View {
         VStack(spacing: 4) {
             Link(destination: AppConfig.membershipURL) {
                 Text("Become a supporter")
-                    .foregroundStyle(.black)
+                    .foregroundStyle(.hxOnAccent)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity)
             }

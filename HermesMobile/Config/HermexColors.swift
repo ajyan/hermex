@@ -8,6 +8,8 @@ import UIKit
 enum HermexToken: CaseIterable {
     case canvas, surface, textPrimary, textSecondary, separator, userBubble
     case codeBackground, inlineCodeBackground, success, warning, danger
+    /// Text and symbols drawn on an accent fill.
+    case onAccent
 }
 
 /// Token values as `0xRRGGBBAA`.
@@ -17,7 +19,8 @@ enum HermexPalette {
         .textPrimary: 0x17171AFF, .textSecondary: 0x666678FF,
         .separator: 0xD0D7DEFF, .userBubble: 0xDAE7FDFF,
         .codeBackground: 0xF6F8FAFF, .inlineCodeBackground: 0x1414140D,
-        .success: 0x1F8A65FF, .warning: 0x9A6700FF, .danger: 0xCF222EFF
+        .success: 0x1F8A65FF, .warning: 0x9A6700FF, .danger: 0xCF222EFF,
+        .onAccent: 0xFFFFFFFF
     ]
 
     static let dark: [HermexToken: UInt32] = [
@@ -25,7 +28,8 @@ enum HermexPalette {
         .textPrimary: 0xE6EDF3FF, .textSecondary: 0x7D8590FF,
         .separator: 0x30363DFF, .userBubble: 0x17243AFF,
         .codeBackground: 0x010409FF, .inlineCodeBackground: 0xFFFFFF12,
-        .success: 0x55A583FF, .warning: 0xD29922FF, .danger: 0xF85149FF
+        .success: 0x55A583FF, .warning: 0xD29922FF, .danger: 0xF85149FF,
+        .onAccent: 0x161616FF
     ]
 
     /// Dark-appearance accent, for surfaces outside the app's asset catalog (the Live Activity).
@@ -61,4 +65,5 @@ extension ShapeStyle where Self == Color {
     static var hxSuccess: Color { Color(hermexToken: .success) }
     static var hxWarning: Color { Color(hermexToken: .warning) }
     static var hxDanger: Color { Color(hermexToken: .danger) }
+    static var hxOnAccent: Color { Color(hermexToken: .onAccent) }
 }
