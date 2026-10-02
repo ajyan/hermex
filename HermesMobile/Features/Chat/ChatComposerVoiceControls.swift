@@ -13,7 +13,7 @@ struct ComposerVoiceStatusView: View {
     var body: some View {
         Label(status.text, systemImage: status.systemImage)
             .font(.caption)
-            .foregroundStyle(status.isError ? Color.red : Color.secondary)
+            .foregroundStyle(status.isError ? Color.hxDanger : Color.secondary)
     }
 }
 
@@ -70,7 +70,7 @@ struct ComposerVoiceControlButton: View {
         Image(systemName: symbolName)
             .font(.system(size: 18, weight: .regular))
             .frame(width: 44, height: 44)
-            .foregroundStyle(isListening || isRecordingVoiceNote ? Color.red : color)
+            .foregroundStyle(isListening || isRecordingVoiceNote ? Color.hxDanger : color)
             .scaleEffect(reduceMotion ? 1 : (isRecordingVoiceNote ? 1.3 : 1))
             .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.7), value: isRecordingVoiceNote)
             .contentShape(Circle())
@@ -160,7 +160,7 @@ struct ComposerVoiceRecordingBar: View {
     var body: some View {
         HStack(spacing: 10) {
             Circle()
-                .fill(Color.red)
+                .fill(Color.hxDanger)
                 .frame(width: 10, height: 10)
                 .opacity(isCancelArmed ? 0.4 : 1)
 
@@ -177,7 +177,7 @@ struct ComposerVoiceRecordingBar: View {
                 systemImage: isCancelArmed ? "xmark.circle.fill" : "chevron.up"
             )
             .font(.caption)
-            .foregroundStyle(isCancelArmed ? Color.red : Color.secondary)
+            .foregroundStyle(isCancelArmed ? Color.hxDanger : Color.secondary)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)

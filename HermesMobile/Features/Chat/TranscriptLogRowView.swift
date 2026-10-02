@@ -149,7 +149,7 @@ struct TranscriptLogRowView<Icon: View, Accessory: View, Status: View, ExpandedB
                 if showsCopied {
                     Text("Copied")
                         .font(AppFont.caption2(weight: .semibold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(.hxSuccess)
                         .padding(.trailing, 4)
                 }
 
@@ -216,7 +216,7 @@ struct TranscriptLogRowView<Icon: View, Accessory: View, Status: View, ExpandedB
     private var summaryText: Text {
         Text(summary)
             .font(AppFont.caption(weight: .semibold))
-            .foregroundStyle(isFailure ? Color.red : Color.primary)
+            .foregroundStyle(isFailure ? Color.hxDanger : Color.primary)
     }
 
     private func detailText(_ detail: String) -> Text {

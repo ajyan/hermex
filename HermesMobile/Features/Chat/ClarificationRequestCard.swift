@@ -144,8 +144,8 @@ struct ClarificationRequestBar: View {
                 Image(systemName: "stop.fill")
                     .font(.system(size: 12, weight: .semibold))
                     .frame(width: stopButtonSize, height: stopButtonSize)
-                    .background(Color.red.opacity(colorScheme == .dark ? 0.22 : 0.12))
-                    .foregroundStyle(.red)
+                    .background(Color.hxDanger.opacity(colorScheme == .dark ? 0.22 : 0.12))
+                    .foregroundStyle(.hxDanger)
                     .clipShape(Circle())
             }
             .buttonStyle(.chatTactile(.icon))
@@ -312,7 +312,7 @@ struct ClarificationRequestCard: View {
         if let errorMessage = nonEmpty(errorMessage) {
             Text(errorMessage)
                 .font(.caption)
-                .foregroundStyle(.red)
+                .foregroundStyle(.hxDanger)
                 .fixedSize(horizontal: false, vertical: true)
                 .onGeometryChange(for: CGFloat.self) { proxy in
                     proxy.size.height

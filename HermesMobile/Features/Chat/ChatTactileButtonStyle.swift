@@ -357,7 +357,7 @@ struct ChatDecisionButtonStyle: ButtonStyle {
         case .secondary:
             return .primary
         case .destructive:
-            return .red
+            return .hxDanger
         }
     }
 
@@ -372,7 +372,7 @@ struct ChatDecisionButtonStyle: ButtonStyle {
         case .secondary:
             return colorScheme == .dark ? Color.white.opacity(isPressed ? 0.12 : 0.08) : Color.black.opacity(isPressed ? 0.07 : 0.045)
         case .destructive:
-            return Color.red.opacity(isPressed ? 0.16 : 0.10)
+            return Color.hxDanger.opacity(isPressed ? 0.16 : 0.10)
         }
     }
 
@@ -383,7 +383,7 @@ struct ChatDecisionButtonStyle: ButtonStyle {
         case .secondary:
             return Color(.separator).opacity(colorScheme == .dark ? 0.36 : 0.24)
         case .destructive:
-            return Color.red.opacity(colorScheme == .dark ? 0.36 : 0.26)
+            return Color.hxDanger.opacity(colorScheme == .dark ? 0.36 : 0.26)
         }
     }
 

@@ -552,11 +552,7 @@ private struct ChatCodeBlock: View {
         .forcedLeftToRight()
     }
 
-    private var codeBlockBackground: SwiftUI.Color {
-        colorScheme == .dark
-            ? SwiftUI.Color(red: 0.04, green: 0.05, blue: 0.07)
-            : SwiftUI.Color(.secondarySystemBackground)
-    }
+    private var codeBlockBackground: SwiftUI.Color { MarkdownPalette.codeBlock }
 
     /// Falls back to a synchronous cache peek so a block that was already highlighted
     /// (reopen, scrolling back, or a sealed stable chunk at the streaming-to-settled swap)
@@ -1382,11 +1378,7 @@ private extension MarkdownUI.Theme {
             .code {
                 FontFamilyVariant(.monospaced)
                 FontSize(.em(0.85))
-                BackgroundColor(
-                    colorScheme == .dark
-                        ? SwiftUI.Color(red: 0.08, green: 0.09, blue: 0.12)
-                        : SwiftUI.Color(.tertiarySystemGroupedBackground)
-                )
+                BackgroundColor(MarkdownPalette.inlineCode)
             }
             .codeBlock { configuration in
                 MathFenceOrCodeBlock(
@@ -1455,23 +1447,9 @@ private struct ChatMarkdownTable: View {
         }
     }
 
-    private var backgroundColor: SwiftUI.Color {
-        colorScheme == .dark
-            ? SwiftUI.Color(red: 0.094, green: 0.098, blue: 0.114)
-            : SwiftUI.Color.white
-    }
-
-    private var secondaryBackgroundColor: SwiftUI.Color {
-        colorScheme == .dark
-            ? SwiftUI.Color(red: 0.145, green: 0.149, blue: 0.165)
-            : SwiftUI.Color(red: 0.969, green: 0.969, blue: 0.976)
-    }
-
-    private var borderColor: SwiftUI.Color {
-        colorScheme == .dark
-            ? SwiftUI.Color(red: 0.259, green: 0.267, blue: 0.306)
-            : SwiftUI.Color(red: 0.894, green: 0.894, blue: 0.91)
-    }
+    private var backgroundColor: SwiftUI.Color { MarkdownPalette.tableBackground }
+    private var secondaryBackgroundColor: SwiftUI.Color { MarkdownPalette.tableSecondaryBackground }
+    private var borderColor: SwiftUI.Color { MarkdownPalette.border }
 }
 
 /// Single-child layout that caps a table cell's width while reporting the
@@ -1542,16 +1520,8 @@ private struct SelectableMarkdownHeading: View {
     let colorScheme: ColorScheme
 
     private var fontScale: Double { [2, 1.5, 1.25, 1, 0.875, 0.85][level - 1] }
-    private var tertiaryColor: SwiftUI.Color {
-        colorScheme == .dark
-            ? SwiftUI.Color(red: 109 / 255, green: 112 / 255, blue: 125 / 255)
-            : SwiftUI.Color(red: 107 / 255, green: 110 / 255, blue: 123 / 255)
-    }
-    private var dividerColor: SwiftUI.Color {
-        colorScheme == .dark
-            ? SwiftUI.Color(red: 51 / 255, green: 52 / 255, blue: 56 / 255)
-            : SwiftUI.Color(red: 208 / 255, green: 208 / 255, blue: 211 / 255)
-    }
+    private var tertiaryColor: SwiftUI.Color { MarkdownPalette.mutedText }
+    private var dividerColor: SwiftUI.Color { MarkdownPalette.border }
     var body: some View {
         if level <= 2 {
             VStack(alignment: .leading, spacing: 0) {
@@ -1573,4 +1543,14 @@ private struct SelectableMarkdownHeading: View {
                 if level == 6 { ForegroundColor(tertiaryColor) }
             }
     }
+}
+
+/// Markdown surface colors, from the Hermex color tokens.
+enum MarkdownPalette {
+    static let codeBlock: SwiftUI.Color = .hxCodeBackground
+    static let inlineCode: SwiftUI.Color = .hxInlineCodeBackground
+    static let tableBackground: SwiftUI.Color = .hxSurface
+    static let tableSecondaryBackground: SwiftUI.Color = .hxCanvas
+    static let border: SwiftUI.Color = .hxSeparator
+    static let mutedText: SwiftUI.Color = .hxTextSecondary
 }

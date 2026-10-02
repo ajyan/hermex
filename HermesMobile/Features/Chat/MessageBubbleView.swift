@@ -306,7 +306,7 @@ struct MessageBubbleView: View {
     private var localNoticeRow: some View {
         localStatusRow(
             iconName: "checkmark.circle.fill",
-            iconColor: .green
+            iconColor: .hxSuccess
         )
     }
 
@@ -589,9 +589,9 @@ struct MessageBubbleView: View {
         )
     }
 
-    private var userBubbleBackground: Color {
-        colorScheme == .dark ? Color(.systemGray3) : Color(.systemGray6)
-    }
+    static let userBubbleFill: Color = .hxUserBubble
+
+    private var userBubbleBackground: Color { Self.userBubbleFill }
 
     private var userBubbleForeground: Color {
         Color(.label)

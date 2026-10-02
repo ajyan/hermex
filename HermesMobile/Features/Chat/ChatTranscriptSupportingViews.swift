@@ -1162,10 +1162,10 @@ struct ChatOfflineCacheBanner: View {
 
             Spacer()
         }
-        .foregroundStyle(.orange)
+        .foregroundStyle(.hxWarning)
         .padding(.horizontal)
         .padding(.vertical, 10)
-        .background(Color.orange.opacity(0.12))
+        .background(Color.hxWarning.opacity(0.12))
         .accessibilityElement(children: .combine)
     }
 }
@@ -1179,7 +1179,7 @@ struct PinnedLocalNoticeStack: View {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color.green)
+                        .foregroundStyle(Color.hxSuccess)
 
                     Text(notice)
                         .font(.footnote)

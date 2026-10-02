@@ -57,11 +57,11 @@ private struct ComposerStatusView: View {
     }
 
     private var backgroundColor: Color {
-        isError ? Color.red.opacity(0.08) : Color(.secondarySystemBackground)
+        isError ? Color.hxDanger.opacity(0.08) : Color(.secondarySystemBackground)
     }
 
     private var borderColor: Color {
-        isError ? Color.red.opacity(0.25) : Color(.separator).opacity(0.25)
+        isError ? Color.hxDanger.opacity(0.25) : Color(.separator).opacity(0.25)
     }
 }
 

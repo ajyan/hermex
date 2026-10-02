@@ -57,6 +57,28 @@ final class HermexColorsTests: XCTestCase {
         }
     }
 
+    func testMarkdownPaletteUsesTokens() {
+        let cases: [(String, Color, HermexToken)] = [
+            ("codeBlock", MarkdownPalette.codeBlock, .codeBackground),
+            ("inlineCode", MarkdownPalette.inlineCode, .inlineCodeBackground),
+            ("tableBackground", MarkdownPalette.tableBackground, .surface),
+            ("tableSecondaryBackground", MarkdownPalette.tableSecondaryBackground, .canvas),
+            ("border", MarkdownPalette.border, .separator),
+            ("mutedText", MarkdownPalette.mutedText, .textSecondary)
+        ]
+        for (name, color, token) in cases {
+            for style in [UIUserInterfaceStyle.light, .dark] {
+                XCTAssertEqual(rgba(UIColor(color), style), rgba(UIColor(Color(hermexToken: token)), style), "\(name) \(style.rawValue)")
+            }
+        }
+    }
+
+    func testUserBubbleFillUsesToken() {
+        for style in [UIUserInterfaceStyle.light, .dark] {
+            XCTAssertEqual(rgba(UIColor(MessageBubbleView.userBubbleFill), style), rgba(UIColor(Color(hermexToken: .userBubble)), style))
+        }
+    }
+
     // MARK: - Helpers
 
     func rgba(_ color: UIColor, _ style: UIUserInterfaceStyle) -> UInt32 {

@@ -22,7 +22,7 @@ struct ToolCallLogRowView: View {
         ) {
             Image(systemName: row.icon)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(row.isFailure ? Color.red : Color.secondary)
+                .foregroundStyle(row.isFailure ? Color.hxDanger : Color.secondary)
         } accessory: {
             if let counts = row.diffCounts {
                 DiffCountsLabel(additions: counts.additions, deletions: counts.deletions)
@@ -47,7 +47,7 @@ struct ToolCallLogRowView: View {
         case .failure:
             Image(systemName: "xmark")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.red)
+                .foregroundStyle(.hxDanger)
         case .running:
             Image(systemName: "ellipsis")
                 .font(.system(size: 11, weight: .semibold))
@@ -98,7 +98,7 @@ struct ToolCallDetailBodyView: View {
     }
 
     private var statusColor: Color {
-        status == .failure ? .red : .secondary
+        status == .failure ? .hxDanger : .secondary
     }
 
     private var statusText: String {

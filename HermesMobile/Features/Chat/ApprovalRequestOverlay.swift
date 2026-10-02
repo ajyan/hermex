@@ -45,7 +45,7 @@ struct ApprovalRequestOverlay: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.yellow)
+                .foregroundStyle(.hxWarning)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Approval required")
@@ -94,7 +94,7 @@ struct ApprovalRequestOverlay: View {
             if let errorMessage = nonEmpty(errorMessage) {
                 Text(errorMessage)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(.hxDanger)
             }
         }
     }

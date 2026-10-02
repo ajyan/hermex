@@ -41,14 +41,14 @@ struct ChatComposerActionAppearance {
     }
 
     var background: Color {
-        if isStop { return Color.red.opacity(colorScheme == .dark ? 0.22 : 0.14) }
+        if isStop { return Color.hxDanger.opacity(colorScheme == .dark ? 0.22 : 0.14) }
         if usesTheme { return HeaderLogoColor.color(for: themeHex) }
         if isDisabled { return colorScheme == .dark ? Color.white.opacity(0.18) : Color.black.opacity(0.12) }
         return colorScheme == .dark ? .white : .black
     }
 
     var foreground: Color {
-        if isStop { return .red }
+        if isStop { return .hxDanger }
         if usesTheme { return HeaderLogoColor.prefersDarkForeground(for: themeHex) ? .black : .white }
         if isDisabled { return Color(.secondaryLabel) }
         return colorScheme == .dark ? .black : .white
