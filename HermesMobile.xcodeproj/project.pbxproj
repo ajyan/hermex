@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		18B144B4DEBF30306CB5306F /* VoiceApprovalMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85CD5EB62F24532DFA50A9BF /* VoiceApprovalMatcher.swift */; };
+		DA7A71AB914D0090DBA76517 /* TurnDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 050448814DCC3A3C78903E26 /* TurnDetector.swift */; };
+		57DACDD34211D8A97FD562AB /* VoiceCallTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80C9FC76FF354272B70675F1 /* VoiceCallTiming.swift */; };
+		22CC867515827938246D8571 /* VoiceApprovalMatcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBF591C77B150A58C93FAB25 /* VoiceApprovalMatcherTests.swift */; };
+		5F3C973DF0918884E44A56F3 /* TurnDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01041E501EAAF703B6A601B6 /* TurnDetectorTests.swift */; };
 		AA0100000000000000000001 /* AtlasActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0200000000000000000001 /* AtlasActivity.swift */; };
 		AA0100000000000000000002 /* APIClient+AtlasActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0200000000000000000002 /* APIClient+AtlasActivity.swift */; };
 		AA0100000000000000000003 /* ActivityViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0200000000000000000003 /* ActivityViewModel.swift */; };
@@ -645,6 +650,11 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		85CD5EB62F24532DFA50A9BF /* VoiceApprovalMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceApprovalMatcher.swift; sourceTree = "<group>"; };
+		050448814DCC3A3C78903E26 /* TurnDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurnDetector.swift; sourceTree = "<group>"; };
+		80C9FC76FF354272B70675F1 /* VoiceCallTiming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallTiming.swift; sourceTree = "<group>"; };
+		EBF591C77B150A58C93FAB25 /* VoiceApprovalMatcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceApprovalMatcherTests.swift; sourceTree = "<group>"; };
+		01041E501EAAF703B6A601B6 /* TurnDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurnDetectorTests.swift; sourceTree = "<group>"; };
 		B48200000000000000000001 /* BotProfileAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bots/BotProfileAppearance.swift; sourceTree = "<group>"; };
 		B48200000000000000000011 /* BotExpressionPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bots/BotExpressionPickerView.swift; sourceTree = "<group>"; };
 		B48200000000000000000031 /* BotCreator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bots/BotCreator.swift; sourceTree = "<group>"; };
@@ -1277,6 +1287,16 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		9BAF7D8BBF390913B4F060B0 /* VoiceCall */ = {
+			isa = PBXGroup;
+			children = (
+				85CD5EB62F24532DFA50A9BF /* VoiceApprovalMatcher.swift */,
+				050448814DCC3A3C78903E26 /* TurnDetector.swift */,
+				80C9FC76FF354272B70675F1 /* VoiceCallTiming.swift */,
+			);
+			path = VoiceCall;
+			sourceTree = "<group>";
+		};
 		1A2B3C4D5E6F700000000030 = {
 			isa = PBXGroup;
 			children = (
@@ -1339,6 +1359,8 @@
 		1A2B3C4D5E6F700000000034 /* HermesMobileTests */ = {
 			isa = PBXGroup;
 			children = (
+				EBF591C77B150A58C93FAB25 /* VoiceApprovalMatcherTests.swift */,
+				01041E501EAAF703B6A601B6 /* TurnDetectorTests.swift */,
 				B48200000000000000000007 /* BotProfileEditorTests.swift */,
 				B48200000000000000000035 /* BotLifecycleTests.swift */,
 				B48200000000000000000023 /* BotFaceMotionTests.swift */,
@@ -1641,6 +1663,7 @@
 		1A2B3C4D5E6F7000000000C3 /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				9BAF7D8BBF390913B4F060B0 /* VoiceCall */,
 				AA0200000000000000000006 /* Activity */,
 				B48200000000000000000001 /* BotProfileAppearance.swift */,
 				B48200000000000000000011 /* BotExpressionPickerView.swift */,
@@ -2362,6 +2385,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				18B144B4DEBF30306CB5306F /* VoiceApprovalMatcher.swift in Sources */,
+				DA7A71AB914D0090DBA76517 /* TurnDetector.swift in Sources */,
+				57DACDD34211D8A97FD562AB /* VoiceCallTiming.swift in Sources */,
 				A4790000000000000000E001 /* PushEnvironment.swift in Sources */,
 				A4790000000000000000E002 /* PushPairing.swift in Sources */,
 				559000000000000000000001 /* PushPreview.swift in Sources */,
@@ -2736,6 +2762,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				22CC867515827938246D8571 /* VoiceApprovalMatcherTests.swift in Sources */,
+				5F3C973DF0918884E44A56F3 /* TurnDetectorTests.swift in Sources */,
 				A4790000000000000000E006 /* PushRegistrationTests.swift in Sources */,
 				B48200000000000000000008 /* BotProfileEditorTests.swift in Sources */,
 				B48200000000000000000036 /* BotLifecycleTests.swift in Sources */,
