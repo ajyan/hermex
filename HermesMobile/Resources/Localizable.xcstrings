@@ -169,6 +169,112 @@
     "Join your private network" : { "localizations" : { "de" : { "stringUnit" : { "state" : "needs_review", "value" : "Tritt deinem privaten Netzwerk bei" } }, "es" : { "stringUnit" : { "state" : "needs_review", "value" : "Únete a tu red privada" } }, "fr" : { "stringUnit" : { "state" : "needs_review", "value" : "Rejoignez votre réseau privé" } }, "it" : { "stringUnit" : { "state" : "needs_review", "value" : "Entra nella tua rete privata" } }, "pl" : { "stringUnit" : { "state" : "needs_review", "value" : "Dołącz do swojej sieci prywatnej" } }, "pt-BR" : { "stringUnit" : { "state" : "needs_review", "value" : "Entre na sua rede privada" } }, "nl" : { "stringUnit" : { "state" : "needs_review", "value" : "Word lid van je privénetwerk" } }, "tr" : { "stringUnit" : { "state" : "needs_review", "value" : "Özel ağınıza katılın" } }, "ru" : { "stringUnit" : { "state" : "needs_review", "value" : "Подключитесь к частной сети" } }, "ja" : { "stringUnit" : { "state" : "needs_review", "value" : "プライベートネットワークに参加" } }, "zh-Hans" : { "stringUnit" : { "state" : "needs_review", "value" : "加入你的私有网络" } }, "ko" : { "stringUnit" : { "state" : "needs_review", "value" : "사설 네트워크에 참여하기" } }, "ar" : { "stringUnit" : { "state" : "needs_review", "value" : "انضم إلى شبكتك الخاصة" } }, "he" : { "stringUnit" : { "state" : "needs_review", "value" : "הצטרפות לרשת הפרטית שלך" } }, "ur" : { "stringUnit" : { "state" : "needs_review", "value" : "اپنے نجی نیٹ ورک میں شامل ہوں" } }, "zh-Hant" : { "stringUnit" : { "state" : "needs_review", "value" : "加入你的私人網路" } }, "zh-HK" : { "stringUnit" : { "state" : "needs_review", "value" : "加入你的私人網絡" } } } },
     "Keep it connected while using Hermex." : { "localizations" : { "de" : { "stringUnit" : { "state" : "needs_review", "value" : "Halte sie verbunden, während du Hermex verwendest." } }, "es" : { "stringUnit" : { "state" : "needs_review", "value" : "Mantenla conectada mientras usas Hermex." } }, "fr" : { "stringUnit" : { "state" : "needs_review", "value" : "Gardez-la connectée pendant que vous utilisez Hermex." } }, "it" : { "stringUnit" : { "state" : "needs_review", "value" : "Mantienila connessa mentre usi Hermex." } }, "pl" : { "stringUnit" : { "state" : "needs_review", "value" : "Utrzymuj ją połączoną podczas korzystania z Hermex." } }, "pt-BR" : { "stringUnit" : { "state" : "needs_review", "value" : "Mantenha-o conectado enquanto usa o Hermex." } }, "nl" : { "stringUnit" : { "state" : "needs_review", "value" : "Houd hem verbonden terwijl je Hermex gebruikt." } }, "tr" : { "stringUnit" : { "state" : "needs_review", "value" : "Hermex’i kullanırken bağlı tutun." } }, "ru" : { "stringUnit" : { "state" : "needs_review", "value" : "Не отключайте его, пока пользуетесь Hermex." } }, "ja" : { "stringUnit" : { "state" : "needs_review", "value" : "Hermex の使用中は接続したままにしてください。" } }, "zh-Hans" : { "stringUnit" : { "state" : "needs_review", "value" : "使用 Hermex 时保持其连接。" } }, "ko" : { "stringUnit" : { "state" : "needs_review", "value" : "Hermex를 사용하는 동안 연결을 유지하세요." } }, "ar" : { "stringUnit" : { "state" : "needs_review", "value" : "أبقِه متصلًا أثناء استخدام Hermex." } }, "he" : { "stringUnit" : { "state" : "needs_review", "value" : "השאר אותה מחוברת בזמן השימוש ב-Hermex." } }, "ur" : { "stringUnit" : { "state" : "needs_review", "value" : "Hermex استعمال کرتے وقت اسے منسلک رکھیں۔" } }, "zh-Hant" : { "stringUnit" : { "state" : "needs_review", "value" : "使用 Hermex 時保持其連線。" } }, "zh-HK" : { "stringUnit" : { "state" : "needs_review", "value" : "使用 Hermex 時保持其連線。" } } } },
     "Network" : { "localizations" : { "de" : { "stringUnit" : { "state" : "needs_review", "value" : "Netzwerk" } }, "es" : { "stringUnit" : { "state" : "needs_review", "value" : "Red" } }, "fr" : { "stringUnit" : { "state" : "needs_review", "value" : "Réseau" } }, "it" : { "stringUnit" : { "state" : "needs_review", "value" : "Rete" } }, "pl" : { "stringUnit" : { "state" : "needs_review", "value" : "Sieć" } }, "pt-BR" : { "stringUnit" : { "state" : "needs_review", "value" : "Rede" } }, "nl" : { "stringUnit" : { "state" : "needs_review", "value" : "Netwerk" } }, "tr" : { "stringUnit" : { "state" : "needs_review", "value" : "Ağ" } }, "ru" : { "stringUnit" : { "state" : "needs_review", "value" : "Сеть" } }, "ja" : { "stringUnit" : { "state" : "needs_review", "value" : "ネットワーク" } }, "zh-Hans" : { "stringUnit" : { "state" : "needs_review", "value" : "网络" } }, "ko" : { "stringUnit" : { "state" : "needs_review", "value" : "네트워크" } }, "ar" : { "stringUnit" : { "state" : "needs_review", "value" : "الشبكة" } }, "he" : { "stringUnit" : { "state" : "needs_review", "value" : "רשת" } }, "ur" : { "stringUnit" : { "state" : "needs_review", "value" : "نیٹ ورک" } }, "zh-Hant" : { "stringUnit" : { "state" : "needs_review", "value" : "網路" } }, "zh-HK" : { "stringUnit" : { "state" : "needs_review", "value" : "網絡" } } } },
+    "Nous blue" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "أزرق Nous"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nous-Blau"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Azul Nous"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Bleu Nous"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "כחול Nous"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Blu Nous"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nous ブルー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nous 블루"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nous-blauw"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Niebieski Nous"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Azul Nous"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Синий Nous"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nous mavisi"
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nous نیلا"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nous 藍"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nous 蓝"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nous 藍"
+          }
+        }
+      }
+    },
     "Private network" : { "localizations" : { "de" : { "stringUnit" : { "state" : "needs_review", "value" : "Privates Netzwerk" } }, "es" : { "stringUnit" : { "state" : "needs_review", "value" : "Red privada" } }, "fr" : { "stringUnit" : { "state" : "needs_review", "value" : "Réseau privé" } }, "it" : { "stringUnit" : { "state" : "needs_review", "value" : "Rete privata" } }, "pl" : { "stringUnit" : { "state" : "needs_review", "value" : "Sieć prywatna" } }, "pt-BR" : { "stringUnit" : { "state" : "needs_review", "value" : "Rede privada" } }, "nl" : { "stringUnit" : { "state" : "needs_review", "value" : "Privénetwerk" } }, "tr" : { "stringUnit" : { "state" : "needs_review", "value" : "Özel ağ" } }, "ru" : { "stringUnit" : { "state" : "needs_review", "value" : "Частная сеть" } }, "ja" : { "stringUnit" : { "state" : "needs_review", "value" : "プライベートネットワーク" } }, "zh-Hans" : { "stringUnit" : { "state" : "needs_review", "value" : "私有网络" } }, "ko" : { "stringUnit" : { "state" : "needs_review", "value" : "사설 네트워크" } }, "ar" : { "stringUnit" : { "state" : "needs_review", "value" : "شبكة خاصة" } }, "he" : { "stringUnit" : { "state" : "needs_review", "value" : "רשת פרטית" } }, "ur" : { "stringUnit" : { "state" : "needs_review", "value" : "نجی نیٹ ورک" } }, "zh-Hant" : { "stringUnit" : { "state" : "needs_review", "value" : "私人網路" } }, "zh-HK" : { "stringUnit" : { "state" : "needs_review", "value" : "私人網絡" } } } },
     "Private network ready" : { "localizations" : { "de" : { "stringUnit" : { "state" : "needs_review", "value" : "Bereit für private Netzwerke" } }, "es" : { "stringUnit" : { "state" : "needs_review", "value" : "Listo para redes privadas" } }, "fr" : { "stringUnit" : { "state" : "needs_review", "value" : "Prêt pour les réseaux privés" } }, "it" : { "stringUnit" : { "state" : "needs_review", "value" : "Pronto per reti private" } }, "pl" : { "stringUnit" : { "state" : "needs_review", "value" : "Gotowy na sieci prywatne" } }, "pt-BR" : { "stringUnit" : { "state" : "needs_review", "value" : "Pronto para redes privadas" } }, "nl" : { "stringUnit" : { "state" : "needs_review", "value" : "Klaar voor privénetwerken" } }, "tr" : { "stringUnit" : { "state" : "needs_review", "value" : "Özel ağa hazır" } }, "ru" : { "stringUnit" : { "state" : "needs_review", "value" : "Готов к частным сетям" } }, "ja" : { "stringUnit" : { "state" : "needs_review", "value" : "プライベートネットワーク対応" } }, "zh-Hans" : { "stringUnit" : { "state" : "needs_review", "value" : "支持私有网络" } }, "ko" : { "stringUnit" : { "state" : "needs_review", "value" : "사설 네트워크 지원" } }, "ar" : { "stringUnit" : { "state" : "needs_review", "value" : "جاهز للشبكات الخاصة" } }, "he" : { "stringUnit" : { "state" : "needs_review", "value" : "מוכן לרשת פרטית" } }, "ur" : { "stringUnit" : { "state" : "needs_review", "value" : "نجی نیٹ ورک کے لیے تیار" } }, "zh-Hant" : { "stringUnit" : { "state" : "needs_review", "value" : "支援私人網路" } }, "zh-HK" : { "stringUnit" : { "state" : "needs_review", "value" : "支援私人網絡" } } } },
     "Put your iPhone on the same private network as your server, such as Tailscale or NetBird. Your agent will reply with the exact URL to use on the next screen." : { "localizations" : { "de" : { "stringUnit" : { "state" : "needs_review", "value" : "Bring dein iPhone in dasselbe private Netzwerk wie deinen Server, etwa Tailscale oder NetBird. Dein Agent antwortet auf dem nächsten Bildschirm mit der genauen URL, die du verwenden sollst." } }, "es" : { "stringUnit" : { "state" : "needs_review", "value" : "Conecta tu iPhone a la misma red privada que tu servidor, como Tailscale o NetBird. Tu agente responderá con la URL exacta a usar en la siguiente pantalla." } }, "fr" : { "stringUnit" : { "state" : "needs_review", "value" : "Connectez votre iPhone au même réseau privé que votre serveur, comme Tailscale ou NetBird. Votre agent vous indiquera l’URL exacte à utiliser à l’écran suivant." } }, "it" : { "stringUnit" : { "state" : "needs_review", "value" : "Collega il tuo iPhone alla stessa rete privata del server, come Tailscale o NetBird. Il tuo agente risponderà con l’URL esatto da usare nella schermata successiva." } }, "pl" : { "stringUnit" : { "state" : "needs_review", "value" : "Podłącz iPhone’a do tej samej sieci prywatnej co serwer, np. Tailscale lub NetBird. Agent odpowie dokładnym adresem URL do użycia na następnym ekranie." } }, "pt-BR" : { "stringUnit" : { "state" : "needs_review", "value" : "Coloque seu iPhone na mesma rede privada do seu servidor, como Tailscale ou NetBird. Seu agente responderá com a URL exata a ser usada na próxima tela." } }, "nl" : { "stringUnit" : { "state" : "needs_review", "value" : "Zet je iPhone op hetzelfde privénetwerk als je server, zoals Tailscale of NetBird. Je agent antwoordt met de exacte URL die je op het volgende scherm gebruikt." } }, "tr" : { "stringUnit" : { "state" : "needs_review", "value" : "iPhone’unuzu sunucunuzla aynı özel ağa, örneğin Tailscale veya NetBird’e bağlayın. Aracınız, bir sonraki ekranda kullanılacak tam URL’yi yanıtlayacaktır." } }, "ru" : { "stringUnit" : { "state" : "needs_review", "value" : "Подключите iPhone к той же частной сети, что и сервер, например Tailscale или NetBird. Ваш агент ответит точным URL для использования на следующем экране." } }, "ja" : { "stringUnit" : { "state" : "needs_review", "value" : "iPhone をサーバと同じプライベートネットワーク（Tailscale や NetBird など）に接続してください。次の画面で、エージェントが使用する正確な URL を返信します。" } }, "zh-Hans" : { "stringUnit" : { "state" : "needs_review", "value" : "让你的 iPhone 加入与服务器相同的私有网络，例如 Tailscale 或 NetBird。下一屏中，代理将回复要使用的确切 URL。" } }, "ko" : { "stringUnit" : { "state" : "needs_review", "value" : "iPhone을 서버와 같은 사설 네트워크(예: Tailscale, NetBird)에 연결하세요. 에이전트가 다음 화면에서 사용할 정확한 URL로 응답해요." } }, "ar" : { "stringUnit" : { "state" : "needs_review", "value" : "ضع الـ iPhone على الشبكة الخاصة نفسها التي يستخدمها خادمك، مثل Tailscale أو NetBird. سيردّ وكيلك بعنوان URL الدقيق لاستخدامه في الشاشة التالية." } }, "he" : { "stringUnit" : { "state" : "needs_review", "value" : "חבר את ה-iPhone לאותה רשת פרטית שבה נמצא השרת שלך, כמו Tailscale או NetBird. הסוכן שלך ישיב עם כתובת ה-URL המדויקת לשימוש במסך הבא." } }, "ur" : { "stringUnit" : { "state" : "needs_review", "value" : "اپنے iPhone کو اپنے سرور والے نجی نیٹ ورک پر لائیں، جیسے Tailscale یا NetBird۔ اگلی اسکرین پر آپ کا ایجنٹ استعمال کرنے کے لیے درست URL کے ساتھ جواب دے گا۔" } }, "zh-Hant" : { "stringUnit" : { "state" : "needs_review", "value" : "讓你的 iPhone 加入與伺服器相同的私人網路，例如 Tailscale 或 NetBird。下一個畫面中，代理會回覆要使用的確切 URL。" } }, "zh-HK" : { "stringUnit" : { "state" : "needs_review", "value" : "讓你的 iPhone 加入與伺服器相同的私人網絡，例如 Tailscale 或 NetBird。在下一個畫面中，代理會回覆要使用的確切 URL。" } } } },
