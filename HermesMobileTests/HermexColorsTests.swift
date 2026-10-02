@@ -107,6 +107,19 @@ final class HermexColorsTests: XCTestCase {
         }
     }
 
+    func testInAppIconImagesUseNousBlueArtwork() throws {
+        for name in ["AppIconLightPreview", "AppIconDarkPreview", "HermesAppIcon"] {
+            let image = try XCTUnwrap(UIImage(named: name), name)
+            let average = UIGraphicsImageRenderer(size: CGSize(width: 1, height: 1)).image { _ in
+                image.draw(in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            }
+            var (r, g, b, a): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+            average.cgImage.map { UIColor(cgColor: CGColor(colorSpace: CGColorSpaceCreateDeviceRGB(), components: pixel($0))!) }?
+                .getRed(&r, green: &g, blue: &b, alpha: &a)
+            XCTAssertGreaterThan(b - r, 0.2, "\(name) should average to a blue, got r=\(r) b=\(b)")
+        }
+    }
+
     // MARK: - Helpers
 
     func rgba(_ color: UIColor, _ style: UIUserInterfaceStyle) -> UInt32 {
@@ -138,5 +151,13 @@ final class HermexColorsTests: XCTestCase {
 
     private func contrastResolved(_ a: UIColor, _ b: UIColor) -> Double {
         contrast(a, b, .light)
+    }
+
+    private func pixel(_ image: CGImage) -> [CGFloat] {
+        var bytes = [UInt8](repeating: 0, count: 4)
+        let ctx = CGContext(data: &bytes, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+        return bytes.map { CGFloat($0) / 255 }
     }
 }
