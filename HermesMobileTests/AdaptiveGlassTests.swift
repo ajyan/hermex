@@ -119,19 +119,15 @@ final class ChatNavigationBackgroundTests: XCTestCase {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let window = UIWindow(windowScene: scene)
         let host = UIHostingController(rootView: NavigationStack {
-            Group {
-                if reduceTransparency {
-                    // Exercise the accessibility branch without changing simulator settings.
-                    Color.clear.modifier(ChatNavigationBackground(reduceTransparency: true))
-                } else {
-                    ChatView(
-                        session: SessionSummary(title: "Synthetic chat", workspace: "/workspace"),
-                        server: URL(string: "https://chat-header.invalid")!,
-                        onAPIError: { _ in },
-                        loadsInitialMessages: false
-                    )
-                }
-            }
+            ChatView(
+                session: SessionSummary(title: "Synthetic chat", workspace: "/workspace"),
+                server: URL(string: "https://chat-header.invalid")!,
+                onAPIError: { _ in },
+                loadsInitialMessages: false
+            )
+            // SwiftUI's public accessibility value is read-only; the test-only
+            // backing setter exercises ChatView without changing simulator settings.
+            .environment(\._accessibilityReduceTransparency, reduceTransparency)
             .background(NavigationAppearanceCompletionObserver { appeared.fulfill() })
         })
         window.rootViewController = host
