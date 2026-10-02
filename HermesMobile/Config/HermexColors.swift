@@ -52,15 +52,23 @@ enum HermexPalette {
 }
 
 extension Color {
+    /// Each token's color is built once: SwiftUI compares colors when diffing views, and a
+    /// fresh dynamic `UIColor` never equals another, so rebuilding would redraw every pass.
     init(hermexToken token: HermexToken) {
-        let light = HermexPalette.uiColor(HermexPalette.light[token] ?? 0)
-        let dark = HermexPalette.uiColor(HermexPalette.dark[token] ?? 0)
-        let lightHighContrast = HermexPalette.increasedContrastLight[token].map(HermexPalette.uiColor) ?? light
-        self.init(uiColor: UIColor { traits in
+        self = HermexPalette.colors[token] ?? .clear
+    }
+}
+
+extension HermexPalette {
+    static let colors: [HermexToken: Color] = Dictionary(uniqueKeysWithValues: HermexToken.allCases.map { token in
+        let light = uiColor(light[token] ?? 0)
+        let dark = uiColor(dark[token] ?? 0)
+        let lightHighContrast = increasedContrastLight[token].map(uiColor) ?? light
+        return (token, Color(uiColor: UIColor { traits in
             if traits.userInterfaceStyle == .dark { return dark }
             return traits.accessibilityContrast == .high ? lightHighContrast : light
-        })
-    }
+        }))
+    })
 }
 
 extension ShapeStyle where Self == Color {

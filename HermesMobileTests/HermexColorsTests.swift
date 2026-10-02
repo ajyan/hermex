@@ -120,6 +120,12 @@ final class HermexColorsTests: XCTestCase {
         }
     }
 
+    func testTokenColorsAreEqualAcrossAccesses() {
+        // SwiftUI diffs views by value; a token that differs from itself re-renders every pass.
+        XCTAssertEqual(Color.hxDanger, Color.hxDanger)
+        XCTAssertEqual(Color(hermexToken: .canvas), Color(hermexToken: .canvas))
+    }
+
     // MARK: - Helpers
 
     func rgba(_ color: UIColor, _ style: UIUserInterfaceStyle) -> UInt32 {
