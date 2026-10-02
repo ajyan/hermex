@@ -35,10 +35,11 @@ final class TurnDetectorTests: XCTestCase {
         XCTAssertEqual(detector.observe(isSpeech: false, at: 3.3), .endOfTurn)
     }
 
-    func testMonologueCapForcesEndOfTurnAt10s() {
+    func testMonologueCapForcesEndOfTurnAt30s() {
         var detector = TurnDetector()
-        XCTAssertEqual(feed(&detector, speech: true, from: 0, to: 9.95), [.speechStarted])
-        XCTAssertEqual(detector.observe(isSpeech: true, at: 10.0), .endOfTurn)
+        // A long spoken request (well past 10 s) is not cut off.
+        XCTAssertEqual(feed(&detector, speech: true, from: 0, to: 29.95), [.speechStarted])
+        XCTAssertEqual(detector.observe(isSpeech: true, at: 30.0), .endOfTurn)
     }
 
     func testResetClearsState() {

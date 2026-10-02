@@ -7,7 +7,7 @@ enum VoiceCallTiming {
     /// Speech needed before silence can end a turn; shorter blips are ignored.
     static let minimumTurnSpeech: TimeInterval = 0.3
     /// A turn is forced to end this long after it started, so a stuck mic can't hang the call.
-    static let monologueCap: TimeInterval = 10
+    static let monologueCap: TimeInterval = 30
     /// Words, not in what Atlas is saying, that must be heard before talking over Atlas interrupts it.
     static let bargeInNovelWords = 2
     /// After a turn ends, how long to wait for the recognizer's final text before sending the partial.
