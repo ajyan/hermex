@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		8BB7958EFD5F6E2398B0F03B /* SpeechTextShaper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B03BB814DC3B14FC646AACF2 /* SpeechTextShaper.swift */; };
+		03665A82226976B4593845C3 /* SpeechTextShaperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9DABBFA641D013A60B59C38 /* SpeechTextShaperTests.swift */; };
 		18B144B4DEBF30306CB5306F /* VoiceApprovalMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85CD5EB62F24532DFA50A9BF /* VoiceApprovalMatcher.swift */; };
 		DA7A71AB914D0090DBA76517 /* TurnDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 050448814DCC3A3C78903E26 /* TurnDetector.swift */; };
 		57DACDD34211D8A97FD562AB /* VoiceCallTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80C9FC76FF354272B70675F1 /* VoiceCallTiming.swift */; };
@@ -650,6 +652,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		B03BB814DC3B14FC646AACF2 /* SpeechTextShaper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechTextShaper.swift; sourceTree = "<group>"; };
+		E9DABBFA641D013A60B59C38 /* SpeechTextShaperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechTextShaperTests.swift; sourceTree = "<group>"; };
 		85CD5EB62F24532DFA50A9BF /* VoiceApprovalMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceApprovalMatcher.swift; sourceTree = "<group>"; };
 		050448814DCC3A3C78903E26 /* TurnDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurnDetector.swift; sourceTree = "<group>"; };
 		80C9FC76FF354272B70675F1 /* VoiceCallTiming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallTiming.swift; sourceTree = "<group>"; };
@@ -1290,6 +1294,7 @@
 		9BAF7D8BBF390913B4F060B0 /* VoiceCall */ = {
 			isa = PBXGroup;
 			children = (
+				B03BB814DC3B14FC646AACF2 /* SpeechTextShaper.swift */,
 				85CD5EB62F24532DFA50A9BF /* VoiceApprovalMatcher.swift */,
 				050448814DCC3A3C78903E26 /* TurnDetector.swift */,
 				80C9FC76FF354272B70675F1 /* VoiceCallTiming.swift */,
@@ -1359,6 +1364,7 @@
 		1A2B3C4D5E6F700000000034 /* HermesMobileTests */ = {
 			isa = PBXGroup;
 			children = (
+				E9DABBFA641D013A60B59C38 /* SpeechTextShaperTests.swift */,
 				EBF591C77B150A58C93FAB25 /* VoiceApprovalMatcherTests.swift */,
 				01041E501EAAF703B6A601B6 /* TurnDetectorTests.swift */,
 				B48200000000000000000007 /* BotProfileEditorTests.swift */,
@@ -2385,6 +2391,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8BB7958EFD5F6E2398B0F03B /* SpeechTextShaper.swift in Sources */,
 				18B144B4DEBF30306CB5306F /* VoiceApprovalMatcher.swift in Sources */,
 				DA7A71AB914D0090DBA76517 /* TurnDetector.swift in Sources */,
 				57DACDD34211D8A97FD562AB /* VoiceCallTiming.swift in Sources */,
@@ -2762,6 +2769,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				03665A82226976B4593845C3 /* SpeechTextShaperTests.swift in Sources */,
 				22CC867515827938246D8571 /* VoiceApprovalMatcherTests.swift in Sources */,
 				5F3C973DF0918884E44A56F3 /* TurnDetectorTests.swift in Sources */,
 				A4790000000000000000E006 /* PushRegistrationTests.swift in Sources */,
