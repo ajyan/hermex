@@ -362,8 +362,8 @@ struct ChatCompletionScrollPolicy {
 
     mutating func readerDidInteract() { readerTookOwnership = true }
 
-    mutating func consumeCompletion(streamID: String, enabled: Bool) -> Bool {
-        guard self.streamID == streamID, !consumed else { return false }
+    mutating func consumeCompletion(streamID: String, enabled: Bool, sceneIsActive: Bool = true) -> Bool {
+        guard sceneIsActive, self.streamID == streamID, !consumed else { return false }
         consumed = true
         return enabled && !readerTookOwnership
     }

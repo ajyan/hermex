@@ -304,6 +304,7 @@ struct ChatView: View {
     @State private var isScrolledNearBottom = true
     @State private var completionScrollPolicy = ChatCompletionScrollPolicy()
     @State private var completedResponseRenderID: String?
+    @State private var hydratedCompletionStreamID: String?
     @State private var composerFocusRevision = 0
     @State private var followLatch = ChatScrollPolicy.FollowLatch()
     @State private var followScrollGeneration = 0
@@ -842,6 +843,7 @@ struct ChatView: View {
                 isOnScreen = false
                 composerFocusRevision += 1
                 completionScrollPolicy.readerDidInteract()
+                hydratedCompletionStreamID = nil
                 parkQueuedMessages()
                 flushDraftsBestEffort()
                 appearanceTask?.cancel()
@@ -2831,6 +2833,7 @@ struct ChatView: View {
                 beginResponseCompletionBackgroundTask()
             }
         case .active:
+            scrollToHydratedCompletionIfReady()
             viewModel.refreshListenPlaybackProgressAfterSceneActivation()
             endResponseCompletionBackgroundTask()
             Task {
@@ -2886,6 +2889,7 @@ struct ChatView: View {
         }
 
         completionScrollPolicy.begin(streamID: activeStreamID, isFollowing: shouldFollowLatestMessage)
+        hydratedCompletionStreamID = nil
         completedResponseRenderID = nil
         startActiveStreamStatusRefreshTask(streamID: activeStreamID)
     }
@@ -2938,18 +2942,9 @@ struct ChatView: View {
             }
 
             let isLatestRunEnd = { viewModel.runEndTrigger == runEndTrigger }
-            if isOnScreen, scenePhase == .active, isLatestRunEnd(),
-               outcome == .completed, viewModel.activeStreamID == nil,
-               viewModel.errorMessage == nil, let completion,
-               let finalRenderID = ChatCompletionScrollPolicy.finalResponseRenderID(
-                   in: displayedTranscriptMessages, terminalReplyRenderIDs: terminalReplyRenderIDs
-               ),
-               completionScrollPolicy.consumeCompletion(
-                   streamID: completion.streamID,
-                   enabled: SessionChatPreferences.CompletionPosition.storedValue(completionPositionRawValue) == .beginning
-               ) {
-                followLatch.isFollowing = false
-                completedResponseRenderID = finalRenderID
+            if isLatestRunEnd(), outcome == .completed {
+                hydratedCompletionStreamID = completion?.streamID
+                scrollToHydratedCompletionIfReady()
             }
             await ResponseCompletionNotificationService.scheduleRunEndedIfAllowed(
                 outcome,
@@ -2964,6 +2959,26 @@ struct ChatView: View {
                 endResponseCompletionBackgroundTask()
             }
         }
+    }
+
+    /// A background completion waits for activation without consuming the run's
+    /// permission. Hydration and activation can finish in either order.
+    private func scrollToHydratedCompletionIfReady() {
+        guard isOnScreen, viewModel.activeStreamID == nil,
+              viewModel.errorMessage == nil,
+              let streamID = hydratedCompletionStreamID,
+              viewModel.successfulResponseCompletion?.streamID == streamID,
+              let finalRenderID = ChatCompletionScrollPolicy.finalResponseRenderID(
+                  in: displayedTranscriptMessages, terminalReplyRenderIDs: terminalReplyRenderIDs
+              ),
+              completionScrollPolicy.consumeCompletion(
+                  streamID: streamID,
+                  enabled: SessionChatPreferences.CompletionPosition.storedValue(completionPositionRawValue) == .beginning,
+                  sceneIsActive: scenePhase == .active
+              ) else { return }
+        hydratedCompletionStreamID = nil
+        followLatch.isFollowing = false
+        completedResponseRenderID = finalRenderID
     }
 
     private func beginResponseCompletionBackgroundTask() {

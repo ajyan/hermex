@@ -11,6 +11,19 @@ final class ChatScrollPolicyTests: XCTestCase {
         XCTAssertFalse(run.consumeCompletion(streamID: "run", enabled: true))
     }
 
+    func testBackgroundCompletionWaitsForActiveSceneAndStillHonorsReaderOwnership() {
+        var run = ChatCompletionScrollPolicy()
+        run.begin(streamID: "background", isFollowing: true)
+        XCTAssertFalse(run.consumeCompletion(streamID: "background", enabled: true, sceneIsActive: false))
+        XCTAssertTrue(run.consumeCompletion(streamID: "background", enabled: true, sceneIsActive: true))
+        XCTAssertFalse(run.consumeCompletion(streamID: "background", enabled: true, sceneIsActive: true))
+
+        run.begin(streamID: "reading", isFollowing: true)
+        XCTAssertFalse(run.consumeCompletion(streamID: "reading", enabled: true, sceneIsActive: false))
+        run.readerDidInteract()
+        XCTAssertFalse(run.consumeCompletion(streamID: "reading", enabled: true, sceneIsActive: true))
+    }
+
     func testCompletionJumpConsumesOnlyOwnedRunOnce() {
         var run = ChatCompletionScrollPolicy()
         run.begin(streamID: "run", isFollowing: true)
