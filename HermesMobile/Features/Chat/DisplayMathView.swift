@@ -1,3 +1,4 @@
+import MarkdownUI
 import SwiftMath
 import SwiftUI
 import UIKit
@@ -64,7 +65,11 @@ enum MathLaTeX {
     /// each streaming chunk — without this cache the same expression is parsed
     /// many times over. `NSCache` is thread-safe and self-evicts under memory
     /// pressure.
-    nonisolated(unsafe) private static let renderableCache = NSCache<NSString, NSNumber>()
+    nonisolated(unsafe) private static let renderableCache: NSCache<NSString, NSNumber> = {
+        let cache = NSCache<NSString, NSNumber>()
+        cache.countLimit = 256
+        return cache
+    }()
 
     /// True when SwiftMath can parse `latex` into a math list without error.
     /// Used to choose the SwiftMath path vs. the Unicode fallback before the
@@ -157,5 +162,264 @@ private struct SwiftMathLabelView: UIViewRepresentable {
     private static func resolvedTextColor(for colorScheme: ColorScheme) -> MTColor {
         let style: UIUserInterfaceStyle = colorScheme == .dark ? .dark : .light
         return UIColor.label.resolvedColor(with: UITraitCollection(userInterfaceStyle: style))
+    }
+}
+
+// MarkdownUI draws inline images as Text attachments. SwiftMath supplies their
+// intrinsic size and baseline; paragraphs and lists retain their native flow.
+struct InlineMathImageProvider: InlineImageProvider {
+    let fontSize: CGFloat
+    let colorScheme: ColorScheme
+    let scale: CGFloat
+    var fallback: any InlineImageProvider = DefaultInlineImageProvider.default
+
+    func image(with url: URL, label: String) async throws -> Image {
+        guard let latex = InlineMathSource.latex(from: url) else {
+            return try await fallback.image(with: url, label: label)
+        }
+        try Task.checkCancellation()
+        let image = try await InlineMathImageCache.shared.image(
+            latex: latex, fontSize: fontSize, dark: colorScheme == .dark, scale: scale
+        )
+        try Task.checkCancellation()
+        return Image(uiImage: image)
+    }
+}
+
+enum InlineMathSource {
+    static let marker = "hermex-math:///"
+
+    static func latex(from url: URL) -> String? {
+        guard url.scheme == "hermex-math", url.host == nil || url.host == "" else { return nil }
+        let encoded = String(url.path.dropFirst())
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        guard let data = Data(base64Encoded: encoded), data.count <= 512 else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+}
+
+/// Serializes SwiftMath work off the main actor. One bounded cache serves every
+/// Markdown consumer; keys include all raster inputs, never a streaming reply.
+actor InlineMathImageCache {
+    static let shared = InlineMathImageCache()
+    // NSCache is thread-safe. Warm reads must not hop through the actor and
+    // publish another view update on each token; only cold rendering is isolated.
+    nonisolated(unsafe) private let storage = NSCache<NSString, UIImage>()
+    private(set) var renderCount = 0
+
+    init() {
+        storage.countLimit = 256
+        storage.totalCostLimit = 16 * 1024 * 1024
+    }
+
+    nonisolated func cachedImage(latex: String, fontSize: CGFloat, dark: Bool, scale: CGFloat) -> UIImage? {
+        storage.object(forKey: "\(fontSize)|\(dark)|\(scale)|\(latex)" as NSString)
+    }
+
+    func image(latex: String, fontSize: CGFloat, dark: Bool, scale: CGFloat) throws -> UIImage {
+        try Task.checkCancellation()
+        let key = "\(fontSize)|\(dark)|\(scale)|\(latex)" as NSString
+        if let cached = storage.object(forKey: key) { return cached }
+        let color = UIColor.label.resolvedColor(with: UITraitCollection(userInterfaceStyle: dark ? .dark : .light))
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        format.opaque = false
+        var math = MathImage(latex: latex, fontSize: fontSize, textColor: color, labelMode: .text, textAlignment: .left)
+        let (error, rendered, layout) = math.asImage()
+        let image: UIImage
+        if error == nil, let rendered, let layout {
+            let scaled: UIImage
+            if rendered.scale == scale {
+                scaled = rendered
+            } else {
+                scaled = UIGraphicsImageRenderer(size: rendered.size, format: format).image { _ in
+                    rendered.draw(at: .zero)
+                }
+            }
+            image = scaled.withBaselineOffset(fromBottom: layout.descent)
+        } else {
+            // Unknown commands remain readable source, never SwiftMath's error UI.
+            let source = "$" + latex + "$" as NSString
+            let font = UIFont.systemFont(ofSize: fontSize)
+            let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
+            let bounds = source.boundingRect(with: CGSize(width: 2048, height: 2048), options: .usesLineFragmentOrigin, attributes: attributes, context: nil)
+            let size = CGSize(width: max(1, ceil(bounds.width)), height: max(1, ceil(bounds.height)))
+            image = UIGraphicsImageRenderer(size: size, format: format).image { _ in
+                source.draw(in: CGRect(origin: .zero, size: size), withAttributes: attributes)
+            }.withBaselineOffset(fromBottom: -font.descender)
+        }
+        try Task.checkCancellation()
+        renderCount += 1
+        storage.setObject(image, forKey: key, cost: Int(image.size.width * image.size.height * scale * scale * 4))
+        return image
+    }
+}
+
+private struct ContainsInlineMathKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var containsInlineMath: Bool {
+        get { self[ContainsInlineMathKey.self] }
+        set { self[ContainsInlineMathKey.self] = newValue }
+    }
+}
+
+/// Adapts only math-bearing inline leaves. MarkdownUI still owns block layout,
+/// list identity and every math-free leaf. Foundation retains nested inline
+/// styles and links while SwiftUI Text attachments share the prose baseline.
+struct MathMarkdownLabel<Label: View>: View {
+    let content: MarkdownContent
+    let label: Label
+    var separator = "\n\n"
+    var tableColumn: Int?
+    var fontScale: Double = 1
+    var weight: Font.Weight = .regular
+    @Environment(\.containsInlineMath) private var containsMath
+
+    var body: some View {
+        if containsMath {
+            let markdown = content.renderMarkdown()
+            if markdown.contains(InlineMathSource.marker) {
+                MathInlineText(markdown: markdown.trimmingCharacters(in: .newlines),
+                               separator: separator, tableColumn: tableColumn,
+                               fontScale: fontScale, weight: weight)
+            } else {
+                plainLabel
+            }
+        } else {
+            plainLabel
+        }
+    }
+
+    private var plainLabel: some View {
+        label.responseSelectableText(content.renderPlainText().trimmingCharacters(in: .newlines),
+                                     separator: separator, tableColumn: tableColumn)
+    }
+}
+
+struct MathInlineText: View {
+    let markdown: String
+    var separator = "\n\n"
+    var tableColumn: Int?
+    var fontScale: Double = 1
+    var weight: Font.Weight = .regular
+    @ScaledMetric(relativeTo: .body) private var fontSize: CGFloat = 16
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.displayScale) private var displayScale
+    @State private var rendered: InlineMathTextResult?
+
+    private var request: InlineMathTextRequest {
+        InlineMathTextRequest(markdown: markdown, fontSize: fontSize * fontScale,
+                              dark: colorScheme == .dark, scale: displayScale)
+    }
+
+    var body: some View {
+        let currentRequest = request
+        let cached = try? currentRequest.cachedResult()
+        Group {
+            if let rendered = cached ?? rendered ?? (try? currentRequest.placeholder()) {
+                rendered.text
+                    .responseSelectableText(rendered.selectableText, separator: separator, tableColumn: tableColumn)
+                    .accessibilityLabel(rendered.accessibilityText)
+            }
+        }
+        .font(.system(size: fontSize * fontScale, weight: weight))
+        .foregroundStyle(.primary)
+        .task(id: cached == nil ? currentRequest : nil) {
+            guard cached == nil else { return }
+            let result = try? await currentRequest.render()
+            guard !Task.isCancelled else { return }
+            rendered = result
+        }
+    }
+}
+
+struct InlineMathTextResult {
+    let text: Text
+    let selectableText: String
+    let accessibilityText: String
+}
+
+struct InlineMathTextRequest: Equatable {
+    let markdown: String
+    let fontSize: CGFloat
+    let dark: Bool
+    let scale: CGFloat
+
+    /// The usual streaming path: source changes, but every completed expression
+    /// is already cached. Compose the new Text without async work or state writes.
+    func cachedResult() throws -> InlineMathTextResult? {
+        let attributed = try parsed()
+        var images: [URL: Image] = [:]
+        for run in attributed.runs {
+            guard let url = run.imageURL else { continue }
+            guard let latex = InlineMathSource.latex(from: url),
+                  let image = InlineMathImageCache.shared.cachedImage(latex: latex, fontSize: fontSize, dark: dark, scale: scale) else {
+                return nil
+            }
+            images[url] = Image(uiImage: image)
+        }
+        return compose(attributed, images: images)
+    }
+
+    /// A cold expression never hides the surrounding sentence while typesetting.
+    /// Once loaded, token appends retain the previous text until the next result.
+    func placeholder() throws -> InlineMathTextResult {
+        compose(try parsed(), images: [:])
+    }
+
+    @MainActor
+    func render(provider suppliedProvider: (any InlineImageProvider)? = nil) async throws -> InlineMathTextResult {
+        try Task.checkCancellation()
+        let attributed = try parsed()
+        let provider = suppliedProvider ?? InlineMathImageProvider(fontSize: fontSize, colorScheme: dark ? .dark : .light, scale: scale)
+        var images: [URL: Image] = [:]
+        for run in attributed.runs {
+            guard let url = run.imageURL, images[url] == nil else { continue }
+            try Task.checkCancellation()
+            do {
+                images[url] = try await provider.image(with: url, label: String(attributed[run.range].characters))
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                // A failed ordinary image must not remove the sentence or equations.
+                // Its alt text remains the fallback, as on the normal Markdown path.
+            }
+        }
+        try Task.checkCancellation()
+        return compose(attributed, images: images)
+    }
+
+    private func parsed() throws -> AttributedString {
+        try AttributedString(markdown: markdown, options: .init(interpretedSyntax: .full))
+    }
+
+    private func compose(_ attributed: AttributedString, images: [URL: Image]) -> InlineMathTextResult {
+        var text = Text("")
+        var selectable = ""
+        var accessible = ""
+        for run in attributed.runs {
+            if let url = run.imageURL {
+                let alt = InlineMathSource.latex(from: url) ?? String(attributed[run.range].characters)
+                let attachment = images[url].map { Text($0) } ?? Text(verbatim: alt)
+                text = text + attachment.customAttribute(ResponseSelectionImageAttribute())
+                accessible += alt
+            } else {
+                var span = AttributedString(attributed[run.range])
+                if run.inlinePresentationIntent?.contains(.code) == true {
+                    span.font = .system(size: fontSize * 0.88, design: .monospaced)
+                    span.backgroundColor = Color(.tertiarySystemGroupedBackground)
+                }
+                text = text + Text(span)
+                let plain = String(span.characters)
+                selectable += plain
+                accessible += plain
+            }
+        }
+        return InlineMathTextResult(text: text, selectableText: selectable, accessibilityText: accessible)
     }
 }
