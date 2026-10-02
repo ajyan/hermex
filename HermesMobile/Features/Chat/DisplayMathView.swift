@@ -172,6 +172,7 @@ struct InlineMathImageProvider: InlineImageProvider {
     let colorScheme: ColorScheme
     let scale: CGFloat
     var fallback: any InlineImageProvider = DefaultInlineImageProvider.default
+    var tintImages = false
 
     func image(with url: URL, label: String) async throws -> Image {
         guard let latex = InlineMathSource.latex(from: url) else {
@@ -182,7 +183,7 @@ struct InlineMathImageProvider: InlineImageProvider {
             latex: latex, fontSize: fontSize, dark: colorScheme == .dark, scale: scale
         )
         try Task.checkCancellation()
-        return Image(uiImage: image)
+        return tintImages ? Image(uiImage: image).renderingMode(.template) : Image(uiImage: image)
     }
 }
 
@@ -278,6 +279,7 @@ struct MathMarkdownLabel<Label: View>: View {
     var tableColumn: Int?
     var fontScale: Double = 1
     var weight: Font.Weight = .regular
+    var tintImages = false
     @Environment(\.containsInlineMath) private var containsMath
 
     var body: some View {
@@ -286,7 +288,7 @@ struct MathMarkdownLabel<Label: View>: View {
             if markdown.contains(InlineMathSource.marker) {
                 MathInlineText(markdown: markdown.trimmingCharacters(in: .newlines),
                                separator: separator, tableColumn: tableColumn,
-                               fontScale: fontScale, weight: weight)
+                               fontScale: fontScale, weight: weight, tintImages: tintImages)
             } else {
                 plainLabel
             }
@@ -307,33 +309,35 @@ struct MathInlineText: View {
     var tableColumn: Int?
     var fontScale: Double = 1
     var weight: Font.Weight = .regular
+    var tintImages = false
     @ScaledMetric(relativeTo: .body) private var fontSize: CGFloat = 16
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.displayScale) private var displayScale
-    @State private var rendered: InlineMathTextResult?
+    @State private var loaded: (style: InlineMathImageStyle, images: [URL: Image])?
 
     private var request: InlineMathTextRequest {
         InlineMathTextRequest(markdown: markdown, fontSize: fontSize * fontScale,
-                              dark: colorScheme == .dark, scale: displayScale)
+                              dark: colorScheme == .dark, scale: displayScale, tintImages: tintImages, fontWeight: weight)
     }
 
     var body: some View {
         let currentRequest = request
-        let cached = try? currentRequest.cachedResult()
+        let images = loaded?.style == currentRequest.imageStyle ? loaded?.images ?? [:] : [:]
+        let cached = try? currentRequest.cachedResult(images: images)
+        let loadIdentity = cached == nil ? try? currentRequest.imageLoadIdentity() : nil
         Group {
-            if let rendered = cached ?? rendered ?? (try? currentRequest.placeholder()) {
+            if let rendered = cached ?? (try? currentRequest.placeholder(images: images)) {
                 rendered.text
                     .responseSelectableText(rendered.selectableText, separator: separator, tableColumn: tableColumn)
                     .accessibilityLabel(rendered.accessibilityText)
             }
         }
         .font(.system(size: fontSize * fontScale, weight: weight))
-        .foregroundStyle(.primary)
-        .task(id: cached == nil ? currentRequest : nil) {
-            guard cached == nil else { return }
-            let result = try? await currentRequest.render()
-            guard !Task.isCancelled else { return }
-            rendered = result
+        .task(id: loadIdentity) {
+            guard loadIdentity != nil,
+                  let result = try? await currentRequest.render(images: images),
+                  !Task.isCancelled else { return }
+            loaded = (currentRequest.imageStyle, result.images)
         }
     }
 }
@@ -342,6 +346,23 @@ struct InlineMathTextResult {
     let text: Text
     let selectableText: String
     let accessibilityText: String
+    let images: [URL: Image]
+}
+
+struct InlineMathImageStyle: Equatable {
+    let fontSize: CGFloat
+    let dark: Bool
+    let scale: CGFloat
+    let tintImages: Bool
+}
+
+struct InlineMathImageLoadIdentity: Equatable {
+    struct Source: Equatable {
+        let url: URL
+        let label: String
+    }
+    let style: InlineMathImageStyle
+    let sources: [Source]
 }
 
 struct InlineMathTextRequest: Equatable {
@@ -349,35 +370,59 @@ struct InlineMathTextRequest: Equatable {
     let fontSize: CGFloat
     let dark: Bool
     let scale: CGFloat
+    var tintImages = false
+    var fontWeight: Font.Weight = .regular
+
+    var imageStyle: InlineMathImageStyle {
+        InlineMathImageStyle(fontSize: fontSize, dark: dark, scale: scale, tintImages: tintImages)
+    }
+
+    /// Token-only appends must not cancel an unchanged image download.
+    func imageLoadIdentity() throws -> InlineMathImageLoadIdentity {
+        let attributed = try parsed()
+        var seen: Set<URL> = []
+        let sources = attributed.runs.compactMap { run -> InlineMathImageLoadIdentity.Source? in
+            guard run.link == nil, let url = run.imageURL, seen.insert(url).inserted else { return nil }
+            return .init(url: url, label: String(attributed[run.range].characters))
+        }
+        return InlineMathImageLoadIdentity(style: imageStyle, sources: sources)
+    }
 
     /// The usual streaming path: source changes, but every completed expression
     /// is already cached. Compose the new Text without async work or state writes.
-    func cachedResult() throws -> InlineMathTextResult? {
+    func cachedResult(images suppliedImages: [URL: Image] = [:]) throws -> InlineMathTextResult? {
         let attributed = try parsed()
-        var images: [URL: Image] = [:]
+        var images = suppliedImages
         for run in attributed.runs {
-            guard run.link == nil, let url = run.imageURL else { continue }
+            guard run.link == nil, let url = run.imageURL, images[url] == nil else { continue }
             guard let latex = InlineMathSource.latex(from: url),
                   let image = InlineMathImageCache.shared.cachedImage(latex: latex, fontSize: fontSize, dark: dark, scale: scale) else {
                 return nil
             }
-            images[url] = Image(uiImage: image)
+            images[url] = tintImages ? Image(uiImage: image).renderingMode(.template) : Image(uiImage: image)
         }
         return compose(attributed, images: images)
     }
 
-    /// A cold expression never hides the surrounding sentence while typesetting.
-    /// Once loaded, token appends retain the previous text until the next result.
-    func placeholder() throws -> InlineMathTextResult {
-        compose(try parsed(), images: [:])
+    /// Always compose current prose, retaining any already available attachments.
+    func placeholder(images suppliedImages: [URL: Image] = [:]) throws -> InlineMathTextResult {
+        let attributed = try parsed()
+        var images = suppliedImages
+        for run in attributed.runs {
+            guard let url = run.imageURL, images[url] == nil,
+                  let latex = InlineMathSource.latex(from: url),
+                  let image = InlineMathImageCache.shared.cachedImage(latex: latex, fontSize: fontSize, dark: dark, scale: scale) else { continue }
+            images[url] = tintImages ? Image(uiImage: image).renderingMode(.template) : Image(uiImage: image)
+        }
+        return compose(attributed, images: images)
     }
 
     @MainActor
-    func render(provider suppliedProvider: (any InlineImageProvider)? = nil) async throws -> InlineMathTextResult {
+    func render(provider suppliedProvider: (any InlineImageProvider)? = nil, images suppliedImages: [URL: Image] = [:]) async throws -> InlineMathTextResult {
         try Task.checkCancellation()
         let attributed = try parsed()
-        let provider = suppliedProvider ?? InlineMathImageProvider(fontSize: fontSize, colorScheme: dark ? .dark : .light, scale: scale)
-        var images: [URL: Image] = [:]
+        let provider = suppliedProvider ?? InlineMathImageProvider(fontSize: fontSize, colorScheme: dark ? .dark : .light, scale: scale, tintImages: tintImages)
+        var images = suppliedImages
         for run in attributed.runs {
             guard run.link == nil, let url = run.imageURL, images[url] == nil else { continue }
             try Task.checkCancellation()
@@ -432,6 +477,7 @@ struct InlineMathTextRequest: Equatable {
         var text = Text("")
         var selectable = ""
         var accessible = ""
+        var retainedImages: [URL: Image] = [:]
         for run in attributed.runs {
             if let url = run.imageURL {
                 let alt = InlineMathSource.latex(from: url) ?? String(attributed[run.range].characters)
@@ -443,6 +489,7 @@ struct InlineMathTextRequest: Equatable {
                     linked.link = link
                     attachment = Text(linked)
                 } else {
+                    retainedImages[url] = images[url]
                     attachment = images[url].map { Text($0) } ?? Text(verbatim: alt)
                 }
                 text = text + attachment.customAttribute(ResponseSelectionImageAttribute())
@@ -450,8 +497,8 @@ struct InlineMathTextRequest: Equatable {
             } else {
                 var span = AttributedString(attributed[run.range])
                 if run.inlinePresentationIntent?.contains(.code) == true {
-                    span.font = .system(size: fontSize * 0.88, design: .monospaced)
-                    span.backgroundColor = Color(.tertiarySystemGroupedBackground)
+                    span.font = .system(size: fontSize * ChatMarkdownInlineStyle.codeFontScale, weight: fontWeight, design: .monospaced)
+                    span.backgroundColor = ChatMarkdownInlineStyle.codeBackground(dark: dark)
                 }
                 text = text + Text(span)
                 let plain = String(span.characters)
@@ -459,6 +506,6 @@ struct InlineMathTextRequest: Equatable {
                 accessible += plain
             }
         }
-        return InlineMathTextResult(text: text, selectableText: selectable, accessibilityText: accessible)
+        return InlineMathTextResult(text: text, selectableText: selectable, accessibilityText: accessible, images: retainedImages)
     }
 }

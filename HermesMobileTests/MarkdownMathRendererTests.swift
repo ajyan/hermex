@@ -1057,3 +1057,66 @@ extension MarkdownMathRendererTests {
                        ["https://example.com/math", "https://example.com/photo"])
     }
 }
+
+
+extension MarkdownMathRendererTests {
+    @MainActor
+    func testStreamingMathAndOrdinaryImagesReuseAssetsWithCurrentText() async throws {
+        let fallback = InlineImageProviderProbe()
+        let provider = InlineMathImageProvider(fontSize: 16, colorScheme: .light, scale: 3, fallback: fallback)
+        var source = "Before $M_S$ ![photo](https://example.com/image.png) after"
+        func request(_ source: String) -> InlineMathTextRequest {
+            .init(markdown: MarkdownMathFormatter.inlineMathImages(in: source), fontSize: 16, dark: false, scale: 3)
+        }
+        let first = request(source)
+        let identity = try first.imageLoadIdentity()
+        let loaded = try await first.render(provider: provider)
+        for _ in 0..<30 {
+            source += " next"
+            let current = request(source)
+            XCTAssertEqual(try current.imageLoadIdentity(), identity, "Token appends must not cancel an in-flight image load")
+            let result = try XCTUnwrap(current.cachedResult(images: loaded.images))
+            XCTAssertEqual(result.accessibilityText, source.replacingOccurrences(of: "$M_S$", with: "M_S")
+                .replacingOccurrences(of: "![photo](https://example.com/image.png)", with: "photo"))
+            XCTAssertEqual(result.selectableText, source.replacingOccurrences(of: "$M_S$", with: "")
+                .replacingOccurrences(of: "![photo](https://example.com/image.png)", with: ""))
+        }
+        let requests = await fallback.requests
+        XCTAssertEqual(requests.map(\.0), [URL(string: "https://example.com/image.png")!])
+        XCTAssertEqual(requests.map(\.1), ["photo"])
+        let removed = try request("Only $M_S$ remains").cachedResult(images: loaded.images)
+        XCTAssertEqual(removed?.images.count, 1, "Per-leaf image state must discard removed sources")
+    }
+
+    @MainActor
+    func testColdFormulaUsesCurrentPlaceholderWithoutDroppingLoadedImages() async throws {
+        let old = InlineMathTextRequest(
+            markdown: MarkdownMathFormatter.inlineMathImages(in: "Before $M_S$ ![photo](https://example.com/image.png)"),
+            fontSize: 16, dark: false, scale: 3
+        )
+        let loaded = try await old.render(provider: InlineImageProviderProbe())
+        let current = InlineMathTextRequest(
+            markdown: MarkdownMathFormatter.inlineMathImages(in: "Before $M_S$ ![photo](https://example.com/image.png) latest $Q_{989,2}$ tail"),
+            fontSize: 16, dark: false, scale: 3
+        )
+        XCTAssertNil(try current.cachedResult(images: loaded.images))
+        let placeholder = try current.placeholder(images: loaded.images)
+        XCTAssertEqual(placeholder.accessibilityText, "Before M_S photo latest Q_{989,2} tail")
+        XCTAssertEqual(placeholder.selectableText, "Before   latest  tail")
+        XCTAssertEqual(placeholder.images[URL(string: "https://example.com/image.png")!], Image(systemName: "square"))
+        XCTAssertNotEqual(try current.imageLoadIdentity(), try old.imageLoadIdentity())
+    }
+
+    func testInlineCodeUsesChatTheme() throws {
+        for dark in [false, true] {
+            for weight in [Font.Weight.regular, .semibold] {
+                let request = InlineMathTextRequest(markdown: "`snippet`", fontSize: 32, dark: dark, scale: 3, fontWeight: weight)
+                let result = try request.placeholder()
+                var expected = try AttributedString(markdown: "`snippet`")
+                expected.font = .system(size: 27.2, weight: weight, design: .monospaced)
+                expected.backgroundColor = dark ? Color(red: 0.08, green: 0.09, blue: 0.12) : Color(.tertiarySystemGroupedBackground)
+                XCTAssertEqual(result.text, Text("") + Text(expected))
+            }
+        }
+    }
+}
