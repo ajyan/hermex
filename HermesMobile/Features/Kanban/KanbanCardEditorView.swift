@@ -187,7 +187,7 @@ struct KanbanCardEditorView: View {
         case .validationFailed:
             Section {
                 Label(state.validationMessage ?? String(localized: "The server rejected the request."), systemImage: "exclamationmark.circle")
-                    .foregroundStyle(.red)
+                    .foregroundStyle(.hxDanger)
             }
         case .checkingResult:
             Section {
@@ -196,20 +196,20 @@ struct KanbanCardEditorView: View {
         case .failed:
             Section {
                 Label("Failed", systemImage: "exclamationmark.circle")
-                    .foregroundStyle(.red)
+                    .foregroundStyle(.hxDanger)
                 Button("Try Again") { beginSubmit() }
             }
         case .outcomeUncertain:
             Section {
                 Label("Outcome Uncertain", systemImage: "questionmark.circle")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.hxWarning)
                 Text("Refresh the Board before trying again.")
                 Button("Try Again") { beginSubmit() }
             }
         case .conflict:
             Section {
                 Label("Conflict", systemImage: "arrow.triangle.branch")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.hxWarning)
                 Text("This Card changed on the server after the editor opened. Your draft has been preserved.")
                 if let remote = state.remoteCard {
                     LabeledContent("Server Title") { Text(remote.title ?? String(localized: "Untitled Task")) }

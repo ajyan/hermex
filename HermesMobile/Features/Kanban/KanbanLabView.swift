@@ -483,7 +483,7 @@ struct KanbanStatusFocusView: View {
             if model.isPreviewStale {
                 Label("This Preview is stale. Run Preview Dispatch again before relying on it.", systemImage: "clock.badge.exclamationmark")
                     .font(.footnote)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.hxWarning)
             }
 
             if let result = dispatch.result {
@@ -585,10 +585,10 @@ struct KanbanStatusFocusView: View {
 
     private func dispatchStatusColor(_ dispatch: KanbanDispatchState) -> Color {
         switch dispatch.phase {
-        case .succeeded: model.isPreviewStale ? .orange : .green
+        case .succeeded: model.isPreviewStale ? .hxWarning : .hxSuccess
         case .submitting, .reconciling: .secondary
-        case .refused, .failed: .red
-        case .outcomeUncertain, .boardUnavailable: .orange
+        case .refused, .failed: .hxDanger
+        case .outcomeUncertain, .boardUnavailable: .hxWarning
         }
     }
 
@@ -695,7 +695,7 @@ struct KanbanStatusFocusView: View {
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
-        .background(summary.needsAttention.isEmpty ? Color.green.opacity(0.1) : Color.orange.opacity(0.12))
+        .background(summary.needsAttention.isEmpty ? Color.hxSuccess.opacity(0.1) : Color.hxWarning.opacity(0.12))
         .accessibilityElement(children: .contain)
         .accessibilityLabel(KanbanBulkAccessibility.resultLabel(summary))
         .accessibilityFocused($bulkSummaryIsFocused)
@@ -795,11 +795,11 @@ struct KanbanStatusFocusView: View {
     private var offlineBanner: some View {
         Label("Offline—showing previously loaded data", systemImage: "wifi.slash")
             .font(.footnote)
-            .foregroundStyle(.orange)
+            .foregroundStyle(.hxWarning)
             .padding(.horizontal)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.orange.opacity(0.12))
+            .background(.hxWarning.opacity(0.12))
             .accessibilityLabel(Text("Offline—showing previously loaded data"))
     }
 
@@ -828,11 +828,11 @@ struct KanbanStatusFocusView: View {
         } icon: {
             Image(systemName: "exclamationmark.triangle.fill")
         }
-        .foregroundStyle(.orange)
+        .foregroundStyle(.hxWarning)
         .padding(.horizontal)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.orange.opacity(0.12))
+        .background(.hxWarning.opacity(0.12))
     }
 
     private var unavailableWriteCapabilityNames: String {
@@ -852,7 +852,7 @@ struct KanbanStatusFocusView: View {
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
-        .background(.red.opacity(0.1))
+        .background(.hxDanger.opacity(0.1))
     }
 
     private var statusSelector: some View {
@@ -1232,18 +1232,18 @@ struct KanbanStatusFocusView: View {
                     .font(.footnote).foregroundStyle(.secondary)
             case .succeeded:
                 Label("Updated", systemImage: "checkmark.circle.fill")
-                    .font(.footnote).foregroundStyle(.green)
+                    .font(.footnote).foregroundStyle(.hxSuccess)
             case .failed:
                 HStack {
                     Label("Update failed", systemImage: "exclamationmark.circle")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(.hxDanger)
                     Button("Try Again") { retryMutation(for: card) }
                 }
                 .font(.footnote)
             case .outcomeUncertain:
                 HStack {
                     Label("Outcome Uncertain", systemImage: "questionmark.circle")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.hxWarning)
                     Button("Refresh") { Task { await model.checkUncertainMutation(for: card) } }
                 }
                 .font(.footnote)
@@ -1819,13 +1819,13 @@ private struct KanbanBoardEditorView: View {
                 if showsSlugError {
                     Text("Required")
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(.hxDanger)
                 }
                 TextField("Name", text: $name)
                 if showsNameError {
                     Text("Required")
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(.hxDanger)
                 }
                 TextField("Description", text: $description, axis: .vertical)
                     .lineLimit(2...5)
@@ -1842,7 +1842,7 @@ private struct KanbanBoardEditorView: View {
                mutation.phase == .failed || mutation.phase == .outcomeUncertain {
                 Section {
                     Text(mutation.phase == .failed ? "Failed" : "Outcome Uncertain")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(.hxDanger)
                     Text("Refresh the Board before trying again.")
                         .font(.footnote)
                 }
@@ -2182,8 +2182,8 @@ struct KanbanCardSummaryView: View {
     private var stalenessColor: Color {
         switch card.staleness {
         case .none: .secondary
-        case .warning: .orange
-        case .critical: .red
+        case .warning: .hxWarning
+        case .critical: .hxDanger
         }
     }
 
@@ -2332,14 +2332,14 @@ struct KanbanStatusPresentation {
 
     var color: Color {
         switch rawValue {
-        case "triage": .gray
-        case "todo": .blue
-        case "ready": .mint
-        case "running": .orange
-        case "blocked": .red
-        case "done": .green
+        case "triage": .secondary
+        case "todo": .hxTextSecondary
+        case "ready": .hxTextPrimary
+        case "running": Color.accentColor
+        case "blocked": .hxDanger
+        case "done": .hxSuccess
         case "archived": .secondary
-        default: .purple
+        default: .secondary
         }
     }
 }

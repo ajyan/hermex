@@ -113,7 +113,7 @@ private struct KanbanCardDetailContent: View {
         List {
             if featureModel.isOffline || featureModel.loadedDetailIsStale {
                 Label("Offline—showing previously loaded data", systemImage: "wifi.slash")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.hxWarning)
                     .accessibilityLabel(Text("Offline—showing previously loaded data"))
             }
 
@@ -246,21 +246,21 @@ private struct KanbanCardDetailContent: View {
             EmptyView()
         case .validationFailed:
             Label("Comment cannot be blank.", systemImage: "exclamationmark.circle")
-                .foregroundStyle(.red)
+                .foregroundStyle(.hxDanger)
         case .submitting:
             Label("Loading", systemImage: "paperplane")
         case .checkingResult:
             Label("Checking Result", systemImage: "arrow.triangle.2.circlepath")
         case .succeeded:
             Label("Added", systemImage: "checkmark.circle.fill")
-                .foregroundStyle(.green)
+                .foregroundStyle(.hxSuccess)
         case .failed:
             Label("Failed", systemImage: "exclamationmark.circle")
-                .foregroundStyle(.red)
+                .foregroundStyle(.hxDanger)
         case .outcomeUncertain:
             VStack(alignment: .leading) {
                 Label("Outcome Uncertain", systemImage: "questionmark.circle")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.hxWarning)
                 Text("Refresh to check the Card before trying again.")
                     .font(.footnote)
                 Button("Refresh") { Task { await state.refresh() } }
@@ -347,10 +347,10 @@ private struct KanbanCardDetailContent: View {
                     Label("Checking Result", systemImage: "arrow.triangle.2.circlepath")
                 case .succeeded:
                     Label("Updated", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(.hxSuccess)
                 case .failed:
                     Label("The server refused or did not apply this update.", systemImage: "exclamationmark.circle")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(.hxDanger)
                     if case .undoArchive = mutation.kind {
                         EmptyView()
                     } else {
@@ -358,7 +358,7 @@ private struct KanbanCardDetailContent: View {
                     }
                 case .outcomeUncertain:
                     Label("Outcome Uncertain", systemImage: "questionmark.circle")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.hxWarning)
                     Text("Refresh the Card to check the server result before trying again.")
                         .font(.footnote)
                     if case .undoArchive = mutation.kind {
@@ -591,7 +591,7 @@ private struct KanbanCardDetailContent: View {
                 if log.truncated == true {
                     Label("Only the last part of this log is shown.", systemImage: "scissors")
                         .font(.footnote)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.hxWarning)
                 }
                 Text(verbatim: log.content ?? "")
                     .font(.body.monospaced())
@@ -599,7 +599,7 @@ private struct KanbanCardDetailContent: View {
                 Button("Refresh") { Task { await state.loadWorkerLog() } }
             case .failed:
                 Label("Failed", systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.red)
+                    .foregroundStyle(.hxDanger)
                 Button("Try Again") { Task { await state.loadWorkerLog() } }
             }
         }
