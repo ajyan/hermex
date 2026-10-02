@@ -44,7 +44,7 @@ final class VoiceCallController {
     @ObservationIgnored private let chat: VoiceCallChatDriving
     @ObservationIgnored private let bridge: CallSystemBridging
     @ObservationIgnored private let now: () -> TimeInterval
-    @ObservationIgnored private let suppressThinkingCue: () -> Bool
+    @ObservationIgnored private let suppressThinkingCue: @MainActor () -> Bool
     @ObservationIgnored private let tickInterval: Duration?
 
     /// The latest chat call (send, cancel, respond) and listener restart; tests await them.
@@ -88,7 +88,7 @@ final class VoiceCallController {
         chat: VoiceCallChatDriving,
         bridge: CallSystemBridging,
         now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
-        suppressThinkingCue: @escaping () -> Bool = { UIAccessibility.isReduceMotionEnabled },
+        suppressThinkingCue: @escaping @MainActor () -> Bool = { UIAccessibility.isReduceMotionEnabled },
         tickInterval: Duration? = .milliseconds(250)
     ) {
         self.listener = listener
