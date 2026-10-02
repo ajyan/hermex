@@ -1,4 +1,25 @@
+import AVFoundation
 import SwiftUI
+
+/// Debug builds append call events to Documents/voice-call.log for on-device diagnosis.
+enum VoiceCallDiagnostics {
+    static func write(_ line: String) {
+        #if DEBUG
+        let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("voice-call.log")
+        let route = AVAudioSession.sharedInstance().currentRoute.outputs.map(\.portType.rawValue).joined(separator: ",")
+        let stamp = Date().formatted(.iso8601.time(includingFractionalSeconds: true))
+        let data = Data("\(stamp) [\(route)] \(line)\n".utf8)
+        if let handle = try? FileHandle(forWritingTo: url) {
+            handle.seekToEndOfFile()
+            handle.write(data)
+            try? handle.close()
+        } else {
+            try? data.write(to: url)
+        }
+        #endif
+    }
+}
 
 /// What a call needs from the chat's stream, read from `ChatViewModel`.
 struct VoiceCallChatSnapshot: Equatable {
@@ -123,7 +144,8 @@ struct VoiceCallView: View {
             listener: AppleSpeechListener(),
             speaker: AppleSpeechSpeaker(),
             chat: chat,
-            bridge: CallSystemBridge()
+            bridge: CallSystemBridge(),
+            log: VoiceCallDiagnostics.write
         )
         self.controller = controller
         await controller.start()

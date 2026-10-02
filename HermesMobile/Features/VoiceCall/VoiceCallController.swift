@@ -40,7 +40,9 @@ enum VoiceCallPhrases {
 @MainActor
 @Observable
 final class VoiceCallController {
-    private(set) var state: VoiceCallState = .idle
+    private(set) var state: VoiceCallState = .idle {
+        didSet { if state != oldValue { log("state \(oldValue) -> \(state)") } }
+    }
     private(set) var partialTranscript = ""
     /// What the user last said, kept on screen until they speak again.
     private(set) var lastSentTurn: String?
@@ -57,6 +59,8 @@ final class VoiceCallController {
     @ObservationIgnored private let now: () -> TimeInterval
     @ObservationIgnored private let suppressThinkingCue: @MainActor () -> Bool
     @ObservationIgnored private let tickInterval: Duration?
+    /// Diagnostics sink (Debug builds write it to a file on the device).
+    @ObservationIgnored private let log: (String) -> Void
 
     /// The latest chat call (send, cancel, respond) and listener restart; tests await them.
     @ObservationIgnored private(set) var lastChatTask: Task<Void, Never>?
@@ -103,8 +107,10 @@ final class VoiceCallController {
         bridge: CallSystemBridging,
         now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
         suppressThinkingCue: @escaping @MainActor () -> Bool = { UIAccessibility.isReduceMotionEnabled },
-        tickInterval: Duration? = .milliseconds(250)
+        tickInterval: Duration? = .milliseconds(250),
+        log: @escaping (String) -> Void = { _ in }
     ) {
+        self.log = log
         self.listener = listener
         self.speaker = speaker
         self.chat = chat
@@ -256,8 +262,10 @@ final class VoiceCallController {
         }
         let novel = Self.words(in: heard).filter { !spokenWords.contains($0) }
         guard novel.count >= VoiceCallTiming.bargeInNovelWords || novel.contains(where: Self.stopWords.contains) else {
+            log("echo ignored: \"\(heard)\"")
             return true
         }
+        log("talk-over: \"\(heard)\" novel=\(novel)")
         speaker.stopNow()
         if isReadBack {
             beginApprovalListening(seed: heard)
@@ -361,6 +369,7 @@ final class VoiceCallController {
         runSeenStreaming = false
         runFinished = false
         thinkingSince = now()
+        log("send: \"\(text)\"")
         lastChatTask = Task { [weak self, chat] in
             let sent = await chat.sendVoiceMessage(VoiceCallPhrases.voicePrefix + text)
             guard !sent, let self, self.replyActive, self.state == .thinking else { return }
@@ -440,6 +449,7 @@ final class VoiceCallController {
             }
         }
         if runSeenStreaming, !isStreaming, !runFinished {
+            log("run finished; text=\"\(streamingText ?? "nil")\"")
             runFinished = true
             speak(shaper.finish())
             if !speaker.isSpeaking { finishReply() }
@@ -452,6 +462,7 @@ final class VoiceCallController {
 
     /// Everything the call speaks goes through here, so its words are known as echo.
     private func say(_ sentence: String) {
+        log("say: \"\(sentence)\"")
         spokenWords.formUnion(Self.words(in: sentence))
         speaker.enqueue(sentence)
     }
@@ -463,6 +474,7 @@ final class VoiceCallController {
     }
 
     private func handleSpeakerFinished() {
+        log("speaker queue finished")
         if isEnded {
             if pendingSystemEnd {
                 pendingSystemEnd = false
