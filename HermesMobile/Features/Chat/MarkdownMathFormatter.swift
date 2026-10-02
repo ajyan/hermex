@@ -13,7 +13,8 @@ struct MarkdownMathFormatter {
             let encoded = Data(latex.utf8).base64EncodedString()
                 .replacingOccurrences(of: "+", with: "-")
                 .replacingOccurrences(of: "/", with: "_")
-            return "![](hermex-math:///" + encoded + ")"
+            // A nonempty alt keeps Foundation from dropping an image inside a link.
+            return "![\u{FFFC}](hermex-math:///" + encoded + ")"
         }
     }
 

@@ -98,7 +98,7 @@ final class MarkdownMathRendererTests: XCTestCase {
         guard case .plain(let rendered) = finalized else {
             return XCTFail("Expected inline math to keep the production renderer on its plain layout path.")
         }
-        XCTAssertTrue(rendered.contains("**![](hermex-math:///RT1bNCwtMl0=)**"))
+        XCTAssertTrue(rendered.contains("**![\u{FFFC}](hermex-math:///RT1bNCwtMl0=)**"))
         XCTAssertTrue(rendered.contains("`$O=[6,-2]$`"))
     }
 
@@ -876,7 +876,7 @@ extension MarkdownMathRendererTests {
         guard case .markdown(let list) = segments[0] else { return XCTFail("Expected the numbered list") }
         XCTAssertTrue(list.contains("1. **Bridge fix**"))
         XCTAssertTrue(list.contains("4. **Block A in exam form**"))
-        XCTAssertTrue(list.contains("*\"determine the set of vectors recovered after sampling with ![]("))
+        XCTAssertTrue(list.contains("*\"determine the set of vectors recovered after sampling with ![\u{FFFC}]("))
     }
 
     func testImageFormattingPreservesLiteralAndPartialTokens() {
@@ -889,7 +889,7 @@ extension MarkdownMathRendererTests {
         for prefix in prefixes {
             XCTAssertEqual(MarkdownMathLayoutCache.uncachedLayout(for: prefix), .plain(prefix))
         }
-        XCTAssertEqual(MarkdownMathFormatter.inlineMathImages(in: #"$\Phi\Phi^*$"#), "![](hermex-math:///XFBoaVxQaGleKg==)")
+        XCTAssertEqual(MarkdownMathFormatter.inlineMathImages(in: #"$\Phi\Phi^*$"#), "![\u{FFFC}](hermex-math:///XFBoaVxQaGleKg==)")
     }
 
     @MainActor
@@ -1011,5 +1011,49 @@ private actor InlineImageProviderProbe: InlineImageProvider {
         requests.append((url, label))
         if fails { throw URLError(.fileDoesNotExist) }
         return Image(systemName: "square")
+    }
+}
+
+
+extension MarkdownMathRendererTests {
+    @MainActor
+    func testLinkedEquationsAndImagesPreserveDestinationsWithReadableFallbacks() async throws {
+        let request = InlineMathTextRequest(
+            markdown: MarkdownMathFormatter.inlineMathImages(in: "[$M_S$](https://example.com/equation)"),
+            fontSize: 16, dark: false, scale: 3
+        )
+        let parsed = try request.parsed()
+        XCTAssertEqual(parsed.runs.compactMap(\.link).map(\.absoluteString), ["https://example.com/equation"])
+        XCTAssertEqual(parsed.runs.compactMap { $0.imageURL.flatMap(InlineMathSource.latex) }, ["M_S"])
+        let result = try await request.render()
+        var expected = AttributedString("M_S")
+        expected.link = URL(string: "https://example.com/equation")
+        XCTAssertEqual(result.text, Text("") + Text(expected).customAttribute(ResponseSelectionImageAttribute()))
+        XCTAssertEqual(result.selectableText, "")
+        XCTAssertEqual(result.accessibilityText, "M_S")
+
+        let imageRequest = InlineMathTextRequest(
+            markdown: "[![workspace screenshot](https://example.com/image.png)](https://example.com/photo)",
+            fontSize: 16, dark: false, scale: 3
+        )
+        let image = try await imageRequest.render(provider: InlineImageProviderProbe())
+        var imageLink = AttributedString("workspace screenshot")
+        imageLink.link = URL(string: "https://example.com/photo")
+        XCTAssertEqual(image.text, Text("") + Text(imageLink).customAttribute(ResponseSelectionImageAttribute()))
+        XCTAssertEqual(image.selectableText, "")
+        XCTAssertEqual(image.accessibilityText, "workspace screenshot")
+    }
+
+    func testLinkedImageRecoveryPreservesSurroundingCodeAndMultilineUnicode() throws {
+        let request = InlineMathTextRequest(
+            markdown: MarkdownMathFormatter.inlineMathImages(in: "é [**see $M_S$**](https://example.com/math) and `![](literal)` [![two\nlines](https://example.com/image.png)](https://example.com/photo)"),
+            fontSize: 16, dark: false, scale: 3
+        )
+        let parsed = try request.parsed()
+        XCTAssertEqual(parsed.runs.compactMap(\.imageURL).map(\.absoluteString),
+                       ["hermex-math:///TV9T", "https://example.com/image.png"])
+        XCTAssertTrue(String(parsed.characters).contains("![](literal)"))
+        XCTAssertEqual(parsed.runs.filter { $0.imageURL != nil }.compactMap(\.link).map(\.absoluteString),
+                       ["https://example.com/math", "https://example.com/photo"])
     }
 }

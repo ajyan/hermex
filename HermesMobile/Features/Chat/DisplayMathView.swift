@@ -356,7 +356,7 @@ struct InlineMathTextRequest: Equatable {
         let attributed = try parsed()
         var images: [URL: Image] = [:]
         for run in attributed.runs {
-            guard let url = run.imageURL else { continue }
+            guard run.link == nil, let url = run.imageURL else { continue }
             guard let latex = InlineMathSource.latex(from: url),
                   let image = InlineMathImageCache.shared.cachedImage(latex: latex, fontSize: fontSize, dark: dark, scale: scale) else {
                 return nil
@@ -379,7 +379,7 @@ struct InlineMathTextRequest: Equatable {
         let provider = suppliedProvider ?? InlineMathImageProvider(fontSize: fontSize, colorScheme: dark ? .dark : .light, scale: scale)
         var images: [URL: Image] = [:]
         for run in attributed.runs {
-            guard let url = run.imageURL, images[url] == nil else { continue }
+            guard run.link == nil, let url = run.imageURL, images[url] == nil else { continue }
             try Task.checkCancellation()
             do {
                 images[url] = try await provider.image(with: url, label: String(attributed[run.range].characters))
@@ -394,8 +394,38 @@ struct InlineMathTextRequest: Equatable {
         return compose(attributed, images: images)
     }
 
-    private func parsed() throws -> AttributedString {
-        try AttributedString(markdown: markdown, options: .init(interpretedSyntax: .full))
+    func parsed() throws -> AttributedString {
+        // Foundation drops image attributes inside links. Recover image attributes
+        // from the parser's source spans without parsing Markdown delimiters here.
+        var previous: UInt8 = 0
+        let mayContainLink = markdown.utf8.contains { byte in
+            defer { previous = byte }
+            return byte == 0x5B && previous != 0x21 // An opening bracket outside image syntax.
+        }
+        guard mayContainLink else {
+            return try AttributedString(markdown: markdown, options: .init(interpretedSyntax: .full))
+        }
+        let source = markdown
+        var attributed = try AttributedString(markdown: source, options: .init(
+            interpretedSyntax: .full, appliesSourcePositionAttributes: true
+        ))
+        let bytes = Array(source.utf8)
+        let lineStarts = [0] + bytes.indices.compactMap { bytes[$0] == 0x0A ? $0 + 1 : nil }
+        for run in Array(attributed.runs).reversed() {
+            guard run.link != nil, run.imageURL == nil, let position = run.markdownSourcePosition,
+                  lineStarts.indices.contains(position.startLine - 1),
+                  lineStarts.indices.contains(position.endLine - 1) else { continue }
+            let start = lineStarts[position.startLine - 1] + position.startColumn - 1
+            let end = lineStarts[position.endLine - 1] + position.endColumn
+            guard start >= 0, end <= bytes.count, start < end else { continue }
+            let imageSource = String(decoding: bytes[start..<end], as: UTF8.self)
+            guard imageSource.contains("!["),
+                  var label = try? AttributedString(markdown: imageSource),
+                  label.runs.contains(where: { $0.imageURL != nil }) else { continue }
+            label.link = run.link
+            attributed.replaceSubrange(run.range, with: label)
+        }
+        return attributed
     }
 
     private func compose(_ attributed: AttributedString, images: [URL: Image]) -> InlineMathTextResult {
@@ -405,7 +435,16 @@ struct InlineMathTextRequest: Equatable {
         for run in attributed.runs {
             if let url = run.imageURL {
                 let alt = InlineMathSource.latex(from: url) ?? String(attributed[run.range].characters)
-                let attachment = images[url].map { Text($0) } ?? Text(verbatim: alt)
+                let attachment: Text
+                if let link = run.link {
+                    // SwiftUI drops links on interpolated image attachments.
+                    // Keep the destination usable with readable source/alt text.
+                    var linked = AttributedString(alt)
+                    linked.link = link
+                    attachment = Text(linked)
+                } else {
+                    attachment = images[url].map { Text($0) } ?? Text(verbatim: alt)
+                }
                 text = text + attachment.customAttribute(ResponseSelectionImageAttribute())
                 accessible += alt
             } else {
