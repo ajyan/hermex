@@ -24,7 +24,16 @@ final class AppThemeTests: XCTestCase {
     func testHeaderLogoColorDisplayNameUsesPresetOrCustomFallback() {
         XCTAssertEqual(HeaderLogoColor.displayName(for: "#FFD700"), "Yellow")
         XCTAssertEqual(HeaderLogoColor.displayName(for: "#123456"), "Custom")
-        XCTAssertEqual(HeaderLogoColor.displayName(for: "not-a-color"), "Yellow")
+        XCTAssertEqual(HeaderLogoColor.displayName(for: "not-a-color"), "Nous blue")
+    }
+
+    func testHeaderLogoDefaultIsNousBlue() {
+        XCTAssertEqual(HeaderLogoColor.defaultHex, "#0053FD")
+    }
+
+    func testStoredYellowLogoChoiceIsRespected() {
+        XCTAssertEqual(HeaderLogoColor.normalizedHex("#FFD700"), "#FFD700")
+        XCTAssertTrue(HeaderLogoColor.presets.contains { $0.hex == "#FFD700" })
     }
 
     func testHeaderLogoColorFormatsRGBComponentsAsHex() {

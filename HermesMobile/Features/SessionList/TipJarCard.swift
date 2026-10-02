@@ -20,7 +20,7 @@ struct TipJarCard: View {
 
     private var faceSize: CGFloat { dynamicTypeSize.isAccessibilitySize ? 36 : 50 }
 
-    private let accent = Color(red: 1, green: 224 / 255, blue: 0)
+    private let accent = Color.accentColor
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {

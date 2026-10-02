@@ -69,9 +69,10 @@ struct HeaderLogoColorPreset: Identifiable, Equatable {
 
 enum HeaderLogoColor {
     static let storageKey = "headerLogoColorHex"
-    static let defaultHex = "#FFD700"
+    static let defaultHex = "#0053FD"
 
     static let presets: [HeaderLogoColorPreset] = [
+        HeaderLogoColorPreset(name: String(localized: "Nous blue"), hex: "#0053FD"),
         HeaderLogoColorPreset(name: String(localized: "Yellow"), hex: "#FFD700"),
         HeaderLogoColorPreset(name: String(localized: "Blue"), hex: "#5B7CFF"),
         HeaderLogoColorPreset(name: String(localized: "Purple"), hex: "#AF52DE"),
@@ -94,7 +95,7 @@ enum HeaderLogoColor {
     }
 
     static func color(for rawValue: String) -> Color {
-        Color(hexRGB: normalizedHex(rawValue) ?? defaultHex) ?? Color(red: 1.0, green: 0.843, blue: 0.0)
+        Color(hexRGB: normalizedHex(rawValue) ?? defaultHex) ?? Color.accentColor
     }
 
     static func prefersDarkForeground(for rawValue: String) -> Bool {

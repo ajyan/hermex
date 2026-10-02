@@ -21,8 +21,8 @@ struct OnboardingWelcomePage: View {
                 ZStack {
                     RadialGradient(
                         colors: [
-                            Color(red: 1.0, green: 0.74, blue: 0.10).opacity(0.55),
-                            Color(red: 1.0, green: 0.62, blue: 0.08).opacity(0.22),
+                            Color.accentColor.opacity(0.55),
+                            Color.accentColor.opacity(0.22),
                             .clear
                         ],
                         center: .center,
@@ -34,7 +34,7 @@ struct OnboardingWelcomePage: View {
 
                     RadialGradient(
                         colors: [
-                            Color(red: 1.0, green: 0.78, blue: 0.18).opacity(0.35),
+                            Color.accentColor.opacity(0.35),
                             .clear
                         ],
                         center: .center,
@@ -59,7 +59,7 @@ struct OnboardingWelcomePage: View {
                                     lineWidth: 1
                                 )
                         )
-                        .shadow(color: Color(red: 1.0, green: 0.62, blue: 0.08).opacity(0.35), radius: 24, y: 10)
+                        .shadow(color: Color.accentColor.opacity(0.35), radius: 24, y: 10)
                 }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Hermex")

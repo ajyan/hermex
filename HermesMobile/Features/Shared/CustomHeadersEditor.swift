@@ -21,7 +21,7 @@ struct CustomHeadersEditor: View {
             fieldBackground: Color(.secondarySystemBackground),
             fieldStroke: Color(.separator),
             accent: .accentColor,
-            removeTint: .red
+            removeTint: .hxDanger
         )
 
         static let onboarding = Style(
@@ -29,8 +29,8 @@ struct CustomHeadersEditor: View {
             secondaryText: .white.opacity(0.5),
             fieldBackground: .white.opacity(0.08),
             fieldStroke: .white.opacity(0.14),
-            accent: Color(red: 1.0, green: 0.74, blue: 0.10),
-            removeTint: Color(red: 1.0, green: 0.5, blue: 0.4)
+            accent: .accentColor,
+            removeTint: .hxDanger
         )
     }
 

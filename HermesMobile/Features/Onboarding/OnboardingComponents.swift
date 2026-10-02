@@ -30,7 +30,7 @@ struct SetupStepRow: View {
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.black)
                 .frame(width: 23, height: 23)
-                .background(Color(red: 1.0, green: 0.74, blue: 0.10), in: Circle())
+                .background(Color.accentColor, in: Circle())
                 .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 7) {
@@ -81,7 +81,7 @@ struct OnboardingCommandPill: View {
                 } label: {
                     Image(systemName: didCopy ? "checkmark" : "doc.on.doc")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(didCopy ? Color(red: 0.45, green: 0.92, blue: 0.56) : .white.opacity(0.76))
+                        .foregroundStyle(didCopy ? Color.hxSuccess : .white.opacity(0.76))
                         .frame(width: 28, height: 28)
                         .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
                 }
@@ -112,7 +112,7 @@ struct OnboardingField<Content: View>: View {
         HStack(spacing: 12) {
             Image(systemName: systemImage)
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Color(red: 1.0, green: 0.74, blue: 0.10))
+                .foregroundStyle(Color.accentColor)
                 .frame(width: 24)
 
             VStack(alignment: .leading, spacing: 4) {
@@ -179,7 +179,7 @@ struct OnboardingPrimaryButtonStyle: ButtonStyle {
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 10)
             .padding(.vertical, 15)
-            .background(Color(red: 1.0, green: 0.74, blue: 0.10), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .opacity(configuration.isPressed ? 0.78 : 1)
     }
 }
@@ -190,7 +190,7 @@ struct OnboardingStepHeader: View {
     let title: String
     let description: String
 
-    private let accent = Color(red: 1.0, green: 0.74, blue: 0.10)
+    private let accent = Color.accentColor
 
     var body: some View {
         VStack(spacing: 20) {

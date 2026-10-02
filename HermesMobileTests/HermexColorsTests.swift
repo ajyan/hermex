@@ -42,6 +42,21 @@ final class HermexColorsTests: XCTestCase {
         }
     }
 
+    func testAttentionColorsetsMapToTokens() throws {
+        let accent = try XCTUnwrap(UIColor(named: "AccentColor"))
+        let mapping: [(String, UIColor)] = [
+            ("AttentionApproval", UIColor(Color(hermexToken: .warning))),
+            ("AttentionInput", accent),
+            ("AttentionWorking", UIColor(Color(hermexToken: .textSecondary)))
+        ]
+        for (name, token) in mapping {
+            let asset = try XCTUnwrap(UIColor(named: name), name)
+            for style in [UIUserInterfaceStyle.light, .dark] {
+                XCTAssertEqual(rgba(asset, style), rgba(token, style), "\(name) \(style.rawValue)")
+            }
+        }
+    }
+
     // MARK: - Helpers
 
     func rgba(_ color: UIColor, _ style: UIUserInterfaceStyle) -> UInt32 {

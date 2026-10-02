@@ -22,7 +22,7 @@ struct AppIconSettingsSection: View {
                 if let appIconErrorMessage {
                     Text(appIconErrorMessage)
                         .font(AppFont.caption())
-                        .foregroundStyle(.red)
+                        .foregroundStyle(.hxDanger)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -148,7 +148,7 @@ private struct AppIconChoiceRow: View {
             } else if isSelected {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(.hxSuccess)
                     .accessibilityHidden(true)
             }
         }

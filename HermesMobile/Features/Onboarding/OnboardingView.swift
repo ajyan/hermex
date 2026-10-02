@@ -109,7 +109,7 @@ struct OnboardingView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 15)
                         .background(
-                            Color(red: 1.0, green: 0.74, blue: 0.10),
+                            Color.accentColor,
                             in: RoundedRectangle(cornerRadius: 8, style: .continuous)
                         )
                 }

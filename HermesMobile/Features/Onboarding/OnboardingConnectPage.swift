@@ -14,8 +14,8 @@ struct OnboardingConnectPage: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var isShowingAdvanced = false
 
-    private let accent = Color(red: 1.0, green: 0.74, blue: 0.10)
-    private let success = Color(red: 0.45, green: 0.92, blue: 0.56)
+    private let accent = Color.accentColor
+    private let success = Color.hxSuccess
 
     private func submitConnection() {
         guard viewModel.canSubmit, !viewModel.isConnectionLocked else { return }
@@ -205,7 +205,7 @@ struct OnboardingConnectPage: View {
             OnboardingStatusBanner(
                 text: errorMessage,
                 systemImage: "exclamationmark.triangle.fill",
-                tint: Color(red: 1.0, green: 0.47, blue: 0.34)
+                tint: Color.hxDanger
             )
         }
     }
