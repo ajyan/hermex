@@ -1021,7 +1021,7 @@ final class ChatStreamCoordinator {
         )
     }
 
-    private func completeCurrentResponse(needsTranscriptRefresh: Bool) {
+    private func completeCurrentResponse(needsTranscriptRefresh: Bool, completedStreamID: String? = nil) {
         if !hasCompletedCurrentResponse {
             ratingPromptState.recordCompletedResponse()
         }
@@ -1031,9 +1031,9 @@ final class ChatStreamCoordinator {
         delegate?.streamCoordinatorRemoveSnapshot(streamID: activeStreamID)
         delegate?.streamCoordinatorStopAuxiliaryMonitoring(clearPrompt: true)
         recordRunEndingIfRunning(.completed)
-        if let activeStreamID {
+        if let completedStreamID = completedStreamID ?? activeStreamID {
             successfulResponseCompletion = SuccessfulResponseCompletion(
-                streamID: activeStreamID, needsTranscriptRefresh: needsTranscriptRefresh
+                streamID: completedStreamID, needsTranscriptRefresh: needsTranscriptRefresh
             )
         }
         activeStreamID = nil
@@ -1048,7 +1048,8 @@ final class ChatStreamCoordinator {
     }
 
     private func completeResponseFromRefreshedTranscriptAndFinishStream(streamID completedStreamID: String?) {
-        completeCurrentResponse(needsTranscriptRefresh: false)
+        // The owned transcript load may have reconciled activeStreamID to nil.
+        completeCurrentResponse(needsTranscriptRefresh: false, completedStreamID: completedStreamID)
         delegate?.streamCoordinatorRemoveSnapshot(streamID: completedStreamID)
         finishStream()
     }

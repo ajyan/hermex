@@ -987,12 +987,24 @@ final class ChatStreamCoordinatorTests: APIClientTestCase {
             return apiTestJSONResponse(#"{"active": false, "stream_id": "stream-123"}"#, for: request)
         }
 
+        delegate.onLoadMessages = {
+            let preparation = coordinator.prepareForSessionLoad()
+            coordinator.reconcileSessionLoad(
+                loadedActiveStreamID: nil,
+                preparation: preparation,
+                usedCacheFallback: false
+            )
+            XCTAssertNil(coordinator.activeStreamID)
+        }
+
         coordinator.start(streamID: "stream-123")
         coordinator.suspendActiveStreamConnection()
 
         await coordinator.reconnectIfNeeded()
 
         XCTAssertNil(coordinator.activeStreamID)
+        XCTAssertEqual(coordinator.successfulResponseCompletion?.streamID, "stream-123")
+        XCTAssertEqual(coordinator.successfulResponseCompletion?.needsTranscriptRefresh, false)
         XCTAssertEqual(delegate.loadMessagesCount, 1)
         XCTAssertEqual(delegate.completedNeedsTranscriptRefreshValues, [false])
         XCTAssertEqual(liveActivityManager.ends.last?.status, .complete)
