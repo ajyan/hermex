@@ -1120,3 +1120,73 @@ extension MarkdownMathRendererTests {
         }
     }
 }
+
+
+extension MarkdownMathRendererTests {
+    @MainActor
+    func testFailedImagesRetryWithoutReloadingSuccessfulAssets() async throws {
+        let provider = RetryingInlineImageProvider(failures: 1)
+        let request = InlineMathTextRequest(
+            markdown: MarkdownMathFormatter.inlineMathImages(in: "$M_S$ ![good](https://example.com/good.png) ![retry](https://example.com/retry.png)"),
+            fontSize: 16, dark: false, scale: 3
+        )
+        var waits: [Int] = []
+        var availableCounts: [Int] = []
+        try await request.renderWithRetries(provider: provider, beforeRetry: { waits.append($0) }) { result in
+            availableCounts.append(result.images.count)
+        }
+        let requests = await provider.requests
+        XCTAssertEqual(requests.map(\.0), ["hermex-math:///TV9T", "https://example.com/good.png", "https://example.com/retry.png", "https://example.com/retry.png"])
+        XCTAssertEqual(requests.map(\.1), ["\u{FFFC}", "good", "retry", "retry"])
+        XCTAssertEqual(waits, [1])
+        XCTAssertEqual(availableCounts, [2, 3], "Successful assets should be published before retrying the missing image")
+    }
+
+    @MainActor
+    func testPermanentImageFailureHasABoundedRetryBudget() async throws {
+        let provider = RetryingInlineImageProvider(failures: 10)
+        let request = InlineMathTextRequest(markdown: "![retry](https://example.com/retry.png)", fontSize: 16, dark: false, scale: 3)
+        var waits: [Int] = []
+        var labels: [String] = []
+        try await request.renderWithRetries(provider: provider, beforeRetry: { waits.append($0) }) { result in
+            labels.append(result.accessibilityText)
+        }
+        let requests = await provider.requests
+        XCTAssertEqual(requests.map(\.0), Array(repeating: "https://example.com/retry.png", count: 3))
+        XCTAssertEqual(waits, [1, 2])
+        XCTAssertEqual(labels, ["retry", "retry", "retry"])
+    }
+
+    @MainActor
+    func testCancellationDuringImageBackoffStopsRequestsAndPublication() async throws {
+        let provider = RetryingInlineImageProvider(failures: 10)
+        let request = InlineMathTextRequest(markdown: "![retry](https://example.com/retry.png)", fontSize: 16, dark: false, scale: 3)
+        var publications = 0
+        let task = Task {
+            try await request.renderWithRetries(provider: provider, beforeRetry: { _ in
+                withUnsafeCurrentTask { $0?.cancel() }
+            }) { _ in publications += 1 }
+        }
+        do {
+            try await task.value
+            XCTFail("Cancellation should leave the retry loop")
+        } catch is CancellationError {}
+        let requests = await provider.requests
+        XCTAssertEqual(requests.map(\.0), ["https://example.com/retry.png"])
+        XCTAssertEqual(publications, 1, "No result may publish after the owning task is cancelled")
+    }
+}
+
+private actor RetryingInlineImageProvider: InlineImageProvider {
+    private var failures: Int
+    private(set) var requests: [(String, String)] = []
+    init(failures: Int) { self.failures = failures }
+    func image(with url: URL, label: String) async throws -> Image {
+        requests.append((url.absoluteString, label))
+        if url.lastPathComponent == "retry.png", failures > 0 {
+            failures -= 1
+            throw URLError(.networkConnectionLost)
+        }
+        return Image(systemName: "square")
+    }
+}

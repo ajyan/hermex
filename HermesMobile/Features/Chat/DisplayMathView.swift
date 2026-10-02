@@ -334,10 +334,10 @@ struct MathInlineText: View {
         }
         .font(.system(size: fontSize * fontScale, weight: weight))
         .task(id: loadIdentity) {
-            guard loadIdentity != nil,
-                  let result = try? await currentRequest.render(images: images),
-                  !Task.isCancelled else { return }
-            loaded = (currentRequest.imageStyle, result.images)
+            guard loadIdentity != nil else { return }
+            try? await currentRequest.renderWithRetries(images: images) { result in
+                loaded = (currentRequest.imageStyle, result.images)
+            }
         }
     }
 }
@@ -415,6 +415,29 @@ struct InlineMathTextRequest: Equatable {
             images[url] = tintImages ? Image(uiImage: image).renderingMode(.template) : Image(uiImage: image)
         }
         return compose(attributed, images: images)
+    }
+
+    /// Retry missing assets without refetching successes. The owning view task
+    /// cancels both provider work and backoff when its assets change or it leaves.
+    @MainActor
+    func renderWithRetries(
+        provider: (any InlineImageProvider)? = nil,
+        images: [URL: Image] = [:],
+        beforeRetry: (Int) async throws -> Void = { attempt in
+            try await Task.sleep(for: .seconds(attempt == 1 ? 2 : 8))
+        },
+        didRender: (InlineMathTextResult) -> Void
+    ) async throws {
+        var available = images
+        for attempt in 0..<3 {
+            if attempt > 0 { try await beforeRetry(attempt) }
+            try Task.checkCancellation()
+            let result = try await render(provider: provider, images: available)
+            try Task.checkCancellation()
+            available = result.images
+            didRender(result)
+            if try cachedResult(images: available) != nil { return }
+        }
     }
 
     @MainActor
