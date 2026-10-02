@@ -92,6 +92,21 @@ final class HermexColorsTests: XCTestCase {
         }
     }
 
+    func testStatusTextMeetsAAInIncreasedContrastLight() {
+        let traits = UITraitCollection(traitsFrom: [
+            UITraitCollection(userInterfaceStyle: .light),
+            UITraitCollection(accessibilityContrast: .high)
+        ])
+        let grouped = UIColor(red: 0xF2 / 255, green: 0xF2 / 255, blue: 0xF7 / 255, alpha: 1)
+        for token in [HermexToken.success, .warning] {
+            let fg = UIColor(Color(hermexToken: token)).resolvedColor(with: traits)
+            // Tinted capsules and banners paint the same hue at up to 18% over white.
+            let tint = blend(fg, alpha: 0.18, over: .white)
+            XCTAssertGreaterThanOrEqual(contrastResolved(fg, grouped), 4.5, "\(token) on grouped")
+            XCTAssertGreaterThanOrEqual(contrastResolved(fg, tint), 4.5, "\(token) on tint")
+        }
+    }
+
     // MARK: - Helpers
 
     func rgba(_ color: UIColor, _ style: UIUserInterfaceStyle) -> UInt32 {
@@ -112,5 +127,16 @@ final class HermexColorsTests: XCTestCase {
         }
         let (l1, l2) = (luminance(a), luminance(b))
         return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
+    }
+
+    private func blend(_ c: UIColor, alpha: CGFloat, over base: UIColor) -> UIColor {
+        var (r, g, b, a): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+        var (br, bg, bb, ba): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+        c.getRed(&r, green: &g, blue: &b, alpha: &a); base.getRed(&br, green: &bg, blue: &bb, alpha: &ba)
+        return UIColor(red: r * alpha + br * (1 - alpha), green: g * alpha + bg * (1 - alpha), blue: b * alpha + bb * (1 - alpha), alpha: 1)
+    }
+
+    private func contrastResolved(_ a: UIColor, _ b: UIColor) -> Double {
+        contrast(a, b, .light)
     }
 }

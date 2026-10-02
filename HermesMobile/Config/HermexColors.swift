@@ -32,6 +32,12 @@ enum HermexPalette {
         .onAccent: 0x161616FF
     ]
 
+    /// Light values under Increase Contrast, where the base value misses WCAG AA on
+    /// grouped backgrounds and tinted status capsules.
+    static let increasedContrastLight: [HermexToken: UInt32] = [
+        .success: 0x176E50FF, .warning: 0x7D5400FF
+    ]
+
     /// Dark-appearance accent, for surfaces outside the app's asset catalog (the Live Activity).
     static let accentDark: UInt32 = 0x4A84FEFF
 
@@ -49,7 +55,11 @@ extension Color {
     init(hermexToken token: HermexToken) {
         let light = HermexPalette.uiColor(HermexPalette.light[token] ?? 0)
         let dark = HermexPalette.uiColor(HermexPalette.dark[token] ?? 0)
-        self.init(uiColor: UIColor { $0.userInterfaceStyle == .dark ? dark : light })
+        let lightHighContrast = HermexPalette.increasedContrastLight[token].map(HermexPalette.uiColor) ?? light
+        self.init(uiColor: UIColor { traits in
+            if traits.userInterfaceStyle == .dark { return dark }
+            return traits.accessibilityContrast == .high ? lightHighContrast : light
+        })
     }
 }
 
