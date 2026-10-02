@@ -41,7 +41,7 @@ import SwiftUI
             }
             .padding(.bottom, 32)
         }
-        .background(Color(uiColor: .systemBackground))
+        .background(Color.hxCanvas)
         .navigationTitle("Expression")
         .navigationBarTitleDisplayMode(.inline)
     }

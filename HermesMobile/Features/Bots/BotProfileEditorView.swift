@@ -145,7 +145,7 @@ import SwiftUI
             .padding(.horizontal, 16)
             .padding(.bottom, 36)
         }
-        .background(Color(uiColor: .systemBackground))
+        .background(Color.hxCanvas)
         .scrollDismissesKeyboard(.interactively)
         .disabled(editor.isSaving)
         .overlay { if editor.isSaving { ProgressView().padding(18).background(.regularMaterial, in: Circle()) } }
@@ -194,7 +194,7 @@ import SwiftUI
                 .foregroundStyle(.primary)
                 .frame(width: 30, height: 30)
                 .background(Color(uiColor: .secondarySystemGroupedBackground), in: Circle())
-                .overlay(Circle().stroke(Color(uiColor: .systemBackground), lineWidth: 3))
+                .overlay(Circle().stroke(Color.hxCanvas, lineWidth: 3))
         }
         .offset(x: 6, y: 6)
         .accessibilityLabel("Change Photo")

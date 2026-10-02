@@ -228,7 +228,7 @@ struct FilePreviewView: View {
                 onRefresh: { Task { await loadFile() } }
             )
         }
-        .background(Color(.systemBackground))
+        .background(Color.hxCanvas)
     }
 
     /// Small files render as one document. Large ones render the chunks the view
@@ -274,7 +274,7 @@ struct FilePreviewView: View {
                 Label("Copy", systemImage: "doc.on.doc")
             }
         }
-        .background(Color(.systemBackground))
+        .background(Color.hxCanvas)
     }
 
     private var isMarkdownFile: Bool {
@@ -297,7 +297,7 @@ struct FilePreviewView: View {
                 }
                 .padding()
             }
-            .background(Color(.systemBackground))
+            .background(Color.hxCanvas)
         } else {
             ContentUnavailableView {
                 Label("Could Not Preview Image", systemImage: "photo")

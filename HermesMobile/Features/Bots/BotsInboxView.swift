@@ -177,7 +177,7 @@ struct BotsInboxHome {
                         BotConnectionWelcomeView(isCovered: showingSetup) { showingSetup = true }
                             .frame(minHeight: geometry.size.height)
                     }
-                    .background(Color(uiColor: .systemBackground))
+                    .background(Color.hxCanvas)
                 }
             }
         }

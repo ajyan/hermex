@@ -171,7 +171,7 @@ struct AppLockView: View {
             }
             .scrollBounceBehavior(.basedOnSize)
         }
-        .background(Color(.systemBackground).ignoresSafeArea())
+        .background(Color.hxCanvas.ignoresSafeArea())
     }
 
     private var locked: some View {

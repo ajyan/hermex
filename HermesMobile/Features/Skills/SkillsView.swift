@@ -92,7 +92,7 @@ struct SkillsView: View {
             .refreshable {
                 await loadSkills()
             }
-            .background(Color(.systemBackground))
+            .background(Color.hxCanvas)
         }
     }
 

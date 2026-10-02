@@ -736,7 +736,7 @@ struct SettingsView: View {
             .padding(.bottom, 36)
             .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
         }
-        .background(Color(.systemBackground))
+        .background(Color.hxCanvas)
         .navigationTitle("Settings")
         .task {
             // A Hermes server has no webui to load from, so no webui 401 can sign it out (#899).
@@ -2351,7 +2351,7 @@ private struct ServerDetailView: View {
             .padding(.top, 18)
             .padding(.bottom, 36)
         }
-        .background(Color(.systemBackground))
+        .background(Color.hxCanvas)
         .navigationTitle(displayName.isEmpty ? hostFallback : displayName)
         .navigationBarTitleDisplayMode(.inline)
         // Persist identity edits to this server's registry entry. When it's the
@@ -2499,7 +2499,7 @@ struct AddServerView: View {
                 .padding(.top, 18)
                 .padding(.bottom, 36)
             }
-            .background(Color(.systemBackground))
+            .background(Color.hxCanvas)
             .navigationTitle("Add Server")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

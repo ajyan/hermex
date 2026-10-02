@@ -38,7 +38,7 @@ struct StreamingLabView: View {
                 proxy.scrollTo(Self.tailAnchorID, anchor: .bottom)
             }
         }
-        .background(Color(.systemBackground))
+        .background(Color.hxCanvas)
         .navigationTitle(Text(verbatim: "Streaming Lab"))
         .navigationBarTitleDisplayMode(.inline)
         .task(id: replayID) {
