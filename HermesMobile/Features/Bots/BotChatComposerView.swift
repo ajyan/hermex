@@ -438,15 +438,13 @@ struct BotChatComposerView: View {
         let insertion = BotVoiceDraftInsertion(draft: model.draft, selection: insertionRange)
         voiceInput.apiClient = nil
         voiceInput.providerPreference = .onDeviceOnly
-        Task {
-            await voiceInput.toggle(currentDraft: "") { transcript in
-                guard let result = insertion.applying(transcript: transcript, to: model.draft) else {
-                    voiceInput.stopBeforeSubmittingDraft()
-                    return
-                }
-                model.editDraft(result.draft)
-                selection = selection.moved(to: result.selection)
+        voiceInput.scheduleToggle(currentDraft: "") { transcript in
+            guard let result = insertion.applying(transcript: transcript, to: model.draft) else {
+                voiceInput.stopBeforeSubmittingDraft()
+                return
             }
+            model.editDraft(result.draft)
+            selection = selection.moved(to: result.selection)
         }
     }
 

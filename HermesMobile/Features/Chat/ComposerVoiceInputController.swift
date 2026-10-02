@@ -43,6 +43,7 @@ final class ComposerVoiceInputController {
     private var audioTapInstalled = false
     private var ownsAudioCapture = false
     @ObservationIgnored private var transcriptionTask: Task<Void, Never>?
+    @ObservationIgnored private var toggleTask: Task<Void, Never>?
     private var activeTranscriptionID: UUID?
     @ObservationIgnored private let recordingLease = ComposerDictationLease.live()
     private static weak var captureOwner: ComposerVoiceInputController?
@@ -99,7 +100,21 @@ final class ComposerVoiceInputController {
         state == .requestingPermission
     }
 
+    /// Queue UI input under the same ownership as capture, so teardown can cancel
+    /// even a microphone tap whose task has not started executing yet.
+    @discardableResult
+    func scheduleToggle(currentDraft: String, updateDraft: @escaping (String) -> Void) -> Task<Void, Never> {
+        toggleTask?.cancel()
+        let task = Task { [weak self] in
+            guard let self, !Task.isCancelled else { return }
+            await self.toggle(currentDraft: currentDraft, updateDraft: updateDraft)
+        }
+        toggleTask = task
+        return task
+    }
+
     func toggle(currentDraft: String, updateDraft: @escaping (String) -> Void) async {
+        guard !Task.isCancelled else { return }
         if isListening {
             stopKeepingTranscript()
         } else {
@@ -110,6 +125,8 @@ final class ComposerVoiceInputController {
     /// Scene inactivity stops capture immediately. A server clip remains owned by this
     /// composer until it returns unlocked, or explicit teardown discards it.
     func suspend() {
+        toggleTask?.cancel()
+        toggleTask = nil
         guard !isSuspended else { return }
         isSuspended = true
         startID = nil
@@ -160,6 +177,8 @@ final class ComposerVoiceInputController {
     }
 
     func stopBeforeSubmittingDraft() {
+        toggleTask?.cancel()
+        toggleTask = nil
         startID = nil
         suppressNextRecognitionError = true
         cancelServerTranscription()

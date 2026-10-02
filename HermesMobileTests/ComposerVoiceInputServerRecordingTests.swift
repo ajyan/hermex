@@ -5,6 +5,23 @@ import UIKit
 
 @MainActor
 final class ComposerVoiceInputServerRecordingTests: APIClientTestCase {
+    func testTeardownCancelsMicrophoneTapBeforeItsTaskStarts() async {
+        let recorder = DictationTestRecorder()
+        let controller = ComposerVoiceInputController(
+            speechRecognizerFactory: { _ in nil }, microphonePermission: { true },
+            serverRecorder: recorder, mayRecord: { true })
+        controller.apiClient = makeClient { _ in
+            XCTFail("A gone composer must not upload")
+            throw URLError(.cancelled)
+        }
+        let tap = controller.scheduleToggle(currentDraft: "Original") { _ in XCTFail("Stale draft update") }
+        controller.stopBeforeSubmittingDraft()
+        await tap.value
+        XCTAssertEqual(recorder.starts, 0)
+        XCTAssertEqual(controller.state, .idle)
+        XCTAssertFalse(recorder.isRecording)
+    }
+
     func testInterruptedRecordingRetainsClipUntilUnlockedAndTranscribesOnce() async throws {
         let previousIdlePolicy = UIApplication.shared.isIdleTimerDisabled
         UIApplication.shared.isIdleTimerDisabled = false

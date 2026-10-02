@@ -1381,10 +1381,8 @@ struct MessageComposerView: View {
     private func toggleVoiceInput() {
         voiceInput.apiClient = apiClient
         voiceInput.providerPreference = ComposerSTTProviderPreference.storedValue(sttProviderPreferenceRawValue)
-        Task {
-            await voiceInput.toggle(currentDraft: draftMessage) { newDraft in
-                editDraft(newDraft)
-            }
+        voiceInput.scheduleToggle(currentDraft: draftMessage) { newDraft in
+            editDraft(newDraft)
         }
     }
 
