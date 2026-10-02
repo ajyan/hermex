@@ -63,7 +63,7 @@ import Observation
                         } icon: {
                             Image(systemName: "exclamationmark.circle.fill")
                         }
-                        .foregroundStyle(.red)
+                        .foregroundStyle(.hxDanger)
                         .accessibilityIdentifier("hermes-connection-error")
                     }
                     if !setup.isServerSignIn {
@@ -174,14 +174,14 @@ import Observation
                     } icon: {
                         Image(systemName: "exclamationmark.circle.fill")
                     }
-                    .foregroundStyle(.red)
+                    .foregroundStyle(.hxDanger)
                     .accessibilityIdentifier("hermes-connection-headers-rejection")
                 }
                 if let warning = setup.accessPairWarning {
                     Label {
                         Text(warning)
                     } icon: {
-                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.hxWarning)
                     }
                     .accessibilityIdentifier("hermes-connection-headers-warning")
                 }

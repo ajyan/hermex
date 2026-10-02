@@ -78,8 +78,8 @@ struct GitActionsMenuButton: View {
             Label("Changes unavailable", systemImage: "exclamationmark.circle")
         } else if let status = presentation.status, status.changedCount > 0 {
             Label {
-                Text("+\(status.totalAdditions)").foregroundStyle(.green)
-                + Text("  −\(status.totalDeletions)").foregroundStyle(.red)
+                Text("+\(status.totalAdditions)").foregroundStyle(.hxSuccess)
+                + Text("  −\(status.totalDeletions)").foregroundStyle(.hxDanger)
                 + Text("  \(status.changedCount)").foregroundStyle(.secondary)
             } icon: {
                 Image(systemName: "doc.text.magnifyingglass")

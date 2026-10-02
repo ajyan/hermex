@@ -107,7 +107,7 @@ struct ProvidersView: View {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.hxWarning)
                     .accessibilityHidden(true)
 
                 Text("Couldn't refresh. Showing previously loaded providers.")
@@ -125,7 +125,7 @@ struct ProvidersView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.orange.opacity(0.14))
+                .fill(Color.hxWarning.opacity(0.14))
         )
         .accessibilityElement(children: .combine)
     }
@@ -203,12 +203,12 @@ private struct ProviderDisclosure: View {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(.hxDanger)
                         .accessibilityHidden(true)
 
                     Text(authError)
                         .font(.footnote)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(.hxDanger)
                         .multilineTextAlignment(.leading)
                 }
                 .accessibilityElement(children: .ignore)
@@ -231,7 +231,7 @@ private struct ProviderDisclosure: View {
                 if let hasKey = provider.hasKey {
                     Image(systemName: hasKey ? "checkmark.seal.fill" : "key.slash")
                         .font(.caption)
-                        .foregroundStyle(hasKey ? Color.green : Color.secondary)
+                        .foregroundStyle(hasKey ? Color.hxSuccess : Color.secondary)
                         .accessibilityHidden(true)
 
                     Text(hasKey ? "Key configured" : "No key")
@@ -247,8 +247,8 @@ private struct ProviderDisclosure: View {
                         .font(.caption2.weight(.semibold))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(Capsule().fill(Color.green.opacity(0.16)))
-                        .foregroundStyle(.green)
+                        .background(Capsule().fill(Color.hxSuccess.opacity(0.16)))
+                        .foregroundStyle(.hxSuccess)
                         .layoutPriority(1)
                 }
 

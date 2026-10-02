@@ -495,7 +495,7 @@ private enum SessionRowStateBadgeKind: String, Identifiable {
     var tint: Color {
         switch self {
         case .cached:
-            return .orange
+            return .hxWarning
         case .readOnly:
             return .gray
         }

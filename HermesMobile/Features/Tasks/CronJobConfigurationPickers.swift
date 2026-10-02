@@ -118,7 +118,7 @@ struct CronJobProfileRow: View {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text(verbatim: errorMessage)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(.hxDanger)
 
                 Spacer(minLength: 0)
 

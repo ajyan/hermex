@@ -183,7 +183,7 @@ struct GitCommitView: View {
             if let error = viewModel.actionErrorMessage {
                 Label(error, systemImage: "exclamationmark.circle")
                     .font(AppFont.caption())
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.hxWarning)
             }
 
             HStack(alignment: .top, spacing: 8) {
@@ -312,8 +312,8 @@ private struct GitCommitFileRow: View {
                         .font(AppFont.caption2(weight: .semibold))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Color.green.opacity(0.18), in: Capsule())
-                        .foregroundStyle(.green)
+                        .background(Color.hxSuccess.opacity(0.18), in: Capsule())
+                        .foregroundStyle(.hxSuccess)
                 }
                 DiffCountsLabel(additions: file.additions ?? 0, deletions: file.deletions ?? 0)
                 GitStatusChip(kind: file.changeKind)

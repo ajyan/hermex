@@ -122,7 +122,7 @@ struct TaskDetailView: View {
         } else if let actionErrorMessage = viewModel.actionErrorMessage {
             Text(actionErrorMessage)
                 .font(.footnote)
-                .foregroundStyle(.red)
+                .foregroundStyle(.hxDanger)
         }
     }
 

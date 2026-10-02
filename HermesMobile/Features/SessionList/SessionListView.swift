@@ -2137,7 +2137,7 @@ private struct PendingNewChatView: View {
     private func pendingErrorBanner(_ message: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle")
-                .foregroundStyle(.orange)
+                .foregroundStyle(.hxWarning)
 
             Text(message)
                 .font(.footnote)

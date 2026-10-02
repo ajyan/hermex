@@ -280,7 +280,7 @@ struct BotDelegationCompletionCard: View {
         return parts.joined(separator: " · ")
     }
 
-    private var iconColor: Color { completion.hasFailures ? .orange : .green }
+    private var iconColor: Color { completion.hasFailures ? .hxWarning : .hxSuccess }
 }
 
 struct BotDelegationResultsSheet: View {
@@ -298,7 +298,7 @@ struct BotDelegationResultsSheet: View {
                         Image(systemName: completion.hasFailures
                               ? "exclamationmark.triangle.fill"
                               : "checkmark.circle.fill")
-                            .foregroundStyle(completion.hasFailures ? .orange : .green)
+                            .foregroundStyle(completion.hasFailures ? .hxWarning : .hxSuccess)
                     }
                     .font(.subheadline.weight(.semibold))
 

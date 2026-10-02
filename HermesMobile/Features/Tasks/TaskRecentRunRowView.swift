@@ -11,7 +11,7 @@ struct TaskRecentRunRowView: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Circle()
-                .fill(completion.didFail ? Color.red : Color.green)
+                .fill(completion.didFail ? Color.hxDanger : Color.hxSuccess)
                 .frame(width: 8, height: 8)
                 .accessibilityHidden(true)
 

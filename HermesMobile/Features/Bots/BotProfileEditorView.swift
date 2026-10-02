@@ -131,7 +131,7 @@ import SwiftUI
                 sectionLabel("Server")
                 card {
                     HStack(spacing: 12) {
-                        Image(systemName: "circle.fill").font(.caption).foregroundStyle(.green)
+                        Image(systemName: "circle.fill").font(.caption).foregroundStyle(.hxSuccess)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(editor.connection.name)
                             Text(editor.connection.address.host ?? editor.connection.address.absoluteString)
@@ -364,7 +364,7 @@ import SwiftUI
         switch outcome { case .saved: return "checkmark.circle.fill"; case .conflict: return "arrow.clockwise.circle"; case .confirmationRequired: return "questionmark.circle"; case .failed: return "exclamationmark.circle" }
     }
     private func resultColor(_ outcome: BotProfileEditor.Outcome) -> Color {
-        switch outcome { case .saved: return .green; case .confirmationRequired: return .orange; case .conflict, .failed: return .red }
+        switch outcome { case .saved: return .hxSuccess; case .confirmationRequired: return .hxWarning; case .conflict, .failed: return .hxDanger }
     }
     private func resultText(_ outcome: BotProfileEditor.Outcome) -> String {
         switch outcome {

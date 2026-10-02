@@ -89,13 +89,13 @@ struct CronJobRowView: View {
     private var tint: Color {
         switch group {
         case .now:
-            return .blue
+            return Color.accentColor
         case .needsAttention:
-            return .red
+            return .hxDanger
         case .paused:
             return .secondary
         case .laterToday, .tomorrow, .thisWeek, .later:
-            return .green
+            return .hxSuccess
         }
     }
 
@@ -104,7 +104,7 @@ struct CronJobRowView: View {
     private var metaStyle: AnyShapeStyle {
         switch group {
         case .needsAttention:
-            return AnyShapeStyle(.red)
+            return AnyShapeStyle(.hxDanger)
         case .paused:
             return AnyShapeStyle(.tertiary)
         default:

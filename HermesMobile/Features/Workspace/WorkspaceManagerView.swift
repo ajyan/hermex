@@ -32,7 +32,7 @@ struct WorkspaceManagerView: View {
                     Section {
                         Label(errorMessage, systemImage: "exclamationmark.triangle")
                             .font(.footnote)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(.hxDanger)
                     }
                 }
 
@@ -177,7 +177,7 @@ struct WorkspaceManagerView: View {
             } label: {
                 Label("Rename", systemImage: "pencil")
             }
-            .tint(.blue)
+            .tint(Color.accentColor)
             .disabled(viewModel.isMutating)
         }
     }
@@ -243,7 +243,7 @@ private struct WorkspaceAddSheet: View {
                     Section {
                         Label(errorMessage, systemImage: "exclamationmark.triangle")
                             .font(.footnote)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(.hxDanger)
                     }
                 }
 

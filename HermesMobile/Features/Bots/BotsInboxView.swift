@@ -293,7 +293,7 @@ struct BotsInboxHome {
             } label: {
                 Label(profile.pinned ? "Unpin" : "Pin", systemImage: profile.pinned ? "pin.slash" : "pin")
             }
-            .tint(.orange)
+            .tint(.hxWarning)
             .disabled(!inbox.mayEdit(profile))
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -365,7 +365,7 @@ struct BotsInboxHome {
             Button { inbox.setRoomPinned(!pinned, room) } label: {
                 Label(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin")
             }
-            .tint(.orange)
+            .tint(.hxWarning)
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button { inbox.setRoomHidden(!hidden, room) } label: {

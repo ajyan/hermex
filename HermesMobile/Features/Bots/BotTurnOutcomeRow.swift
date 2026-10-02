@@ -19,14 +19,14 @@ struct BotTurnOutcomeRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let failure {
-                block(systemImage: "xmark.circle.fill", tint: .red, title: Self.title(for: failure),
+                block(systemImage: "xmark.circle.fill", tint: .hxDanger, title: Self.title(for: failure),
                       detail: failure.error, resetsAt: failure.surface?.resetsAt) {
                     failureButtons
                 }
             }
             if let warning = notice?.warning {
                 // The host's words, verbatim: a fixed sentence could lie about a new warning.
-                block(systemImage: "exclamationmark.triangle.fill", tint: .orange,
+                block(systemImage: "exclamationmark.triangle.fill", tint: .hxWarning,
                       title: String(localized: "Reply shown but not saved"), detail: warning, resetsAt: nil) {
                     EmptyView()
                 }

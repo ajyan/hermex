@@ -204,7 +204,7 @@ import SwiftUI
             Label {
                 Text("Sent. Apple accepted the test; it should arrive in a few seconds.")
             } icon: {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.hxSuccess)
             }
             .font(AppFont.caption())
         }
@@ -217,7 +217,7 @@ import SwiftUI
         let isRunning = provisioner.isRunning(step)
         return HStack(spacing: 10) {
             Image(systemName: isDone ? "checkmark.circle.fill" : (isRunning ? "circle.dashed" : "circle"))
-                .foregroundStyle(isDone ? Color.green : .secondary)
+                .foregroundStyle(isDone ? Color.hxSuccess : .secondary)
             Text(step.title).fontWeight(isRunning ? .semibold : .regular)
         }
         .font(.footnote)
@@ -257,7 +257,7 @@ import SwiftUI
         let newest = HermexPushPlugin.newestVersion.description
         switch card {
         case .status(.available(let loaded)):
-            callout("arrow.up.circle.fill", tint: .blue, title: Text("Plugin update available"),
+            callout("arrow.up.circle.fill", tint: Color.accentColor, title: Text("Plugin update available"),
                     message: loaded.map { Text("Your Hermes host has hermex-push \($0.description) loaded. The newest is \(newest).") }
                         ?? Text("Your Hermes host has an older hermex-push loaded. The newest is \(newest)."),
                     action: String(localized: "Update plugin…")) { isConfirmingUpdate = true }
@@ -265,11 +265,11 @@ import SwiftUI
             callout("circle.dashed", tint: .secondary, title: Text("Updating the plugin…"), message: Text(step.progress))
         case .status(.restartNeeded(let loaded)) where HermexPushPlugin.canRestart(loaded):
             // The loaded plugin has the restart route, so restarting is the card's one action.
-            callout("arrow.clockwise.circle.fill", tint: .orange, title: Text("Restart Hermes to finish"),
+            callout("arrow.clockwise.circle.fill", tint: .hxWarning, title: Text("Restart Hermes to finish"),
                     message: Text("The new plugin is installed, but Hermes loads plugins only when it starts."),
                     action: String(localized: "Restart Hermes…")) { isConfirmingRestart = true }
         case .status(.restartNeeded):
-            callout("arrow.clockwise.circle.fill", tint: .orange, title: Text("Restart Hermes to finish"),
+            callout("arrow.clockwise.circle.fill", tint: .hxWarning, title: Text("Restart Hermes to finish"),
                     message: Text("The new plugin is installed, but Hermes loads plugins only when it starts. Restart `hermes dashboard` on your host, then check again. Hermex can’t restart it from this iPhone."),
                     action: provisioner.phase == .checkingPlugin ? String(localized: "Checking…") : String(localized: "Check again")) {
                 Task { await provisioner.checkPluginAgain() }
@@ -278,16 +278,16 @@ import SwiftUI
             callout("circle.dashed", tint: .secondary, title: Text("Restarting Hermes…"),
                     message: Text("Waiting for Hermes to come back"))
         case .status(.restartTimedOut):
-            callout("exclamationmark.triangle.fill", tint: .red, title: Text("Hermes didn’t come back"),
+            callout("exclamationmark.triangle.fill", tint: .hxDanger, title: Text("Hermes didn’t come back"),
                     message: Text("Hermes hasn’t answered since it restarted. If it stopped, start `hermes dashboard` on your host, then check again."),
                     action: provisioner.phase == .checkingPlugin ? String(localized: "Checking…") : String(localized: "Check again")) {
                 Task { await provisioner.checkPluginAgain() }
             }
         case .status(.upToDate(let version)):
-            callout("checkmark.circle.fill", tint: .green, title: Text("Plugin up to date"),
+            callout("checkmark.circle.fill", tint: .hxSuccess, title: Text("Plugin up to date"),
                     message: Text("hermex-push \(version.description) is loaded on your host."))
         case .status(.checkFailed(let failure)):
-            callout("exclamationmark.triangle.fill", tint: .red, title: Text(failure.title), message: Text(failure.message),
+            callout("exclamationmark.triangle.fill", tint: .hxDanger, title: Text(failure.title), message: Text(failure.message),
                     action: provisioner.phase == .checkingPlugin ? String(localized: "Checking…") : String(localized: "Check again")) {
                 Task { await provisioner.checkPluginAgain() }
             }
@@ -300,7 +300,7 @@ import SwiftUI
     /// a restart that never ran. The action asks for that step's confirmation again before
     /// the host changes.
     private func failureCallout(_ failure: HermexPushProvisioner.Failure, action: String) -> some View {
-        callout("exclamationmark.triangle.fill", tint: .red, title: Text(failure.title), message: Text(failure.message),
+        callout("exclamationmark.triangle.fill", tint: .hxDanger, title: Text(failure.title), message: Text(failure.message),
                 action: action) {
             if failure.remedy == .retryRestart { isConfirmingRestart = true } else { isConfirmingUpdate = true }
         }
@@ -336,22 +336,22 @@ import SwiftUI
     @ViewBuilder private func pluginLine(_ card: HermexPushProvisioner.PluginCard) -> some View {
         switch card {
         case .failed(let failure) where failure.remedy == .retryRestart:
-            captionLine("arrow.clockwise.circle.fill", tint: .orange, text: String(localized: "Restart Hermes to finish"),
+            captionLine("arrow.clockwise.circle.fill", tint: .hxWarning, text: String(localized: "Restart Hermes to finish"),
                         textTint: .secondary)
         case .status(.available), .failed:
-            captionLine("arrow.up.circle.fill", tint: .blue, text: String(localized: "Plugin update available"), textTint: .blue)
+            captionLine("arrow.up.circle.fill", tint: Color.accentColor, text: String(localized: "Plugin update available"), textTint: Color.accentColor)
         case .updating:
             captionLine("circle.dashed", tint: .secondary, text: String(localized: "Updating plugin…"), textTint: .secondary)
         case .restarting:
             captionLine("circle.dashed", tint: .secondary, text: String(localized: "Restarting Hermes…"), textTint: .secondary)
         case .status(.restartNeeded):
-            captionLine("arrow.clockwise.circle.fill", tint: .orange, text: String(localized: "Restart Hermes to finish"),
+            captionLine("arrow.clockwise.circle.fill", tint: .hxWarning, text: String(localized: "Restart Hermes to finish"),
                         textTint: .secondary)
         case .status(.restartTimedOut):
-            captionLine("exclamationmark.triangle.fill", tint: .red, text: String(localized: "Hermes didn’t come back"),
+            captionLine("exclamationmark.triangle.fill", tint: .hxDanger, text: String(localized: "Hermes didn’t come back"),
                         textTint: .secondary)
         case .status(.checkFailed(let failure)):
-            captionLine("exclamationmark.triangle.fill", tint: .red, text: failure.title, textTint: .secondary)
+            captionLine("exclamationmark.triangle.fill", tint: .hxDanger, text: failure.title, textTint: .secondary)
         case .status(.upToDate):
             EmptyView()
         }
@@ -370,7 +370,7 @@ import SwiftUI
             Text(failure.title).font(.footnote.weight(.semibold))
             Text(failure.message).font(.footnote)
         }
-        .foregroundStyle(.red)
+        .foregroundStyle(.hxDanger)
         .accessibilityElement(children: .combine)
     }
 }

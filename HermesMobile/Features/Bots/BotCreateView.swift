@@ -35,7 +35,7 @@ import SwiftUI
                             .padding(16)
                     }
                     if let problem = creator.nameProblem {
-                        Text(problem).font(.caption).foregroundStyle(.red).padding(.top, 8).padding(.horizontal, 12)
+                        Text(problem).font(.caption).foregroundStyle(.hxDanger).padding(.top, 8).padding(.horizontal, 12)
                     } else if !creator.name.isEmpty, !creator.hasStarted {
                         Text(verbatim: creator.name).font(.caption).foregroundStyle(.tertiary).padding(.top, 8)
                     }
@@ -291,7 +291,7 @@ import SwiftUI
         switch outcome { case .done: return "checkmark.circle.fill"; case .uncertain: return "questionmark.circle"; case .failed: return "exclamationmark.circle" }
     }
     private func color(_ outcome: BotCreator.Outcome) -> Color {
-        switch outcome { case .done: return .green; case .uncertain: return .orange; case .failed: return .red }
+        switch outcome { case .done: return .hxSuccess; case .uncertain: return .hxWarning; case .failed: return .hxDanger }
     }
     private func text(_ outcome: BotCreator.Outcome) -> String {
         switch outcome {

@@ -62,7 +62,7 @@ struct TaskDetailHeaderCard: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(CronJobRowView.elapsedText(running))
                     .font(.title2.weight(.semibold))
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color.accentColor)
                 Text("Running now")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -100,7 +100,7 @@ struct TaskDetailHeaderCard: View {
                     .lineLimit(3)
             } icon: {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
+                    .foregroundStyle(.hxDanger)
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(Text("Last run failed. \(failure)"))
@@ -114,7 +114,7 @@ struct TaskDetailHeaderCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(Color.red.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color.hxDanger.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     /// The card's two controls, as its bottom edge rather than as objects
@@ -190,17 +190,17 @@ struct TaskDetailHeaderCard: View {
     }
 
     private var statusColor: Color {
-        guard runningElapsed == nil else { return .blue }
+        guard runningElapsed == nil else { return Color.accentColor }
 
         switch job.status {
         case .active:
-            return .green
+            return .hxSuccess
         case .paused, .off:
-            return .orange
+            return .hxWarning
         case .error:
-            return .red
+            return .hxDanger
         case .needsAttention:
-            return .yellow
+            return .hxWarning
         }
     }
 }

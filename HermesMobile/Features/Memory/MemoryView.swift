@@ -235,7 +235,7 @@ private struct MemoryEditSheet: View {
                     Section {
                         Text(errorMessage)
                             .font(.footnote)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(.hxDanger)
                     }
                 }
             }

@@ -124,7 +124,7 @@ struct TaskRunHistoryRow: View {
     var body: some View {
         HStack(spacing: 10) {
             Circle()
-                .fill(hasFailed ? Color.red : Color.green)
+                .fill(hasFailed ? Color.hxDanger : Color.hxSuccess)
                 .frame(width: 7, height: 7)
                 .accessibilityHidden(true)
 

@@ -253,7 +253,7 @@ struct TasksView: View {
         } label: {
             Label("Run Now", systemImage: "play.fill")
         }
-        .tint(.blue)
+        .tint(Color.accentColor)
         .disabled(job.jobId == nil || viewModel.isPendingAction(job))
     }
 
@@ -265,7 +265,7 @@ struct TasksView: View {
             } label: {
                 Label("Pause", systemImage: "pause.fill")
             }
-            .tint(.orange)
+            .tint(.hxWarning)
             .disabled(job.jobId == nil || viewModel.isPendingAction(job))
         } else {
             Button {
@@ -273,7 +273,7 @@ struct TasksView: View {
             } label: {
                 Label("Resume", systemImage: "play.circle")
             }
-            .tint(.green)
+            .tint(.hxSuccess)
             .disabled(job.jobId == nil || viewModel.isPendingAction(job))
         }
     }

@@ -32,7 +32,7 @@ struct DefaultProfilePickerView: View {
                 if let saveError {
                     Text(verbatim: saveError)
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(.hxDanger)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 0, trailing: 12))
                         .listRowSeparator(.hidden)
@@ -395,7 +395,7 @@ private struct CreateProfileSheet: View {
                 } footer: {
                     if hasInvalidBaseURL {
                         Text("Base URL must start with http:// or https://.")
-                            .foregroundStyle(.red)
+                            .foregroundStyle(.hxDanger)
                     } else {
                         Text("Optional. Base URL example: http://localhost:11434")
                     }
@@ -405,7 +405,7 @@ private struct CreateProfileSheet: View {
                     Section {
                         Text(errorMessage)
                             .font(.caption)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(.hxDanger)
                     }
                 }
             }

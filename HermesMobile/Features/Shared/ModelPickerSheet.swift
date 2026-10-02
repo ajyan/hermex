@@ -65,7 +65,7 @@ struct ModelPickerSheet: View {
                 if let errorMessage {
                     Text(verbatim: errorMessage)
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(.hxDanger)
                         .frame(maxWidth: .infinity, minHeight: rowContentMinHeight(verticalInsets: 8), alignment: .leading)
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 0, trailing: 12))
                         .listRowSeparator(.hidden)

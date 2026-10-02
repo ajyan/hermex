@@ -249,7 +249,7 @@ private struct FileTreeRowView: View {
             } else if hasLoadFailure {
                 Image(systemName: "exclamationmark.triangle")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.hxWarning)
             } else if let childCount {
                 Text(childCount, format: .number)
                     .font(.caption2.weight(.medium))

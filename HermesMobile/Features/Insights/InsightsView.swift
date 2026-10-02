@@ -100,7 +100,7 @@ struct InsightsView: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         } icon: {
                             Image(systemName: "exclamationmark.triangle")
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(.hxWarning)
                         }
                     }
                 }

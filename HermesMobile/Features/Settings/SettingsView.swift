@@ -996,7 +996,7 @@ struct SettingsView: View {
             // load (e.g. a restart that never came back).
             SettingsStatusPill(label: String(localized: "Connected"))
         } else {
-            SettingsStatusPill(label: serverSettingsError ?? String(localized: "Unknown"), tint: .orange)
+            SettingsStatusPill(label: serverSettingsError ?? String(localized: "Unknown"), tint: .hxWarning)
         }
     }
 
@@ -1123,7 +1123,7 @@ struct SettingsView: View {
             case .upToDate:
                 updateNoteRow(systemImage: "checkmark.circle", tint: .secondary, text: String(localized: "Up to date"))
             case let .updateAvailable(behind):
-                updateNoteRow(systemImage: "arrow.up.circle", tint: .blue, text: String(localized: "Update available · \(behind) behind"))
+                updateNoteRow(systemImage: "arrow.up.circle", tint: Color.accentColor, text: String(localized: "Update available · \(behind) behind"))
             case .unavailable:
                 EmptyView()
             }
@@ -1167,7 +1167,7 @@ struct SettingsView: View {
             }
         case .failed:
             VStack(alignment: .leading, spacing: 10) {
-                updateMessageRow(systemImage: "exclamationmark.triangle", tint: .orange)
+                updateMessageRow(systemImage: "exclamationmark.triangle", tint: .hxWarning)
                 updateActionButton(title: String(localized: "Retry update"))
             }
         }
@@ -1808,7 +1808,7 @@ private struct SettingsErrorFootnote: View {
         HStack(alignment: .top, spacing: 6) {
             Image(systemName: "exclamationmark.triangle")
                 .font(AppFont.caption())
-                .foregroundStyle(.orange)
+                .foregroundStyle(.hxWarning)
 
             Text(text)
                 .font(AppFont.caption())
@@ -2070,22 +2070,22 @@ private struct SettingsButton: View {
                 }
             }
             .font(AppFont.subheadline(weight: .medium))
-            .foregroundStyle(role == .destructive ? .red : .primary)
+            .foregroundStyle(role == .destructive ? .hxDanger : .primary)
             .frame(maxWidth: .infinity)
             .frame(minHeight: 46)
             .background {
-                shape.fill((role == .destructive ? Color.red : Color.primary).opacity(0.08))
+                shape.fill((role == .destructive ? Color.hxDanger : Color.primary).opacity(0.08))
             }
             .adaptiveGlass(
                 .regular,
                 isInteractive: true,
-                tint: role == .destructive ? .red.opacity(0.08) : nil,
+                tint: role == .destructive ? .hxDanger.opacity(0.08) : nil,
                 fallbackMaterial: .thinMaterial,
                 in: shape
             )
             .overlay {
                 shape
-                    .stroke((role == .destructive ? Color.red : Color.primary).opacity(strokeOpacity), lineWidth: 0.7)
+                    .stroke((role == .destructive ? Color.hxDanger : Color.primary).opacity(strokeOpacity), lineWidth: 0.7)
                     .allowsHitTesting(false)
             }
             .contentShape(shape)
@@ -2642,7 +2642,7 @@ struct AddServerView: View {
         if let errorMessage = form.errorMessage {
             Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
                 .font(AppFont.footnote())
-                .foregroundStyle(.orange)
+                .foregroundStyle(.hxWarning)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }

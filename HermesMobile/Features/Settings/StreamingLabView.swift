@@ -80,7 +80,7 @@ struct StreamingLabView: View {
             if !isStreamedTextAnimationEnabled {
                 Text(verbatim: "Animation is off — the knobs below have no visible effect until it's re-enabled.")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.hxWarning)
             }
 
             knobSlider(

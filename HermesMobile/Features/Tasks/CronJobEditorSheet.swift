@@ -244,6 +244,6 @@ struct CronJobEditorSheet: View {
     }
 
     private var messageColor: Color {
-        errorMessage == nil ? .secondary : .red
+        errorMessage == nil ? .secondary : .hxDanger
     }
 }

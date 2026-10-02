@@ -316,7 +316,7 @@ struct SessionSidebarUtilityRows: View {
             title: String(localized: "Active Profile"),
             assetImage: "LucideUserRoundCog",
             isExpanded: profilesAreExpanded,
-            tint: viewModel.activeProfileErrorMessage == nil ? .primary : .orange
+            tint: viewModel.activeProfileErrorMessage == nil ? .primary : .hxWarning
         ) {
             profilesAreExpanded.toggle()
         } accessory: {
@@ -686,7 +686,7 @@ struct SessionInteractiveRow: View {
                 Label("Archive", systemImage: "archivebox")
             }
             .disabled(viewModel.isMutating(session))
-            .tint(.orange)
+            .tint(.hxWarning)
 
             Button {
                 actions.delete(session)
@@ -694,7 +694,7 @@ struct SessionInteractiveRow: View {
                 Label("Delete", systemImage: "trash")
             }
             .disabled(viewModel.isMutating(session))
-            .tint(.red)
+            .tint(.hxDanger)
         }
     }
 
@@ -1750,10 +1750,10 @@ struct OfflineCacheBanner: View {
 
             Spacer()
         }
-        .foregroundStyle(.orange)
+        .foregroundStyle(.hxWarning)
         .padding(.horizontal, 24)
         .padding(.vertical, 10)
-        .background(Color.orange.opacity(0.12))
+        .background(Color.hxWarning.opacity(0.12))
         .accessibilityElement(children: .combine)
     }
 }

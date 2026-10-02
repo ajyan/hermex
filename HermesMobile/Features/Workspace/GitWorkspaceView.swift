@@ -184,9 +184,9 @@ struct DiffCountsLabel: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Text(verbatim: "+\(additions)").foregroundStyle(.green)
+            Text(verbatim: "+\(additions)").foregroundStyle(.hxSuccess)
             if let deletions {
-                Text(verbatim: "−\(deletions)").foregroundStyle(.red)
+                Text(verbatim: "−\(deletions)").foregroundStyle(.hxDanger)
             }
         }
         .font(AppFont.mono(style: .caption, weight: .semibold))
@@ -264,11 +264,11 @@ struct GitStatusChip: View {
 
     private var tint: Color {
         switch kind {
-        case .added, .untracked: return .green
-        case .deleted: return .red
-        case .renamed: return .blue
-        case .conflict: return .orange
-        case .modified: return .yellow
+        case .added, .untracked: return .hxSuccess
+        case .deleted: return .hxDanger
+        case .renamed: return Color.accentColor
+        case .conflict: return .hxWarning
+        case .modified: return .hxWarning
         case .ignored, .unknown: return .secondary
         }
     }

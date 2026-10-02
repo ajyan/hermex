@@ -68,7 +68,7 @@ struct BotPendingRequestCard: View {
             if let resolution {
                 Text(resolution.message)
                     .font(.caption)
-                    .foregroundStyle(resolution.outcome == .answered ? .secondary : Color.red)
+                    .foregroundStyle(resolution.outcome == .answered ? .secondary : Color.hxDanger)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -112,7 +112,7 @@ private struct BotApprovalRequestBody: View {
 
     var body: some View {
         BotRequestHeader(
-            systemImage: "exclamationmark.triangle.fill", tint: .yellow,
+            systemImage: "exclamationmark.triangle.fill", tint: .hxWarning,
             title: String(localized: "Approval required"), identity: identity
         )
         if let consequence = approval.consequence {
@@ -637,10 +637,10 @@ private struct BotConnectionTargetRow: View {
     private var stateLabel: some View {
         let (title, symbol, tint): (String, String?, Color) = switch target.state {
         case .pending, .initiated: (String(localized: "Waiting"), nil, .secondary)
-        case .connected: (String(localized: "Connected"), "checkmark.circle.fill", .green)
+        case .connected: (String(localized: "Connected"), "checkmark.circle.fill", .hxSuccess)
         case .skipped: (String(localized: "Skipped"), nil, .secondary)
-        case .failed: (String(localized: "Failed"), "exclamationmark.circle.fill", .red)
-        case .expired: (String(localized: "Expired"), "clock.badge.exclamationmark", .red)
+        case .failed: (String(localized: "Failed"), "exclamationmark.circle.fill", .hxDanger)
+        case .expired: (String(localized: "Expired"), "clock.badge.exclamationmark", .hxDanger)
         case .notConnected: (String(localized: "Not connected"), nil, .secondary)
         case .unavailable: (String(localized: "Unavailable"), nil, .secondary)
         case nil: (String(localized: "Unknown"), nil, .secondary)
