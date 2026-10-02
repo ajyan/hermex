@@ -16,10 +16,14 @@ import XCTest
         let settings = try XCTUnwrap(UserDefaults(suiteName: UUID().uuidString))
         settings.set(false, forKey: ChatTranscriptDisplaySettings.showsAssistantTurnTimestampsKey)
         let model = make(BotFixtureWire())
-        let window = try show(BotArtifactMessageView(
-            message: ChatMessage(role: "assistant", content: "**A settled reply**", timestamp: nil, messageId: nil),
-            model: model
-        ).defaultAppStorage(settings))
+        let probeLabel = "Footer accessibility probe"
+        let window = try show(VStack {
+            Button(probeLabel) {}
+            BotArtifactMessageView(
+                message: ChatMessage(role: "assistant", content: "**A settled reply**", timestamp: nil, messageId: nil),
+                model: model
+            )
+        }.defaultAppStorage(settings))
         defer { model.suspend(); close(window) }
         await settle(window)
 
@@ -38,6 +42,10 @@ import XCTest
                 pending += (0..<count).compactMap { node.accessibilityElement(at: $0) as? NSObject }
             }
         }
+        // Some CI toolchains do not publish SwiftUI's in-process accessibility
+        // tree. An unrelated button distinguishes that limitation from a missing Copy.
+        try XCTSkipUnless(nodes.contains { $0.accessibilityLabel == probeLabel },
+                          "This toolchain does not expose the independent SwiftUI accessibility probe")
         XCTAssertEqual(nodes.filter { $0.accessibilityLabel == "Copy" }.count, 1,
                        "The reply must expose one Copy control without a timestamp or reactions")
         XCTAssertFalse(nodes.flatMap { $0.accessibilityCustomActions ?? [] }.contains { $0.name == "Copy" },
