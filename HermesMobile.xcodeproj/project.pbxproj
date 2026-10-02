@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AA0100000000000000000001 /* AtlasActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0200000000000000000001 /* AtlasActivity.swift */; };
+		AA0100000000000000000002 /* APIClient+AtlasActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0200000000000000000002 /* APIClient+AtlasActivity.swift */; };
+		AA0100000000000000000003 /* ActivityViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0200000000000000000003 /* ActivityViewModel.swift */; };
+		AA0100000000000000000004 /* APIClientAtlasActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0200000000000000000004 /* APIClientAtlasActivityTests.swift */; };
+		AA0100000000000000000005 /* ActivityViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0200000000000000000005 /* ActivityViewModelTests.swift */; };
 		A4790000000000000000E001 /* PushEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4790000000000000000F001 /* PushEnvironment.swift */; };
 		A4790000000000000000E002 /* PushPairing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4790000000000000000F002 /* PushPairing.swift */; };
 		A4790000000000000000E003 /* PushRelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4790000000000000000F003 /* PushRelayClient.swift */; };
@@ -1029,6 +1034,11 @@
 		3F91D2A54B9A4F66A2C01014 /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
 		3F91D2A54B9A4F66A2C01015 /* TaskDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailViewModel.swift; sourceTree = "<group>"; };
 		57B5FD09B6B5937573B5F9A4 /* InsightsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InsightsView.swift; sourceTree = "<group>"; };
+		AA0200000000000000000001 /* AtlasActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasActivity.swift; sourceTree = "<group>"; };
+		AA0200000000000000000002 /* APIClient+AtlasActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "APIClient+AtlasActivity.swift"; sourceTree = "<group>"; };
+		AA0200000000000000000003 /* ActivityViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityViewModel.swift; sourceTree = "<group>"; };
+		AA0200000000000000000004 /* APIClientAtlasActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientAtlasActivityTests.swift; sourceTree = "<group>"; };
+		AA0200000000000000000005 /* ActivityViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityViewModelTests.swift; sourceTree = "<group>"; };
 		C0DE512E0000000000000201 /* InsightsModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InsightsModels.swift; sourceTree = "<group>"; };
 		C0DE512E0000000000000203 /* SectionCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SectionCard.swift; sourceTree = "<group>"; };
 		C08650000000000000000001 /* ActionToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionToast.swift; sourceTree = "<group>"; };
@@ -1365,6 +1375,8 @@
 				C03900000000000000000001 /* APIClientSessionListTests.swift */,
 				B23000000000000000000004 /* SessionSearchExcerptTests.swift */,
 				C03900000000000000000002 /* APIClientInsightsTests.swift */,
+				AA0200000000000000000004 /* APIClientAtlasActivityTests.swift */,
+				AA0200000000000000000005 /* ActivityViewModelTests.swift */,
 				C03900000000000000000017 /* APIClientUpdatesCheckTests.swift */,
 				C03900000000000000000018 /* APIClientUpdatesApplyTests.swift */,
 				C03900000000000000000003 /* APIClientSessionDetailTests.swift */,
@@ -1543,6 +1555,7 @@
 		1A2B3C4D5E6F7000000000C1 /* Networking */ = {
 			isa = PBXGroup;
 			children = (
+				AA0200000000000000000002 /* APIClient+AtlasActivity.swift */,
 				5619C4EB852849D396C45F95 /* BotProtocol.swift */,
 				BF2EA5336E9B431489F91A63 /* BotClient.swift */,
 				02620AA1CBC865AE71DB7C5C /* BotDashboardClient.swift */,
@@ -1585,6 +1598,7 @@
 		1A2B3C4D5E6F7000000000C2 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				AA0200000000000000000001 /* AtlasActivity.swift */,
 				1A2B3C4D5E6F7000000000B4 /* ServerInfo.swift */,
 				1A2B3C4D5E6F7000000000BB /* Session.swift */,
 				1A2B3C4D5E6F7000000000BA /* ChatMessage.swift */,
@@ -1618,6 +1632,7 @@
 		1A2B3C4D5E6F7000000000C3 /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				AA0200000000000000000006 /* Activity */,
 				B48200000000000000000001 /* BotProfileAppearance.swift */,
 				B48200000000000000000011 /* BotExpressionPickerView.swift */,
 				B48200000000000000000031 /* BotCreator.swift */,
@@ -2087,6 +2102,14 @@
 				C036900000000000000000A /* CronJobSkillsPicker.swift */,
 			);
 			path = Tasks;
+			sourceTree = "<group>";
+		};
+		AA0200000000000000000006 /* Activity */ = {
+			isa = PBXGroup;
+			children = (
+				AA0200000000000000000003 /* ActivityViewModel.swift */,
+			);
+			path = Activity;
 			sourceTree = "<group>";
 		};
 		B50E1CE3A8912B92B1924714 /* Insights */ = {
@@ -2686,6 +2709,9 @@
 				05814DEA5DE4690F730B1E15 /* InsightsViewModel.swift in Sources */,
 				26AB000000000000000000B1 /* ProvidersViewModel.swift in Sources */,
 				26AB000000000000000000B2 /* ProvidersView.swift in Sources */,
+				AA0100000000000000000001 /* AtlasActivity.swift in Sources */,
+				AA0100000000000000000002 /* APIClient+AtlasActivity.swift in Sources */,
+				AA0100000000000000000003 /* ActivityViewModel.swift in Sources */,
 				B5A100000000000000000001 /* SharedDraftStore.swift in Sources */,
 				B5A100000000000000000008 /* ShareInputReader.swift in Sources */,
 			);
@@ -2885,6 +2911,8 @@
 				C0DE88500000000000000003 /* AppLockTests.swift in Sources */,
 				1A2B3C4D5E6F700000000341 /* AppIntentNewChatTests.swift in Sources */,
 				1A2B3C4D5E6F700000000345 /* AppIntentNewChatInProfileTests.swift in Sources */,
+				AA0100000000000000000004 /* APIClientAtlasActivityTests.swift in Sources */,
+				AA0100000000000000000005 /* ActivityViewModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
