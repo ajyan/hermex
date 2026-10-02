@@ -423,7 +423,7 @@ struct MessageComposerView: View {
         }
     }
 
-    var body: some View {
+    private var composerWithLifecycle: some View {
         AdaptiveGlassContainer(spacing: 6) {
             VStack(spacing: 6) {
                 if voiceNoteRecorder.isRecording {
@@ -636,6 +636,10 @@ struct MessageComposerView: View {
                 showFileImporter = true
             }
         }
+    }
+
+    var body: some View {
+        composerWithLifecycle
         .sheet(isPresented: $showsAllModelsSheet, onDismiss: restoreFocusAfterPresentationIfNeeded) {
             ModelPickerSheet(
                 configuration: .composer,
