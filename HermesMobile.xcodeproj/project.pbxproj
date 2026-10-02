@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5F201B95050DF00E83D78791 /* VoiceCallController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46292D5019E080E8AE8924B /* VoiceCallController.swift */; };
+		203BC1D401E4ABC4CE5BABD8 /* VoiceCallProtocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AC570C2487BCFB697166EAF /* VoiceCallProtocols.swift */; };
+		0E056C2716F8F8E35B29DD90 /* VoiceCallControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9094EEA2D39453D516E10424 /* VoiceCallControllerTests.swift */; };
 		8BB7958EFD5F6E2398B0F03B /* SpeechTextShaper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B03BB814DC3B14FC646AACF2 /* SpeechTextShaper.swift */; };
 		03665A82226976B4593845C3 /* SpeechTextShaperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9DABBFA641D013A60B59C38 /* SpeechTextShaperTests.swift */; };
 		18B144B4DEBF30306CB5306F /* VoiceApprovalMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85CD5EB62F24532DFA50A9BF /* VoiceApprovalMatcher.swift */; };
@@ -652,6 +655,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A46292D5019E080E8AE8924B /* VoiceCallController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallController.swift; sourceTree = "<group>"; };
+		8AC570C2487BCFB697166EAF /* VoiceCallProtocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallProtocols.swift; sourceTree = "<group>"; };
+		9094EEA2D39453D516E10424 /* VoiceCallControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallControllerTests.swift; sourceTree = "<group>"; };
 		B03BB814DC3B14FC646AACF2 /* SpeechTextShaper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechTextShaper.swift; sourceTree = "<group>"; };
 		E9DABBFA641D013A60B59C38 /* SpeechTextShaperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechTextShaperTests.swift; sourceTree = "<group>"; };
 		85CD5EB62F24532DFA50A9BF /* VoiceApprovalMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceApprovalMatcher.swift; sourceTree = "<group>"; };
@@ -1294,6 +1300,8 @@
 		9BAF7D8BBF390913B4F060B0 /* VoiceCall */ = {
 			isa = PBXGroup;
 			children = (
+				A46292D5019E080E8AE8924B /* VoiceCallController.swift */,
+				8AC570C2487BCFB697166EAF /* VoiceCallProtocols.swift */,
 				B03BB814DC3B14FC646AACF2 /* SpeechTextShaper.swift */,
 				85CD5EB62F24532DFA50A9BF /* VoiceApprovalMatcher.swift */,
 				050448814DCC3A3C78903E26 /* TurnDetector.swift */,
@@ -1364,6 +1372,7 @@
 		1A2B3C4D5E6F700000000034 /* HermesMobileTests */ = {
 			isa = PBXGroup;
 			children = (
+				9094EEA2D39453D516E10424 /* VoiceCallControllerTests.swift */,
 				E9DABBFA641D013A60B59C38 /* SpeechTextShaperTests.swift */,
 				EBF591C77B150A58C93FAB25 /* VoiceApprovalMatcherTests.swift */,
 				01041E501EAAF703B6A601B6 /* TurnDetectorTests.swift */,
@@ -2391,6 +2400,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5F201B95050DF00E83D78791 /* VoiceCallController.swift in Sources */,
+				203BC1D401E4ABC4CE5BABD8 /* VoiceCallProtocols.swift in Sources */,
 				8BB7958EFD5F6E2398B0F03B /* SpeechTextShaper.swift in Sources */,
 				18B144B4DEBF30306CB5306F /* VoiceApprovalMatcher.swift in Sources */,
 				DA7A71AB914D0090DBA76517 /* TurnDetector.swift in Sources */,
@@ -2769,6 +2780,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0E056C2716F8F8E35B29DD90 /* VoiceCallControllerTests.swift in Sources */,
 				03665A82226976B4593845C3 /* SpeechTextShaperTests.swift in Sources */,
 				22CC867515827938246D8571 /* VoiceApprovalMatcherTests.swift in Sources */,
 				5F3C973DF0918884E44A56F3 /* TurnDetectorTests.swift in Sources */,
