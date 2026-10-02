@@ -71,7 +71,9 @@ to `CacheStore`. Two consequences:
 Draft content and settings remain keyed by server and context. Their app-owned
 attachment copies share a 200 MB device-wide budget, measured from file lengths
 on disk rather than optional server upload sizes. New staging reclaims only the
-oldest inactive copies needed to fit. There is no age expiry or cleanup UI.
+oldest inactive copies needed to fit. Unreferenced copies left by interrupted
+saves or cleanup are reclaimed first, excluding live reservations. There is no
+age expiry or cleanup UI.
 Optional `lastUsedAt` metadata in the version-4 draft document records genuine
 use; reading drafts for enumeration does not refresh it. Equal recency uses the
 persisted attachment order, then filename, for a stable eviction order.

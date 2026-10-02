@@ -1241,6 +1241,25 @@ final class ChatDraftStoreTests: XCTestCase {
         XCTAssertEqual(draft, original)
     }
 
+    func testPressureReclaimsOnlyNeededOrphansAndProtectsLiveCopies() async throws {
+        let key = ChatDraftKey(serverID: "a", context: .newChat)
+        let original = ChatDraft(text: "keep", attachments: [Self.sampleAttachment(file: "referenced")])
+        let persistence = RetentionTestPersistence(drafts: [key: original])
+        let files = RetentionTestFiles(bytes: ["orphan-a": 2, "orphan-b": 2, "live": 2, "referenced": 2])
+        let store = ChatDraftStore(persistence: persistence, attachmentStore: files, retainedByteLimit: 8)
+        let live = store.makeAttachmentLease()
+        live.files.insert("live")
+        let incoming = store.makeAttachmentLease()
+        let staged = try await store.stageAttachment(data: Data([1, 2]), filename: "new", lease: incoming)
+        let inventory = try await files.retainedFileBytes()
+        let deleted = await files.deleted
+        let restored = await store.draft(for: key)
+        XCTAssertEqual(deleted, ["orphan-a"])
+        XCTAssertEqual(inventory, ["orphan-b": 2, "live": 2, "referenced": 2, staged: 2])
+        XCTAssertEqual(restored, original)
+        withExtendedLifetime(live) {}
+    }
+
     func testPartialDeletionCommitsRecordsBeforeFilesAndRefusesIfBytesRemain() async throws {
         let key = ChatDraftKey(serverID: "a", context: .newChat)
         let persistence = RetentionTestPersistence(drafts: [key: ChatDraft(text: "keep", attachments: [Self.sampleAttachment(file: "a"), Self.sampleAttachment(file: "b")])])

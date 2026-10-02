@@ -885,6 +885,13 @@ final class ChatDraftStore {
                     position[file] = min(position[file] ?? index, index)
                 }
             }
+            // Interrupted saves/deletions can leave unreferenced copies behind.
+            // Reclaim those before draft content, but keep every live reservation.
+            let referenced = Set(drafts.values.flatMap { $0.attachments.compactMap(\.file) })
+            for file in inventory.keys where !referenced.contains(file) && !protected.contains(file) {
+                recency[file] = .distantPast
+                position[file] = -1
+            }
             let ordered = recency.keys.sorted {
                 if recency[$0] != recency[$1] { return recency[$0]! < recency[$1]! }
                 // The strip's persisted order breaks ties within a draft; file
