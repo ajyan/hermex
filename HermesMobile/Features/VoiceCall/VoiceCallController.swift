@@ -42,6 +42,8 @@ enum VoiceCallPhrases {
 final class VoiceCallController {
     private(set) var state: VoiceCallState = .idle
     private(set) var partialTranscript = ""
+    /// What the user last said, kept on screen until they speak again.
+    private(set) var lastSentTurn: String?
     private(set) var currentTool: String?
     private(set) var isMuted = false
     private(set) var startError: VoiceCallStartError?
@@ -291,6 +293,7 @@ final class VoiceCallController {
         switch turnDetector.observe(isSpeech: isSpeech, at: time) {
         case .speechStarted:
             discardFinals = false
+            lastSentTurn = nil
         case .endOfTurn:
             if case .awaitingApproval = state {
                 approvalTurnEnded = true
@@ -305,6 +308,7 @@ final class VoiceCallController {
 
     /// Keeps the speech that interrupted, as the start of the next turn.
     private func restartTurn(speechFrom start: TimeInterval, to time: TimeInterval) {
+        lastSentTurn = nil
         turnDetector.reset()
         _ = turnDetector.observe(isSpeech: true, at: start)
         _ = turnDetector.observe(isSpeech: true, at: time)
@@ -319,6 +323,7 @@ final class VoiceCallController {
         let text = partialTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         state = .thinking
+        lastSentTurn = text
         discardFinals = true
         clearTranscript()
         shaper = SpeechTextShaper()

@@ -200,6 +200,22 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(controller.partialTranscript, "hello there")
     }
 
+    func testSentTurnStaysOnScreenUntilNextSpeech() async {
+        await controller.start()
+        await say("hello there")
+        XCTAssertEqual(controller.partialTranscript, "")
+        XCTAssertEqual(controller.lastSentTurn, "hello there")
+
+        update(text: "Hi.")
+        update(text: "Hi.", streaming: false)
+        speaker.drain()
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertEqual(controller.lastSentTurn, "hello there")
+
+        voice(true, for: 0.2)
+        XCTAssertNil(controller.lastSentTurn)
+    }
+
     func testNoSecondSendWhileThinking() async {
         await controller.start()
         await say("hello")

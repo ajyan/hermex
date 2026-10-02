@@ -162,13 +162,17 @@ struct VoiceCallView: View {
         .accessibilityElement(children: .combine)
     }
 
+    /// What the user is saying, or, once sent, what they said, dimmed.
     private var transcript: some View {
-        Text(controller?.partialTranscript ?? "")
+        let live = controller?.partialTranscript ?? ""
+        let text = live.isEmpty ? (controller?.lastSentTurn ?? "") : live
+        return Text(text)
             .font(.title3)
+            .foregroundStyle(live.isEmpty ? Color.hxTextSecondary : Color.primary)
             .multilineTextAlignment(.center)
             .lineLimit(6)
             .frame(maxWidth: .infinity)
-            .accessibilityLabel(controller?.partialTranscript ?? "")
+            .accessibilityLabel(text)
     }
 
     private var controls: some View {
