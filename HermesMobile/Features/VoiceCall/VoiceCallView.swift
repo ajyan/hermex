@@ -29,21 +29,34 @@ struct VoiceCallChatSnapshot: Equatable {
     var isReconnecting: Bool
     var currentTool: String?
 
-    /// `replyMessageID` is the reply this turn streamed into, remembered so its
-    /// final text can still be read after the stream ends.
+    @MainActor
+    static func of(_ chat: ChatViewModel) -> VoiceCallChatSnapshot {
+        make(
+            messages: chat.messages,
+            activeStreamID: chat.activeStreamID,
+            recovery: chat.activeStreamRecoveryState,
+            approval: chat.approvalPrompt,
+            liveToolCalls: chat.liveToolCalls
+        )
+    }
+
+    /// The reply is everything Atlas said after the latest user turn, joined in
+    /// order. No message IDs: they change when a run finishes, and a reply split
+    /// around tool calls spans several messages.
     static func make(
         messages: [ChatMessage],
-        streamingMessageID: String?,
-        replyMessageID: String?,
         activeStreamID: String?,
         recovery: ActiveStreamRecoveryState,
         approval: ApprovalPromptState?,
         liveToolCalls: [ToolCall]
     ) -> VoiceCallChatSnapshot {
-        let textID = streamingMessageID ?? replyMessageID
-        let text = textID.flatMap { id in messages.last(where: { $0.id == id })?.content }
+        let replyStart = (messages.lastIndex { $0.role == "user" }).map { $0 + 1 } ?? messages.endIndex
+        let parts = messages[replyStart...]
+            .filter { $0.role == "assistant" }
+            .compactMap(\.content)
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         return VoiceCallChatSnapshot(
-            streamingText: text,
+            streamingText: parts.isEmpty ? nil : parts.joined(separator: "\n"),
             isStreaming: activeStreamID != nil,
             approval: approval,
             isReconnecting: recovery == .reconnecting || recovery == .waitingForNetwork,
@@ -59,7 +72,6 @@ struct VoiceCallView: View {
     let onClose: () -> Void
 
     @State private var controller: VoiceCallController?
-    @State private var replyMessageID: String?
     @State private var startMessage: String?
     @Environment(\.openURL) private var openURL
 
@@ -95,7 +107,6 @@ struct VoiceCallView: View {
         }
         .task { await startCall() }
         .onChange(of: snapshot) { _, snapshot in
-            if let id = chat.streamingAssistantMessageID, replyMessageID != id { replyMessageID = id }
             controller?.chatDidUpdate(
                 streamingText: snapshot.streamingText,
                 isStreaming: snapshot.isStreaming,
@@ -103,10 +114,6 @@ struct VoiceCallView: View {
                 isReconnecting: snapshot.isReconnecting,
                 currentTool: snapshot.currentTool
             )
-        }
-        .onChange(of: controller?.state) { _, state in
-            // A new turn: forget the previous reply so its text is never re-read.
-            if state == .thinking, chat.streamingAssistantMessageID == nil { replyMessageID = nil }
         }
         .onChange(of: controller?.isFinished) { _, finished in
             if finished == true, controller?.startError == nil { onClose() }
@@ -123,15 +130,7 @@ struct VoiceCallView: View {
     }
 
     private var snapshot: VoiceCallChatSnapshot {
-        VoiceCallChatSnapshot.make(
-            messages: chat.messages,
-            streamingMessageID: chat.streamingAssistantMessageID,
-            replyMessageID: replyMessageID,
-            activeStreamID: chat.activeStreamID,
-            recovery: chat.activeStreamRecoveryState,
-            approval: chat.approvalPrompt,
-            liveToolCalls: chat.liveToolCalls
-        )
+        VoiceCallChatSnapshot.of(chat)
     }
 
     private func startCall() async {

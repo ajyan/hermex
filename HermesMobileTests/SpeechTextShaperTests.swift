@@ -66,4 +66,11 @@ final class SpeechTextShaperTests: XCTestCase {
         XCTAssertEqual(shaper.append("[voi"), [])
         XCTAssertEqual(shaper.append("[voice] Hi. The"), ["Hi."])
     }
+
+    func testSentenceFollowedByASpaceIsCompleteWithoutMoreText() {
+        var shaper = SpeechTextShaper()
+        XCTAssertEqual(shaper.append("It's sunny. "), ["It's sunny."])
+        XCTAssertEqual(shaper.append("It's sunny. Warm"), [])
+        XCTAssertEqual(shaper.finish(), ["Warm"])
+    }
 }

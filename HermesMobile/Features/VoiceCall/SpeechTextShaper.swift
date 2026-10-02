@@ -102,6 +102,10 @@ struct SpeechTextShaper {
             } else {
                 current.append(Block(text: content, closed: false))
             }
+            // A streamed line ending in a space has finished its last sentence.
+            if isLastLine, !lineComplete, rawLine.last?.isWhitespace == true, let last = current.indices.last {
+                current[last].text += " "
+            }
             paragraphs[paragraphs.count - 1] = current
         }
 
