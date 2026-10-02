@@ -33,7 +33,20 @@ struct SpeechTextShaper {
         var closed: Bool
     }
 
-    static func sentences(in text: String, final: Bool) -> [String] {
+    static func sentences(in rawText: String, final: Bool) -> [String] {
+        // Atlas sometimes echoes the call's "[voice]" tag; never say it.
+        var text = Substring(rawText.drop(while: \.isWhitespace))
+        if text.hasPrefix(echoedTag) {
+            text = text.dropFirst(echoedTag.count)
+        } else if !final, echoedTag.hasPrefix(text) {
+            return []
+        }
+        return sentences(inUntagged: String(text), final: final)
+    }
+
+    private static let echoedTag = "[voice]"
+
+    private static func sentences(inUntagged text: String, final: Bool) -> [String] {
         var paragraphs: [[Block]] = [[]]
         var inFence = false
         var sawDetailsMarker = false

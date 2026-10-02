@@ -59,4 +59,11 @@ final class SpeechTextShaperTests: XCTestCase {
         XCTAssertEqual(shaper.append("Hello there"), [])
         XCTAssertEqual(shaper.finish(), ["Hello there"])
     }
+
+    func testEchoedVoiceTagIsNotSpoken() {
+        XCTAssertEqual(spoken("[voice] It's Friday, October 2nd, 2026."), ["It's Friday, October 2nd, 2026."])
+        var shaper = SpeechTextShaper()
+        XCTAssertEqual(shaper.append("[voi"), [])
+        XCTAssertEqual(shaper.append("[voice] Hi. The"), ["Hi."])
+    }
 }
