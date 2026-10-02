@@ -19,6 +19,11 @@ APP_GROUP_IDENTIFIER = group.com.uzairansar.hermesmobile$(APP_IDENTIFIER_SUFFIX)
 KEYCHAIN_DEFAULT_ACCESS_GROUP = $(DEVELOPMENT_TEAM).$(APP_BUNDLE_IDENTIFIER)
 KEYCHAIN_ACCESS_GROUP = $(DEVELOPMENT_TEAM).$(APP_BUNDLE_IDENTIFIER).push
 
+// The main app's entitlements file. A free personal team cannot sign Push
+// Notifications or Time Sensitive Notifications; point this at
+// Config/HermesMobile.FreeTeam.entitlements from Local.xcconfig in that case.
+APP_ENTITLEMENTS = HermesMobile/Resources/HermesMobile.entitlements
+
 // Optional per-machine overrides. This include must stay last: later
 // assignments win, so Local.xcconfig values override the defaults above.
 #include? "Local.xcconfig"
