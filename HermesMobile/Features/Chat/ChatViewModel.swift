@@ -6964,6 +6964,26 @@ extension ServerTTSAudioPlayer: AVAudioPlayerDelegate {
     }
 }
 
+extension ChatViewModel: VoiceCallChatDriving {
+    /// Sends one spoken turn. Unlike `sendMessage`, it never picks up the
+    /// composer's staged attachments.
+    func sendVoiceMessage(_ text: String) async -> Bool {
+        guard !isViewingCachedData, !isClearingConversation, !isStartingChat, let sessionID else { return false }
+        let message = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !message.isEmpty else { return false }
+        return await performChatSend(
+            sessionID: sessionID,
+            localMessageID: "local-\(UUID().uuidString)",
+            displayContent: message,
+            messageForAPI: message,
+            messageAttachments: [],
+            apiPayloads: nil,
+            attachmentsToRestoreOnFailure: [],
+            modelContext: nil
+        )
+    }
+}
+
 protocol ChatSpeechSynthesizing: AnyObject {
     var delegate: (any AVSpeechSynthesizerDelegate)? { get set }
     var isSpeaking: Bool { get }

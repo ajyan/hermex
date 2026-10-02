@@ -342,8 +342,10 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(controller.state, .ended("Call ended, connection lost"))
         XCTAssertEqual(speaker.spoken.last, "Call ended, connection lost.")
         XCTAssertEqual(listener.stopCount, 1)
+        XCTAssertFalse(controller.isFinished)
         speaker.drain()
         XCTAssertEqual(bridge.endCount, 1)
+        XCTAssertTrue(controller.isFinished)
         XCTAssertEqual(chat.cancelCount, 0)
     }
 
@@ -355,6 +357,7 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(chat.cancelCount, 0)
         XCTAssertEqual(listener.stopCount, 1)
         XCTAssertEqual(bridge.endCount, 1)
+        XCTAssertTrue(controller.isFinished)
         XCTAssertGreaterThanOrEqual(speaker.stopCount, 1)
 
         // Later chat updates don't revive the call.
@@ -369,6 +372,7 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(listener.stopCount, 1)
         XCTAssertEqual(bridge.endCount, 0)
         XCTAssertEqual(chat.cancelCount, 0)
+        XCTAssertTrue(controller.isFinished)
     }
 
     func testStartFailureEndsWithReason() async {

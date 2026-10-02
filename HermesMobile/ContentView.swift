@@ -139,6 +139,11 @@ struct ContentView: View {
             return
         }
 
+        if HermesDeepLink.isNewCallURL(url) {
+            if reachWebuiServer() { pendingNewChatRequest = NewChatRequest(startsCall: true) }
+            return
+        }
+
         // The profile variant carries the chosen profile name, so the composer creates the
         // session pinned to it (#339). A malformed link with no profile falls back to a
         // plain new chat (server's active profile) rather than failing.

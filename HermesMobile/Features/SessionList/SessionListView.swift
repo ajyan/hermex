@@ -603,6 +603,10 @@ struct SessionListView: View {
 
                 if !isSearchingSessions {
                     newSessionButton
+                        .contextMenu {
+                            Button("New Chat", systemImage: "square.and.pencil", action: openNewChat)
+                            Button("New Call", systemImage: "phone", action: openNewCall)
+                        }
                         .padding(.bottom, 22)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
@@ -645,6 +649,7 @@ struct SessionListView: View {
                 autoStartsVoiceInput: route.autoStartsVoiceInput,
                 profileName: route.profileName,
                 projectID: route.projectID,
+                startsCall: route.startsCall,
                 server: server,
                 viewModel: viewModel,
                 onAPIError: authManager.handleAPIError,
@@ -1664,7 +1669,8 @@ struct SessionListView: View {
         selectDestination(
             PendingNewChatRoute(
                 autoStartsVoiceInput: request.autoStartsVoiceInput,
-                profileName: request.profileName
+                profileName: request.profileName,
+                startsCall: request.startsCall
             )
         )
     }
@@ -1674,6 +1680,11 @@ struct SessionListView: View {
     /// (#875). System entry points (App Intents, deep links, shares) never inherit it.
     private func openNewChat() {
         selectDestination(PendingNewChatRoute(projectID: selectedProjectID))
+    }
+
+    /// A new chat that opens straight into a voice call with Atlas.
+    private func openNewCall() {
+        selectDestination(PendingNewChatRoute(projectID: selectedProjectID, startsCall: true))
     }
 
     private func selectSession(_ session: SessionSummary) {
@@ -1882,11 +1893,14 @@ struct NewChatRequest: Equatable {
     /// When set, the new session is created pinned to this profile; nil uses the server's
     /// active profile (the plain "+" / "New Chat" behavior).
     let profileName: String?
+    /// When true, the new chat opens straight into a voice call.
+    let startsCall: Bool
 
-    init(autoStartsVoiceInput: Bool = false, profileName: String? = nil) {
+    init(autoStartsVoiceInput: Bool = false, profileName: String? = nil, startsCall: Bool = false) {
         self.id = UUID()
         self.autoStartsVoiceInput = autoStartsVoiceInput
         self.profileName = profileName
+        self.startsCall = startsCall
     }
 }
 
@@ -1900,19 +1914,23 @@ struct PendingNewChatRoute: Identifiable, Hashable {
     let profileName: String?
     /// When set, the new session is created in this project (#875).
     let projectID: String?
+    /// When true, the new chat opens straight into a voice call.
+    let startsCall: Bool
 
     init(
         initialDraft: String = "",
         initialAttachments: [SharedAttachmentImport] = [],
         autoStartsVoiceInput: Bool = false,
         profileName: String? = nil,
-        projectID: String? = nil
+        projectID: String? = nil,
+        startsCall: Bool = false
     ) {
         self.initialDraft = initialDraft
         self.initialAttachments = initialAttachments
         self.autoStartsVoiceInput = autoStartsVoiceInput
         self.profileName = profileName
         self.projectID = projectID
+        self.startsCall = startsCall
     }
 
     static func == (lhs: PendingNewChatRoute, rhs: PendingNewChatRoute) -> Bool {
@@ -2003,6 +2021,7 @@ private struct PendingNewChatView: View {
     let autoStartsVoiceInput: Bool
     let profileName: String?
     let projectID: String?
+    let startsCall: Bool
     let draftStore: ChatDraftStore
 
     @State private var createdSession: SessionSummary?
@@ -2020,6 +2039,7 @@ private struct PendingNewChatView: View {
         autoStartsVoiceInput: Bool = false,
         profileName: String? = nil,
         projectID: String? = nil,
+        startsCall: Bool = false,
         server: URL,
         viewModel: SessionListViewModel,
         onAPIError: @escaping (Error) -> Void,
@@ -2034,6 +2054,7 @@ private struct PendingNewChatView: View {
         self.autoStartsVoiceInput = autoStartsVoiceInput
         self.profileName = profileName
         self.projectID = projectID
+        self.startsCall = startsCall
         self.draftStore = draftStore ?? .shared
         _draftMessage = State(initialValue: initialDraft)
     }
@@ -2050,6 +2071,7 @@ private struct PendingNewChatView: View {
                     initialAttachments: initialAttachments,
                     loadsInitialMessages: false,
                     autoStartsVoiceInput: autoStartsVoiceInput,
+                    startsCall: startsCall,
                     draftStore: draftStore,
                     restoresDraftSettings: true,
                     onConversationStarted: markConversationStarted

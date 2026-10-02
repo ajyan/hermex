@@ -615,9 +615,19 @@ struct MessageBubbleView: View {
     /// when the user has opted to hide it. Display-only: `message.content` and the
     /// sent payload are untouched.
     private var userBubbleText: String {
-        let content = message.content ?? ""
+        let content = Self.displayText(forUserMessage: message.content ?? "")
         guard !textOnly, hidesAttachmentPaths else { return content }
         return MessageAttachment.contentWithoutAttachedFilesMarker(in: content)
+    }
+}
+
+extension MessageBubbleView {
+    /// A user message as shown: a call's leading `[voice] ` marker is hidden.
+    /// Display-only; the stored and copied text keep it.
+    static func displayText(forUserMessage content: String) -> String {
+        if content == "[voice]" { return "" }
+        guard content.hasPrefix(VoiceCallPhrases.voicePrefix) else { return content }
+        return String(content.dropFirst(VoiceCallPhrases.voicePrefix.count))
     }
 }
 

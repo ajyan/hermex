@@ -38,6 +38,8 @@ final class VoiceCallController {
     private(set) var currentTool: String?
     private(set) var isMuted = false
     private(set) var startError: VoiceCallStartError?
+    /// True once the system call is gone: the call screen can close.
+    private(set) var isFinished = false
 
     @ObservationIgnored private let listener: SpeechListening
     @ObservationIgnored private let speaker: SpeechSpeaking
@@ -154,9 +156,11 @@ final class VoiceCallController {
             speaker.stopNow()
             speaker.enqueue(message + ".")
             pendingSystemEnd = endSystemCall
+            isFinished = !endSystemCall
         } else {
             speaker.stopNow()
             if endSystemCall { bridge.endCall() }
+            isFinished = true
         }
     }
 
@@ -410,6 +414,7 @@ final class VoiceCallController {
             if pendingSystemEnd {
                 pendingSystemEnd = false
                 bridge.endCall()
+                isFinished = true
             }
             return
         }

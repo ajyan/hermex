@@ -1,6 +1,118 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Call Atlas in ${applicationName}": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "اتصل بـ Atlas في ${applicationName}"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Atlas in ${applicationName} anrufen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Call Atlas in ${applicationName}"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Llamar a Atlas en ${applicationName}"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Appeler Atlas dans ${applicationName}"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "להתקשר ל-Atlas ב-${applicationName}"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Chiama Atlas in ${applicationName}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "${applicationName}でAtlasに電話"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "${applicationName}에서 Atlas에게 전화"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Atlas bellen in ${applicationName}"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Zadzwoń do Atlasa w ${applicationName}"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ligar para Atlas no ${applicationName}"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Позвонить Atlas в ${applicationName}"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "${applicationName} içinde Atlas'ı ara"
+          }
+        },
+        "ur": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "${applicationName} میں Atlas کو کال کریں"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在 ${applicationName} 中致電 Atlas"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在 ${applicationName} 中呼叫 Atlas"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在 ${applicationName} 中撥打給 Atlas"
+          }
+        }
+      }
+    },
     "New ${applicationName} chat": {
       "localizations": {
         "ar": {

@@ -64,6 +64,22 @@ struct NewChatVoiceIntent: AppIntent {
     }
 }
 
+/// "Call Atlas" — opens Hermex on a new chat and starts a hands-free voice call on it,
+/// so Siri or the Action button can start a call in one step.
+struct CallAtlasIntent: AppIntent {
+    static var title: LocalizedStringResource = "Call Atlas"
+    static var description = IntentDescription("Start a voice call with Atlas on a new chat.")
+
+    /// Foregrounds the app: CallKit and the microphone run in-process.
+    static var openAppWhenRun: Bool = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        AppIntentRouter.shared.requestDeepLink(HermesDeepLink.newCallURL)
+        return .result()
+    }
+}
+
 /// "New Chat in <Profile>" — opens Hermex on a new chat pinned to a specific server profile
 /// the user picks when configuring the Shortcut/Siri phrase (issue #339). The chosen
 /// `ProfileEntity` is carried through the same `AppIntentRouter`/deep-link plumbing as the
@@ -117,6 +133,14 @@ struct HermexShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "New Chat with Voice",
             systemImageName: "mic.badge.plus"
+        )
+        AppShortcut(
+            intent: CallAtlasIntent(),
+            phrases: [
+                "Call Atlas in \(.applicationName)"
+            ],
+            shortTitle: "Call Atlas",
+            systemImageName: "phone"
         )
         AppShortcut(
             intent: NewChatInProfileIntent(),
