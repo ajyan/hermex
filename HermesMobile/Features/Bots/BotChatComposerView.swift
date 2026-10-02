@@ -207,7 +207,12 @@ struct BotChatComposerView: View {
             voiceInput.stopBeforeSubmittingDraft()
         }
         .onChange(of: scenePhase) { _, newPhase in
-            if newPhase != .active { voiceInput.stopBeforeSubmittingDraft() }
+            if newPhase != .active { voiceInput.suspend() }
+            else { voiceInput.resume() }
+        }
+        .onChange(of: AppLock.shared.isLocked) { _, locked in
+            if locked { voiceInput.suspend() }
+            else if scenePhase == .active { voiceInput.resume() }
         }
         // Ask Hermex lands the passage here, so the keyboard should already be
         // up for whatever the user wants to ask about it.

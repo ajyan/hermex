@@ -598,15 +598,19 @@ struct MessageComposerView: View {
             // "New Chat with Voice" intent once its session is created) — start here.
             // Runs again when the app lock changes, since dictation waits for it (#885);
             // one modifier keeps this chain inside CI Xcode's type-checking budget.
+            if AppLock.shared.isLocked { voiceInput.suspend() }
+            else if scenePhase == .active { voiceInput.resume() }
             autoStartVoiceInputIfNeeded()
         }
+        .onChange(of: sessionID) { _, _ in voiceInput.stopBeforeSubmittingDraft() }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase != .active {
-                voiceInput.stopBeforeSubmittingDraft()
+                voiceInput.suspend()
                 // Backgrounding stops the recorder's run-loop ticker, so cancel
                 // the in-flight recording rather than leave it silently stalled.
                 cancelVoiceNote()
             } else {
+                voiceInput.resume()
                 // An intent that opened this composer may have foregrounded the app
                 // a beat after it appeared; auto-start once we're active (#338).
                 autoStartVoiceInputIfNeeded()
