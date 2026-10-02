@@ -10,8 +10,12 @@
 		AA0100000000000000000001 /* AtlasActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0200000000000000000001 /* AtlasActivity.swift */; };
 		AA0100000000000000000002 /* APIClient+AtlasActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0200000000000000000002 /* APIClient+AtlasActivity.swift */; };
 		AA0100000000000000000003 /* ActivityViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0200000000000000000003 /* ActivityViewModel.swift */; };
+		B0A764E9C4C085020542605A /* AtlasRulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ABEA1D1A1914B24903E156B /* AtlasRulesView.swift */; };
+		D893B0F3205882B2C84347AE /* ActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E948C7A39145FC2898B5FDC /* ActivityView.swift */; };
+		5F3AB28E2E6F48E380119613 /* ActivityPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F610F8AB9422AB347562971 /* ActivityPresentation.swift */; };
 		AA0100000000000000000004 /* APIClientAtlasActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0200000000000000000004 /* APIClientAtlasActivityTests.swift */; };
 		AA0100000000000000000005 /* ActivityViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0200000000000000000005 /* ActivityViewModelTests.swift */; };
+		A7DC7671EF7AC618959F136C /* ActivityPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 116F88CF04387ACD8E12245A /* ActivityPresentationTests.swift */; };
 		A4790000000000000000E001 /* PushEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4790000000000000000F001 /* PushEnvironment.swift */; };
 		A4790000000000000000E002 /* PushPairing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4790000000000000000F002 /* PushPairing.swift */; };
 		A4790000000000000000E003 /* PushRelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4790000000000000000F003 /* PushRelayClient.swift */; };
@@ -1037,8 +1041,12 @@
 		AA0200000000000000000001 /* AtlasActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasActivity.swift; sourceTree = "<group>"; };
 		AA0200000000000000000002 /* APIClient+AtlasActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "APIClient+AtlasActivity.swift"; sourceTree = "<group>"; };
 		AA0200000000000000000003 /* ActivityViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityViewModel.swift; sourceTree = "<group>"; };
+		0ABEA1D1A1914B24903E156B /* AtlasRulesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasRulesView.swift; sourceTree = "<group>"; };
+		3E948C7A39145FC2898B5FDC /* ActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityView.swift; sourceTree = "<group>"; };
+		7F610F8AB9422AB347562971 /* ActivityPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityPresentation.swift; sourceTree = "<group>"; };
 		AA0200000000000000000004 /* APIClientAtlasActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientAtlasActivityTests.swift; sourceTree = "<group>"; };
 		AA0200000000000000000005 /* ActivityViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityViewModelTests.swift; sourceTree = "<group>"; };
+		116F88CF04387ACD8E12245A /* ActivityPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityPresentationTests.swift; sourceTree = "<group>"; };
 		C0DE512E0000000000000201 /* InsightsModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InsightsModels.swift; sourceTree = "<group>"; };
 		C0DE512E0000000000000203 /* SectionCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SectionCard.swift; sourceTree = "<group>"; };
 		C08650000000000000000001 /* ActionToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionToast.swift; sourceTree = "<group>"; };
@@ -1377,6 +1385,7 @@
 				C03900000000000000000002 /* APIClientInsightsTests.swift */,
 				AA0200000000000000000004 /* APIClientAtlasActivityTests.swift */,
 				AA0200000000000000000005 /* ActivityViewModelTests.swift */,
+				116F88CF04387ACD8E12245A /* ActivityPresentationTests.swift */,
 				C03900000000000000000017 /* APIClientUpdatesCheckTests.swift */,
 				C03900000000000000000018 /* APIClientUpdatesApplyTests.swift */,
 				C03900000000000000000003 /* APIClientSessionDetailTests.swift */,
@@ -2108,6 +2117,9 @@
 			isa = PBXGroup;
 			children = (
 				AA0200000000000000000003 /* ActivityViewModel.swift */,
+				0ABEA1D1A1914B24903E156B /* AtlasRulesView.swift */,
+				3E948C7A39145FC2898B5FDC /* ActivityView.swift */,
+				7F610F8AB9422AB347562971 /* ActivityPresentation.swift */,
 			);
 			path = Activity;
 			sourceTree = "<group>";
@@ -2712,6 +2724,9 @@
 				AA0100000000000000000001 /* AtlasActivity.swift in Sources */,
 				AA0100000000000000000002 /* APIClient+AtlasActivity.swift in Sources */,
 				AA0100000000000000000003 /* ActivityViewModel.swift in Sources */,
+				B0A764E9C4C085020542605A /* AtlasRulesView.swift in Sources */,
+				D893B0F3205882B2C84347AE /* ActivityView.swift in Sources */,
+				5F3AB28E2E6F48E380119613 /* ActivityPresentation.swift in Sources */,
 				B5A100000000000000000001 /* SharedDraftStore.swift in Sources */,
 				B5A100000000000000000008 /* ShareInputReader.swift in Sources */,
 			);
@@ -2913,6 +2928,7 @@
 				1A2B3C4D5E6F700000000345 /* AppIntentNewChatInProfileTests.swift in Sources */,
 				AA0100000000000000000004 /* APIClientAtlasActivityTests.swift in Sources */,
 				AA0100000000000000000005 /* ActivityViewModelTests.swift in Sources */,
+				A7DC7671EF7AC618959F136C /* ActivityPresentationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

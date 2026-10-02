@@ -132,6 +132,12 @@ struct SettingsView: View {
                             SettingsAccessoryRow(title: String(localized: "Archived Sessions"), systemImage: "archivebox")
                         }
                         .buttonStyle(.plain)
+                        NavigationLink {
+                            ActivityView(server: server)
+                        } label: {
+                            SettingsAccessoryRow(title: String(localized: "Activity"), systemImage: "list.bullet.rectangle")
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
 
