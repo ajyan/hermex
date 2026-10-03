@@ -7,7 +7,12 @@ import Foundation
 /// `finish()` and spoken only when the reply has no fenced code and no `---`
 /// line: on a call, those mark the details Atlas put in the chat instead.
 struct SpeechTextShaper {
+    /// A call reply is spoken to at most this many sentences; the rest stays in the chat.
+    static let sentenceCap = 3
+    static let restInChat = "I'll put the rest in the chat."
+
     private var emitted: [String] = []
+    private var capped = false
     private var lastText = ""
 
     /// `final` is true once the run has ended: a trailing fragment is then a
@@ -27,6 +32,13 @@ struct SpeechTextShaper {
     private mutating func emit(_ sentences: [String]) -> [String] {
         var fresh: [String] = []
         for (index, sentence) in sentences.enumerated() {
+            if index >= Self.sentenceCap {
+                if !capped {
+                    capped = true
+                    fresh.append(Self.restInChat)
+                }
+                break
+            }
             if index >= emitted.count {
                 emitted.append(sentence)
                 fresh.append(sentence)

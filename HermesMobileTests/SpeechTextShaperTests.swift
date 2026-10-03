@@ -22,10 +22,8 @@ final class SpeechTextShaperTests: XCTestCase {
     }
 
     func testStripsMarkdown() {
-        XCTAssertEqual(
-            spoken("# Heading\n**bold** move.\n- item\n1. first\nSee [text](https://a.b/c) and `ls`."),
-            ["Heading", "bold move.", "item", "first", "See text and ls."]
-        )
+        XCTAssertEqual(spoken("# Heading\n**bold** move.\n- item"), ["Heading", "bold move.", "item"])
+        XCTAssertEqual(spoken("1. first\nSee [text](https://a.b/c) and `ls`."), ["first", "See text and ls."])
     }
 
     func testSkipsFencedCode() {
@@ -58,6 +56,25 @@ final class SpeechTextShaperTests: XCTestCase {
         var shaper = SpeechTextShaper()
         XCTAssertEqual(shaper.append("Hello there"), [])
         XCTAssertEqual(shaper.finish(), ["Hello there"])
+    }
+
+    func testLongReplyStopsAfterThreeSentencesAndPointsToTheChat() {
+        var shaper = SpeechTextShaper()
+        XCTAssertEqual(shaper.append("One. Two. Three. Four"), ["One.", "Two.", "Three."])
+        XCTAssertEqual(shaper.append("One. Two. Three. Four. Five"), [SpeechTextShaper.restInChat])
+        XCTAssertEqual(shaper.append("One. Two. Three. Four. Five. Six."), [])
+        XCTAssertEqual(shaper.finish(), [])
+    }
+
+    func testCapAppliesWhenTheFourthSentenceIsTheTrailingFragment() {
+        XCTAssertEqual(
+            spoken("One. Two. Three. Four"),
+            ["One.", "Two.", "Three.", SpeechTextShaper.restInChat]
+        )
+    }
+
+    func testThreeSentenceReplyIsNotCapped() {
+        XCTAssertEqual(spoken("One. Two. Three."), ["One.", "Two.", "Three."])
     }
 
     func testEchoedVoiceTagVariantsAreNotSpoken() {
