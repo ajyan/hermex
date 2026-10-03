@@ -5884,7 +5884,9 @@ final class ChatViewModel {
     }
 
     private static func displayTitle(from title: String?) -> String {
-        let trimmedTitle = title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        // A call's sessions are titled from the first spoken turn; hide its tag.
+        let trimmedTitle = title.map { VoiceCallPhrases.withoutVoiceTag($0.trimmingCharacters(in: .whitespacesAndNewlines)) }?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         guard let trimmedTitle, !trimmedTitle.isEmpty else {
             return String(localized: "Untitled Session")
         }
@@ -6961,6 +6963,26 @@ extension ServerTTSAudioPlayer: AVAudioPlayerDelegate {
         Task { @MainActor in
             self.onFinish?()
         }
+    }
+}
+
+extension ChatViewModel: VoiceCallChatDriving {
+    /// Sends one spoken turn. Unlike `sendMessage`, it never picks up the
+    /// composer's staged attachments.
+    func sendVoiceMessage(_ text: String) async -> Bool {
+        guard !isViewingCachedData, !isClearingConversation, !isStartingChat, let sessionID else { return false }
+        let message = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !message.isEmpty else { return false }
+        return await performChatSend(
+            sessionID: sessionID,
+            localMessageID: "local-\(UUID().uuidString)",
+            displayContent: message,
+            messageForAPI: message,
+            messageAttachments: [],
+            apiPayloads: nil,
+            attachmentsToRestoreOnFailure: [],
+            modelContext: nil
+        )
     }
 }
 

@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Shows a voice call from both ends: the phone's call log (Debug builds write
+# Documents/voice-call.log) and the Mac agent's record of each reply, so a cut-off
+# can be placed on the phone or on the model.
+#
+#   scripts/voice-call-log <device-id> [minutes]   (default: last 30 minutes)
+set -euo pipefail
+
+device=${1:?usage: scripts/voice-call-log <device-id> [minutes]}
+minutes=${2:-30}
+bundle=${HERMEX_BUNDLE_ID:-com.andrewjyan.hermex}
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+echo "== Phone (Documents/voice-call.log, times UTC) =="
+if xcrun devicectl device copy from --device "$device" --domain-type appDataContainer \
+    --domain-identifier "$bundle" --source Documents/voice-call.log \
+    --destination "$tmp/voice-call.log" >"$tmp/copy.out" 2>&1; then
+  since=$(date -u -v-"${minutes}"M +%H:%M:%S)
+  awk -v since="$since" 'substr($1, 1, 8) >= since' "$tmp/voice-call.log"
+else
+  echo "(couldn't read the phone's call log; unlock it and keep it connected)"
+  grep -m1 "ERROR" "$tmp/copy.out" || true
+fi
+
+echo
+echo "== Agent replies (~/.hermes/logs/agent.log, local time) =="
+since_local=$(date -v-"${minutes}"M "+%Y-%m-%d %H:%M:%S")
+awk -v since="$since_local" '($1 " " substr($2, 1, 8)) >= since' ~/.hermes/logs/agent.log \
+  | grep "Turn ended" \
+  | sed -E 's/^([0-9-]+ [0-9:]+),[0-9]+ .* reason=([^ ]+).* response_len=([0-9]+).*session=([^ ]+).*/\1  len=\3  \2  \4/'

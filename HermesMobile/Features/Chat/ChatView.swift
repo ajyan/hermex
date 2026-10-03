@@ -282,6 +282,8 @@ struct ChatView: View {
     /// When true, the composer auto-starts voice dictation on appear — set by the
     /// "New Chat with Voice" App Intent (#338). Defaults to false for normal opens.
     let autoStartsVoiceInput: Bool
+    /// When true, a voice call starts once the chat appears ("New call", "Call Atlas").
+    let startsCall: Bool
     let draftStore: ChatDraftStore
     /// Store holding the durable app-owned copies of staged attachments.
     let draftAttachmentStore: any ChatDraftAttachmentStoring
@@ -298,6 +300,8 @@ struct ChatView: View {
     /// `persistDraftEdit`.
     @State private var draftMessage = ""
     @State private var draftQuotes: [ComposerQuote] = []
+    @State private var isVoiceCallPresented = false
+    @State private var didAutoStartCall = false
     @State private var draftRevision = 0
     @State private var isScrolledNearBottom = true
     @State private var followLatch = ChatScrollPolicy.FollowLatch()
@@ -395,6 +399,7 @@ struct ChatView: View {
         initialAttachments: [SharedAttachmentImport] = [],
         loadsInitialMessages: Bool = true,
         autoStartsVoiceInput: Bool = false,
+        startsCall: Bool = false,
         draftStore: ChatDraftStore? = nil,
         draftAttachmentStore: (any ChatDraftAttachmentStoring)? = nil,
         restoresDraftSettings: Bool = false,
@@ -405,6 +410,7 @@ struct ChatView: View {
         self.onAPIError = onAPIError
         self.loadsInitialMessages = loadsInitialMessages
         self.autoStartsVoiceInput = autoStartsVoiceInput
+        self.startsCall = startsCall
         self.draftStore = draftStore ?? .shared
         let resolvedDraftAttachmentStore = draftAttachmentStore ?? ChatDraftAttachmentStore.shared
         self.draftAttachmentStore = resolvedDraftAttachmentStore
@@ -881,6 +887,16 @@ struct ChatView: View {
 
                 ToolbarItem(placement: .topBarTrailing) {
                     ChatToolbarActionCluster {
+                        ChatToolbarActionSlot {
+                            Button {
+                                isVoiceCallPresented = true
+                            } label: {
+                                Label("Call Atlas", systemImage: "phone")
+                            }
+                            .disabled(viewModel.isViewingCachedData)
+                            .accessibilityLabel("Call Atlas")
+                        }
+
                         if viewModel.hasActivatedGoalCommand {
                             ChatToolbarActionSlot {
                                 goalControlMenu
@@ -909,6 +925,17 @@ struct ChatView: View {
             }
             .navigationDestination(item: $pushedSession) { session in
                 ChatView(session: session, server: server, onAPIError: onAPIError)
+            }
+            .onChange(of: isVoiceCallPresented) { _, presented in
+                if presented { dismissKeyboard() }
+            }
+            .fullScreenCover(isPresented: $isVoiceCallPresented) {
+                VoiceCallView(chat: viewModel) { isVoiceCallPresented = false }
+            }
+            .onAppear {
+                guard startsCall, !didAutoStartCall else { return }
+                didAutoStartCall = true
+                isVoiceCallPresented = true
             }
             .sheet(item: $attachmentPreviewItem) { item in
                 ChatAttachmentPreviewView(
