@@ -13,6 +13,8 @@ enum ShellPushDestination: Hashable {
     case tasks
     case kanban
     case settings(SettingsScrollAnchor?)
+    /// Screens still reached from the old sidebar rows until they move into Settings.
+    case legacy(SessionListUtilityDestination)
 }
 
 /// Navigation for the chat-first shell: one chat root, a push path over it, and
@@ -97,5 +99,55 @@ struct ShellNavigationState: Equatable {
         guard let sessionID else { return nil }
         let trimmed = sessionID.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+/// Resolves the hardware-keyboard chat shortcuts (⌘1–⌘9, Next and Previous
+/// Chat) against the ordinary chat rows in on-screen order.
+enum ChatShortcutNavigation {
+    /// The chat at a 1-based list position, or nil when the list is shorter.
+    static func chat(atPosition position: Int, in chats: [SessionSummary]) -> SessionSummary? {
+        chats.indices.contains(position - 1) ? chats[position - 1] : nil
+    }
+
+    /// The chat `offset` rows from the selection, wrapping at the ends. Without
+    /// a selection in the list, next starts at the first chat and previous at
+    /// the last.
+    static func adjacentChat(
+        offset: Int,
+        from selectedSessionID: String?,
+        in chats: [SessionSummary]
+    ) -> SessionSummary? {
+        guard !chats.isEmpty else { return nil }
+        guard let selectedSessionID,
+              let selectedIndex = chats.firstIndex(where: { $0.sessionId == selectedSessionID })
+        else {
+            return offset > 0 ? chats.first : chats.last
+        }
+
+        let count = chats.count
+        return chats[((selectedIndex + offset) % count + count) % count]
+    }
+}
+
+/// Device-local last-seen server timestamps for session rows. The server URL
+/// scopes equal session IDs on different configured servers independently.
+struct SessionUnreadStore {
+    var defaults: UserDefaults = .standard
+
+    private func key(for server: URL) -> String {
+        "session-inbox-seen." + server.absoluteString
+    }
+
+    func load(for server: URL) -> [String: Double] {
+        defaults.dictionary(forKey: key(for: server)) as? [String: Double] ?? [:]
+    }
+
+    func save(_ seen: [String: Double], for server: URL) {
+        defaults.set(seen, forKey: key(for: server))
+    }
+
+    func remove(for server: URL) {
+        defaults.removeObject(forKey: key(for: server))
     }
 }

@@ -37,8 +37,7 @@ struct SessionListForegroundRefresh: Equatable {
 ///   there. Otherwise it shows on the other session screen if that is showing,
 ///   or nowhere. Either way the session is in Archived.
 struct SessionListArchiveToastRoute: Equatable {
-    /// On iPhone the Scheduled screen covers the list; on iPad it fills the
-    /// detail column beside the sidebar.
+    /// The drawer's list, or the Scheduled screen pushed over the chat.
     enum Host: Equatable {
         case list
         case scheduled
@@ -57,17 +56,15 @@ struct SessionListArchiveToastRoute: Equatable {
     mutating func archiveConfirmed(
         _ number: Int,
         swipedOn: Host,
-        destination: SessionNavigationDestination?,
-        isRegularWidth: Bool
+        isListShowing: Bool,
+        isScheduledShowing: Bool
     ) -> Host? {
         guard number > newestShown else { return nil }
 
         func isShowing(_ candidate: Host) -> Bool {
             switch candidate {
-            case .list:
-                return isRegularWidth || destination == nil
-            case .scheduled:
-                return destination == .utility(.scheduled)
+            case .list: isListShowing
+            case .scheduled: isScheduledShowing
             }
         }
 
@@ -80,7 +77,9 @@ struct SessionListArchiveToastRoute: Equatable {
 }
 
 @MainActor
-struct SessionListView: View {
+/// The logged-in root: one chat stack with a left drawer of chats over it.
+/// Every launch opens a new chat; the drawer holds search, rows, and navigation.
+struct ChatShellView: View {
     private static let searchChromeIconVisualSize: CGFloat = 36
     private static let searchChromeIconHitTarget: CGFloat = 44
 
@@ -99,20 +98,22 @@ struct SessionListView: View {
     @Binding private var pendingWebuiPush: WebuiPushDestination?
 
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.requestReview) private var requestReview
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage(TipJar.completedResponseCountKey) private var completedResponses = 0
     @AppStorage(TipJar.dismissedReleaseKey) private var tipDismissedRelease: String?
     @State private var wasBackgrounded = false
     @State private var foregroundRefresh = SessionListForegroundRefresh()
-    @State private var ratingRequestID: UUID?
-    @State private var ratingMoment: RatingPromptMoment = .coldLaunch
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var viewModel: SessionListViewModel
-    @State private var navigationState: SessionNavigationState
+    @State private var navigation = ShellNavigationState()
+    @GestureState private var drawerDrag: CGFloat = 0
+    /// The drawer is built on first open and kept alive, so it keeps its scroll position.
+    @State private var hasOpenedDrawer = false
+    /// False while ChatView pushes its own screens (Files, forks), which the typed path cannot see.
+    @State private var isRootVisible = true
     @State private var sessionPendingRename: SessionSummary?
     @State private var sessionPendingDeletion: SessionSummary?
     @State private var sessionPendingProjectCreation: SessionSummary?
@@ -131,8 +132,6 @@ struct SessionListView: View {
     @State private var sidebarScrollPosition: String?
     @State private var didCompleteInitialLoad = false
     @State private var returnRefreshID: UUID?
-    /// Set while compact width pops back to the list on the way to Settings → Notifications.
-    @State private var opensNotificationSettingsOnReturn = false
     @State private var actionToast = ActionToastState()
     @State private var archiveToastRoute = SessionListArchiveToastRoute()
     @FocusState private var searchFieldIsFocused: Bool
@@ -192,11 +191,6 @@ struct SessionListView: View {
         _pendingBotDestination = pendingBotDestination
         _pendingWebuiPush = pendingWebuiPush
         _viewModel = State(initialValue: SessionListViewModel(server: server))
-        _navigationState = State(
-            initialValue: SessionNavigationState(
-                lastSelectedSessionID: SessionNavigationPersistence.load(for: server)
-            )
-        )
         _showsCliSessions = AppStorage(
             wrappedValue: SessionRowDisplaySettings.showsCliSessions(for: server),
             SessionRowDisplaySettings.showCliSessionsKey(for: server)
@@ -221,31 +215,12 @@ struct SessionListView: View {
                     ) {
                         refreshAfterReturningIfNeeded()
                     }
-                    ratingMoment = .foreground
-                    ratingRequestID = UUID()
-                } else if phase != .active {
-                    ratingRequestID = nil
                 }
             }
-            .task(id: ratingRequestID) {
-                guard ratingRequestID != nil else { return }
-                await RatingPromptState.shared.requestWhenQuiet(
-                    moment: ratingMoment,
-                    server: server,
-                    isSessionListVisible: {
-                        if showsTipCard && isQuietSessionListVisible {
-                            RatingPromptState.shared.recordTipCardShown()
-                        }
-                        return isQuietSessionListVisible
-                    },
-                    loadSessions: { try await APIClient(baseURL: server).sessions(includeArchived: true).sessions },
-                    request: { requestReview() }
-                )
-            }
-            // Turning the gate off while the Bots inbox is open pops back to the list.
+            // Turning the gate off while the Bots inbox is open pops it.
             .onChange(of: isBotModeEnabled) {
-                if !isBotModeEnabled, navigationState.destination == .utility(.bots) {
-                    navigationState.clearDestination()
+                if !isBotModeEnabled {
+                    navigation.path.removeAll { $0 == .legacy(.bots) }
                 }
             }
             .safeAreaInset(edge: .top, spacing: 0) {
@@ -371,11 +346,8 @@ struct SessionListView: View {
                     loadSessions: {
                         await loadSessionRows()
                     },
-                    restoreSelection: {
+                    sessionsDidLoad: {
                         didCompleteInitialLoad = true
-                        // Ordered after the deep link so restoreIfNeeded() sees the
-                        // explicit destination and leaves the stored selection alone.
-                        restoreLastSelectedSessionIfNeeded()
                     },
                     loadProjects: {
                         await loadProjectsIfLive()
@@ -408,7 +380,6 @@ struct SessionListView: View {
                 refreshAfterReturningIfNeeded()
             }
             .onDisappear {
-                ratingRequestID = nil
                 sessionOpenTask?.cancel()
                 viewModel.invalidateSessionOpening()
                 actionToast.dismiss()
@@ -435,18 +406,12 @@ struct SessionListView: View {
                 guard !showsProjectsSection else { return }
                 selectedProjectID = nil
             }
-            .onChange(of: navigationState.destination) { oldValue, newValue in
-                if case .session(let previous)? = oldValue,
-                   oldValue?.selectedSessionID != newValue?.selectedSessionID {
+            .onChange(of: navigation.root) { oldValue, newValue in
+                if case .session(let previous) = oldValue, previous.sessionId != navigation.selectedSessionID {
                     viewModel.noteReturn(from: previous)
                 }
-                if case .session(let current)? = newValue {
+                if case .session(let current) = newValue {
                     viewModel.beginViewing(current)
-                }
-                ratingRequestID = nil
-                if oldValue != nil, newValue == nil {
-                    ratingMoment = .returnedToSessionList
-                    ratingRequestID = UUID()
                 }
                 SessionListDestinationReturn.run(
                     from: oldValue,
@@ -454,6 +419,10 @@ struct SessionListView: View {
                     suppressEmptyPlaceholders: viewModel.removeEmptySidebarPlaceholders,
                     refreshSessions: refreshAfterReturningIfNeeded
                 )
+            }
+            .onChange(of: navigation.isDrawerOpen) { wasOpen, isOpen in
+                guard ShellNavigationState.drawerOpenRequestsRefresh(wasOpen: wasOpen, isOpen: isOpen) else { return }
+                refreshAfterReturningIfNeeded()
             }
             .modifier(
                 SessionActionConfirmations(
@@ -479,20 +448,6 @@ struct SessionListView: View {
             hasSharedImport: hasWaitingSharedImport || pendingSharedImport != nil,
             ratingPolicy: RatingPromptState.shared.policy
         )
-    }
-
-    private var isQuietSessionListVisible: Bool {
-        guard case .loggedIn(let activeServer) = authManager.state, activeServer == server else { return false }
-        return scenePhase == .active && didCompleteInitialLoad
-            && navigationState.destination == nil
-            && pendingDeepLinkedSessionID == nil && requestedNewChat == nil
-            && pendingSharedImport == nil && !hasWaitingSharedImport
-            && !isSearchingSessions && !viewModel.isViewingCachedData
-            && sessionExportShareItem == nil && sessionPendingRename == nil
-            && sessionPendingProjectCreation == nil && sessionPendingDeletion == nil
-            && projectPendingRename == nil && projectPendingDeletion == nil
-            && !isPresentingProjectCreation && !isPresentingAddServer
-            && sessionOpenErrorMessage == nil && !viewModel.isCreatingSession
     }
 
     private var waitingSharedImportBanner: some View {
@@ -523,11 +478,11 @@ struct SessionListView: View {
         .accessibilityElement(children: .contain)
     }
 
-    /// The navigation container plus bot-link routing. Kept off `body`'s modifier
-    /// chain, which is long enough that adding to it exceeds the type-checker's
-    /// budget on the CI toolchain.
+    /// The shell plus bot-link routing. Kept off `body`'s modifier chain, which is
+    /// long enough that adding to it exceeds the type-checker's budget on the CI
+    /// toolchain.
     private var routedNavigationContainer: some View {
-        navigationContainer
+        shellContainer
             // Cold launch delivers the link before this view appears; a warm one after.
             .task { showBotsForPendingDestination() }
             .onChange(of: pendingBotDestination) { showBotsForPendingDestination() }
@@ -535,18 +490,9 @@ struct SessionListView: View {
             .openNotificationSettings { showNotificationSettings() }
     }
 
-    /// Opens Settings → Notifications for a chat's one-time offer (#863). On compact
-    /// width a fork or a chat under Settings → Archived Sessions can sit above the
-    /// destination, and retargeting the destination leaves it on top. So compact pops
-    /// to the list first, and the list opens Settings once it is back on screen.
-    /// Regular width pops the detail column on every root selection already.
+    /// Opens Settings → Notifications for a chat's one-time offer (#863).
     private func showNotificationSettings() {
-        guard horizontalSizeClass != .regular, navigationState.destination != nil else {
-            selectDestination(.settings(.notifications))
-            return
-        }
-        opensNotificationSettingsOnReturn = true
-        navigationState.clearDestination()
+        navigation.showOnly(.settings(.notifications))
     }
 
     /// A bot deep link opens this server's Bots inbox, which owns resolving it. Only
@@ -555,40 +501,185 @@ struct SessionListView: View {
     /// screen resolves the link itself, so it is not pushed a second time.
     private func showBotsForPendingDestination() {
         guard isBotModeEnabled, let destination = pendingBotDestination, destination.server == server,
-              navigationState.destination != .utility(.bots) else {
+              navigation.path.last != .legacy(.bots) else {
             return
         }
-        selectDestination(.bots)
+        navigation.showOnly(.legacy(.bots))
+    }
+
+    // MARK: - Shell
+
+    private var shellContainer: some View {
+        GeometryReader { proxy in
+            let width = DrawerSettle.width(
+                screenWidth: proxy.size.width,
+                isAccessibilitySize: dynamicTypeSize.isAccessibilitySize
+            )
+            let fraction = drawerFraction(width: width)
+            let shift = reduceMotion ? 0 : fraction * width
+
+            ZStack(alignment: .leading) {
+                mainStack
+                    .offset(x: shift)
+                    .accessibilityHidden(navigation.isDrawerOpen)
+
+                if fraction > 0 {
+                    Color.black.opacity(0.3 * fraction)
+                        .ignoresSafeArea()
+                        .offset(x: shift)
+                        .contentShape(Rectangle())
+                        .onTapGesture { setDrawerOpen(false) }
+                        .accessibilityHidden(true)
+                }
+
+                if hasOpenedDrawer {
+                    sessionListSurface
+                        .frame(width: width)
+                        .background(Color.hxCanvas.ignoresSafeArea())
+                        .offset(x: reduceMotion ? 0 : (fraction - 1) * width)
+                        .opacity(reduceMotion ? fraction : 1)
+                        .allowsHitTesting(navigation.isDrawerOpen)
+                        .accessibilityHidden(!navigation.isDrawerOpen)
+                        .accessibilityElement(children: .contain)
+                        .accessibilityAddTraits(.isModal)
+                        .accessibilityAction(.escape) { setDrawerOpen(false) }
+                }
+
+                if navigation.isDrawerOpen {
+                    Button("Close Chats") { setDrawerOpen(false) }
+                        .keyboardShortcut(.cancelAction)
+                        .hidden()
+                        .accessibilityHidden(true)
+                }
+            }
+            .simultaneousGesture(drawerDragGesture(width: width))
+        }
+    }
+
+    private var mainStack: some View {
+        NavigationStack(path: $navigation.path) {
+            rootView
+                .toolbar { shellToolbar }
+                .onAppear { isRootVisible = true }
+                .onDisappear { isRootVisible = false }
+                .navigationDestination(for: ShellPushDestination.self) { destination in
+                    pushedView(destination)
+                }
+        }
+        // A new root also drops screens ChatView pushed outside the typed path.
+        .id(navigation.rootRevision)
+        .background(Color.hxCanvas.ignoresSafeArea())
     }
 
     @ViewBuilder
-    private var navigationContainer: some View {
-        if horizontalSizeClass == .regular {
-            SessionSplitView(rootRevision: navigationState.rootRevision) {
-                sessionListSurface
-                    .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 420)
-            } detail: {
-                regularWidthDetail
+    private var rootView: some View {
+        switch navigation.root {
+        case .session(let session):
+            ChatView(
+                session: session,
+                server: server,
+                onAPIError: authManager.handleAPIError,
+                draftStore: draftStore
+            )
+            .id(session.id)
+        case .newChat(let route):
+            PendingNewChatView(
+                initialDraft: route.initialDraft,
+                initialAttachments: route.initialAttachments,
+                autoStartsVoiceInput: route.autoStartsVoiceInput,
+                profileName: route.profileName,
+                projectID: route.projectID,
+                startsCall: route.startsCall,
+                server: server,
+                viewModel: viewModel,
+                onAPIError: authManager.handleAPIError,
+                onSessionCreated: rememberCreatedSession,
+                draftStore: draftStore
+            )
+            .id(route.id)
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var shellToolbar: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Button {
+                setDrawerOpen(!navigation.isDrawerOpen)
+            } label: {
+                Image(systemName: "line.3.horizontal")
             }
-        } else {
-            NavigationStack {
-                sessionListSurface
-                    .navigationDestination(item: navigationDestinationBinding) { destination in
-                        navigationDestination(destination)
-                    }
-                    .onAppear {
-                        // The pop `showNotificationSettings` started has landed.
-                        guard opensNotificationSettingsOnReturn else { return }
-                        opensNotificationSettingsOnReturn = false
-                        selectDestination(.settings(.notifications))
-                    }
+            .accessibilityLabel(navigation.isDrawerOpen ? "Close chats" : "Open chats")
+        }
+
+        ToolbarItem(placement: .topBarTrailing) {
+            Button(action: openNewChat) {
+                Image(systemName: "square.and.pencil")
             }
+            .disabled(viewModel.isViewingCachedData || navigation.isCreatingNewChat)
+            .accessibilityLabel("New chat")
+        }
+    }
+
+    @ViewBuilder
+    private func pushedView(_ destination: ShellPushDestination) -> some View {
+        switch destination {
+        case .settings(let scrollTo):
+            utilityDestination(.settings(scrollTo))
+        case .tasks:
+            utilityDestination(.tasks)
+        case .kanban:
+            utilityDestination(.kanban)
+        case .legacy(let utility):
+            utilityDestination(utility)
+        case .projects, .project:
+            Text(verbatim: "")
+        }
+    }
+
+    private func drawerFraction(width: CGFloat) -> CGFloat {
+        DrawerSettle.openFraction(startedOpen: navigation.isDrawerOpen, translation: drawerDrag, width: width)
+    }
+
+    /// Tracks only drags that can move the drawer: any horizontal drag while it is
+    /// open, or one starting at the left edge of the chat root while it is closed.
+    private func drawerDragGesture(width: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 10, coordinateSpace: .global)
+            .updating($drawerDrag) { value, state, _ in
+                guard tracksDrawerDrag(value) else { return }
+                state = value.translation.width
+            }
+            .onEnded { value in
+                guard tracksDrawerDrag(value) else { return }
+                setDrawerOpen(DrawerSettle.isOpen(
+                    startedOpen: navigation.isDrawerOpen,
+                    translation: value.translation.width,
+                    velocity: value.velocity.width,
+                    width: width
+                ))
+            }
+    }
+
+    private func tracksDrawerDrag(_ value: DragGesture.Value) -> Bool {
+        guard abs(value.translation.width) > abs(value.translation.height) else { return false }
+        return navigation.isDrawerOpen || DrawerSettle.allowsEdgeOpen(
+            startX: value.startLocation.x,
+            pathIsEmpty: navigation.path.isEmpty && isRootVisible
+        )
+    }
+
+    private func setDrawerOpen(_ isOpen: Bool) {
+        if isOpen {
+            hasOpenedDrawer = true
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        }
+        withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.3)) {
+            navigation.isDrawerOpen = isOpen
         }
     }
 
     private var sessionListSurface: some View {
         ZStack(alignment: .bottomTrailing) {
-            Color(.systemBackground)
+            Color.hxCanvas
                 .ignoresSafeArea()
 
             content
@@ -612,53 +703,6 @@ struct SessionListView: View {
                 }
             }
             .padding(.horizontal, 24)
-        }
-    }
-
-    @ViewBuilder
-    private var regularWidthDetail: some View {
-        if let destination = navigationState.destination {
-            navigationDestination(destination)
-        } else {
-            ContentUnavailableView {
-                Label("Select a Chat", systemImage: "bubble.left.and.bubble.right")
-            } description: {
-                Text("Choose a session from the sidebar or start a new chat.")
-            } actions: {
-                Button("New Chat", action: openNewChat)
-                    .buttonStyle(.borderedProminent)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func navigationDestination(_ destination: SessionNavigationDestination) -> some View {
-        switch destination {
-        case .session(let session):
-            ChatView(
-                session: session,
-                server: server,
-                onAPIError: authManager.handleAPIError,
-                draftStore: draftStore
-            )
-                .id(session.id)
-        case .newChat(let route):
-            PendingNewChatView(
-                initialDraft: route.initialDraft,
-                initialAttachments: route.initialAttachments,
-                autoStartsVoiceInput: route.autoStartsVoiceInput,
-                profileName: route.profileName,
-                projectID: route.projectID,
-                startsCall: route.startsCall,
-                server: server,
-                viewModel: viewModel,
-                onAPIError: authManager.handleAPIError,
-                onSessionCreated: rememberCreatedSession,
-                draftStore: draftStore
-            )
-            .id(route.id)
-        case .utility(let destination):
-            utilityDestination(destination)
         }
     }
 
@@ -693,9 +737,7 @@ struct SessionListView: View {
                     showsCronSessions: showsCronSessions,
                     showsMessageCount: showsSessionMessageCount,
                     showsWorkspace: showsSessionWorkspace,
-                    selectedSessionID: horizontalSizeClass == .regular
-                        ? navigationState.selectedSessionID
-                        : nil,
+                    selectedSessionID: navigation.selectedSessionID,
                     actions: sessionRowActions(toastHost: .scheduled),
                     actionToast: archiveToastRoute.host == .scheduled ? actionToast : nil
                 )
@@ -707,16 +749,6 @@ struct SessionListView: View {
             }
         }
         .adaptiveSecondaryNavigationTitle()
-    }
-
-    private var navigationDestinationBinding: Binding<SessionNavigationDestination?> {
-        Binding(
-            get: { navigationState.destination },
-            set: { destination in
-                guard destination == nil else { return }
-                navigationState.clearDestination()
-            }
-        )
     }
 
     private var content: some View {
@@ -767,9 +799,7 @@ struct SessionListView: View {
                     isSearchActive: isSearchingSessions,
                     showsMessageCount: showsSessionMessageCount,
                     showsWorkspace: showsSessionWorkspace,
-                    selectedSessionID: horizontalSizeClass == .regular
-                        ? navigationState.selectedSessionID
-                        : nil,
+                    selectedSessionID: navigation.selectedSessionID,
                     userIsExpanded: $scheduledSessionsAreExpanded,
                     actions: sessionRowActions(),
                     viewAll: { selectDestination(.scheduled) }
@@ -785,9 +815,7 @@ struct SessionListView: View {
                 isSearchActive: isSearchingSessions,
                 showsMessageCount: showsSessionMessageCount,
                 showsWorkspace: showsSessionWorkspace,
-                selectedSessionID: horizontalSizeClass == .regular
-                    ? navigationState.selectedSessionID
-                    : nil,
+                selectedSessionID: navigation.selectedSessionID,
                 actions: sessionRowActions(),
                 suppressEmptyState: !groups.scheduled.isEmpty
             )
@@ -1004,7 +1032,7 @@ struct SessionListView: View {
             )
         }
         .buttonStyle(SessionListFloatingChatButtonStyle())
-        .disabled(viewModel.isViewingCachedData || navigationState.isCreatingNewChat)
+        .disabled(viewModel.isViewingCachedData || navigation.isCreatingNewChat)
         .opacity(viewModel.isViewingCachedData ? 0.45 : 1)
         .accessibilityLabel("New Session")
     }
@@ -1205,8 +1233,7 @@ struct SessionListView: View {
             streamIDs: SessionListViewModel.activeStreamIDs(in: activeSessions),
             hasActiveRows: !activeSessions.isEmpty,
             isViewingCachedData: viewModel.isViewingCachedData,
-            isRegularWidth: horizontalSizeClass == .regular,
-            destination: navigationState.destination
+            isDrawerOpen: navigation.isDrawerOpen
         )
     }
 
@@ -1283,7 +1310,7 @@ struct SessionListView: View {
 
     private var sceneActions: HermexSceneActions {
         HermexSceneActions(
-            canCreateNewChat: !viewModel.isViewingCachedData && !navigationState.isCreatingNewChat,
+            canCreateNewChat: !viewModel.isViewingCachedData && !navigation.isCreatingNewChat,
             createNewChat: openNewChatFromKeyboard,
             searchSessions: openSearchFromKeyboard,
             openChat: openChatFromKeyboard(atPosition:),
@@ -1308,23 +1335,20 @@ struct SessionListView: View {
     private func openAdjacentChatFromKeyboard(offset: Int) {
         guard let chat = ChatShortcutNavigation.adjacentChat(
             offset: offset,
-            from: viewModel.openingSessionID ?? navigationState.selectedSessionID,
+            from: viewModel.openingSessionID ?? navigation.selectedSessionID,
             in: keyboardShortcutChats
         ) else { return }
         startOpeningSession(chat)
     }
 
     private func openNewChatFromKeyboard() {
-        guard !viewModel.isViewingCachedData, !navigationState.isCreatingNewChat else { return }
+        guard !viewModel.isViewingCachedData, !navigation.isCreatingNewChat else { return }
         openNewChat()
     }
 
     private func openSearchFromKeyboard() {
         searchFieldIsFocused = false
-
-        if horizontalSizeClass != .regular {
-            navigationState.clearDestination()
-        }
+        setDrawerOpen(true)
 
         Task { @MainActor in
             await Task.yield()
@@ -1453,8 +1477,8 @@ struct SessionListView: View {
             let shownOn = archiveToastRoute.archiveConfirmed(
                 archiveNumber,
                 swipedOn: toastHost,
-                destination: navigationState.destination,
-                isRegularWidth: horizontalSizeClass == .regular
+                isListShowing: navigation.isDrawerOpen,
+                isScheduledShowing: navigation.path.last == .legacy(.scheduled)
             )
             if shownOn != nil {
                 showArchiveUndoToast(for: session)
@@ -1606,14 +1630,12 @@ struct SessionListView: View {
               authManager.state == .loggedIn(server: server), !Task.isCancelled else { return }
         sessionOpenTask?.cancel()
         viewModel.invalidateSessionOpening()
-        navigationState.openSessionList()
-        persistLastSelectedSession()
-        let revision = navigationState.rootRevision
+        let revision = navigation.rootRevision
         let session = await viewModel.loadSessionForDeepLink(
             id: destination.sessionID, modelContext: modelContext, isPush: true)
         guard !Task.isCancelled, pendingWebuiPush == destination,
               authManager.state == .loggedIn(server: server) else { return }
-        guard navigationState.rootRevision == revision else {
+        guard navigation.rootRevision == revision else {
             pendingWebuiPush = nil
             return
         }
@@ -1631,12 +1653,12 @@ struct SessionListView: View {
     private func openPendingDeepLinkedSessionIfNeeded() async {
         guard !Task.isCancelled else { return }
 
-        while let sessionID = navigationState.beginDeepLinkedSessionLoad(
+        while let sessionID = navigation.beginDeepLinkedSessionLoad(
             id: pendingDeepLinkedSessionID
         ) {
             pendingDeepLinkedSessionID = nil
             await openDeepLinkedSession(id: sessionID)
-            navigationState.finishDeepLinkedSessionLoad(id: sessionID)
+            navigation.finishDeepLinkedSessionLoad(id: sessionID)
             guard !Task.isCancelled else { return }
         }
     }
@@ -1689,22 +1711,25 @@ struct SessionListView: View {
 
     private func selectSession(_ session: SessionSummary) {
         selectDestination(session)
-        persistLastSelectedSession()
     }
 
     private func selectDestination(_ session: SessionSummary) {
         viewModel.invalidateSessionOpening()
-        navigationState.select(session)
+        navigation.select(session)
     }
 
     private func selectDestination(_ route: PendingNewChatRoute) {
         viewModel.invalidateSessionOpening()
-        navigationState.select(route)
+        navigation.select(route)
     }
 
     private func selectDestination(_ utility: SessionListUtilityDestination) {
-        viewModel.invalidateSessionOpening()
-        navigationState.select(utility)
+        switch utility {
+        case .settings(let scrollTo): navigation.push(.settings(scrollTo))
+        case .tasks: navigation.push(.tasks)
+        case .kanban: navigation.push(.kanban)
+        default: navigation.push(.legacy(utility))
+        }
     }
 
     private func startOpeningSession(_ session: SessionSummary) {
@@ -1740,40 +1765,23 @@ struct SessionListView: View {
     }
 
     private func rememberCreatedSession(_ session: SessionSummary) {
-        navigationState.remember(session)
-        persistLastSelectedSession()
+        navigation.remember(session)
     }
 
     private func removeSessionFromNavigation(_ session: SessionSummary) {
-        navigationState.remove(sessionID: session.sessionId)
-        persistLastSelectedSession()
-    }
-
-    private func restoreLastSelectedSessionIfNeeded() {
-        guard pendingWebuiPush == nil else { return }
-        navigationState.restoreIfNeeded(
-            from: viewModel.sessions,
-            clearsMissingSelection: viewModel.sessionLoadError == nil,
-            pendingDeepLinkedSessionID: pendingDeepLinkedSessionID
-        )
-        persistLastSelectedSession()
-    }
-
-    private func persistLastSelectedSession() {
-        SessionNavigationPersistence.save(navigationState.lastSelectedSessionID, for: server)
+        navigation.remove(sessionID: session.sessionId)
     }
 
 }
 
-/// Orders the session list's cold-start load. Restore needs only the session
-/// rows, so it runs as soon as they arrive and the pending deep link has
-/// resolved; projects and the active profile load afterwards, side by side.
+/// Orders the shell's cold-start load: the session rows and a pending deep link
+/// first, then projects and the active profile side by side.
 enum SessionListInitialLoad {
     @MainActor
     static func run(
         resolvePendingDeepLink: @escaping @MainActor () async -> Void,
         loadSessions: @escaping @MainActor () async -> Void,
-        restoreSelection: @MainActor () -> Void,
+        sessionsDidLoad: @MainActor () -> Void,
         loadProjects: @escaping @MainActor () async -> Void,
         loadActiveProfile: @escaping @MainActor () async -> Void
     ) async {
@@ -1781,7 +1789,7 @@ enum SessionListInitialLoad {
         await resolvePendingDeepLink()
         await sessions
         guard !Task.isCancelled else { return }
-        restoreSelection()
+        sessionsDidLoad()
         await loadProjectsAndActiveProfile(loadProjects: loadProjects, loadActiveProfile: loadActiveProfile)
     }
 
@@ -1825,14 +1833,13 @@ enum SessionListReturnRefresh {
 /// `onChange` in `SessionListView`.
 enum SessionListDestinationReturn {
     static func run(
-        from oldValue: SessionNavigationDestination?,
-        to newValue: SessionNavigationDestination?,
+        from oldValue: ShellRoot,
+        to newValue: ShellRoot,
         suppressEmptyPlaceholders: () -> Void,
         refreshSessions: () -> Void
     ) {
-        // Nothing to refresh against before the first destination, and a
-        // destination that re-emits itself has no new server state to adopt.
-        guard let oldValue, oldValue != newValue else { return }
+        // A root that re-emits itself has no new server state to adopt.
+        guard oldValue != newValue else { return }
         // Replacing one pending new-chat route with another stays on the same
         // screen, so it is not a return.
         if case .newChat = oldValue, case .newChat = newValue { return }
@@ -1968,10 +1975,8 @@ private struct SessionSearchTaskID: Hashable {
 
 /// Identity for the session list's active-row poll. SwiftUI restarts the poll
 /// whenever this changes, and the poll runs only while `shouldPoll` holds.
-/// On compact width a pushed chat or utility screen covers the list, so the
-/// poll pauses until the user returns; `SessionListReturnRefresh` reloads the
-/// rows and runs one tick then. Scheduled sessions shows live rows from the same view model,
-/// so it keeps the poll running.
+/// The streaming-row poll runs only while the drawer shows the rows; opening it
+/// again runs `SessionListReturnRefresh`, which reloads the rows and ticks once.
 struct ActiveSessionMonitorTaskID: Hashable {
     /// Wait between polls. The open chat watches its own run over SSE, so the
     /// list only needs badges and the Working-to-done switch reasonably fresh.
@@ -1981,312 +1986,26 @@ struct ActiveSessionMonitorTaskID: Hashable {
     let hasActiveRows: Bool
     let isViewingCachedData: Bool
     let isListVisible: Bool
-    let isRegularWidth: Bool
 
     init(
         streamIDs: [String],
         hasActiveRows: Bool,
         isViewingCachedData: Bool,
-        isRegularWidth: Bool,
-        destination: SessionNavigationDestination?
+        isDrawerOpen: Bool
     ) {
         self.streamIDs = streamIDs
         self.hasActiveRows = hasActiveRows
         self.isViewingCachedData = isViewingCachedData
-        self.isRegularWidth = isRegularWidth
-        isListVisible = isRegularWidth || destination == nil || destination == .utility(.scheduled)
+        isListVisible = isDrawerOpen
     }
 
     var shouldPoll: Bool {
         hasActiveRows && isListVisible && !isViewingCachedData
     }
 
-    /// Whether a return to the list needs an immediate tick. Only compact width
-    /// pauses the poll; the regular-width sidebar keeps polling throughout.
+    /// The poll pauses while the drawer is closed, so reopening it ticks once.
     var needsTickOnReturn: Bool {
-        shouldPoll && !isRegularWidth
-    }
-}
-
-private struct PendingNewChatView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.scenePhase) private var scenePhase
-    @AppStorage(AppHaptics.isEnabledKey) private var isHapticsEnabled = true
-
-    let server: URL
-    let viewModel: SessionListViewModel
-    let onAPIError: (Error) -> Void
-    let onSessionCreated: (SessionSummary) -> Void
-    let initialAttachments: [SharedAttachmentImport]
-    let autoStartsVoiceInput: Bool
-    let profileName: String?
-    let projectID: String?
-    let startsCall: Bool
-    let draftStore: ChatDraftStore
-
-    @State private var createdSession: SessionSummary?
-    @State private var draftMessage = ""
-    @State private var draftQuotes: [ComposerQuote] = []
-    @State private var didStartCreation = false
-    @State private var didStartConversation = false
-    @State private var didRequestComposerFocus = false
-    @State private var creationErrorMessage: String?
-    @FocusState private var composerIsFocused: Bool
-
-    init(
-        initialDraft: String = "",
-        initialAttachments: [SharedAttachmentImport] = [],
-        autoStartsVoiceInput: Bool = false,
-        profileName: String? = nil,
-        projectID: String? = nil,
-        startsCall: Bool = false,
-        server: URL,
-        viewModel: SessionListViewModel,
-        onAPIError: @escaping (Error) -> Void,
-        onSessionCreated: @escaping (SessionSummary) -> Void = { _ in },
-        draftStore: ChatDraftStore? = nil
-    ) {
-        self.server = server
-        self.viewModel = viewModel
-        self.onAPIError = onAPIError
-        self.onSessionCreated = onSessionCreated
-        self.initialAttachments = initialAttachments
-        self.autoStartsVoiceInput = autoStartsVoiceInput
-        self.profileName = profileName
-        self.projectID = projectID
-        self.startsCall = startsCall
-        self.draftStore = draftStore ?? .shared
-        _draftMessage = State(initialValue: initialDraft)
-    }
-
-    var body: some View {
-        Group {
-            if let createdSession {
-                ChatView(
-                    session: createdSession,
-                    server: server,
-                    onAPIError: onAPIError,
-                    initialDraft: draftMessage,
-                    initialQuotes: draftQuotes,
-                    initialAttachments: initialAttachments,
-                    loadsInitialMessages: false,
-                    autoStartsVoiceInput: autoStartsVoiceInput,
-                    startsCall: startsCall,
-                    draftStore: draftStore,
-                    restoresDraftSettings: true,
-                    onConversationStarted: markConversationStarted
-                )
-            } else {
-                pendingContent
-            }
-        }
-        .background(
-            NavigationAppearanceCompletionObserver(action: requestPendingComposerFocus)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-        )
-        .task {
-            await prepareNewChat()
-        }
-        .onChange(of: scenePhase) {
-            if scenePhase != .active {
-                flushDraftsBestEffort()
-            }
-        }
-        .onDisappear {
-            restoreAbandonedDraftIfNeeded()
-            flushDraftsBestEffort()
-        }
-    }
-
-    private var pendingContent: some View {
-        ZStack(alignment: .bottom) {
-            Color(.systemBackground)
-                .ignoresSafeArea()
-
-            ContentUnavailableView {
-                Image(systemName: "bubble.left.and.bubble.right")
-            } description: {
-                Text("Send a message to start the conversation.")
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                composerIsFocused = false
-            }
-
-            VStack(spacing: 10) {
-                if let creationErrorMessage {
-                    pendingErrorBanner(creationErrorMessage)
-                }
-
-                pendingComposer
-            }
-            .padding(.horizontal)
-            .padding(.bottom, 12)
-        }
-        .navigationTitle("New Chat")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-
-    private var pendingComposer: some View {
-        HStack(alignment: .bottom, spacing: 10) {
-            TextField("Message Hermex", text: persistedDraftBinding, axis: .vertical)
-                .textFieldStyle(.plain)
-                .lineLimit(1...5)
-                .focused($composerIsFocused)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 13)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .strokeBorder(Color(.separator).opacity(0.18), lineWidth: 0.5)
-                }
-                .submitLabel(.send)
-
-            Button {} label: {
-                Image(systemName: "arrow.up")
-                    .font(.headline.weight(.bold))
-                    .foregroundStyle(Color(.secondaryLabel))
-                    .frame(width: 44, height: 44)
-                    .background(Color(.tertiarySystemFill), in: Circle())
-            }
-            .buttonStyle(.plain)
-            .disabled(true)
-            .accessibilityLabel("Send")
-        }
-    }
-
-    private func pendingErrorBanner(_ message: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: "exclamationmark.triangle")
-                .foregroundStyle(.hxWarning)
-
-            Text(message)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-
-            Spacer(minLength: 0)
-
-            Button("Retry") {
-                Task { await retryCreateSession() }
-            }
-            .font(.footnote.weight(.semibold))
-            .disabled(viewModel.isCreatingSession)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    private func createSessionIfNeeded() async {
-        guard !didStartCreation, createdSession == nil else { return }
-
-        didStartCreation = true
-        creationErrorMessage = nil
-        let session = await viewModel.createSession(
-            modelContext: modelContext,
-            profile: profileName,
-            projectID: projectID
-        )
-        guard !Task.isCancelled else { return }
-        if let lastError = viewModel.lastError {
-            onAPIError(lastError)
-        }
-
-        if let session {
-            let sessionKey = draftKey(for: session)
-            draftStore.setDraft(draftMessage, for: draftKey)
-            let movedDraft = draftStore.moveDraft(from: draftKey, to: sessionKey)
-            draftMessage = movedDraft.text
-            draftQuotes = movedDraft.quotes
-            SessionHaptics.sessionCreated(isEnabled: isHapticsEnabled)
-            onSessionCreated(session)
-            createdSession = session
-        } else {
-            creationErrorMessage = viewModel.actionErrorMessage
-                ?? viewModel.lastError?.localizedDescription
-                ?? String(localized: "Could not start a new chat.")
-            viewModel.clearActionError()
-            didStartCreation = false
-        }
-    }
-
-    private func retryCreateSession() async {
-        didStartCreation = false
-        creationErrorMessage = nil
-        viewModel.clearActionError()
-        await createSessionIfNeeded()
-    }
-
-    private var draftKey: ChatDraftKey {
-        .newChat(server: server)
-    }
-
-    private func draftKey(for session: SessionSummary) -> ChatDraftKey {
-        let normalizedSessionID = session.sessionId?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let sessionID = normalizedSessionID.flatMap { $0.isEmpty ? nil : $0 } ?? session.id
-        return .session(server: server, sessionID: sessionID)
-    }
-
-    private var persistedDraftBinding: Binding<String> {
-        Binding(
-            get: { draftMessage },
-            set: { newValue in
-                draftMessage = newValue
-                draftStore.setDraft(newValue, for: draftKey)
-            }
-        )
-    }
-
-    private func prepareNewChat() async {
-        await hydrateDraft()
-        guard !Task.isCancelled else { return }
-        await createSessionIfNeeded()
-    }
-
-    private func hydrateDraft() async {
-        let textBeforeHydration = draftMessage
-        let persistedDraft = await draftStore.draft(for: draftKey)
-        guard !Task.isCancelled, draftMessage == textBeforeHydration else { return }
-
-        if textBeforeHydration.isEmpty {
-            if let persistedDraft, !persistedDraft.text.isEmpty {
-                draftMessage = persistedDraft.text
-            }
-        } else {
-            draftStore.setDraft(textBeforeHydration, for: draftKey)
-        }
-    }
-
-    private func flushDraftsBestEffort() {
-        Task {
-            try? await draftStore.flush()
-        }
-    }
-
-    private func markConversationStarted() {
-        didStartConversation = true
-    }
-
-    private func restoreAbandonedDraftIfNeeded() {
-        guard let createdSession else { return }
-        draftMessage = draftStore.restoreAbandonedNewChatDraft(
-            from: draftKey(for: createdSession),
-            to: draftKey,
-            didStartConversation: didStartConversation
-        )?.text ?? draftMessage
-    }
-
-    private func requestPendingComposerFocus() {
-        guard !didRequestComposerFocus else { return }
-        didRequestComposerFocus = true
-
-        Task { @MainActor in
-            await Task.yield()
-            guard createdSession == nil else { return }
-            composerIsFocused = true
-        }
+        shouldPoll
     }
 }
 
