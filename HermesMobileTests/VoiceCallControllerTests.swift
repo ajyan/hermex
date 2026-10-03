@@ -234,6 +234,45 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(speaker.spoken.count, 2)
     }
 
+    func testReplyCutMidSentenceAtRunEndIsCompletedWhenTheFullTextLands() async {
+        await startSpeaking()
+        let cut = "An octopus has three hearts, and its blood is blue because it uses copper to carry oxygen instead of"
+        update(text: "First sentence. " + cut, streaming: false)
+        XCTAssertEqual(speaker.spoken, ["First sentence.", cut])
+        // The transcript refresh then delivers the whole message.
+        update(text: "First sentence. " + cut + " iron.", streaming: false)
+        XCTAssertEqual(speaker.spoken, ["First sentence.", cut, "iron."])
+        speaker.drain()
+        XCTAssertEqual(controller.state, .listening)
+    }
+
+    func testRunEndedBeforeAnyReplyTextWaitsForTheText() async {
+        await controller.start()
+        await say("hello")
+        update(text: nil, streaming: true)
+        update(text: nil, streaming: false)
+        XCTAssertEqual(controller.state, .thinking)
+        update(text: "Your entry is bare. Just the check-in.", streaming: false)
+        XCTAssertEqual(speaker.spoken, ["Your entry is bare.", "Just the check-in."])
+        XCTAssertEqual(controller.state, .speaking)
+        speaker.drain()
+        XCTAssertEqual(controller.state, .listening)
+    }
+
+    func testRunEndedWithNoReplyTextEventuallyReturnsToListening() async {
+        await controller.start()
+        await say("hello")
+        update(text: nil, streaming: true)
+        update(text: nil, streaming: false)
+        clock += VoiceCallTiming.noReplyTextGrace - 0.5
+        controller.tick()
+        XCTAssertEqual(controller.state, .thinking)
+        clock += 0.5
+        controller.tick()
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertTrue(speaker.spoken.isEmpty)
+    }
+
     func testPartialTranscriptShownWhileListening() async {
         await controller.start()
         listener.onFinal?("hello")

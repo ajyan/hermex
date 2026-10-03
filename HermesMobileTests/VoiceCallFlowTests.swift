@@ -75,6 +75,24 @@ final class VoiceCallFlowTests: XCTestCase {
         XCTAssertEqual(controller.state, .thinking)
     }
 
+    func testReplyEndingExactlyOnASentenceBoundaryIsSpokenToTheEnd() async throws {
+        await say("tell me something")
+        stream.emit(.token("One. Two."))
+        stream.emit(.done(DoneStreamEvent(session: try detail(reply: [("assistant", "One. Two.")]))))
+        feed()
+        XCTAssertEqual(speaker.spoken, ["One.", "Two."])
+    }
+
+    func testLongUnterminatedLastSentenceIsSpokenInFull() async throws {
+        let last = "An octopus has three hearts, and its blood is blue because it uses copper to carry oxygen instead of iron"
+        await say("tell me about octopuses")
+        stream.emit(.token("Sure. " + last))
+        feed()
+        stream.emit(.done(DoneStreamEvent(session: try detail(reply: [("assistant", "Sure. " + last)]))))
+        feed()
+        XCTAssertEqual(speaker.spoken, ["Sure.", last])
+    }
+
     // MARK: - Helpers
 
     private func feed() {

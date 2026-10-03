@@ -96,6 +96,7 @@ final class VoiceCallController {
     @ObservationIgnored private var replyStarted = false
     @ObservationIgnored private var runSeenStreaming = false
     @ObservationIgnored private var runFinished = false
+    @ObservationIgnored private var runFinishedAt: TimeInterval?
     @ObservationIgnored private var lastIsStreaming = false
     @ObservationIgnored private var thinkingSince: TimeInterval?
     @ObservationIgnored private var cueOn = false
@@ -229,7 +230,10 @@ final class VoiceCallController {
                 tearDown(endSystemCall: true, message: nil)
             }
         case .thinking:
-            if !replyStarted, let thinkingSince, time - thinkingSince >= VoiceCallTiming.thinkingCueDelay,
+            if runFinished, !replyStarted, let runFinishedAt, time - runFinishedAt >= VoiceCallTiming.noReplyTextGrace {
+                log("run finished with no reply text; giving up")
+                finishReply()
+            } else if !replyStarted, let thinkingSince, time - thinkingSince >= VoiceCallTiming.thinkingCueDelay,
                !suppressThinkingCue() {
                 setCue(true)
             }
@@ -388,6 +392,7 @@ final class VoiceCallController {
         replyStarted = false
         runSeenStreaming = false
         runFinished = false
+        runFinishedAt = nil
         thinkingSince = now()
         log("send: \"\(text)\"")
         lastChatTask = Task { [weak self, chat] in
@@ -472,7 +477,7 @@ final class VoiceCallController {
 
         guard replyActive, !isHeld, pendingApproval == nil else { return }
         if let streamingText, !streamingText.isEmpty {
-            speak(shaper.append(streamingText))
+            speak(shaper.append(streamingText, final: runFinished))
             if !replyStarted {
                 replyStarted = true
                 setCue(false)
@@ -482,9 +487,12 @@ final class VoiceCallController {
         if runSeenStreaming, !isStreaming, !runFinished {
             log("run finished; text=\"\(streamingText ?? "nil")\"")
             runFinished = true
+            runFinishedAt = now()
             speak(shaper.finish())
-            if !speaker.isSpeaking { finishReply() }
         }
+        // With no text yet, the reply may still land (the transcript refresh
+        // after the run); `tick` gives up after a grace period.
+        if runFinished, replyStarted, !speaker.isSpeaking { finishReply() }
     }
 
     private func speak(_ sentences: [String]) {

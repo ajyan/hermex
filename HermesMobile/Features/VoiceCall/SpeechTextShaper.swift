@@ -7,22 +7,35 @@ import Foundation
 /// `finish()` and spoken only when the reply has no fenced code and no `---`
 /// line: on a call, those mark the details Atlas put in the chat instead.
 struct SpeechTextShaper {
-    private var emitted = 0
+    private var emitted: [String] = []
     private var lastText = ""
 
-    mutating func append(_ cumulativeText: String) -> [String] {
+    /// `final` is true once the run has ended: a trailing fragment is then a
+    /// sentence. Text that grows after the run ended (the transcript refresh
+    /// delivering the whole message) still yields its new words.
+    mutating func append(_ cumulativeText: String, final: Bool = false) -> [String] {
         lastText = cumulativeText
-        return emit(Self.sentences(in: cumulativeText, final: false))
+        return emit(Self.sentences(in: cumulativeText, final: final))
     }
 
     mutating func finish() -> [String] {
         emit(Self.sentences(in: lastText, final: true))
     }
 
+    /// Emits what hasn't been emitted. A sentence emitted as a cut-off fragment
+    /// that later grows yields only its new tail.
     private mutating func emit(_ sentences: [String]) -> [String] {
-        guard sentences.count > emitted else { return [] }
-        let fresh = Array(sentences[emitted...])
-        emitted = sentences.count
+        var fresh: [String] = []
+        for (index, sentence) in sentences.enumerated() {
+            if index >= emitted.count {
+                emitted.append(sentence)
+                fresh.append(sentence)
+            } else if sentence != emitted[index], sentence.hasPrefix(emitted[index]) {
+                let tail = sentence.dropFirst(emitted[index].count).trimmingCharacters(in: .whitespaces)
+                emitted[index] = sentence
+                if !tail.isEmpty { fresh.append(tail) }
+            }
+        }
         return fresh
     }
 
