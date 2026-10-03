@@ -252,57 +252,14 @@ final class SessionNavigationStateTests: XCTestCase {
         XCTAssertFalse(refresh.consumeIfReady(didCompleteInitialLoad: true, isLoading: false))
     }
 
-    func testArchiveToastShowsOnTheScreenTheRowWasSwipedOn() {
+    func testArchiveToastShowsOnlyWhileTheDrawerIsOpen() {
         var route = SessionListArchiveToastRoute()
-        let scheduledArchive = route.archiveStarted()
-        XCTAssertEqual(
-            route.archiveConfirmed(
-                scheduledArchive, swipedOn: .scheduled, isListShowing: false, isScheduledShowing: true
-            ),
-            .scheduled
-        )
-        XCTAssertEqual(route.host, .scheduled)
+        let hidden = route.archiveStarted()
+        let shown = route.archiveStarted()
 
-        // Both screens showing: the toast stays where the row was swiped.
-        let sidebarArchive = route.archiveStarted()
-        XCTAssertEqual(
-            route.archiveConfirmed(
-                sidebarArchive, swipedOn: .list, isListShowing: true, isScheduledShowing: true
-            ),
-            .list
-        )
-        XCTAssertEqual(route.host, .list)
-    }
-
-    func testArchiveToastFollowsTheUserToTheOtherSessionScreen() {
-        var route = SessionListArchiveToastRoute()
-
-        // Swiped on Scheduled, then went back to the drawer before the reply.
-        let leftScheduled = route.archiveStarted()
-        XCTAssertEqual(
-            route.archiveConfirmed(leftScheduled, swipedOn: .scheduled, isListShowing: true, isScheduledShowing: false),
-            .list
-        )
-
-        // Swiped in the drawer, then opened Scheduled before the reply.
-        let openedScheduled = route.archiveStarted()
-        XCTAssertEqual(
-            route.archiveConfirmed(
-                openedScheduled, swipedOn: .list, isListShowing: false, isScheduledShowing: true
-            ),
-            .scheduled
-        )
-    }
-
-    func testArchiveToastIsSkippedWhileAnotherScreenCoversBothHosts() {
-        var route = SessionListArchiveToastRoute()
-        let older = route.archiveStarted()
-        let newer = route.archiveStarted()
-
-        XCTAssertNil(route.archiveConfirmed(newer, swipedOn: .scheduled, isListShowing: false, isScheduledShowing: false))
-        XCTAssertEqual(
-            route.archiveConfirmed(older, swipedOn: .list, isListShowing: true, isScheduledShowing: false),
-            .list,
+        XCTAssertFalse(route.archiveConfirmed(shown, isListShowing: false))
+        XCTAssertTrue(
+            route.archiveConfirmed(hidden, isListShowing: true),
             "a skipped toast must not block an older archive that lands where the user can see it"
         )
     }
@@ -312,11 +269,8 @@ final class SessionNavigationStateTests: XCTestCase {
         let first = route.archiveStarted()
         let second = route.archiveStarted()
 
-        XCTAssertEqual(route.archiveConfirmed(second, swipedOn: .list, isListShowing: true, isScheduledShowing: false), .list)
-        XCTAssertNil(
-            route.archiveConfirmed(first, swipedOn: .list, isListShowing: true, isScheduledShowing: false),
-            "the first archive's reply landed last"
-        )
+        XCTAssertTrue(route.archiveConfirmed(second, isListShowing: true))
+        XCTAssertFalse(route.archiveConfirmed(first, isListShowing: true), "the first archive's reply landed last")
     }
 
     func testChatShortcutPositionPicksNthChatOrNothing() {

@@ -132603,7 +132603,15 @@
     "Bot Mode is unfinished. It adds a Bots row to the Agent section above for your direct Hermes bots. Each server’s Hermes connection is available with it off." : { },
     "New Chat in Project" : { },
     "No chats in this project" : { },
-    "Project" : { }
+    "Project" : { },
+    "Recents" : { },
+    "Show" : { },
+    "Show All" : { },
+    "Try another search." : { },
+    "Close chats" : { },
+    "Open chats" : { },
+    "No %@ chats" : { },
+    "Showing %@ chats" : { }
   },
   "version" : "1.0"
 }

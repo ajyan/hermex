@@ -237,52 +237,6 @@ final class SessionIdentityTests: XCTestCase {
     }
 }
 
-final class SessionSidebarDisclosureSettingsTests: XCTestCase {
-    private var suiteName: String!
-    private var defaults: UserDefaults!
-
-    override func setUp() {
-        super.setUp()
-        suiteName = "SessionSidebarDisclosureSettingsTests-\(UUID().uuidString)"
-        defaults = UserDefaults(suiteName: suiteName)
-        defaults.removePersistentDomain(forName: suiteName)
-    }
-
-    override func tearDown() {
-        defaults.removePersistentDomain(forName: suiteName)
-        defaults = nil
-        suiteName = nil
-        super.tearDown()
-    }
-
-    func testDisclosureStatesDefaultToCollapsedWhenUnset() {
-        XCTAssertNil(defaults.object(forKey: SessionSidebarDisclosureSettings.profilesAreExpandedKey))
-        XCTAssertNil(defaults.object(forKey: SessionSidebarDisclosureSettings.projectsAreExpandedKey))
-        XCTAssertNil(defaults.object(forKey: SessionSidebarDisclosureSettings.scheduledSessionsAreExpandedKey))
-        XCTAssertFalse(SessionSidebarDisclosureSettings.profilesAreExpanded(in: defaults))
-        XCTAssertFalse(SessionSidebarDisclosureSettings.projectsAreExpanded(in: defaults))
-        XCTAssertFalse(SessionSidebarDisclosureSettings.scheduledSessionsAreExpanded(in: defaults))
-    }
-
-    func testDisclosureStatesRoundTripThroughUserDefaults() {
-        defaults.set(true, forKey: SessionSidebarDisclosureSettings.profilesAreExpandedKey)
-        defaults.set(false, forKey: SessionSidebarDisclosureSettings.projectsAreExpandedKey)
-        defaults.set(true, forKey: SessionSidebarDisclosureSettings.scheduledSessionsAreExpandedKey)
-
-        XCTAssertTrue(SessionSidebarDisclosureSettings.profilesAreExpanded(in: defaults))
-        XCTAssertFalse(SessionSidebarDisclosureSettings.projectsAreExpanded(in: defaults))
-        XCTAssertTrue(SessionSidebarDisclosureSettings.scheduledSessionsAreExpanded(in: defaults))
-
-        defaults.set(false, forKey: SessionSidebarDisclosureSettings.profilesAreExpandedKey)
-        defaults.set(true, forKey: SessionSidebarDisclosureSettings.projectsAreExpandedKey)
-        defaults.set(false, forKey: SessionSidebarDisclosureSettings.scheduledSessionsAreExpandedKey)
-
-        XCTAssertFalse(SessionSidebarDisclosureSettings.profilesAreExpanded(in: defaults))
-        XCTAssertTrue(SessionSidebarDisclosureSettings.projectsAreExpanded(in: defaults))
-        XCTAssertFalse(SessionSidebarDisclosureSettings.scheduledSessionsAreExpanded(in: defaults))
-    }
-}
-
 final class SessionRowDisplaySettingsTests: XCTestCase {
     private var suiteName: String!
     private var defaults: UserDefaults!

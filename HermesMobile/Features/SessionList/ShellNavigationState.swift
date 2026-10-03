@@ -13,8 +13,6 @@ enum ShellPushDestination: Hashable {
     case tasks
     case kanban
     case settings(SettingsScrollAnchor?)
-    /// Screens still reached from the old sidebar rows until they move into Settings.
-    case legacy(SessionListUtilityDestination)
 }
 
 /// Navigation for the chat-first shell: one chat root, a push path over it, and

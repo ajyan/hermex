@@ -18,41 +18,6 @@ struct SessionListSection: Identifiable {
     var id: String { kind.rawValue }
 }
 
-struct ScheduledSessionGroups: Equatable {
-    let ordinary: [SessionSummary]
-    let scheduled: [SessionSummary]
-    let totalScheduledCount: Int
-
-    /// Splits the visible rows in one pass, keeping their order: cron rows go
-    /// to `scheduled` unless archived, everything else to `ordinary`.
-    init(partitioning visible: [SessionSummary], totalScheduledCount: Int) {
-        var ordinary: [SessionSummary] = []
-        var scheduled: [SessionSummary] = []
-        for session in visible {
-            if session.isCronSession {
-                if session.archived != true { scheduled.append(session) }
-            } else {
-                ordinary.append(session)
-            }
-        }
-        self.ordinary = ordinary
-        self.scheduled = scheduled
-        self.totalScheduledCount = totalScheduledCount
-    }
-
-    var scheduledPreview: [SessionSummary] {
-        Array(scheduled.prefix(5))
-    }
-
-    var hasAdditionalScheduledSessions: Bool {
-        scheduled.count > scheduledPreview.count
-    }
-
-    func showsDisclosure(isSearchActive: Bool) -> Bool {
-        totalScheduledCount > 0 && (!isSearchActive || !scheduled.isEmpty)
-    }
-}
-
 enum ActiveSessionStateRefreshResult: Equatable {
     case unchanged
     case reloaded
@@ -269,23 +234,6 @@ final class SessionListViewModel {
         }
 
         return sortedLocalMatches + Self.sortedSessions(remoteMatches)
-    }
-
-    func scheduledSessionGroups(
-        searchText: String,
-        selectedProjectID: String?,
-        automatedVisibility: AutomatedSessionVisibility = .showAll
-    ) -> ScheduledSessionGroups {
-        ScheduledSessionGroups(
-            partitioning: visibleSessions(
-                searchText: searchText,
-                selectedProjectID: selectedProjectID,
-                automatedVisibility: automatedVisibility
-            ),
-            totalScheduledCount: automatedVisibility.showsCron
-                ? sessions.filter { $0.isCronSession && $0.archived != true }.count
-                : 0
-        )
     }
 
     @discardableResult

@@ -108,298 +108,6 @@ struct SidebarSectionVisibility: Equatable {
     }
 }
 
-struct SessionSidebarUtilityRows: View {
-    // Vertical gap between every utility row, matching the navigation rows so the
-    // headers and subrows share one consistent rhythm now that each is its own row.
-    private static let rowSpacing: CGFloat = 2
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    let viewModel: SessionListViewModel
-    let topPadding: CGFloat
-    let automatedVisibility: AutomatedSessionVisibility
-    let sectionVisibility: SidebarSectionVisibility
-    @Binding var profilesAreExpanded: Bool
-    @Binding var projectsAreExpanded: Bool
-    @Binding var selectedProjectID: String?
-    @Binding var projectPendingDeletion: ProjectSummary?
-    @Binding var projectPendingRename: ProjectSummary?
-
-    let openDestination: (SessionListUtilityDestination) -> Void
-    let switchActiveProfile: (ProfileSummary) -> Void
-    let presentProjectCreation: () -> Void
-
-    // Each disclosure subrow is emitted as its own List row (like the session
-    // rows below it). List does not animate height/transition changes inside a
-    // single row, so packing the subrows into one row made expand/collapse snap
-    // instantly. As real rows, List animates them folding in/out; the fold is
-    // driven by a value-based .animation on the List in SessionListView, which
-    // works even though the disclosure booleans are @AppStorage-backed.
-    var body: some View {
-        if sectionVisibility.showsAnyUtilityLink {
-            utilityLinks
-                .padding(.top, topPadding)
-                .sessionsScreenListRow()
-        }
-
-        // In single-profile mode the server rejects switching, so the whole
-        // "Active Profile" disclosure would only no-op or error — hide it (#24).
-        if showsActiveProfile {
-            activeProfileHeader
-                .padding(.top, activeProfileTopPadding)
-                .sessionsScreenListRow()
-
-            if profilesAreExpanded {
-                activeProfileOptionRows
-            }
-        }
-
-        if sectionVisibility.projects {
-            projectsHeader
-                .padding(.top, projectsTopPadding)
-                .sessionsScreenListRow()
-
-            if projectsAreExpanded {
-                projectOptionRows
-            }
-        }
-    }
-
-    private var showsActiveProfile: Bool {
-        sectionVisibility.activeProfile && !viewModel.isSingleProfileMode
-    }
-
-    // Whichever row lands first carries the section's top padding, since #189 can
-    // hide the rows above it; the rest keep the tight inter-row spacing.
-    private var activeProfileTopPadding: CGFloat {
-        sectionVisibility.showsAnyUtilityLink ? Self.rowSpacing : topPadding
-    }
-
-    private var projectsTopPadding: CGFloat {
-        sectionVisibility.showsAnyUtilityLink || showsActiveProfile ? Self.rowSpacing : topPadding
-    }
-
-    private func disclosureSubrow<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        content()
-            .padding(.horizontal, 24)
-            .padding(.top, Self.rowSpacing)
-            .sessionsScreenListRow()
-            .transition(SessionListMotion.disclosureContentTransition(reduceMotion: reduceMotion))
-    }
-
-    private var utilityLinks: some View {
-        VStack(alignment: .leading, spacing: Self.rowSpacing) {
-            if sectionVisibility.bots {
-                SidebarNavButton(title: String(localized: "Bots"), assetImage: "LucideBot") {
-                    openDestination(.bots)
-                }
-            }
-
-            if sectionVisibility.tasks {
-                SidebarNavButton(title: String(localized: "Tasks"), assetImage: "LucideCalendarClock") {
-                    openDestination(.tasks)
-                }
-            }
-
-            if sectionVisibility.kanban {
-                SidebarNavButton(title: String(localized: "Kanban"), assetImage: "LucideColumns3") {
-                    openDestination(.kanban)
-                }
-            }
-
-            if sectionVisibility.skills {
-                SidebarNavButton(title: String(localized: "Skills"), assetImage: "LucideHammer") {
-                    openDestination(.skills)
-                }
-            }
-
-            if sectionVisibility.memory {
-                SidebarNavButton(title: String(localized: "Memory"), assetImage: "LucideBrain") {
-                    openDestination(.memory)
-                }
-            }
-
-            if sectionVisibility.insights {
-                SidebarNavButton(title: String(localized: "Usage"), assetImage: "LucideChartColumnIncreasing") {
-                    openDestination(.insights)
-                }
-            }
-        }
-        .padding(.horizontal, 24)
-    }
-
-    private var activeProfileHeader: some View {
-        SidebarDisclosureButton(
-            title: String(localized: "Active Profile"),
-            assetImage: "LucideUserRoundCog",
-            isExpanded: profilesAreExpanded,
-            tint: viewModel.activeProfileErrorMessage == nil ? .primary : .hxWarning
-        ) {
-            profilesAreExpanded.toggle()
-        } accessory: {
-            if viewModel.isLoadingActiveProfile {
-                ProgressView()
-                    .controlSize(.small)
-            }
-        }
-        .padding(.horizontal, 24)
-        .accessibilityLabel(profilesAreExpanded ? "Collapse active profile picker" : "Expand active profile picker")
-    }
-
-    @ViewBuilder
-    private var activeProfileOptionRows: some View {
-        if viewModel.isLoadingActiveProfile && viewModel.profileOptions.isEmpty {
-            disclosureSubrow {
-                CompactStatusRow(title: String(localized: "Loading profiles..."), systemImage: "person.crop.circle")
-            }
-        } else if viewModel.profileOptions.isEmpty {
-            disclosureSubrow {
-                CompactStatusRow(
-                    title: viewModel.activeProfileErrorMessage == nil ? String(localized: "No profiles") : String(localized: "Could not load profiles"),
-                    systemImage: "exclamationmark.triangle"
-                )
-            }
-        } else {
-            ForEach(viewModel.profileOptions) { profile in
-                let profileIsActive = isActiveProfile(profile)
-
-                disclosureSubrow {
-                    ActiveProfilePickerRow(
-                        profile: profile,
-                        isSelected: profileIsActive,
-                        isSwitching: viewModel.isSwitchingActiveProfile
-                            && viewModel.switchingActiveProfileName == profile.normalizedName
-                    ) {
-                        guard !profileIsActive else { return }
-                        switchActiveProfile(profile)
-                    }
-                    .disabled(
-                        viewModel.isViewingCachedData
-                            || viewModel.isSwitchingActiveProfile
-                            || profile.normalizedName == nil
-                    )
-                }
-            }
-        }
-    }
-
-    private var projectsHeader: some View {
-        HStack(spacing: 8) {
-            SidebarDisclosureButton(
-                title: String(localized: "Projects"),
-                assetImage: "LucideFolder",
-                isExpanded: projectsAreExpanded
-            ) {
-                projectsAreExpanded.toggle()
-            } accessory: {
-                EmptyView()
-            }
-            .accessibilityLabel(projectsAreExpanded ? "Collapse projects" : "Expand projects")
-
-            // Standalone "create empty project" affordance, shown only while the
-            // Projects list is expanded. It is a sibling of the disclosure button
-            // (not nested inside its label) so VoiceOver exposes it as its own
-            // focusable control, mirroring the "All" button below. Nesting it in
-            // the button's label flattened it into the parent's a11y element and
-            // made it unreachable by assistive tech.
-            if projectsAreExpanded {
-                addProjectButton
-            }
-
-            if selectedProjectID != nil {
-                HapticButton {
-                    withAnimation(SessionListMotion.disclosureAnimation(reduceMotion: reduceMotion)) {
-                        selectedProjectID = nil
-                    }
-                } label: {
-                    Text("All")
-                        .padding(.horizontal, 10)
-                        .frame(minHeight: 32)
-                        // Flat translucent fill rather than Liquid Glass: the glass
-                        // elevation shadow would spill past this tightly-sized List
-                        // row and get clipped by the next row's opaque background.
-                        .background(.thinMaterial, in: Capsule())
-                        .frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle())
-                }
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(.secondary)
-                .buttonStyle(.plain)
-                .accessibilityLabel("Show all projects")
-                .accessibilityHint("Clears the selected project filter.")
-            }
-        }
-        .padding(.horizontal, 24)
-    }
-
-    private var addProjectButton: some View {
-        HapticButton {
-            presentProjectCreation()
-        } label: {
-            Image(systemName: "plus")
-                .font(.body.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Add project")
-        .accessibilityHint("Creates a new empty project.")
-    }
-
-    @ViewBuilder
-    private var projectOptionRows: some View {
-        if viewModel.isLoadingProjects && viewModel.projects.isEmpty {
-            disclosureSubrow {
-                CompactStatusRow(title: String(localized: "Loading projects..."), systemImage: "folder")
-            }
-        } else if viewModel.projects.isEmpty {
-            disclosureSubrow {
-                CompactStatusRow(title: String(localized: "No projects"), systemImage: "folder")
-            }
-        } else {
-            ForEach(viewModel.projects) { project in
-                disclosureSubrow {
-                    ProjectFilterRow(
-                        project: project,
-                        isSelected: selectedProjectID == project.projectId,
-                        count: sessionCount(for: project),
-                        isViewingCachedData: viewModel.isViewingCachedData,
-                        isRenamingProject: viewModel.isRenamingProject,
-                        isDeletingProject: viewModel.isDeletingProject
-                    ) {
-                        guard let projectID = project.projectId else { return }
-
-                        withAnimation(SessionListMotion.disclosureAnimation(reduceMotion: reduceMotion)) {
-                            selectedProjectID = selectedProjectID == projectID ? nil : projectID
-                        }
-                    } rename: {
-                        projectPendingRename = project
-                    } delete: {
-                        projectPendingDeletion = project
-                    }
-                }
-            }
-        }
-    }
-
-    private func isActiveProfile(_ profile: ProfileSummary) -> Bool {
-        guard let profileName = profile.normalizedName else { return false }
-
-        if let activeProfileName = viewModel.activeProfileName {
-            return profileName == activeProfileName
-        }
-
-        return profile.isActive == true
-    }
-
-    private func sessionCount(for project: ProjectSummary) -> Int {
-        guard let projectID = project.projectId else { return 0 }
-        return viewModel.sessions.filter { session in
-            session.projectId == projectID && automatedVisibility.shows(session)
-        }.count
-    }
-}
-
 struct SessionListRowsSection: View {
     let viewModel: SessionListViewModel
     /// The sidebar's current query, forwarded to rows for match excerpts.
@@ -413,11 +121,15 @@ struct SessionListRowsSection: View {
     let selectedSessionID: String?
     let actions: SessionListRowActions
     var suppressEmptyState = false
+    /// The drawer draws its own Recents header and shows this one only while searching.
+    var showsHeader = true
 
     var body: some View {
-        sessionsHeaderRow
-            .padding(.top, isSearchActive ? 16 : 28)
-            .sessionsScreenListRow()
+        if showsHeader {
+            sessionsHeaderRow
+                .padding(.top, isSearchActive ? 16 : 28)
+                .sessionsScreenListRow()
+        }
 
         if viewModel.isLoading && viewModel.sessions.isEmpty {
             sessionLoadingSkeletonRows
@@ -551,7 +263,7 @@ struct SessionInteractiveRow: View {
         .id(session.id)
         .background(
             session.sessionId == selectedSessionID
-                ? Color.accentColor.opacity(0.12)
+                ? Color.hxSurface
                 : Color.clear,
             in: RoundedRectangle(cornerRadius: 12, style: .continuous)
         )
@@ -618,154 +330,6 @@ struct SessionInteractiveRow: View {
         SessionRowActionPolicy.offersMutationActions(for: session)
             && !viewModel.isViewingCachedData
             && hasServerSessionID(session)
-    }
-}
-
-struct ScheduledSessionsDisclosure: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    let viewModel: SessionListViewModel
-    /// The sidebar's current query, forwarded to rows for match excerpts.
-    var searchText: String = ""
-    let sessions: [SessionSummary]
-    let totalCount: Int
-    let isSearchActive: Bool
-    let showsMessageCount: Bool
-    let showsWorkspace: Bool
-    let selectedSessionID: String?
-    @Binding var userIsExpanded: Bool
-    let actions: SessionListRowActions
-    let viewAll: () -> Void
-
-    private var isExpanded: Bool { isSearchActive || userIsExpanded }
-    private var displayedSessions: [SessionSummary] {
-        isSearchActive ? sessions : Array(sessions.prefix(5))
-    }
-
-    var body: some View {
-        SidebarDisclosureButton(
-            title: String(localized: "Scheduled sessions"),
-            assetImage: "LucideCalendarClock",
-            isExpanded: isExpanded
-        ) {
-            guard !isSearchActive else { return }
-            userIsExpanded.toggle()
-        } accessory: {
-            Text("\(totalCount)")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 2)
-                .background(.thinMaterial, in: Capsule())
-        }
-        .padding(.horizontal, 24)
-        .padding(.top, isSearchActive ? 16 : 12)
-        .sessionsScreenListRow()
-        .accessibilityLabel(
-            isSearchActive
-                ? String(localized: "Scheduled sessions")
-                : isExpanded
-                    ? String(localized: "Collapse scheduled sessions")
-                    : String(localized: "Expand scheduled sessions")
-        )
-
-        if isExpanded {
-            ForEach(displayedSessions) { session in
-                SessionInteractiveRow(
-                    viewModel: viewModel,
-                    session: session,
-                    showsMessageCount: showsMessageCount,
-                    showsWorkspace: showsWorkspace,
-                    selectedSessionID: selectedSessionID,
-                    actions: actions,
-                    searchText: searchText
-                )
-                .transition(SessionListMotion.disclosureContentTransition(reduceMotion: reduceMotion))
-            }
-
-            if !isSearchActive && sessions.count > 5 {
-                HapticButton(action: viewAll) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "magnifyingglass")
-                            .frame(width: 24)
-                        Text("View all")
-                            .font(.subheadline.weight(.medium))
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.forward")
-                            .font(.caption.weight(.semibold))
-                    }
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 24)
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .sessionsScreenListRow()
-                .transition(SessionListMotion.disclosureContentTransition(reduceMotion: reduceMotion))
-            }
-        }
-    }
-}
-
-struct ScheduledSessionsView: View {
-    let viewModel: SessionListViewModel
-    let showsCronSessions: Bool
-    let showsMessageCount: Bool
-    let showsWorkspace: Bool
-    let selectedSessionID: String?
-    let actions: SessionListRowActions
-    /// The archive Undo toast, when an archive on this screen owns it (#865).
-    let actionToast: ActionToastState?
-
-    @State private var searchText = ""
-
-    var body: some View {
-        List {
-            if sessions.isEmpty {
-                SessionListStatusRow(
-                    title: searchText.isEmpty
-                        ? String(localized: "No sessions yet")
-                        : String(localized: "No matching sessions"),
-                    description: searchText.isEmpty
-                        ? nil
-                        : String(localized: "Try another search or project filter."),
-                    systemImage: "calendar.badge.clock"
-                )
-                .padding(.horizontal, 24)
-                .sessionsScreenListRow()
-            } else {
-                ForEach(sessions) { session in
-                    SessionInteractiveRow(
-                        viewModel: viewModel,
-                        session: session,
-                        showsMessageCount: showsMessageCount,
-                        showsWorkspace: showsWorkspace,
-                        selectedSessionID: selectedSessionID,
-                        actions: actions,
-                        searchText: searchText
-                    )
-                }
-            }
-        }
-        .listStyle(.plain)
-        .environment(\.defaultMinListRowHeight, 0)
-        .scrollContentBackground(.hidden)
-        .navigationTitle("Scheduled sessions")
-        .searchable(text: $searchText, prompt: "Search sessions")
-        .overlay(alignment: .bottom) {
-            if let actionToast {
-                ActionToastView(state: actionToast)
-                    .frame(maxWidth: 420)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 22)
-            }
-        }
-    }
-
-    private var sessions: [SessionSummary] {
-        guard showsCronSessions else { return [] }
-
-        return viewModel.visibleSessions(searchText: searchText, selectedProjectID: nil)
-            .filter { $0.isCronSession && $0.archived != true }
     }
 }
 
@@ -1041,29 +605,7 @@ extension View {
     func sessionsScreenListRow(insets: EdgeInsets = EdgeInsets()) -> some View {
         listRowInsets(insets)
             .listRowSeparator(.hidden)
-            .listRowBackground(Color(.systemBackground))
-    }
-
-    func sessionsTopChromeListRow() -> some View {
-        listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 18, trailing: 0))
-            .listRowSeparator(.hidden)
-            .listRowBackground(Color.clear)
-            .zIndex(1)
-    }
-
-    func sessionsChromeGlass<S: InsettableShape>(
-        isInteractive: Bool = false,
-        tint: Color? = nil,
-        fallbackMaterial: Material = .ultraThinMaterial,
-        in shape: S
-    ) -> some View {
-        adaptiveGlass(
-            .regular,
-            isInteractive: isInteractive,
-            tint: tint,
-            fallbackMaterial: fallbackMaterial,
-            in: shape
-        )
+            .listRowBackground(Color.hxCanvas)
     }
 }
 
@@ -1098,111 +640,6 @@ private func hasServerSessionID(_ session: SessionSummary) -> Bool {
     return !sessionID.isEmpty
 }
 
-struct SessionListFloatingChatButtonStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.isEnabled) private var isEnabled
-
-    func makeBody(configuration: Configuration) -> some View {
-        let isPressed = isEnabled && configuration.isPressed
-
-        configuration.label
-            .scaleEffect(reduceMotion ? 1 : (isPressed ? 0.975 : 1))
-            .opacity(isPressed ? 0.96 : 1)
-            .shadow(
-                color: .black.opacity(isPressed ? 0.10 : 0.18),
-                radius: isPressed ? 8 : 18,
-                y: isPressed ? 3 : 8
-            )
-            .animation(SessionListMotion.pressAnimation(reduceMotion: reduceMotion), value: isPressed)
-    }
-}
-
-struct SidebarNavButton: View {
-    let title: String
-    let assetImage: String
-    let action: () -> Void
-
-    var body: some View {
-        HapticButton(action: action) {
-            HStack(spacing: 18) {
-                SidebarUtilityIcon(assetImage: assetImage)
-
-                Text(title)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-
-                Spacer(minLength: 0)
-            }
-            .frame(minHeight: 44)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-    }
-}
-
-struct SidebarDisclosureButton<Accessory: View>: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    let title: String
-    let assetImage: String
-    let isExpanded: Bool
-    var tint: Color = .primary
-    let action: () -> Void
-    @ViewBuilder let accessory: () -> Accessory
-
-    var body: some View {
-        HapticButton(action: action) {
-            HStack(alignment: .center, spacing: 18) {
-                SidebarUtilityIcon(assetImage: assetImage, tint: tint)
-
-                Text(title)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-
-                Spacer(minLength: 0)
-
-                accessory()
-
-                SidebarDisclosureChevron(isExpanded: isExpanded)
-            }
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-private struct SidebarDisclosureChevron: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.layoutDirection) private var layoutDirection
-    let isExpanded: Bool
-
-    // Rotate inside a square box so the pivot is the visual center; the outer
-    // frame keeps a fixed slot so the chevron never shifts horizontally or
-    // vertically. A value-based animation rotates it in place (and is skipped
-    // under Reduce Motion) regardless of the ambient List transaction.
-    // `chevron.forward` mirrors to point leading-ward under RTL; the expand
-    // rotation reverses there so the open state still points down (issue #294).
-    var body: some View {
-        Image(systemName: "chevron.forward")
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .frame(width: 24, height: 24)
-            .rotationEffect(
-                .degrees(RTLLayout.disclosureChevronRotationDegrees(
-                    isExpanded: isExpanded,
-                    isRightToLeft: layoutDirection == .rightToLeft
-                )),
-                anchor: .center
-            )
-            .frame(width: 24, height: 40)
-            .animation(SessionListMotion.disclosureAnimation(reduceMotion: reduceMotion), value: isExpanded)
-            .accessibilityHidden(true)
-    }
-}
-
 struct SidebarUtilityIcon: View {
     let assetImage: String
     var tint: Color = .primary
@@ -1215,17 +652,6 @@ struct SidebarUtilityIcon: View {
             .frame(width: 21, height: 21)
             .foregroundStyle(tint)
             .frame(width: 28)
-            .accessibilityHidden(true)
-    }
-}
-
-struct SidebarSelectedSubrowIndicator: View {
-    var body: some View {
-        Image(systemName: "checkmark")
-            .font(.caption2.weight(.bold))
-            .foregroundStyle(.white)
-            .frame(width: 18, height: 18)
-            .background(Color.accentColor, in: Circle())
             .accessibilityHidden(true)
     }
 }
@@ -1253,6 +679,17 @@ struct SidebarSubrowSelectionStyle: ViewModifier {
 extension View {
     func sidebarSubrowSelectionStyle(isSelected: Bool) -> some View {
         modifier(SidebarSubrowSelectionStyle(isSelected: isSelected))
+    }
+}
+
+struct SidebarSelectedSubrowIndicator: View {
+    var body: some View {
+        Image(systemName: "checkmark")
+            .font(.caption2.weight(.bold))
+            .foregroundStyle(.white)
+            .frame(width: 18, height: 18)
+            .background(Color.accentColor, in: Circle())
+            .accessibilityHidden(true)
     }
 }
 
@@ -1311,131 +748,6 @@ struct ActiveProfilePickerRow: View {
         let state = isSelected ? String(localized: "Active profile") : String(localized: "Profile")
         let switchingState = isSwitching ? String(localized: ", switching in progress") : ""
         return String(localized: "\(state), \(profile.displayName), \(defaultModelTitle)\(switchingState)")
-    }
-}
-
-struct ProjectFilterRow: View {
-    let project: ProjectSummary
-    let isSelected: Bool
-    let count: Int
-    let isViewingCachedData: Bool
-    let isRenamingProject: Bool
-    let isDeletingProject: Bool
-    let action: () -> Void
-    let rename: () -> Void
-    let delete: () -> Void
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Button(action: action) {
-                HStack(spacing: 18) {
-                    SidebarUtilityIcon(assetImage: "LucideFolder", tint: projectColor)
-
-                    Text(displayName)
-                        .font(.body)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-
-                    Spacer(minLength: 0)
-
-                    HStack(spacing: 8) {
-                        if count > 0 {
-                            Text("\(count)")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                        }
-
-                        if isSelected {
-                            SidebarSelectedSubrowIndicator()
-                        }
-                    }
-                }
-                .padding(.leading, 18)
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(displayName)
-            .accessibilityValue(accessibilityValue)
-            .accessibilityHint(isSelected ? "Clears this project filter." : "Filters sessions to this project.")
-
-            Menu {
-                Button {
-                    rename()
-                } label: {
-                    Label("Rename Project", systemImage: "pencil")
-                }
-                .disabled(projectActionsAreDisabled)
-
-                Button(role: .destructive) {
-                    delete()
-                } label: {
-                    Label("Delete Project", systemImage: "trash")
-                }
-                .disabled(projectActionsAreDisabled)
-            } label: {
-                Label(String(localized: "Project actions for \(displayName)"), systemImage: "ellipsis")
-                    .labelStyle(.iconOnly)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(String(localized: "Project actions for \(displayName)"))
-            .accessibilityHint("Shows rename and delete actions for this project.")
-        }
-        .background {
-            if isSelected {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.accentColor.opacity(0.10))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(Color.accentColor.opacity(0.20), lineWidth: 1)
-                    }
-            }
-        }
-    }
-
-    private var displayName: String {
-        let name = project.name?.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let name, !name.isEmpty else {
-            return String(localized: "Untitled Project")
-        }
-        return name
-    }
-
-    private var accessibilityValue: String {
-        let countTitle = String(localized: "\(count) sessions")
-        return isSelected ? String(localized: "Selected, \(countTitle)") : countTitle
-    }
-
-    private var projectActionsAreDisabled: Bool {
-        isViewingCachedData
-            || isRenamingProject
-            || isDeletingProject
-            || project.projectId == nil
-    }
-
-    private var projectColor: Color {
-        if let apiColor = Color(hexString: project.color) {
-            return apiColor
-        }
-
-        switch stableColorSeed % 5 {
-        case 0: return .green
-        case 1: return .blue
-        case 2: return .red
-        case 3: return .orange
-        default: return .primary
-        }
-    }
-
-    private var stableColorSeed: Int {
-        let source = project.projectId ?? displayName
-        return source.unicodeScalars.reduce(0) { partialResult, scalar in
-            partialResult &+ Int(scalar.value)
-        }
     }
 }
 
