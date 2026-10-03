@@ -202,6 +202,7 @@
 		A04300000000000000000001 /* SessionListComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04300000000000000000011 /* SessionListComponents.swift */; };
 		5800E593CB79D63F1359A4F8 /* PendingNewChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4935EA102F256EEF5CDAF37F /* PendingNewChatView.swift */; };
 		E626781235CEDA476EF8BA87 /* ShellNavigationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D47CAF96988A9A66D9809E88 /* ShellNavigationState.swift */; };
+		304FA3D5BBF98F6499CB988D /* ProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A7827505CB6DC88368DBB98 /* ProjectsView.swift */; };
 		D02817A0E87BEF62EF5E23F0 /* DrawerSettle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6501C5C136AD44341F12A22 /* DrawerSettle.swift */; };
 		93E10058E8552A4AA439B3A1 /* RecentsFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96B6ABCB2B2999629CD767C8 /* RecentsFilter.swift */; };
 		A04300000000000000000002 /* SessionListActionConfirmations.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04300000000000000000012 /* SessionListActionConfirmations.swift */; };
@@ -847,6 +848,7 @@
 		A04300000000000000000011 /* SessionListComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListComponents.swift; sourceTree = "<group>"; };
 		4935EA102F256EEF5CDAF37F /* PendingNewChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingNewChatView.swift; sourceTree = "<group>"; };
 		D47CAF96988A9A66D9809E88 /* ShellNavigationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellNavigationState.swift; sourceTree = "<group>"; };
+		7A7827505CB6DC88368DBB98 /* ProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsView.swift; sourceTree = "<group>"; };
 		C6501C5C136AD44341F12A22 /* DrawerSettle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawerSettle.swift; sourceTree = "<group>"; };
 		96B6ABCB2B2999629CD767C8 /* RecentsFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentsFilter.swift; sourceTree = "<group>"; };
 		A04300000000000000000012 /* SessionListActionConfirmations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListActionConfirmations.swift; sourceTree = "<group>"; };
@@ -1855,6 +1857,7 @@
 				A04300000000000000000011 /* SessionListComponents.swift */,
 				4935EA102F256EEF5CDAF37F /* PendingNewChatView.swift */,
 				D47CAF96988A9A66D9809E88 /* ShellNavigationState.swift */,
+				7A7827505CB6DC88368DBB98 /* ProjectsView.swift */,
 				C6501C5C136AD44341F12A22 /* DrawerSettle.swift */,
 				96B6ABCB2B2999629CD767C8 /* RecentsFilter.swift */,
 				A04300000000000000000012 /* SessionListActionConfirmations.swift */,
@@ -2763,6 +2766,7 @@
 				A04300000000000000000001 /* SessionListComponents.swift in Sources */,
 				5800E593CB79D63F1359A4F8 /* PendingNewChatView.swift in Sources */,
 				E626781235CEDA476EF8BA87 /* ShellNavigationState.swift in Sources */,
+				304FA3D5BBF98F6499CB988D /* ProjectsView.swift in Sources */,
 				D02817A0E87BEF62EF5E23F0 /* DrawerSettle.swift in Sources */,
 				93E10058E8552A4AA439B3A1 /* RecentsFilter.swift in Sources */,
 				A04300000000000000000002 /* SessionListActionConfirmations.swift in Sources */,

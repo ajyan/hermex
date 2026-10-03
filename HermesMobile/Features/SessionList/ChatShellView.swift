@@ -636,8 +636,25 @@ struct ChatShellView: View {
             utilityDestination(.kanban)
         case .legacy(let utility):
             utilityDestination(utility)
-        case .projects, .project:
-            Text(verbatim: "")
+        case .projects:
+            ProjectsView(
+                viewModel: viewModel,
+                openProject: { navigation.push(.project($0)) },
+                createProject: { isPresentingProjectCreation = true },
+                renameProject: { projectPendingRename = $0 },
+                deleteProject: { projectPendingDeletion = $0 }
+            )
+        case .project(let projectID):
+            ProjectDetailView(
+                viewModel: viewModel,
+                projectID: projectID,
+                automatedVisibility: automatedSessionVisibility,
+                actions: sessionRowActions(),
+                selectedSessionID: navigation.selectedSessionID,
+                showsMessageCount: showsSessionMessageCount,
+                showsWorkspace: showsSessionWorkspace,
+                startChat: { selectDestination(PendingNewChatRoute(projectID: projectID)) }
+            )
         }
     }
 

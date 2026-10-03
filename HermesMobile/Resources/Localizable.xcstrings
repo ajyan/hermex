@@ -132600,7 +132600,10 @@
     "CLI" : { "shouldTranslate" : false },
     "Messaging" : { },
     "Agent" : { },
-    "Bot Mode is unfinished. It adds a Bots row to the Agent section above for your direct Hermes bots. Each server’s Hermes connection is available with it off." : { }
+    "Bot Mode is unfinished. It adds a Bots row to the Agent section above for your direct Hermes bots. Each server’s Hermes connection is available with it off." : { },
+    "New Chat in Project" : { },
+    "No chats in this project" : { },
+    "Project" : { }
   },
   "version" : "1.0"
 }
