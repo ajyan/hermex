@@ -75,6 +75,16 @@ final class ShellNavigationStateTests: XCTestCase {
         XCTAssertNil(newChatState.selectedSessionID)
     }
 
+    func testRemovingCurrentSessionKeepsTheDrawerAsItWas() {
+        var state = ShellNavigationState()
+        state.select(SessionSummary(sessionId: "s1"))
+        state.isDrawerOpen = true
+
+        state.remove(sessionID: "s1")
+
+        XCTAssertTrue(state.isDrawerOpen, "archiving from the drawer must not close it")
+    }
+
     func testRemovingAnotherSessionKeepsRoot() {
         var state = ShellNavigationState()
         state.select(SessionSummary(sessionId: "s1"))

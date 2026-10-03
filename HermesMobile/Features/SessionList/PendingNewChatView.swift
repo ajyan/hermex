@@ -19,6 +19,9 @@ struct PendingNewChatView: View {
     let projectID: String?
     let startsCall: Bool
     let draftStore: ChatDraftStore
+    /// True while the shell still has this chat as its root. A push over the root
+    /// also fires `onDisappear`; only a replaced root abandons the draft.
+    let isStillRoot: () -> Bool
 
     @State private var createdSession: SessionSummary?
     @State private var draftMessage = ""
@@ -40,7 +43,8 @@ struct PendingNewChatView: View {
         viewModel: SessionListViewModel,
         onAPIError: @escaping (Error) -> Void,
         onSessionCreated: @escaping (SessionSummary) -> Void = { _ in },
-        draftStore: ChatDraftStore? = nil
+        draftStore: ChatDraftStore? = nil,
+        isStillRoot: @escaping () -> Bool = { false }
     ) {
         self.server = server
         self.viewModel = viewModel
@@ -52,6 +56,7 @@ struct PendingNewChatView: View {
         self.projectID = projectID
         self.startsCall = startsCall
         self.draftStore = draftStore ?? .shared
+        self.isStillRoot = isStillRoot
         _draftMessage = State(initialValue: initialDraft)
     }
 
@@ -90,7 +95,9 @@ struct PendingNewChatView: View {
             }
         }
         .onDisappear {
-            restoreAbandonedDraftIfNeeded()
+            if !isStillRoot() {
+                restoreAbandonedDraftIfNeeded()
+            }
             flushDraftsBestEffort()
         }
     }
@@ -185,7 +192,12 @@ struct PendingNewChatView: View {
             profile: profileName,
             projectID: projectID
         )
-        guard !Task.isCancelled else { return }
+        // A push over this root cancels the task; let the next appearance retry
+        // instead of leaving creation marked as started forever.
+        guard !Task.isCancelled else {
+            didStartCreation = false
+            return
+        }
         if let lastError = viewModel.lastError {
             onAPIError(lastError)
         }

@@ -27,6 +27,12 @@ enum DrawerSettle {
         return openFraction(startedOpen: startedOpen, translation: translation, width: width) >= openThreshold
     }
 
+    /// With the drawer open, only drags that start on the scrim or the drawer's
+    /// trailing edge move it, so swiping a row reveals its actions instead.
+    static func tracksCloseDrag(startX: CGFloat, width: CGFloat) -> Bool {
+        startX >= width - edgeWidth
+    }
+
     /// The edge pan opens the drawer only from the chat root, so the system
     /// back-swipe keeps working on pushed screens.
     static func allowsEdgeOpen(startX: CGFloat, pathIsEmpty: Bool) -> Bool {

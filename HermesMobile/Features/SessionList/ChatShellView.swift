@@ -70,14 +70,12 @@ struct ChatShellView: View {
     @Binding private var pendingWebuiPush: WebuiPushDestination?
 
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var wasBackgrounded = false
     @State private var foregroundRefresh = SessionListForegroundRefresh()
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var viewModel: SessionListViewModel
     @State private var navigation = ShellNavigationState()
-    @GestureState private var drawerDrag: CGFloat = 0
     /// The drawer is built on first open and kept alive, so it keeps its scroll position.
     @State private var hasOpenedDrawer = false
     /// False while ChatView pushes its own screens (Files, forks), which the typed path cannot see.
@@ -170,6 +168,9 @@ struct ChatShellView: View {
                         refreshAfterReturningIfNeeded()
                     }
                 }
+            }
+            .onChange(of: automatedSessionVisibility, initial: true) {
+                viewModel.recentsVisibility = automatedSessionVisibility
             }
             .onChange(of: viewModel.availableRecentsFilters) {
                 recentsFilter = RecentsFilter.resolved(recentsFilter, available: viewModel.availableRecentsFilters)
@@ -365,6 +366,9 @@ struct ChatShellView: View {
                 )
             }
             .onChange(of: navigation.isDrawerOpen) { wasOpen, isOpen in
+                // Closing by any path (scrim, Esc, picking a row) must not leave the
+                // keyboard typing into the hidden search field.
+                if !isOpen { searchFieldIsFocused = false }
                 guard ShellNavigationState.drawerOpenRequestsRefresh(wasOpen: wasOpen, isOpen: isOpen) else { return }
                 refreshAfterReturningIfNeeded()
             }
@@ -449,50 +453,17 @@ struct ChatShellView: View {
     // MARK: - Shell
 
     private var shellContainer: some View {
-        GeometryReader { proxy in
-            let width = DrawerSettle.width(
-                screenWidth: proxy.size.width,
-                isAccessibilitySize: dynamicTypeSize.isAccessibilitySize
-            )
-            let fraction = drawerFraction(width: width)
-            let shift = reduceMotion ? 0 : fraction * width
-
-            ZStack(alignment: .leading) {
-                mainStack
-                    .offset(x: shift)
-                    .accessibilityHidden(navigation.isDrawerOpen)
-
-                // Always present so it animates with the chat; inserting it would
-                // snap it to its final offset while the chat is still sliding.
-                Color.black.opacity(0.3 * fraction)
-                    .ignoresSafeArea()
-                    .offset(x: shift)
-                    .contentShape(Rectangle())
-                    .onTapGesture { setDrawerOpen(false) }
-                    .allowsHitTesting(fraction > 0)
-                    .accessibilityHidden(true)
-
-                if hasOpenedDrawer {
-                    sessionListSurface
-                        .frame(width: width)
-                        .background(Color.hxCanvas.ignoresSafeArea())
-                        .offset(x: reduceMotion ? 0 : (fraction - 1) * width)
-                        .opacity(reduceMotion ? fraction : 1)
-                        .allowsHitTesting(navigation.isDrawerOpen)
-                        .accessibilityHidden(!navigation.isDrawerOpen)
-                        .accessibilityElement(children: .contain)
-                        .accessibilityAddTraits(.isModal)
-                        .accessibilityAction(.escape) { setDrawerOpen(false) }
-                }
-
-                if navigation.isDrawerOpen {
-                    Button("Close chats") { setDrawerOpen(false) }
-                        .keyboardShortcut(.cancelAction)
-                        .hidden()
-                        .accessibilityHidden(true)
-                }
+        DrawerContainer(
+            isOpen: navigation.isDrawerOpen,
+            canEdgeOpen: navigation.path.isEmpty && isRootVisible,
+            willOpen: { if !hasOpenedDrawer { hasOpenedDrawer = true } },
+            setOpen: setDrawerOpen
+        ) {
+            mainStack
+        } drawer: {
+            if hasOpenedDrawer {
+                sessionListSurface
             }
-            .simultaneousGesture(drawerDragGesture(width: width))
         }
     }
 
@@ -534,7 +505,8 @@ struct ChatShellView: View {
                 viewModel: viewModel,
                 onAPIError: authManager.handleAPIError,
                 onSessionCreated: rememberCreatedSession,
-                draftStore: draftStore
+                draftStore: draftStore,
+                isStillRoot: { navigation.root == .newChat(route) }
             )
             .id(route.id)
         }
@@ -596,41 +568,6 @@ struct ChatShellView: View {
                 startChat: { selectDestination(PendingNewChatRoute(projectID: projectID)) }
             )
         }
-    }
-
-    private func drawerFraction(width: CGFloat) -> CGFloat {
-        DrawerSettle.openFraction(startedOpen: navigation.isDrawerOpen, translation: drawerDrag, width: width)
-    }
-
-    /// Tracks only drags that can move the drawer: any horizontal drag while it is
-    /// open, or one starting at the left edge of the chat root while it is closed.
-    private func drawerDragGesture(width: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 10, coordinateSpace: .global)
-            .updating($drawerDrag) { value, state, _ in
-                guard tracksDrawerDrag(value) else { return }
-                state = value.translation.width
-            }
-            .onChanged { value in
-                // Build the drawer as the first drag starts, so it is not blank under the finger.
-                if !hasOpenedDrawer, tracksDrawerDrag(value) { hasOpenedDrawer = true }
-            }
-            .onEnded { value in
-                guard tracksDrawerDrag(value) else { return }
-                setDrawerOpen(DrawerSettle.isOpen(
-                    startedOpen: navigation.isDrawerOpen,
-                    translation: value.translation.width,
-                    velocity: value.velocity.width,
-                    width: width
-                ))
-            }
-    }
-
-    private func tracksDrawerDrag(_ value: DragGesture.Value) -> Bool {
-        guard abs(value.translation.width) > abs(value.translation.height) else { return false }
-        return navigation.isDrawerOpen || DrawerSettle.allowsEdgeOpen(
-            startX: value.startLocation.x,
-            pathIsEmpty: navigation.path.isEmpty && isRootVisible
-        )
     }
 
     private func setDrawerOpen(_ isOpen: Bool) {

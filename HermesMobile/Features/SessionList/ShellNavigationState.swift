@@ -63,10 +63,13 @@ struct ShellNavigationState: Equatable {
         newChatSessionID = sessionID
     }
 
-    /// A removed (deleted or archived) current chat leaves the user on a fresh new chat.
+    /// A removed (deleted or archived) current chat leaves the user on a fresh new
+    /// chat. The drawer stays as it was, since that is usually where the removal happened.
     mutating func remove(sessionID: String?) {
         guard let sessionID = Self.normalized(sessionID), sessionID == selectedSessionID else { return }
+        let wasDrawerOpen = isDrawerOpen
         select(PendingNewChatRoute())
+        isDrawerOpen = wasDrawerOpen
     }
 
     mutating func beginDeepLinkedSessionLoad(id: String?) -> String? {

@@ -29,6 +29,12 @@ final class DrawerSettleTests: XCTestCase {
         XCTAssertEqual(DrawerSettle.openFraction(startedOpen: false, translation: -40, width: 300), 0)
     }
 
+    func testOpenDrawerTracksOnlyDragsFromTheScrimOrTrailingEdge() {
+        XCTAssertFalse(DrawerSettle.tracksCloseDrag(startX: 150, width: 300), "row swipes inside the drawer belong to the row")
+        XCTAssertTrue(DrawerSettle.tracksCloseDrag(startX: 290, width: 300))
+        XCTAssertTrue(DrawerSettle.tracksCloseDrag(startX: 340, width: 300))
+    }
+
     func testWidth() {
         XCTAssertEqual(DrawerSettle.width(screenWidth: 390, isAccessibilitySize: false), 331.5)
         XCTAssertEqual(DrawerSettle.width(screenWidth: 390, isAccessibilitySize: true), 346)

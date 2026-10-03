@@ -28,10 +28,18 @@ enum ActiveSessionStateRefreshResult: Equatable {
 @Observable
 final class SessionListViewModel {
     private(set) var sessions: [SessionSummary] = [] {
-        didSet { availableRecentsFilters = RecentsFilter.available(in: sessions) }
+        didSet { updateAvailableRecentsFilters() }
     }
-    /// The filter choices the drawer offers, recomputed only when `sessions` changes.
+    /// The Settings visibility toggles, so the drawer never offers a kind they hide.
+    var recentsVisibility: AutomatedSessionVisibility = .showAll {
+        didSet { if recentsVisibility != oldValue { updateAvailableRecentsFilters() } }
+    }
+    /// The filter choices the drawer offers, recomputed only when the rows or toggles change.
     private(set) var availableRecentsFilters: [RecentsFilter] = [.all, .hermes]
+
+    private func updateAvailableRecentsFilters() {
+        availableRecentsFilters = RecentsFilter.available(in: sessions.filter(recentsVisibility.shows))
+    }
     private(set) var isLoading = false
     private(set) var isCreatingSession = false
     private(set) var isCreatingProject = false

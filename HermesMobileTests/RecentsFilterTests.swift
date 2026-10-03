@@ -32,7 +32,33 @@ final class RecentsFilterTests: XCTestCase {
     }
 
     @MainActor
+    func testAvailableFiltersIgnoreKindsHiddenBySettings() async throws {
+        let viewModel = try await loadedViewModel()
+        XCTAssertEqual(viewModel.availableRecentsFilters, [.all, .hermes, .claudeCode])
+
+        viewModel.recentsVisibility = AutomatedSessionVisibility(showsCron: true, showsCli: true, showsClaudeCode: false)
+
+        XCTAssertEqual(viewModel.availableRecentsFilters, [.all, .hermes])
+        XCTAssertEqual(RecentsFilter.resolved(.claudeCode, available: viewModel.availableRecentsFilters), .hermes)
+    }
+
+    @MainActor
     func testViewModelFilterAppliesOnlyWithoutSearch() async throws {
+        let viewModel = try await loadedViewModel()
+
+        XCTAssertEqual(
+            viewModel.visibleSessions(searchText: "", selectedProjectID: nil, filter: .hermes).compactMap(\.sessionId),
+            ["hermes-1"]
+        )
+        XCTAssertEqual(
+            Set(viewModel.visibleSessions(searchText: "alpha", selectedProjectID: nil, filter: .hermes).compactMap(\.sessionId)),
+            ["hermes-1", "claude-1"]
+        )
+        XCTAssertEqual(viewModel.availableRecentsFilters, [.all, .hermes, .claudeCode])
+    }
+
+    @MainActor
+    private func loadedViewModel() async throws -> SessionListViewModel {
         let server = try XCTUnwrap(URL(string: "https://example.test"))
         MockURLProtocol.requestHandler = { request in
             apiTestJSONResponse("""
@@ -50,15 +76,6 @@ final class RecentsFilterTests: XCTestCase {
         let viewModel = SessionListViewModel(server: server, client: client)
 
         await viewModel.load()
-
-        XCTAssertEqual(
-            viewModel.visibleSessions(searchText: "", selectedProjectID: nil, filter: .hermes).compactMap(\.sessionId),
-            ["hermes-1"]
-        )
-        XCTAssertEqual(
-            Set(viewModel.visibleSessions(searchText: "alpha", selectedProjectID: nil, filter: .hermes).compactMap(\.sessionId)),
-            ["hermes-1", "claude-1"]
-        )
-        XCTAssertEqual(viewModel.availableRecentsFilters, [.all, .hermes, .claudeCode])
+        return viewModel
     }
 }
