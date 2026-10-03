@@ -156,6 +156,7 @@
 		C08650000000000000000004 /* ActionToastStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C08650000000000000000003 /* ActionToastStateTests.swift */; };
 		C03910000000000000000019 /* SessionRowAttentionStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03900000000000000000019 /* SessionRowAttentionStateTests.swift */; };
 		A10900000000000000000002 /* SessionNavigationStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10900000000000000000012 /* SessionNavigationStateTests.swift */; };
+		6A782D4CAA2AF88D5F94A780 /* ShellNavigationStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 456E58BC75E2EBE335416D28 /* ShellNavigationStateTests.swift */; };
 		8ED1BF0E83115706BFB110A4 /* DrawerSettleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3A55225279372080EAE5602 /* DrawerSettleTests.swift */; };
 		C2067E557A82E018C2421DC8 /* RecentsFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E6E51C25647DF0AB97836D6 /* RecentsFilterTests.swift */; };
 		19C1150000000000000000A3 /* CliSessionsSyncModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19C1150000000000000000A4 /* CliSessionsSyncModelTests.swift */; };
@@ -200,6 +201,7 @@
 		1A2B3C4D5E6F7000000000D1 /* SessionListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000D3 /* SessionListViewModel.swift */; };
 		A04300000000000000000001 /* SessionListComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04300000000000000000011 /* SessionListComponents.swift */; };
 		A10900000000000000000001 /* SessionNavigationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10900000000000000000011 /* SessionNavigationState.swift */; };
+		E626781235CEDA476EF8BA87 /* ShellNavigationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D47CAF96988A9A66D9809E88 /* ShellNavigationState.swift */; };
 		D02817A0E87BEF62EF5E23F0 /* DrawerSettle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6501C5C136AD44341F12A22 /* DrawerSettle.swift */; };
 		93E10058E8552A4AA439B3A1 /* RecentsFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96B6ABCB2B2999629CD767C8 /* RecentsFilter.swift */; };
 		A04300000000000000000002 /* SessionListActionConfirmations.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04300000000000000000012 /* SessionListActionConfirmations.swift */; };
@@ -798,6 +800,7 @@
 		C08650000000000000000003 /* ActionToastStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionToastStateTests.swift; sourceTree = "<group>"; };
 		C03900000000000000000019 /* SessionRowAttentionStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRowAttentionStateTests.swift; sourceTree = "<group>"; };
 		A10900000000000000000012 /* SessionNavigationStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionNavigationStateTests.swift; sourceTree = "<group>"; };
+		456E58BC75E2EBE335416D28 /* ShellNavigationStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellNavigationStateTests.swift; sourceTree = "<group>"; };
 		B3A55225279372080EAE5602 /* DrawerSettleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawerSettleTests.swift; sourceTree = "<group>"; };
 		6E6E51C25647DF0AB97836D6 /* RecentsFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentsFilterTests.swift; sourceTree = "<group>"; };
 		19C1150000000000000000A4 /* CliSessionsSyncModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CliSessionsSyncModelTests.swift; sourceTree = "<group>"; };
@@ -842,6 +845,7 @@
 		1A2B3C4D5E6F7000000000D3 /* SessionListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListViewModel.swift; sourceTree = "<group>"; };
 		A04300000000000000000011 /* SessionListComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListComponents.swift; sourceTree = "<group>"; };
 		A10900000000000000000011 /* SessionNavigationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionNavigationState.swift; sourceTree = "<group>"; };
+		D47CAF96988A9A66D9809E88 /* ShellNavigationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellNavigationState.swift; sourceTree = "<group>"; };
 		C6501C5C136AD44341F12A22 /* DrawerSettle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawerSettle.swift; sourceTree = "<group>"; };
 		96B6ABCB2B2999629CD767C8 /* RecentsFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentsFilter.swift; sourceTree = "<group>"; };
 		A04300000000000000000012 /* SessionListActionConfirmations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListActionConfirmations.swift; sourceTree = "<group>"; };
@@ -1494,6 +1498,7 @@
 				C08650000000000000000003 /* ActionToastStateTests.swift */,
 				C03900000000000000000019 /* SessionRowAttentionStateTests.swift */,
 				A10900000000000000000012 /* SessionNavigationStateTests.swift */,
+				456E58BC75E2EBE335416D28 /* ShellNavigationStateTests.swift */,
 				B3A55225279372080EAE5602 /* DrawerSettleTests.swift */,
 				6E6E51C25647DF0AB97836D6 /* RecentsFilterTests.swift */,
 				19C1150000000000000000A4 /* CliSessionsSyncModelTests.swift */,
@@ -1847,6 +1852,7 @@
 				1A2B3C4D5E6F7000000000D3 /* SessionListViewModel.swift */,
 				A04300000000000000000011 /* SessionListComponents.swift */,
 				A10900000000000000000011 /* SessionNavigationState.swift */,
+				D47CAF96988A9A66D9809E88 /* ShellNavigationState.swift */,
 				C6501C5C136AD44341F12A22 /* DrawerSettle.swift */,
 				96B6ABCB2B2999629CD767C8 /* RecentsFilter.swift */,
 				A04300000000000000000012 /* SessionListActionConfirmations.swift */,
@@ -2752,6 +2758,7 @@
 				1A2B3C4D5E6F7000000000D1 /* SessionListViewModel.swift in Sources */,
 				A04300000000000000000001 /* SessionListComponents.swift in Sources */,
 				A10900000000000000000001 /* SessionNavigationState.swift in Sources */,
+				E626781235CEDA476EF8BA87 /* ShellNavigationState.swift in Sources */,
 				D02817A0E87BEF62EF5E23F0 /* DrawerSettle.swift in Sources */,
 				93E10058E8552A4AA439B3A1 /* RecentsFilter.swift in Sources */,
 				A04300000000000000000002 /* SessionListActionConfirmations.swift in Sources */,
@@ -2912,6 +2919,7 @@
 				C08650000000000000000004 /* ActionToastStateTests.swift in Sources */,
 				C03910000000000000000019 /* SessionRowAttentionStateTests.swift in Sources */,
 				A10900000000000000000002 /* SessionNavigationStateTests.swift in Sources */,
+				6A782D4CAA2AF88D5F94A780 /* ShellNavigationStateTests.swift in Sources */,
 				8ED1BF0E83115706BFB110A4 /* DrawerSettleTests.swift in Sources */,
 				C2067E557A82E018C2421DC8 /* RecentsFilterTests.swift in Sources */,
 				19C1150000000000000000A3 /* CliSessionsSyncModelTests.swift in Sources */,
