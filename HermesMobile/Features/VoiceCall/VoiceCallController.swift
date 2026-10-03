@@ -84,6 +84,8 @@ final class VoiceCallController {
     /// A turn has ended with only a partial transcript; waiting briefly for the final one.
     @ObservationIgnored private var awaitingFinalSince: TimeInterval?
     @ObservationIgnored private var isHeld = false
+    /// When the current turn's first speech was heard, so the log can show how long it took to send.
+    @ObservationIgnored private var turnStartedAt: TimeInterval?
     /// When the transcript last changed, for ending a turn the level meter never heard.
     @ObservationIgnored private var transcriptChangedAt: TimeInterval?
     /// When `listening` began, for the no-speech prompt.
@@ -343,6 +345,8 @@ final class VoiceCallController {
     private func observeTurn(_ isSpeech: Bool, at time: TimeInterval) {
         switch turnDetector.observe(isSpeech: isSpeech, at: time) {
         case .speechStarted:
+            turnStartedAt = time
+            log("turn started")
             discardFinals = false
             lastSentTurn = nil
             awaitingFinalSince = nil
@@ -394,7 +398,9 @@ final class VoiceCallController {
         runFinished = false
         runFinishedAt = nil
         thinkingSince = now()
-        log("send: \"\(text)\"")
+        let spokenFor = turnStartedAt.map { String(format: " (turn started %.1fs ago)", now() - $0) } ?? ""
+        turnStartedAt = nil
+        log("send: \"\(text)\"\(spokenFor)")
         lastChatTask = Task { [weak self, chat] in
             let sent = await chat.sendVoiceMessage(VoiceCallPhrases.voicePrefix + text)
             guard !sent, let self, self.replyActive, self.state == .thinking else { return }

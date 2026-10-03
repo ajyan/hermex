@@ -100,8 +100,10 @@ final class VoiceCallControllerTests: XCTestCase {
     private var clock: TimeInterval = 0
     private var suppressCue = false
     private var controller: VoiceCallController!
+    private var logLines: [String] = []
 
     override func setUp() async throws {
+        logLines = []
         listener = FakeListener()
         speaker = FakeSpeaker()
         chat = FakeChat()
@@ -115,7 +117,8 @@ final class VoiceCallControllerTests: XCTestCase {
             bridge: bridge,
             now: { [unowned self] in clock },
             suppressThinkingCue: { [unowned self] in suppressCue },
-            tickInterval: nil
+            tickInterval: nil,
+            log: { [unowned self] in logLines.append($0) }
         )
     }
 
@@ -271,6 +274,16 @@ final class VoiceCallControllerTests: XCTestCase {
         controller.tick()
         XCTAssertEqual(controller.state, .listening)
         XCTAssertTrue(speaker.spoken.isEmpty)
+    }
+
+    func testLogDistinguishesTurnStartedFromTurnSent() async {
+        await controller.start()
+        await say("hello", seconds: 1.0)
+        let started = logLines.firstIndex { $0 == "turn started" }
+        let sent = logLines.firstIndex { $0.hasPrefix("send: \"hello\" (turn started ") }
+        XCTAssertNotNil(started)
+        XCTAssertNotNil(sent)
+        if let started, let sent { XCTAssertLessThan(started, sent) }
     }
 
     func testPartialTranscriptShownWhileListening() async {
