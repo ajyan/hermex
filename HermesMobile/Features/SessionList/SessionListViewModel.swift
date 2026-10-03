@@ -62,7 +62,11 @@ enum ActiveSessionStateRefreshResult: Equatable {
 @MainActor
 @Observable
 final class SessionListViewModel {
-    private(set) var sessions: [SessionSummary] = []
+    private(set) var sessions: [SessionSummary] = [] {
+        didSet { availableRecentsFilters = RecentsFilter.available(in: sessions) }
+    }
+    /// The filter choices the drawer offers, recomputed only when `sessions` changes.
+    private(set) var availableRecentsFilters: [RecentsFilter] = [.all, .hermes]
     private(set) var isLoading = false
     private(set) var isCreatingSession = false
     private(set) var isCreatingProject = false
@@ -190,13 +194,15 @@ final class SessionListViewModel {
     func visibleSessions(
         searchText: String,
         selectedProjectID: String?,
-        automatedVisibility: AutomatedSessionVisibility = .showAll
+        automatedVisibility: AutomatedSessionVisibility = .showAll,
+        filter: RecentsFilter = .all
     ) -> [SessionSummary] {
         visibleSessions(
             among: sessions,
             searchText: searchText,
             selectedProjectID: selectedProjectID,
-            automatedVisibility: automatedVisibility
+            automatedVisibility: automatedVisibility,
+            filter: filter
         )
     }
 
@@ -224,12 +230,16 @@ final class SessionListViewModel {
         among candidates: [SessionSummary],
         searchText rawSearchText: String,
         selectedProjectID: String?,
-        automatedVisibility: AutomatedSessionVisibility
+        automatedVisibility: AutomatedSessionVisibility,
+        filter: RecentsFilter = .all
     ) -> [SessionSummary] {
         let query = Self.normalizedSearchQuery(rawSearchText)
         // Every word must appear somewhere in the row, in any order and field.
         let searchTerms = query.split(whereSeparator: \.isWhitespace)
-        let baseSessions = candidates.filter { automatedVisibility.shows($0) }
+        // Search spans every source, so the recents filter applies only without a query.
+        let baseSessions = candidates.filter {
+            automatedVisibility.shows($0) && (!query.isEmpty || filter.includes($0))
+        }
         let projectFilteredSessions = baseSessions.filter { session in
             guard let selectedProjectID else { return true }
             return session.projectId == selectedProjectID
