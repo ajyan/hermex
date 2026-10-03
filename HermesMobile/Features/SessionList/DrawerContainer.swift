@@ -13,7 +13,10 @@ struct DrawerContainer<Main: View, Drawer: View>: View {
     @ViewBuilder let main: Main
     @ViewBuilder let drawer: Drawer
 
-    @GestureState private var drag: CGFloat = 0
+    /// Animated reset, so a release glides from the finger to the settled state
+    /// instead of snapping back to it first.
+    @GestureState(resetTransaction: Transaction(animation: .spring(duration: 0.3)))
+    private var drag: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
