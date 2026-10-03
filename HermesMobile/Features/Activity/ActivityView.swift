@@ -54,7 +54,17 @@ struct ActivityView: View {
         }
     }
 
-    private var timeline: some View {
+    // `AnyView` (not `some View`) so the two branch types, which differ in
+    // their opaque types, unify in a single non-ViewBuilder property.
+    private var timeline: AnyView {
+        if viewModel.filter == .attention && viewModel.episodesAvailable {
+            AnyView(episodeTimeline)
+        } else {
+            AnyView(eventTimeline)
+        }
+    }
+
+    private var eventTimeline: some View {
         List {
             if viewModel.state == .serviceDown {
                 banner(String(localized: "The activity service isn't running"))
@@ -82,9 +92,43 @@ struct ActivityView: View {
         }
     }
 
+    private var episodeTimeline: some View {
+        List {
+            if viewModel.state == .serviceDown {
+                banner(String(localized: "The activity service isn't running"))
+            }
+            if let rulesError = viewModel.rulesError {
+                banner(String(localized: "Rules file has an error; using the previous version"), detail: rulesError)
+            }
+            ForEach(episodeSections, id: \.day) { section in
+                Section(ActivityPresentation.dayHeader(for: section.day, now: .now, calendar: .current)) {
+                    ForEach(section.episodes) { episode in
+                        EpisodeRow(episode: episode)
+                            .onAppear {
+                                if episode.id == viewModel.episodes.last?.id {
+                                    Task { await viewModel.loadMore() }
+                                }
+                            }
+                    }
+                }
+            }
+        }
+        .overlay {
+            if viewModel.state == .loaded, viewModel.episodes.isEmpty {
+                ContentUnavailableView("No activity yet", systemImage: "tray")
+            }
+        }
+    }
+
     private var sections: [(day: Date, events: [AtlasActivityEvent])] {
         let calendar = Calendar.current
         let grouped = Dictionary(grouping: viewModel.events) { calendar.startOfDay(for: $0.ts) }
+        return grouped.keys.sorted(by: >).map { ($0, grouped[$0] ?? []) }
+    }
+
+    private var episodeSections: [(day: Date, episodes: [AtlasEpisode])] {
+        let calendar = Calendar.current
+        let grouped = Dictionary(grouping: viewModel.episodes) { calendar.startOfDay(for: $0.firstTs) }
         return grouped.keys.sorted(by: >).map { ($0, grouped[$0] ?? []) }
     }
 
@@ -127,7 +171,25 @@ private struct ActivityRow: View {
                     .font(.system(.caption, design: .monospaced))
                     .foregroundStyle(.hxTextSecondary)
                     .lineLimit(2)
-                if let ruleID = event.ruleID, event.outcome == .blocked || event.outcome == .denied {
+                if let display = event.display {
+                    // Newer sidecars send a human-readable projection; prefer it
+                    // over the raw rule id when it carries a sentence.
+                    if ActivityPresentation.showsRulePlain(
+                        display.rulePlain,
+                        outcome: event.outcome,
+                        actionNeeded: display.actionNeeded
+                    ) {
+                        Text(display.rulePlain!)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(ActivityPresentation.outcomeStyle(event.outcome))
+                    }
+                    if !display.actionNeeded.isEmpty {
+                        Text(display.actionNeeded)
+                            .font(.caption)
+                            .foregroundStyle(ActivityPresentation.outcomeStyle(event.outcome))
+                    }
+                } else if let ruleID = event.ruleID, event.outcome == .blocked || event.outcome == .denied {
+                    // Backward compat: older sidecars send no `display`.
                     Text("Rule: \(ruleID)")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(ActivityPresentation.outcomeStyle(event.outcome))
@@ -143,6 +205,40 @@ private struct ActivityRow: View {
                 }
                 .font(.caption)
                 .foregroundStyle(.hxTextSecondary)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct EpisodeRow: View {
+    let episode: AtlasEpisode
+
+    private var actionColor: Color {
+        ActivityPresentation.outcomeStyle(ActivityPresentation.episodeHighlightOutcome(episode.outcomes) ?? .unknown)
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: ActivityPresentation.symbol(forTool: episode.tools.first ?? ""))
+                .frame(width: 24)
+                .foregroundStyle(.hxTextSecondary)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(ActivityPresentation.episodeTitle(rulePlain: episode.rulePlain))
+                    .font(.subheadline.weight(.semibold))
+                Text(ActivityPresentation.episodeSubtitle(count: episode.count, first: episode.firstTs, last: episode.lastTs))
+                    .font(.caption)
+                    .foregroundStyle(.hxTextSecondary)
+                Text(episode.sampleCommand)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.hxTextSecondary)
+                    .lineLimit(2)
+                if !episode.actionNeeded.isEmpty {
+                    Text(episode.actionNeeded)
+                        .font(.caption)
+                        .foregroundStyle(actionColor)
+                }
             }
         }
         .accessibilityElement(children: .combine)
