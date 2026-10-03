@@ -20,6 +20,24 @@ extension APIClient {
         return try AtlasActivityTimestampFormatter.decoder.decode(AtlasActivityPage.self, from: data)
     }
 
+    /// One page of attention episodes, newest first. `before` is the cursor
+    /// from a previous page's `nextBefore`. Shares the events endpoint's auth
+    /// and error surface: 404 means the sidecar predates episodes, which the
+    /// view model treats as the feature being absent.
+    func atlasEpisodes(
+        before: Int? = nil,
+        limit: Int = 20,
+        filter: AtlasActivityFilter = .attention
+    ) async throws -> AtlasEpisodePage {
+        let data = try await sendData(
+            endpoint: .atlasActivityEpisodes(before: before, limit: limit, filter: filter),
+            method: "GET",
+            encodedBody: nil,
+            extraHeaders: sidecarProvenanceHeaders
+        )
+        return try AtlasActivityTimestampFormatter.decoder.decode(AtlasEpisodePage.self, from: data)
+    }
+
     /// The sidecar's current ruleset, or the sidecar's own error reason when
     /// the rules could not be loaded.
     func atlasRules() async throws -> AtlasRulesSnapshot {

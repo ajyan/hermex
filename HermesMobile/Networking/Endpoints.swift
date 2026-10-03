@@ -98,6 +98,9 @@ enum Endpoint {
     /// `filter` is `.all` (no `filter` item) or one of the sidecar's named
     /// filters. `before` is the cursor from the previous page's `next_before`.
     case atlasActivityEvents(before: Int?, limit: Int, filter: AtlasActivityFilter)
+    /// Proxied Atlas sidecar: one page of attention episodes, newest first.
+    /// Same `filter`/`before` semantics as `atlasActivityEvents`.
+    case atlasActivityEpisodes(before: Int?, limit: Int, filter: AtlasActivityFilter)
     /// Proxied Atlas sidecar: the current ruleset, or the sidecar's own
     /// error reason when the rules could not be loaded.
     case atlasRules
@@ -327,6 +330,8 @@ enum Endpoint {
             return "/api/insights"
         case .atlasActivityEvents:
             return "/api/extensions/atlas-activity/sidecar/events"
+        case .atlasActivityEpisodes:
+            return "/api/extensions/atlas-activity/sidecar/episodes"
         case .atlasRules:
             return "/api/extensions/atlas-activity/sidecar/rules"
         case .crons:
@@ -578,6 +583,16 @@ enum Endpoint {
         case let .atlasActivityEvents(before, limit, filter):
             // `filter` is omitted for `.all` so the wire format stays
             // byte-identical to a sidecar request without the parameter.
+            var items = [URLQueryItem(name: "limit", value: "\(limit)")]
+            if let before {
+                items.append(URLQueryItem(name: "before", value: "\(before)"))
+            }
+            if filter != .all {
+                items.append(URLQueryItem(name: "filter", value: filter.rawValue))
+            }
+            return items
+        case let .atlasActivityEpisodes(before, limit, filter):
+            // Mirrors `atlasActivityEvents`: `filter` omitted for `.all`.
             var items = [URLQueryItem(name: "limit", value: "\(limit)")]
             if let before {
                 items.append(URLQueryItem(name: "before", value: "\(before)"))

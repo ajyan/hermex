@@ -28,6 +28,14 @@ enum AtlasOutcome: String, Decodable, Sendable {
     }
 }
 
+/// The human-readable projection of one activity event, added by newer sidecars.
+/// Older sidecars omit the whole object, so it is optional on the event.
+struct AtlasEventDisplay: Decodable, Equatable, Sendable {
+    let plainCommand: String
+    let rulePlain: String?
+    let actionNeeded: String
+}
+
 /// One row of the activity log, as reported by the Atlas sidecar.
 struct AtlasActivityEvent: Decodable, Identifiable, Equatable, Sendable {
     let id: Int
@@ -39,11 +47,12 @@ struct AtlasActivityEvent: Decodable, Identifiable, Equatable, Sendable {
     let ruleID: String?
     let outcome: AtlasOutcome
     let durationMs: Int?
+    let display: AtlasEventDisplay?
 
     // The decoder's `.convertFromSnakeCase` yields `sessionId` / `ruleId`, so
     // the acronym properties need their converted spelling as the key.
     private enum CodingKeys: String, CodingKey {
-        case id, ts, source, summary, outcome
+        case id, ts, source, summary, outcome, display
         case sessionID = "sessionId"
         case toolName
         case ruleID = "ruleId"
@@ -54,6 +63,44 @@ struct AtlasActivityEvent: Decodable, Identifiable, Equatable, Sendable {
 /// One page of activity events, plus the cursor for the next (older) page.
 struct AtlasActivityPage: Decodable, Equatable, Sendable {
     let events: [AtlasActivityEvent]
+    let nextBefore: Int?
+}
+
+/// A run of activity events the sidecar has grouped into one attention item.
+/// The sidecar returns episodes newest-first; `firstId`/`lastId` are the event
+/// ids bracketing the run, and `nextBefore` is the cursor for the next page.
+struct AtlasEpisode: Decodable, Identifiable, Equatable, Sendable {
+    let ruleID: String?
+    let rulePlain: String?
+    let sessionID: String?
+    let firstTs: Date
+    let lastTs: Date
+    let count: Int
+    let tools: [String]
+    let outcomes: [AtlasOutcome]
+    let sampleCommand: String
+    let actionNeeded: String
+    let firstId: Int
+    let lastId: Int
+
+    var id: Int { firstId }
+
+    // Acronym properties decode from the snake_case keys that
+    // `.convertFromSnakeCase` converts to `sessionId` / `ruleId` / `firstId` /
+    // `lastId`.
+    private enum CodingKeys: String, CodingKey {
+        case firstTs, lastTs, count, tools, outcomes, sampleCommand, actionNeeded
+        case ruleID = "ruleId"
+        case rulePlain
+        case sessionID = "sessionId"
+        case firstId
+        case lastId
+    }
+}
+
+/// One page of attention episodes, plus the cursor for the next (older) page.
+struct AtlasEpisodePage: Decodable, Equatable, Sendable {
+    let episodes: [AtlasEpisode]
     let nextBefore: Int?
 }
 

@@ -7,6 +7,7 @@ import Observation
 /// conforming it here.
 protocol AtlasActivityDataClient: Sendable {
     func atlasActivity(before: Int?, limit: Int, filter: AtlasActivityFilter) async throws -> AtlasActivityPage
+    func atlasEpisodes(before: Int?, limit: Int, filter: AtlasActivityFilter) async throws -> AtlasEpisodePage
     func atlasRules() async throws -> AtlasRulesSnapshot
 }
 
@@ -30,12 +31,19 @@ final class ActivityViewModel {
     private(set) var state: ActivityLoadState = .idle
     private(set) var rulesError: String?
     private(set) var isLoadingMore = false
+    private(set) var episodes: [AtlasEpisode] = []
+    private(set) var episodesAvailable: Bool = false
 
     /// Cursor for the next (older) page: the last page's `nextBefore`.
     private var nextBefore: Int?
+    /// Episode cursor for the next (older) episode page, separate from the
+    /// events cursor: the two paginates independently.
+    private var nextBeforeEpisodes: Int?
     private let client: any AtlasActivityDataClient
     /// Page size for the sidecar's `limit` parameter.
     private let pageSize: Int = 50
+    /// Page size for the sidecar's episode `limit` parameter.
+    private let episodePageSize: Int = 20
 
     init(client: any AtlasActivityDataClient) {
         self.client = client
@@ -54,6 +62,9 @@ final class ActivityViewModel {
     func reload() async {
         state = .loading
         nextBefore = nil
+        nextBeforeEpisodes = nil
+        episodes = []
+        episodesAvailable = false
         isLoadingMore = false
 
         do {
@@ -64,10 +75,31 @@ final class ActivityViewModel {
         } catch {
             state = Self.state(for: error)
         }
+
+        if filter == .attention {
+            await reloadEpisodes()
+        }
+    }
+
+    /// Attention-only: fetch the first page of episodes in the same load.
+    /// The events fetch is primary — an episode failure never overrides the
+    /// events state. A 404 means the sidecar predates episodes, so the feature
+    /// is simply absent.
+    private func reloadEpisodes() async {
+        do {
+            let page = try await client.atlasEpisodes(before: nil, limit: episodePageSize, filter: filter)
+            apply(page: page)
+        } catch is CancellationError {
+            // Superseded by a newer reload; that one owns the state.
+        } catch {
+            clearEpisodes()
+        }
     }
 
     /// Appends the next older page using the pagination cursor. A no-op when
     /// there is nothing older (`nextBefore` is nil) or a load is in flight.
+    /// When episodes are available in attention mode, the next episode page is
+    /// appended in the same load; its failure never affects the events state.
     func loadMore() async {
         guard state == .loaded, let cursor = nextBefore, !isLoadingMore else {
             return
@@ -85,6 +117,24 @@ final class ActivityViewModel {
         } catch {
             keepEvents()
             state = Self.state(for: error)
+        }
+
+        if filter == .attention, episodesAvailable, let episodeCursor = nextBeforeEpisodes {
+            await loadMoreEpisodes(cursor: episodeCursor)
+        }
+    }
+
+    private func loadMoreEpisodes(cursor: Int) async {
+        do {
+            let page = try await client.atlasEpisodes(before: cursor, limit: episodePageSize, filter: filter)
+            episodes.append(contentsOf: page.episodes)
+            nextBeforeEpisodes = page.nextBefore
+        } catch is CancellationError {
+            // Superseded by a newer reload; that one owns the state.
+        } catch {
+            // The events fetch is primary: an episode pagination failure keeps
+            // what we have and only stops further episode paging.
+            clearEpisodes()
         }
     }
 
@@ -106,6 +156,21 @@ final class ActivityViewModel {
         events = page.events
         nextBefore = page.nextBefore
         state = .loaded
+    }
+
+    private func apply(page: AtlasEpisodePage) {
+        episodes = page.episodes
+        nextBeforeEpisodes = page.nextBefore
+        episodesAvailable = true
+    }
+
+    /// Clears episode state. Used when the sidecar does not serve episodes
+    /// (404) or an episode request fails: the view falls back to the events
+    /// list, which is always loaded independently.
+    private func clearEpisodes() {
+        episodes = []
+        nextBeforeEpisodes = nil
+        episodesAvailable = false
     }
 
     /// A 502/503 means the sidecar is briefly unreachable: keep the last good
@@ -144,6 +209,10 @@ private struct APIClientAtlasActivityAdapter: AtlasActivityDataClient {
 
     func atlasActivity(before: Int?, limit: Int, filter: AtlasActivityFilter) async throws -> AtlasActivityPage {
         try await apiClient.atlasActivity(before: before, limit: limit, filter: filter)
+    }
+
+    func atlasEpisodes(before: Int?, limit: Int, filter: AtlasActivityFilter) async throws -> AtlasEpisodePage {
+        try await apiClient.atlasEpisodes(before: before, limit: limit, filter: filter)
     }
 
     func atlasRules() async throws -> AtlasRulesSnapshot {
