@@ -132598,7 +132598,9 @@
     "Send code" : { "localizations" : { "de" : { "stringUnit" : { "state" : "needs_review", "value" : "Code senden" } }, "es" : { "stringUnit" : { "state" : "needs_review", "value" : "Enviar código" } }, "fr" : { "stringUnit" : { "state" : "needs_review", "value" : "Envoyer le code" } }, "it" : { "stringUnit" : { "state" : "needs_review", "value" : "Invia codice" } }, "pl" : { "stringUnit" : { "state" : "needs_review", "value" : "Wyślij kod" } }, "pt-BR" : { "stringUnit" : { "state" : "needs_review", "value" : "Enviar código" } }, "nl" : { "stringUnit" : { "state" : "needs_review", "value" : "Code versturen" } }, "tr" : { "stringUnit" : { "state" : "needs_review", "value" : "Kodu gönder" } }, "ru" : { "stringUnit" : { "state" : "needs_review", "value" : "Отправить код" } }, "ja" : { "stringUnit" : { "state" : "needs_review", "value" : "コードを送信" } }, "zh-Hans" : { "stringUnit" : { "state" : "needs_review", "value" : "发送验证码" } }, "ko" : { "stringUnit" : { "state" : "needs_review", "value" : "코드 보내기" } }, "ar" : { "stringUnit" : { "state" : "needs_review", "value" : "إرسال الرمز" } }, "he" : { "stringUnit" : { "state" : "needs_review", "value" : "שליחת הקוד" } }, "ur" : { "stringUnit" : { "state" : "needs_review", "value" : "کوڈ بھیجیں" } }, "zh-Hant" : { "stringUnit" : { "state" : "needs_review", "value" : "傳送驗證碼" } }, "zh-HK" : { "stringUnit" : { "state" : "needs_review", "value" : "傳送驗證碼" } } } },
     "Claude Code" : { "shouldTranslate" : false },
     "CLI" : { "shouldTranslate" : false },
-    "Messaging" : { }
+    "Messaging" : { },
+    "Agent" : { },
+    "Bot Mode is unfinished. It adds a Bots row to the Agent section above for your direct Hermes bots. Each server’s Hermes connection is available with it off." : { }
   },
   "version" : "1.0"
 }

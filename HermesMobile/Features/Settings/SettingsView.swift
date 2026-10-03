@@ -18,17 +18,29 @@ struct SettingsView: View {
     /// When set, Settings scrolls to this section once on first appear (#283).
     let initialScrollTarget: SettingsScrollAnchor?
     let onDefaultProfileSelected: (DefaultProfileSelection) -> Void
+    /// The shell's session-list model, which owns the active profile. Nil hides
+    /// the Active Profile row (Bot-mode servers have none).
+    let profileViewModel: SessionListViewModel?
+    let switchActiveProfile: (ProfileSummary) -> Void
+    /// A bot deep link waiting for the Bots inbox; Settings pushes Bots for it.
+    @Binding var pendingBotDestination: BotDestination?
 
     init(
         authManager: AuthManager,
         server: URL,
         initialScrollTarget: SettingsScrollAnchor? = nil,
-        onDefaultProfileSelected: @escaping (DefaultProfileSelection) -> Void = { _ in }
+        onDefaultProfileSelected: @escaping (DefaultProfileSelection) -> Void = { _ in },
+        profileViewModel: SessionListViewModel? = nil,
+        switchActiveProfile: @escaping (ProfileSummary) -> Void = { _ in },
+        pendingBotDestination: Binding<BotDestination?> = .constant(nil)
     ) {
         self.authManager = authManager
         self.server = server
         self.initialScrollTarget = initialScrollTarget
         self.onDefaultProfileSelected = onDefaultProfileSelected
+        self.profileViewModel = profileViewModel
+        self.switchActiveProfile = switchActiveProfile
+        _pendingBotDestination = pendingBotDestination
         // The CLI-sessions toggle is server-synced (#19): loads adopt the
         // server's `show_cli_sessions`, toggles POST it back, failures revert.
         // Stored per-server so one server's value never leaks into another.
@@ -43,6 +55,7 @@ struct SettingsView: View {
 
     @ScaledMetric(relativeTo: .body) private var settingsCardSpacing: CGFloat = 18
     @State private var isConfirmingReconfigure = false
+    @State private var isShowingBots = false
     @State private var didScrollToInitialTarget = false
     @State private var isPresentingAddServer = false
     @State private var isConfirmingClearCache = false
@@ -125,20 +138,7 @@ struct SettingsView: View {
                 }
 
                 if !isHermesServer {
-                    SettingsCard(title: String(localized: "Archived Sessions")) {
-                        NavigationLink {
-                            ArchivedSessionsView(server: server, onAPIError: authManager.handleAPIError)
-                        } label: {
-                            SettingsAccessoryRow(title: String(localized: "Archived Sessions"), systemImage: "archivebox")
-                        }
-                        .buttonStyle(.plain)
-                        NavigationLink {
-                            ActivityView(server: server)
-                        } label: {
-                            SettingsAccessoryRow(title: String(localized: "Activity"), systemImage: "list.bullet.rectangle")
-                        }
-                        .buttonStyle(.plain)
-                    }
+                    agentCard
                 }
 
                 SettingsCard(title: String(localized: "Preview")) {
@@ -148,7 +148,7 @@ struct SettingsView: View {
                         isOn: $isBotModeEnabled
                     )
 
-                    SettingsFootnote(String(localized: "Bot Mode is unfinished. It adds a Bots row to the main screen for your direct Hermes bots. Each server’s Hermes connection is available with it off."))
+                    SettingsFootnote(String(localized: "Bot Mode is unfinished. It adds a Bots row to the Agent section above for your direct Hermes bots. Each server’s Hermes connection is available with it off."))
                 }
 
                 SettingsCard(title: String(localized: "Appearance")) {
@@ -897,6 +897,69 @@ struct SettingsView: View {
 
     /// On a Hermes server Settings loads nothing from a webui and hides every row that
     /// configures or reads one (#899).
+    /// The agent's own screens, moved here from the old home screen's sidebar.
+    private var agentCard: some View {
+        SettingsCard(title: String(localized: "Agent")) {
+            if showsSkillsSection {
+                agentLink(String(localized: "Skills"), systemImage: "hammer") {
+                    SkillsView(server: server, onAPIError: authManager.handleAPIError)
+                }
+            }
+            if showsMemorySection {
+                agentLink(String(localized: "Memory"), systemImage: "brain") {
+                    MemoryView(server: server, onAPIError: authManager.handleAPIError)
+                }
+            }
+            if showsInsightsSection {
+                agentLink(String(localized: "Usage"), systemImage: "chart.bar") {
+                    InsightsView(server: server, onAPIError: authManager.handleAPIError)
+                }
+            }
+            if showsActiveProfileSection, let profileViewModel, !profileViewModel.isSingleProfileMode {
+                agentLink(String(localized: "Active Profile"), systemImage: "person.crop.circle") {
+                    ActiveProfilePickerView(viewModel: profileViewModel, onSwitch: switchActiveProfile)
+                }
+            }
+            if isBotModeEnabled {
+                Button {
+                    isShowingBots = true
+                } label: {
+                    SettingsAccessoryRow(title: String(localized: "Bots"), systemImage: "cpu")
+                }
+                .buttonStyle(.plain)
+            }
+            agentLink(String(localized: "Archived Sessions"), systemImage: "archivebox") {
+                ArchivedSessionsView(server: server, onAPIError: authManager.handleAPIError)
+            }
+            agentLink(String(localized: "Activity"), systemImage: "list.bullet.rectangle") {
+                ActivityView(server: server)
+            }
+        }
+        .navigationDestination(isPresented: $isShowingBots) {
+            BotsInboxView(server: server, pendingDestination: $pendingBotDestination)
+        }
+        .onAppear { showBotsForPendingDestination() }
+        .onChange(of: pendingBotDestination) { showBotsForPendingDestination() }
+    }
+
+    private func agentLink<Destination: View>(
+        _ title: String,
+        systemImage: String,
+        @ViewBuilder destination: @escaping () -> Destination
+    ) -> some View {
+        NavigationLink {
+            destination()
+        } label: {
+            SettingsAccessoryRow(title: title, systemImage: systemImage)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func showBotsForPendingDestination() {
+        guard isBotModeEnabled, pendingBotDestination?.server == server else { return }
+        isShowingBots = true
+    }
+
     private var isHermesServer: Bool { authManager.kind(of: server) == .hermes }
 
     /// A Hermes server's Active Server card: its sign-in, with its headers, and the

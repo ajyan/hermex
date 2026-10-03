@@ -495,16 +495,21 @@ struct ChatShellView: View {
         navigation.showOnly(.settings(.notifications))
     }
 
-    /// A bot deep link opens this server's Bots inbox, which owns resolving it. Only
-    /// this view's own server routes: a link for another server switches servers
-    /// first, which rebuilds this view against it (#554). An inbox already on
-    /// screen resolves the link itself, so it is not pushed a second time.
+    /// A bot deep link opens Settings, which pushes this server's Bots inbox to
+    /// resolve it. Only this view's own server routes: a link for another server
+    /// switches servers first, which rebuilds this view against it (#554). Settings
+    /// already on screen pushes Bots itself, so it is not pushed a second time.
     private func showBotsForPendingDestination() {
         guard isBotModeEnabled, let destination = pendingBotDestination, destination.server == server,
-              navigation.path.last != .legacy(.bots) else {
+              !navigation.path.contains(where: Self.isSettings) else {
             return
         }
-        navigation.showOnly(.legacy(.bots))
+        navigation.showOnly(.settings(nil))
+    }
+
+    private static func isSettings(_ destination: ShellPushDestination) -> Bool {
+        if case .settings = destination { return true }
+        return false
     }
 
     // MARK: - Shell
@@ -715,7 +720,12 @@ struct ChatShellView: View {
                     authManager: authManager,
                     server: server,
                     initialScrollTarget: scrollTo,
-                    onDefaultProfileSelected: viewModel.adoptDefaultProfileSelection
+                    onDefaultProfileSelected: viewModel.adoptDefaultProfileSelection,
+                    profileViewModel: viewModel,
+                    switchActiveProfile: { profile in
+                        Task { await switchActiveProfile(profile) }
+                    },
+                    pendingBotDestination: $pendingBotDestination
                 )
             case .bots:
                 BotsInboxView(server: server, pendingDestination: $pendingBotDestination)

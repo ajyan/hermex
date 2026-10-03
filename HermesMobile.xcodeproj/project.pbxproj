@@ -325,6 +325,7 @@
 		C04400000000000000000003 /* CacheFallbackPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04400000000000000000004 /* CacheFallbackPolicyTests.swift */; };
 		C86900000000000000000003 /* NetworkPathMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C86900000000000000000004 /* NetworkPathMonitorTests.swift */; };
 		1A2B3C4D5E6F7000000000F5 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000F6 /* SettingsView.swift */; };
+		17EC3737326D00E47B2A0C75 /* ActiveProfilePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C88591BA287BCB895A6CFB72 /* ActiveProfilePickerView.swift */; };
 		1A2B3C4D5E6F7000000000F8 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000F9 /* AppConfig.swift */; };
 		532000000000000000000001 /* RatingPromptState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 532000000000000000000002 /* RatingPromptState.swift */; };
 		5320000000000000000000D1 /* DevAutoLogin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5320000000000000000000D2 /* DevAutoLogin.swift */; };
@@ -969,6 +970,7 @@
 		C04400000000000000000004 /* CacheFallbackPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheFallbackPolicyTests.swift; sourceTree = "<group>"; };
 		C86900000000000000000004 /* NetworkPathMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPathMonitorTests.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7000000000F6 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		C88591BA287BCB895A6CFB72 /* ActiveProfilePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveProfilePickerView.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7000000000F9 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		532000000000000000000002 /* RatingPromptState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RatingPromptState.swift; sourceTree = "<group>"; };
 		5320000000000000000000D2 /* DevAutoLogin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevAutoLogin.swift; sourceTree = "<group>"; };
@@ -2042,6 +2044,7 @@
 			isa = PBXGroup;
 			children = (
 				1A2B3C4D5E6F7000000000F6 /* SettingsView.swift */,
+				C88591BA287BCB895A6CFB72 /* ActiveProfilePickerView.swift */,
 				C012400000000000000003 /* AppIconSettingsSection.swift */,
 				1A2B3C4D5E6F70000000115 /* DefaultModelPickerView.swift */,
 				103200000000000000000001 /* DefaultProfilePickerView.swift */,
@@ -2627,6 +2630,7 @@
 				C28702000000000000000001 /* ChatDraftStore.swift in Sources */,
 				C28702000000000000000005 /* ChatDraftAttachmentStore.swift in Sources */,
 				1A2B3C4D5E6F7000000000F5 /* SettingsView.swift in Sources */,
+				17EC3737326D00E47B2A0C75 /* ActiveProfilePickerView.swift in Sources */,
 				C012400000000000000004 /* AppIconSettingsSection.swift in Sources */,
 				1A2B3C4D5E6F70000000114 /* DefaultModelPickerView.swift in Sources */,
 				103200000000000000000002 /* DefaultProfilePickerView.swift in Sources */,
