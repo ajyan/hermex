@@ -47,12 +47,23 @@ struct SpeechTextShaper {
     }
 
     static func sentences(in rawText: String, final: Bool) -> [String] {
-        // Atlas sometimes echoes the call's "[voice]" tag; never say it.
+        // Atlas sometimes echoes the call's "[voice]" tag, or a bare "voice"; never say it.
         var text = Substring(rawText.drop(while: \.isWhitespace))
-        if text.hasPrefix(echoedTag) {
+        let lowered = text.lowercased()
+        if lowered.hasPrefix(echoedTag) {
             text = text.dropFirst(echoedTag.count)
-        } else if !final, echoedTag.hasPrefix(text) {
+            if text.first == ":" { text = text.dropFirst() }
+        } else if !final, echoedTag.hasPrefix(lowered) {
             return []
+        } else if lowered.hasPrefix("voice") {
+            let rest = text.dropFirst("voice".count)
+            if !final, rest.allSatisfy(\.isWhitespace) { return [] }
+            if rest.first == ":" {
+                text = rest.dropFirst()
+            } else if rest.first?.isWhitespace == true, rest.drop(while: \.isWhitespace).first?.isUppercase == true,
+                      text.first?.isLowercase == true {
+                text = rest
+            }
         }
         return sentences(inUntagged: String(text), final: final)
     }

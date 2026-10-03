@@ -60,6 +60,24 @@ final class SpeechTextShaperTests: XCTestCase {
         XCTAssertEqual(shaper.finish(), ["Hello there"])
     }
 
+    func testEchoedVoiceTagVariantsAreNotSpoken() {
+        XCTAssertEqual(spoken("[Voice]: It's Friday."), ["It's Friday."])
+        XCTAssertEqual(spoken("voice: It's Friday."), ["It's Friday."])
+        XCTAssertEqual(spoken("voice It's Friday."), ["It's Friday."])
+        XCTAssertEqual(spoken("[voice]\nIt's Friday."), ["It's Friday."])
+    }
+
+    func testBareVoiceIsHeldWhileStreamingThenDropped() {
+        var shaper = SpeechTextShaper()
+        XCTAssertEqual(shaper.append("voice"), [])
+        XCTAssertEqual(shaper.append("voice It's Friday. Next"), ["It's Friday."])
+    }
+
+    func testRealSentencesStartingWithVoiceAreKept() {
+        XCTAssertEqual(spoken("Voice notes are saved."), ["Voice notes are saved."])
+        XCTAssertEqual(spoken("voice mail is full."), ["voice mail is full."])
+    }
+
     func testEchoedVoiceTagIsNotSpoken() {
         XCTAssertEqual(spoken("[voice] It's Friday, October 2nd, 2026."), ["It's Friday, October 2nd, 2026."])
         var shaper = SpeechTextShaper()
