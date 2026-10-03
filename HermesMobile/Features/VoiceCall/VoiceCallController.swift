@@ -21,6 +21,7 @@ enum VoiceCallPhrases {
     static let sendFailed = "I couldn't reach Atlas."
     static let approved = "Approved."
     static let denied = "Denied."
+    static let didntCatch = "I didn't catch that."
 
     /// `text` without a call's leading `[voice] ` tag, for display.
     static func withoutVoiceTag(_ text: String) -> String {
@@ -41,7 +42,11 @@ enum VoiceCallPhrases {
 @Observable
 final class VoiceCallController {
     private(set) var state: VoiceCallState = .idle {
-        didSet { if state != oldValue { log("state \(oldValue) -> \(state)") } }
+        didSet {
+            guard state != oldValue else { return }
+            log("state \(oldValue) -> \(state)")
+            if state == .listening { listeningSince = now() }
+        }
     }
     private(set) var partialTranscript = ""
     /// What the user last said, kept on screen until they speak again.
@@ -79,6 +84,10 @@ final class VoiceCallController {
     /// A turn has ended with only a partial transcript; waiting briefly for the final one.
     @ObservationIgnored private var awaitingFinalSince: TimeInterval?
     @ObservationIgnored private var isHeld = false
+    /// When the transcript last changed, for ending a turn the level meter never heard.
+    @ObservationIgnored private var transcriptChangedAt: TimeInterval?
+    /// When `listening` began, for the no-speech prompt.
+    @ObservationIgnored private var listeningSince: TimeInterval?
 
     // Reply
     @ObservationIgnored private var shaper = SpeechTextShaper()
@@ -204,6 +213,15 @@ final class VoiceCallController {
         case .listening:
             if let awaitingFinalSince, time - awaitingFinalSince >= VoiceCallTiming.finalTranscriptWait {
                 submitTurn()
+            } else if !isMuted, !isHeld {
+                if awaitingFinalSince == nil, !turnDetector.isInTurn, !partialTranscript.isEmpty,
+                   let transcriptChangedAt, time - transcriptChangedAt >= VoiceCallTiming.transcriptStallEnd {
+                    log("turn ended by transcript stall")
+                    submitTurn()
+                } else if partialTranscript.isEmpty, let listeningSince,
+                          time - listeningSince >= VoiceCallTiming.noSpeechTimeout {
+                    announceNoSpeech()
+                }
             }
         case .connecting:
             if let connectingSince, time - connectingSince >= VoiceCallTiming.connectTimeout {
@@ -234,6 +252,7 @@ final class VoiceCallController {
         if checkTalkOver(text) { return }
         guard isHearing, !discardFinals else { return }
         partial = text
+        transcriptChangedAt = now()
         publishTranscript()
         decideApprovalIfReady()
     }
@@ -244,6 +263,7 @@ final class VoiceCallController {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty { finals.append(trimmed) }
         partial = ""
+        transcriptChangedAt = now()
         publishTranscript()
         decideApprovalIfReady()
         if state == .listening, awaitingFinalSince != nil { submitTurn() }
@@ -379,6 +399,17 @@ final class VoiceCallController {
             self.state = .speaking
             self.runFinished = true
         }
+    }
+
+    /// Nothing was heard for a while: say so instead of sitting silent.
+    private func announceNoSpeech() {
+        log("no speech heard; prompting")
+        listeningSince = nil
+        spokenWords = []
+        replyActive = false
+        runFinished = true
+        state = .speaking
+        say(VoiceCallPhrases.didntCatch)
     }
 
     private func bargeIn(seed: String) {

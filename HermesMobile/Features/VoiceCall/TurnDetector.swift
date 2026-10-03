@@ -13,6 +13,9 @@ struct TurnDetector {
     private var silenceStart: TimeInterval?
     private var spoken: TimeInterval = 0
 
+    /// True from the first speech sample until the turn ends.
+    var isInTurn: Bool { turnStart != nil }
+
     mutating func observe(isSpeech: Bool, at time: TimeInterval) -> TurnEvent? {
         var started = false
         if isSpeech {

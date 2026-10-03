@@ -226,13 +226,13 @@ private final class SFRecognizer: CallRecognizer {
 /// published every 100 ms. Runs on the audio thread.
 private final class VoiceActivityMeter: @unchecked Sendable {
     /// Speech must be this far above the noise floor.
-    private static let marginDecibels: Float = 12
+    private static let marginDecibels: Float = 9
     /// Quieter than this is never speech.
-    private static let absoluteFloorDecibels: Float = -55
+    private static let absoluteFloorDecibels: Float = -58
     private static let window: TimeInterval = 0.1
 
     private let publish: (Bool, TimeInterval) -> Void
-    private var noiseFloor: Float = -60
+    private var noiseFloor: Float = -70
     private var windowStart: TimeInterval?
     private var speechBuffers = 0
     private var totalBuffers = 0

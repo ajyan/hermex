@@ -193,6 +193,47 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(chat.sent, ["[voice] hello", "[voice] thanks"])
     }
 
+    func testQuietFirstUtteranceSendsEvenWhenVoiceActivityNeverFires() async {
+        await controller.start()
+        // The mic level never crosses the speech threshold, but the recognizer hears words.
+        listener.onPartial?("what time is it")
+        clock += 1.0
+        controller.tick()
+        XCTAssertEqual(controller.state, .listening)
+        clock += 0.5
+        controller.tick()
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.sent, ["[voice] what time is it"])
+        XCTAssertEqual(controller.state, .thinking)
+    }
+
+    func testTranscriptStallDoesNotCutOffASpeakerVoiceActivityStillHears() async {
+        await controller.start()
+        voice(true, for: 0.6)
+        listener.onPartial?("send a message to")
+        clock += 3
+        controller.tick()
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertTrue(chat.sent.isEmpty)
+    }
+
+    func testSilentListeningSaysIDidntCatchThatOnceThenRearms() async {
+        await controller.start()
+        clock += VoiceCallTiming.noSpeechTimeout - 1
+        controller.tick()
+        XCTAssertTrue(speaker.spoken.isEmpty)
+        clock += 1
+        controller.tick()
+        XCTAssertEqual(speaker.spoken, [VoiceCallPhrases.didntCatch])
+        controller.tick()
+        XCTAssertEqual(speaker.spoken.count, 1)
+        speaker.drain()
+        XCTAssertEqual(controller.state, .listening)
+        clock += VoiceCallTiming.noSpeechTimeout
+        controller.tick()
+        XCTAssertEqual(speaker.spoken.count, 2)
+    }
+
     func testPartialTranscriptShownWhileListening() async {
         await controller.start()
         listener.onFinal?("hello")

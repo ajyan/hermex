@@ -6,6 +6,11 @@ enum VoiceCallTiming {
     static let endOfTurnSilence: TimeInterval = 0.8
     /// Speech needed before silence can end a turn; shorter blips are ignored.
     static let minimumTurnSpeech: TimeInterval = 0.3
+    /// With no voice activity, a transcript that stops changing this long is a finished turn.
+    /// Covers a quiet speaker the level meter never calls speech.
+    static let transcriptStallEnd: TimeInterval = 1.5
+    /// Listening this long with nothing heard prompts "I didn't catch that".
+    static let noSpeechTimeout: TimeInterval = 15
     /// A turn is forced to end this long after it started, so a stuck mic can't hang the call.
     static let monologueCap: TimeInterval = 30
     /// Words, not in what Atlas is saying, that must be heard before talking over Atlas interrupts it.
