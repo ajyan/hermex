@@ -133,31 +133,50 @@ struct ChatDrawerView<ServerMenu: View>: View {
     }
 
     private var recentsHeader: some View {
-        HStack {
-            Text("Recents")
-                .font(.headline)
-            Spacer()
-            Menu {
-                Picker("Show", selection: $filter) {
-                    ForEach(viewModel.availableRecentsFilters, id: \.self) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-            } label: {
-                HStack(spacing: 4) {
-                    Text(filter.title)
-                    Image(systemName: "chevron.down")
-                        .font(.caption.weight(.semibold))
-                }
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
+        // Side by side when it fits; stacked at the largest text sizes.
+        ViewThatFits(in: .horizontal) {
+            HStack {
+                recentsTitle
+                Spacer()
+                filterMenu
             }
-            .accessibilityLabel(String(localized: "Showing \(filter.title) chats"))
+            VStack(alignment: .leading, spacing: 0) {
+                recentsTitle
+                filterMenu
+            }
         }
         .padding(.horizontal, 20)
         .padding(.top, 16)
+    }
+
+    private var recentsTitle: some View {
+        Text("Recents")
+            .font(.headline)
+            .lineLimit(1)
+            .fixedSize()
+    }
+
+    private var filterMenu: some View {
+        Menu {
+            Picker("Show", selection: $filter) {
+                ForEach(viewModel.availableRecentsFilters, id: \.self) { option in
+                    Text(option.title).tag(option)
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(filter.title)
+                    .lineLimit(1)
+                    .fixedSize()
+                Image(systemName: "chevron.down")
+                    .font(.caption.weight(.semibold))
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .accessibilityLabel(String(localized: "Showing \(filter.title) chats"))
     }
 
     private var showsFilterEmptyState: Bool {
@@ -185,11 +204,14 @@ struct ChatDrawerView<ServerMenu: View>: View {
                     .accessibilityHidden(true)
                 Text("Settings")
                     .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .fixedSize()
                 Spacer(minLength: 8)
                 Text(serverName)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .layoutPriority(-1)
             }
             .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
             .contentShape(Rectangle())

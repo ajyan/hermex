@@ -462,14 +462,15 @@ struct ChatShellView: View {
                     .offset(x: shift)
                     .accessibilityHidden(navigation.isDrawerOpen)
 
-                if fraction > 0 {
-                    Color.black.opacity(0.3 * fraction)
-                        .ignoresSafeArea()
-                        .offset(x: shift)
-                        .contentShape(Rectangle())
-                        .onTapGesture { setDrawerOpen(false) }
-                        .accessibilityHidden(true)
-                }
+                // Always present so it animates with the chat; inserting it would
+                // snap it to its final offset while the chat is still sliding.
+                Color.black.opacity(0.3 * fraction)
+                    .ignoresSafeArea()
+                    .offset(x: shift)
+                    .contentShape(Rectangle())
+                    .onTapGesture { setDrawerOpen(false) }
+                    .allowsHitTesting(fraction > 0)
+                    .accessibilityHidden(true)
 
                 if hasOpenedDrawer {
                     sessionListSurface
@@ -608,6 +609,10 @@ struct ChatShellView: View {
             .updating($drawerDrag) { value, state, _ in
                 guard tracksDrawerDrag(value) else { return }
                 state = value.translation.width
+            }
+            .onChanged { value in
+                // Build the drawer as the first drag starts, so it is not blank under the finger.
+                if !hasOpenedDrawer, tracksDrawerDrag(value) { hasOpenedDrawer = true }
             }
             .onEnded { value in
                 guard tracksDrawerDrag(value) else { return }
