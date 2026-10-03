@@ -296,6 +296,42 @@ xcodebuild -project HermesMobile.xcodeproj -scheme HermesMobile -destination 'pl
 
 If `iPhone 17` is not installed, choose a nearby available iPhone simulator.
 
+## Installing on Your Own iPhone
+
+Branch TestFlight (below) uploads to the maintainer's team (`6GYD9C9N6R`), so it only
+works for an Xcode account with App Store Connect access to that team. Anyone else,
+including a contributor on a free personal team, fails at export with
+`No Accounts with App Store Connect Access` after the archive succeeds. Install
+directly instead:
+
+1. Sign with your own team through `Config/Local.xcconfig`
+   ([CONTRIBUTING.md](CONTRIBUTING.md) § Code signing for contributors). On a free
+   team, also set `APP_ENTITLEMENTS = Config/HermesMobile.FreeTeam.entitlements`,
+   since a free team can't sign Push. The file is gitignored, so each new worktree
+   needs its own copy.
+2. Connect the phone (cable or wireless pairing) and find its UDID:
+
+   ```zsh
+   xcrun devicectl list devices
+   ```
+
+3. Build and install from the branch's checkout:
+
+   ```zsh
+   xcodebuild -project HermesMobile.xcodeproj -scheme HermesMobile -configuration Debug \
+     -destination 'id=<phone-udid>' -derivedDataPath build/device-dd \
+     -allowProvisioningUpdates build
+   xcrun devicectl device install app --device <phone-udid> \
+     build/device-dd/Build/Products/Debug-iphoneos/HermesMobile.app
+   ```
+
+   Or open `HermesMobile.xcodeproj`, choose the `HermesMobile` scheme and the phone, and
+   press ⌘R to also attach the debugger and console. Installing over an earlier build
+   with the same bundle ID keeps the app's data and sign-in.
+
+A free-team install stops launching after 7 days; rerun step 3 to refresh it. Push
+notifications don't work on a free team; everything else, including CallKit, does.
+
 ## TestFlight
 
 Production internal/external uploads, signing setup, release gates, and review notes
