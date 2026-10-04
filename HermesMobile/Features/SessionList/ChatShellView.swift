@@ -1287,7 +1287,7 @@ struct HermesHeaderLogo: View {
         .aspectRatio(Self.aspectRatio, contentMode: .fit)
         .compositingGroup()
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("HERMEX")
+        .accessibilityLabel("ATLAS")
     }
 }
 
