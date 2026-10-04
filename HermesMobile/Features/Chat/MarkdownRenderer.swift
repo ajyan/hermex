@@ -422,7 +422,7 @@ private struct ChatMarkdownView: View {
     var body: some View {
         // Parsed here rather than inside `Markdown(_: String)` so the parse alone is timed.
         let signpost = performanceSignposter.beginInterval("Markdown Parse")
-        let parsedContent = MarkdownContent(content)
+        let parsedContent = MarkdownContent(MarkdownTildeEscaping.escapingSingleTildes(in: content))
         performanceSignposter.endInterval("Markdown Parse", signpost, "chars=\(content.count, privacy: .public)")
 
         return Markdown(parsedContent)
@@ -1562,4 +1562,71 @@ enum MarkdownPalette {
     static let tableSecondaryBackground: SwiftUI.Color = .hxCanvas
     static let border: SwiftUI.Color = .hxSeparator
     static let mutedText: SwiftUI.Color = .hxTextSecondary
+}
+
+/// MarkdownUI's GFM parser treats a single `~` as strikethrough, so two home-relative
+/// paths in one paragraph (`~/.hermes … ~/Code`) struck out everything between them.
+/// Lone tildes are escaped before parsing; `~~strike~~`, code spans, fenced code, and
+/// URLs are left as written.
+enum MarkdownTildeEscaping {
+    static func escapingSingleTildes(in markdown: String) -> String {
+        guard markdown.contains("~") else { return markdown }
+
+        var output = ""
+        output.reserveCapacity(markdown.count + 8)
+        var fence: String?
+
+        for (index, line) in markdown.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+            if index > 0 { output.append("\n") }
+            let trimmed = line.drop { $0 == " " }
+            if let openFence = fence {
+                output.append(contentsOf: line)
+                if trimmed.hasPrefix(openFence) { fence = nil }
+                continue
+            }
+            if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
+                fence = String(trimmed.prefix(3))
+                output.append(contentsOf: line)
+                continue
+            }
+            output.append(escapingLine(line))
+        }
+        return output
+    }
+
+    private static func escapingLine(_ line: Substring) -> String {
+        let characters = Array(line)
+        var result = ""
+        var codeSpanTicks = 0
+        var wordStart = 0
+        var index = 0
+
+        while index < characters.count {
+            let character = characters[index]
+            if character == "`" {
+                var run = 0
+                while index + run < characters.count, characters[index + run] == "`" { run += 1 }
+                if codeSpanTicks == 0 {
+                    codeSpanTicks = run
+                } else if run == codeSpanTicks {
+                    codeSpanTicks = 0
+                }
+                result.append(String(repeating: "`", count: run))
+                index += run
+                continue
+            }
+            if character.isWhitespace { wordStart = index + 1 }
+
+            if character == "~", codeSpanTicks == 0,
+               index == 0 || (characters[index - 1] != "~" && characters[index - 1] != "\\"),
+               index + 1 >= characters.count || characters[index + 1] != "~",
+               !String(characters[wordStart..<index]).contains("://") {
+                result.append("\\~")
+            } else {
+                result.append(character)
+            }
+            index += 1
+        }
+        return result
+    }
 }

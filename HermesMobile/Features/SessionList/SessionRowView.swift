@@ -234,7 +234,7 @@ struct SessionRowView: View {
     private var titleAndPin: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text(displayTitle)
-                .font(AppFont.headline(weight: .semibold))
+                .font(AppFont.body())
                 .foregroundStyle(.primary)
                 .lineLimit(titleLineLimit)
                 .truncationMode(.tail)
@@ -360,7 +360,7 @@ struct SessionRowView: View {
     }
 
     private var titleLineLimit: Int {
-        dynamicTypeSize.isAccessibilitySize ? 3 : 2
+        dynamicTypeSize.isAccessibilitySize ? 3 : 1
     }
 
     private var metadataLineLimit: Int {

@@ -28,7 +28,7 @@ struct SetupStepRow: View {
         HStack(alignment: .top, spacing: 12) {
             Text(number)
                 .font(.caption.weight(.bold))
-                .foregroundStyle(.black)
+                .foregroundStyle(.white)
                 .frame(width: 23, height: 23)
                 .background(Color.accentColor, in: Circle())
                 .padding(.top, 1)
@@ -170,10 +170,13 @@ struct OnboardingStatusBanner: View {
 }
 
 struct OnboardingPrimaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.black)
+            // White reads on the Nous blue accent in both appearances.
+            .foregroundStyle(.white.opacity(isEnabled ? 1 : 0.6))
             .lineLimit(1)
             .minimumScaleFactor(0.78)
             .frame(maxWidth: .infinity)

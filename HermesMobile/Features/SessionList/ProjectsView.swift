@@ -33,19 +33,28 @@ struct ProjectsView: View {
 
     var body: some View {
         List {
-            if viewModel.isLoadingProjects && viewModel.projects.isEmpty {
-                CompactStatusRow(title: String(localized: "Loading projects..."), systemImage: "folder")
-            } else if viewModel.projects.isEmpty {
-                CompactStatusRow(title: String(localized: "No projects"), systemImage: "folder")
-            } else {
-                ForEach(viewModel.projects) { project in
-                    row(for: project)
-                }
+            ForEach(viewModel.projects) { project in
+                row(for: project)
             }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Color.hxCanvas)
+        // Centered states instead of a lone list row, which drew a white band between separators.
+        .overlay {
+            if viewModel.projects.isEmpty {
+                if viewModel.isLoadingProjects {
+                    ProgressView("Loading projects...")
+                } else {
+                    ContentUnavailableView {
+                        Label("No projects", systemImage: "folder")
+                    } actions: {
+                        Button("New Project", action: createProject)
+                            .disabled(viewModel.isViewingCachedData || viewModel.isCreatingProject)
+                    }
+                }
+            }
+        }
         .navigationTitle("Projects")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

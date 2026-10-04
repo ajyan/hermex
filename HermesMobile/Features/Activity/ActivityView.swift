@@ -12,6 +12,8 @@ struct ActivityView: View {
 
     var body: some View {
         content
+            .scrollContentBackground(.hidden)
+            .background(Color.hxCanvas)
             .navigationTitle("Activity")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -151,7 +153,8 @@ struct ActivityView: View {
         .pickerStyle(.segmented)
         .padding(.horizontal)
         .padding(.vertical, 8)
-        .background(.bar)
+        // Matches the navigation bar and list, so no seam shows under the picker.
+        .background(Color.hxCanvas)
     }
 }
 

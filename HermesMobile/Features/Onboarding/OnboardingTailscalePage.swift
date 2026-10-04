@@ -53,7 +53,7 @@ struct OnboardingTailscalePage: View {
         HStack(alignment: .top, spacing: 12) {
             Text(number)
                 .font(.caption.weight(.bold))
-                .foregroundStyle(.black)
+                .foregroundStyle(.white)
                 .frame(width: 23, height: 23)
                 .background(Color.accentColor, in: Circle())
 

@@ -304,6 +304,7 @@ struct ChatView: View {
     @State private var draftMessage = ""
     @State private var draftQuotes: [ComposerQuote] = []
     @State private var isVoiceCallPresented = false
+    @State private var isFileBrowserPresented = false
     @State private var didAutoStartCall = false
     @State private var draftRevision = 0
     @State private var isScrolledNearBottom = true
@@ -909,39 +910,36 @@ struct ChatView: View {
                     )
                 }
 
+                // One overflow menu keeps the title readable beside the shell's New Chat.
                 ToolbarItem(placement: .topBarTrailing) {
                     ChatToolbarActionCluster {
                         ChatToolbarActionSlot {
-                            Button {
-                                isVoiceCallPresented = true
-                            } label: {
-                                Label("Call Atlas", systemImage: "phone")
-                            }
-                            .disabled(viewModel.isViewingCachedData)
-                            .accessibilityLabel("Call Atlas")
-                        }
-
-                        if viewModel.hasActivatedGoalCommand {
-                            ChatToolbarActionSlot {
-                                goalControlMenu
-                            }
-                        }
-
-                        if showsFilesButton {
-                            ChatToolbarActionSlot {
-                                NavigationLink {
-                                    FileBrowserView(session: session, server: server, onAPIError: onAPIError)
+                            Menu {
+                                Button {
+                                    isVoiceCallPresented = true
                                 } label: {
-                                    Label("Files", systemImage: "folder")
+                                    Label("Call Atlas", systemImage: "phone")
                                 }
                                 .disabled(viewModel.isViewingCachedData)
-                                .accessibilityLabel("Files")
-                            }
-                        }
 
-                        if showsGitControls, gitAvailabilityViewModel.hasRepository {
-                            ChatToolbarActionSlot {
-                                gitActionsMenu
+                                if showsFilesButton {
+                                    Button {
+                                        isFileBrowserPresented = true
+                                    } label: {
+                                        Label("Files", systemImage: "folder")
+                                    }
+                                    .disabled(viewModel.isViewingCachedData)
+                                }
+
+                                if viewModel.hasActivatedGoalCommand {
+                                    goalControlMenu
+                                }
+
+                                if showsGitControls, gitAvailabilityViewModel.hasRepository {
+                                    gitActionsMenu
+                                }
+                            } label: {
+                                Label("More", systemImage: "ellipsis")
                             }
                         }
                     }
@@ -949,6 +947,9 @@ struct ChatView: View {
             }
             .navigationDestination(item: $pushedSession) { session in
                 ChatView(session: session, server: server, onAPIError: onAPIError)
+            }
+            .navigationDestination(isPresented: $isFileBrowserPresented) {
+                FileBrowserView(session: session, server: server, onAPIError: onAPIError)
             }
             .onChange(of: isVoiceCallPresented) { _, presented in
                 if presented { dismissKeyboard() }

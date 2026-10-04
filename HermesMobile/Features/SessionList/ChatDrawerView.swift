@@ -24,8 +24,9 @@ struct ChatDrawerView<ServerMenu: View>: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Containers (search, selected row) sit 8pt in; their content lines up at 20pt.
             searchField
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 8)
                 .padding(.top, 12)
                 .padding(.bottom, 8)
 
@@ -172,7 +173,8 @@ struct ChatDrawerView<ServerMenu: View>: View {
                     .font(.caption.weight(.semibold))
             }
             .font(.subheadline)
-            .foregroundStyle(.secondary)
+            // Explicit color: a Menu label otherwise renders the tint at secondary opacity.
+            .foregroundStyle(Color(.secondaryLabel))
             .frame(minHeight: 44)
             .contentShape(Rectangle())
         }

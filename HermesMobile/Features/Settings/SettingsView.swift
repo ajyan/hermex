@@ -920,39 +920,12 @@ struct SettingsView: View {
     /// The agent's own screens, moved here from the old home screen's sidebar.
     private var agentCard: some View {
         SettingsCard(title: String(localized: "Agent")) {
-            if showsSkillsSection {
-                agentLink(String(localized: "Skills"), systemImage: "hammer") {
-                    SkillsView(server: server, onAPIError: authManager.handleAPIError)
+            let rows = visibleAgentRows
+            ForEach(Array(rows.enumerated()), id: \.element) { index, row in
+                if index > 0 {
+                    SettingsDivider()
                 }
-            }
-            if showsMemorySection {
-                agentLink(String(localized: "Memory"), systemImage: "brain") {
-                    MemoryView(server: server, onAPIError: authManager.handleAPIError)
-                }
-            }
-            if showsInsightsSection {
-                agentLink(String(localized: "Usage"), systemImage: "chart.bar") {
-                    InsightsView(server: server, onAPIError: authManager.handleAPIError)
-                }
-            }
-            if showsActiveProfileSection, let profileViewModel, !profileViewModel.isSingleProfileMode {
-                agentLink(String(localized: "Active Profile"), systemImage: "person.crop.circle") {
-                    ActiveProfilePickerView(viewModel: profileViewModel, onSwitch: switchActiveProfile)
-                }
-            }
-            if isBotModeEnabled {
-                Button {
-                    isShowingBots = true
-                } label: {
-                    SettingsAccessoryRow(title: String(localized: "Bots"), systemImage: "cpu")
-                }
-                .buttonStyle(.plain)
-            }
-            agentLink(String(localized: "Archived Sessions"), systemImage: "archivebox") {
-                ArchivedSessionsView(server: server, onAPIError: authManager.handleAPIError)
-            }
-            agentLink(String(localized: "Activity"), systemImage: "list.bullet.rectangle") {
-                ActivityView(server: server)
+                agentRow(row)
             }
         }
         .navigationDestination(isPresented: $isShowingBots) {
@@ -960,6 +933,64 @@ struct SettingsView: View {
         }
         .onAppear { showBotsForPendingDestination() }
         .onChange(of: pendingBotDestination) { showBotsForPendingDestination() }
+    }
+
+    private enum AgentRow: Hashable {
+        case skills, memory, usage, activeProfile, bots, archivedSessions, activity
+    }
+
+    /// The Agent card's rows, in order, filtered by the Main Page visibility toggles.
+    private var visibleAgentRows: [AgentRow] {
+        var rows: [AgentRow] = []
+        if showsSkillsSection { rows.append(.skills) }
+        if showsMemorySection { rows.append(.memory) }
+        if showsInsightsSection { rows.append(.usage) }
+        if showsActiveProfileSection, let profileViewModel, !profileViewModel.isSingleProfileMode {
+            rows.append(.activeProfile)
+        }
+        if isBotModeEnabled { rows.append(.bots) }
+        rows.append(.archivedSessions)
+        rows.append(.activity)
+        return rows
+    }
+
+    @ViewBuilder
+    private func agentRow(_ row: AgentRow) -> some View {
+        switch row {
+        case .skills:
+            agentLink(String(localized: "Skills"), systemImage: "hammer") {
+                SkillsView(server: server, onAPIError: authManager.handleAPIError)
+            }
+        case .memory:
+            agentLink(String(localized: "Memory"), systemImage: "brain") {
+                MemoryView(server: server, onAPIError: authManager.handleAPIError)
+            }
+        case .usage:
+            agentLink(String(localized: "Usage"), systemImage: "chart.bar") {
+                InsightsView(server: server, onAPIError: authManager.handleAPIError)
+            }
+        case .activeProfile:
+            if let profileViewModel {
+                agentLink(String(localized: "Active Profile"), systemImage: "person.crop.circle") {
+                    ActiveProfilePickerView(viewModel: profileViewModel, onSwitch: switchActiveProfile)
+                }
+            }
+        case .bots:
+            Button {
+                isShowingBots = true
+            } label: {
+                SettingsAccessoryRow(title: String(localized: "Bots"), systemImage: "cpu")
+            }
+            .buttonStyle(.plain)
+        case .archivedSessions:
+            agentLink(String(localized: "Archived Sessions"), systemImage: "archivebox") {
+                ArchivedSessionsView(server: server, onAPIError: authManager.handleAPIError)
+            }
+        case .activity:
+            agentLink(String(localized: "Activity"), systemImage: "list.bullet.rectangle") {
+                ActivityView(server: server)
+            }
+        }
     }
 
     private func agentLink<Destination: View>(
@@ -1589,12 +1620,20 @@ private struct SessionIdentitySettingsEditor: View {
                 }
             }
 
-            SettingsTextFieldRow(title: String(localized: "Display Name"), text: $displayName, placeholder: NSFullUserName())
+            SettingsDivider()
+
+            SettingsTextFieldRow(title: String(localized: "Display Name"), text: $displayName, placeholder: displayNamePlaceholder)
 
             SettingsDivider()
 
             SettingsTextFieldRow(title: String(localized: "Initials"), text: $initials, placeholder: previewInitials)
         }
+    }
+
+    /// iOS often reports no full user name, which left the field looking blank.
+    private var displayNamePlaceholder: String {
+        let fullName = NSFullUserName()
+        return fullName.isEmpty ? String(localized: "Not set") : fullName
     }
 }
 
@@ -1693,7 +1732,8 @@ private struct HeaderLogoColorSettings: View {
                 )
                 .accessibilityHidden(true)
 
-            HStack(spacing: 10) {
+            // Evenly spread so seven presets fit the card on the narrowest phones.
+            HStack(spacing: 0) {
                 ForEach(HeaderLogoColor.presets) { preset in
                     HeaderLogoColorPresetButton(
                         preset: preset,
@@ -1730,8 +1770,8 @@ private struct HeaderLogoColorPresetButton: View {
                 }
             }
             .frame(width: 34, height: 34)
-            .frame(width: 44, height: 44)
-            .contentShape(Circle())
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(String(localized: "\(preset.name) header logo color"))

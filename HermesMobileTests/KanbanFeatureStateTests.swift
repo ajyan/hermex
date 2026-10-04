@@ -307,6 +307,29 @@ final class KanbanFeatureStateTests: XCTestCase {
         XCTAssertEqual(state.selectedStatus, "ready")
     }
 
+    func testColdLoadOpensOnTheFirstStatusWithCards() async {
+        let state = KanbanFeatureState(
+            server: URL(string: "https://example.test")!,
+            client: KanbanClientStub(boardResult: .success(KanbanFixtures.richSnapshot))
+        )
+
+        await state.load()
+
+        // Triage is empty in this Board, so the first Status with a Card wins.
+        XCTAssertEqual(state.selectedStatus, "ready")
+    }
+
+    func testColdLoadKeepsTriageWhenItHasCards() async {
+        let state = KanbanFeatureState(
+            server: URL(string: "https://example.test")!,
+            client: KanbanClientStub(boardResult: .success(KanbanFixtures.supportedSnapshot))
+        )
+
+        await state.load()
+
+        XCTAssertEqual(state.selectedStatus, "triage")
+    }
+
     func testFilterAndBoardTransitionsPreserveLocalPresentationState() async {
         let client = BrowsingClient()
         let state = KanbanFeatureState(server: URL(string: "https://example.test")!, client: client)
