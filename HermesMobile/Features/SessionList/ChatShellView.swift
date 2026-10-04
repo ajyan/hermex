@@ -548,6 +548,10 @@ struct ChatShellView: View {
         case .kanban:
             KanbanView(server: server, onAPIError: authManager.handleAPIError)
                 .adaptiveSecondaryNavigationTitle()
+        case .dailyDeck:
+            DailyDeckView(server: server) { sessionID in
+                Task { await openDeepLinkedSession(id: sessionID) }
+            }
         case .projects:
             ProjectsView(
                 viewModel: viewModel,

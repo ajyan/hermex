@@ -12,6 +12,7 @@ enum ShellPushDestination: Hashable {
     case project(String)
     case tasks
     case kanban
+    case dailyDeck
     case settings(SettingsScrollAnchor?)
 }
 

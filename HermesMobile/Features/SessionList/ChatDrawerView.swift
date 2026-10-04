@@ -117,6 +117,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
         if sectionVisibility.kanban {
             drawerRow(String(localized: "Kanban"), systemImage: "rectangle.split.3x1") { onOpen(.kanban) }
         }
+        drawerRow("Daily Brief", systemImage: "sun.horizon") { onOpen(.dailyDeck) }
     }
 
     private func drawerRow(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
