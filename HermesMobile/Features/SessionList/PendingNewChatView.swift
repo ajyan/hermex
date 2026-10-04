@@ -23,6 +23,7 @@ struct PendingNewChatView: View {
     /// also fires `onDisappear`; only a replaced root abandons the draft.
     let isStillRoot: () -> Bool
 
+    @State private var attachmentLease: ChatDraftAttachmentLease?
     @State private var createdSession: SessionSummary?
     @State private var draftMessage = ""
     @State private var draftQuotes: [ComposerQuote] = []
@@ -254,6 +255,8 @@ struct PendingNewChatView: View {
     }
 
     private func hydrateDraft() async {
+        if attachmentLease == nil { attachmentLease = draftStore.makeAttachmentLease(key: draftKey) }
+        await draftStore.markUsed(draftKey)
         let textBeforeHydration = draftMessage
         let persistedDraft = await draftStore.draft(for: draftKey)
         guard !Task.isCancelled, draftMessage == textBeforeHydration else { return }
