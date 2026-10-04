@@ -201,7 +201,7 @@ final class DailyDeckTests: XCTestCase {
     }
 
     @MainActor
-    func testFilingSendsOneMessageToTodaysSessionAndClearsTheDraft() async throws {
+    func testFilingSendsOneMessageInAFreshSessionAndClearsTheDraft() async throws {
         store.setWorkspace("/vault", for: server)
         let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.deckJSON)
         let viewModel = makeViewModel(client)
@@ -210,9 +210,11 @@ final class DailyDeckTests: XCTestCase {
 
         let opened = await viewModel.file()
 
-        XCTAssertEqual(opened, "new-1")
+        XCTAssertEqual(opened, "new-2", "Filing gets its own session, not the one that read the deck")
         XCTAssertEqual(viewModel.state, .filed)
-        XCTAssertEqual(client.sent.map(\.sessionID), ["new-1"])
+        XCTAssertEqual(client.sent.map(\.sessionID), ["new-2"])
+        XCTAssertEqual(store.session(for: server, date: "2026-10-04"), "new-2")
+        XCTAssertEqual(viewModel.sessionID, "new-2")
         XCTAssertEqual(client.sent.first?.workspace, "/vault")
         XCTAssertTrue(client.sent.first?.message.contains("\"text\" : \"Ship it.\"") == true)
         XCTAssertEqual(store.answers(for: server, date: "2026-10-04", kind: "morning"), [:])

@@ -182,13 +182,18 @@ final class DailyDeckViewModel {
 
     // MARK: Filing
 
-    /// Sends the answers to today's session. Returns that session's id on success so
-    /// the caller can open it and watch the agent file them.
+    /// Sends the answers in a fresh session, so the chat it opens holds only this filing
+    /// (never an earlier, stopped attempt). Returns that session's id on success so the
+    /// caller can open it and watch the agent file them.
     func file() async -> String? {
-        guard let deck, let sessionID, let workspace, filing != .filing else { return nil }
+        guard let deck, let workspace, filing != .filing else { return nil }
         filing = .filing
         do {
             let message = try DeckAnswersPayload(deck: deck, answers: answers, completedAt: now()).message()
+            let sessionID = try await client.createSession(workspace: workspace)
+            try? await client.renameSession(id: sessionID, title: Self.sessionTitle(for: now()))
+            store.setSession(sessionID, for: server, date: date)
+            self.sessionID = sessionID
             try await client.startChat(sessionID: sessionID, message: message, workspace: workspace)
             store.setAnswers([:], for: server, date: date, kind: kind)
             filing = .idle
