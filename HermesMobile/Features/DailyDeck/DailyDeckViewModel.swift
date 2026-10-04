@@ -37,11 +37,13 @@ enum DailyDeckFilingState: Equatable {
 final class DailyDeckViewModel {
     private(set) var state: DailyDeckState = .idle
     private(set) var deck: DailyDeck?
+    /// What each swipe shows; set with the deck.
+    private(set) var pages: [DeckPage] = []
     private(set) var answers: [String: DeckAnswer] = [:]
     private(set) var filing: DailyDeckFilingState = .idle
     private(set) var sessionID: String?
     private(set) var workspace: String?
-    /// The card on screen.
+    /// The page on screen.
     var index = 0
 
     let server: URL
@@ -89,9 +91,11 @@ final class DailyDeckViewModel {
                 return
             }
             let content = try await client.fileContent(sessionID: sessionID, path: DailyDeckPaths.deck(date: date, kind: kind))
-            deck = try DailyDeck.decode(content)
+            let decoded = try DailyDeck.decode(content)
+            deck = decoded
+            pages = DeckPage.pages(for: decoded.cards)
             answers = store.answers(for: server, date: date, kind: kind)
-            index = min(index, max(cards.count - 1, 0))
+            index = min(index, max(pages.count - 1, 0))
             state = .ready
         } catch is CancellationError {
             // A newer load owns the state.
@@ -167,10 +171,6 @@ final class DailyDeckViewModel {
             answer.action = answer.action == action.id ? nil : action.id
             if !action.takesText { answer.text = nil }
         }
-    }
-
-    func react(_ reaction: DeckReaction, for card: DeckCard) {
-        update(card) { $0.reaction = $0.reaction == reaction ? nil : reaction }
     }
 
     private func update(_ card: DeckCard, _ change: (inout DeckAnswer) -> Void) {

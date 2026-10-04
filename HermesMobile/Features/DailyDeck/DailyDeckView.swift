@@ -91,18 +91,18 @@ struct DailyDeckView: View {
     }
 
     private var deck: some View {
-        let cards = viewModel.cards
+        let pages = viewModel.pages
         return VStack(spacing: 0) {
-            progress(count: cards.count)
+            progress(count: pages.count)
             TabView(selection: $viewModel.index) {
-                ForEach(Array(cards.enumerated()), id: \.element.id) { offset, card in
-                    DeckCardView(card: card, viewModel: viewModel, file: file)
+                ForEach(Array(pages.enumerated()), id: \.element.id) { offset, page in
+                    DeckPageView(page: page, viewModel: viewModel, file: file)
                         .padding(.horizontal, 16)
                         .tag(offset)
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            stepper(count: cards.count)
+            stepper(count: pages.count)
         }
     }
 
@@ -141,7 +141,7 @@ struct DailyDeckView: View {
     }
 
     private func step(_ delta: Int) {
-        let target = min(max(viewModel.index + delta, 0), max(viewModel.cards.count - 1, 0))
+        let target = min(max(viewModel.index + delta, 0), max(viewModel.pages.count - 1, 0))
         if reduceMotion {
             viewModel.index = target
         } else {

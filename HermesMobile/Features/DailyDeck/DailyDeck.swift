@@ -101,10 +101,9 @@ struct DeckAnswer: Codable, Equatable {
     var card: String
     var text: String?
     var action: String?
-    var reaction: DeckReaction?
 
     var isEmpty: Bool {
-        !hasText && action == nil && reaction == nil
+        !hasText && action == nil
     }
 
     private var hasText: Bool {
@@ -119,9 +118,32 @@ struct DeckAnswer: Codable, Equatable {
     }
 }
 
-enum DeckReaction: String, Codable, Equatable {
-    case resonates
-    case skip
+/// What one swipe shows: a single card, or every follow-up together so they can be
+/// cleared in one pass.
+enum DeckPage: Identifiable, Equatable {
+    case card(DeckCard)
+    case followUps([DeckCard])
+
+    var id: String {
+        switch self {
+        case .card(let card): card.id
+        case .followUps(let cards): "followups-\(cards.first?.id ?? "")"
+        }
+    }
+
+    /// Cards in deck order, with all decision cards gathered onto one page where the first sat.
+    static func pages(for cards: [DeckCard]) -> [DeckPage] {
+        let decisions = cards.filter { $0.type == .decision }
+        var pages: [DeckPage] = []
+        for card in cards {
+            if card.type == .decision {
+                if card.id == decisions.first?.id { pages.append(.followUps(decisions)) }
+            } else {
+                pages.append(.card(card))
+            }
+        }
+        return pages
+    }
 }
 
 /// The answers file the agent saves verbatim and files with `brain brief file`.

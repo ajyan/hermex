@@ -51,7 +51,7 @@ final class DailyDeckTests: XCTestCase {
     func testPayloadKeepsDeckOrderDropsEmptyAnswersAndTrimsText() throws {
         let deck = try DailyDeck.decode(Self.deckJSON)
         let answers: [String: DeckAnswer] = [
-            "book": DeckAnswer(card: "book", reaction: .resonates),
+            "book": DeckAnswer(card: "book", text: "It does."),
             "advisor": DeckAnswer(card: "advisor", text: "  Ship it.\n"),
             "media-1": DeckAnswer(card: "media-1", text: "   "),
             "followup-3": DeckAnswer(card: "followup-3", action: "skip")
@@ -174,17 +174,30 @@ final class DailyDeckTests: XCTestCase {
         let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.deckJSON)
         let viewModel = makeViewModel(client)
         await viewModel.load()
-        let decision = viewModel.cards[2], book = viewModel.cards[4]
+        let decision = viewModel.cards[2], answer = decision.actions[0], skip = decision.actions[1]
 
-        viewModel.choose(decision.actions[1], for: decision)
-        viewModel.react(.resonates, for: book)
-        viewModel.react(.resonates, for: book)  // second tap clears it
+        viewModel.choose(answer, for: decision)
+        XCTAssertEqual(viewModel.answeredCount, 0, "Answer with no text says nothing yet")
+        viewModel.setText("Enough as-is.", for: decision)
         XCTAssertEqual(viewModel.answeredCount, 1)
+        viewModel.choose(skip, for: decision)
+        XCTAssertNil(viewModel.answer(for: decision)?.text, "Skip drops the typed answer")
+        viewModel.choose(skip, for: decision)  // second tap clears it
+        XCTAssertNil(viewModel.answer(for: decision))
+        viewModel.setText("Still true.", for: viewModel.cards[3])
 
         let reopened = makeViewModel(client)
         await reopened.load()
-        XCTAssertEqual(reopened.answer(for: decision)?.action, "skip")
-        XCTAssertNil(reopened.answer(for: book))
+        XCTAssertEqual(reopened.answer(for: reopened.cards[3])?.text, "Still true.")
+    }
+
+    func testFollowUpsShareOnePageWhereTheFirstOneSat() throws {
+        let deck = try DailyDeck.decode(Self.deckJSON)
+        let extra = try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"a","type":"prompt"},{"id":"f1","type":"decision"},{"id":"b","type":"reflect"},{"id":"f2","type":"decision"},{"id":"close","type":"close"}]}"#)
+        XCTAssertEqual(DeckPage.pages(for: extra.cards).map(\.id), ["a", "followups-f1", "b", "close"])
+        guard case .followUps(let cards) = DeckPage.pages(for: extra.cards)[1] else { return XCTFail("Expected follow-ups") }
+        XCTAssertEqual(cards.map(\.id), ["f1", "f2"])
+        XCTAssertEqual(DeckPage.pages(for: deck.cards).count, deck.cards.count)
     }
 
     @MainActor
