@@ -147,8 +147,7 @@ enum ActivityPresentation {
     }
 
     private static func pluralEventCount(_ count: Int) -> String {
-        if count == 1 { return String(localized: "1 event") }
-        return "\(count) \(String(localized: "events"))"
+        String(localized: "\(count) events")
     }
 
     /// The locale used for the pure display strings above. In production this
