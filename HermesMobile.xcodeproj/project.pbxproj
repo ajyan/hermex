@@ -118,8 +118,7 @@
 		1A2B3C4D5E6F7000000000A5 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000B5 /* OnboardingView.swift */; };
 		1A2B3C4D5E6F70000000410 /* OnboardingComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F70000000411 /* OnboardingComponents.swift */; };
 		1A2B3C4D5E6F7000000000A6 /* OnboardingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000B6 /* OnboardingViewModel.swift */; };
-		1A2B3C4D5E6F7000000000A7 /* SessionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000B7 /* SessionListView.swift */; };
-		531000000000000000000101 /* TipJarCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 531000000000000000000102 /* TipJarCard.swift */; };
+		1A2B3C4D5E6F7000000000A7 /* ChatShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000B7 /* ChatShellView.swift */; };
 		1A2B3C4D5E6F7000000000A8 /* Endpoints.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000B8 /* Endpoints.swift */; };
 		1A2B3C4D5E6F7000000000A9 /* JSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000B9 /* JSONValue.swift */; };
 		1A2B3C4D5E6F7000000000AA /* ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000BA /* ChatMessage.swift */; };
@@ -156,6 +155,9 @@
 		C08650000000000000000004 /* ActionToastStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C08650000000000000000003 /* ActionToastStateTests.swift */; };
 		C03910000000000000000019 /* SessionRowAttentionStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03900000000000000000019 /* SessionRowAttentionStateTests.swift */; };
 		A10900000000000000000002 /* SessionNavigationStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10900000000000000000012 /* SessionNavigationStateTests.swift */; };
+		6A782D4CAA2AF88D5F94A780 /* ShellNavigationStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 456E58BC75E2EBE335416D28 /* ShellNavigationStateTests.swift */; };
+		8ED1BF0E83115706BFB110A4 /* DrawerSettleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3A55225279372080EAE5602 /* DrawerSettleTests.swift */; };
+		C2067E557A82E018C2421DC8 /* RecentsFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E6E51C25647DF0AB97836D6 /* RecentsFilterTests.swift */; };
 		19C1150000000000000000A3 /* CliSessionsSyncModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19C1150000000000000000A4 /* CliSessionsSyncModelTests.swift */; };
 		C03910000000000000000010 /* APIEndpointContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03900000000000000000010 /* APIEndpointContractTests.swift */; };
 		C03910000000000000000011 /* CronManagementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03900000000000000000011 /* CronManagementTests.swift */; };
@@ -197,7 +199,13 @@
 		B23000000000000000000001 /* SessionSearchExcerpt.swift in Sources */ = {isa = PBXBuildFile; fileRef = B23000000000000000000002 /* SessionSearchExcerpt.swift */; };
 		1A2B3C4D5E6F7000000000D1 /* SessionListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000D3 /* SessionListViewModel.swift */; };
 		A04300000000000000000001 /* SessionListComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04300000000000000000011 /* SessionListComponents.swift */; };
-		A10900000000000000000001 /* SessionNavigationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10900000000000000000011 /* SessionNavigationState.swift */; };
+		5800E593CB79D63F1359A4F8 /* PendingNewChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4935EA102F256EEF5CDAF37F /* PendingNewChatView.swift */; };
+		E626781235CEDA476EF8BA87 /* ShellNavigationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D47CAF96988A9A66D9809E88 /* ShellNavigationState.swift */; };
+		B30219DBC9834A9AD8131404 /* DrawerContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 978F6BF88ED2531DB1F2ABAA /* DrawerContainer.swift */; };
+		AF4B23CF3D588E3351B37E2E /* ChatDrawerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64D9BCC5BBCE1EF8008DF83 /* ChatDrawerView.swift */; };
+		304FA3D5BBF98F6499CB988D /* ProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A7827505CB6DC88368DBB98 /* ProjectsView.swift */; };
+		D02817A0E87BEF62EF5E23F0 /* DrawerSettle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6501C5C136AD44341F12A22 /* DrawerSettle.swift */; };
+		93E10058E8552A4AA439B3A1 /* RecentsFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96B6ABCB2B2999629CD767C8 /* RecentsFilter.swift */; };
 		A04300000000000000000002 /* SessionListActionConfirmations.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04300000000000000000012 /* SessionListActionConfirmations.swift */; };
 		A04300000000000000000003 /* SessionMutator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04300000000000000000013 /* SessionMutator.swift */; };
 		A040C0DE0000000000000001 /* ProjectCreationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A040C0DE0000000000000002 /* ProjectCreationSheet.swift */; };
@@ -319,6 +327,7 @@
 		C04400000000000000000003 /* CacheFallbackPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04400000000000000000004 /* CacheFallbackPolicyTests.swift */; };
 		C86900000000000000000003 /* NetworkPathMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C86900000000000000000004 /* NetworkPathMonitorTests.swift */; };
 		1A2B3C4D5E6F7000000000F5 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000F6 /* SettingsView.swift */; };
+		17EC3737326D00E47B2A0C75 /* ActiveProfilePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C88591BA287BCB895A6CFB72 /* ActiveProfilePickerView.swift */; };
 		1A2B3C4D5E6F7000000000F8 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000F9 /* AppConfig.swift */; };
 		532000000000000000000001 /* RatingPromptState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 532000000000000000000002 /* RatingPromptState.swift */; };
 		5320000000000000000000D1 /* DevAutoLogin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5320000000000000000000D2 /* DevAutoLogin.swift */; };
@@ -756,8 +765,7 @@
 		1A2B3C4D5E6F7000000000B5 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F70000000411 /* OnboardingComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingComponents.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7000000000B6 /* OnboardingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingViewModel.swift; sourceTree = "<group>"; };
-		1A2B3C4D5E6F7000000000B7 /* SessionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListView.swift; sourceTree = "<group>"; };
-		531000000000000000000102 /* TipJarCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TipJarCard.swift; sourceTree = "<group>"; };
+		1A2B3C4D5E6F7000000000B7 /* ChatShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatShellView.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7000000000B8 /* Endpoints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Endpoints.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7000000000B9 /* JSONValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONValue.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7000000000BA /* ChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessage.swift; sourceTree = "<group>"; };
@@ -794,6 +802,9 @@
 		C08650000000000000000003 /* ActionToastStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionToastStateTests.swift; sourceTree = "<group>"; };
 		C03900000000000000000019 /* SessionRowAttentionStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRowAttentionStateTests.swift; sourceTree = "<group>"; };
 		A10900000000000000000012 /* SessionNavigationStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionNavigationStateTests.swift; sourceTree = "<group>"; };
+		456E58BC75E2EBE335416D28 /* ShellNavigationStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellNavigationStateTests.swift; sourceTree = "<group>"; };
+		B3A55225279372080EAE5602 /* DrawerSettleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawerSettleTests.swift; sourceTree = "<group>"; };
+		6E6E51C25647DF0AB97836D6 /* RecentsFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentsFilterTests.swift; sourceTree = "<group>"; };
 		19C1150000000000000000A4 /* CliSessionsSyncModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CliSessionsSyncModelTests.swift; sourceTree = "<group>"; };
 		C03900000000000000000010 /* APIEndpointContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIEndpointContractTests.swift; sourceTree = "<group>"; };
 		C03900000000000000000011 /* CronManagementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CronManagementTests.swift; sourceTree = "<group>"; };
@@ -835,7 +846,13 @@
 		B23000000000000000000002 /* SessionSearchExcerpt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionSearchExcerpt.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7000000000D3 /* SessionListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListViewModel.swift; sourceTree = "<group>"; };
 		A04300000000000000000011 /* SessionListComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListComponents.swift; sourceTree = "<group>"; };
-		A10900000000000000000011 /* SessionNavigationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionNavigationState.swift; sourceTree = "<group>"; };
+		4935EA102F256EEF5CDAF37F /* PendingNewChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingNewChatView.swift; sourceTree = "<group>"; };
+		D47CAF96988A9A66D9809E88 /* ShellNavigationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellNavigationState.swift; sourceTree = "<group>"; };
+		978F6BF88ED2531DB1F2ABAA /* DrawerContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawerContainer.swift; sourceTree = "<group>"; };
+		A64D9BCC5BBCE1EF8008DF83 /* ChatDrawerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatDrawerView.swift; sourceTree = "<group>"; };
+		7A7827505CB6DC88368DBB98 /* ProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsView.swift; sourceTree = "<group>"; };
+		C6501C5C136AD44341F12A22 /* DrawerSettle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawerSettle.swift; sourceTree = "<group>"; };
+		96B6ABCB2B2999629CD767C8 /* RecentsFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentsFilter.swift; sourceTree = "<group>"; };
 		A04300000000000000000012 /* SessionListActionConfirmations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListActionConfirmations.swift; sourceTree = "<group>"; };
 		A04300000000000000000013 /* SessionMutator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionMutator.swift; sourceTree = "<group>"; };
 		A040C0DE0000000000000002 /* ProjectCreationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectCreationSheet.swift; sourceTree = "<group>"; };
@@ -957,6 +974,7 @@
 		C04400000000000000000004 /* CacheFallbackPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheFallbackPolicyTests.swift; sourceTree = "<group>"; };
 		C86900000000000000000004 /* NetworkPathMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPathMonitorTests.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7000000000F6 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		C88591BA287BCB895A6CFB72 /* ActiveProfilePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveProfilePickerView.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7000000000F9 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		532000000000000000000002 /* RatingPromptState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RatingPromptState.swift; sourceTree = "<group>"; };
 		5320000000000000000000D2 /* DevAutoLogin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevAutoLogin.swift; sourceTree = "<group>"; };
@@ -1486,6 +1504,9 @@
 				C08650000000000000000003 /* ActionToastStateTests.swift */,
 				C03900000000000000000019 /* SessionRowAttentionStateTests.swift */,
 				A10900000000000000000012 /* SessionNavigationStateTests.swift */,
+				456E58BC75E2EBE335416D28 /* ShellNavigationStateTests.swift */,
+				B3A55225279372080EAE5602 /* DrawerSettleTests.swift */,
+				6E6E51C25647DF0AB97836D6 /* RecentsFilterTests.swift */,
 				19C1150000000000000000A4 /* CliSessionsSyncModelTests.swift */,
 				C03900000000000000000010 /* APIEndpointContractTests.swift */,
 				C03900000000000000000011 /* CronManagementTests.swift */,
@@ -1830,13 +1851,18 @@
 		1A2B3C4D5E6F7000000000C5 /* SessionList */ = {
 			isa = PBXGroup;
 			children = (
-				1A2B3C4D5E6F7000000000B7 /* SessionListView.swift */,
-				531000000000000000000102 /* TipJarCard.swift */,
+				1A2B3C4D5E6F7000000000B7 /* ChatShellView.swift */,
 				1A2B3C4D5E6F7000000000D2 /* SessionRowView.swift */,
 				B23000000000000000000002 /* SessionSearchExcerpt.swift */,
 				1A2B3C4D5E6F7000000000D3 /* SessionListViewModel.swift */,
 				A04300000000000000000011 /* SessionListComponents.swift */,
-				A10900000000000000000011 /* SessionNavigationState.swift */,
+				4935EA102F256EEF5CDAF37F /* PendingNewChatView.swift */,
+				D47CAF96988A9A66D9809E88 /* ShellNavigationState.swift */,
+				978F6BF88ED2531DB1F2ABAA /* DrawerContainer.swift */,
+				A64D9BCC5BBCE1EF8008DF83 /* ChatDrawerView.swift */,
+				7A7827505CB6DC88368DBB98 /* ProjectsView.swift */,
+				C6501C5C136AD44341F12A22 /* DrawerSettle.swift */,
+				96B6ABCB2B2999629CD767C8 /* RecentsFilter.swift */,
 				A04300000000000000000012 /* SessionListActionConfirmations.swift */,
 				A04300000000000000000013 /* SessionMutator.swift */,
 				C08800000000000000000002 /* SessionHaptics.swift */,
@@ -2024,6 +2050,7 @@
 			isa = PBXGroup;
 			children = (
 				1A2B3C4D5E6F7000000000F6 /* SettingsView.swift */,
+				C88591BA287BCB895A6CFB72 /* ActiveProfilePickerView.swift */,
 				C012400000000000000003 /* AppIconSettingsSection.swift */,
 				1A2B3C4D5E6F70000000115 /* DefaultModelPickerView.swift */,
 				103200000000000000000001 /* DefaultProfilePickerView.swift */,
@@ -2609,6 +2636,7 @@
 				C28702000000000000000001 /* ChatDraftStore.swift in Sources */,
 				C28702000000000000000005 /* ChatDraftAttachmentStore.swift in Sources */,
 				1A2B3C4D5E6F7000000000F5 /* SettingsView.swift in Sources */,
+				17EC3737326D00E47B2A0C75 /* ActiveProfilePickerView.swift in Sources */,
 				C012400000000000000004 /* AppIconSettingsSection.swift in Sources */,
 				1A2B3C4D5E6F70000000114 /* DefaultModelPickerView.swift in Sources */,
 				103200000000000000000002 /* DefaultProfilePickerView.swift in Sources */,
@@ -2635,8 +2663,7 @@
 				C0366000000000000000001 /* ModelPickerSheet.swift in Sources */,
 				C0366000000000000000003 /* ModelPickerConfiguration.swift in Sources */,
 				C09500000000000000000005 /* AdaptiveGlassDebugFixture.swift in Sources */,
-					1A2B3C4D5E6F7000000000A7 /* SessionListView.swift in Sources */,
-					531000000000000000000101 /* TipJarCard.swift in Sources */,
+					1A2B3C4D5E6F7000000000A7 /* ChatShellView.swift in Sources */,
 					1A2B3C4D5E6F7000000000AF /* ChatView.swift in Sources */,
 					C05100000000000000000001 /* ChatTranscriptView.swift in Sources */,
 					C05100000000000000000002 /* ChatMessageActions.swift in Sources */,
@@ -2739,7 +2766,13 @@
 				B23000000000000000000001 /* SessionSearchExcerpt.swift in Sources */,
 				1A2B3C4D5E6F7000000000D1 /* SessionListViewModel.swift in Sources */,
 				A04300000000000000000001 /* SessionListComponents.swift in Sources */,
-				A10900000000000000000001 /* SessionNavigationState.swift in Sources */,
+				5800E593CB79D63F1359A4F8 /* PendingNewChatView.swift in Sources */,
+				E626781235CEDA476EF8BA87 /* ShellNavigationState.swift in Sources */,
+				B30219DBC9834A9AD8131404 /* DrawerContainer.swift in Sources */,
+				AF4B23CF3D588E3351B37E2E /* ChatDrawerView.swift in Sources */,
+				304FA3D5BBF98F6499CB988D /* ProjectsView.swift in Sources */,
+				D02817A0E87BEF62EF5E23F0 /* DrawerSettle.swift in Sources */,
+				93E10058E8552A4AA439B3A1 /* RecentsFilter.swift in Sources */,
 				A04300000000000000000002 /* SessionListActionConfirmations.swift in Sources */,
 				A04300000000000000000003 /* SessionMutator.swift in Sources */,
 				A040C0DE0000000000000001 /* ProjectCreationSheet.swift in Sources */,
@@ -2898,6 +2931,9 @@
 				C08650000000000000000004 /* ActionToastStateTests.swift in Sources */,
 				C03910000000000000000019 /* SessionRowAttentionStateTests.swift in Sources */,
 				A10900000000000000000002 /* SessionNavigationStateTests.swift in Sources */,
+				6A782D4CAA2AF88D5F94A780 /* ShellNavigationStateTests.swift in Sources */,
+				8ED1BF0E83115706BFB110A4 /* DrawerSettleTests.swift in Sources */,
+				C2067E557A82E018C2421DC8 /* RecentsFilterTests.swift in Sources */,
 				19C1150000000000000000A3 /* CliSessionsSyncModelTests.swift in Sources */,
 				C03910000000000000000010 /* APIEndpointContractTests.swift in Sources */,
 				C03910000000000000000011 /* CronManagementTests.swift in Sources */,

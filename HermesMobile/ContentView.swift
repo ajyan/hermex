@@ -100,7 +100,7 @@ struct ContentView: View {
         case .loggedOut(let server):
             OnboardingView(authManager: authManager, savedServer: server)
         case .loggedIn(let server):
-            SessionListView(
+            ChatShellView(
                 authManager: authManager,
                 server: server,
                 pendingSharedImport: $pendingSharedImport,
@@ -113,7 +113,7 @@ struct ContentView: View {
                 pendingWebuiPush: $pendingWebuiPush
             )
             // Switching the active server keeps us in `.loggedIn`, so without a
-            // per-server identity SwiftUI would reuse the same SessionListView (and
+            // per-server identity SwiftUI would reuse the same ChatShellView (and
             // its server-bound view model), leaving stale sessions/chat on screen.
             // Keying on the server tears the whole stack down and rebuilds it
             // against the newly active server (#17).
@@ -122,6 +122,7 @@ struct ContentView: View {
     }
 
     private func handleOpenURL(_ url: URL) {
+        Task { await AgentLiveActivityManager.shared.dismissFinishedActivity(from: url) }
         pendingWebuiPush = nil
         if let destination = WebuiPushDestination(url: url) {
             pendingBotDestination = nil

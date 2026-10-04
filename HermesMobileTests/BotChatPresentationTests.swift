@@ -12,6 +12,46 @@ import XCTest
         MainActor.assumeIsolated { warmUpSoftwareKeyboard() }
     }
 
+    func testSettledReplyShowsCopyWithoutTimestampsOrReactions() async throws {
+        let settings = try XCTUnwrap(UserDefaults(suiteName: UUID().uuidString))
+        settings.set(false, forKey: ChatTranscriptDisplaySettings.showsAssistantTurnTimestampsKey)
+        let model = make(BotFixtureWire())
+        let probeLabel = "Footer accessibility probe"
+        let window = try show(VStack {
+            Button(probeLabel) {}
+            BotArtifactMessageView(
+                message: ChatMessage(role: "assistant", content: "**A settled reply**", timestamp: nil, messageId: nil),
+                model: model
+            )
+        }.defaultAppStorage(settings))
+        defer { model.suspend(); close(window) }
+        await settle(window)
+
+        // SwiftUI can expose the same element through both container APIs.
+        // Visit each object once so this counts controls, not traversal paths.
+        var pending: [NSObject] = [window]
+        var seen: Set<ObjectIdentifier> = []
+        var nodes: [NSObject] = []
+        while let node = pending.popLast() {
+            guard seen.insert(ObjectIdentifier(node)).inserted else { continue }
+            nodes.append(node)
+            pending += (node as? UIView)?.subviews ?? []
+            pending += (node.accessibilityElements ?? []).compactMap { $0 as? NSObject }
+            let count = node.accessibilityElementCount()
+            if count != NSNotFound, count > 0 {
+                pending += (0..<count).compactMap { node.accessibilityElement(at: $0) as? NSObject }
+            }
+        }
+        // Some CI toolchains do not publish SwiftUI's in-process accessibility
+        // tree. An unrelated button distinguishes that limitation from a missing Copy.
+        try XCTSkipUnless(nodes.contains { $0.accessibilityLabel == probeLabel },
+                          "This toolchain does not expose the independent SwiftUI accessibility probe")
+        XCTAssertEqual(nodes.filter { $0.accessibilityLabel == "Copy" }.count, 1,
+                       "The reply must expose one Copy control without a timestamp or reactions")
+        XCTAssertFalse(nodes.flatMap { $0.accessibilityCustomActions ?? [] }.contains { $0.name == "Copy" },
+                       "Reply text must not duplicate the footer's Copy as a VoiceOver action")
+    }
+
     func testAttachmentOverlayReceivesOwningSceneLifecycle() async throws {
         let model = AttachmentSceneHarnessModel()
         let window = try show(AttachmentSceneHarnessView(model: model))
@@ -291,14 +331,59 @@ import XCTest
         let reader = BotRoomReader(key: BotRoomKey(server: server, connectionID: connection.id, roomID: room.id),
             connection: connection, room: room, cache: cache, makeWire: { _ in roomWire })
         await reader.open(); reader.close()
+        // The row's "room · sender" title is built from these two values. Assert them
+        // directly: OCR on the hosted CI simulator misreads that line ("chier-of-statt").
+        let hits = try await cache.search("Message 20", scope: .init(server: server, connectionID: connection.id),
+                                          profileIDs: nil, roomIDs: Set(inbox.rooms.map(\.id)))
+        let hit = try XCTUnwrap(hits.first)
+        XCTAssertEqual(inbox.roomForSearch(hit)?.name, "Comms")
+        XCTAssertEqual(hit.message.sender, "chief-of-staff")
         let window = try show(BotSearchView(inbox: inbox, cache: cache, query: "Message 20") { _ in }
             .environment(\.scenePhase, .active))
         defer { close(window) }
-        // The view debounces its query before reading the cache, so wait on the hit itself.
-        let after = try await screenshot(window, name: "528-after-opening-room", awaiting: ["Comms", "chief-of-staff"])
-        XCTAssertTrue(after.contains("Comms"), after)
-        XCTAssertTrue(after.contains("chief-of-staff"), after)
+        // The view debounces its query before reading the cache, so wait for the row itself:
+        // its trailing "Message" kind label draws below the section header only with a room hit.
+        let header = "Messages saved on this iPhone"
+        let after = try await screenshot(window, name: "528-after-opening-room") {
+            $0.components(separatedBy: header).dropFirst().joined().contains("Message")
+        }
+        XCTAssertTrue(after.components(separatedBy: header).dropFirst().joined().contains("Message"), after)
         XCTAssertFalse(after.contains("No saved messages found"), after)
+    }
+
+    func testThreadSearchOpensChronologicalDetailAndItsOwnComposer() async throws {
+        let server = URL(string: "https://room.example")!
+        let connection = BotConnection(id: UUID(), name: "Fixture", address: server, username: "fixture", password: "fixture")
+        let room = try XCTUnwrap(BotGroupRoom(RoomFixture.room(latest: 80)))
+        let cache = BotHistoryCache()
+        let key = BotRoomKey(server: server, connectionID: connection.id, roomID: room.id)
+        var log = BotRoomLog()
+        let events = (1...80).map { seq -> BotJSON in
+            var event = RoomFixture.event(seq, kind: seq == 1 ? "message.user" : "message.member").fields!
+            event["payload"] = .object(["text": .string("Thread message \(seq)"), "thread_id": .string("desktop-thread")])
+            return .object(event)
+        }
+        log.apply(RoomFixture.page(events, cursor: 80))
+        cache.recent.save(.room(log), for: .room(key), owner: cache.recent.begin(.room(key)))
+        let reader = BotRoomReader(key: key, connection: connection, room: room, cache: cache,
+                                   initialSequence: 20, makeWire: { _ in RoomWire() })
+        reader.draft = "overview draft"
+        reader.setDraft("thread draft", in: "desktop-thread")
+        let window = try show(NavigationStack {
+            BotRoomView(reader: reader, roster: [], avatars: [:])
+        }.environment(\.scenePhase, .inactive))
+        defer { reader.close(); close(window) }
+        await settle(window) {
+            descendants(window).compactMap { $0 as? ComposerChipTextView }
+                .contains { $0.accessibilityLabel == "Reply in thread" }
+        }
+        let editor = try XCTUnwrap(descendants(window).compactMap { $0 as? ComposerChipTextView }
+            .first { $0.accessibilityLabel == "Reply in thread" })
+        XCTAssertEqual(editor.sourceText, "thread draft")
+        XCTAssertEqual(reader.draft, "overview draft")
+        let replies = try replyLeaves(in: window)
+        XCTAssertTrue(replies.visible.contains("Thread message 20"), "Search must materialize and reveal its actual thread: \(replies)")
+        XCTAssertFalse(replies.visible.contains("Thread message 80"), "Search must keep the reading anchor")
     }
 
     func testWarmRoomBuildsOnlyTheNewestPageOfReplies() async throws {
@@ -1575,11 +1660,17 @@ import XCTest
     /// pace, so this waits on the content under test instead of a pass count.
     private func screenshot(_ window: UIWindow, name: String,
                             awaiting expected: [String]) async throws -> String {
+        try await screenshot(window, name: name) { text in expected.allSatisfy(text.contains) }
+    }
+
+    /// OCR reads of `window`, settling between passes until `done` accepts one
+    /// or the bounded passes run out; returns the last read.
+    private func screenshot(_ window: UIWindow, name: String, until done: (String) -> Bool) async throws -> String {
         var text = ""
         for _ in 0..<8 {
             await settle(window)
             text = try screenshot(window, name: name)
-            if expected.allSatisfy(text.contains) { break }
+            if done(text) { break }
         }
         return text
     }
@@ -1750,7 +1841,7 @@ private struct SessionChatPresentationFixture: View {
             draftMessage: $draft, quotes: $quotes, isFocused: $focus.isFocused,
             isSending: false, isCompressingSession: false, isWaitingForStream: false,
             isCancellingStream: false, readOnlyMessage: nil, errorMessage: nil,
-            configurationErrorMessage: nil, contextWindowSnapshot: nil, gitViewModel: git,
+            errorFixPrompt: nil, configurationErrorMessage: nil, contextWindowSnapshot: nil, gitViewModel: git,
             modelGroups: [], selectedModelID: nil, selectedModelProviderID: nil, selectedModelTitle: "Model",
             workspaceRoots: [], selectedWorkspacePath: nil, workspaceSuggestions: [], workspaceManagementServer: nil,
             personalitySuggestions: [], skillSuggestions: [], hasLoadedSkillSuggestions: true,

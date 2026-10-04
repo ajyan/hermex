@@ -18,41 +18,6 @@ struct SessionListSection: Identifiable {
     var id: String { kind.rawValue }
 }
 
-struct ScheduledSessionGroups: Equatable {
-    let ordinary: [SessionSummary]
-    let scheduled: [SessionSummary]
-    let totalScheduledCount: Int
-
-    /// Splits the visible rows in one pass, keeping their order: cron rows go
-    /// to `scheduled` unless archived, everything else to `ordinary`.
-    init(partitioning visible: [SessionSummary], totalScheduledCount: Int) {
-        var ordinary: [SessionSummary] = []
-        var scheduled: [SessionSummary] = []
-        for session in visible {
-            if session.isCronSession {
-                if session.archived != true { scheduled.append(session) }
-            } else {
-                ordinary.append(session)
-            }
-        }
-        self.ordinary = ordinary
-        self.scheduled = scheduled
-        self.totalScheduledCount = totalScheduledCount
-    }
-
-    var scheduledPreview: [SessionSummary] {
-        Array(scheduled.prefix(5))
-    }
-
-    var hasAdditionalScheduledSessions: Bool {
-        scheduled.count > scheduledPreview.count
-    }
-
-    func showsDisclosure(isSearchActive: Bool) -> Bool {
-        totalScheduledCount > 0 && (!isSearchActive || !scheduled.isEmpty)
-    }
-}
-
 enum ActiveSessionStateRefreshResult: Equatable {
     case unchanged
     case reloaded
@@ -62,7 +27,19 @@ enum ActiveSessionStateRefreshResult: Equatable {
 @MainActor
 @Observable
 final class SessionListViewModel {
-    private(set) var sessions: [SessionSummary] = []
+    private(set) var sessions: [SessionSummary] = [] {
+        didSet { updateAvailableRecentsFilters() }
+    }
+    /// The Settings visibility toggles, so the drawer never offers a kind they hide.
+    var recentsVisibility: AutomatedSessionVisibility = .showAll {
+        didSet { if recentsVisibility != oldValue { updateAvailableRecentsFilters() } }
+    }
+    /// The filter choices the drawer offers, recomputed only when the rows or toggles change.
+    private(set) var availableRecentsFilters: [RecentsFilter] = [.all, .hermes]
+
+    private func updateAvailableRecentsFilters() {
+        availableRecentsFilters = RecentsFilter.available(in: sessions.filter(recentsVisibility.shows))
+    }
     private(set) var isLoading = false
     private(set) var isCreatingSession = false
     private(set) var isCreatingProject = false
@@ -190,13 +167,15 @@ final class SessionListViewModel {
     func visibleSessions(
         searchText: String,
         selectedProjectID: String?,
-        automatedVisibility: AutomatedSessionVisibility = .showAll
+        automatedVisibility: AutomatedSessionVisibility = .showAll,
+        filter: RecentsFilter = .all
     ) -> [SessionSummary] {
         visibleSessions(
             among: sessions,
             searchText: searchText,
             selectedProjectID: selectedProjectID,
-            automatedVisibility: automatedVisibility
+            automatedVisibility: automatedVisibility,
+            filter: filter
         )
     }
 
@@ -224,12 +203,16 @@ final class SessionListViewModel {
         among candidates: [SessionSummary],
         searchText rawSearchText: String,
         selectedProjectID: String?,
-        automatedVisibility: AutomatedSessionVisibility
+        automatedVisibility: AutomatedSessionVisibility,
+        filter: RecentsFilter = .all
     ) -> [SessionSummary] {
         let query = Self.normalizedSearchQuery(rawSearchText)
         // Every word must appear somewhere in the row, in any order and field.
         let searchTerms = query.split(whereSeparator: \.isWhitespace)
-        let baseSessions = candidates.filter { automatedVisibility.shows($0) }
+        // Search spans every source, so the recents filter applies only without a query.
+        let baseSessions = candidates.filter {
+            automatedVisibility.shows($0) && (!query.isEmpty || filter.includes($0))
+        }
         let projectFilteredSessions = baseSessions.filter { session in
             guard let selectedProjectID else { return true }
             return session.projectId == selectedProjectID
@@ -259,23 +242,6 @@ final class SessionListViewModel {
         }
 
         return sortedLocalMatches + Self.sortedSessions(remoteMatches)
-    }
-
-    func scheduledSessionGroups(
-        searchText: String,
-        selectedProjectID: String?,
-        automatedVisibility: AutomatedSessionVisibility = .showAll
-    ) -> ScheduledSessionGroups {
-        ScheduledSessionGroups(
-            partitioning: visibleSessions(
-                searchText: searchText,
-                selectedProjectID: selectedProjectID,
-                automatedVisibility: automatedVisibility
-            ),
-            totalScheduledCount: automatedVisibility.showsCron
-                ? sessions.filter { $0.isCronSession && $0.archived != true }.count
-                : 0
-        )
     }
 
     @discardableResult

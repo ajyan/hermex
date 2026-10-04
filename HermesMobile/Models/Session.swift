@@ -546,6 +546,15 @@ extension SessionSummary {
             || markers.contains(where: Self.cliSourceMarkers.contains)
     }
 
+    /// Rows imported from a messaging gateway (Telegram, Slack, email, …).
+    var isMessagingSession: Bool {
+        if Self.normalizedSourceMarker(sessionSource) == "webui" { return false }
+        if Self.normalizedSourceMarker(sessionSource) == "messaging" { return true }
+        return [rawSource, sourceTag, sourceLabel]
+            .compactMap(Self.normalizedSourceMarker)
+            .contains(where: Self.messagingSourceMarkers.contains)
+    }
+
     /// The source chip shown by hermes-webui, preferring the server's label and
     /// falling back to stable brand/acronym casing for older servers.
     var sourceDisplayLabel: String? {
