@@ -73,7 +73,9 @@ private struct DeckCardView: View {
         case .headline:
             headline
         case .prompt:
-            if let context = card.context { CollapsibleText(text: context) }
+            if let context = card.context {
+                Text(inlineMarkdown(context)).font(AppFont.subheadline()).foregroundStyle(.secondary)
+            }
             question
             AnswerBox(card: card, viewModel: viewModel, prompt: "Your answer")
         case .reflect:
@@ -296,25 +298,5 @@ private struct ChoiceButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-}
-
-/// Long advisor context, folded to a few lines until asked.
-private struct CollapsibleText: View {
-    let text: String
-    @State private var isExpanded = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(verbatim: text)
-                .font(AppFont.subheadline())
-                .foregroundStyle(.secondary)
-                .lineLimit(isExpanded ? nil : 4)
-            Button { isExpanded.toggle() } label: {
-                Text(verbatim: isExpanded ? "Less" : "More").font(AppFont.footnote(weight: .medium))
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(Color.accentColor)
-        }
     }
 }
