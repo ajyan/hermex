@@ -1,4 +1,5 @@
 import AVFoundation
+import AVKit
 import SwiftUI
 
 /// Debug builds append call events to Documents/voice-call.log for on-device diagnosis.
@@ -73,21 +74,27 @@ struct VoiceCallView: View {
 
     @State private var controller: VoiceCallController?
     @State private var startMessage: String?
+    @State private var levels = VoiceCallAudioLevels()
+    /// When the call first started listening, for the call timer.
+    @State private var connectedAt: Date?
     @Environment(\.openURL) private var openURL
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
-            Color(.systemBackground).ignoresSafeArea()
+            background
 
-            VStack(spacing: 24) {
+            VStack(spacing: 0) {
                 header
-                Spacer(minLength: 0)
-                transcript
-                Spacer(minLength: 0)
+                Spacer(minLength: 12)
+                orb
+                Spacer(minLength: 12)
+                captions
                 controls
             }
             .padding(.horizontal, 24)
-            .padding(.vertical, 32)
+            .padding(.top, 24)
+            .padding(.bottom, 16)
 
             if let prompt = chat.approvalPrompt {
                 ApprovalRequestOverlay(
@@ -105,6 +112,8 @@ struct VoiceCallView: View {
                 )
             }
         }
+        // A call is an immersive, dark surface in either appearance, like the Phone app.
+        .preferredColorScheme(.dark)
         .task { await startCall() }
         .onChange(of: snapshot) { _, snapshot in
             controller?.chatDidUpdate(
@@ -115,8 +124,14 @@ struct VoiceCallView: View {
                 currentTool: snapshot.currentTool
             )
         }
+        .onChange(of: controller?.state) { _, state in
+            if state == .listening, connectedAt == nil { connectedAt = .now }
+        }
         .onChange(of: controller?.isFinished) { _, finished in
             if finished == true, controller?.startError == nil { onClose() }
+        }
+        .sensoryFeedback(trigger: controller?.lastSentTurn) { _, sent in
+            sent == nil ? nil : .impact(weight: .light)
         }
         .sheet(isPresented: permissionSheetBinding, onDismiss: onClose) {
             permissionSheet
@@ -140,8 +155,8 @@ struct VoiceCallView: View {
             return
         }
         let controller = VoiceCallController(
-            listener: AppleSpeechListener(),
-            speaker: AppleSpeechSpeaker(),
+            listener: AppleSpeechListener(levels: levels),
+            speaker: AppleSpeechSpeaker(levels: levels),
             chat: chat,
             bridge: CallSystemBridge(),
             log: VoiceCallDiagnostics.write
@@ -161,99 +176,210 @@ struct VoiceCallView: View {
 
     // MARK: - Pieces
 
+    private var state: VoiceCallState { controller?.state ?? .idle }
+
+    private var mood: VoiceCallOrbMood {
+        switch state {
+        case .idle, .connecting, .reconnecting: .connecting
+        case .listening: controller?.isMuted == true ? .quiet : .listening
+        case .thinking: .thinking
+        case .speaking: .speaking
+        case .awaitingApproval: .attention
+        case .ended: .quiet
+        }
+    }
+
+    /// Near-black with a wash of the current speaker's color from the top.
+    private var background: some View {
+        ZStack {
+            Color.black
+            RadialGradient(
+                colors: [moodTint.opacity(0.32), .clear],
+                center: .init(x: 0.5, y: 0.38),
+                startRadius: 0,
+                endRadius: 520
+            )
+        }
+        .ignoresSafeArea()
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.8), value: mood)
+    }
+
+    private var moodTint: Color {
+        switch mood {
+        case .listening: Color(red: 0.2, green: 0.55, blue: 1.0)
+        case .thinking, .speaking: Color(red: 0.6, green: 0.3, blue: 0.95)
+        case .attention: Color(red: 1.0, green: 0.6, blue: 0.2)
+        case .connecting, .quiet: Color(red: 0.4, green: 0.45, blue: 0.55)
+        }
+    }
+
     private var header: some View {
-        VStack(spacing: 8) {
-            Image(systemName: stateSymbol)
-                .font(.system(size: 44, weight: .regular))
-                .foregroundStyle(stateColor)
-                .frame(height: 56)
-                .accessibilityHidden(true)
+        VStack(spacing: 6) {
             Text(verbatim: CallSystemBridge.handle)
-                .font(.title.weight(.semibold))
-            Text(stateLabel)
-                .font(.subheadline)
-                .foregroundStyle(Color.hxTextSecondary)
+                .font(.largeTitle.weight(.semibold))
+            HStack(spacing: 6) {
+                Text(stateLabel)
+                if let connectedAt, !isEnded {
+                    Text(verbatim: "·").accessibilityHidden(true)
+                    Text(timerInterval: connectedAt...Date.distantFuture, countsDown: false)
+                        .monospacedDigit()
+                }
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
             if let tool = controller?.currentTool {
                 Label(tool, systemImage: "wrench.and.screwdriver")
                     .font(.footnote.monospaced())
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .adaptiveGlass(fallbackMaterial: .ultraThinMaterial, in: Capsule())
+                    .padding(.top, 6)
+                    .transition(.opacity)
             }
         }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: controller?.currentTool)
         .accessibilityElement(children: .combine)
     }
 
-    /// What the user is saying, or, once sent, what they said, dimmed.
-    private var transcript: some View {
+    /// The orb doubles as the one-tap shortcut: send now, or cut Atlas off.
+    private var orb: some View {
+        let action = controller?.tapAction
+        return VStack(spacing: 12) {
+            Button {
+                controller?.performTapAction()
+            } label: {
+                VoiceCallOrb(levels: levels, mood: mood)
+                    .aspectRatio(1, contentMode: .fit)
+                    .frame(maxWidth: 340, maxHeight: 340)
+                    .contentShape(Circle().scale(0.7))
+            }
+            .buttonStyle(.plain)
+            .disabled(action == nil)
+            .accessibilityLabel(tapHint ?? "")
+            .accessibilityHidden(action == nil)
+
+            Text(tapHint ?? " ")
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(.secondary)
+                .opacity(tapHint == nil ? 0 : 1)
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: tapHint)
+                .accessibilityHidden(true)
+        }
+    }
+
+    private var tapHint: LocalizedStringKey? {
+        switch controller?.tapAction {
+        case .send: "Tap to send"
+        case .interrupt: "Tap to interrupt"
+        case nil: controller?.isMuted == true ? "You're muted" : nil
+        }
+    }
+
+    /// Live captions for whoever is talking: the user's words while listening,
+    /// Atlas's latest sentences while it answers, with the user's turn above.
+    private var captions: some View {
         let live = controller?.partialTranscript ?? ""
-        let text = live.isEmpty ? (controller?.lastSentTurn ?? "") : live
-        return Text(text)
-            .font(.title3)
-            .foregroundStyle(live.isEmpty ? Color.hxTextSecondary : Color.primary)
-            .multilineTextAlignment(.center)
-            .lineLimit(6)
-            .frame(maxWidth: .infinity)
-            .accessibilityLabel(text)
+        let sent = controller?.lastSentTurn
+        let reply = atlasCaption
+        return VStack(spacing: 10) {
+            if let reply {
+                if let sent {
+                    Text(sent)
+                        .font(.subheadline)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                }
+                Text(reply)
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(4)
+                    .truncationMode(.head)
+            } else if !live.isEmpty {
+                Text(live)
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(4)
+                    .truncationMode(.head)
+            } else if let sent {
+                Text(sent)
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+                    .truncationMode(.head)
+            }
+        }
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity, minHeight: 132, alignment: .bottom)
+        .padding(.bottom, 28)
+    }
+
+    /// The tail of what Atlas is saying, as it would be spoken (no markdown).
+    private var atlasCaption: String? {
+        switch state {
+        case .thinking, .speaking, .reconnecting: break
+        default: return nil
+        }
+        guard let text = snapshot.streamingText else { return nil }
+        let sentences = SpeechTextShaper.sentences(in: text, final: true)
+        guard !sentences.isEmpty else { return nil }
+        return sentences.suffix(3).joined(separator: " ")
     }
 
     private var controls: some View {
-        HStack(spacing: 48) {
-            let isMuted = controller?.isMuted ?? false
-            Button {
-                controller?.setMuted(!isMuted)
-            } label: {
-                Label(isMuted ? LocalizedStringKey("Unmute") : "Mute", systemImage: isMuted ? "mic.slash.fill" : "mic.fill")
-                    .labelStyle(.iconOnly)
-                    .font(.title2)
-                    .frame(width: 64, height: 64)
-                    .background(Color(.tertiarySystemFill), in: Circle())
+        let isMuted = controller?.isMuted ?? false
+        return HStack(alignment: .top) {
+            CallControl(title: "Audio") {
+                CallAudioRoutePicker()
             }
-            .accessibilityLabel(isMuted ? LocalizedStringKey("Unmute") : "Mute")
 
-            Button {
-                if let controller { controller.end() } else { onClose() }
-            } label: {
-                Label("End", systemImage: "phone.down.fill")
-                    .labelStyle(.iconOnly)
-                    .font(.title2)
-                    .foregroundStyle(.white)
-                    .frame(width: 64, height: 64)
-                    .background(Color.hxDanger, in: Circle())
+            Spacer()
+
+            CallControl(title: isMuted ? "Unmute" : "Mute", isOn: isMuted) {
+                Button {
+                    controller?.setMuted(!isMuted)
+                } label: {
+                    Image(systemName: isMuted ? "mic.slash.fill" : "mic.fill")
+                        .contentTransition(.symbolEffect(.replace))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Circle())
+                }
+                .accessibilityLabel(isMuted ? LocalizedStringKey("Unmute") : "Mute")
             }
-            .accessibilityLabel("End")
+
+            Spacer()
+
+            CallControl(title: "End", tint: .hxDanger) {
+                Button {
+                    if let controller { controller.end() } else { onClose() }
+                } label: {
+                    Image(systemName: "phone.down.fill")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Circle())
+                }
+                .accessibilityLabel("End")
+            }
         }
         .buttonStyle(.plain)
+        .padding(.horizontal, 8)
+    }
+
+    private var isEnded: Bool {
+        if case .ended = state { return true }
+        return false
     }
 
     private var stateLabel: LocalizedStringKey {
-        switch controller?.state ?? .idle {
+        switch state {
         case .idle, .connecting: "Connecting"
-        case .listening: "Listening"
+        case .listening: controller?.isMuted == true ? "Muted" : "Listening"
         case .thinking: "Thinking"
         case .speaking: "Speaking"
         case .awaitingApproval: "Waiting for your approval"
         case .reconnecting: "Reconnecting"
         case .ended: "Call ended"
-        }
-    }
-
-    private var stateSymbol: String {
-        switch controller?.state ?? .idle {
-        case .idle, .connecting: "phone.connection"
-        case .listening: "waveform"
-        case .thinking: "ellipsis"
-        case .speaking: "speaker.wave.2.fill"
-        case .awaitingApproval: "hand.raised.fill"
-        case .reconnecting: "arrow.triangle.2.circlepath"
-        case .ended: "phone.down"
-        }
-    }
-
-    private var stateColor: Color {
-        switch controller?.state ?? .idle {
-        case .awaitingApproval: .hxWarning
-        case .reconnecting, .ended: .hxTextSecondary
-        default: .accentColor
         }
     }
 
@@ -282,4 +408,50 @@ struct VoiceCallView: View {
         .padding(24)
         .presentationDetents([.medium])
     }
+}
+
+/// One round call button with its caption underneath, Phone-app style.
+private struct CallControl<Content: View>: View {
+    let title: LocalizedStringKey
+    var isOn = false
+    var tint: Color?
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(spacing: 8) {
+            button
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+        }
+        .frame(minWidth: 80)
+    }
+
+    /// Solid when it carries meaning (End, or a control that's on), glass otherwise.
+    @ViewBuilder
+    private var button: some View {
+        let face = content
+            .font(.title2)
+            .foregroundStyle(isOn ? Color.black : Color.white)
+            .frame(width: 72, height: 72)
+        if let solid = tint ?? (isOn ? Color.white : nil) {
+            face.background(solid, in: Circle())
+        } else {
+            face.adaptiveGlass(fallbackMaterial: .ultraThinMaterial, in: Circle())
+        }
+    }
+}
+
+/// The system audio route menu (speaker, receiver, AirPods) for the call.
+private struct CallAudioRoutePicker: UIViewRepresentable {
+    func makeUIView(context: Context) -> AVRoutePickerView {
+        let picker = AVRoutePickerView()
+        picker.tintColor = .white
+        picker.activeTintColor = .white
+        picker.prioritizesVideoDevices = false
+        return picker
+    }
+
+    func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
 }

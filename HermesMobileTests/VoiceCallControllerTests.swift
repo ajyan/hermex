@@ -340,6 +340,47 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(chat.cancelCount, 1)
     }
 
+    func testTapSendsWhatWasSaidWithoutWaitingForThePause() async {
+        await controller.start()
+        XCTAssertNil(controller.tapAction)
+        voice(true, for: 0.5)
+        listener.onPartial?("what's on my calendar")
+        XCTAssertEqual(controller.tapAction, .send)
+
+        controller.performTapAction()
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.sent, ["[voice] what's on my calendar"])
+        XCTAssertEqual(controller.state, .thinking)
+        XCTAssertNil(controller.tapAction)
+    }
+
+    func testTapInterruptsAtlasAndCancelsTheRunOnce() async {
+        await startSpeaking()
+        XCTAssertEqual(controller.tapAction, .interrupt)
+
+        controller.performTapAction()
+        await controller.lastChatTask?.value
+        XCTAssertEqual(speaker.stopCount, 1)
+        XCTAssertEqual(chat.cancelCount, 1)
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertEqual(controller.partialTranscript, "")
+
+        // The abandoned reply isn't spoken, and the next turn sends normally.
+        update(text: "First sentence. Second sentence. Third.")
+        XCTAssertEqual(speaker.spoken, ["First sentence."])
+        await say("never mind")
+        XCTAssertEqual(chat.sent, ["[voice] hello", "[voice] never mind"])
+    }
+
+    func testTapInterruptAfterTheRunFinishedDoesNotCancel() async {
+        await startSpeaking()
+        update(text: "First sentence. Second sentence.", streaming: false)
+        controller.performTapAction()
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.cancelCount, 0)
+        XCTAssertEqual(controller.state, .listening)
+    }
+
     func testEchoOfOwnReplyDoesNotInterrupt() async {
         await startSpeaking()
         voice(true, for: 1.0)

@@ -168,6 +168,42 @@ final class VoiceCallController {
         bridge.setMuted(muted)
     }
 
+    enum TapAction: Equatable {
+        /// Send what the user has said without waiting for the pause.
+        case send
+        /// Cut Atlas off and listen, as talking over it would.
+        case interrupt
+    }
+
+    /// What tapping the call visual does right now, if anything.
+    var tapAction: TapAction? {
+        guard !isHeld else { return nil }
+        switch state {
+        case .listening where !partialTranscript.isEmpty: return .send
+        case .speaking: return .interrupt
+        default: return nil
+        }
+    }
+
+    func performTapAction() {
+        switch tapAction {
+        case .send:
+            log("tap: send")
+            submitTurn()
+        case .interrupt:
+            log("tap: interrupt")
+            speaker.stopNow()
+            if replyActive, lastIsStreaming, !runFinished {
+                lastChatTask = Task { [chat] in _ = await chat.cancelActiveStream() }
+            }
+            replyActive = false
+            setCue(false)
+            returnToListening()
+        case nil:
+            break
+        }
+    }
+
     private var isEnded: Bool {
         if case .ended = state { return true }
         return false
