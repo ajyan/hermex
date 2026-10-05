@@ -139,11 +139,13 @@ struct TasksView: View {
                         }
                     }
                 }
+                .scrollContentBackground(.hidden)
                 .refreshable {
                     await loadTasks()
                 }
             }
         }
+        .background(Color.hxCanvas)
         .safeAreaInset(edge: .top, spacing: 0) {
             filterPicker
         }
@@ -166,7 +168,8 @@ struct TasksView: View {
         .pickerStyle(.segmented)
         .padding(.horizontal)
         .padding(.vertical, 8)
-        .background(.bar)
+        // Matches the navigation bar and list above and below it, so no seam shows.
+        .background(Color.hxCanvas)
     }
 
     /// Cross-task recent completions, above the agenda and outside the filter.

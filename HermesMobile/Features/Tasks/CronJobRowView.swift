@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// One agenda row: a status rail, the job's name, and a single meta line whose
+/// One agenda row: a status dot, the job's name, and a single meta line whose
 /// content is chosen by the group the row sits in. Model, provider, profile,
 /// skills, deliver and the prompt live on Task Detail — a list that repeats
 /// them reads as a wall.
@@ -13,10 +13,11 @@ struct CronJobRowView: View {
     @Environment(\.calendar) private var calendar
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Capsule(style: .continuous)
+        // Same dot as the Ran Recently rows, so status reads one way across the screen.
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Circle()
                 .fill(tint)
-                .frame(width: 3)
+                .frame(width: 8, height: 8)
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {

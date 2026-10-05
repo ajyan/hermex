@@ -12,11 +12,20 @@ final class AppleSpeechSpeaker: SpeechSpeaking {
     private var pending: Set<ObjectIdentifier> = []
     private var delegateProxy: VoiceCallSynthesizerDelegate?
     private var cueTask: Task<Void, Never>?
+    private let levels: VoiceCallAudioLevels?
 
-    init(synthesizer: ChatSpeechSynthesizing = AVSpeechSynthesizer(), voice: AVSpeechSynthesisVoice? = VoiceSelection.installedVoice()) {
+    /// `levels` receives a beat per spoken word for the call visual.
+    init(
+        synthesizer: ChatSpeechSynthesizing = AVSpeechSynthesizer(),
+        voice: AVSpeechSynthesisVoice? = VoiceSelection.installedVoice(),
+        levels: VoiceCallAudioLevels? = nil
+    ) {
         self.synthesizer = synthesizer
         self.voice = voice
-        let proxy = VoiceCallSynthesizerDelegate { [weak self] id, finished in
+        self.levels = levels
+        let proxy = VoiceCallSynthesizerDelegate(
+            onWord: { [levels] length in levels?.wordSpoken(length: length) }
+        ) { [weak self] id, finished in
             self?.utteranceEnded(id, finished: finished)
         }
         delegateProxy = proxy
@@ -32,6 +41,7 @@ final class AppleSpeechSpeaker: SpeechSpeaking {
 
     func stopNow() {
         pending.removeAll()
+        levels?.voiceStopped()
         synthesizer.stopSpeaking(at: .immediate)
     }
 
@@ -52,15 +62,26 @@ final class AppleSpeechSpeaker: SpeechSpeaking {
 
     private func utteranceEnded(_ id: ObjectIdentifier, finished: Bool) {
         guard pending.remove(id) != nil, finished, pending.isEmpty else { return }
+        levels?.voiceStopped()
         onFinishedQueue?()
     }
 }
 
 private final class VoiceCallSynthesizerDelegate: NSObject, AVSpeechSynthesizerDelegate {
+    private let onWord: @Sendable (Int) -> Void
     private let onEnded: @MainActor (ObjectIdentifier, Bool) -> Void
 
-    init(onEnded: @escaping @MainActor (ObjectIdentifier, Bool) -> Void) {
+    init(onWord: @escaping @Sendable (Int) -> Void, onEnded: @escaping @MainActor (ObjectIdentifier, Bool) -> Void) {
+        self.onWord = onWord
         self.onEnded = onEnded
+    }
+
+    func speechSynthesizer(
+        _ synthesizer: AVSpeechSynthesizer,
+        willSpeakRangeOfSpeechString characterRange: NSRange,
+        utterance: AVSpeechUtterance
+    ) {
+        onWord(characterRange.length)
     }
 
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {

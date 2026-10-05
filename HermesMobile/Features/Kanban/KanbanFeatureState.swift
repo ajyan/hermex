@@ -680,6 +680,14 @@ final class KanbanFeatureState {
         searchMatchedCards.count { $0.status?.rawValue == status }
     }
 
+    /// A cold load lands on the first Status that has Cards, so the Board never opens
+    /// on an empty Triage while work waits in To Do. A Status the user picked is kept.
+    private func selectFirstNonEmptyStatusIfNeeded() {
+        guard statusCount(selectedStatus) == 0,
+              let firstWithCards = availableStatuses.first(where: { statusCount($0) > 0 }) else { return }
+        selectedStatus = firstWithCards
+    }
+
     func canMutateCard(_ card: KanbanCard) -> Bool {
         guard canUseCardWorkflow,
               normalizedOptional(card.cardID) != nil,
@@ -1007,6 +1015,9 @@ final class KanbanFeatureState {
             selectedBoardSlug = boardToLoad
             boardSelectionNotice = nil
             self.snapshot = snapshot
+            if previouslySelectedBoard == nil {
+                selectFirstNonEmptyStatusIfNeeded()
+            }
             snapshotRequest = request
             markBoardActivity()
             detailRefreshRevision &+= 1

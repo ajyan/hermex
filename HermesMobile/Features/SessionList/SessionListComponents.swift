@@ -188,7 +188,7 @@ struct SessionListRowsSection: View {
                 showsMessageCount: showsMessageCount,
                 showsWorkspace: showsWorkspace
             )
-            .sessionsScreenListRow(insets: EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12))
+            .sessionsScreenListRow(insets: EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8))
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Loading sessions")
             .accessibilityHidden(index > 0)
@@ -289,7 +289,7 @@ struct SessionInteractiveRow: View {
                 actions: actions
             )
         }
-        .sessionsScreenListRow(insets: EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12))
+        .sessionsScreenListRow(insets: EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8))
     }
 
     @ViewBuilder
@@ -886,9 +886,9 @@ struct SessionRowSkeletonView: View {
 
     private var titleText: some View {
         Text(verbatim: configuration.title)
-            .font(AppFont.headline(weight: .semibold))
+            .font(AppFont.body())
             .foregroundStyle(.primary)
-            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 2)
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
             .truncationMode(.tail)
             .fixedSize(horizontal: false, vertical: true)
     }

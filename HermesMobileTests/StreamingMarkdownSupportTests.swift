@@ -335,3 +335,31 @@ final class TableCellWidthCapTests: XCTestCase {
         XCTAssertEqual(width, maxWidth)
     }
 }
+
+final class MarkdownTildeEscapingTests: XCTestCase {
+    func testLoneTildesInProseAreEscaped() {
+        let text = "Rules: ~/.hermes/rules.yaml. Tests: cd ~/Code/guard"
+
+        XCTAssertEqual(
+            MarkdownTildeEscaping.escapingSingleTildes(in: text),
+            #"Rules: \~/.hermes/rules.yaml. Tests: cd \~/Code/guard"#
+        )
+    }
+
+    func testDoubleTildeStrikethroughIsKept() {
+        let text = "This is ~~gone~~ now."
+
+        XCTAssertEqual(MarkdownTildeEscaping.escapingSingleTildes(in: text), text)
+    }
+
+    func testCodeSpansFencesAndURLsAreLeftAlone() {
+        let text = """
+        Run `ls ~/Code` then open https://example.test/~user
+        ```
+        cd ~/Code
+        ```
+        """
+
+        XCTAssertEqual(MarkdownTildeEscaping.escapingSingleTildes(in: text), text)
+    }
+}

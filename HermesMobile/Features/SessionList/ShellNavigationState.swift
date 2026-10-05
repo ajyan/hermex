@@ -25,6 +25,8 @@ struct ShellNavigationState: Equatable {
     /// The session a new-chat root created, once the server returns it. The root
     /// stays `.newChat` so its view (and any live stream) is never rebuilt.
     private var newChatSessionID: String?
+    /// True once the new-chat root has a first turn (typed or spoken on a call).
+    private var newChatHasStarted = false
     private var deepLinkedSessionLoadID: String?
 
     var selectedSessionID: String? {
@@ -37,6 +39,13 @@ struct ShellNavigationState: Equatable {
     var isCreatingNewChat: Bool {
         guard case .newChat = root else { return false }
         return newChatSessionID == nil
+    }
+
+    /// The root is a new chat nothing has been said in yet, so starting
+    /// another new chat would land right back here.
+    var isOnEmptyNewChat: Bool {
+        guard case .newChat = root else { return false }
+        return !newChatHasStarted
     }
 
     mutating func select(_ session: SessionSummary) {
@@ -56,6 +65,11 @@ struct ShellNavigationState: Equatable {
     mutating func showOnly(_ destination: ShellPushDestination) {
         path = [destination]
         isDrawerOpen = false
+    }
+
+    mutating func markNewChatStarted() {
+        guard case .newChat = root else { return }
+        newChatHasStarted = true
     }
 
     mutating func remember(_ session: SessionSummary) {
@@ -91,6 +105,7 @@ struct ShellNavigationState: Equatable {
     private mutating func setRoot(_ newRoot: ShellRoot) {
         rootRevision += 1
         newChatSessionID = nil
+        newChatHasStarted = false
         root = newRoot
         path = []
         isDrawerOpen = false

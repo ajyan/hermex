@@ -14,6 +14,12 @@ final class AppleSpeechListener: SpeechListening {
 
     private let engine = AVAudioEngine()
     private var recognizer: CallRecognizer?
+    private let levels: VoiceCallAudioLevels?
+
+    /// `levels` receives mic loudness for the call visual.
+    init(levels: VoiceCallAudioLevels? = nil) {
+        self.levels = levels
+    }
 
     func start() async throws {
         guard await Self.requestPermissions() else { throw VoiceCallStartError.permissionDenied }
@@ -34,7 +40,7 @@ final class AppleSpeechListener: SpeechListening {
         // Echo cancellation, so Atlas's own voice doesn't read as the user barging in.
         try? input.setVoiceProcessingEnabled(true)
         let format = input.outputFormat(forBus: 0)
-        let meter = VoiceActivityMeter { [weak self] isSpeech, time in
+        let meter = VoiceActivityMeter(levels: levels) { [weak self] isSpeech, time in
             Task { @MainActor in self?.onVoiceActivity?(isSpeech, time) }
         }
         let sink = recognizer.makeBufferSink(inputFormat: format)
@@ -57,6 +63,7 @@ final class AppleSpeechListener: SpeechListening {
         engine.stop()
         recognizer?.finish()
         recognizer = nil
+        levels?.setMic(0)
     }
 
     private static func requestPermissions() async -> Bool {
@@ -223,7 +230,8 @@ private final class SFRecognizer: CallRecognizer {
 }
 
 /// Voice activity from buffer loudness against an adaptive noise floor,
-/// published every 100 ms. Runs on the audio thread.
+/// published every 100 ms, plus per-buffer loudness for the call visual.
+/// Runs on the audio thread.
 private final class VoiceActivityMeter: @unchecked Sendable {
     /// Speech must be this far above the noise floor.
     private static let marginDecibels: Float = 9
@@ -231,13 +239,18 @@ private final class VoiceActivityMeter: @unchecked Sendable {
     private static let absoluteFloorDecibels: Float = -58
     private static let window: TimeInterval = 0.1
 
+    /// Loudness this far above the noise floor reads as full scale on the visual.
+    private static let visualRangeDecibels: Float = 30
+
+    private let levels: VoiceCallAudioLevels?
     private let publish: (Bool, TimeInterval) -> Void
     private var noiseFloor: Float = -70
     private var windowStart: TimeInterval?
     private var speechBuffers = 0
     private var totalBuffers = 0
 
-    init(publish: @escaping (Bool, TimeInterval) -> Void) {
+    init(levels: VoiceCallAudioLevels?, publish: @escaping (Bool, TimeInterval) -> Void) {
+        self.levels = levels
         self.publish = publish
     }
 
@@ -251,6 +264,8 @@ private final class VoiceActivityMeter: @unchecked Sendable {
         // The floor drops at once and rises slowly, so speech doesn't become the floor.
         noiseFloor = level < noiseFloor ? level : noiseFloor + (level - noiseFloor) * 0.002
         let isSpeech = level > max(noiseFloor + Self.marginDecibels, Self.absoluteFloorDecibels)
+        let audible = level - max(noiseFloor + Self.marginDecibels * 0.5, Self.absoluteFloorDecibels)
+        levels?.setMic(audible / Self.visualRangeDecibels)
 
         let now = ProcessInfo.processInfo.systemUptime
         let start = windowStart ?? now
