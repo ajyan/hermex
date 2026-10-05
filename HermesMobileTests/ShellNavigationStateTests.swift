@@ -49,6 +49,28 @@ final class ShellNavigationStateTests: XCTestCase {
         XCTAssertFalse(state.isCreatingNewChat)
     }
 
+    func testNewChatIsEmptyUntilItsFirstTurn() {
+        var state = ShellNavigationState()
+        XCTAssertTrue(state.isOnEmptyNewChat)
+
+        state.remember(SessionSummary(sessionId: "c1"))
+        XCTAssertTrue(state.isOnEmptyNewChat)
+
+        state.markNewChatStarted()
+        XCTAssertFalse(state.isOnEmptyNewChat)
+
+        state.select(PendingNewChatRoute())
+        XCTAssertTrue(state.isOnEmptyNewChat)
+    }
+
+    func testSessionRootIsNeverAnEmptyNewChat() {
+        var state = ShellNavigationState()
+        state.select(SessionSummary(sessionId: "s1"))
+        XCTAssertFalse(state.isOnEmptyNewChat)
+        state.markNewChatStarted()
+        XCTAssertFalse(state.isOnEmptyNewChat)
+    }
+
     func testSelectingNewChatForgetsRememberedSession() {
         var state = ShellNavigationState()
         state.remember(SessionSummary(sessionId: "c1"))

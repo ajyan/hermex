@@ -13,6 +13,8 @@ struct PendingNewChatView: View {
     let viewModel: SessionListViewModel
     let onAPIError: (Error) -> Void
     let onSessionCreated: (SessionSummary) -> Void
+    /// The first turn went out (typed or spoken on a call).
+    let onConversationStarted: () -> Void
     let initialAttachments: [SharedAttachmentImport]
     let autoStartsVoiceInput: Bool
     let profileName: String?
@@ -44,6 +46,7 @@ struct PendingNewChatView: View {
         viewModel: SessionListViewModel,
         onAPIError: @escaping (Error) -> Void,
         onSessionCreated: @escaping (SessionSummary) -> Void = { _ in },
+        onConversationStarted: @escaping () -> Void = {},
         draftStore: ChatDraftStore? = nil,
         isStillRoot: @escaping () -> Bool = { false }
     ) {
@@ -51,6 +54,7 @@ struct PendingNewChatView: View {
         self.viewModel = viewModel
         self.onAPIError = onAPIError
         self.onSessionCreated = onSessionCreated
+        self.onConversationStarted = onConversationStarted
         self.initialAttachments = initialAttachments
         self.autoStartsVoiceInput = autoStartsVoiceInput
         self.profileName = profileName
@@ -278,6 +282,7 @@ struct PendingNewChatView: View {
 
     private func markConversationStarted() {
         didStartConversation = true
+        onConversationStarted()
     }
 
     private func restoreAbandonedDraftIfNeeded() {

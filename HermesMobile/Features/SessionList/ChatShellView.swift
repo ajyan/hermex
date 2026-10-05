@@ -505,6 +505,7 @@ struct ChatShellView: View {
                 viewModel: viewModel,
                 onAPIError: authManager.handleAPIError,
                 onSessionCreated: rememberCreatedSession,
+                onConversationStarted: { navigation.markNewChatStarted() },
                 draftStore: draftStore,
                 isStillRoot: { navigation.root == .newChat(route) }
             )
@@ -524,15 +525,24 @@ struct ChatShellView: View {
         }
 
         ToolbarItem(placement: .topBarTrailing) {
-            Button(action: openNewChat) {
-                Image(systemName: "square.and.pencil")
-            }
-            .disabled(viewModel.isViewingCachedData || navigation.isCreatingNewChat)
-            .accessibilityLabel("New chat")
-            // Long press: the voice-call entry that used to live on the floating Chat button.
-            .contextMenu {
-                Button("New Chat", systemImage: "square.and.pencil", action: openNewChat)
-                Button("New Call", systemImage: "phone", action: openNewCall)
+            // On a chat that's already new and empty, a new chat goes nowhere: offer the call instead.
+            if navigation.isOnEmptyNewChat {
+                Button(action: callFromEmptyNewChat) {
+                    Image(systemName: "phone")
+                }
+                .disabled(viewModel.isViewingCachedData)
+                .accessibilityLabel("Call Atlas")
+            } else {
+                Button(action: openNewChat) {
+                    Image(systemName: "square.and.pencil")
+                }
+                .disabled(viewModel.isViewingCachedData || navigation.isCreatingNewChat)
+                .accessibilityLabel("New chat")
+                // Long press: the voice-call entry that used to live on the floating Chat button.
+                .contextMenu {
+                    Button("New Chat", systemImage: "square.and.pencil", action: openNewChat)
+                    Button("New Call", systemImage: "phone", action: openNewCall)
+                }
             }
         }
     }
@@ -1118,6 +1128,12 @@ struct ChatShellView: View {
     /// A new chat that opens straight into a voice call with Atlas.
     private func openNewCall() {
         selectDestination(PendingNewChatRoute(startsCall: true))
+    }
+
+    /// Calls from the empty new chat on screen, keeping its profile and project.
+    private func callFromEmptyNewChat() {
+        guard case .newChat(let route) = navigation.root else { return openNewCall() }
+        selectDestination(PendingNewChatRoute(profileName: route.profileName, projectID: route.projectID, startsCall: true))
     }
 
     private func selectSession(_ session: SessionSummary) {

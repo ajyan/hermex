@@ -954,7 +954,10 @@ struct ChatView: View {
             .onChange(of: isVoiceCallPresented) { _, presented in
                 if presented { dismissKeyboard() }
             }
-            .fullScreenCover(isPresented: $isVoiceCallPresented) {
+            .fullScreenCover(isPresented: $isVoiceCallPresented, onDismiss: {
+                // Call turns don't go through the composer's send path.
+                if !viewModel.messages.isEmpty { onConversationStarted() }
+            }) {
                 VoiceCallView(chat: viewModel) { isVoiceCallPresented = false }
             }
             .onAppear {
