@@ -626,6 +626,11 @@
 		559000000000000000000006 /* PushPreviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 559000000000000000000016 /* PushPreviewTests.swift */; };
 		C0DE88500000000000000003 /* AppLockTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE88500000000000000004 /* AppLockTests.swift */; };
 		559000000000000000000007 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 10CA110C0DE000000000B002 /* Localizable.xcstrings */; };
+		E38C2C7CB2630EE82E7754E8 /* DailyDeck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22112FC4500BC48A8D86A376 /* DailyDeck.swift */; };
+		0D0A3A284474E49DBDD0F9E9 /* DailyDeckViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71D8CEEBE37C8E43E46A2B4 /* DailyDeckViewModel.swift */; };
+		218E7F5B009F877FF54BA04A /* DailyDeckView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD79724DF6D6FD92B594BBC5 /* DailyDeckView.swift */; };
+		1F2EF7D6C585EAF7E1C46CD2 /* DeckCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */; };
+		2A8CB7ACCDBA9BBE34E57FDC /* DailyDeckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A997D807C262D12E5491E89 /* DailyDeckTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1291,6 +1296,11 @@
 		559000000000000000000015 /* PushNotificationRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationRouter.swift; sourceTree = "<group>"; };
 		559000000000000000000016 /* PushPreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushPreviewTests.swift; sourceTree = "<group>"; };
 		C0DE88500000000000000004 /* AppLockTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLockTests.swift; sourceTree = "<group>"; };
+		22112FC4500BC48A8D86A376 /* DailyDeck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDeck.swift; sourceTree = "<group>"; };
+		D71D8CEEBE37C8E43E46A2B4 /* DailyDeckViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDeckViewModel.swift; sourceTree = "<group>"; };
+		AD79724DF6D6FD92B594BBC5 /* DailyDeckView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDeckView.swift; sourceTree = "<group>"; };
+		7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckCardView.swift; sourceTree = "<group>"; };
+		3A997D807C262D12E5491E89 /* DailyDeckTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDeckTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1420,6 +1430,7 @@
 		1A2B3C4D5E6F700000000034 /* HermesMobileTests */ = {
 			isa = PBXGroup;
 			children = (
+				3A997D807C262D12E5491E89 /* DailyDeckTests.swift */,
 				F42EE649B1547E6CBDC22A5A /* VoiceCallFlowTests.swift */,
 				A1C0FFEE0000000000000F02 /* VoiceCallAudioLevelsTests.swift */,
 				CC7685CE580C850A7254B14E /* VoiceCallChatSnapshotTests.swift */,
@@ -1735,6 +1746,7 @@
 		1A2B3C4D5E6F7000000000C3 /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				12A06408B1B8DA1A340CBD38 /* DailyDeck */,
 				9BAF7D8BBF390913B4F060B0 /* VoiceCall */,
 				AA0200000000000000000006 /* Activity */,
 				B48200000000000000000001 /* BotProfileAppearance.swift */,
@@ -2240,6 +2252,17 @@
 			path = Insights;
 			sourceTree = "<group>";
 		};
+		12A06408B1B8DA1A340CBD38 /* DailyDeck */ = {
+			isa = PBXGroup;
+			children = (
+				7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */,
+				AD79724DF6D6FD92B594BBC5 /* DailyDeckView.swift */,
+				D71D8CEEBE37C8E43E46A2B4 /* DailyDeckViewModel.swift */,
+				22112FC4500BC48A8D86A376 /* DailyDeck.swift */,
+			);
+			path = DailyDeck;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -2463,6 +2486,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1F2EF7D6C585EAF7E1C46CD2 /* DeckCardView.swift in Sources */,
+				218E7F5B009F877FF54BA04A /* DailyDeckView.swift in Sources */,
+				0D0A3A284474E49DBDD0F9E9 /* DailyDeckViewModel.swift in Sources */,
+				E38C2C7CB2630EE82E7754E8 /* DailyDeck.swift in Sources */,
 				E229069D4B665D7B3CF24038 /* VoiceCallView.swift in Sources */,
 				325135E0239A6B2D29978A89 /* CallSystemBridge.swift in Sources */,
 				FC52783B970A4E589E5A203F /* AppleSpeechListener.swift in Sources */,
@@ -2855,6 +2882,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2A8CB7ACCDBA9BBE34E57FDC /* DailyDeckTests.swift in Sources */,
 				B15C1E3E39CB8EAC55E8BD67 /* VoiceCallFlowTests.swift in Sources */,
 				A1C0FFEE0000000000000B02 /* VoiceCallAudioLevelsTests.swift in Sources */,
 				BF7E56FE3F4B476686A0DCEF /* VoiceCallChatSnapshotTests.swift in Sources */,

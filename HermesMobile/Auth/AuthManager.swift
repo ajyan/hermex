@@ -424,6 +424,7 @@ final class AuthManager {
 
         try? await BotHistoryCache.shared.removeServer(active, activeConnectionID: (try? BotConnectionStore(keychain: keychain).load(server: active))?.id)
         SessionUnreadStore().remove(for: active)
+        DailyDeckStore().remove(for: active)
         await ChatDraftStore.shared.discardBotDrafts(server: active)
         await PushRegistrar.shared?.forget(for: active)
         advanceAfterRemoving(activeServer: active)
@@ -437,6 +438,7 @@ final class AuthManager {
         guard let serverURL = URL(string: account.urlString) else { return }
         try? await BotHistoryCache.shared.removeServer(serverURL, activeConnectionID: (try? BotConnectionStore(keychain: keychain).load(server: serverURL))?.id)
         SessionUnreadStore().remove(for: serverURL)
+        DailyDeckStore().remove(for: serverURL)
         await ChatDraftStore.shared.discardBotDrafts(server: serverURL)
         // A Hermes server has no push pairing until #706, so the relay is never called for one.
         if account.kind == .webui { await PushRegistrar.shared?.forget(for: serverURL) }

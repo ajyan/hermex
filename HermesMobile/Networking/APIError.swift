@@ -129,6 +129,19 @@ enum APIError: LocalizedError {
     }
 }
 
+extension APIError {
+    /// The server answered 404 "Session not found": the session id is gone.
+    var isVanishedSession: Bool {
+        guard case let .http(statusCode, body) = self else { return false }
+        return Self.isVanishedSession(statusCode: statusCode, body: body)
+    }
+
+    var isNotFound: Bool {
+        guard case let .http(statusCode, _) = self else { return false }
+        return statusCode == 404
+    }
+}
+
 private extension APIError {
     struct ErrorPayload: Decodable {
         let error: String?
