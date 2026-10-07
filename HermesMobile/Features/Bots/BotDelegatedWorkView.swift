@@ -76,7 +76,7 @@ import UIKit
                     }
                 }
             } message: {
-                Text("This stops this delegated worker now. Hermex cannot resume it. The parent and sibling workers keep running.")
+                Text("This stops this delegated worker now. Atlas cannot resume it. The parent and sibling workers keep running.")
             }
         }
     }

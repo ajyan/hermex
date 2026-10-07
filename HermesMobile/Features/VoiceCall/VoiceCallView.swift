@@ -397,7 +397,7 @@ struct VoiceCallView: View {
                 .font(.largeTitle)
                 .foregroundStyle(Color.hxWarning)
                 .accessibilityHidden(true)
-            Text("Hermex needs the microphone and speech recognition for calls")
+            Text("Atlas needs the microphone and speech recognition for calls")
                 .font(.headline)
                 .multilineTextAlignment(.center)
             Button("Settings") {

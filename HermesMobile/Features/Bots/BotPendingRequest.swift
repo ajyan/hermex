@@ -325,21 +325,21 @@ struct BotCredentialRequest: Equatable {
     var handling: String {
         switch kind {
         case .sudo:
-            return String(localized: "Sent to this bot's Mac to run this command. Hermex never saves it.")
+            return String(localized: "Sent to this bot's Mac to run this command. Atlas never saves it.")
         case .secret:
             guard let envVar else {
-                return String(localized: "Saved on this bot's Mac. Hermex never saves it.")
+                return String(localized: "Saved on this bot's Mac. Atlas never saves it.")
             }
-            return String(localized: "Saved on this bot's Mac as \(envVar). Hermex never saves it.")
+            return String(localized: "Saved on this bot's Mac as \(envVar). Atlas never saves it.")
         case .vaultUnlock:
             guard let displayName else {
-                return String(localized: "Goes straight to the password manager on this bot's Mac to unlock it for this chat. Hermex never saves it.")
+                return String(localized: "Goes straight to the password manager on this bot's Mac to unlock it for this chat. Atlas never saves it.")
             }
-            return String(localized: "Goes straight to \(displayName) on this bot's Mac to unlock it for this chat. Hermex never saves it.")
+            return String(localized: "Goes straight to \(displayName) on this bot's Mac to unlock it for this chat. Atlas never saves it.")
         case .vaultSaveLogin:
-            return String(localized: "Saved in Hermes's password vault on this bot's Mac, then filled into the page. The model never sees the password, and Hermex never saves it.")
+            return String(localized: "Saved in Hermes's password vault on this bot's Mac, then filled into the page. The model never sees the password, and Atlas never saves it.")
         case .vaultCode:
-            return String(localized: "Typed into the page on this bot's Mac. The model never sees it, and Hermex never saves it.")
+            return String(localized: "Typed into the page on this bot's Mac. The model never sees it, and Atlas never saves it.")
         }
     }
 

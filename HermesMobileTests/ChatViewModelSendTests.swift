@@ -301,7 +301,7 @@ final class ChatViewModelSendTests: XCTestCase {
         XCTAssertEqual(audioSession.activateCount, 1)
         XCTAssertEqual(remoteControlCenter.configureCount, 1)
         XCTAssertEqual(remoteControlCenter.snapshots.last, ListenNowPlayingSnapshot(
-            title: "Hermex response 1",
+            title: "Atlas response 1",
             duration: 83,
             elapsedTime: 0,
             speed: .normal,

@@ -96,7 +96,7 @@ enum PushRelayTestOutcome: Equatable {
     /// fixed thread and collapse ids make it replace the first banner instead of stacking.
     func sendTestNotification(pairing: PushPairing) async -> PushRelayTestOutcome {
         let keys = PushPreviewKeys(installKey: pairing.installKey, previewKey: pairing.previewKey)
-        let preview = PushPreview(title: String(localized: "Hermex test notification"),
+        let preview = PushPreview(title: String(localized: "Atlas test notification"),
                                   body: String(localized: "Push through this server’s relay reached this iPhone."))
         guard let url = try? Self.installURL(pairing: pairing).appending(path: "notify"),
               let sealed = PushPreview.seal(preview, keys: keys),

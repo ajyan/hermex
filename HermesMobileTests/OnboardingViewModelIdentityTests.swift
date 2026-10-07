@@ -543,9 +543,9 @@ final class OnboardingViewModelIdentityTests: XCTestCase {
             ("/auth/password-login", .json(401, .object(["error": .string("invalid_credentials")])),
              "Hermes didn't accept the username or password.", 1),
             ("/api/status", .json(200, oldStatus),
-             "This Hermes host runs 0.20.0. Hermex needs Hermes 0.21.3 or later. Update Hermes on the host, then try again.", 0),
+             "This Hermes host runs 0.20.0. Atlas needs Hermes 0.21.3 or later. Update Hermes on the host, then try again.", 0),
             ("/api/status", .json(200, browserOnly),
-             "This Hermes host only offers sign-in with a browser, which Hermex doesn't support yet. To connect now, add a dashboard username and password on the host.", 0)
+             "This Hermes host only offers sign-in with a browser, which Atlas doesn't support yet. To connect now, add a dashboard username and password on the host.", 0)
         ]
         for (path, reply, copy, logins) in rows {
             HermesHostFixture.reset()

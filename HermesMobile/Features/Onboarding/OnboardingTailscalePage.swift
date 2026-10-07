@@ -16,7 +16,7 @@ struct OnboardingTailscalePage: View {
                 VStack(alignment: .leading, spacing: 14) {
                     tailscaleStep(number: "1", text: String(localized: "Install your network’s app, such as Tailscale or NetBird, from the App Store."))
                     tailscaleStep(number: "2", text: String(localized: "Sign in with the same account you used on your server."))
-                    tailscaleStep(number: "3", text: String(localized: "Keep it connected while using Hermex."))
+                    tailscaleStep(number: "3", text: String(localized: "Keep it connected while using Atlas."))
 
                     Button(action: openTailscaleInAppStore) {
                         Label("Get Tailscale on the App Store", systemImage: "arrow.up.forward.square")
