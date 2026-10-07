@@ -3165,7 +3165,7 @@
 			baseConfigurationReference = 351C0F1600000000000000A1 /* Shared.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				APP_DISPLAY_NAME = Hermex;
+				APP_DISPLAY_NAME = Atlas;
 				APP_URL_SCHEME_SUFFIX = "";
 				APS_ENVIRONMENT = development;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -3233,7 +3233,7 @@
 			baseConfigurationReference = 351C0F1600000000000000A1 /* Shared.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				APP_DISPLAY_NAME = Hermex;
+				APP_DISPLAY_NAME = Atlas;
 				APP_URL_SCHEME_SUFFIX = "";
 				APS_ENVIRONMENT = production;
 				CLANG_ANALYZER_NONNULL = YES;
