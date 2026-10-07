@@ -20,6 +20,7 @@ struct PendingNewChatView: View {
     let profileName: String?
     let projectID: String?
     let startsCall: Bool
+    let callRequest: Int
     let draftStore: ChatDraftStore
     /// True while the shell still has this chat as its root. A push over the root
     /// also fires `onDisappear`; only a replaced root abandons the draft.
@@ -42,6 +43,7 @@ struct PendingNewChatView: View {
         profileName: String? = nil,
         projectID: String? = nil,
         startsCall: Bool = false,
+        callRequest: Int = 0,
         server: URL,
         viewModel: SessionListViewModel,
         onAPIError: @escaping (Error) -> Void,
@@ -60,6 +62,7 @@ struct PendingNewChatView: View {
         self.profileName = profileName
         self.projectID = projectID
         self.startsCall = startsCall
+        self.callRequest = callRequest
         self.draftStore = draftStore ?? .shared
         self.isStillRoot = isStillRoot
         _draftMessage = State(initialValue: initialDraft)
@@ -78,6 +81,7 @@ struct PendingNewChatView: View {
                     loadsInitialMessages: false,
                     autoStartsVoiceInput: autoStartsVoiceInput,
                     startsCall: startsCall,
+                    callRequest: callRequest,
                     draftStore: draftStore,
                     restoresDraftSettings: true,
                     onConversationStarted: markConversationStarted

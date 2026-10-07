@@ -287,6 +287,8 @@ struct ChatView: View {
     let autoStartsVoiceInput: Bool
     /// When true, a voice call starts once the chat appears ("New call", "Call Atlas").
     let startsCall: Bool
+    /// Bumped by the shell's call button to call on this chat.
+    let callRequest: Int
     let draftStore: ChatDraftStore
     /// Store holding the durable app-owned copies of staged attachments.
     let draftAttachmentStore: any ChatDraftAttachmentStoring
@@ -411,6 +413,7 @@ struct ChatView: View {
         loadsInitialMessages: Bool = true,
         autoStartsVoiceInput: Bool = false,
         startsCall: Bool = false,
+        callRequest: Int = 0,
         draftStore: ChatDraftStore? = nil,
         draftAttachmentStore: (any ChatDraftAttachmentStoring)? = nil,
         restoresDraftSettings: Bool = false,
@@ -422,6 +425,7 @@ struct ChatView: View {
         self.loadsInitialMessages = loadsInitialMessages
         self.autoStartsVoiceInput = autoStartsVoiceInput
         self.startsCall = startsCall
+        self.callRequest = callRequest
         self.draftStore = draftStore ?? .shared
         let resolvedDraftAttachmentStore = draftAttachmentStore ?? ChatDraftAttachmentStore.shared
         self.draftAttachmentStore = resolvedDraftAttachmentStore
@@ -954,6 +958,11 @@ struct ChatView: View {
             }
             .onChange(of: isVoiceCallPresented) { _, presented in
                 if presented { dismissKeyboard() }
+            }
+            .onChange(of: callRequest) {
+                guard !isVoiceCallPresented, !viewModel.isViewingCachedData else { return }
+                VoiceCallDiagnostics.write("call opened from the top-bar call button")
+                isVoiceCallPresented = true
             }
             .fullScreenCover(isPresented: $isVoiceCallPresented, onDismiss: {
                 // Call turns don't go through the composer's send path.
