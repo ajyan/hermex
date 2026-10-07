@@ -295,7 +295,8 @@ struct PendingNewChatView: View {
     }
 
     private func requestPendingComposerFocus() {
-        guard !didRequestComposerFocus else { return }
+        // A new chat opened for a call goes straight to the call screen.
+        guard !startsCall, !didRequestComposerFocus else { return }
         didRequestComposerFocus = true
 
         Task { @MainActor in

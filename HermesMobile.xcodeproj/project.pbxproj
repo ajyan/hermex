@@ -16,6 +16,9 @@
 		325135E0239A6B2D29978A89 /* CallSystemBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C1C41E4E055E24D8807B748 /* CallSystemBridge.swift */; };
 		FC52783B970A4E589E5A203F /* AppleSpeechListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82AFE15D0047CB82A7D17117 /* AppleSpeechListener.swift */; };
 		A1C0FFEE0000000000000B01 /* VoiceCallOrb.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE0000000000000F01 /* VoiceCallOrb.swift */; };
+		CA1100CAB0000000000000B3 /* ServerSpeechSpeaker.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA1100CAB0000000000000F3 /* ServerSpeechSpeaker.swift */; };
+		CA1100CAB0000000000000B2 /* VoiceCallLab.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA1100CAB0000000000000F2 /* VoiceCallLab.swift */; };
+		CA1100CAB0000000000000B1 /* VoiceCallCaptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA1100CAB0000000000000F1 /* VoiceCallCaptions.swift */; };
 		954E319A4BD0B8DA7E196FC0 /* AppleSpeechSpeaker.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECBE80F25AABC5C8492E76BD /* AppleSpeechSpeaker.swift */; };
 		6DC4CBC3209EDC8867615D9F /* VoiceSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DECBED9AE462B72459C5DAD /* VoiceSelection.swift */; };
 		9458AB4DE05FB68351DA797B /* VoiceSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F71E01C788925F5B2DC4820E /* VoiceSelectionTests.swift */; };
@@ -690,6 +693,9 @@
 		4C1C41E4E055E24D8807B748 /* CallSystemBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallSystemBridge.swift; sourceTree = "<group>"; };
 		82AFE15D0047CB82A7D17117 /* AppleSpeechListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSpeechListener.swift; sourceTree = "<group>"; };
 		A1C0FFEE0000000000000F01 /* VoiceCallOrb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallOrb.swift; sourceTree = "<group>"; };
+		CA1100CAB0000000000000F3 /* ServerSpeechSpeaker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSpeechSpeaker.swift; sourceTree = "<group>"; };
+		CA1100CAB0000000000000F2 /* VoiceCallLab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallLab.swift; sourceTree = "<group>"; };
+		CA1100CAB0000000000000F1 /* VoiceCallCaptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallCaptions.swift; sourceTree = "<group>"; };
 		ECBE80F25AABC5C8492E76BD /* AppleSpeechSpeaker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSpeechSpeaker.swift; sourceTree = "<group>"; };
 		8DECBED9AE462B72459C5DAD /* VoiceSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceSelection.swift; sourceTree = "<group>"; };
 		F71E01C788925F5B2DC4820E /* VoiceSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceSelectionTests.swift; sourceTree = "<group>"; };
@@ -1356,6 +1362,9 @@
 				4C1C41E4E055E24D8807B748 /* CallSystemBridge.swift */,
 				82AFE15D0047CB82A7D17117 /* AppleSpeechListener.swift */,
 				A1C0FFEE0000000000000F01 /* VoiceCallOrb.swift */,
+				CA1100CAB0000000000000F3 /* ServerSpeechSpeaker.swift */,
+				CA1100CAB0000000000000F2 /* VoiceCallLab.swift */,
+				CA1100CAB0000000000000F1 /* VoiceCallCaptions.swift */,
 				ECBE80F25AABC5C8492E76BD /* AppleSpeechSpeaker.swift */,
 				8DECBED9AE462B72459C5DAD /* VoiceSelection.swift */,
 				A46292D5019E080E8AE8924B /* VoiceCallController.swift */,
@@ -2494,6 +2503,9 @@
 				325135E0239A6B2D29978A89 /* CallSystemBridge.swift in Sources */,
 				FC52783B970A4E589E5A203F /* AppleSpeechListener.swift in Sources */,
 				A1C0FFEE0000000000000B01 /* VoiceCallOrb.swift in Sources */,
+				CA1100CAB0000000000000B3 /* ServerSpeechSpeaker.swift in Sources */,
+				CA1100CAB0000000000000B2 /* VoiceCallLab.swift in Sources */,
+				CA1100CAB0000000000000B1 /* VoiceCallCaptions.swift in Sources */,
 				954E319A4BD0B8DA7E196FC0 /* AppleSpeechSpeaker.swift in Sources */,
 				6DC4CBC3209EDC8867615D9F /* VoiceSelection.swift in Sources */,
 				5F201B95050DF00E83D78791 /* VoiceCallController.swift in Sources */,
