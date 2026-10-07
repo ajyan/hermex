@@ -13,7 +13,7 @@ struct TranscriptMediaImageLightbox: View {
     @State private var viewModel: TranscriptMediaPreviewViewModel
     @State private var exportDocument = ExportedFileDocument(data: Data())
     @State private var exportContentType = UTType.data
-    @State private var exportFilename = String(localized: "Hermes Media")
+    @State private var exportFilename = String(localized: "Atlas Media")
     @State private var isFileExporterPresented = false
     @State private var isExportingMedia = false
     @State private var isSavingToPhotos = false

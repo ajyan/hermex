@@ -307,7 +307,7 @@ private struct TranscriptMediaAudioExportView: View {
     @State private var cachedData: Data?
     @State private var exportDocument = ExportedFileDocument(data: Data())
     @State private var exportContentType = UTType.audio
-    @State private var exportFilename = String(localized: "Hermes Media")
+    @State private var exportFilename = String(localized: "Atlas Media")
     @State private var isFileExporterPresented = false
     @State private var isExporting = false
     @State private var errorMessage: String?
@@ -406,7 +406,7 @@ private struct TranscriptMediaFileExportView: View {
     @State private var cachedData: Data?
     @State private var exportDocument = ExportedFileDocument(data: Data())
     @State private var exportContentType = UTType.data
-    @State private var exportFilename = String(localized: "Hermes Media")
+    @State private var exportFilename = String(localized: "Atlas Media")
     @State private var isFileExporterPresented = false
     @State private var isExporting = false
     @State private var errorMessage: String?
@@ -631,7 +631,7 @@ struct TranscriptMediaPreviewView: View {
     @State private var viewModel: TranscriptMediaPreviewViewModel
     @State private var exportDocument = ExportedFileDocument(data: Data())
     @State private var exportContentType = UTType.data
-    @State private var exportFilename = String(localized: "Hermes Media")
+    @State private var exportFilename = String(localized: "Atlas Media")
     @State private var isFileExporterPresented = false
     @State private var isExportingMedia = false
     @State private var isSavingToPhotos = false

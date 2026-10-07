@@ -380,7 +380,7 @@ enum ChatActiveRunStatusKind: Equatable {
         case .starting:
             return String(localized: "Starting response")
         case .active:
-            return String(localized: "Hermes is working")
+            return String(localized: "Atlas is working")
         case .checking:
             return String(localized: "Checking stream")
         case .reconnecting:
@@ -395,17 +395,17 @@ enum ChatActiveRunStatusKind: Equatable {
     var accessibilityLabel: String {
         switch self {
         case .starting:
-            return String(localized: "Hermes is starting a response")
+            return String(localized: "Atlas is starting a response")
         case .active:
-            return String(localized: "Hermes is working on the response")
+            return String(localized: "Atlas is working on the response")
         case .checking:
-            return String(localized: "Hermes is checking the response stream")
+            return String(localized: "Atlas is checking the response stream")
         case .reconnecting:
-            return String(localized: "Hermes is reconnecting the response stream")
+            return String(localized: "Atlas is reconnecting the response stream")
         case .waitingForNetwork:
-            return String(localized: "Hermes is waiting for the network to return")
+            return String(localized: "Atlas is waiting for the network to return")
         case .stopping:
-            return String(localized: "Hermes is stopping the response")
+            return String(localized: "Atlas is stopping the response")
         }
     }
 }
@@ -423,11 +423,11 @@ struct ChatActiveRunStatusPresentation: Equatable {
         self.startedAt = kind == .active ? startedAt : nil
     }
 
-    /// "Hermes is working · 2m 13s" while `startedAt` is set, else the kind's label.
+    /// "Atlas is working · 2m 13s" while `startedAt` is set, else the kind's label.
     func label(now: Date) -> String {
         guard let startedAt else { return kind.label }
         return String(
-            localized: "Hermes is working · \(ChatWorkingElapsedFormatter.label(startedAt: startedAt, now: now))"
+            localized: "Atlas is working · \(ChatWorkingElapsedFormatter.label(startedAt: startedAt, now: now))"
         )
     }
 
@@ -435,7 +435,7 @@ struct ChatActiveRunStatusPresentation: Equatable {
     func accessibilityLabel(now: Date) -> String {
         guard let startedAt else { return kind.accessibilityLabel }
         return String(
-            localized: "Hermes has been working for \(ChatWorkingElapsedFormatter.spokenLabel(startedAt: startedAt, now: now))"
+            localized: "Atlas has been working for \(ChatWorkingElapsedFormatter.spokenLabel(startedAt: startedAt, now: now))"
         )
     }
 }
@@ -592,7 +592,7 @@ struct ResponseCompletionNotificationRequest: Equatable {
     let sessionID: String?
     let server: URL
     /// The chat title when the alert is scheduled, trimmed the way the Live Activity
-    /// trims it, falling back to "Hermes session".
+    /// trims it, falling back to "Atlas session".
     let title: String
     let outcome: ResponseCompletionOutcome
 

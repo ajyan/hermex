@@ -908,7 +908,7 @@ struct ChatWorkingRowView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(
                 String(
-                    localized: "Hermes has been working for \(ChatWorkingElapsedFormatter.spokenLabel(startedAt: startedAt, now: context.date))"
+                    localized: "Atlas has been working for \(ChatWorkingElapsedFormatter.spokenLabel(startedAt: startedAt, now: context.date))"
                 )
             )
         }

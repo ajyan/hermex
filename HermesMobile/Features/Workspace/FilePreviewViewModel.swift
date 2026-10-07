@@ -182,7 +182,7 @@ final class FilePreviewViewModel {
 
     private var exportFilename: String {
         let lastPathComponent = URL(fileURLWithPath: path).lastPathComponent.trimmingCharacters(in: .whitespacesAndNewlines)
-        return lastPathComponent.isEmpty ? String(localized: "Hermes File") : lastPathComponent
+        return lastPathComponent.isEmpty ? String(localized: "Atlas File") : lastPathComponent
     }
 }
 

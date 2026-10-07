@@ -340,7 +340,7 @@ enum AgentRunActivitySanitizer {
 
     static func sessionTitle(_ rawValue: String) -> String {
         let normalized = normalizedSingleLine(rawValue)
-        return trimmed(normalized.isEmpty ? String(localized: "Hermes session") : normalized, limit: maximumSessionTitleCharacters)
+        return trimmed(normalized.isEmpty ? String(localized: "Atlas session") : normalized, limit: maximumSessionTitleCharacters)
     }
 
     static func activityLine(_ rawValue: String) -> String {

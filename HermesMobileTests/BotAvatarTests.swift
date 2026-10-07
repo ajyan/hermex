@@ -21,7 +21,7 @@ import XCTest
         XCTAssertNil(bare.description)
         XCTAssertFalse(bare.hasAvatar)
         XCTAssertNil(bare.lookRevision)
-        XCTAssertEqual(BotProfile(row("default"))!.name, "Hermes")
+        XCTAssertEqual(BotProfile(row("default"))!.name, "Atlas")
 
         let renamed = BotProfile(row("dev", extra: ["display_name": .string("  Dev Bot "), "description": .string("Ships code")]))!
         XCTAssertEqual(renamed.name, "Dev Bot")
