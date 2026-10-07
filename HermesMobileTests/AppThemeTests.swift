@@ -276,7 +276,7 @@ final class ResponseCompletionNotificationServiceTests: XCTestCase {
         let request = ResponseCompletionNotificationRequest(
             sessionID: "session-abc", server: serverA, title: " \n ", outcome: .completed)
 
-        XCTAssertEqual(request.title, "Hermes session")
+        XCTAssertEqual(request.title, "Atlas session")
         XCTAssertEqual(request.body, "Response complete")
     }
 

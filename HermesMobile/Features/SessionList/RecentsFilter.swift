@@ -27,7 +27,7 @@ enum RecentsFilter: String, CaseIterable, Hashable {
     var title: String {
         switch self {
         case .all: String(localized: "All")
-        case .hermes: String(localized: "Hermes")
+        case .hermes: String(localized: "Atlas")
         case .claudeCode: String(localized: "Claude Code")
         case .cli: String(localized: "CLI")
         case .messaging: String(localized: "Messaging")

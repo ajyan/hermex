@@ -15,7 +15,7 @@ struct FilePreviewView: View {
     @State private var selectableText: SelectableTextPresentation?
     @State private var exportDocument = ExportedFileDocument(data: Data())
     @State private var exportContentType = UTType.data
-    @State private var exportFilename = String(localized: "Hermes File")
+    @State private var exportFilename = String(localized: "Atlas File")
     @State private var isFileExporterPresented = false
     @State private var exportErrorMessage: String?
     @State private var saveConfirmationMessage: String?
