@@ -39,14 +39,14 @@ import XCTest
     /// Settings' test notification seals on the phone (#874); the extension must open it
     /// exactly as it opens the plugin's, and only with this install's keys.
     func testAPhoneSealedPreviewOpensOnlyForItsOwnInstall() throws {
-        let preview = PushPreview(title: "Hermex test notification", body: "Push reached this iPhone.")
+        let preview = PushPreview(title: "Atlas test notification", body: "Push reached this iPhone.")
         let sealed = try XCTUnwrap(PushPreview.seal(preview, keys: keys))
         XCTAssertNotEqual(PushPreview.seal(preview, keys: keys), sealed, "Every seal takes a fresh nonce")
         XCTAssertEqual(PushPreview.open(sealed: sealed, keys: keys), preview)
 
         let content = banner(sealed: sealed)
         PushPreview.rewrite(content, candidates: [keys])
-        XCTAssertEqual(content.title, "Hermex test notification")
+        XCTAssertEqual(content.title, "Atlas test notification")
         XCTAssertEqual(content.body, "Push reached this iPhone.")
 
         let otherInstall = PushPreviewKeys(installKey: String(repeating: "f", count: 64), previewKey: keys.previewKey)
@@ -67,7 +67,7 @@ import XCTest
     func testRewriteLeavesTheBannerContentFreeOnAnyFailure() {
         for content in [banner(sealed: nil), banner(sealed: "AAAA")] {
             PushPreview.rewrite(content, candidates: [keys])
-            XCTAssertEqual(content.title, "Hermex")
+            XCTAssertEqual(content.title, "Atlas")
             XCTAssertEqual(content.subtitle, "")
             XCTAssertEqual(content.body, "New activity")
             XCTAssertNil(PushPayload(userInfo: content.userInfo).profile)
@@ -307,7 +307,7 @@ import XCTest
     /// A banner as the relay's `bannerPush` builds it.
     private func banner(sealed: String?) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
-        content.title = "Hermex"
+        content.title = "Atlas"
         content.body = "New activity"
         content.userInfo = [
             "v": 1, "kind": "reply", "install_hash": installHash, "session_id": "s1",

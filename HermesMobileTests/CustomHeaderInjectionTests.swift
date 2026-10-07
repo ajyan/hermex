@@ -434,7 +434,7 @@ final class CustomHeaderAuthManagerTests: XCTestCase {
 
         XCTAssertEqual(
             manager.lastErrorMessage,
-            "This server signs in with single sign-on, which Hermex doesn't support yet."
+            "This server signs in with single sign-on, which Atlas doesn't support yet."
         )
         XCTAssertNotEqual(manager.lastErrorMessage, AuthManager.passkeyOnlyMessage)
         XCTAssertEqual(manager.state, .unconfigured)

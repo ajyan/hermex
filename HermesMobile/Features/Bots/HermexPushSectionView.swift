@@ -71,7 +71,7 @@ import SwiftUI
             // transaction even if Settings closes before it returns.
             Button("Set up push") { Task { await provisioner.enable() } }
         } message: {
-            Text("If this host is not set up yet, Hermex installs the hermex-push plugin on it and restarts its gateway, interrupting work running there. A host that is already set up is only paired. Nothing happens until you tap this.")
+            Text("If this host is not set up yet, Atlas installs the hermex-push plugin on it and restarts its gateway, interrupting work running there. A host that is already set up is only paired. Nothing happens until you tap this.")
         }
         .confirmationDialog("Turn off notifications for this server?", isPresented: $isConfirmingDisable, titleVisibility: .visible) {
             Button("Turn off notifications", role: .destructive) { Task { await provisioner.disable() } }
@@ -91,7 +91,7 @@ import SwiftUI
             // Like the update, the run outlives the screen: the host has already been asked to restart.
             Button("Restart", role: .destructive) { Task { await provisioner.restartHermes() } }
         } message: {
-            Text("Bot turns running on this host stop. Hermex reconnects when Hermes is back.")
+            Text("Bot turns running on this host stop. Atlas reconnects when Hermes is back.")
         }
     }
 
@@ -128,7 +128,7 @@ import SwiftUI
                 .disabled(provisioner.isWorking)
                 .frame(minHeight: 44)
             if provisioner.notificationsOff {
-                notificationsOffRow(title: nil, message: String(localized: "Notifications are off for Hermex, so this server’s notifications can’t show on this iPhone."))
+                notificationsOffRow(title: nil, message: String(localized: "Notifications are off for Atlas, so this server’s notifications can’t show on this iPhone."))
             }
         } else if provisioner.connection != nil {
             Button(provisioner.isWorking ? String(localized: "Setting up…") : String(localized: "Turn on notifications…")) {
@@ -137,13 +137,13 @@ import SwiftUI
             .disabled(provisioner.isWorking)
             .frame(minHeight: 44)
             if provisioner.notificationsOff {
-                notificationsOffRow(title: String(localized: "Notifications are off for Hermex"),
-                                    message: String(localized: "Allow notifications for Hermex in iOS Settings, then turn this on again."))
+                notificationsOffRow(title: String(localized: "Notifications are off for Atlas"),
+                                    message: String(localized: "Allow notifications for Atlas in iOS Settings, then turn this on again."))
             }
             if provisioner.showsSteps {
                 ForEach(HermexPushProvisioner.Step.allCases) { step in stepRow(step) }
             }
-            Text("Hermex sets this Hermes host up for push and pairs this iPhone with its relay. Your host encrypts every notification’s text: the relay only ever sees ciphertext.")
+            Text("Atlas sets this Hermes host up for push and pairs this iPhone with its relay. Your host encrypts every notification’s text: the relay only ever sees ciphertext.")
                 .font(AppFont.caption()).foregroundStyle(.secondary)
         }
         // Also available after pairing, so an expired sign-in can be repaired
@@ -270,7 +270,7 @@ import SwiftUI
                     action: String(localized: "Restart Hermes…")) { isConfirmingRestart = true }
         case .status(.restartNeeded):
             callout("arrow.clockwise.circle.fill", tint: .hxWarning, title: Text("Restart Hermes to finish"),
-                    message: Text("The new plugin is installed, but Hermes loads plugins only when it starts. Restart `hermes dashboard` on your host, then check again. Hermex can’t restart it from this iPhone."),
+                    message: Text("The new plugin is installed, but Hermes loads plugins only when it starts. Restart `hermes dashboard` on your host, then check again. Atlas can’t restart it from this iPhone."),
                     action: provisioner.phase == .checkingPlugin ? String(localized: "Checking…") : String(localized: "Check again")) {
                 Task { await provisioner.checkPluginAgain() }
             }

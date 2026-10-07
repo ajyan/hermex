@@ -362,9 +362,9 @@ import XCTest
             // A proxy's 401 page: not the webui's JSON object.
             ((401, .null), "Something in front of Hermes, such as Cloudflare Access, wants its own sign-in first. Add its service token under Connection Headers in the Hermes connection, or use an address that skips it, such as the dashboard's local network address."),
             ((200, .object(["auth_required": .bool(true), "auth_providers": .array([.string("nous")])])),
-             "This Hermes host only offers sign-in with a browser, which Hermex doesn't support yet. To connect now, add a dashboard username and password on the host."),
+             "This Hermes host only offers sign-in with a browser, which Atlas doesn't support yet. To connect now, add a dashboard username and password on the host."),
             ((200, .object(["auth_required": .bool(true), "auth_providers": .array([.string("basic")]), "version": .string("0.21.2")])),
-             "This Hermes host runs 0.21.2. Hermex needs Hermes 0.21.3 or later. Update Hermes on the host, then try again.")
+             "This Hermes host runs 0.21.2. Atlas needs Hermes 0.21.3 or later. Update Hermes on the host, then try again.")
         ]
         for (status, message) in rows {
             PushHTTPFixture.reset()
@@ -379,8 +379,8 @@ import XCTest
     func testEachFailureNamesWhatAnsweredIt() {
         let unusable = HermexPushFailure.unusablePairing.errorDescription
         let cases: [(any Error, String?)] = [
-            (PushRegistrarError.permissionDenied, "Allow notifications for Hermex in iOS Settings, then turn this on again."),
-            (PushRegistrarError.unsupportedBuild, "This build of Hermex can’t receive push notifications."),
+            (PushRegistrarError.permissionDenied, "Allow notifications for Atlas in iOS Settings, then turn this on again."),
+            (PushRegistrarError.unsupportedBuild, "This build of Atlas can’t receive push notifications."),
             (PushRegistrarError.tokenUnavailable, "iOS gave no notification token. Check this iPhone’s internet connection, then try again."),
             (PushRegistrarError.malformedPairing, unusable),
             (PushRegistrarError.pairingChanged, "This step did not finish. Try again."),
@@ -596,7 +596,7 @@ import XCTest
             (.rejected(statusCode: 429, result: nil),
              "The relay’s hosting refused the request (HTTP 429). The relay may be over its daily limit or switched off."),
             (.rejected(statusCode: 400, result: "invalid_request"), "The relay couldn’t deliver (HTTP 400)."),
-            (.unusablePairing, "This Hermes host returned pairing keys Hermex cannot use. Update the hermex-push plugin.")
+            (.unusablePairing, "This Hermes host returned pairing keys Atlas cannot use. Update the hermex-push plugin.")
         ]
         for (outcome, message) in cases {
             let provisioner = makeProvisioner(server: serverA, registrar: registrar, testSender: { _ in outcome })
@@ -903,7 +903,7 @@ import XCTest
         await provisioner.enable()
         XCTAssertEqual(provisioner.failure, HermexPushProvisioner.Failure(
             title: HermexPushProvisioner.Step.pair.title,
-            message: "This Hermes host returned pairing keys Hermex cannot use. Update the hermex-push plugin.",
+            message: "This Hermes host returned pairing keys Atlas cannot use. Update the hermex-push plugin.",
             remedy: .updatePlugin))
 
         await provisioner.updatePlugin()

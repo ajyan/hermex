@@ -1081,7 +1081,7 @@ enum KanbanContractViolation: Error, Equatable, LocalizedError, Sendable {
     case missingCardStatus
 
     var errorDescription: String? {
-        String(localized: "This server's Kanban response is incompatible with Hermex.")
+        String(localized: "This server's Kanban response is incompatible with Atlas.")
     }
 }
 
@@ -1089,7 +1089,7 @@ enum KanbanResponseError: Error, Equatable, LocalizedError, Sendable {
     case nonJSONContentType
 
     var errorDescription: String? {
-        String(localized: "This server's Kanban response is incompatible with Hermex.")
+        String(localized: "This server's Kanban response is incompatible with Atlas.")
     }
 }
 

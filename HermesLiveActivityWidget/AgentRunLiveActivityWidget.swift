@@ -148,7 +148,7 @@ private struct AgentRunLockScreenView: View {
                                 isStale: context.presentedState.isStale, size: 34)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(isBot ? "Hermex · \(String(localized: "Bot"))" : "Hermex")
+                Text(isBot ? "Atlas · \(String(localized: "Bot"))" : "Atlas")
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(AgentRunLiveActivityTheme.secondaryText)
                     .textCase(.uppercase)
@@ -287,7 +287,7 @@ private struct AgentRunIslandBadge: View {
     var body: some View {
         HStack(spacing: 6) {
             AgentRunLeadingMark(bot: bot, status: status, isStale: false)
-            Text(bot == nil ? "Hermex" : title)
+            Text(bot == nil ? "Atlas" : title)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(AgentRunLiveActivityTheme.primaryText)
                 .lineLimit(1)

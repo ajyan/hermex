@@ -673,9 +673,9 @@ import UserNotifications
         case let failure as PushRegistrarError:
             switch failure {
             case .permissionDenied:
-                return String(localized: "Allow notifications for Hermex in iOS Settings, then turn this on again.")
+                return String(localized: "Allow notifications for Atlas in iOS Settings, then turn this on again.")
             case .unsupportedBuild:
-                return String(localized: "This build of Hermex can’t receive push notifications.")
+                return String(localized: "This build of Atlas can’t receive push notifications.")
             case .tokenUnavailable:
                 return String(localized: "iOS gave no notification token. Check this iPhone’s internet connection, then try again.")
             case .malformedPairing:

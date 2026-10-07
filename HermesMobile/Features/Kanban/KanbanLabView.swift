@@ -189,7 +189,7 @@ struct KanbanStatusFocusView: View {
                 )
             case .incompatibleContract:
                 unavailableContent(
-                    title: String(localized: "This server's Kanban response is incompatible with Hermex."),
+                    title: String(localized: "This server's Kanban response is incompatible with Atlas."),
                     detail: String(localized: "No Kanban changes were made."),
                     systemImage: "exclamationmark.triangle"
                 )
@@ -491,7 +491,7 @@ struct KanbanStatusFocusView: View {
             }
 
             if dispatch.phase == .outcomeUncertain {
-                Text("Hermex refreshed the Board, but cannot prove whether workers started. Review the current Board before running Dispatcher again.")
+                Text("Atlas refreshed the Board, but cannot prove whether workers started. Review the current Board before running Dispatcher again.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 if dispatch.canAcknowledgeUncertainOutcome {
@@ -507,7 +507,7 @@ struct KanbanStatusFocusView: View {
                 .font(.footnote.weight(.semibold))
                 .frame(minHeight: 44)
             } else if dispatch.phase == .refused {
-                Text("The server refused this Dispatcher request. Hermex did not retry it.")
+                Text("The server refused this Dispatcher request. Atlas did not retry it.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             } else if dispatch.phase == .boardUnavailable {
@@ -1519,7 +1519,7 @@ private struct KanbanBoardManagementView: View {
                     boardRow(board)
                 }
             } footer: {
-                Text("Browsing a Board stays local to Hermex. Making a Board active changes shared server state.")
+                Text("Browsing a Board stays local to Atlas. Making a Board active changes shared server state.")
             }
         }
         .navigationTitle("Manage")
@@ -1558,7 +1558,7 @@ private struct KanbanBoardManagementView: View {
                 Task { await model.archiveBoard(slug: board.slug ?? "") }
             }
         } message: { _ in
-            Text("Hermex cannot restore an archived Board in-app.")
+            Text("Atlas cannot restore an archived Board in-app.")
         }
         .alert(
             "Make Active Board",
@@ -1617,7 +1617,7 @@ private struct KanbanBoardManagementView: View {
                 )
             )
             .accessibilityHint(
-                Text("Browsing a Board stays local to Hermex. Making a Board active changes shared server state.")
+                Text("Browsing a Board stays local to Atlas. Making a Board active changes shared server state.")
             )
         } else {
             boardRowContent(board, presentation: presentation)

@@ -381,7 +381,7 @@ struct HermesHeaders: Sendable {
             case .reserved(let name):
                 // First-strong isolates keep the name in one left-to-right run in right-to-left text.
                 let shown = "\u{2068}\(name)\u{2069}"
-                return String(localized: "\(shown) is reserved for Hermex and Hermes, so it can't be a connection header. Remove this header to connect.")
+                return String(localized: "\(shown) is reserved for Atlas and Hermes, so it can't be a connection header. Remove this header to connect.")
             case .malformed(let name):
                 let shown = "\u{2068}\(name)\u{2069}"
                 return String(localized: "\(shown) isn't a valid header: names can't contain spaces or colons, and values must fit on one line. Fix or remove it to connect.")

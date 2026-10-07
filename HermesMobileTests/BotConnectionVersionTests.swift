@@ -404,7 +404,7 @@ final class BotConnectionVersionTests: XCTestCase {
             (CustomHeader(name: "Authorization", value: "Bearer abc"),
              "Hermes reads Authorization: Bearer as its own sign-in and refuses it. Remove this header to connect."),
             (CustomHeader(name: "Cookie", value: "hermes_session=x"),
-             "\u{2068}Cookie\u{2069} is reserved for Hermex and Hermes, so it can't be a connection header. Remove this header to connect."),
+             "\u{2068}Cookie\u{2069} is reserved for Atlas and Hermes, so it can't be a connection header. Remove this header to connect."),
             (CustomHeader(name: "Bad Name", value: "x"),
              "\u{2068}Bad Name\u{2069} isn't a valid header: names can't contain spaces or colons, and values must fit on one line. Fix or remove it to connect.")
         ]
@@ -578,9 +578,9 @@ final class BotConnectionAdviceTests: XCTestCase {
             (BotFailure.rejected(530), tunnel),
             (BotFailure.rejected(401), "Hermes didn't accept the username or password."),
             (BotFailure.blocked, "Something in front of Hermes, such as Cloudflare Access, wants its own sign-in first. Add its service token under Connection Headers in the Hermes connection, or use an address that skips it, such as the dashboard's local network address."),
-            (BotFailure.browserSignIn, "This Hermes host only offers sign-in with a browser, which Hermex doesn't support yet. To connect now, add a dashboard username and password on the host."),
+            (BotFailure.browserSignIn, "This Hermes host only offers sign-in with a browser, which Atlas doesn't support yet. To connect now, add a dashboard username and password on the host."),
             (BotFailure.upgradeRefused(403), "Hermes accepted the sign-in, but the live connection was refused. If a proxy or tunnel sits in front of Hermes, turn on WebSocket support and let the Sec-WebSocket-Protocol header through."),
-            (BotFailure.outdated("0.21.2"), "This Hermes host runs 0.21.2. Hermex needs Hermes 0.21.3 or later. Update Hermes on the host, then try again."),
+            (BotFailure.outdated("0.21.2"), "This Hermes host runs 0.21.2. Atlas needs Hermes 0.21.3 or later. Update Hermes on the host, then try again."),
             (URLError(.networkConnectionLost), "Couldn't reach hermes.example. Check the address and network.")
         ]
         for (error, expected) in rows {

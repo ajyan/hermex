@@ -553,16 +553,16 @@ struct SettingsView: View {
                     if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
                         Link(destination: settingsURL) {
                             SettingsAccessoryRow(
-                                title: String(localized: "Open Hermex Settings"),
+                                title: String(localized: "Open Atlas Settings"),
                                 systemImage: "gearshape",
                                 accessorySystemImage: "arrow.up.forward"
                             )
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Open Hermex Settings")
+                        .accessibilityLabel("Open Atlas Settings")
                     }
 
-                    SettingsFootnote(String(localized: "Run Hermex actions like New Chat from Siri, Spotlight, the Lock Screen, or the iPhone Action button. Open Hermex Settings to manage its Siri & Search options. To assign an action to the Action button, open the iOS Settings app, choose Action Button, then Shortcut, and pick a Hermex action."))
+                    SettingsFootnote(String(localized: "Run Atlas actions like New Chat from Siri, Spotlight, the Lock Screen, or the iPhone Action button. Open Atlas Settings to manage its Siri & Search options. To assign an action to the Action button, open the iOS Settings app, choose Action Button, then Shortcut, and pick a Atlas action."))
                 }
 
                 serversCard
@@ -706,13 +706,13 @@ struct SettingsView: View {
 
                     Link(destination: AppConfig.writeReviewURL) {
                         SettingsAccessoryRow(
-                            title: String(localized: "Rate Hermex"),
+                            title: String(localized: "Rate Atlas"),
                             systemImage: "star",
                             accessorySystemImage: "arrow.up.forward"
                         )
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Rate Hermex, opens the App Store")
+                    .accessibilityLabel("Rate Atlas, opens the App Store")
 
                     SettingsDivider()
 
@@ -2172,7 +2172,7 @@ private struct AppLockSettingsRow: View {
         }
 
         SettingsFootnote(capability.hasPasscode
-            ? String(localized: "Locks Hermex when it opens and after a minute away. Notifications, Live Activities and the share sheet still show their content.")
+            ? String(localized: "Locks Atlas when it opens and after a minute away. Notifications, Live Activities and the share sheet still show their content.")
             : String(localized: "Set a passcode in iOS Settings to use this."))
     }
 
