@@ -71,6 +71,8 @@ struct ChatShellView: View {
 
     @Environment(\.scenePhase) private var scenePhase
     @State private var wasBackgrounded = false
+    /// Bumped by the top-bar call button; the chat on screen starts a call when it changes.
+    @State private var callRequest = 0
     @State private var foregroundRefresh = SessionListForegroundRefresh()
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -490,6 +492,7 @@ struct ChatShellView: View {
                 session: session,
                 server: server,
                 onAPIError: authManager.handleAPIError,
+                callRequest: callRequest,
                 draftStore: draftStore
             )
             .id(session.id)
@@ -501,6 +504,7 @@ struct ChatShellView: View {
                 profileName: route.profileName,
                 projectID: route.projectID,
                 startsCall: route.startsCall,
+                callRequest: callRequest,
                 server: server,
                 viewModel: viewModel,
                 onAPIError: authManager.handleAPIError,
@@ -533,15 +537,16 @@ struct ChatShellView: View {
                 .disabled(viewModel.isViewingCachedData)
                 .accessibilityLabel("Call Atlas")
             } else {
-                Button(action: openNewChat) {
-                    Image(systemName: "square.and.pencil")
+                // In a conversation, call on it; New Chat stays in the drawer and on long press.
+                Button { callRequest += 1 } label: {
+                    Image(systemName: "phone")
                 }
-                .disabled(viewModel.isViewingCachedData || navigation.isCreatingNewChat)
-                .accessibilityLabel("New chat")
-                // Long press: the voice-call entry that used to live on the floating Chat button.
+                .disabled(viewModel.isViewingCachedData)
+                .accessibilityLabel("Call Atlas")
                 .contextMenu {
+                    Button("Call Atlas", systemImage: "phone") { callRequest += 1 }
                     Button("New Chat", systemImage: "square.and.pencil", action: openNewChat)
-                    Button("New Call", systemImage: "phone", action: openNewCall)
+                    Button("New Call", systemImage: "phone.badge.plus", action: openNewCall)
                 }
             }
         }

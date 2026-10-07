@@ -12,8 +12,8 @@ struct VoiceCallCaptions: View {
     let isReplying: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// Four lines of the caption font.
-    @ScaledMetric(relativeTo: .title2) private var bodyHeight: CGFloat = 120
+    /// Seven lines of the caption font.
+    @ScaledMetric(relativeTo: .title2) private var bodyHeight: CGFloat = 205
     @ScaledMetric(relativeTo: .title3) private var fadeHeight: CGFloat = 32
 
     struct Content: Equatable {
