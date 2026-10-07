@@ -3,20 +3,40 @@ import AVKit
 import SwiftUI
 
 /// Debug builds append call events to Documents/voice-call.log for on-device diagnosis.
+/// Each line carries the wall time, seconds since the call began, and the audio route.
 enum VoiceCallDiagnostics {
+    #if DEBUG
+    private static let queue = DispatchQueue(label: "voice-call.log", qos: .utility)
+    nonisolated(unsafe) private static var callStart = ProcessInfo.processInfo.systemUptime
+    #endif
+
+    /// Starts a call's section of the log; later lines are timed from here.
+    @MainActor static func beginCall() {
+        #if DEBUG
+        callStart = ProcessInfo.processInfo.systemUptime
+        let device = UIDevice.current
+        write("===== call begin: \(device.model) iOS \(device.systemVersion)")
+        #endif
+    }
+
     static func write(_ line: String) {
         #if DEBUG
-        let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("voice-call.log")
-        let route = AVAudioSession.sharedInstance().currentRoute.outputs.map(\.portType.rawValue).joined(separator: ",")
-        let stamp = Date().formatted(.iso8601.time(includingFractionalSeconds: true))
-        let data = Data("\(stamp) [\(route)] \(line)\n".utf8)
-        if let handle = try? FileHandle(forWritingTo: url) {
-            handle.seekToEndOfFile()
-            handle.write(data)
-            try? handle.close()
-        } else {
-            try? data.write(to: url)
+        let elapsed = ProcessInfo.processInfo.systemUptime - callStart
+        let date = Date()
+        queue.async {
+            let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("voice-call.log")
+            let route = AVAudioSession.sharedInstance().currentRoute.outputs.map(\.portType.rawValue)
+                .joined(separator: ",")
+            let stamp = date.formatted(.iso8601.time(includingFractionalSeconds: true))
+            let data = Data(String(format: "%@ +%7.3f [%@] %@\n", stamp, elapsed, route, line).utf8)
+            if let handle = try? FileHandle(forWritingTo: url) {
+                handle.seekToEndOfFile()
+                handle.write(data)
+                try? handle.close()
+            } else {
+                try? data.write(to: url)
+            }
         }
         #endif
     }
@@ -77,6 +97,9 @@ struct VoiceCallView: View {
     @State private var levels = VoiceCallAudioLevels()
     /// When the call first started listening, for the call timer.
     @State private var connectedAt: Date?
+    @AppStorage(VoiceCallSettings.usesServerVoiceKey) private var usesServerVoice = false
+    /// The orb's slot in screen coordinates; the full-screen orb is centered on it.
+    @State private var orbSlot: CGRect = .zero
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -89,7 +112,6 @@ struct VoiceCallView: View {
                 Spacer(minLength: 12)
                 orb
                 Spacer(minLength: 12)
-                captions
                 controls
             }
             .padding(.horizontal, 24)
@@ -115,6 +137,13 @@ struct VoiceCallView: View {
         // A call is an immersive, dark surface in either appearance, like the Phone app.
         .preferredColorScheme(.dark)
         .task { await startCall() }
+        // However the screen goes away, its system call goes with it; a call left
+        // live blocks the next one from connecting.
+        .onDisappear {
+            guard let controller, !controller.isFinished else { return }
+            VoiceCallDiagnostics.write("call screen closed without hanging up; ending the call")
+            controller.end()
+        }
         .onChange(of: snapshot) { _, snapshot in
             controller?.chatDidUpdate(
                 streamingText: snapshot.streamingText,
@@ -154,9 +183,10 @@ struct VoiceCallView: View {
             startMessage = String(localized: "Reconnect to the server to send a message.")
             return
         }
+        VoiceCallDiagnostics.beginCall()
         let controller = VoiceCallController(
-            listener: AppleSpeechListener(levels: levels),
-            speaker: AppleSpeechSpeaker(levels: levels),
+            listener: AppleSpeechListener(levels: levels, log: VoiceCallDiagnostics.write),
+            speaker: makeSpeaker(),
             chat: chat,
             bridge: CallSystemBridge(),
             log: VoiceCallDiagnostics.write
@@ -174,6 +204,19 @@ struct VoiceCallView: View {
         }
     }
 
+    private func makeSpeaker() -> SpeechSpeaking {
+        let apple = AppleSpeechSpeaker(levels: levels, log: VoiceCallDiagnostics.write)
+        guard usesServerVoice else { return apple }
+        VoiceCallDiagnostics.write("speaker: server voice (openai engine)")
+        let client = chat.client
+        return ServerSpeechSpeaker(
+            synthesize: { text in try await client.synthesizeSpeech(text: text, voice: nil, engine: .openai) },
+            fallback: apple,
+            levels: levels,
+            log: VoiceCallDiagnostics.write
+        )
+    }
+
     // MARK: - Pieces
 
     private var state: VoiceCallState { controller?.state ?? .idle }
@@ -189,34 +232,19 @@ struct VoiceCallView: View {
         }
     }
 
-    /// Near-black with a wash of the current speaker's color from the top.
+    /// Near-black under the breathing glow, which carries the speaker's color.
     private var background: some View {
         ZStack {
-            Color.black
-            RadialGradient(
-                colors: [moodTint.opacity(0.32), .clear],
-                center: .init(x: 0.5, y: 0.38),
-                startRadius: 0,
-                endRadius: 520
-            )
+            Color(red: 0.02, green: 0.024, blue: 0.04)
+            VoiceCallOrb(levels: levels, mood: mood, focus: orbSlot)
         }
         .ignoresSafeArea()
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.8), value: mood)
-    }
-
-    private var moodTint: Color {
-        switch mood {
-        case .listening: Color(red: 0.2, green: 0.55, blue: 1.0)
-        case .thinking, .speaking: Color(red: 0.6, green: 0.3, blue: 0.95)
-        case .attention: Color(red: 1.0, green: 0.6, blue: 0.2)
-        case .connecting, .quiet: Color(red: 0.4, green: 0.45, blue: 0.55)
-        }
     }
 
     private var header: some View {
         VStack(spacing: 6) {
             Text(verbatim: CallSystemBridge.handle)
-                .font(.largeTitle.weight(.semibold))
+                .font(.headline.weight(.medium))
             HStack(spacing: 6) {
                 Text(stateLabel)
                 if let connectedAt, !isEnded {
@@ -225,7 +253,7 @@ struct VoiceCallView: View {
                         .monospacedDigit()
                 }
             }
-            .font(.subheadline)
+            .font(.footnote)
             .foregroundStyle(.secondary)
             if let tool = controller?.currentTool {
                 Label(tool, systemImage: "wrench.and.screwdriver")
@@ -250,12 +278,20 @@ struct VoiceCallView: View {
             Button {
                 controller?.performTapAction()
             } label: {
-                VoiceCallOrb(levels: levels, mood: mood)
+                // The orb itself is drawn full screen behind everything, centered here.
+                Color.clear
                     .aspectRatio(1, contentMode: .fit)
-                    .frame(maxWidth: 340, maxHeight: 340)
+                    .frame(maxWidth: 380, maxHeight: 380)
                     .contentShape(Circle().scale(0.7))
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { orbSlot = $0 }
             }
             .buttonStyle(.plain)
+            // Captions ride over the orb; taps go through to it.
+            .overlay {
+                captions
+                    .padding(.horizontal, 12)
+                    .allowsHitTesting(false)
+            }
             .disabled(action == nil)
             .accessibilityLabel(tapHint ?? "")
             .accessibilityHidden(action == nil)
@@ -277,55 +313,20 @@ struct VoiceCallView: View {
         }
     }
 
-    /// Live captions for whoever is talking: the user's words while listening,
-    /// Atlas's latest sentences while it answers, with the user's turn above.
     private var captions: some View {
-        let live = controller?.partialTranscript ?? ""
-        let sent = controller?.lastSentTurn
-        let reply = atlasCaption
-        return VStack(spacing: 10) {
-            if let reply {
-                if let sent {
-                    Text(sent)
-                        .font(.subheadline)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                        .truncationMode(.head)
-                }
-                Text(reply)
-                    .font(.title3.weight(.medium))
-                    .foregroundStyle(.primary)
-                    .lineLimit(4)
-                    .truncationMode(.head)
-            } else if !live.isEmpty {
-                Text(live)
-                    .font(.title3.weight(.medium))
-                    .foregroundStyle(.primary)
-                    .lineLimit(4)
-                    .truncationMode(.head)
-            } else if let sent {
-                Text(sent)
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(3)
-                    .truncationMode(.head)
-            }
-        }
-        .multilineTextAlignment(.center)
-        .frame(maxWidth: .infinity, minHeight: 132, alignment: .bottom)
-        .padding(.bottom, 28)
+        VoiceCallCaptions(
+            sent: controller?.lastSentTurn,
+            live: controller?.partialTranscript ?? "",
+            reply: replyCaption,
+            isReplying: [.thinking, .speaking, .reconnecting].contains(state)
+        )
     }
 
-    /// The tail of what Atlas is saying, as it would be spoken (no markdown).
-    private var atlasCaption: String? {
-        switch state {
-        case .thinking, .speaking, .reconnecting: break
-        default: return nil
-        }
+    /// Atlas's reply to the latest turn, as it would be spoken (no markdown).
+    private var replyCaption: String? {
         guard let text = snapshot.streamingText else { return nil }
         let sentences = SpeechTextShaper.sentences(in: text, final: true)
-        guard !sentences.isEmpty else { return nil }
-        return sentences.suffix(3).joined(separator: " ")
+        return sentences.isEmpty ? nil : sentences.joined(separator: " ")
     }
 
     private var controls: some View {
@@ -417,24 +418,20 @@ private struct CallControl<Content: View>: View {
     var tint: Color?
     @ViewBuilder let content: Content
 
+    /// The title is for VoiceOver; the round buttons speak for themselves on screen.
     var body: some View {
-        VStack(spacing: 8) {
-            button
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-        }
-        .frame(minWidth: 80)
+        button
+            .accessibilityLabel(title)
+            .frame(minWidth: 60)
     }
 
     /// Solid when it carries meaning (End, or a control that's on), glass otherwise.
     @ViewBuilder
     private var button: some View {
         let face = content
-            .font(.title2)
+            .font(.title3)
             .foregroundStyle(isOn ? Color.black : Color.white)
-            .frame(width: 72, height: 72)
+            .frame(width: 60, height: 60)
         if let solid = tint ?? (isOn ? Color.white : nil) {
             face.background(solid, in: Circle())
         } else {

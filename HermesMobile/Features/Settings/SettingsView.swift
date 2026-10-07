@@ -111,6 +111,7 @@ struct SettingsView: View {
     @AppStorage(PrimaryActionTintSettings.isEnabledKey) private var tintsPrimaryActions = false
     @AppStorage(SessionIdentitySettings.displayNameKey) private var identityDisplayName = ""
     @AppStorage(SessionIdentitySettings.initialsKey) private var identityInitials = ""
+    @AppStorage(VoiceCallSettings.usesServerVoiceKey) private var usesServerVoiceForCalls = false
     @AppStorage(SectionVisibilitySettings.tasksKey) private var showsTasksSection = true
     @AppStorage(SectionVisibilitySettings.kanbanKey) private var showsKanbanSection = true
     @AppStorage(SectionVisibilitySettings.skillsKey) private var showsSkillsSection = true
@@ -206,6 +207,18 @@ struct SettingsView: View {
                     }
 
                     SettingsDivider()
+
+                    if !isHermesServer {
+                        SettingsToggleRow(
+                            title: String(localized: "Server Voice for Calls"),
+                            systemImage: "person.wave.2",
+                            isOn: $usesServerVoiceForCalls
+                        )
+
+                        SettingsFootnote(String(localized: "Calls speak with your server's OpenAI-compatible voice, such as a local Kokoro server. If it can't be reached, the call switches to the on-device voice."))
+
+                        SettingsDivider()
+                    }
 
                     // Push on a Hermes server waits for #706.
                     if !isHermesServer {

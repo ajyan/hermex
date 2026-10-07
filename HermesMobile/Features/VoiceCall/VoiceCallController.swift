@@ -49,7 +49,7 @@ final class VoiceCallController {
         }
     }
     private(set) var partialTranscript = ""
-    /// What the user last said, kept on screen until they speak again.
+    /// What the user last said, kept on screen until their next words are recognized.
     private(set) var lastSentTurn: String?
     private(set) var currentTool: String?
     private(set) var isMuted = false
@@ -102,6 +102,10 @@ final class VoiceCallController {
     @ObservationIgnored private var lastIsStreaming = false
     @ObservationIgnored private var thinkingSince: TimeInterval?
     @ObservationIgnored private var cueOn = false
+    /// When the current turn was sent, so the log can time the reply against it.
+    @ObservationIgnored private var sentAt: TimeInterval?
+    /// When `tick` last ran; a long gap means the main thread stalled.
+    @ObservationIgnored private var lastTickAt: TimeInterval?
 
     // Approval
     @ObservationIgnored private var pendingApproval: ApprovalPromptState?
@@ -149,11 +153,14 @@ final class VoiceCallController {
         startTicker()
         do {
             try await bridge.startCall()
+            log("system call connected \(since(connectingSince))")
             guard state == .connecting else { return }
             try await listener.start()
+            log("listener started \(since(connectingSince))")
             guard state == .connecting else { return }
             state = .listening
         } catch {
+            log("start failed: \(error)")
             if startError == nil { startError = error as? VoiceCallStartError }
             tearDown(endSystemCall: true, message: nil)
         }
@@ -248,12 +255,22 @@ final class VoiceCallController {
     /// Time-based transitions: the thinking cue, the approval timeout, and giving up on a reconnect.
     func tick() {
         let time = now()
+        // Only the live ticker's gaps mean anything; tests drive `tick` by hand.
+        if tickInterval != nil, let lastTickAt, time - lastTickAt > 0.75 {
+            log(String(format: "main thread stalled: %.2fs between ticks", time - lastTickAt))
+        }
+        lastTickAt = time
         switch state {
         case .listening:
             if let awaitingFinalSince, time - awaitingFinalSince >= VoiceCallTiming.finalTranscriptWait {
+                log("final transcript never came; sending the partial")
                 submitTurn()
             } else if !isMuted, !isHeld {
-                if awaitingFinalSince == nil, !turnDetector.isInTurn, !partialTranscript.isEmpty,
+                if awaitingFinalSince == nil, partial.isEmpty, !finals.isEmpty, let transcriptChangedAt,
+                   time - transcriptChangedAt >= VoiceCallTiming.finalTranscriptSettle {
+                    log("turn ended by settled final transcript")
+                    submitTurn()
+                } else if awaitingFinalSince == nil, !turnDetector.isInTurn, !partialTranscript.isEmpty,
                    let transcriptChangedAt, time - transcriptChangedAt >= VoiceCallTiming.transcriptStallEnd {
                     log("turn ended by transcript stall")
                     submitTurn()
@@ -293,9 +310,14 @@ final class VoiceCallController {
     private func handlePartial(_ text: String) {
         if checkTalkOver(text) { return }
         guard isHearing, !discardFinals else { return }
+        if partialTranscript.isEmpty {
+            let afterSpeech = turnStartedAt.map { String(format: " (%.2fs after speech started)", now() - $0) } ?? ""
+            log("first words: \"\(text)\"\(afterSpeech)")
+        }
         partial = text
         transcriptChangedAt = now()
         publishTranscript()
+        if !partialTranscript.isEmpty { lastSentTurn = nil }
         decideApprovalIfReady()
     }
 
@@ -303,10 +325,12 @@ final class VoiceCallController {
         if checkTalkOver(text) { return }
         guard isHearing, !discardFinals else { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        log("final: \"\(trimmed)\"\(awaitingFinalSince.map { String(format: " (%.2fs after end of turn)", now() - $0) } ?? "")")
         if !trimmed.isEmpty { finals.append(trimmed) }
         partial = ""
         transcriptChangedAt = now()
         publishTranscript()
+        if !partialTranscript.isEmpty { lastSentTurn = nil }
         decideApprovalIfReady()
         if state == .listening, awaitingFinalSince != nil { submitTurn() }
     }
@@ -384,17 +408,19 @@ final class VoiceCallController {
             turnStartedAt = time
             log("turn started")
             discardFinals = false
-            lastSentTurn = nil
             awaitingFinalSince = nil
         case .endOfTurn:
             if case .awaitingApproval = state {
                 approvalTurnEnded = true
                 decideApprovalIfReady()
             } else if partial.isEmpty {
+                log("end of turn (silence)")
                 submitTurn()
             } else {
                 // The recognizer is still finishing the last words; give it a moment.
+                log("end of turn (silence); finalizing transcript")
                 awaitingFinalSince = time
+                listener.endTurn()
             }
         case nil:
             break
@@ -436,9 +462,11 @@ final class VoiceCallController {
         thinkingSince = now()
         let spokenFor = turnStartedAt.map { String(format: " (turn started %.1fs ago)", now() - $0) } ?? ""
         turnStartedAt = nil
+        sentAt = now()
         log("send: \"\(text)\"\(spokenFor)")
         lastChatTask = Task { [weak self, chat] in
             let sent = await chat.sendVoiceMessage(VoiceCallPhrases.voicePrefix + text)
+            self?.log("send \(sent ? "accepted" : "FAILED") \(self?.since(self?.sentAt) ?? "")")
             guard !sent, let self, self.replyActive, self.state == .thinking else { return }
             self.replyActive = false
             self.setCue(false)
@@ -492,7 +520,13 @@ final class VoiceCallController {
         currentTool: String?
     ) {
         guard !isEnded, state != .idle, state != .connecting else { return }
-        if self.currentTool != currentTool { self.currentTool = currentTool }
+        if self.currentTool != currentTool {
+            if let currentTool { log("tool: \(currentTool) \(since(sentAt))") }
+            self.currentTool = currentTool
+        }
+        if isStreaming != lastIsStreaming {
+            log("stream \(isStreaming ? "open" : "closed") \(since(sentAt))")
+        }
         lastIsStreaming = isStreaming
         if isStreaming { runSeenStreaming = true }
 
@@ -521,13 +555,14 @@ final class VoiceCallController {
         if let streamingText, !streamingText.isEmpty {
             speak(shaper.append(streamingText, final: runFinished))
             if !replyStarted {
+                log("first reply text \(since(sentAt))")
                 replyStarted = true
                 setCue(false)
                 state = .speaking
             }
         }
         if runSeenStreaming, !isStreaming, !runFinished {
-            log("run finished; text=\"\(streamingText ?? "nil")\"")
+            log("run finished \(since(sentAt)); text=\"\(streamingText ?? "nil")\"")
             runFinished = true
             runFinishedAt = now()
             speak(shaper.finish())
@@ -535,6 +570,11 @@ final class VoiceCallController {
         // With no text yet, the reply may still land (the transcript refresh
         // after the run); `tick` gives up after a grace period.
         if runFinished, replyStarted, !speaker.isSpeaking { finishReply() }
+    }
+
+    /// "after 1.23s" since `start`, for the log.
+    private func since(_ start: TimeInterval?) -> String {
+        start.map { String(format: "after %.2fs", now() - $0) } ?? ""
     }
 
     private func speak(_ sentences: [String]) {

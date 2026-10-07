@@ -7007,10 +7007,16 @@ extension ChatViewModel: VoiceCallChatDriving {
     /// Sends one spoken turn. Unlike `sendMessage`, it never picks up the
     /// composer's staged attachments.
     func sendVoiceMessage(_ text: String) async -> Bool {
-        guard !isViewingCachedData, !isClearingConversation, !isStartingChat, let sessionID else { return false }
+        guard !isViewingCachedData, !isClearingConversation, !isStartingChat, let sessionID else {
+            VoiceCallDiagnostics.write(
+                "send refused: cached=\(isViewingCachedData) clearing=\(isClearingConversation) "
+                    + "starting=\(isStartingChat) session=\(sessionID != nil)"
+            )
+            return false
+        }
         let message = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !message.isEmpty else { return false }
-        return await performChatSend(
+        let sent = await performChatSend(
             sessionID: sessionID,
             localMessageID: "local-\(UUID().uuidString)",
             displayContent: message,
@@ -7020,6 +7026,13 @@ extension ChatViewModel: VoiceCallChatDriving {
             attachmentsToRestoreOnFailure: [],
             modelContext: nil
         )
+        if !sent {
+            VoiceCallDiagnostics.write(
+                "send failed: \(sendErrorMessage ?? "no message") workspace=\(currentWorkspace ?? "nil") "
+                    + "model=\(currentModel ?? "nil") error=\(lastError.map { String(describing: $0) } ?? "nil")"
+            )
+        }
+        return sent
     }
 }
 

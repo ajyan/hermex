@@ -10,6 +10,9 @@ protocol SpeechListening: AnyObject {
     var onVoiceActivity: ((Bool, TimeInterval) -> Void)? { get set }
     func start() async throws
     func stop()
+    /// The user has paused: finalize what has been heard so far, so its final
+    /// result arrives now rather than when the recognizer decides.
+    func endTurn()
 }
 
 /// Speaks queued sentences in order. `onFinishedQueue` fires when the queue

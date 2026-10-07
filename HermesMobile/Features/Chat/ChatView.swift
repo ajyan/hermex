@@ -916,6 +916,7 @@ struct ChatView: View {
                         ChatToolbarActionSlot {
                             Menu {
                                 Button {
+                                    VoiceCallDiagnostics.write("call opened from the chat menu")
                                     isVoiceCallPresented = true
                                 } label: {
                                     Label("Call Atlas", systemImage: "phone")
@@ -963,6 +964,7 @@ struct ChatView: View {
             .onAppear {
                 guard startsCall, !didAutoStartCall else { return }
                 didAutoStartCall = true
+                VoiceCallDiagnostics.write("call opened automatically for a new chat")
                 isVoiceCallPresented = true
             }
             .sheet(item: $attachmentPreviewItem) { item in
@@ -3147,8 +3149,11 @@ struct ChatView: View {
         )
     }
 
+    /// Never while a call is up or about to open: the keyboard would sit over the call screen.
     private var canFocusComposer: Bool {
-        !viewModel.isViewingCachedData
+        !isVoiceCallPresented
+            && !(startsCall && !didAutoStartCall)
+            && !viewModel.isViewingCachedData
             && !viewModel.isUploadingAttachment
             && viewModel.uploadAttachmentErrorMessage == nil
     }

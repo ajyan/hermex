@@ -16,6 +16,9 @@ private final class FakeListener: SpeechListening {
     }
 
     func stop() { stopCount += 1 }
+
+    var endTurnCount = 0
+    func endTurn() { endTurnCount += 1 }
 }
 
 @MainActor
@@ -25,11 +28,13 @@ private final class FakeSpeaker: SpeechSpeaking {
     var queue: [String] = []
     var stopCount = 0
     var cueStates: [Bool] = []
+    var onEnqueue: (() -> Void)?
     var isSpeaking: Bool { !queue.isEmpty }
 
     func enqueue(_ sentence: String) {
         spoken.append(sentence)
         queue.append(sentence)
+        onEnqueue?()
     }
 
     func stopNow() {
@@ -220,6 +225,44 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertTrue(chat.sent.isEmpty)
     }
 
+    func testSettledFinalSendsWhileTheLevelMeterStillHearsNoise() async {
+        await controller.start()
+        voice(true, for: 0.6)
+        listener.onFinal?("what time is it")
+        // Background noise keeps the meter "in a turn", but nothing new is recognized.
+        voice(true, for: VoiceCallTiming.finalTranscriptSettle - 0.2)
+        controller.tick()
+        XCTAssertTrue(chat.sent.isEmpty)
+        voice(true, for: 0.3)
+        controller.tick()
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.sent, ["[voice] what time is it"])
+    }
+
+    func testFinalFollowedByMoreSpeechDoesNotSendEarly() async {
+        await controller.start()
+        voice(true, for: 0.6)
+        listener.onFinal?("send a message")
+        clock += 0.5
+        listener.onPartial?("to Sam")
+        clock += VoiceCallTiming.finalTranscriptSettle
+        controller.tick()
+        XCTAssertTrue(chat.sent.isEmpty)
+        XCTAssertEqual(controller.partialTranscript, "send a message to Sam")
+    }
+
+    func testEndOfTurnWithAPartialAsksTheRecognizerToFinalize() async {
+        await controller.start()
+        voice(true, for: 0.6)
+        listener.onPartial?("explain how tailscale works in det")
+        voice(false, for: 0.9)
+        XCTAssertEqual(listener.endTurnCount, 1)
+        XCTAssertTrue(chat.sent.isEmpty)
+        listener.onFinal?("Explain how Tailscale works in detail.")
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.sent, ["[voice] Explain how Tailscale works in detail."])
+    }
+
     func testSilentListeningSaysIDidntCatchThatOnceThenRearms() async {
         await controller.start()
         clock += VoiceCallTiming.noSpeechTimeout - 1
@@ -293,7 +336,7 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(controller.partialTranscript, "hello there")
     }
 
-    func testSentTurnStaysOnScreenUntilNextSpeech() async {
+    func testSentTurnStaysOnScreenUntilNextWordsAreHeard() async {
         await controller.start()
         await say("hello there")
         XCTAssertEqual(controller.partialTranscript, "")
@@ -305,7 +348,10 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(controller.state, .listening)
         XCTAssertEqual(controller.lastSentTurn, "hello there")
 
+        // Noise the level meter calls speech doesn't clear it; recognized words do.
         voice(true, for: 0.2)
+        XCTAssertEqual(controller.lastSentTurn, "hello there")
+        listener.onPartial?("and")
         XCTAssertNil(controller.lastSentTurn)
     }
 
@@ -687,5 +733,107 @@ final class VoiceCallControllerTests: XCTestCase {
         await startSpeaking()
         update(text: "First sentence. Second", tool: "terminal")
         XCTAssertEqual(controller.currentTool, "terminal")
+    }
+}
+
+final class VoiceCallCaptionsTests: XCTestCase {
+    private func content(sent: String? = nil, live: String = "", reply: String? = nil, replying: Bool = false)
+        -> VoiceCallCaptions.Content? {
+        VoiceCallCaptions.content(sent: sent, live: live, reply: reply, isReplying: replying)
+    }
+
+    func testCaptionsFollowATurn() {
+        XCTAssertNil(content(reply: "an older chat reply"))
+        XCTAssertEqual(content(live: "what time"), .init(speaker: .user, body: "what time", isActive: true))
+        // Sent, Atlas hasn't answered yet: the question stays in place, dimmed.
+        XCTAssertEqual(content(sent: "what time is it", replying: true),
+                       .init(speaker: .user, body: "what time is it", isActive: false))
+        XCTAssertEqual(content(sent: "what time is it", reply: "It's 2:37.", replying: true),
+                       .init(speaker: .atlas, context: "what time is it", body: "It's 2:37.", isActive: true))
+        // Done: the reply stays, dimmed, until the user's next words.
+        XCTAssertEqual(content(sent: "what time is it", reply: "It's 2:37."),
+                       .init(speaker: .atlas, context: "what time is it", body: "It's 2:37.", isActive: false))
+        XCTAssertEqual(content(live: "thanks", reply: "It's 2:37.")?.body, "thanks")
+    }
+}
+
+@MainActor
+final class ServerSpeechSpeakerTests: XCTestCase {
+    private var requests: [String] = []
+    private var fallback: FakeSpeaker!
+
+    override func setUp() async throws {
+        requests = []
+        fallback = FakeSpeaker()
+    }
+
+    /// `respond` answers each request in order; Data() is undecodable, so the clip is skipped.
+    private func makeSpeaker(_ respond: @escaping (Int) async throws -> Data) -> ServerSpeechSpeaker {
+        ServerSpeechSpeaker(
+            synthesize: { [unowned self] text in
+                requests.append(text)
+                return try await respond(requests.count)
+            },
+            fallback: fallback,
+            requestSpacing: 0
+        )
+    }
+
+    func testFirstSentenceIsFetchedAloneAndLaterOnesAreBatched() async {
+        var gate: CheckedContinuation<Void, Never>?
+        let firstRequested = expectation(description: "first request")
+        let drained = expectation(description: "queue drained")
+        let speaker = makeSpeaker { count in
+            if count == 1 {
+                await withCheckedContinuation { gate = $0; firstRequested.fulfill() }
+            }
+            return Data()
+        }
+        speaker.onFinishedQueue = { drained.fulfill() }
+        speaker.enqueue("One.")
+        await fulfillment(of: [firstRequested], timeout: 5)
+        speaker.enqueue("Two.")
+        speaker.enqueue("Three.")
+        XCTAssertTrue(speaker.isSpeaking)
+        gate?.resume()
+        await fulfillment(of: [drained], timeout: 5)
+        XCTAssertEqual(requests, ["One.", "Two. Three."])
+        XCTAssertTrue(fallback.spoken.isEmpty)
+    }
+
+    func testRateLimitedRequestIsRetried() async {
+        let drained = expectation(description: "queue drained")
+        let speaker = makeSpeaker { count in
+            if count == 1 { throw APIError.http(statusCode: 429, body: nil) }
+            return Data()
+        }
+        speaker.onFinishedQueue = { drained.fulfill() }
+        speaker.enqueue("One.")
+        await fulfillment(of: [drained], timeout: 5)
+        XCTAssertEqual(requests, ["One.", "One."])
+    }
+
+    func testFailureHandsTheRestOfTheCallToTheOnDeviceVoice() async {
+        let failed = expectation(description: "fell back")
+        let speaker = makeSpeaker { _ in throw URLError(.cannotConnectToHost) }
+        fallback.onEnqueue = { failed.fulfill() }
+        speaker.enqueue("One.")
+        await fulfillment(of: [failed], timeout: 5)
+        fallback.onEnqueue = nil
+        XCTAssertEqual(fallback.spoken, ["One."])
+        speaker.enqueue("Two.")
+        XCTAssertEqual(fallback.spoken, ["One.", "Two."])
+        XCTAssertEqual(requests, ["One."])
+
+        let drained = expectation(description: "queue drained")
+        speaker.onFinishedQueue = { drained.fulfill() }
+        fallback.drain()
+        await fulfillment(of: [drained], timeout: 5)
+    }
+
+    func testThinkingCueUsesTheOnDeviceSpeaker() {
+        let speaker = makeSpeaker { _ in Data() }
+        speaker.setThinkingCue(true)
+        XCTAssertEqual(fallback.cueStates, [true])
     }
 }

@@ -11,7 +11,21 @@ final class CallSystemBridge: NSObject, CallSystemBridging, CXProviderDelegate {
 
     static let handle = "Atlas"
 
-    private let provider: CXProvider
+    /// One provider for the app, as CallKit expects; each call's bridge becomes its delegate.
+    private static let sharedProvider: CXProvider = {
+        let configuration = CXProviderConfiguration()
+        configuration.supportsVideo = false
+        configuration.includesCallsInRecents = false
+        configuration.maximumCallsPerCallGroup = 1
+        configuration.maximumCallGroups = 1
+        configuration.supportedHandleTypes = [.generic]
+        return CXProvider(configuration: configuration)
+    }()
+    /// Calls started and not yet seen to end. One left over from a call screen that
+    /// went away without hanging up would block the next call from starting.
+    private static var liveCallIDs: Set<UUID> = []
+
+    private let provider = CallSystemBridge.sharedProvider
     private let controller = CXCallController()
     private var callID: UUID?
     private var activation: CheckedContinuation<Void, Error>?
@@ -21,19 +35,16 @@ final class CallSystemBridge: NSObject, CallSystemBridging, CXProviderDelegate {
     }
 
     override init() {
-        let configuration = CXProviderConfiguration()
-        configuration.supportsVideo = false
-        configuration.includesCallsInRecents = false
-        configuration.maximumCallsPerCallGroup = 1
-        configuration.maximumCallGroups = 1
-        configuration.supportedHandleTypes = [.generic]
-        provider = CXProvider(configuration: configuration)
         super.init()
         provider.setDelegate(self, queue: nil)
     }
 
     func startCall() async throws {
+        for stale in Self.liveCallIDs {
+            provider.reportCall(with: stale, endedAt: nil, reason: .remoteEnded)
+        }
         let id = UUID()
+        Self.liveCallIDs = [id]
         callID = id
         let action = CXStartCallAction(call: id, handle: CXHandle(type: .generic, value: Self.handle))
         action.isVideo = false
@@ -63,6 +74,7 @@ final class CallSystemBridge: NSObject, CallSystemBridging, CXProviderDelegate {
     }
 
     private func callEnded() {
+        if let callID { Self.liveCallIDs.remove(callID) }
         callID = nil
         finishActivation(throwing: BridgeError.ended)
         onEnded?()

@@ -98,6 +98,8 @@ struct HermesMobileApp: App {
                 NavigationStack {
                     StreamingLabView()
                 }
+            } else if ProcessInfo.processInfo.arguments.contains("--voice-call-lab") {
+                VoiceCallLab()
             } else {
                 ContentView(authManager: authManager)
                     .preferredColorScheme(AppTheme.storedValue(appThemeRawValue).colorScheme)

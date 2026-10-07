@@ -58,23 +58,11 @@ final class SpeechTextShaperTests: XCTestCase {
         XCTAssertEqual(shaper.finish(), ["Hello there"])
     }
 
-    func testLongReplyStopsAfterThreeSentencesAndPointsToTheChat() {
+    func testLongReplyIsSpokenInFull() {
         var shaper = SpeechTextShaper()
         XCTAssertEqual(shaper.append("One. Two. Three. Four"), ["One.", "Two.", "Three."])
-        XCTAssertEqual(shaper.append("One. Two. Three. Four. Five"), [SpeechTextShaper.restInChat])
-        XCTAssertEqual(shaper.append("One. Two. Three. Four. Five. Six."), [])
-        XCTAssertEqual(shaper.finish(), [])
-    }
-
-    func testCapAppliesWhenTheFourthSentenceIsTheTrailingFragment() {
-        XCTAssertEqual(
-            spoken("One. Two. Three. Four"),
-            ["One.", "Two.", "Three.", SpeechTextShaper.restInChat]
-        )
-    }
-
-    func testThreeSentenceReplyIsNotCapped() {
-        XCTAssertEqual(spoken("One. Two. Three."), ["One.", "Two.", "Three."])
+        XCTAssertEqual(shaper.append("One. Two. Three. Four. Five"), ["Four."])
+        XCTAssertEqual(shaper.finish(), ["Five"])
     }
 
     func testEchoedVoiceTagVariantsAreNotSpoken() {

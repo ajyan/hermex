@@ -17,6 +17,9 @@ enum VoiceCallTiming {
     static let monologueCap: TimeInterval = 30
     /// Words, not in what Atlas is saying, that must be heard before talking over Atlas interrupts it.
     static let bargeInNovelWords = 2
+    /// A final transcript that nothing has followed for this long is a finished turn,
+    /// even while the level meter still hears noise.
+    static let finalTranscriptSettle: TimeInterval = 1.0
     /// After a turn ends, how long to wait for the recognizer's final text before sending the partial.
     static let finalTranscriptWait: TimeInterval = 1.0
     /// Wait without a reply token before the thinking cue plays.
@@ -27,4 +30,9 @@ enum VoiceCallTiming {
     static let connectTimeout: TimeInterval = 10
     /// How long to wait for a dropped stream to come back before ending the call.
     static let reconnectGiveUp: TimeInterval = 30
+}
+
+enum VoiceCallSettings {
+    /// Speak call replies with the server's OpenAI-compatible voice instead of the on-device one.
+    static let usesServerVoiceKey = "voiceCall.usesServerVoice"
 }

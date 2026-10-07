@@ -178,6 +178,7 @@ private final class FlowListener: SpeechListening {
     var onVoiceActivity: ((Bool, TimeInterval) -> Void)?
     func start() async throws {}
     func stop() {}
+    func endTurn() {}
 }
 
 @MainActor
