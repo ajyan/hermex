@@ -540,7 +540,7 @@ struct ChatShellView: View {
                 .disabled(viewModel.isViewingCachedData)
                 .accessibilityLabel("Call Atlas")
             } else {
-                // In a conversation, call on it; New Chat stays in the drawer and on long press.
+                // In a conversation, call on it; New Chat stays on the drawer's compose button and on long press.
                 Button { callRequest += 1 } label: {
                     Image(systemName: "phone")
                 }

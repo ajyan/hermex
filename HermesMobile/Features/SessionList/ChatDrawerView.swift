@@ -22,6 +22,8 @@ struct ChatDrawerView<ServerMenu: View>: View {
     let refresh: () async -> Void
     @ViewBuilder let serverMenu: () -> ServerMenu
 
+    @ScaledMetric(relativeTo: .title2) private var composeButtonSize: CGFloat = 56
+
     var body: some View {
         let sections = DrawerSessionSections(sessions, isSearching: isSearching)
 
@@ -77,6 +79,11 @@ struct ChatDrawerView<ServerMenu: View>: View {
             .environment(\.defaultMinListRowHeight, 0)
             .scrollContentBackground(.hidden)
             .scrollDismissesKeyboard(.interactively)
+            // Room below the last row so the compose button never hides it.
+            .contentMargins(.bottom, composeButtonSize + 32, for: .scrollContent)
+            .overlay(alignment: .bottomTrailing) {
+                if !isSearching { composeButton }
+            }
 
             settingsBar
         }
@@ -113,8 +120,6 @@ struct ChatDrawerView<ServerMenu: View>: View {
 
     @ViewBuilder
     private var navigationRows: some View {
-        drawerRow(String(localized: "New Chat"), systemImage: "square.and.pencil", action: onNewChat)
-            .disabled(!canCreateNewChat)
         if sectionVisibility.projects {
             drawerRow(String(localized: "Projects"), systemImage: "folder") { onOpen(.projects) }
         }
@@ -128,6 +133,23 @@ struct ChatDrawerView<ServerMenu: View>: View {
         if sectionVisibility.brain {
             drawerRow("Brain", systemImage: "brain") { onOpen(.brain) }
         }
+    }
+
+    /// Floating bottom-right New Chat, where messaging apps put compose.
+    private var composeButton: some View {
+        Button(action: onNewChat) {
+            Image(systemName: "square.and.pencil")
+                .font(.title2.weight(.medium))
+                .frame(width: composeButtonSize, height: composeButtonSize)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.primary)
+        .adaptiveGlass(isInteractive: true, in: Circle())
+        .disabled(!canCreateNewChat)
+        .accessibilityLabel(String(localized: "New Chat"))
+        .padding(.trailing, 16)
+        .padding(.bottom, 16)
     }
 
     private func drawerRow(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
