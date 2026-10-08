@@ -493,7 +493,10 @@ struct ChatShellView: View {
                 server: server,
                 onAPIError: authManager.handleAPIError,
                 callRequest: callRequest,
-                draftStore: draftStore
+                draftStore: draftStore,
+                onSessionRenamed: { sessionID, title in
+                    viewModel.applyConfirmedRename(sessionID: sessionID, title: title, modelContext: modelContext)
+                }
             )
             .id(session.id)
         case .newChat(let route):

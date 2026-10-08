@@ -1001,20 +1001,7 @@ final class SessionListViewModel {
             }
 
             let resolvedTitle = Self.nonEmpty(response.session?.title) ?? title
-            let baseSession = sessions.first(where: { $0.sessionId == sessionId }) ?? session
-            let updatedSession = baseSession.replacingTitle(with: resolvedTitle)
-            if let existingIndex = sessions.firstIndex(where: { $0.sessionId == sessionId }) {
-                sessions[existingIndex] = updatedSession
-            }
-
-            if let modelContext {
-                do {
-                    try CacheStore.cacheSession(updatedSession, serverURL: server, in: modelContext)
-                } catch {
-                    cacheErrorMessage = error.localizedDescription
-                }
-            }
-
+            applyConfirmedRename(sessionID: sessionId, fallback: session, title: resolvedTitle, modelContext: modelContext)
             return true
         } catch {
             guard !isCancellationError(error) else { return false }
@@ -1022,6 +1009,34 @@ final class SessionListViewModel {
             lastError = error
             actionErrorMessage = error.localizedDescription
             return false
+        }
+    }
+
+    /// Shows a title the server already stored, such as a rename made from the
+    /// chat title, on the matching row and its cached copy.
+    /// A session not loaded in the list is left alone; the next load shows it.
+    func applyConfirmedRename(sessionID: String, title: String, modelContext: ModelContext? = nil) {
+        applyConfirmedRename(sessionID: sessionID, fallback: nil, title: title, modelContext: modelContext)
+    }
+
+    private func applyConfirmedRename(
+        sessionID: String,
+        fallback: SessionSummary?,
+        title: String,
+        modelContext: ModelContext?
+    ) {
+        guard let baseSession = sessions.first(where: { $0.sessionId == sessionID }) ?? fallback else { return }
+        let updatedSession = baseSession.replacingTitle(with: title)
+        if let existingIndex = sessions.firstIndex(where: { $0.sessionId == sessionID }) {
+            sessions[existingIndex] = updatedSession
+        }
+
+        if let modelContext {
+            do {
+                try CacheStore.cacheSession(updatedSession, serverURL: server, in: modelContext)
+            } catch {
+                cacheErrorMessage = error.localizedDescription
+            }
         }
     }
 

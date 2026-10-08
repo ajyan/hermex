@@ -298,6 +298,9 @@ struct ChatView: View {
     /// load their configuration from the server and never re-apply a snapshot.
     let restoresDraftSettings: Bool
     let onConversationStarted: () -> Void
+    /// Called with the session ID and stored title after the server confirms a
+    /// rename from the chat title, so the session list can show it.
+    let onSessionRenamed: (String, String) -> Void
 
     /// The composer's draft. Never read it in `body` or wrap it in a get/set
     /// binding for the composer: either re-runs this whole screen on every
@@ -308,6 +311,10 @@ struct ChatView: View {
     @State private var isVoiceCallPresented = false
     @State private var isFileBrowserPresented = false
     @State private var didAutoStartCall = false
+    /// Rename sheet opened by tapping the chat title.
+    @State private var isTitleRenamePresented = false
+    @State private var titleRenameIsSubmitting = false
+    @State private var titleRenameAlertMessage: String?
     @State private var draftRevision = 0
     @State private var isScrolledNearBottom = true
     @State private var completionScrollPolicy = ChatCompletionScrollPolicy()
@@ -417,7 +424,8 @@ struct ChatView: View {
         draftStore: ChatDraftStore? = nil,
         draftAttachmentStore: (any ChatDraftAttachmentStoring)? = nil,
         restoresDraftSettings: Bool = false,
-        onConversationStarted: @escaping () -> Void = {}
+        onConversationStarted: @escaping () -> Void = {},
+        onSessionRenamed: @escaping (String, String) -> Void = { _, _ in }
     ) {
         self.session = session
         self.server = server
@@ -431,6 +439,7 @@ struct ChatView: View {
         self.draftAttachmentStore = resolvedDraftAttachmentStore
         self.restoresDraftSettings = restoresDraftSettings
         self.onConversationStarted = onConversationStarted
+        self.onSessionRenamed = onSessionRenamed
         _draftMessage = State(initialValue: initialDraft)
         _draftQuotes = State(initialValue: initialQuotes)
         _initialAttachments = State(initialValue: initialAttachments)
@@ -908,10 +917,17 @@ struct ChatView: View {
         chatLifecycle
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    ChatToolbarTitleLabel(
-                        title: displayTitle,
-                        subtitle: headerSubtitle
-                    )
+                    Button {
+                        isTitleRenamePresented = true
+                    } label: {
+                        ChatToolbarTitleLabel(
+                            title: displayTitle,
+                            subtitle: headerSubtitle
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!viewModel.canRenameSession)
+                    .accessibilityHint(String(localized: "Rename the current session"))
                 }
 
                 // One overflow menu keeps the title readable beside the shell's New Chat.
@@ -1037,6 +1053,28 @@ struct ChatView: View {
                         }
                     }
                 )
+            }
+            .sheet(isPresented: $isTitleRenamePresented) {
+                SessionRenameSheet(
+                    initialTitle: displayTitle,
+                    isSaving: titleRenameIsSubmitting
+                ) {
+                    isTitleRenamePresented = false
+                } onSave: { title in
+                    Task { await submitTitleRename(title) }
+                }
+                // On the sheet: an alert on the chat cannot present over it.
+                .alert(
+                    String(localized: "Session Action Failed"),
+                    isPresented: Binding(
+                        get: { titleRenameAlertMessage != nil },
+                        set: { if !$0 { titleRenameAlertMessage = nil } }
+                    )
+                ) {
+                    Button(String(localized: "OK"), role: .cancel) {}
+                } message: {
+                    Text(titleRenameAlertMessage ?? "")
+                }
             }
     }
 
@@ -2008,6 +2046,20 @@ struct ChatView: View {
 
         if let lastError = viewModel.lastError {
             onAPIError(lastError)
+        }
+    }
+
+    private func submitTitleRename(_ title: String) async {
+        titleRenameIsSubmitting = true
+        defer { titleRenameIsSubmitting = false }
+        switch await viewModel.renameSession(to: title) {
+        case .renamed(let storedTitle):
+            isTitleRenamePresented = false
+            if let sessionID = session.sessionId {
+                onSessionRenamed(sessionID, storedTitle)
+            }
+        case .failed(let message):
+            titleRenameAlertMessage = message
         }
     }
 
