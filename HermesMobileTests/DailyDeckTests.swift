@@ -290,6 +290,47 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(store.answers(for: server, date: "2026-10-04", kind: "morning")["advisor"]?.text, "Ship it.")
     }
 
+    // MARK: - Journal calendar
+
+    func testMonthGridPadsToTheFirstWeekday() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.firstWeekday = 1  // Sunday
+        let grid = DailyDeckJournal.grid(year: 2026, month: 10, calendar: calendar)  // Oct 1 2026 is a Thursday
+        XCTAssertEqual(grid.prefix(5).map { $0 }, [nil, nil, nil, nil, 1])
+        XCTAssertEqual(grid.compactMap { $0 }.count, 31)
+        calendar.firstWeekday = 2  // Monday
+        XCTAssertEqual(DailyDeckJournal.grid(year: 2026, month: 10, calendar: calendar).prefix(4).map { $0 }, [nil, nil, nil, 1])
+    }
+
+    func testReadableEntryDropsFrontMatterAndAgentMarkers() {
+        let text = "---\ntype: journal\n---\n# 2026-10-05\n\n<!-- brain:briefing generated=x -->\nGood morning.\n<!-- brain:deck 2026-10-05 morning -->\n- Ship it."
+        XCTAssertEqual(DailyDeckJournal.readable(text), "# 2026-10-05\n\nGood morning.\n- Ship it.")
+    }
+
+    func testFiledDaysComeFromAnswersFiles() {
+        XCTAssertEqual(DailyDeckViewModel.filedDates(in: ["2026-10-04.morning.json", "2026-10-04.morning.answers.json",
+                                                         "2026-10-05.morning.json", "2026-10-05.morning.filed.json"], kind: "morning"),
+                       ["2026-10-04"])
+    }
+
+    @MainActor
+    func testJournalDaysFindTheMonthFolderAndEntry() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.deckJSON)
+        client.listings["journal/2026"] = ["03-March", "10-October"]
+        client.listings["journal/2026/10-October"] = ["2026-10-01.md", "2026-10-04.md", "notes.txt"]
+        client.files["journal/2026/10-October/2026-10-04.md"] = "# 2026-10-04\n<!-- brain:deck x -->\n- Ran."
+        let viewModel = makeViewModel(client)
+        await viewModel.load()
+
+        let days = await viewModel.journalDays(year: 2026, month: 10)
+        XCTAssertEqual(days, ["2026-10-01", "2026-10-04"])
+        let none = await viewModel.journalDays(year: 2026, month: 11)
+        XCTAssertEqual(none, [])
+        let entry = try await viewModel.journalEntry(for: "2026-10-04")
+        XCTAssertEqual(entry, "# 2026-10-04\n- Ran.")
+    }
+
     // MARK: - Helpers
 
     @MainActor
@@ -326,6 +367,8 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     var sendError: Error?
     /// Bodies by path; anything else reads as `deck`.
     var files: [String: String] = [:]
+    /// Folder listings other than `briefs/`.
+    var listings: [String: [String]] = [:]
     private(set) var createdWorkspaces: [String] = []
     private(set) var renamed: [(String, String)] = []
     private(set) var listedSessions: [String] = []
@@ -348,6 +391,8 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     func renameSession(id: String, title: String) async throws { renamed.append((id, title)) }
 
     func entryNames(sessionID: String, path: String) async throws -> [String] {
+        if let listing = listings[path] { return listing }
+        if path != DailyDeckPaths.directory { throw APIError.http(statusCode: 404, body: #"{"error": "Not a directory"}"#) }
         listedSessions.append(sessionID)
         if vanished.contains(sessionID) { throw APIError.http(statusCode: 404, body: #"{"error": "Session not found"}"#) }
         guard let names else { throw APIError.http(statusCode: 404, body: #"{"error": "Not a directory"}"#) }

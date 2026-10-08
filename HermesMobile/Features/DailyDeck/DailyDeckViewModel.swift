@@ -46,6 +46,8 @@ final class DailyDeckViewModel {
     private(set) var filedAnswers: [String: DeckAnswer]?
     /// Days with a deck in `briefs/`, newest first.
     private(set) var availableDates: [String] = []
+    /// Days whose deck has been filed.
+    private(set) var filedDates: Set<String> = []
     /// The page on screen.
     var index = 0
 
@@ -106,6 +108,7 @@ final class DailyDeckViewModel {
             let (sessionID, names) = try await sessionAndBriefs(workspace: workspace)
             self.sessionID = sessionID
             availableDates = Self.deckDates(in: names ?? [], kind: kind)
+            filedDates = Self.filedDates(in: names ?? [], kind: kind)
             try await openDeck(names: names ?? [], sessionID: sessionID)
         } catch is CancellationError {
             // A newer load owns the state.
@@ -146,8 +149,14 @@ final class DailyDeckViewModel {
         state = .ready
     }
 
+    /// Days with `<date>.<kind>.answers.json`, the file the agent saves when a deck is filed.
+    nonisolated static func filedDates(in names: [String], kind: String) -> Set<String> {
+        let suffix = ".\(kind).answers.json"
+        return Set(names.filter { $0.hasSuffix(suffix) }.map { String($0.dropLast(suffix.count)) })
+    }
+
     /// `2026-10-05` from `2026-10-05.morning.json`, newest first.
-    static func deckDates(in names: [String], kind: String) -> [String] {
+    nonisolated static func deckDates(in names: [String], kind: String) -> [String] {
         let suffix = ".\(kind).json"
         return names.filter { $0.hasSuffix(suffix) }.map { String($0.dropLast(suffix.count)) }.sorted(by: >)
     }
@@ -206,6 +215,36 @@ final class DailyDeckViewModel {
     /// "Daily Brief · Oct 5" for the deck's day.
     static func sessionTitle(for day: String) -> String {
         "Daily Brief · \(DailyDeckPaths.label(day))"
+    }
+
+    // MARK: Journal
+
+    /// Days in `year`-`month` with a journal entry (`journal/YYYY/MM-Month/YYYY-MM-DD.md`).
+    /// The month folder is found by its `MM-` prefix, whatever the month is spelled as.
+    func journalDays(year: Int, month: Int) async -> Set<String> {
+        guard let sessionID, let folder = await monthFolder(year: year, month: month, sessionID: sessionID),
+              let names = try? await client.entryNames(sessionID: sessionID, path: folder)
+        else { return [] }
+        let prefix = String(format: "%04d-%02d-", year, month)
+        return Set(names.filter { $0.hasPrefix(prefix) && $0.hasSuffix(".md") }.map { String($0.dropLast(3)) })
+    }
+
+    /// That day's journal entry as Markdown, without machine markers.
+    func journalEntry(for day: String) async throws -> String {
+        let parts = day.split(separator: "-").compactMap { Int($0) }
+        guard let sessionID, parts.count == 3,
+              let folder = await monthFolder(year: parts[0], month: parts[1], sessionID: sessionID)
+        else { throw DailyDeckJournalError.missing }
+        let text = try await client.fileContent(sessionID: sessionID, path: "\(folder)/\(day).md")
+        return DailyDeckJournal.readable(text)
+    }
+
+    private func monthFolder(year: Int, month: Int, sessionID: String) async -> String? {
+        let base = "journal/\(year)"
+        guard let names = try? await client.entryNames(sessionID: sessionID, path: base),
+              let folder = names.first(where: { $0.hasPrefix(String(format: "%02d-", month)) })
+        else { return nil }
+        return "\(base)/\(folder)"
     }
 
     // MARK: Answering

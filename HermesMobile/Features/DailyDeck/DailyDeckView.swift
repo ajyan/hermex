@@ -6,6 +6,7 @@ import SwiftUI
 struct DailyDeckView: View {
     @State private var viewModel: DailyDeckViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isShowingCalendar = false
     private let openSession: (String) -> Void
 
     init(server: URL, openSession: @escaping (String) -> Void) {
@@ -19,20 +20,10 @@ struct DailyDeckView: View {
             .navigationBarTitleDisplayMode(.inline)
             .background(Color.hxCanvas.ignoresSafeArea())
             .toolbar {
-                if viewModel.availableDates.count > 1 {
+                if viewModel.workspace != nil {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Menu {
-                            Picker(selection: dateSelection) {
-                                ForEach(viewModel.availableDates, id: \.self) { day in
-                                    Text(verbatim: day == viewModel.today ? "Today" : DailyDeckPaths.label(day)).tag(day)
-                                }
-                            } label: {
-                                Text(verbatim: "Past Briefs")
-                            }
-                        } label: {
-                            Image(systemName: "calendar")
-                        }
-                        .accessibilityLabel(Text(verbatim: "Past Briefs"))
+                        Button { isShowingCalendar = true } label: { Image(systemName: "calendar") }
+                            .accessibilityLabel(Text(verbatim: "Journal Calendar"))
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -52,14 +43,11 @@ struct DailyDeckView: View {
                 }
             }
             .task { await viewModel.load() }
-    }
-
-    /// The day on screen, as a picker selection: choosing another day opens its deck.
-    private var dateSelection: Binding<String> {
-        Binding(
-            get: { viewModel.date },
-            set: { day in Task { await viewModel.show(date: day) } }
-        )
+            .sheet(isPresented: $isShowingCalendar) {
+                DeckCalendarView(viewModel: viewModel) { day in
+                    Task { await viewModel.show(date: day) }
+                }
+            }
     }
 
     @ViewBuilder
