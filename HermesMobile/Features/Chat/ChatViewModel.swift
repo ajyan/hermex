@@ -645,7 +645,9 @@ final class ChatViewModel {
         isCLISession = session.isCliSession == true
         self.server = server
         let resolvedClient = client ?? APIClient(baseURL: server)
-        let resolvedStreamClient = streamClient ?? SSEClient()
+        // The coordinator owns chat stream reconnects so a resume replays from
+        // its latest cursor with replay dedup armed.
+        let resolvedStreamClient = streamClient ?? SSEClient(reconnectsAfterServerClose: false)
         let resolvedLiveActivityManager = liveActivityManager ?? AgentLiveActivityManager.shared
         self.client = resolvedClient
         self.streamCoordinator = ChatStreamCoordinator(

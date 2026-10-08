@@ -14,27 +14,50 @@ protocol SSEStreamingClient: AnyObject {
 final class SSEClient: SSEStreamingClient {
     private let baseConfiguration: URLSessionConfiguration
     private var eventSource: EventSource?
+    /// The connection whose callbacks may still reach the caller. A stopped or
+    /// replaced connection can have callbacks already queued for the main actor;
+    /// they are dropped instead of being delivered as the new connection's.
+    private var currentConnection: UUID?
     private(set) var lastEventID: String?
     /// Read at stream start so a new stream picks up the latest headers (#255).
     private let customHeaderProvider: @MainActor () -> [CustomHeader]
+    /// LDSwiftEventSource reopens a connection the server or a proxy closed
+    /// cleanly, using the original URL. With `false`, that close is reported as
+    /// `.transportError` and the caller owns the reconnect instead: a resume
+    /// cursor in the URL (`replay=1&after_seq=N`) is stale by then, and the
+    /// server would replay events the caller already rendered.
+    private let reconnectsAfterServerClose: Bool
 
     init(
         urlSessionConfiguration: URLSessionConfiguration = .default,
+        reconnectsAfterServerClose: Bool = true,
         customHeaderProvider: @escaping @MainActor () -> [CustomHeader] = { CustomHeaderStore.shared.snapshot() }
     ) {
         baseConfiguration = urlSessionConfiguration
+        self.reconnectsAfterServerClose = reconnectsAfterServerClose
         self.customHeaderProvider = customHeaderProvider
     }
 
     func start(url: URL, onEvent: @escaping @MainActor (SSEEvent) -> Void) {
         stop()
         lastEventID = nil
+        let connection = UUID()
+        currentConnection = connection
 
         let handler = SSEEventHandler(
             onEventID: { [weak self] eventID in
-                self?.lastEventID = eventID
+                guard let self, self.currentConnection == connection else { return }
+                self.lastEventID = eventID
             },
-            onEvent: onEvent
+            onEvent: { [weak self] event in
+                guard let self, self.currentConnection == connection else { return }
+                onEvent(event)
+            },
+            onClosed: { [weak self] in
+                guard let self, self.currentConnection == connection, !self.reconnectsAfterServerClose else { return }
+                self.stop()
+                onEvent(.transportError(URLError(.networkConnectionLost).localizedDescription))
+            }
         )
         var config = EventSource.Config(handler: handler, url: url)
         config.connectionErrorHandler = { _ in .shutdown }
@@ -59,6 +82,7 @@ final class SSEClient: SSEStreamingClient {
     }
 
     func stop() {
+        currentConnection = nil
         eventSource?.stop()
         eventSource = nil
     }
@@ -369,18 +393,27 @@ private extension String {
 private final class SSEEventHandler: EventHandler {
     private let onEventID: @MainActor (String) -> Void
     private let onEvent: @MainActor (SSEEvent) -> Void
+    private let onClosedHandler: @MainActor () -> Void
 
     init(
         onEventID: @escaping @MainActor (String) -> Void,
-        onEvent: @escaping @MainActor (SSEEvent) -> Void
+        onEvent: @escaping @MainActor (SSEEvent) -> Void,
+        onClosed: @escaping @MainActor () -> Void
     ) {
         self.onEventID = onEventID
         self.onEvent = onEvent
+        self.onClosedHandler = onClosed
     }
 
     func onOpened() {}
 
-    func onClosed() {}
+    /// Also called for our own `stop()`; `SSEClient` drops that one because the
+    /// connection is no longer current by the time it reaches the main actor.
+    func onClosed() {
+        Task { @MainActor in
+            onClosedHandler()
+        }
+    }
 
     func onMessage(eventType: String, messageEvent: MessageEvent) {
         let event = SSEEventDecoder.decode(eventType: eventType, data: messageEvent.data)
