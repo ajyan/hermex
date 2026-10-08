@@ -290,6 +290,108 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(store.answers(for: server, date: "2026-10-04", kind: "morning")["advisor"]?.text, "Ship it.")
     }
 
+    // MARK: - Not for Me and questions
+
+    func testDecodesReasonAndAlternativeQuestions() throws {
+        let deck = try DailyDeck.decode(Self.feedbackDeckJSON)
+        XCTAssertEqual(deck.cards[1].reason, "Fits today's thread")
+        XCTAssertEqual(deck.cards[1].altQuestions, ["Second?", "Third?"])
+        XCTAssertEqual(deck.cards[2].altQuestions, [])
+        XCTAssertEqual(deck.cards.map(\.takesFeedback), [false, true, true, false])
+    }
+
+    @MainActor
+    func testRegenerateStepsThroughTheQuestionsAndWrapsBackToTheCardsOwn() async throws {
+        let viewModel = try await loadedViewModel(Self.feedbackDeckJSON)
+        let card = viewModel.cards[1]
+
+        viewModel.regenerateQuestion(for: card)
+        XCTAssertEqual(viewModel.question(for: card), "Second?")
+        viewModel.regenerateQuestion(for: card)
+        XCTAssertEqual(viewModel.question(for: card), "Third?")
+        viewModel.regenerateQuestion(for: card)
+        XCTAssertEqual(viewModel.question(for: card), "First?")
+        XCTAssertNil(viewModel.answer(for: card), "back to the card's own question leaves nothing to file")
+    }
+
+    @MainActor
+    func testOwnQuestionIsFiledWithTheAnswerAndClearsWhenEmpty() async throws {
+        let viewModel = try await loadedViewModel(Self.feedbackDeckJSON)
+        let card = viewModel.cards[2]
+
+        viewModel.setOwnQuestion("  What would I build?  ", for: card)
+        XCTAssertEqual(viewModel.question(for: card), "What would I build?")
+        XCTAssertEqual(viewModel.answeredCount, 0, "a question alone isn't an answer")
+        viewModel.setText("A running app.", for: card)
+        let payload = DeckAnswersPayload(deck: try XCTUnwrap(viewModel.deck), answers: ["wiki": try XCTUnwrap(viewModel.answer(for: card))], completedAt: morning)
+        XCTAssertEqual(payload.answers.first?.question, "What would I build?")
+
+        viewModel.setOwnQuestion(" ", for: card)
+        XCTAssertEqual(viewModel.question(for: card), "Own?")
+    }
+
+    @MainActor
+    func testNotForMeHidesTheCardFilesTheFeedbackAndUndoBringsItBack() async throws {
+        let viewModel = try await loadedViewModel(Self.feedbackDeckJSON)
+        let book = viewModel.cards[1]
+        viewModel.index = 1
+        viewModel.setText("Half a thought", for: book)
+
+        viewModel.dismiss(book, feedback: DeckFeedback(verdict: .less, reasons: ["topic"], note: "  stale  "))
+
+        XCTAssertEqual(viewModel.visiblePages.map(\.id), ["headline", "wiki", "close"])
+        XCTAssertEqual(viewModel.currentPage?.id, "wiki", "the next card takes its place")
+        XCTAssertEqual(viewModel.skippedCount, 1)
+        XCTAssertEqual(viewModel.answeredCount, 1, "its text is kept")
+        let feedback = try XCTUnwrap(viewModel.answer(for: book)?.feedback)
+        XCTAssertEqual(feedback, DeckFeedback(verdict: .less, reasons: ["topic"], note: "stale"))
+        let message = try DeckAnswersPayload(deck: try XCTUnwrap(viewModel.deck), answers: ["book": try XCTUnwrap(viewModel.answer(for: book))], completedAt: morning).message()
+        XCTAssertTrue(message.contains("\"verdict\" : \"less\""))
+
+        viewModel.undoDismissal()
+        XCTAssertNil(viewModel.lastDismissal)
+        XCTAssertEqual(viewModel.currentPage?.id, "book")
+        XCTAssertEqual(viewModel.answer(for: book), DeckAnswer(card: "book", text: "Half a thought"))
+    }
+
+    @MainActor
+    func testFeedbackAloneIsFiledAndRestoreSkippedBringsEveryCardBack() async throws {
+        let viewModel = try await loadedViewModel(Self.feedbackDeckJSON)
+        viewModel.index = 2
+        viewModel.dismiss(viewModel.cards[2], feedback: DeckFeedback(verdict: .skip))
+        XCTAssertEqual(viewModel.currentPage?.id, "close", "dismissing the last card before close lands on close")
+        viewModel.dismiss(viewModel.cards[1], feedback: DeckFeedback(verdict: .skip))
+        XCTAssertEqual(viewModel.answeredCount, 0)
+        XCTAssertTrue(viewModel.hasChanges)
+        let payload = DeckAnswersPayload(deck: try XCTUnwrap(viewModel.deck), answers: viewModel.answers, completedAt: morning)
+        XCTAssertEqual(payload.answers.map(\.card), ["book", "wiki"])
+
+        viewModel.restoreSkipped()
+        XCTAssertEqual(viewModel.skippedCount, 0)
+        XCTAssertEqual(viewModel.visiblePages.count, 4)
+        XCTAssertEqual(viewModel.answers, [:])
+    }
+
+    @MainActor
+    private func loadedViewModel(_ json: String) async throws -> DailyDeckViewModel {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: json)
+        let viewModel = makeViewModel(client)
+        await viewModel.load()
+        XCTAssertEqual(viewModel.state, .ready)
+        return viewModel
+    }
+
+    static let feedbackDeckJSON = """
+    {"date": "2026-10-04", "kind": "morning", "cards": [
+      {"id": "headline", "type": "headline", "title": "Rest is part of the training"},
+      {"id": "book", "type": "reflect", "kind": "book", "title": "Four Thousand Weeks", "body": "A quote.",
+       "question": "First?", "alt_questions": ["Second?", "Third?"], "reason": "Fits today's thread"},
+      {"id": "wiki", "type": "reflect", "kind": "on_this_day", "title": "Oct 8, 2025", "question": "Own?"},
+      {"id": "close", "type": "close"}
+    ]}
+    """
+
     // MARK: - Journal calendar
 
     func testMonthGridPadsToTheFirstWeekday() {

@@ -52,12 +52,25 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let draft: DeckDraft?
     let actions: [DeckAction]
     let fallback: String?
+    /// Why the brief picked this card today ("fits today's thread · unseen 3 weeks").
+    let reason: String?
+    /// Other questions for the same material; Regenerate steps through them.
+    let altQuestions: [String]
 
     /// Whether answering this card means typing (prompt and reflect cards).
     var takesText: Bool { type == .prompt || type == .reflect }
 
+    /// Whether "Not for Me" applies: material the brief chose, not the deck's own pages.
+    var takesFeedback: Bool {
+        switch type {
+        case .prompt, .reflect, .item, .unknown: true
+        case .headline, .decision, .close: false
+        }
+    }
+
     private enum CodingKeys: String, CodingKey {
         case id, type, title, body, source, lines, question, context, voice, why, draft, actions, fallback
+        case reason, altQuestions
         case itemKind = "kind"
     }
 
@@ -77,6 +90,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         draft = try? c.decodeIfPresent(DeckDraft.self, forKey: .draft)
         actions = (try? c.decodeIfPresent([DeckAction].self, forKey: .actions)) ?? []
         fallback = try? c.decodeIfPresent(String.self, forKey: .fallback)
+        reason = try? c.decodeIfPresent(String.self, forKey: .reason)
+        altQuestions = (try? c.decodeIfPresent([String].self, forKey: .altQuestions)) ?? []
     }
 }
 
@@ -101,21 +116,52 @@ struct DeckAnswer: Codable, Equatable {
     var card: String
     var text: String?
     var action: String?
+    /// The question answered, when it isn't the card's own (regenerated, or the user's).
+    var question: String?
+    /// "Not for Me" on this card; a card with feedback leaves the deck.
+    var feedback: DeckFeedback?
 
     var isEmpty: Bool {
-        !hasText && action == nil
+        !hasText && action == nil && question == nil && feedback == nil
     }
 
     private var hasText: Bool {
         !(text?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
     }
 
-    /// Whether this answer says something for `card`: a decision whose chosen
-    /// action needs text (Answer, Edit) says nothing until the text is there.
-    func isMeaningful(for card: DeckCard) -> Bool {
+    /// Whether this answers `card`: a decision whose chosen action needs text
+    /// (Answer, Edit) answers nothing until the text is there.
+    func isAnswer(for card: DeckCard) -> Bool {
         if let action, card.actions.first(where: { $0.id == action })?.takesText == true { return hasText }
-        return !isEmpty
+        return hasText || action != nil
     }
+
+    /// Whether this says something worth filing: an answer, or feedback on the card.
+    func isMeaningful(for card: DeckCard) -> Bool {
+        feedback != nil || isAnswer(for: card)
+    }
+}
+
+/// Why a card wasn't for the user. `brain brief file` weighs future picks by it.
+struct DeckFeedback: Codable, Equatable {
+    enum Verdict: String, Codable {
+        /// Not today; no signal about the material.
+        case skip
+        /// Show this kind of thing less.
+        case less
+    }
+
+    var verdict: Verdict
+    /// Ids from `DeckFeedback.reasons`.
+    var reasons: [String] = []
+    var note: String?
+
+    static let reasons: [(id: String, label: String)] = [
+        ("topic", "Topic isn't me anymore"),
+        ("question", "Question misses"),
+        ("repeat", "Seen it too often"),
+        ("length", "Too long")
+    ]
 }
 
 /// What one swipe shows: a single card, or every follow-up together so they can be

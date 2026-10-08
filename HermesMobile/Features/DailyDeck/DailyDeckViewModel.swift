@@ -76,8 +76,27 @@ final class DailyDeckViewModel {
 
     var cards: [DeckCard] { deck?.cards ?? [] }
 
-    /// Cards with something to send (the headline and close cards never count).
-    var answeredCount: Int { cards.filter { answers[$0.id]?.isMeaningful(for: $0) == true }.count }
+    /// Cards answered (the headline and close cards never count, nor feedback alone).
+    var answeredCount: Int { cards.filter { answers[$0.id]?.isAnswer(for: $0) == true }.count }
+
+    /// What the deck shows: every page but cards marked "Not for Me". `index` counts these.
+    var visiblePages: [DeckPage] {
+        pages.filter { page in
+            guard case .card(let card) = page else { return true }
+            return answers[card.id]?.feedback == nil
+        }
+    }
+
+    var currentPage: DeckPage? {
+        let visible = visiblePages
+        return visible.indices.contains(index) ? visible[index] : nil
+    }
+
+    /// Cards on this deck marked "Not for Me".
+    var skippedCount: Int { cards.filter { answers[$0.id]?.feedback != nil }.count }
+
+    /// The last card marked "Not for Me" and its answer before that, for Undo.
+    private(set) var lastDismissal: (card: DeckCard, previous: DeckAnswer?)?
 
     func answer(for card: DeckCard) -> DeckAnswer? { answers[card.id] }
 
@@ -145,7 +164,8 @@ final class DailyDeckViewModel {
         pages = DeckPage.pages(for: decoded.cards)
         let draft = store.answers(for: server, date: date, kind: kind)
         answers = draft.isEmpty ? (filedAnswers ?? [:]) : draft
-        index = min(index, max(pages.count - 1, 0))
+        index = min(index, max(visiblePages.count - 1, 0))
+        lastDismissal = nil
         state = .ready
     }
 
@@ -258,6 +278,54 @@ final class DailyDeckViewModel {
         update(card) { answer in
             answer.action = answer.action == action.id ? nil : action.id
             if !action.takesText { answer.text = nil }
+        }
+    }
+
+    /// The question on screen: the user's or a regenerated one, else the card's.
+    func question(for card: DeckCard) -> String? {
+        answers[card.id]?.question ?? card.question
+    }
+
+    /// Steps to the card's next question, wrapping back to its own.
+    func regenerateQuestion(for card: DeckCard) {
+        let options = [card.question].compactMap { $0 } + card.altQuestions
+        guard options.count > 1 else { return }
+        let current = options.firstIndex(of: question(for: card) ?? "") ?? 0
+        let next = options[(current + 1) % options.count]
+        update(card) { $0.question = next == card.question ? nil : next }
+    }
+
+    /// Replaces the card's question with the user's own; an empty one restores the card's.
+    func setOwnQuestion(_ text: String, for card: DeckCard) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        update(card) { $0.question = trimmed.isEmpty || trimmed == card.question ? nil : trimmed }
+    }
+
+    /// Marks a card "Not for Me": it leaves the deck and its feedback is filed with the answers.
+    func dismiss(_ card: DeckCard, feedback: DeckFeedback) {
+        var feedback = feedback
+        feedback.note = feedback.note?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if feedback.note?.isEmpty == true { feedback.note = nil }
+        lastDismissal = (card, answers[card.id])
+        update(card) { $0.feedback = feedback }
+        index = min(index, max(visiblePages.count - 1, 0))
+    }
+
+    /// Puts the last dismissed card back where it was and shows it.
+    func undoDismissal() {
+        guard let (card, previous) = lastDismissal else { return }
+        lastDismissal = nil
+        update(card) { $0 = previous ?? DeckAnswer(card: card.id) }
+        if let position = visiblePages.firstIndex(where: { $0.id == card.id }) { index = position }
+    }
+
+    func clearDismissal() { lastDismissal = nil }
+
+    /// Brings back every card marked "Not for Me" on this deck, dropping their feedback.
+    func restoreSkipped() {
+        lastDismissal = nil
+        for card in cards where answers[card.id]?.feedback != nil {
+            update(card) { $0.feedback = nil }
         }
     }
 
