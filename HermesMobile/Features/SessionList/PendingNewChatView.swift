@@ -84,7 +84,10 @@ struct PendingNewChatView: View {
                     callRequest: callRequest,
                     draftStore: draftStore,
                     restoresDraftSettings: true,
-                    onConversationStarted: markConversationStarted
+                    onConversationStarted: markConversationStarted,
+                    onSessionRenamed: { sessionID, title in
+                        viewModel.applyConfirmedRename(sessionID: sessionID, title: title, modelContext: modelContext)
+                    }
                 )
             } else {
                 pendingContent

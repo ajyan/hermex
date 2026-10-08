@@ -23,7 +23,9 @@ struct ChatDrawerView<ServerMenu: View>: View {
     @ViewBuilder let serverMenu: () -> ServerMenu
 
     var body: some View {
-        VStack(spacing: 0) {
+        let sections = DrawerSessionSections(sessions, isSearching: isSearching)
+
+        return VStack(spacing: 0) {
             // Containers (search, selected row) sit 8pt in; their content lines up at 20pt.
             searchField
                 .padding(.horizontal, 8)
@@ -40,6 +42,10 @@ struct ChatDrawerView<ServerMenu: View>: View {
                             .sessionsScreenListRow()
                     }
 
+                    if !sections.pinned.isEmpty {
+                        pinnedSection(sections.pinned)
+                    }
+
                     recentsHeader
                         .sessionsScreenListRow()
                 }
@@ -52,7 +58,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
                 SessionListRowsSection(
                     viewModel: viewModel,
                     searchText: searchText,
-                    sessions: sessions,
+                    sessions: sections.recents,
                     emptyTitle: isSearching ? String(localized: "No matching sessions") : String(localized: "No sessions yet"),
                     emptyDescription: isSearching ? String(localized: "Try another search.") : nil,
                     isSearchActive: isSearching,
@@ -60,7 +66,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
                     showsWorkspace: showsWorkspace,
                     selectedSessionID: selectedSessionID,
                     actions: actions,
-                    suppressEmptyState: showsFilterEmptyState,
+                    suppressEmptyState: showsFilterEmptyState || !sections.pinned.isEmpty,
                     showsHeader: isSearching
                 )
             }
@@ -132,6 +138,29 @@ struct ChatDrawerView<ServerMenu: View>: View {
         .buttonStyle(.plain)
         .padding(.horizontal, 20)
         .sessionsScreenListRow()
+    }
+
+    @ViewBuilder
+    private func pinnedSection(_ pinned: [SessionSummary]) -> some View {
+        Text("Pinned")
+            .font(.headline)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .accessibilityAddTraits(.isHeader)
+            .sessionsScreenListRow()
+
+        ForEach(pinned) { session in
+            SessionInteractiveRow(
+                viewModel: viewModel,
+                session: session,
+                showsMessageCount: showsMessageCount,
+                showsWorkspace: showsWorkspace,
+                selectedSessionID: selectedSessionID,
+                actions: actions
+            )
+        }
     }
 
     private var recentsHeader: some View {
@@ -228,5 +257,22 @@ struct ChatDrawerView<ServerMenu: View>: View {
                 .fill(Color.hxSeparator)
                 .frame(height: 1 / UIScreen.main.scale)
         }
+    }
+}
+
+/// Splits the drawer's rows into a Pinned section above Recents, each keeping
+/// the incoming order. Search shows one flat list of matches instead.
+struct DrawerSessionSections: Equatable {
+    let pinned: [SessionSummary]
+    let recents: [SessionSummary]
+
+    init(_ sessions: [SessionSummary], isSearching: Bool) {
+        guard !isSearching else {
+            pinned = []
+            recents = sessions
+            return
+        }
+        pinned = sessions.filter { $0.pinned == true }
+        recents = sessions.filter { $0.pinned != true }
     }
 }

@@ -4592,6 +4592,58 @@ final class ChatViewModelSendTests: XCTestCase {
     }
 
     @MainActor
+    func testRenameSessionFromChatTitleShowsServerStoredTitle() async throws {
+        let viewModel = try makeViewModel { request in
+            XCTAssertEqual(request.url?.path, "/api/session/rename")
+            let body = try XCTUnwrap(apiTestJSONBody(from: request))
+            XCTAssertEqual(body["session_id"] as? String, "session-abc")
+            XCTAssertEqual(body["title"] as? String, "Launch Notes")
+            return apiTestJSONResponse(
+                #"{"ok":true,"session":{"session_id":"session-abc","title":"Launch Notes v2"}}"#,
+                for: request
+            )
+        }
+
+        let result = await viewModel.renameSession(to: "  Launch Notes  ")
+
+        XCTAssertEqual(result, .renamed("Launch Notes v2"))
+        XCTAssertEqual(viewModel.displayTitle, "Launch Notes v2")
+    }
+
+    @MainActor
+    func testRenameSessionFailureKeepsChatTitle() async throws {
+        let viewModel = try makeViewModel { request in
+            let response = try XCTUnwrap(HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 500,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            ))
+            return (response, Data(#"{"error":"rename failed"}"#.utf8))
+        }
+
+        let result = await viewModel.renameSession(to: "Launch Notes")
+
+        guard case .failed = result else {
+            return XCTFail("Expected a failed rename, got \(result)")
+        }
+        XCTAssertEqual(viewModel.displayTitle, "Planning")
+    }
+
+    @MainActor
+    func testRenameSessionBlankTitleMakesNoRequest() async throws {
+        let viewModel = try makeViewModel { request in
+            XCTFail("Blank titles should not reach the server: \(request.url?.path ?? "nil")")
+            throw URLError(.badURL)
+        }
+
+        let result = await viewModel.renameSession(to: "   ")
+
+        XCTAssertEqual(result, .failed("Enter a session title."))
+        XCTAssertEqual(viewModel.displayTitle, "Planning")
+    }
+
+    @MainActor
     func testLateContextJoinPreservesNilContextReconnectMessageAndCachesIt() async throws {
         let context = try makeContext()
         let sessionRequestStarted = expectation(description: "nil-context session reload started")

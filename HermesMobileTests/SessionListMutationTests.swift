@@ -1203,6 +1203,32 @@ final class SessionListMutationTests: XCTestCase {
     }
 
     @MainActor
+    func testApplyConfirmedRenameUpdatesRowAndCacheWithoutRequest() async throws {
+        var requestedPaths: [String] = []
+        let context = try makeContext()
+        let server = try XCTUnwrap(URL(string: "https://example.test"))
+        let viewModel = try makeViewModel { request in
+            let path = request.url?.path ?? "nil"
+            requestedPaths.append(path)
+            guard path == "/api/sessions" else {
+                XCTFail("Unexpected request path: \(path)")
+                throw URLError(.badURL)
+            }
+            return apiTestJSONResponse(self.sessionListJSON(forLoadCount: 1), for: request)
+        }
+
+        await viewModel.load(modelContext: context)
+        let session = try XCTUnwrap(viewModel.sessions.first)
+        viewModel.applyConfirmedRename(sessionID: try XCTUnwrap(session.sessionId), title: "Launch Notes", modelContext: context)
+        viewModel.applyConfirmedRename(sessionID: "session-not-loaded", title: "Ignored", modelContext: context)
+        let cachedSessions = try CacheStore.cachedSessions(serverURL: server, in: context)
+
+        XCTAssertEqual(requestedPaths, ["/api/sessions"])
+        XCTAssertEqual(viewModel.sessions.map(\.title), ["Launch Notes"])
+        XCTAssertEqual(cachedSessions.map(\.title), ["Launch Notes"])
+    }
+
+    @MainActor
     func testRenameSessionBlocksBlankTitleBeforeNetworkRequest() async throws {
         let viewModel = try makeViewModel { request in
             XCTFail("Blank session titles should not make network requests: \(request.url?.path ?? "nil")")

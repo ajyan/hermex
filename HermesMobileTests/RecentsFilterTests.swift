@@ -57,6 +57,32 @@ final class RecentsFilterTests: XCTestCase {
         XCTAssertEqual(viewModel.availableRecentsFilters, [.all, .hermes, .claudeCode])
     }
 
+    func testDrawerSectionsMovePinnedRowsAboveRecentsWithoutDuplicates() {
+        let sessions = [
+            SessionSummary(sessionId: "pinned-new", pinned: true),
+            SessionSummary(sessionId: "recent-new"),
+            SessionSummary(sessionId: "pinned-old", pinned: true),
+            SessionSummary(sessionId: "recent-old", pinned: false)
+        ]
+
+        let sections = DrawerSessionSections(sessions, isSearching: false)
+
+        XCTAssertEqual(sections.pinned.compactMap(\.sessionId), ["pinned-new", "pinned-old"])
+        XCTAssertEqual(sections.recents.compactMap(\.sessionId), ["recent-new", "recent-old"])
+    }
+
+    func testDrawerSectionsKeepSearchResultsFlat() {
+        let sessions = [
+            SessionSummary(sessionId: "pinned", pinned: true),
+            SessionSummary(sessionId: "recent")
+        ]
+
+        let sections = DrawerSessionSections(sessions, isSearching: true)
+
+        XCTAssertTrue(sections.pinned.isEmpty)
+        XCTAssertEqual(sections.recents.compactMap(\.sessionId), ["pinned", "recent"])
+    }
+
     @MainActor
     private func loadedViewModel() async throws -> SessionListViewModel {
         let server = try XCTUnwrap(URL(string: "https://example.test"))
