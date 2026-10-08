@@ -99,6 +99,11 @@ struct ChatShellView: View {
     @State private var returnRefreshID: UUID?
     @State private var actionToast = ActionToastState()
     @State private var archiveToastRoute = SessionListArchiveToastRoute()
+    /// The running auto-archive pass; owned here so it ends with the shell.
+    @State private var autoArchiveTask: Task<Void, Never>?
+    /// Chats the last pass archived, held until the drawer (the toast's host) is open.
+    @State private var pendingAutoArchived: [SessionSummary] = []
+    @State private var isPresentingArchiveReview = false
     @FocusState private var searchFieldIsFocused: Bool
     @AppStorage(SessionRowDisplaySettings.showMessageCountKey) private var showsSessionMessageCount = true
     @AppStorage(SessionRowDisplaySettings.showWorkspaceKey) private var showsSessionWorkspace = true
@@ -163,6 +168,7 @@ struct ChatShellView: View {
                 }
                 if phase == .active, wasBackgrounded {
                     wasBackgrounded = false
+                    viewModel.noteAppForegrounded()
                     if foregroundRefresh.appReturned(
                         didCompleteInitialLoad: didCompleteInitialLoad,
                         isLoading: viewModel.isLoading
@@ -282,6 +288,11 @@ struct ChatShellView: View {
                 }
                 .presentationDetents([.medium])
             }
+            .sheet(isPresented: $isPresentingArchiveReview) {
+                ArchiveReviewSheet(viewModel: viewModel) { session in
+                    removeSessionFromNavigation(session)
+                }
+            }
             .sheet(isPresented: $isPresentingAddServer) {
                 // Reuse #17's add-server flow directly as a power-user shortcut.
                 // On success `addServer` switches the active server, which
@@ -335,6 +346,7 @@ struct ChatShellView: View {
             }
             .onDisappear {
                 sessionOpenTask?.cancel()
+                autoArchiveTask?.cancel()
                 viewModel.invalidateSessionOpening()
                 actionToast.dismiss()
             }
@@ -371,6 +383,7 @@ struct ChatShellView: View {
                 // Closing by any path (scrim, Esc, picking a row) must not leave the
                 // keyboard typing into the hidden search field.
                 if !isOpen { searchFieldIsFocused = false }
+                if isOpen { showPendingAutoArchiveToast() }
                 guard ShellNavigationState.drawerOpenRequestsRefresh(wasOpen: wasOpen, isOpen: isOpen) else { return }
                 refreshAfterReturningIfNeeded()
             }
@@ -650,6 +663,7 @@ struct ChatShellView: View {
             canCreateNewChat: !viewModel.isViewingCachedData && !navigation.isCreatingNewChat,
             onNewChat: openNewChat,
             onOpen: { navigation.push($0) },
+            onReviewArchiveCandidates: { isPresentingArchiveReview = true },
             refresh: { await refreshSessionsAndActiveProfile() }
         ) {
             AvatarServerSwitcherMenu(
@@ -736,6 +750,9 @@ struct ChatShellView: View {
             },
             archive: { session in
                 Task { await archive(session) }
+            },
+            summarizeAndArchive: { session in
+                Task { await summarizeAndArchive(session) }
             },
             delete: { session in
                 sessionPendingDeletion = session
@@ -877,6 +894,74 @@ struct ChatShellView: View {
         await viewModel.load(modelContext: modelContext)
         guard !Task.isCancelled else { return }
         handleLastError()
+        startAutoArchivePassIfDue()
+    }
+
+    /// Starts this foreground's auto-archive pass after a live load. It runs
+    /// in its own task so a refresh that replaces the load task can't cut it short.
+    private func startAutoArchivePassIfDue() {
+        guard viewModel.isAutoArchiveDue, autoArchiveTask == nil else { return }
+        autoArchiveTask = Task {
+            let archived = await viewModel.runAutoArchivePassIfDue(
+                excludingSessionID: navigation.selectedSessionID,
+                modelContext: modelContext
+            )
+            autoArchiveTask = nil
+            guard !Task.isCancelled else { return }
+            handleLastError()
+            guard !archived.isEmpty else { return }
+            pendingAutoArchived = archived
+            showPendingAutoArchiveToast()
+        }
+    }
+
+    /// "Archived N idle chats · Undo", shown once the drawer is open.
+    private func showPendingAutoArchiveToast() {
+        guard navigation.isDrawerOpen, !pendingAutoArchived.isEmpty else { return }
+        let batch = pendingAutoArchived
+        pendingAutoArchived = []
+        let message = String(localized: "Archived \(batch.count) idle chats")
+        actionToast.show(
+            ActionToast(
+                message: message,
+                systemImage: "archivebox",
+                accessibilityLabel: message,
+                actionTitle: String(localized: "Undo"),
+                action: {
+                    Task {
+                        _ = await viewModel.undoAutoArchive(batch, modelContext: modelContext)
+                        handleLastError()
+                    }
+                }
+            )
+        )
+    }
+
+    /// The row menu's Summarize & Archive. A failure leaves the chat in place
+    /// and says why in a toast that can retry.
+    private func summarizeAndArchive(_ session: SessionSummary) async {
+        if let failure = await viewModel.summarizeAndArchive(session, modelContext: modelContext) {
+            handleLastError()
+            actionToast.show(
+                ActionToast(
+                    message: String(localized: "Summary failed"),
+                    systemImage: "exclamationmark.triangle",
+                    accessibilityLabel: String.localizedStringWithFormat(
+                        String(localized: "%@, %@"),
+                        SessionRowView.displayTitle(for: session),
+                        failure
+                    ),
+                    actionTitle: String(localized: "Retry"),
+                    action: {
+                        Task { await summarizeAndArchive(session) }
+                    }
+                )
+            )
+            return
+        }
+        guard !viewModel.sessions.contains(where: { $0.sessionId == session.sessionId }) else { return }
+        removeSessionFromNavigation(session)
+        SessionHaptics.archiveStateChanged(isEnabled: isHapticsEnabled)
     }
 
     /// Skipped while the list shows cached rows: the server was unreachable a
@@ -916,6 +1001,7 @@ struct ChatShellView: View {
         handleLastError()
 
         if didArchive {
+            viewModel.recordManualArchive(session)
             removeSessionFromNavigation(session)
             SessionHaptics.archiveStateChanged(isEnabled: isHapticsEnabled)
             if archiveToastRoute.archiveConfirmed(archiveNumber, isListShowing: isArchiveToastHostShowing) {
@@ -957,6 +1043,7 @@ struct ChatShellView: View {
         handleLastError()
 
         if didUnarchive {
+            viewModel.forgetManualArchive(session)
             SessionHaptics.archiveStateChanged(isEnabled: isHapticsEnabled)
         }
     }

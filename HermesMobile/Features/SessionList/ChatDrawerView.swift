@@ -19,6 +19,8 @@ struct ChatDrawerView<ServerMenu: View>: View {
     let canCreateNewChat: Bool
     let onNewChat: () -> Void
     let onOpen: (ShellPushDestination) -> Void
+    /// Opens the sheet of idle chats waiting for a keep-or-archive decision.
+    let onReviewArchiveCandidates: () -> Void
     let refresh: () async -> Void
     @ViewBuilder let serverMenu: () -> ServerMenu
 
@@ -40,6 +42,12 @@ struct ChatDrawerView<ServerMenu: View>: View {
 
                     if viewModel.isViewingCachedData {
                         OfflineCacheBanner()
+                            .padding(.top, 8)
+                            .sessionsScreenListRow()
+                    }
+
+                    if !viewModel.archiveReviewCandidates.isEmpty {
+                        archiveReviewBanner(count: viewModel.archiveReviewCandidates.count)
                             .padding(.top, 8)
                             .sessionsScreenListRow()
                     }
@@ -163,6 +171,31 @@ struct ChatDrawerView<ServerMenu: View>: View {
         .buttonStyle(.plain)
         .padding(.horizontal, 20)
         .sessionsScreenListRow()
+    }
+
+    /// "N chats to review before archiving", above the chat rows.
+    private func archiveReviewBanner(count: Int) -> some View {
+        Button(action: onReviewArchiveCandidates) {
+            HStack(spacing: 10) {
+                Image(systemName: "archivebox")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                Text("\(count) chats to review before archiving")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.forward")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 12)
+            .frame(minHeight: 44)
+            .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 8)
     }
 
     @ViewBuilder

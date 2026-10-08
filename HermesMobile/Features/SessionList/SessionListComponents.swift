@@ -7,6 +7,7 @@ struct SessionListRowActions {
     let toggleUnread: (SessionSummary) -> Void
     let togglePinned: (SessionSummary) -> Void
     let archive: (SessionSummary) -> Void
+    let summarizeAndArchive: (SessionSummary) -> Void
     let delete: (SessionSummary) -> Void
     let rename: (SessionSummary) -> Void
     let duplicate: (SessionSummary) -> Void
@@ -263,6 +264,14 @@ struct SessionInteractiveRow: View {
             )
         }
         .buttonStyle(.plain)
+        .overlay(alignment: .trailing) {
+            if viewModel.isSummarizing(session) {
+                ProgressView()
+                    .controlSize(.small)
+                    .padding(.trailing, 12)
+                    .accessibilityLabel(Text("Summarizing"))
+            }
+        }
         .id(session.id)
         .background(
             session.sessionId == selectedSessionID
@@ -450,6 +459,15 @@ struct SessionRowContextMenu: View {
                 Label("Archive", systemImage: "archivebox")
             }
             .disabled(!canShowSessionMutationActions || isMutating)
+
+            if !session.requiresExternalImport {
+                Button {
+                    actions.summarizeAndArchive(session)
+                } label: {
+                    Label("Summarize & Archive", systemImage: "text.badge.checkmark")
+                }
+                .disabled(!canShowSessionMutationActions || isMutating)
+            }
 
             Button(role: .destructive) {
                 actions.delete(session)
