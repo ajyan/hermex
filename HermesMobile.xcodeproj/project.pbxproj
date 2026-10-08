@@ -635,6 +635,7 @@
 		1F2EF7D6C585EAF7E1C46CD2 /* DeckCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */; };
 		B1A1C0DE0000000000000001 /* BrainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000101 /* BrainView.swift */; };
 		B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000102 /* BrainViewModel.swift */; };
+		B1A1C0DE0000000000000201 /* BrainViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */; };
 		2A8CB7ACCDBA9BBE34E57FDC /* DailyDeckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A997D807C262D12E5491E89 /* DailyDeckTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -1310,6 +1311,7 @@
 		B1A1C0DE0000000000000101 /* BrainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainView.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000102 /* BrainViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainViewModel.swift; sourceTree = "<group>"; };
 		7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckCardView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainViewModelTests.swift; sourceTree = "<group>"; };
 		3A997D807C262D12E5491E89 /* DailyDeckTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDeckTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -1444,6 +1446,7 @@
 			isa = PBXGroup;
 			children = (
 				3A997D807C262D12E5491E89 /* DailyDeckTests.swift */,
+				B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */,
 				F42EE649B1547E6CBDC22A5A /* VoiceCallFlowTests.swift */,
 				A1C0FFEE0000000000000F02 /* VoiceCallAudioLevelsTests.swift */,
 				CC7685CE580C850A7254B14E /* VoiceCallChatSnapshotTests.swift */,
@@ -2911,6 +2914,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2A8CB7ACCDBA9BBE34E57FDC /* DailyDeckTests.swift in Sources */,
+				B1A1C0DE0000000000000201 /* BrainViewModelTests.swift in Sources */,
 				B15C1E3E39CB8EAC55E8BD67 /* VoiceCallFlowTests.swift in Sources */,
 				A1C0FFEE0000000000000B02 /* VoiceCallAudioLevelsTests.swift in Sources */,
 				BF7E56FE3F4B476686A0DCEF /* VoiceCallChatSnapshotTests.swift in Sources */,

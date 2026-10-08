@@ -153,7 +153,7 @@ enum Endpoint {
     case upload
     case transcribe
     case tts
-    /// The second brain's contact list (read-only CRM over the webui's brain API).
+    /// The Second Brain CRM people list. Fork-only (`api/brain.py` in this user's hermes-webui); stock servers 404.
     case brainPeople
     /// One contact's full profile. `file` is the contact's note filename.
     case brainPerson(file: String)
