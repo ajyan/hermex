@@ -18,11 +18,10 @@ enum DailyDeckState: Equatable {
     case loading
     /// No workspace chosen yet and the server has several: the user picks one.
     case needsWorkspace([String])
-    /// The workspace has no deck for today (the brief has not run, or was skipped).
+    /// The workspace has no deck for that day (the brief has not run, or was skipped).
     case noDeck
+    /// A deck is on screen: to answer, or to reread and edit once filed (`isFiled`).
     case ready
-    /// Today's answers are already filed.
-    case filed
     case failed(String)
 }
 
@@ -43,11 +42,18 @@ final class DailyDeckViewModel {
     private(set) var filing: DailyDeckFilingState = .idle
     private(set) var sessionID: String?
     private(set) var workspace: String?
+    /// What was last filed for the deck on screen; nil until it is filed.
+    private(set) var filedAnswers: [String: DeckAnswer]?
+    /// Days with a deck in `briefs/`, newest first.
+    private(set) var availableDates: [String] = []
     /// The page on screen.
     var index = 0
 
     let server: URL
-    let date: String
+    /// The user's today: its deck opens first.
+    let today: String
+    /// The day of the deck on screen.
+    private(set) var date: String
     let kind = "morning"
     private let client: any DailyDeckDataClient
     private let store: DailyDeckStore
@@ -58,7 +64,8 @@ final class DailyDeckViewModel {
         self.client = client
         self.store = store
         self.now = now
-        self.date = DailyDeckPaths.day(now())
+        self.today = DailyDeckPaths.day(now())
+        self.date = today
     }
 
     convenience init(server: URL) {
@@ -72,8 +79,25 @@ final class DailyDeckViewModel {
 
     func answer(for card: DeckCard) -> DeckAnswer? { answers[card.id] }
 
+    var isFiled: Bool { filedAnswers != nil }
+
+    /// Whether the answers differ from what was filed (always true before the first filing).
+    var hasChanges: Bool {
+        guard let filedAnswers else { return true }
+        return meaningful(answers) != meaningful(filedAnswers)
+    }
+
+    private func meaningful(_ answers: [String: DeckAnswer]) -> [String: DeckAnswer] {
+        Dictionary(uniqueKeysWithValues: cards.compactMap { card in
+            guard var answer = answers[card.id], answer.isMeaningful(for: card) else { return nil }
+            answer.text = answer.text?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return (card.id, answer)
+        })
+    }
+
     // MARK: Loading
 
+    /// Finds the brief's folder, then opens the deck for `date` (today on first load).
     func load() async {
         state = .loading
         do {
@@ -81,27 +105,51 @@ final class DailyDeckViewModel {
             self.workspace = workspace
             let (sessionID, names) = try await sessionAndBriefs(workspace: workspace)
             self.sessionID = sessionID
-            guard let names else { state = .noDeck; return }
-            if names.contains(fileName(DailyDeckPaths.answers(date: date, kind: kind))) {
-                state = .filed
-                return
-            }
-            guard names.contains(fileName(DailyDeckPaths.deck(date: date, kind: kind))) else {
-                state = .noDeck
-                return
-            }
-            let content = try await client.fileContent(sessionID: sessionID, path: DailyDeckPaths.deck(date: date, kind: kind))
-            let decoded = try DailyDeck.decode(content)
-            deck = decoded
-            pages = DeckPage.pages(for: decoded.cards)
-            answers = store.answers(for: server, date: date, kind: kind)
-            index = min(index, max(pages.count - 1, 0))
-            state = .ready
+            availableDates = Self.deckDates(in: names ?? [], kind: kind)
+            try await openDeck(names: names ?? [], sessionID: sessionID)
         } catch is CancellationError {
             // A newer load owns the state.
         } catch {
             state = .failed(error.localizedDescription)
         }
+    }
+
+    /// Opens another day's deck from `availableDates`, to reread or edit it.
+    func show(date: String) async {
+        guard date != self.date || state != .ready else { return }
+        self.date = date
+        index = 0
+        await load()
+    }
+
+    /// Loads the deck and, when it was filed, the filed answers. Unsent edits on this
+    /// device win over the filed copy, so leaving mid-edit loses nothing.
+    private func openDeck(names: [String], sessionID: String) async throws {
+        deck = nil
+        pages = []
+        filedAnswers = nil
+        guard names.contains(fileName(DailyDeckPaths.deck(date: date, kind: kind))) else {
+            state = .noDeck
+            return
+        }
+        let content = try await client.fileContent(sessionID: sessionID, path: DailyDeckPaths.deck(date: date, kind: kind))
+        let decoded = try DailyDeck.decode(content)
+        if names.contains(fileName(DailyDeckPaths.answers(date: date, kind: kind))) {
+            let filed = try await client.fileContent(sessionID: sessionID, path: DailyDeckPaths.answers(date: date, kind: kind))
+            filedAnswers = DeckAnswersFile.decodeAnswers(filed)
+        }
+        deck = decoded
+        pages = DeckPage.pages(for: decoded.cards)
+        let draft = store.answers(for: server, date: date, kind: kind)
+        answers = draft.isEmpty ? (filedAnswers ?? [:]) : draft
+        index = min(index, max(pages.count - 1, 0))
+        state = .ready
+    }
+
+    /// `2026-10-05` from `2026-10-05.morning.json`, newest first.
+    static func deckDates(in names: [String], kind: String) -> [String] {
+        let suffix = ".\(kind).json"
+        return names.filter { $0.hasSuffix(suffix) }.map { String($0.dropLast(suffix.count)) }.sorted(by: >)
     }
 
     func chooseWorkspace(_ path: String) async {
@@ -129,10 +177,10 @@ final class DailyDeckViewModel {
         return nil
     }
 
-    /// Today's session and the names in `briefs/` (nil when the folder is missing).
-    /// A remembered session the server no longer knows is replaced once.
+    /// A session to read `briefs/` through (today's, whichever deck is shown) and the names
+    /// in it (nil when the folder is missing). A session the server lost is replaced once.
     private func sessionAndBriefs(workspace: String) async throws -> (String, [String]?) {
-        if let stored = store.session(for: server, date: date) {
+        if let stored = store.session(for: server, date: today) {
             do {
                 return (stored, try await briefNames(sessionID: stored))
             } catch let error as APIError where error.isVanishedSession {
@@ -140,8 +188,8 @@ final class DailyDeckViewModel {
             }
         }
         let created = try await client.createSession(workspace: workspace)
-        store.setSession(created, for: server, date: date)
-        try? await client.renameSession(id: created, title: Self.sessionTitle(for: now()))
+        store.setSession(created, for: server, date: today)
+        try? await client.renameSession(id: created, title: Self.sessionTitle(for: date))
         return (created, try await briefNames(sessionID: created))
     }
 
@@ -155,8 +203,9 @@ final class DailyDeckViewModel {
 
     private func fileName(_ path: String) -> String { (path as NSString).lastPathComponent }
 
-    static func sessionTitle(for date: Date) -> String {
-        "Daily Brief · \(date.formatted(.dateTime.month(.abbreviated).day()))"
+    /// "Daily Brief · Oct 5" for the deck's day.
+    static func sessionTitle(for day: String) -> String {
+        "Daily Brief · \(DailyDeckPaths.label(day))"
     }
 
     // MARK: Answering
@@ -183,21 +232,22 @@ final class DailyDeckViewModel {
     // MARK: Filing
 
     /// Sends the answers in a fresh session, so the chat it opens holds only this filing
-    /// (never an earlier, stopped attempt). Returns that session's id on success so the
-    /// caller can open it and watch the agent file them.
+    /// (never an earlier, stopped attempt). Filing again sends every answer; the server
+    /// updates only what changed. Returns the session id on success so the caller can
+    /// open it and watch the agent file them.
     func file() async -> String? {
         guard let deck, let workspace, filing != .filing else { return nil }
         filing = .filing
         do {
-            let message = try DeckAnswersPayload(deck: deck, answers: answers, completedAt: now()).message()
+            let message = try DeckAnswersPayload(deck: deck, answers: answers, completedAt: now()).message(refiling: isFiled)
             let sessionID = try await client.createSession(workspace: workspace)
-            try? await client.renameSession(id: sessionID, title: Self.sessionTitle(for: now()))
-            store.setSession(sessionID, for: server, date: date)
+            try? await client.renameSession(id: sessionID, title: Self.sessionTitle(for: date))
+            store.setSession(sessionID, for: server, date: today)
             self.sessionID = sessionID
             try await client.startChat(sessionID: sessionID, message: message, workspace: workspace)
             store.setAnswers([:], for: server, date: date, kind: kind)
+            filedAnswers = answers
             filing = .idle
-            state = .filed
             return sessionID
         } catch {
             filing = .failed(error.localizedDescription)
