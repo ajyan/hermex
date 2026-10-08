@@ -567,6 +567,9 @@ struct ChatShellView: View {
             DailyDeckView(server: server) { sessionID in
                 Task { await openDeepLinkedSession(id: sessionID) }
             }
+        case .brain:
+            BrainView(server: server, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
         case .projects:
             ProjectsView(
                 viewModel: viewModel,
@@ -683,7 +686,8 @@ struct ChatShellView: View {
             memory: showsMemorySection,
             insights: showsInsightsSection,
             activeProfile: showsActiveProfileSection,
-            projects: showsProjectsSection
+            projects: showsProjectsSection,
+            brain: true
         )
     }
 

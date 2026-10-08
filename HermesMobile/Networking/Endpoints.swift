@@ -153,6 +153,10 @@ enum Endpoint {
     case upload
     case transcribe
     case tts
+    /// The second brain's contact list (read-only CRM over the webui's brain API).
+    case brainPeople
+    /// One contact's full profile. `file` is the contact's note filename.
+    case brainPerson(file: String)
 
     var path: String {
         switch self {
@@ -418,6 +422,10 @@ enum Endpoint {
             return "/api/transcribe"
         case .tts:
             return "/api/tts"
+        case .brainPeople:
+            return "/api/brain/people"
+        case .brainPerson:
+            return "/api/brain/person"
         }
     }
 
@@ -615,6 +623,8 @@ enum Endpoint {
                 items.append(URLQueryItem(name: "file", value: file))
             }
             return items
+        case let .brainPerson(file):
+            return [URLQueryItem(name: "file", value: file)]
         default:
             return []
         }
