@@ -163,6 +163,7 @@
 		6A782D4CAA2AF88D5F94A780 /* ShellNavigationStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 456E58BC75E2EBE335416D28 /* ShellNavigationStateTests.swift */; };
 		8ED1BF0E83115706BFB110A4 /* DrawerSettleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3A55225279372080EAE5602 /* DrawerSettleTests.swift */; };
 		C2067E557A82E018C2421DC8 /* RecentsFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E6E51C25647DF0AB97836D6 /* RecentsFilterTests.swift */; };
+		BDADA90E35426E18B6B4C495 /* AutoArchiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A6E520F53A63761084F83A3 /* AutoArchiveTests.swift */; };
 		19C1150000000000000000A3 /* CliSessionsSyncModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19C1150000000000000000A4 /* CliSessionsSyncModelTests.swift */; };
 		C03910000000000000000010 /* APIEndpointContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03900000000000000000010 /* APIEndpointContractTests.swift */; };
 		C03910000000000000000011 /* CronManagementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03900000000000000000011 /* CronManagementTests.swift */; };
@@ -211,6 +212,10 @@
 		304FA3D5BBF98F6499CB988D /* ProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A7827505CB6DC88368DBB98 /* ProjectsView.swift */; };
 		D02817A0E87BEF62EF5E23F0 /* DrawerSettle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6501C5C136AD44341F12A22 /* DrawerSettle.swift */; };
 		93E10058E8552A4AA439B3A1 /* RecentsFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96B6ABCB2B2999629CD767C8 /* RecentsFilter.swift */; };
+		17C6736606E293C99BE86638 /* ArchiveReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 840C11CB0B65C68095DDD79D /* ArchiveReviewSheet.swift */; };
+		3EC76C98C56F0B12B4BBF9E9 /* SessionListViewModel+AutoArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 429F8EA2085D0C07166ED24E /* SessionListViewModel+AutoArchive.swift */; };
+		815BBD42E72D0ED334DEF769 /* ChatDigestSummarizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FFFED4F8D6A1138AD6D62B8 /* ChatDigestSummarizer.swift */; };
+		DAB4490B2F44EE0F00EABE6C /* AutoArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22A3FB95B3192EE1048414D0 /* AutoArchive.swift */; };
 		A04300000000000000000002 /* SessionListActionConfirmations.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04300000000000000000012 /* SessionListActionConfirmations.swift */; };
 		A04300000000000000000003 /* SessionMutator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04300000000000000000013 /* SessionMutator.swift */; };
 		A040C0DE0000000000000001 /* ProjectCreationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A040C0DE0000000000000002 /* ProjectCreationSheet.swift */; };
@@ -823,6 +828,7 @@
 		456E58BC75E2EBE335416D28 /* ShellNavigationStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellNavigationStateTests.swift; sourceTree = "<group>"; };
 		B3A55225279372080EAE5602 /* DrawerSettleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawerSettleTests.swift; sourceTree = "<group>"; };
 		6E6E51C25647DF0AB97836D6 /* RecentsFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentsFilterTests.swift; sourceTree = "<group>"; };
+		6A6E520F53A63761084F83A3 /* AutoArchiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoArchiveTests.swift; sourceTree = "<group>"; };
 		19C1150000000000000000A4 /* CliSessionsSyncModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CliSessionsSyncModelTests.swift; sourceTree = "<group>"; };
 		C03900000000000000000010 /* APIEndpointContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIEndpointContractTests.swift; sourceTree = "<group>"; };
 		C03900000000000000000011 /* CronManagementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CronManagementTests.swift; sourceTree = "<group>"; };
@@ -871,6 +877,10 @@
 		7A7827505CB6DC88368DBB98 /* ProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsView.swift; sourceTree = "<group>"; };
 		C6501C5C136AD44341F12A22 /* DrawerSettle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawerSettle.swift; sourceTree = "<group>"; };
 		96B6ABCB2B2999629CD767C8 /* RecentsFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentsFilter.swift; sourceTree = "<group>"; };
+		840C11CB0B65C68095DDD79D /* ArchiveReviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveReviewSheet.swift; sourceTree = "<group>"; };
+		429F8EA2085D0C07166ED24E /* SessionListViewModel+AutoArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SessionListViewModel+AutoArchive.swift"; sourceTree = "<group>"; };
+		3FFFED4F8D6A1138AD6D62B8 /* ChatDigestSummarizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatDigestSummarizer.swift; sourceTree = "<group>"; };
+		22A3FB95B3192EE1048414D0 /* AutoArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoArchive.swift; sourceTree = "<group>"; };
 		A04300000000000000000012 /* SessionListActionConfirmations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListActionConfirmations.swift; sourceTree = "<group>"; };
 		A04300000000000000000013 /* SessionMutator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionMutator.swift; sourceTree = "<group>"; };
 		A040C0DE0000000000000002 /* ProjectCreationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectCreationSheet.swift; sourceTree = "<group>"; };
@@ -1540,6 +1550,7 @@
 				456E58BC75E2EBE335416D28 /* ShellNavigationStateTests.swift */,
 				B3A55225279372080EAE5602 /* DrawerSettleTests.swift */,
 				6E6E51C25647DF0AB97836D6 /* RecentsFilterTests.swift */,
+				6A6E520F53A63761084F83A3 /* AutoArchiveTests.swift */,
 				19C1150000000000000000A4 /* CliSessionsSyncModelTests.swift */,
 				C03900000000000000000010 /* APIEndpointContractTests.swift */,
 				C03900000000000000000011 /* CronManagementTests.swift */,
@@ -1898,6 +1909,10 @@
 				7A7827505CB6DC88368DBB98 /* ProjectsView.swift */,
 				C6501C5C136AD44341F12A22 /* DrawerSettle.swift */,
 				96B6ABCB2B2999629CD767C8 /* RecentsFilter.swift */,
+				840C11CB0B65C68095DDD79D /* ArchiveReviewSheet.swift */,
+				429F8EA2085D0C07166ED24E /* SessionListViewModel+AutoArchive.swift */,
+				3FFFED4F8D6A1138AD6D62B8 /* ChatDigestSummarizer.swift */,
+				22A3FB95B3192EE1048414D0 /* AutoArchive.swift */,
 				A04300000000000000000012 /* SessionListActionConfirmations.swift */,
 				A04300000000000000000013 /* SessionMutator.swift */,
 				C08800000000000000000002 /* SessionHaptics.swift */,
@@ -2838,6 +2853,10 @@
 				304FA3D5BBF98F6499CB988D /* ProjectsView.swift in Sources */,
 				D02817A0E87BEF62EF5E23F0 /* DrawerSettle.swift in Sources */,
 				93E10058E8552A4AA439B3A1 /* RecentsFilter.swift in Sources */,
+				17C6736606E293C99BE86638 /* ArchiveReviewSheet.swift in Sources */,
+				3EC76C98C56F0B12B4BBF9E9 /* SessionListViewModel+AutoArchive.swift in Sources */,
+				815BBD42E72D0ED334DEF769 /* ChatDigestSummarizer.swift in Sources */,
+				DAB4490B2F44EE0F00EABE6C /* AutoArchive.swift in Sources */,
 				A04300000000000000000002 /* SessionListActionConfirmations.swift in Sources */,
 				A04300000000000000000003 /* SessionMutator.swift in Sources */,
 				A040C0DE0000000000000001 /* ProjectCreationSheet.swift in Sources */,
@@ -3002,6 +3021,7 @@
 				6A782D4CAA2AF88D5F94A780 /* ShellNavigationStateTests.swift in Sources */,
 				8ED1BF0E83115706BFB110A4 /* DrawerSettleTests.swift in Sources */,
 				C2067E557A82E018C2421DC8 /* RecentsFilterTests.swift in Sources */,
+				BDADA90E35426E18B6B4C495 /* AutoArchiveTests.swift in Sources */,
 				19C1150000000000000000A3 /* CliSessionsSyncModelTests.swift in Sources */,
 				C03910000000000000000010 /* APIEndpointContractTests.swift in Sources */,
 				C03910000000000000000011 /* CronManagementTests.swift in Sources */,

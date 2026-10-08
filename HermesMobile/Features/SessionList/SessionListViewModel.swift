@@ -51,12 +51,12 @@ final class SessionListViewModel {
     private(set) var isViewingCachedData = false
     private(set) var projects: [ProjectSummary] = []
     private(set) var errorMessage: String?
-    private(set) var actionErrorMessage: String?
+    internal(set) var actionErrorMessage: String?
     private(set) var cacheErrorMessage: String?
     private(set) var searchErrorMessage: String?
     private(set) var isSearchingRemoteSessions = false
     private(set) var sessionLoadError: Error?
-    private(set) var lastError: Error?
+    internal(set) var lastError: Error?
     private(set) var activeProfileName: String?
     private(set) var activeProfileDisplayName: String?
     private(set) var activeProfileModel: String?
@@ -92,9 +92,19 @@ final class SessionListViewModel {
     private(set) var openingSessionID: String?
     private var activeProfileGeneration = 0
 
-    private let client: APIClient
-    private let sessionMutator: SessionMutator
-    private let server: URL
+    let client: APIClient
+    let sessionMutator: SessionMutator
+    let server: URL
+    // Auto-archive state; behavior lives in SessionListViewModel+AutoArchive.swift.
+    /// Idle chats the keep model thinks are worth a look before archiving.
+    internal(set) var archiveReviewCandidates: [SessionSummary] = []
+    /// Chats whose digest run is in flight, for the row and review-sheet spinners.
+    internal(set) var summarizingSessionIDs: Set<String> = []
+    /// True until this server's pass runs; set again on each return to the foreground.
+    internal(set) var isAutoArchiveDue = true
+    let autoArchiveStore: AutoArchiveStore
+    var digestSummarizer: ChatDigestSummarizer
+    let now: () -> Date
     private let unreadStore: SessionUnreadStore
     private var viewingSessionID: String?
     private var returnedFromSessionIDs: Set<String> = []
@@ -102,13 +112,22 @@ final class SessionListViewModel {
     private var returnRevision = 0
     private var activeLoadCount = 0
 
-    init(server: URL, client: APIClient? = nil, unreadStore: SessionUnreadStore = SessionUnreadStore()) {
+    init(
+        server: URL,
+        client: APIClient? = nil,
+        unreadStore: SessionUnreadStore = SessionUnreadStore(),
+        autoArchiveStore: AutoArchiveStore = AutoArchiveStore(),
+        now: @escaping () -> Date = Date.init
+    ) {
         self.server = server
         self.unreadStore = unreadStore
+        self.autoArchiveStore = autoArchiveStore
+        self.now = now
         seenMessageTimes = unreadStore.load(for: server)
         let resolvedClient = client ?? APIClient(baseURL: server)
         self.client = resolvedClient
         self.sessionMutator = SessionMutator(client: resolvedClient)
+        self.digestSummarizer = ChatDigestSummarizer(client: resolvedClient)
 
         // Sweep exports leaked by a previous app run (view dismissed while a
         // download was in flight, so the share sheet — and its on-dismiss
@@ -281,6 +300,7 @@ final class SessionListViewModel {
                         && $0.shouldAppearInSessionList
                 }
             reconcileUnread(visibleSessions, allSessions: allSessions, returnedFromIDs: returnedFromIDs)
+            pruneArchiveReviewCandidates(present: visibleSessions)
             applySessions(visibleSessions, archivedCount: response.archivedCount, animation: animation)
             isViewingCachedData = false
 
@@ -1525,11 +1545,11 @@ final class SessionListViewModel {
         return Date(timeIntervalSince1970: value)
     }
 
-    private func beginSessionMutation(_ sessionId: String) -> Bool {
+    func beginSessionMutation(_ sessionId: String) -> Bool {
         mutatingSessionIDs.insert(sessionId).inserted
     }
 
-    private func endSessionMutation(_ sessionId: String) {
+    func endSessionMutation(_ sessionId: String) {
         mutatingSessionIDs.remove(sessionId)
     }
 
@@ -1599,7 +1619,7 @@ final class SessionListViewModel {
         }
     }
 
-    private func isCancellationError(_ error: Error) -> Bool {
+    func isCancellationError(_ error: Error) -> Bool {
         if error is CancellationError {
             return true
         }
