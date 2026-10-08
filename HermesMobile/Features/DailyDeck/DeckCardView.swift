@@ -73,7 +73,9 @@ private struct DeckCardView: View {
         case .headline:
             headline
         case .prompt:
-            if let context = card.context { CollapsibleText(text: context) }
+            if let context = card.context {
+                Text(inlineMarkdown(context)).font(AppFont.subheadline()).foregroundStyle(.secondary)
+            }
             question
             AnswerBox(card: card, viewModel: viewModel, prompt: "Your answer")
         case .reflect:
@@ -158,24 +160,33 @@ private struct DeckCardView: View {
     @ViewBuilder
     private var close: some View {
         let count = viewModel.answeredCount
-        Text(verbatim: count == 0 ? "Nothing answered yet" : "\(count) answered")
-            .font(AppFont.title3(weight: .semibold))
-        Text(verbatim: "Filing sends your answers to today's session. Atlas writes them into the journal and runs the follow-ups you chose.")
-            .font(AppFont.subheadline())
-            .foregroundStyle(.secondary)
+        if viewModel.isFiled && !viewModel.hasChanges {
+            Text(verbatim: "Filed").font(AppFont.title3(weight: .semibold))
+            Text(verbatim: "\(count) answered and in your journal. Edit any card and file again to update it.")
+                .font(AppFont.subheadline())
+                .foregroundStyle(.secondary)
+        } else {
+            Text(verbatim: count == 0 ? "Nothing answered yet" : "\(count) answered")
+                .font(AppFont.title3(weight: .semibold))
+            Text(verbatim: viewModel.isFiled
+                 ? "Filing again updates the journal: changed answers replace what was filed, new ones are added, and nothing is deleted."
+                 : "Filing sends your answers to a new session. Atlas writes them into the journal and runs the follow-ups you chose.")
+                .font(AppFont.subheadline())
+                .foregroundStyle(.secondary)
+        }
         if case .failed(let message) = viewModel.filing {
             Text(verbatim: message).font(AppFont.footnote()).foregroundStyle(Color.hxDanger)
         }
         Button(action: file) {
             HStack {
                 if viewModel.filing == .filing { ProgressView().tint(Color.hxOnAccent) }
-                Text(verbatim: "File It")
+                Text(verbatim: viewModel.isFiled ? "File Changes" : "File It")
             }
             .font(AppFont.body(weight: .semibold))
             .frame(maxWidth: .infinity, minHeight: 44)
         }
         .buttonStyle(.borderedProminent)
-        .disabled(viewModel.filing == .filing)
+        .disabled(viewModel.filing == .filing || !viewModel.hasChanges)
     }
 }
 
@@ -296,25 +307,5 @@ private struct ChoiceButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-}
-
-/// Long advisor context, folded to a few lines until asked.
-private struct CollapsibleText: View {
-    let text: String
-    @State private var isExpanded = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(verbatim: text)
-                .font(AppFont.subheadline())
-                .foregroundStyle(.secondary)
-                .lineLimit(isExpanded ? nil : 4)
-            Button { isExpanded.toggle() } label: {
-                Text(verbatim: isExpanded ? "Less" : "More").font(AppFont.footnote(weight: .medium))
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(Color.accentColor)
-        }
     }
 }

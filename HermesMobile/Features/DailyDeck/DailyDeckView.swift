@@ -6,6 +6,7 @@ import SwiftUI
 struct DailyDeckView: View {
     @State private var viewModel: DailyDeckViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isShowingCalendar = false
     private let openSession: (String) -> Void
 
     init(server: URL, openSession: @escaping (String) -> Void) {
@@ -19,6 +20,12 @@ struct DailyDeckView: View {
             .navigationBarTitleDisplayMode(.inline)
             .background(Color.hxCanvas.ignoresSafeArea())
             .toolbar {
+                if viewModel.workspace != nil {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { isShowingCalendar = true } label: { Image(systemName: "calendar") }
+                            .accessibilityLabel(Text(verbatim: "Journal Calendar"))
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button { Task { await viewModel.load() } } label: {
@@ -36,6 +43,11 @@ struct DailyDeckView: View {
                 }
             }
             .task { await viewModel.load() }
+            .sheet(isPresented: $isShowingCalendar) {
+                DeckCalendarView(viewModel: viewModel) { day in
+                    Task { await viewModel.show(date: day) }
+                }
+            }
     }
 
     @ViewBuilder
@@ -52,15 +64,10 @@ struct DailyDeckView: View {
                 Text(verbatim: "The morning brief writes today's deck to briefs/ in \(viewModel.workspace ?? "the workspace").")
             } actions: {
                 Button { Task { await viewModel.load() } } label: { Text(verbatim: "Check Again") }
-            }
-        case .filed:
-            ContentUnavailableView {
-                Label { Text(verbatim: "Filed") } icon: { Image(systemName: "checkmark.circle") }
-            } description: {
-                Text(verbatim: "Today's answers are in the journal.")
-            } actions: {
-                if let sessionID = viewModel.sessionID {
-                    Button { openSession(sessionID) } label: { Text(verbatim: "Open Today's Session") }
+                if let latest = viewModel.availableDates.first(where: { $0 != viewModel.date }) {
+                    Button { Task { await viewModel.show(date: latest) } } label: {
+                        Text(verbatim: "Open \(DailyDeckPaths.label(latest))")
+                    }
                 }
             }
         case .failed(let message):
@@ -110,10 +117,22 @@ struct DailyDeckView: View {
         VStack(spacing: 6) {
             ProgressView(value: Double(viewModel.index + 1), total: Double(max(count, 1)))
                 .tint(.secondary)
-            Text(verbatim: "\(viewModel.index + 1) of \(count)")
-                .font(AppFont.caption())
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
+            HStack(spacing: 6) {
+                if viewModel.date != viewModel.today {
+                    Text(verbatim: DailyDeckPaths.label(viewModel.date))
+                    Text(verbatim: "·")
+                }
+                Text(verbatim: "\(viewModel.index + 1) of \(count)").monospacedDigit()
+                if viewModel.isFiled {
+                    Text(verbatim: "·")
+                    Label { Text(verbatim: viewModel.hasChanges ? "Edited" : "Filed") } icon: {
+                        Image(systemName: viewModel.hasChanges ? "pencil" : "checkmark")
+                    }
+                    .labelStyle(.titleAndIcon)
+                }
+            }
+            .font(AppFont.caption())
+            .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)

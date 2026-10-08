@@ -171,18 +171,32 @@ struct DeckAnswersPayload: Encodable, Equatable {
 
     /// The one chat message that files the deck: where to save the JSON, the
     /// command to run, then the JSON itself.
-    func message() throws -> String {
+    func message(refiling: Bool = false) throws -> String {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         let json = String(decoding: try encoder.encode(self), as: UTF8.self)
         return """
-        File today's \(kind) brief: save the JSON below to \(DailyDeckPaths.answers(date: date, kind: kind)) \
-        exactly, then run `bin/brain brief file \(date) \(kind)` and do what it prints.
+        \(refiling ? "File my edits to the" : "File the") \(date) \(kind) brief: save the JSON below to \
+        \(DailyDeckPaths.answers(date: date, kind: kind)) exactly (replacing any earlier copy), then run \
+        `bin/brain brief file \(date) \(kind)` and do what it prints.
         ```json
         \(json)
         ```
         """
+    }
+}
+
+/// The answers file the agent saved when a deck was filed: the same shape the app sends.
+enum DeckAnswersFile {
+    private struct Body: Decodable { let answers: [DeckAnswer]? }
+
+    /// Card id → answer; empty when the file is unreadable.
+    static func decodeAnswers(_ content: String) -> [String: DeckAnswer] {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let answers = (try? decoder.decode(Body.self, from: Data(content.utf8)))?.answers ?? []
+        return Dictionary(answers.map { ($0.card, $0) }, uniquingKeysWith: { _, last in last })
     }
 }
 
@@ -192,6 +206,15 @@ enum DailyDeckPaths {
     static func deck(date: String, kind: String) -> String { "\(directory)/\(date).\(kind).json" }
     static func answers(date: String, kind: String) -> String { "\(directory)/\(date).\(kind).answers.json" }
 
+    /// "Oct 5" for `2026-10-05`.
+    static func label(_ day: String) -> String {
+        let parts = day.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3,
+              let date = Calendar.current.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
+        else { return day }
+        return date.formatted(.dateTime.month(.abbreviated).day())
+    }
+
     /// `2026-10-04` in the device's time zone: the deck's day is the user's day.
     static func day(_ date: Date, calendar: Calendar = .current) -> String {
         let parts = calendar.dateComponents([.year, .month, .day], from: date)
@@ -200,7 +223,7 @@ enum DailyDeckPaths {
 }
 
 /// Per-server Daily Deck state in UserDefaults: the brief's workspace, today's
-/// session, and unsent answers. Keys end in `|<server absoluteString>` like the
+/// session, and unsent answers per deck. Keys end in `|<server absoluteString>` like the
 /// other per-server preferences; `remove(for:)` runs when a server is removed.
 struct DailyDeckStore {
     var defaults: UserDefaults = .standard
@@ -224,28 +247,31 @@ struct DailyDeckStore {
         defaults.set([date: sessionID], forKey: key("session", server))
     }
 
-    /// Unsent answers for one deck. Only the latest deck's answers are kept, so an
-    /// abandoned day never lingers.
+    /// Unsent answers per deck, kept for the most recent `draftDays` decks so editing an
+    /// older deck never wipes today's.
     func answers(for server: URL, date: String, kind: String) -> [String: DeckAnswer] {
-        guard let data = defaults.data(forKey: key("answers", server)),
-              let stored = try? JSONDecoder().decode(StoredAnswers.self, from: data),
-              stored.deck == "\(date).\(kind)"
-        else { return [:] }
-        return stored.answers
+        drafts(for: server)["\(date).\(kind)"] ?? [:]
     }
 
     func setAnswers(_ answers: [String: DeckAnswer], for server: URL, date: String, kind: String) {
-        let k = key("answers", server)
-        if answers.isEmpty {
+        var all = drafts(for: server)
+        all["\(date).\(kind)"] = answers.isEmpty ? nil : answers
+        for stale in all.keys.sorted(by: >).dropFirst(Self.draftDays) { all[stale] = nil }
+        let k = key("drafts", server)
+        if all.isEmpty {
             defaults.removeObject(forKey: k)
-        } else if let data = try? JSONEncoder().encode(StoredAnswers(deck: "\(date).\(kind)", answers: answers)) {
+        } else if let data = try? JSONEncoder().encode(all) {
             defaults.set(data, forKey: k)
         }
     }
 
-    private struct StoredAnswers: Codable {
-        let deck: String
-        let answers: [String: DeckAnswer]
+    static let draftDays = 7
+
+    private func drafts(for server: URL) -> [String: [String: DeckAnswer]] {
+        guard let data = defaults.data(forKey: key("drafts", server)),
+              let all = try? JSONDecoder().decode([String: [String: DeckAnswer]].self, from: data)
+        else { return [:] }
+        return all
     }
 
     func remove(for server: URL) {

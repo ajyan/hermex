@@ -92,11 +92,17 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(store.workspace(for: otherServer), "/elsewhere")
     }
 
-    func testStoreKeepsOnlyTheLatestDecksAnswersAndOneDaysSession() {
+    func testStoreKeepsDraftsPerDeckForAWeekAndOneDaysSession() {
         store.setAnswers(["a": DeckAnswer(card: "a", text: "x")], for: server, date: "2026-10-03", kind: "morning")
         store.setAnswers(["b": DeckAnswer(card: "b", text: "y")], for: server, date: "2026-10-04", kind: "morning")
-        XCTAssertEqual(store.answers(for: server, date: "2026-10-03", kind: "morning"), [:])
+        XCTAssertEqual(store.answers(for: server, date: "2026-10-03", kind: "morning")["a"]?.text, "x")
         XCTAssertEqual(store.answers(for: server, date: "2026-10-04", kind: "morning")["b"]?.text, "y")
+
+        for day in 5...12 {
+            store.setAnswers(["c": DeckAnswer(card: "c", text: "\(day)")], for: server, date: String(format: "2026-10-%02d", day), kind: "morning")
+        }
+        XCTAssertEqual(store.answers(for: server, date: "2026-10-05", kind: "morning"), [:], "older than the last 7 decks")
+        XCTAssertEqual(store.answers(for: server, date: "2026-10-12", kind: "morning")["c"]?.text, "12")
 
         store.setSession("s3", for: server, date: "2026-10-03")
         store.setSession("s4", for: server, date: "2026-10-04")
@@ -161,11 +167,57 @@ final class DailyDeckTests: XCTestCase {
         await second.load()
         XCTAssertEqual(second.state, .noDeck)
 
-        let filed = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json", "2026-10-04.morning.answers.json"], deck: Self.deckJSON)
-        let third = makeViewModel(filed)
-        await third.load()
-        XCTAssertEqual(third.state, .filed)
-        XCTAssertEqual(filed.readPaths, [])
+    }
+
+    @MainActor
+    func testAFiledDeckReopensWithItsAnswersAndTracksEdits() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json", "2026-10-04.morning.answers.json"], deck: Self.deckJSON)
+        client.files["briefs/2026-10-04.morning.answers.json"] = """
+        {"version": 1, "date": "2026-10-04", "kind": "morning", "completed_at": "x",
+         "answers": [{"card": "advisor", "text": "Ship it."}, {"card": "followup-3", "action": "skip"}]}
+        """
+        let viewModel = makeViewModel(client)
+        await viewModel.load()
+
+        XCTAssertEqual(viewModel.state, .ready)
+        XCTAssertTrue(viewModel.isFiled)
+        XCTAssertFalse(viewModel.hasChanges)
+        XCTAssertEqual(viewModel.answer(for: viewModel.cards[1])?.text, "Ship it.")
+
+        viewModel.setText("Ship it today.", for: viewModel.cards[1])
+        XCTAssertTrue(viewModel.hasChanges)
+        viewModel.setText("Ship it.", for: viewModel.cards[1])
+        XCTAssertFalse(viewModel.hasChanges, "back to what was filed")
+
+        viewModel.setText("Ship it today.", for: viewModel.cards[1])
+        let reopened = makeViewModel(client)
+        await reopened.load()
+        XCTAssertEqual(reopened.answer(for: reopened.cards[1])?.text, "Ship it today.", "unsent edits win over the filed copy")
+
+        _ = await reopened.file()
+        XCTAssertTrue(client.sent.last?.message.hasPrefix("File my edits to the 2026-10-04 morning brief") == true)
+        XCTAssertFalse(reopened.hasChanges)
+    }
+
+    @MainActor
+    func testPastDaysAreListedNewestFirstAndOpenable() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: [
+            "2026-10-02.morning.json", "2026-10-04.morning.json", "2026-10-03.morning.json",
+            "2026-10-03.morning.answers.json", "2026-10-03.morning.filed.json", "notes.md"
+        ], deck: Self.deckJSON)
+        let viewModel = makeViewModel(client)
+        await viewModel.load()
+        XCTAssertEqual(viewModel.availableDates, ["2026-10-04", "2026-10-03", "2026-10-02"])
+        XCTAssertFalse(viewModel.isFiled)
+
+        await viewModel.show(date: "2026-10-03")
+        XCTAssertEqual(viewModel.date, "2026-10-03")
+        XCTAssertEqual(viewModel.state, .ready)
+        XCTAssertTrue(viewModel.isFiled)
+        XCTAssertEqual(client.listedSessions, ["new-1", "new-1"], "the reading session is reused for other days")
+        XCTAssertTrue(client.readPaths.contains("briefs/2026-10-03.morning.answers.json"))
     }
 
     @MainActor
@@ -211,7 +263,8 @@ final class DailyDeckTests: XCTestCase {
         let opened = await viewModel.file()
 
         XCTAssertEqual(opened, "new-2", "Filing gets its own session, not the one that read the deck")
-        XCTAssertEqual(viewModel.state, .filed)
+        XCTAssertEqual(viewModel.state, .ready)
+        XCTAssertTrue(viewModel.isFiled, "the filed deck stays open to reread")
         XCTAssertEqual(client.sent.map(\.sessionID), ["new-2"])
         XCTAssertEqual(store.session(for: server, date: "2026-10-04"), "new-2")
         XCTAssertEqual(viewModel.sessionID, "new-2")
@@ -235,6 +288,47 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(viewModel.state, .ready)
         guard case .failed = viewModel.filing else { return XCTFail("Expected a failed filing") }
         XCTAssertEqual(store.answers(for: server, date: "2026-10-04", kind: "morning")["advisor"]?.text, "Ship it.")
+    }
+
+    // MARK: - Journal calendar
+
+    func testMonthGridPadsToTheFirstWeekday() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.firstWeekday = 1  // Sunday
+        let grid = DailyDeckJournal.grid(year: 2026, month: 10, calendar: calendar)  // Oct 1 2026 is a Thursday
+        XCTAssertEqual(grid.prefix(5).map { $0 }, [nil, nil, nil, nil, 1])
+        XCTAssertEqual(grid.compactMap { $0 }.count, 31)
+        calendar.firstWeekday = 2  // Monday
+        XCTAssertEqual(DailyDeckJournal.grid(year: 2026, month: 10, calendar: calendar).prefix(4).map { $0 }, [nil, nil, nil, 1])
+    }
+
+    func testReadableEntryDropsFrontMatterAndAgentMarkers() {
+        let text = "---\ntype: journal\n---\n# 2026-10-05\n\n<!-- brain:briefing generated=x -->\nGood morning.\n<!-- brain:deck 2026-10-05 morning -->\n- Ship it."
+        XCTAssertEqual(DailyDeckJournal.readable(text), "# 2026-10-05\n\nGood morning.\n- Ship it.")
+    }
+
+    func testFiledDaysComeFromAnswersFiles() {
+        XCTAssertEqual(DailyDeckViewModel.filedDates(in: ["2026-10-04.morning.json", "2026-10-04.morning.answers.json",
+                                                         "2026-10-05.morning.json", "2026-10-05.morning.filed.json"], kind: "morning"),
+                       ["2026-10-04"])
+    }
+
+    @MainActor
+    func testJournalDaysFindTheMonthFolderAndEntry() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.deckJSON)
+        client.listings["journal/2026"] = ["03-March", "10-October"]
+        client.listings["journal/2026/10-October"] = ["2026-10-01.md", "2026-10-04.md", "notes.txt"]
+        client.files["journal/2026/10-October/2026-10-04.md"] = "# 2026-10-04\n<!-- brain:deck x -->\n- Ran."
+        let viewModel = makeViewModel(client)
+        await viewModel.load()
+
+        let days = await viewModel.journalDays(year: 2026, month: 10)
+        XCTAssertEqual(days, ["2026-10-01", "2026-10-04"])
+        let none = await viewModel.journalDays(year: 2026, month: 11)
+        XCTAssertEqual(none, [])
+        let entry = try await viewModel.journalEntry(for: "2026-10-04")
+        XCTAssertEqual(entry, "# 2026-10-04\n- Ran.")
     }
 
     // MARK: - Helpers
@@ -271,6 +365,10 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     let deck: String
     var vanished: Set<String> = []
     var sendError: Error?
+    /// Bodies by path; anything else reads as `deck`.
+    var files: [String: String] = [:]
+    /// Folder listings other than `briefs/`.
+    var listings: [String: [String]] = [:]
     private(set) var createdWorkspaces: [String] = []
     private(set) var renamed: [(String, String)] = []
     private(set) var listedSessions: [String] = []
@@ -293,6 +391,8 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     func renameSession(id: String, title: String) async throws { renamed.append((id, title)) }
 
     func entryNames(sessionID: String, path: String) async throws -> [String] {
+        if let listing = listings[path] { return listing }
+        if path != DailyDeckPaths.directory { throw APIError.http(statusCode: 404, body: #"{"error": "Not a directory"}"#) }
         listedSessions.append(sessionID)
         if vanished.contains(sessionID) { throw APIError.http(statusCode: 404, body: #"{"error": "Session not found"}"#) }
         guard let names else { throw APIError.http(statusCode: 404, body: #"{"error": "Not a directory"}"#) }
@@ -301,7 +401,7 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
 
     func fileContent(sessionID: String, path: String) async throws -> String {
         readPaths.append(path)
-        return deck
+        return files[path] ?? deck
     }
 
     func startChat(sessionID: String, message: String, workspace: String) async throws {
