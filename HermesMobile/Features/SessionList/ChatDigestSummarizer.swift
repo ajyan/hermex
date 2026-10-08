@@ -43,7 +43,8 @@ struct ChatDigestSummarizer {
             sessionID: sessionID,
             message: Self.prompt,
             workspace: session.workspace,
-            model: nil
+            model: nil,
+            profile: session.profile
         )
         guard let streamID = response.streamId, !streamID.isEmpty else {
             throw ChatDigestError.notStarted(serverMessage: response.error)
