@@ -153,10 +153,12 @@ enum Endpoint {
     case upload
     case transcribe
     case tts
-    /// The Second Brain CRM people list. Fork-only (`api/brain.py` in this user's hermes-webui); stock servers 404.
-    case brainPeople
-    /// One contact's full profile. `file` is the contact's note filename.
-    case brainPerson(file: String)
+    /// The Brain module library (`api/brain.py`): module counts, item lists, one page, search, and the link graph.
+    case brainModules
+    case brainList(module: String, tag: String?, cursor: Int?)
+    case brainPage(module: String, id: String)
+    case brainSearch(query: String, module: String?)
+    case brainGraph(module: String, id: String)
 
     var path: String {
         switch self {
@@ -422,10 +424,16 @@ enum Endpoint {
             return "/api/transcribe"
         case .tts:
             return "/api/tts"
-        case .brainPeople:
-            return "/api/brain/people"
-        case .brainPerson:
-            return "/api/brain/person"
+        case .brainModules:
+            return "/api/brain/modules"
+        case .brainList:
+            return "/api/brain/list"
+        case .brainPage:
+            return "/api/brain/page"
+        case .brainSearch:
+            return "/api/brain/search"
+        case .brainGraph:
+            return "/api/brain/graph"
         }
     }
 
@@ -623,8 +631,17 @@ enum Endpoint {
                 items.append(URLQueryItem(name: "file", value: file))
             }
             return items
-        case let .brainPerson(file):
-            return [URLQueryItem(name: "file", value: file)]
+        case let .brainList(module, tag, cursor):
+            var items = [URLQueryItem(name: "module", value: module)]
+            if let tag { items.append(URLQueryItem(name: "tag", value: tag)) }
+            if let cursor { items.append(URLQueryItem(name: "cursor", value: String(cursor))) }
+            return items
+        case let .brainPage(module, id), let .brainGraph(module, id):
+            return [URLQueryItem(name: "module", value: module), URLQueryItem(name: "id", value: id)]
+        case let .brainSearch(query, module):
+            var items = [URLQueryItem(name: "q", value: query)]
+            if let module { items.append(URLQueryItem(name: "module", value: module)) }
+            return items
         default:
             return []
         }
@@ -660,9 +677,16 @@ enum Endpoint {
             return url
         }
 
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        components?.queryItems = queryItems
-        return components?.url ?? url
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return url
+        }
+        components.queryItems = queryItems
+        // `queryItems` leaves `+` raw, and form decoders on the server (Python's
+        // `parse_qs`) read it as a space, so "c++" would arrive as "c". Apple's
+        // documented workaround: encode `+` after assigning the items.
+        components.percentEncodedQuery = components.percentEncodedQuery?
+            .replacingOccurrences(of: "+", with: "%2B")
+        return components.url ?? url
     }
 
     private func kanbanTaskURL(relativeTo baseURL: URL, cardID: String, suffix: String = "") -> URL {

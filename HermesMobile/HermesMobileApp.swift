@@ -118,7 +118,7 @@ struct HermesMobileApp: App {
                 .preferredColorScheme(AppTheme.storedValue(appThemeRawValue).colorScheme)
             #endif
         }
-        .modelContainer(for: [CachedSession.self, CachedMessage.self])
+        .modelContainer(for: [CachedSession.self, CachedMessage.self, CachedBrainEntry.self])
         .commands {
             HermexCommands()
             SidebarCommands()

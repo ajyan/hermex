@@ -584,8 +584,15 @@ struct ChatShellView: View {
                 Task { await openDeepLinkedSession(id: sessionID) }
             }
         case .brain:
-            BrainView(server: server, onAPIError: authManager.handleAPIError)
-                .adaptiveSecondaryNavigationTitle()
+            BrainHomeView(
+                server: server,
+                modelContext: modelContext,
+                onAPIError: authManager.handleAPIError,
+                push: { navigation.path.append(.brainRoute($0)) }
+            )
+            .adaptiveSecondaryNavigationTitle()
+        case .brainRoute(let route):
+            brainDestination(route)
         case .projects:
             ProjectsView(
                 viewModel: viewModel,
@@ -605,6 +612,37 @@ struct ChatShellView: View {
                 showsWorkspace: showsSessionWorkspace,
                 startChat: { selectDestination(PendingNewChatRoute(projectID: projectID)) }
             )
+        }
+    }
+
+    @ViewBuilder
+    private func brainDestination(_ route: BrainRoute) -> some View {
+        switch route {
+        case .module(.highlights):
+            BrainHighlightsView(server: server, modelContext: modelContext, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
+        case .module(let module):
+            BrainModuleListView(
+                module: module,
+                server: server,
+                modelContext: modelContext,
+                onAPIError: authManager.handleAPIError
+            )
+            .adaptiveSecondaryNavigationTitle()
+        case .page(let module, let id) where BrainHighlightsBookView.isBook(module: module, id: id):
+            BrainHighlightsBookView(id: id, server: server, modelContext: modelContext, onAPIError: authManager.handleAPIError)
+        case .page(let module, let id):
+            BrainReaderView(
+                module: module,
+                id: id,
+                server: server,
+                modelContext: modelContext,
+                onAPIError: authManager.handleAPIError,
+                push: { navigation.path.append(.brainRoute($0)) }
+            )
+        case .searchAll(let module, let query):
+            BrainSearchView(module: module, query: query, server: server, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
         }
     }
 

@@ -9,9 +9,19 @@ enum DailyDeckJournal {
     /// A journal entry as the reader should see it: front matter and the agent's
     /// `<!-- … -->` markers dropped.
     static func readable(_ text: String) -> String {
-        var body = BrainPersonFile.strippingFrontmatter(text)
+        var body = strippingFrontmatter(text)
         body = body.replacingOccurrences(of: #"<!--.*?-->\n?"#, with: "", options: .regularExpression)
         return body.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// `text` without a leading YAML frontmatter block (`---` … `---`); text without
+    /// one is returned unchanged.
+    static func strippingFrontmatter(_ text: String) -> String {
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        guard lines.first?.trimmingCharacters(in: .whitespaces) == "---",
+              let end = lines.dropFirst().firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "---" })
+        else { return text }
+        return lines[(end + 1)...].joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// The days of `month` laid out in weeks: nil pads the first week to the locale's first weekday.

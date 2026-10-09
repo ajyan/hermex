@@ -134,6 +134,7 @@ final class SteerMessageTests: XCTestCase {
         let container = try ModelContainer(
             for: CachedSession.self,
             CachedMessage.self,
+            CachedBrainEntry.self,
             configurations: configuration
         )
         let context = ModelContext(container)
