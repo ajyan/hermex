@@ -511,3 +511,43 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
         sent.append(Sent(sessionID: sessionID, message: message, workspace: workspace))
     }
 }
+
+final class DailyBriefReminderTests: XCTestCase {
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/New_York")!
+        return calendar
+    }
+
+    private func at(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
+        calendar.date(from: DateComponents(year: 2026, month: 10, day: day, hour: hour, minute: minute))!
+    }
+
+    func testEightOClockRepeatsAndAWeekOfNineOClockRemindersFollow() {
+        let plan = DailyBriefReminder.plan(now: at(8, 7), openedOn: nil, calendar: calendar)
+        XCTAssertEqual(plan.first, .init(id: "dailyBrief.ready", components: DateComponents(hour: 8, minute: 0), repeats: true, isReminder: false))
+        let reminders = plan.dropFirst()
+        XCTAssertEqual(reminders.map(\.id).first, "dailyBrief.reminder.2026-10-08")
+        XCTAssertEqual(reminders.count, 7)
+        XCTAssertTrue(reminders.allSatisfy { !$0.repeats && $0.components.hour == 9 && $0.components.minute == 0 })
+    }
+
+    func testOpeningTodaysBriefSkipsOnlyTodaysReminder() {
+        let plan = DailyBriefReminder.plan(now: at(8, 8, 30), openedOn: "2026-10-08", calendar: calendar)
+        XCTAssertEqual(plan.dropFirst().map(\.id).first, "dailyBrief.reminder.2026-10-09")
+        XCTAssertEqual(plan.count, 1 + 6)
+    }
+
+    func testAfterNineTodaysReminderIsPast() {
+        let plan = DailyBriefReminder.plan(now: at(8, 9, 30), openedOn: nil, calendar: calendar)
+        XCTAssertEqual(plan.dropFirst().map(\.id).first, "dailyBrief.reminder.2026-10-09")
+    }
+
+    func testDailyBriefDeepLinkRoundTrips() throws {
+        let url = try XCTUnwrap(HermesDeepLink.dailyBriefURL)
+        XCTAssertTrue(HermesDeepLink.isDailyBriefURL(url))
+        XCTAssertFalse(HermesDeepLink.isNewChatURL(url))
+        XCTAssertTrue(DailyBriefReminder.isDailyBrief(["dailyBrief": true]))
+        XCTAssertFalse(DailyBriefReminder.isDailyBrief([:]))
+    }
+}

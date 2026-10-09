@@ -8,6 +8,7 @@ struct DailyDeckView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isShowingCalendar = false
     @State private var feedbackCard: DeckCard?
+    @AppStorage(DailyBriefReminder.enabledKey) private var notifies = false
     private let openSession: (String) -> Void
 
     init(server: URL, openSession: @escaping (String) -> Void) {
@@ -45,6 +46,9 @@ struct DailyDeckView: View {
                                 }
                             }
                         }
+                        Toggle(isOn: Binding(get: { notifies }, set: { on in Task { await DailyBriefReminder.setEnabled(on) } })) {
+                            Label { Text(verbatim: "Notify Me at 8:00") } icon: { Image(systemName: "bell") }
+                        }
                         Button { Task { await viewModel.load() } } label: {
                             Label { Text(verbatim: "Reload") } icon: { Image(systemName: "arrow.clockwise") }
                         }
@@ -59,7 +63,16 @@ struct DailyDeckView: View {
                     .accessibilityLabel(Text(verbatim: "More"))
                 }
             }
-            .task { await viewModel.load() }
+            .task {
+                await viewModel.load()
+                await DailyBriefReminder.enableOnFirstOpen()
+            }
+            .onChange(of: viewModel.state) {
+                // Opening today's brief is the answer the 09:00 reminder waits for.
+                if viewModel.state == .ready, viewModel.date == viewModel.today {
+                    Task { await DailyBriefReminder.noteOpened() }
+                }
+            }
             .sheet(isPresented: $isShowingCalendar) {
                 DeckCalendarView(viewModel: viewModel) { day in
                     Task { await viewModel.show(date: day) }

@@ -50,6 +50,22 @@ enum HermesDeepLink {
             && url.host?.lowercased() == newChatVoiceHost
     }
 
+    /// Host for "open the Daily Brief", used by its 08:00 and 09:00 notifications.
+    static let dailyBriefHost = "daily-brief"
+
+    /// `hermes-agent://daily-brief` (scheme follows the active build).
+    static var dailyBriefURL: URL? {
+        var components = URLComponents()
+        components.scheme = scheme
+        components.host = dailyBriefHost
+        return components.url
+    }
+
+    static func isDailyBriefURL(_ url: URL) -> Bool {
+        url.scheme?.lowercased() == scheme
+            && url.host?.lowercased() == dailyBriefHost
+    }
+
     /// Host for "start a new chat and call Atlas on it", used by the session list's
     /// New call item and the "Call Atlas" App Intent.
     static let newCallHost = "new-call"
