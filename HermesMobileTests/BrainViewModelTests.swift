@@ -1,3 +1,4 @@
+import SwiftData
 import XCTest
 import Foundation
 @testable import HermesMobile
@@ -85,6 +86,153 @@ final class BrainViewModelTests: XCTestCase {
             return XCTFail("Expected a failure, got \(viewModel.state)")
         }
     }
+
+    // MARK: - Library view models
+
+    private func makeCache(server: URL = URL(string: "https://a.example")!) throws -> BrainCacheHandle {
+        let container = try ModelContainer(
+            for: CachedBrainEntry.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        return BrainCacheHandle(server: server, context: ModelContext(container))
+    }
+
+    private let samplePage = BrainPage(item: BrainItem(module: .wiki, id: "p1", title: "Page One"), content: "Body")
+
+    func testSearchDebouncesAndCancelsStaleQueries() async {
+        let client = FakeBrainClient()
+        let viewModel = BrainSearchViewModel(client: client, debounce: .zero)
+        viewModel.query = "ma"
+        viewModel.query = "mar"
+        viewModel.query = "marc"
+        await viewModel.settled()
+        XCTAssertEqual(client.searchQueries, ["marc"])
+        XCTAssertNotNil(viewModel.result)
+        XCTAssertFalse(viewModel.isSearching)
+    }
+
+    func testShortQueryMakesNoCall() async {
+        let client = FakeBrainClient()
+        let viewModel = BrainSearchViewModel(client: client, debounce: .zero)
+        viewModel.query = "marc"
+        await viewModel.settled()
+        viewModel.query = " m "
+        await viewModel.settled()
+        XCTAssertEqual(client.searchQueries, ["marc"])
+        XCTAssertNil(viewModel.result)
+        XCTAssertFalse(viewModel.isSearching)
+    }
+
+    func testPageFallsBackToCacheWhenOffline() async throws {
+        let cache = try makeCache()
+        try BrainCache.store(samplePage, server: cache.server, kind: "page", id: "p1", in: try XCTUnwrap(cache.context))
+        let client = FakeBrainClient()
+        client.pageResult = .failure(URLError(.notConnectedToInternet))
+        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: cache, onAPIError: { _ in })
+        await viewModel.load()
+        XCTAssertEqual(viewModel.state, .loaded(samplePage))
+        XCTAssertTrue(viewModel.isShowingCachedCopy)
+        XCTAssertEqual(viewModel.page, samplePage)
+    }
+
+    func testPageOfflineWithoutCacheFails() async throws {
+        let client = FakeBrainClient()
+        client.pageResult = .failure(URLError(.notConnectedToInternet))
+        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: try makeCache(), onAPIError: { _ in })
+        await viewModel.load()
+        guard case .failed = viewModel.state else { return XCTFail("Expected failure, got \(viewModel.state)") }
+    }
+
+    func testSuccessfulPageIsCachedAndNotMarkedCached() async throws {
+        let cache = try makeCache()
+        let client = FakeBrainClient()
+        client.pageResult = .success(samplePage)
+        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: cache, onAPIError: { _ in })
+        await viewModel.load()
+        XCTAssertFalse(viewModel.isShowingCachedCopy)
+        XCTAssertEqual(try BrainCache.load(BrainPage.self, server: cache.server, kind: "page", id: "p1", in: try XCTUnwrap(cache.context)), samplePage)
+    }
+
+    func testPage404SetsMissing() async {
+        let client = FakeBrainClient()
+        client.pageResult = .failure(APIError.http(statusCode: 404, body: nil))
+        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
+        await viewModel.load()
+        XCTAssertTrue(viewModel.isMissing)
+        XCTAssertEqual(viewModel.state, .failed("This page moved or was removed"))
+    }
+
+    func testModules404IsUnavailable() async {
+        let client = FakeBrainClient()
+        client.modulesResult = .failure(APIError.http(statusCode: 404, body: nil))
+        let viewModel = BrainHomeViewModel(client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
+        await viewModel.load()
+        XCTAssertEqual(viewModel.state, .unavailable)
+    }
+
+    func testGraphFailureDoesNotFailPage() async {
+        let client = FakeBrainClient()
+        client.pageResult = .success(samplePage)
+        client.graphResult = .failure(URLError(.timedOut))
+        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
+        await viewModel.load()
+        XCTAssertEqual(viewModel.state, .loaded(samplePage))
+        XCTAssertNil(viewModel.graph)
+    }
+
+    func testTagSelectionReloadsWithTag() async {
+        let client = FakeBrainClient()
+        let viewModel = BrainListViewModel(module: .wiki, client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
+        await viewModel.load()
+        viewModel.selectedTag = "swift"
+        await viewModel.settled()
+        XCTAssertEqual(client.listCalls.map(\.tag), [nil, "swift"])
+        XCTAssertEqual(client.listCalls.map(\.cursor), [nil, nil])
+    }
+
+    func testLoadMoreAppendsUsingCursorAndStopsWhenNil() async {
+        let client = FakeBrainClient()
+        client.listResults = [
+            .success(BrainList(items: [BrainItem(module: .wiki, id: "a")], nextCursor: 20)),
+            .success(BrainList(items: [BrainItem(module: .wiki, id: "b")], nextCursor: nil)),
+        ]
+        let viewModel = BrainListViewModel(module: .wiki, client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
+        await viewModel.load()
+        await viewModel.loadMore()
+        await viewModel.loadMore()
+        XCTAssertEqual(viewModel.list?.items.map(\.id), ["a", "b"])
+        XCTAssertEqual(client.listCalls.map(\.cursor), [nil, 20])
+    }
+}
+
+final class FakeBrainClient: BrainDataClient, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _searchQueries: [String] = []
+    private var _listCalls: [(tag: String?, cursor: Int?)] = []
+    var modulesResult: Result<[BrainModule], Error> = .success([])
+    var pageResult: Result<BrainPage, Error> = .failure(CancellationError())
+    var graphResult: Result<BrainGraph, Error> = .success(BrainGraph())
+    var listResults: [Result<BrainList, Error>] = []
+
+    var searchQueries: [String] { lock.withLock { _searchQueries } }
+    var listCalls: [(tag: String?, cursor: Int?)] { lock.withLock { _listCalls } }
+
+    func people() async throws -> [BrainPerson] { [] }
+    func person(file: String) async throws -> BrainPersonFile { BrainPersonFile(content: "", error: nil) }
+    func modules() async throws -> [BrainModule] { try modulesResult.get() }
+    func list(module: BrainModuleID, tag: String?, cursor: Int?) async throws -> BrainList {
+        let next: Result<BrainList, Error>? = lock.withLock {
+            _listCalls.append((tag, cursor))
+            return listResults.isEmpty ? nil : listResults.removeFirst()
+        }
+        return try (next ?? .success(BrainList())).get()
+    }
+    func page(module: BrainModuleID, id: String) async throws -> BrainPage { try pageResult.get() }
+    func search(query: String, module: BrainModuleID?) async throws -> BrainSearchResult {
+        lock.withLock { _searchQueries.append(query) }
+        return BrainSearchResult()
+    }
+    func graph(module: BrainModuleID, id: String) async throws -> BrainGraph { try graphResult.get() }
 }
 
 private struct StubBrainClient: BrainDataClient {
