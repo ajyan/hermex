@@ -29,8 +29,8 @@ struct BrainHighlightsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: BrainStyle.l) {
+        List {
+            Section {
                 Picker(selection: $segment) {
                     ForEach(Segment.allCases, id: \.self) { segment in
                         Text(verbatim: segment.title).tag(segment)
@@ -39,14 +39,18 @@ struct BrainHighlightsView: View {
                     Text(verbatim: "Highlights")
                 }
                 .pickerStyle(.segmented)
-                .padding(.horizontal, BrainStyle.l)
-
-                BrainListStateView(viewModel: viewModel, inline: true) { list in
-                    segmentContent(list)
+                .brainListClearRow()
+            }
+            BrainListStateView(viewModel: viewModel, inline: true) { list in
+                segmentSection(list)
+                Section {
+                    EmptyView()
+                } footer: {
+                    BrainListFooter(viewModel: viewModel)
                 }
             }
-            .padding(.vertical, BrainStyle.l)
         }
+        .brainListStyle()
         .refreshable { await viewModel.load() }
         .navigationTitle(Text(verbatim: BrainModuleID.highlights.defaultTitle))
         .background(Color.hxCanvas.ignoresSafeArea())
@@ -58,46 +62,51 @@ struct BrainHighlightsView: View {
         }
     }
 
-    @ViewBuilder
-    private func segmentContent(_ list: BrainList) -> some View {
+    private func segmentSection(_ list: BrainList) -> some View {
         let split = BrainListLayout.splitHighlights(list)
         let items = segment == .books ? split.books : split.videos
         let lastID = items.last?.id
-        if items.isEmpty {
-            Text(verbatim: segment == .books ? "No book highlights yet" : "No videos yet")
-                .brainText(.rowSubtitle)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.vertical, BrainStyle.xl)
-        } else if segment == .books {
-            LazyVGrid(columns: BrainListLayout.columns(3, dynamicType: dynamicTypeSize), spacing: BrainStyle.m) {
+        return Section {
+            if items.isEmpty {
+                emptySegment(hasMore: list.nextCursor != nil)
+                    // This segment may only start on a later page: keep paging until it
+                    // fills or the list runs out, so the empty state is never a false one.
+                    .task(id: list.items.count) {
+                        if list.nextCursor != nil { await viewModel.loadMore() }
+                    }
+            } else if segment == .books {
+                BrainCardRows(
+                    items: items,
+                    columns: BrainListLayout.columnCount(3, dynamicType: dynamicTypeSize),
+                    style: .tile,
+                    destination: { .brainRoute(.page(.highlights, $0)) },
+                    onLastAppear: loadMore
+                )
+            } else {
                 ForEach(items, id: \.id) { item in
                     NavigationLink(value: ShellPushDestination.brainRoute(.page(.highlights, item.id))) {
-                        BrainCard(item: item, style: .tile)
+                        BrainCoverRow(item: item)
                     }
-                    .buttonStyle(.plain)
-                    .onAppear { if item.id == lastID { loadMore() } }
-                }
-            }
-            .padding(.horizontal, BrainStyle.l)
-        } else {
-            LazyVStack(spacing: 0) {
-                ForEach(items, id: \.id) { item in
-                    NavigationLink(value: ShellPushDestination.brainRoute(.page(.highlights, item.id))) {
-                        BrainCoverRow(item: item, side: BrainStyle.searchThumbnailSize)
-                            .padding(.horizontal, BrainStyle.l)
-                            .background(Color.hxSurface)
-                    }
-                    .buttonStyle(.plain)
-                    .overlay(alignment: .bottom) {
-                        if item.id != lastID {
-                            Divider().padding(.leading, BrainStyle.l)
-                        }
-                    }
+                    .brainListRow()
                     .onAppear { if item.id == lastID { loadMore() } }
                 }
             }
         }
-        BrainListFooter(viewModel: viewModel)
+    }
+
+    @ViewBuilder
+    private func emptySegment(hasMore: Bool) -> some View {
+        Group {
+            if hasMore {
+                ProgressView()
+            } else {
+                Text(verbatim: segment == .books ? "No book highlights yet" : "No videos yet")
+                    .brainText(.rowSubtitle)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.vertical, BrainStyle.xl)
+        .brainListClearRow()
     }
 
     private func loadMore() {
@@ -218,7 +227,6 @@ struct BrainQuoteCard: View {
     let highlight: BrainHighlight
 
     var body: some View {
-        let shape = BrainStyle.cardShape()
         VStack(alignment: .leading, spacing: BrainStyle.s) {
             Text(verbatim: highlight.text)
                 .brainText(.quote)
@@ -230,15 +238,18 @@ struct BrainQuoteCard: View {
         }
         .padding(.horizontal, BrainStyle.cardHorizontalPadding)
         .padding(.vertical, BrainStyle.cardVerticalPadding)
-        .background(Color.hxSurface, in: shape)
-        .contentShape(.contextMenuPreview, shape)
+        .brainCardSurface()
+        .contentShape(.contextMenuPreview, BrainStyle.cardShape())
         .contextMenu {
-            Button {
-                UIPasteboard.general.string = highlight.text
-            } label: {
+            Button(action: copy) {
                 Label { Text(verbatim: "Copy") } icon: { Image(systemName: "doc.on.doc") }
             }
         }
         .accessibilityElement(children: .combine)
+        .accessibilityAction(named: Text(verbatim: "Copy"), copy)
+    }
+
+    private func copy() {
+        UIPasteboard.general.string = highlight.text
     }
 }

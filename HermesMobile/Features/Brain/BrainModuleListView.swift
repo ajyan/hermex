@@ -77,16 +77,31 @@ enum BrainListLayout {
         title.caseInsensitiveCompare("Concepts") == .orderedSame
     }
 
-    /// Grid columns, collapsing at accessibility text sizes so cards never squeeze.
-    static func columns(_ count: Int, dynamicType: DynamicTypeSize) -> [GridItem] {
-        let resolved = dynamicType.isAccessibilitySize ? max(count - 1, 1) : count
-        return Array(repeating: GridItem(.flexible(), spacing: BrainStyle.m, alignment: .top), count: resolved)
+    /// One grid row of cards, identified by its first item's id.
+    struct Chunk: Equatable {
+        let id: String
+        let items: [BrainItem]
+    }
+
+    /// Splits `items` into rows of `size` cards, in order; the last row may be short.
+    static func chunks(_ items: [BrainItem], size: Int) -> [Chunk] {
+        let size = max(size, 1)
+        return stride(from: 0, to: items.count, by: size).map { start in
+            let row = Array(items[start..<min(start + size, items.count)])
+            return Chunk(id: row[0].id, items: row)
+        }
+    }
+
+    /// Cards per grid row, dropping to one at accessibility text sizes so cards never squeeze.
+    static func columnCount(_ count: Int, dynamicType: DynamicTypeSize) -> Int {
+        dynamicType.isAccessibilitySize ? 1 : max(count, 1)
     }
 }
 
 /// One module's browsable list (people, wiki, articles, journal), shaped per spec §2.
-/// Pushed as `.brainRoute(.module(_:))`; owns no `NavigationStack`. Every cell pushes
-/// `.brainRoute(.page(module, id))`.
+/// Every module screen is one `List` in the shared Brain style; grids are chunked
+/// rows of cards. Pushed as `.brainRoute(.module(_:))`; owns no `NavigationStack`.
+/// Every cell pushes `.brainRoute(.page(module, id))`.
 struct BrainModuleListView: View {
     let module: BrainModuleID
     @State private var viewModel: BrainListViewModel
@@ -123,137 +138,130 @@ struct BrainModuleListView: View {
 
     @ViewBuilder
     private var content: some View {
-        switch module {
-        case .people, .journal:
-            BrainListStateView(viewModel: viewModel) { list in
-                if module == .people { peopleList(list) } else { journalList(list) }
-            }
-        case .wiki, .articles, .highlights:
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: BrainStyle.l) {
-                    if hasChipBar, !chipTags.isEmpty {
-                        BrainTagChipBar(tags: chipTags, selected: $viewModel.selectedTag)
-                    }
-                    BrainListStateView(viewModel: viewModel, inline: true) { list in
-                        if module == .wiki { wikiSections(list) } else { articleGrid(list) }
-                    }
+        if hasChipBar, !chipTags.isEmpty {
+            // The chip bar stays put while a tag reloads; the state shows beneath it.
+            List {
+                Section {
+                    BrainTagChipBar(tags: chipTags, selected: $viewModel.selectedTag)
+                        .brainListClearRow(edgeToEdge: true)
                 }
-                .padding(.vertical, BrainStyle.l)
+                BrainListStateView(viewModel: viewModel, inline: true) { list in
+                    loadedSections(list)
+                }
             }
+            .brainListStyle()
             .refreshable { await viewModel.load() }
+        } else {
+            BrainListStateView(viewModel: viewModel) { list in
+                List { loadedSections(list) }
+                    .brainListStyle()
+                    .refreshable { await viewModel.load() }
+            }
         }
+    }
+
+    @ViewBuilder
+    private func loadedSections(_ list: BrainList) -> some View {
+        switch module {
+        case .people: peopleSection(list)
+        case .journal: journalSections(list)
+        case .wiki: wikiSections(list)
+        // Highlights routes to `BrainHighlightsView`; it shares the article grid only to
+        // keep the switch exhaustive.
+        case .articles, .highlights: articleSection(list)
+        }
+        Section {
+            EmptyView()
+        } footer: {
+            BrainListFooter(viewModel: viewModel)
+        }
+    }
+
+    private func link(_ id: String) -> ShellPushDestination {
+        .brainRoute(.page(module, id))
     }
 
     // MARK: People
 
-    private func peopleList(_ list: BrainList) -> some View {
+    private func peopleSection(_ list: BrainList) -> some View {
         let items = BrainListLayout.uniqueItems(list.items)
         let lastID = items.last?.id
-        return List {
-            Section {
-                ForEach(items, id: \.id) { item in
-                    NavigationLink(value: ShellPushDestination.brainRoute(.page(module, item.id))) {
-                        BrainPeopleRow(item: item)
-                    }
-                    .brainListRow()
-                    .onAppear { if item.id == lastID { loadMore() } }
+        return Section {
+            ForEach(items, id: \.id) { item in
+                NavigationLink(value: link(item.id)) {
+                    BrainPeopleRow(item: item)
                 }
-            } footer: {
-                BrainListFooter(viewModel: viewModel)
+                .brainListRow()
+                .onAppear { if item.id == lastID { loadMore() } }
             }
         }
-        .brainListStyle()
-        .refreshable { await viewModel.load() }
     }
 
     // MARK: Journal
 
-    private func journalList(_ list: BrainList) -> some View {
+    private func journalSections(_ list: BrainList) -> some View {
         let sections = BrainListLayout.sections(list)
         let lastID = sections.last?.items.last?.id
-        return List {
-            ForEach(sections, id: \.title) { section in
-                Section {
-                    if !section.title.isEmpty {
-                        BrainMonthBanner(title: section.title, count: section.items.count)
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
+        return ForEach(sections, id: \.title) { section in
+            Section {
+                if !section.title.isEmpty {
+                    BrainMonthBanner(title: section.title, count: section.items.count)
+                        .brainListClearRow()
+                }
+                ForEach(section.items, id: \.id) { item in
+                    NavigationLink(value: link(item.id)) {
+                        BrainRow(title: item.title.isEmpty ? item.date : item.title,
+                                 subtitle: item.preview, subtitleLineLimit: 1)
                     }
+                    .brainListRow()
+                    .onAppear { if item.id == lastID { loadMore() } }
+                }
+            }
+        }
+    }
+
+    // MARK: Wiki
+
+    private func wikiSections(_ list: BrainList) -> some View {
+        let sections = BrainListLayout.sections(list)
+        let lastID = sections.last?.items.last?.id
+        return ForEach(sections, id: \.title) { section in
+            Section {
+                if BrainListLayout.isGridSection(section.title) {
+                    cardRows(section.items, columns: 2, lastID: lastID)
+                } else {
                     ForEach(section.items, id: \.id) { item in
-                        NavigationLink(value: ShellPushDestination.brainRoute(.page(module, item.id))) {
-                            BrainRow(title: item.title.isEmpty ? item.date : item.title,
-                                     subtitle: item.preview, subtitleLineLimit: 1)
+                        NavigationLink(value: link(item.id)) {
+                            BrainCoverRow(item: item)
                         }
                         .brainListRow()
                         .onAppear { if item.id == lastID { loadMore() } }
                     }
                 }
-            }
-            Section {
-                EmptyView()
-            } footer: {
-                BrainListFooter(viewModel: viewModel)
-            }
-        }
-        .brainListStyle()
-        .refreshable { await viewModel.load() }
-    }
-
-    // MARK: Wiki
-
-    @ViewBuilder
-    private func wikiSections(_ list: BrainList) -> some View {
-        let sections = BrainListLayout.sections(list)
-        let lastID = sections.last?.items.last?.id
-        ForEach(sections, id: \.title) { section in
-            if !section.title.isEmpty {
-                BrainSectionHeader(title: section.title, count: section.items.count)
-                    .padding(.horizontal, BrainStyle.l)
-            }
-            if BrainListLayout.isGridSection(section.title) {
-                cardGrid(section.items, columns: 2, lastID: lastID)
-            } else {
-                LazyVStack(spacing: 0) {
-                    ForEach(section.items, id: \.id) { item in
-                        NavigationLink(value: ShellPushDestination.brainRoute(.page(module, item.id))) {
-                            BrainCoverRow(item: item)
-                                .padding(.horizontal, BrainStyle.l)
-                                .background(Color.hxSurface)
-                        }
-                        .buttonStyle(.plain)
-                        .overlay(alignment: .bottom) {
-                            if item.id != section.items.last?.id {
-                                Divider().padding(.leading, BrainStyle.l)
-                            }
-                        }
-                        .onAppear { if item.id == lastID { loadMore() } }
-                    }
+            } header: {
+                if !section.title.isEmpty {
+                    BrainSectionHeader(title: section.title, count: section.items.count)
                 }
             }
         }
-        BrainListFooter(viewModel: viewModel)
     }
 
     // MARK: Articles
 
-    @ViewBuilder
-    private func articleGrid(_ list: BrainList) -> some View {
+    private func articleSection(_ list: BrainList) -> some View {
         let items = BrainListLayout.uniqueItems(list.items)
-        cardGrid(items, columns: 2, lastID: items.last?.id)
-        BrainListFooter(viewModel: viewModel)
+        return Section {
+            cardRows(items, columns: 2, lastID: items.last?.id)
+        }
     }
 
-    private func cardGrid(_ items: [BrainItem], columns: Int, lastID: String?) -> some View {
-        LazyVGrid(columns: BrainListLayout.columns(columns, dynamicType: dynamicTypeSize), spacing: BrainStyle.m) {
-            ForEach(items, id: \.id) { item in
-                NavigationLink(value: ShellPushDestination.brainRoute(.page(module, item.id))) {
-                    BrainCard(item: item)
-                }
-                .buttonStyle(.plain)
-                .onAppear { if item.id == lastID { loadMore() } }
-            }
-        }
-        .padding(.horizontal, BrainStyle.l)
+    private func cardRows(_ items: [BrainItem], columns: Int, lastID: String?) -> some View {
+        BrainCardRows(
+            items: items,
+            columns: BrainListLayout.columnCount(columns, dynamicType: dynamicTypeSize),
+            destination: link,
+            onLastAppear: { if items.last?.id == lastID { loadMore() } }
+        )
     }
 
     private func loadMore() {
@@ -272,6 +280,17 @@ struct BrainListStateView<Loaded: View>: View {
     @ViewBuilder let loaded: (BrainList) -> Loaded
 
     var body: some View {
+        if case .loaded(let list) = viewModel.state, !list.items.isEmpty {
+            loaded(list)
+        } else if inline {
+            placeholder.brainListClearRow()
+        } else {
+            placeholder
+        }
+    }
+
+    @ViewBuilder
+    private var placeholder: some View {
         switch viewModel.state {
         case .loading:
             ProgressView()
@@ -291,15 +310,11 @@ struct BrainListStateView<Loaded: View>: View {
             } actions: {
                 Button { Task { await viewModel.load() } } label: { Text(verbatim: "Try again") }
             }
-        case .loaded(let list):
-            if list.items.isEmpty {
-                ContentUnavailableView {
-                    Label { Text(verbatim: emptyTitle) } icon: { Image(systemName: viewModel.module.symbolName) }
-                } description: {
-                    Text(verbatim: emptyDescription)
-                }
-            } else {
-                loaded(list)
+        case .loaded:
+            ContentUnavailableView {
+                Label { Text(verbatim: emptyTitle) } icon: { Image(systemName: viewModel.module.symbolName) }
+            } description: {
+                Text(verbatim: emptyDescription)
             }
         }
     }
@@ -312,6 +327,44 @@ struct BrainListStateView<Loaded: View>: View {
         viewModel.selectedTag == nil
             ? "Items appear here once the server has notes to show."
             : "Pick another tag, or All to see everything."
+    }
+}
+
+/// A cover grid as `List` rows: each row is an `HStack` of up to `columns` cards with
+/// equal widths (a short last row keeps its cards at grid width). Every card is its
+/// own link, so a row of several cards never opens as one.
+struct BrainCardRows: View {
+    let items: [BrainItem]
+    let columns: Int
+    var style: BrainCard.Style = .standard
+    let destination: (String) -> ShellPushDestination
+    /// Called when the last row appears, for pagination.
+    let onLastAppear: () -> Void
+
+    var body: some View {
+        let chunks = BrainListLayout.chunks(items, size: columns)
+        let lastChunkID = chunks.last?.id
+        ForEach(chunks, id: \.id) { chunk in
+            HStack(alignment: .top, spacing: BrainStyle.m) {
+                ForEach(chunk.items, id: \.id) { item in
+                    NavigationLink(value: destination(item.id)) {
+                        BrainCard(item: item, style: style)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity)
+                }
+                ForEach(chunk.items.count..<columns, id: \.self) { _ in
+                    Color.clear
+                        .frame(maxWidth: .infinity, maxHeight: 0)
+                        .accessibilityHidden(true)
+                }
+            }
+            // Half the card spacing above and below, so rows sit one card gap apart.
+            .listRowInsets(EdgeInsets(top: BrainStyle.m / 2, leading: BrainStyle.l,
+                                      bottom: BrainStyle.m / 2, trailing: BrainStyle.l))
+            .brainListClearRow()
+            .onAppear { if chunk.id == lastChunkID { onLastAppear() } }
+        }
     }
 }
 

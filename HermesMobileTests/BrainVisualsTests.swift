@@ -254,10 +254,23 @@ final class BrainVisualsTests: XCTestCase {
         XCTAssertEqual(BrainListLayout.topTags(tags, selected: "t4").count, 12)
     }
 
-    func testGridColumnsCollapseAtAccessibilitySizes() {
-        XCTAssertEqual(BrainListLayout.columns(3, dynamicType: .xxLarge).count, 3)
-        XCTAssertEqual(BrainListLayout.columns(3, dynamicType: .accessibility2).count, 2)
-        XCTAssertEqual(BrainListLayout.columns(2, dynamicType: .accessibility1).count, 1)
+    func testGridColumnsDropToOneAtAccessibilitySizes() {
+        XCTAssertEqual(BrainListLayout.columnCount(3, dynamicType: .xxLarge), 3)
+        XCTAssertEqual(BrainListLayout.columnCount(2, dynamicType: .large), 2)
+        XCTAssertEqual(BrainListLayout.columnCount(3, dynamicType: .accessibility2), 1)
+        XCTAssertEqual(BrainListLayout.columnCount(2, dynamicType: .accessibility1), 1)
+    }
+
+    func testChunksKeepOrderShortLastRowAndFirstItemIds() {
+        let items = ["a", "b", "c", "d", "e"].map { item($0) }
+        let chunks = BrainListLayout.chunks(items, size: 2)
+        XCTAssertEqual(chunks.map(\.id), ["a", "c", "e"])
+        XCTAssertEqual(chunks.map { $0.items.map(\.id) }, [["a", "b"], ["c", "d"], ["e"]])
+        XCTAssertEqual(BrainListLayout.chunks(items, size: 3).map(\.items.count), [3, 2])
+        XCTAssertEqual(BrainListLayout.chunks([], size: 3), [])
+        // Ids stay stable as later pages append.
+        let grown = BrainListLayout.chunks(items + [item("f"), item("g")], size: 2)
+        XCTAssertEqual(Array(grown.prefix(3)).map(\.id), ["a", "c", "e"])
     }
 
     func testBookRouteDetection() {

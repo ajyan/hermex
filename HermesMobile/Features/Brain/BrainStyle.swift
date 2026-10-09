@@ -140,6 +140,31 @@ extension View {
     func brainListRow() -> some View {
         listRowBackground(Color.hxSurface)
     }
+
+    /// A list row that sits on the canvas without a separator: chip bars, pickers,
+    /// banners, card rows and inline states. `edgeToEdge` drops the row insets, for
+    /// content that scrolls sideways and pads itself.
+    @ViewBuilder
+    func brainListClearRow(edgeToEdge: Bool = false) -> some View {
+        let row = listRowBackground(Color.clear).listRowSeparator(.hidden)
+        if edgeToEdge {
+            row.listRowInsets(EdgeInsets())
+        } else {
+            row
+        }
+    }
+
+    /// The one card surface: `.hxSurface` in the 18pt continuous card shape with a
+    /// hairline `hxSeparator` stroke. Shared by `BrainCard` and the quote cards.
+    func brainCardSurface() -> some View {
+        let shape = BrainStyle.cardShape()
+        return background(Color.hxSurface, in: shape)
+            .clipShape(shape)
+            .overlay {
+                shape.stroke(Color.hxSeparator.opacity(0.6), lineWidth: 0.7)
+                    .allowsHitTesting(false)
+            }
+    }
 }
 
 extension BrainModuleID {
@@ -332,12 +357,7 @@ struct BrainCard: View {
             .padding(.vertical, style == .tile ? BrainStyle.s : BrainStyle.cardVerticalPadding)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .background(Color.hxSurface, in: shape)
-        .clipShape(shape)
-        .overlay {
-            shape.stroke(Color.hxSeparator.opacity(0.6), lineWidth: 0.7)
-                .allowsHitTesting(false)
-        }
+        .brainCardSurface()
         .contentShape(shape)
         // One element reading the title and the meta, in both styles; the cover is decorative.
         .accessibilityElement(children: .ignore)
