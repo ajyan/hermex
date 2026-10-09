@@ -85,18 +85,19 @@ struct PrepRunView: View {
                 Task { await viewModel.load() }
             }
         case .rep(let rep, _):
-            scaffold(rep) { repContent(rep) }
+            scaffold(rep, hasAction: hasAction(rep)) { repContent(rep) } bottom: { repAction(rep) }
                 // Fresh view state (timer start, example toggle) for every rep.
                 .id(rep.index)
         case .result(let rep, let result, _):
-            scaffold(rep) {
+            scaffold(rep, hasAction: true) {
                 PrepResultView(
                     rep: rep,
                     result: result,
                     chosenID: chosen?.rep == rep.index ? chosen?.id : nil,
-                    placedLines: viewModel.board?.placed ?? [],
-                    onContinue: { Task { await viewModel.continue() } }
+                    placedLines: viewModel.board?.placed ?? []
                 )
+            } bottom: {
+                PrepPrimaryButton(title: "Continue") { Task { await viewModel.continue() } }
             }
             .id(rep.index)
         case .finished(let streak, let moved):
@@ -105,7 +106,10 @@ struct PrepRunView: View {
     }
 
     /// A rep's screen: the progress bar and problem card pinned over the drill's scroll view.
-    private func scaffold<Content: View>(_ rep: PrepRep, @ViewBuilder content: () -> Content) -> some View {
+    /// The primary action is pinned in a bottom bar so it never scrolls out of reach.
+    private func scaffold<Content: View, Bottom: View>(
+        _ rep: PrepRep, hasAction: Bool, @ViewBuilder content: () -> Content, @ViewBuilder bottom: () -> Bottom
+    ) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: BrainStyle.xl) {
                 content()
@@ -124,6 +128,48 @@ struct PrepRunView: View {
             .padding(.bottom, BrainStyle.s)
             .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
             .background(Color.hxCanvas)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if hasAction {
+                VStack(spacing: BrainStyle.s) {
+                    bottom()
+                    if case .rep = viewModel.phase, let submitError = viewModel.submitError {
+                        PrepSubmitError(message: submitError)
+                    }
+                }
+                .padding(.horizontal, BrainStyle.l)
+                .padding(.vertical, BrainStyle.s)
+                .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
+                .background(Color.hxCanvas)
+            }
+        }
+    }
+
+    private func hasAction(_ rep: PrepRep) -> Bool {
+        switch rep.drill {
+        case .parsons, .primer: true
+        default: false
+        }
+    }
+
+    /// The pinned action for a rep awaiting its answer; choice reps answer by tapping an option.
+    @ViewBuilder
+    private func repAction(_ rep: PrepRep) -> some View {
+        switch rep.drill {
+        case .parsons:
+            if let board = viewModel.board {
+                PrepPrimaryButton(
+                    title: "Check order",
+                    enabled: board.isFull(target: PrepCopy.parsonsTarget(poolCount: board.pool.count))
+                        && !viewModel.isSubmitting
+                ) { Task { await viewModel.checkParsons() } }
+            }
+        case .primer:
+            PrepPrimaryButton(title: "Got it", enabled: !viewModel.isSubmitting) {
+                Task { await viewModel.acknowledgePrimer() }
+            }
+        default:
+            EmptyView()
         }
     }
 
@@ -147,21 +193,13 @@ struct PrepRunView: View {
                     board: board,
                     hintsShown: viewModel.hintsShown,
                     isSubmitting: viewModel.isSubmitting,
-                    submitError: viewModel.submitError,
                     place: { viewModel.place(poolIndex: $0) },
                     unplace: { viewModel.unplace(at: $0) },
-                    showHint: { viewModel.showHint() },
-                    check: { Task { await viewModel.checkParsons() } }
+                    showHint: { viewModel.showHint() }
                 )
             }
         case .primer:
-            PrepPrimerView(
-                item: rep.item,
-                isSubmitting: viewModel.isSubmitting,
-                submitError: viewModel.submitError
-            ) {
-                Task { await viewModel.acknowledgePrimer() }
-            }
+            PrepPrimerView(item: rep.item)
         case .unknown:
             EmptyView()
         }
@@ -203,7 +241,9 @@ struct PrepRunCompleteView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: BrainStyle.xl) {
                 SectionCard {
-                    BrainRow(title: PrepCopy.streak(days: streak.days), subtitle: PrepCopy.freezes(streak.freezes))
+                    BrainRow(
+                        title: PrepCopy.streakTitle(days: streak.days),
+                        subtitle: PrepCopy.streakSubtitle(days: streak.days, freezes: streak.freezes))
                 }
                 if !moved.isEmpty {
                     VStack(alignment: .leading, spacing: BrainStyle.s) {

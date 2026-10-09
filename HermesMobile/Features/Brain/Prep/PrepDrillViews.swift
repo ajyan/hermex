@@ -167,11 +167,9 @@ struct PrepParsonsView: View {
     let board: ParsonsBoard
     let hintsShown: Int
     let isSubmitting: Bool
-    let submitError: String?
     let place: (Int) -> Void
     let unplace: (Int) -> Void
     let showHint: () -> Void
-    let check: () -> Void
 
     private var target: Int { PrepCopy.parsonsTarget(poolCount: board.pool.count) }
 
@@ -221,21 +219,15 @@ struct PrepParsonsView: View {
             }
         }
 
-        VStack(spacing: BrainStyle.s) {
-            PrepPrimaryButton(title: "Check order", enabled: board.isFull(target: target) && !isSubmitting, action: check)
-            if let submitError {
-                PrepSubmitError(message: submitError)
+        if hintsShown < hints.count {
+            Button(action: showHint) {
+                Text(verbatim: "Show a hint")
+                    .font(BrainStyle.rowTitle)
+                    .foregroundStyle(Color.accentColor)
+                    .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
+                    .contentShape(Rectangle())
             }
-            if hintsShown < hints.count {
-                Button(action: showHint) {
-                    Text(verbatim: "Show a hint")
-                        .font(BrainStyle.rowTitle)
-                        .foregroundStyle(Color.accentColor)
-                        .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
+            .buttonStyle(.plain)
         }
     }
 }
@@ -246,23 +238,17 @@ struct PrepParsonsView: View {
 /// the worked example. "Got it" records it as seen.
 struct PrepPrimerView: View {
     let item: PrepItemExcerpt
-    let isSubmitting: Bool
-    let submitError: String?
-    let onAcknowledge: () -> Void
 
     var body: some View {
         if let primer = item.primer {
             if !primer.signals.isEmpty {
                 VStack(alignment: .leading, spacing: BrainStyle.s) {
                     BrainSectionHeader(title: "Signals")
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: BrainStyle.s) {
-                            ForEach(Array(primer.signals.enumerated()), id: \.offset) { _, signal in
-                                BrainTagChip(tag: signal)
-                            }
+                    PrepFlowLayout(spacing: BrainStyle.s) {
+                        ForEach(Array(primer.signals.enumerated()), id: \.offset) { _, signal in
+                            BrainTagChip(tag: signal)
                         }
                     }
-                    .scrollClipDisabled()
                 }
             }
             if !primer.template.isEmpty {
@@ -302,12 +288,6 @@ struct PrepPrimerView: View {
                 MarkdownRenderer(content: reference)
             }
         }
-        VStack(spacing: BrainStyle.s) {
-            PrepPrimaryButton(title: "Got it", enabled: !isSubmitting, action: onAcknowledge)
-            if let submitError {
-                PrepSubmitError(message: submitError)
-            }
-        }
     }
 }
 
@@ -321,7 +301,6 @@ struct PrepResultView: View {
     let result: PrepAttemptResult
     let chosenID: String?
     let placedLines: [String]
-    let onContinue: () -> Void
 
     var body: some View {
         switch rep.drill {
@@ -366,8 +345,6 @@ struct PrepResultView: View {
                     .frame(minHeight: BrainStyle.minTapTarget)
             }
         }
-
-        PrepPrimaryButton(title: "Continue", action: onContinue)
     }
 
     private var correctChoice: String? {
@@ -468,5 +445,40 @@ struct PrepCodeLine: View {
             .foregroundStyle(Color.hxTextPrimary)
             .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
             .contentShape(Rectangle())
+    }
+}
+
+/// Wraps its children onto as many lines as the proposed width needs, leading aligned.
+struct PrepFlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = arrange(width: proposal.width ?? .infinity, subviews: subviews)
+        return CGSize(width: proposal.width ?? result.size.width, height: result.size.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = arrange(width: bounds.width, subviews: subviews)
+        for (subview, origin) in zip(subviews, result.origins) {
+            subview.place(at: CGPoint(x: bounds.minX + origin.x, y: bounds.minY + origin.y), proposal: .unspecified)
+        }
+    }
+
+    private func arrange(width: CGFloat, subviews: Subviews) -> (origins: [CGPoint], size: CGSize) {
+        var origins: [CGPoint] = []
+        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0, maxX: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > width {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            origins.append(CGPoint(x: x, y: y))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+            maxX = max(maxX, x - spacing)
+        }
+        return (origins, CGSize(width: maxX, height: y + rowHeight))
     }
 }

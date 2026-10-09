@@ -302,9 +302,22 @@ enum PrepCopy {
         count == 1 ? "1 freeze saved" : "\(count) freezes saved"
     }
 
-    /// The Brain home row's subtitle.
+    /// The streak row's title; a zero streak reads as not started.
+    static func streakTitle(days: Int) -> String {
+        days == 0 ? "No streak yet" : streak(days: days)
+    }
+
+    /// The streak row's subtitle: the nudge at zero, the freezes only when there are some.
+    static func streakSubtitle(days: Int, freezes: Int) -> String? {
+        if days == 0 { return "Finish a run to start one" }
+        return freezes == 0 ? nil : Self.freezes(freezes)
+    }
+
+    /// The Brain home row's subtitle; the streak part only when there is one.
     static func homeRowSubtitle(streakDays: Int, remaining: Int) -> String {
-        "\(streak(days: streakDays)) · " + (remaining == 0 ? "run done" : "today's run is ready")
+        let run = remaining == 0 ? "run done" : "today's run is ready"
+        if streakDays == 0 { return run == "run done" ? "Run done" : "Today's run is ready" }
+        return "\(streak(days: streakDays)) · " + run
     }
 
     /// "32 min · 14 reps · Sliding window, Stack" (the focus part only when present).

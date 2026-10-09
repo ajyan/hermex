@@ -62,8 +62,8 @@ struct PrepHomeView: View {
                     }
                     PrepRowDivider()
                     BrainRow(
-                        title: PrepCopy.streak(days: home.streak.days),
-                        subtitle: PrepCopy.freezes(home.streak.freezes)
+                        title: PrepCopy.streakTitle(days: home.streak.days),
+                        subtitle: PrepCopy.streakSubtitle(days: home.streak.days, freezes: home.streak.freezes)
                     )
                     if let readiness = home.readiness {
                         PrepRowDivider()
@@ -162,9 +162,12 @@ private struct PrepTrackCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            BrainCoverView(spec: cover)
+            // The clear base takes the card's full width at the cover ratio; the art
+            // is an overlay so it can never be narrower than the card.
+            Color.clear
                 .aspectRatio(BrainStyle.coverAspectRatio, contentMode: .fit)
-                .drawingGroup()
+                .overlay { BrainCoverView(spec: cover).drawingGroup() }
+                .clipped()
             VStack(alignment: .leading, spacing: BrainStyle.xs) {
                 Text(verbatim: track.title)
                     .brainText(.rowTitle)
@@ -180,8 +183,9 @@ private struct PrepTrackCard: View {
             }
             .padding(.horizontal, BrainStyle.cardHorizontalPadding)
             .padding(.vertical, BrainStyle.cardVerticalPadding)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .brainCardSurface()
         .contentShape(BrainStyle.cardShape())
         .accessibilityElement(children: .ignore)
