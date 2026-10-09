@@ -254,6 +254,48 @@ final class BrainViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.list?.items.map(\.id), ["a", "c"])
     }
 
+    func testLoadMoreAlreadyInFlightWhenTagChangesCannotOverwrite() async {
+        let client = FakeBrainClient()
+        client.listResults = [
+            .success(BrainList(items: [BrainItem(module: .wiki, id: "a")], nextCursor: 20)),
+            .success(BrainList(items: [BrainItem(module: .wiki, id: "stale")], nextCursor: nil)),
+            .success(BrainList(items: [BrainItem(module: .wiki, id: "x1")], nextCursor: nil)),
+        ]
+        let viewModel = BrainListViewModel(module: .wiki, client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
+        await viewModel.load()
+        let gate = Gate()
+        client.pagedListGate = gate
+        let task = Task { await viewModel.loadMore() }
+        await gate.waitEntered()
+        viewModel.selectedTag = "x"
+        await viewModel.settled()
+        gate.open()
+        await task.value
+        XCTAssertEqual(viewModel.list?.items.map(\.id), ["x1"])
+    }
+
+    func testCancelledFirstLoadDoesNotWedgeLoading() async {
+        let client = FakeBrainClient()
+        client.listResults = [
+            .success(BrainList(items: [BrainItem(module: .wiki, id: "a")], nextCursor: 20)),
+            .success(BrainList(items: [BrainItem(module: .wiki, id: "a")], nextCursor: 20)),
+            .success(BrainList(items: [BrainItem(module: .wiki, id: "b")], nextCursor: nil)),
+        ]
+        let viewModel = BrainListViewModel(module: .wiki, client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
+        let gate = Gate()
+        client.firstListGate = gate
+        let task = Task { await viewModel.load() }
+        await gate.waitEntered()
+        task.cancel()
+        gate.open()
+        await task.value
+        XCTAssertFalse(viewModel.isLoading)
+        client.firstListGate = nil
+        await viewModel.load()
+        await viewModel.loadMore()
+        XCTAssertEqual(viewModel.list?.items.map(\.id), ["a", "b"])
+    }
+
     func testSearchFailureClearsResultAndFlagsFailure() async {
         let client = FakeBrainClient()
         client.failingSearches = ["mark"]
@@ -280,12 +322,19 @@ final class BrainViewModelTests: XCTestCase {
         let gate = Gate()
         client.graphGate = gate
         let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
+        let published = expectation(description: "page published")
+        withObservationTracking {
+            _ = viewModel.page
+        } onChange: {
+            // onChange fires before the write lands; hop so the assertions see it.
+            Task { @MainActor in published.fulfill() }
+        }
         let task = Task { await viewModel.load() }
-        await gate.waitEntered()
-        let publishedEarly = viewModel.state == .loaded(samplePage)
+        await fulfillment(of: [published], timeout: 10)
+        XCTAssertEqual(viewModel.state, .loaded(samplePage))
+        XCTAssertNil(viewModel.graph, "graph is still suspended")
         gate.open()
         await task.value
-        XCTAssertTrue(publishedEarly, "page should publish before the graph returns")
         XCTAssertEqual(viewModel.graph, graph)
     }
 }
@@ -341,6 +390,7 @@ final class FakeBrainClient: BrainDataClient, @unchecked Sendable {
     var failingSearches: Set<String> = []
     var graphGate: Gate?
     var pagedListGate: Gate?
+    var firstListGate: Gate?
 
     var searchQueries: [String] { lock.withLock { _searchQueries } }
     var listCalls: [(tag: String?, cursor: Int?)] { lock.withLock { _listCalls } }
@@ -354,6 +404,7 @@ final class FakeBrainClient: BrainDataClient, @unchecked Sendable {
             return listResults.isEmpty ? nil : listResults.removeFirst()
         }
         if cursor != nil, let gate = pagedListGate { await gate.pass() }
+        if cursor == nil, let gate = firstListGate { await gate.pass() }
         return try (next ?? .success(BrainList())).get()
     }
     func page(module: BrainModuleID, id: String) async throws -> BrainPage { try pageResult.get() }

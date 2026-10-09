@@ -131,6 +131,7 @@ final class BrainListViewModel {
         let token = generation
         isLoadingMore = false
         isLoading = true
+        defer { if token == generation { isLoading = false } }
         let tag = selectedTag
         if list == nil { state = .loading }
         do {
