@@ -287,7 +287,24 @@ final class ContractReadinessTests: XCTestCase {
                 path: "/api/skills/content",
                 query: ["name": "swiftui-ui-patterns", "file": "references/navigation.md"]
             ),
-            .init(name: "upload", method: "POST", endpoint: .upload, path: "/api/upload")
+            .init(name: "upload", method: "POST", endpoint: .upload, path: "/api/upload"),
+            .init(name: "tutor home", method: "GET", endpoint: .tutorHome, path: "/api/tutor/home"),
+            .init(name: "tutor today", method: "GET", endpoint: .tutorToday, path: "/api/tutor/today"),
+            .init(
+                name: "tutor map",
+                method: "GET",
+                endpoint: .tutorMap(track: "dsa"),
+                path: "/api/tutor/map",
+                query: ["track": "dsa"]
+            ),
+            .init(
+                name: "tutor item",
+                method: "GET",
+                endpoint: .tutorItem(id: "dsa.0217"),
+                path: "/api/tutor/item",
+                query: ["id": "dsa.0217"]
+            ),
+            .init(name: "tutor attempt", method: "POST", endpoint: .tutorAttempt, path: "/api/tutor/attempt")
         ]
 
         let baseURL = URL(string: "https://example.test")!
