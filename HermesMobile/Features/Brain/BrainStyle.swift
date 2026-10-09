@@ -401,6 +401,7 @@ struct BrainCard: View {
                     Text(verbatim: meta)
                         .brainText(.meta)
                         .lineLimit(2)
+                        .multilineTextAlignment(.leading)
                 }
             }
             .padding(.horizontal, padding)

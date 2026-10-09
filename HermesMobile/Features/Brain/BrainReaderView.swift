@@ -19,6 +19,19 @@ enum BrainReaderLayout {
             .joined(separator: " · ")
     }
 
+    /// Reader tag chips without the ingest-channel tags every article or video carries.
+    static func displayTags(_ tags: [String]) -> [String] {
+        tags.filter { !["email", "youtube"].contains($0.lowercased()) }
+    }
+
+    /// The digest for an article or video note in the summary outline; nil keeps the
+    /// plain markdown reader (wiki pages, journal days, people, and anything else).
+    static func digest(for page: BrainPage) -> BrainArticleDigest? {
+        let isSummary = page.item.module == .articles
+            || (page.item.module == .highlights && page.item.kind == "video")
+        return isSummary ? BrainArticleDigest.parse(page.content) : nil
+    }
+
     /// The footer under a saved copy: a page the server no longer has reads as removed.
     static func cachedCopyFooter(isMissing: Bool) -> String {
         isMissing ? "Removed from the Brain · saved copy" : "Offline, showing saved copy"
@@ -156,6 +169,8 @@ struct BrainReaderContent: View {
     let push: (BrainRoute) -> Void
     /// Built once per page, never in `body`.
     private let cover: BrainCoverSpec
+    /// Articles and video notes in the summary outline read as a digest.
+    private let digest: BrainArticleDigest?
     @State private var showsAllBacklinks = false
 
     init(page: BrainPage, graph: BrainGraph?, isShowingCachedCopy: Bool, isMissing: Bool = false,
@@ -166,6 +181,7 @@ struct BrainReaderContent: View {
         self.isMissing = isMissing
         self.push = push
         self.cover = BrainReaderLayout.cover(for: page.item)
+        self.digest = BrainReaderLayout.digest(for: page)
     }
 
     var body: some View {
@@ -178,23 +194,29 @@ struct BrainReaderContent: View {
                     } else {
                         titleBlock
                     }
-                    if !page.item.tags.isEmpty {
+                    if !BrainReaderLayout.displayTags(page.item.tags).isEmpty {
                         tagRow
                     }
                 }
                 if !page.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    MarkdownRenderer(content: page.content)
-                        .environment(\.openURL, OpenURLAction { url in
-                            switch BrainReaderLayout.linkAction(for: url) {
-                            case .push(let route):
-                                push(route)
-                                return .handled
-                            case .discard:
-                                return .discarded
-                            case .system:
-                                return .systemAction
-                            }
-                        })
+                    Group {
+                        if let digest {
+                            BrainArticleDigestView(digest: digest)
+                        } else {
+                            MarkdownRenderer(content: page.content)
+                        }
+                    }
+                    .environment(\.openURL, OpenURLAction { url in
+                        switch BrainReaderLayout.linkAction(for: url) {
+                        case .push(let route):
+                            push(route)
+                            return .handled
+                        case .discard:
+                            return .discarded
+                        case .system:
+                            return .systemAction
+                        }
+                    })
                 }
                 linkedFrom
                 furtherReading
@@ -243,7 +265,7 @@ struct BrainReaderContent: View {
     private var tagRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: BrainStyle.s) {
-                ForEach(page.item.tags, id: \.self) { BrainTagChip(tag: $0) }
+                ForEach(BrainReaderLayout.displayTags(page.item.tags), id: \.self) { BrainTagChip(tag: $0) }
             }
         }
         .scrollClipDisabled()
