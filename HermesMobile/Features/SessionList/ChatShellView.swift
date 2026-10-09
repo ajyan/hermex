@@ -644,13 +644,13 @@ struct ChatShellView: View {
             BrainSearchView(module: module, query: query, server: server, onAPIError: authManager.handleAPIError)
                 .adaptiveSecondaryNavigationTitle()
         case .prep(.home):
-            PrepHomeView(server: server)
+            PrepHomeView(server: server, onAPIError: authManager.handleAPIError)
                 .adaptiveSecondaryNavigationTitle()
         case .prep(.track(let track)):
-            PrepTrackView(track: track, server: server)
+            PrepTrackView(track: track, server: server, onAPIError: authManager.handleAPIError)
                 .adaptiveSecondaryNavigationTitle()
         case .prep(.run):
-            PrepRunView(server: server)
+            PrepRunView(server: server, onAPIError: authManager.handleAPIError)
         }
     }
 

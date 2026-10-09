@@ -6,9 +6,9 @@ struct PrepHomeView: View {
     @State private var viewModel: PrepHomeViewModel
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    init(server: URL) {
+    init(server: URL, onAPIError: @escaping (Error) -> Void) {
         _viewModel = State(initialValue: PrepHomeViewModel(
-            client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server))))
+            client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
     }
 
     var body: some View {

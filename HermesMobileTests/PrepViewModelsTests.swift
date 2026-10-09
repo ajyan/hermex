@@ -248,6 +248,86 @@ final class PrepViewModelsTests: XCTestCase {
         if case .result = vm.phase {} else { XCTFail("phase \(vm.phase)") }
     }
 
+    func testAdvanceSkipsDroppedRepTheServerPointsAt() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(run(index: 0, reps: [rep(0), rep(2)]))]
+        client.mapResults = [.success(map([]))]
+        client.attemptResults = [.success(result(next: 1))]
+        let vm = makeVM(client)
+        await vm.load()
+        await vm.choose(.choice("x"))
+        await vm.continue()
+        XCTAssertEqual(currentRep(vm)?.index, 2)
+    }
+
+    func testAdvanceNeverRepeatsTheAnsweredRep() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(run(index: 0, reps: [rep(0), rep(2)]))]
+        client.mapResults = [.success(map([]))]
+        // A server that points back at the rep just answered.
+        client.attemptResults = [.success(result(next: 0))]
+        let vm = makeVM(client)
+        await vm.load()
+        await vm.choose(.choice("x"))
+        await vm.continue()
+        XCTAssertEqual(currentRep(vm)?.index, 2)
+    }
+
+    func testBadRequestReloadsRunLikeConflict() async {
+        let client = FakePrepClient()
+        client.todayResults = [
+            .success(run(index: 0, reps: [rep(0)], date: "2026-10-08")),
+            .success(run(index: 2, reps: [rep(0), rep(2)], date: "2026-10-09")),
+        ]
+        client.mapResults = [.success(map([]))]
+        client.attemptResults = [.failure(http(400))]
+        let vm = makeVM(client)
+        await vm.load()
+        await vm.choose(.choice("a"))
+        XCTAssertNil(vm.submitError)
+        XCTAssertEqual(currentRep(vm)?.index, 2)
+    }
+
+    func testStaleSubmitErrorDoesNotLandOnReloadedRun() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(run(index: 0, reps: [rep(0)]))]
+        client.mapResults = [.success(map([]))]
+        client.attemptResults = [.failure(http(500))]
+        let (started, startedCont) = AsyncStream<Void>.makeStream()
+        let (release, releaseCont) = AsyncStream<Void>.makeStream()
+        client.gate = (startedCont, release)
+        let vm = makeVM(client)
+        await vm.load()
+        let submit = Task { await vm.choose(.choice("a")) }
+        for await _ in started { break }
+        await vm.load()
+        releaseCont.yield()
+        await submit.value
+        XCTAssertNil(vm.submitError)
+        XCTAssertFalse(vm.isSubmitting)
+    }
+
+    func testUnauthorizedReportsToAPIErrorHandler() async {
+        let client = FakePrepClient()
+        client.homeResults = [.failure(http(401))]
+        client.todayResults = [.failure(http(401))]
+        client.mapResults = [.failure(http(401))]
+        var seen = 0
+        let handler: (Error) -> Void = { error in
+            if case .http(401, _)? = error as? APIError { seen += 1 }
+        }
+        await PrepHomeViewModel(client: client, onAPIError: handler).load()
+        await PrepTrackViewModel(track: "dsa", client: client, onAPIError: handler).load()
+        await PrepRunViewModel(client: client, onAPIError: handler).load()
+        XCTAssertEqual(seen, 3)
+    }
+
+    func testChoiceMatchIgnoresCaseAndWhitespace() {
+        XCTAssertTrue(PrepCopy.isSameChoice(" Sliding_Window\n", "sliding_window"))
+        XCTAssertFalse(PrepCopy.isSameChoice("stack", "sliding_window"))
+        XCTAssertFalse(PrepCopy.isSameChoice("a", nil))
+    }
+
     func testDoubleSubmitPostsOnce() async {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [rep(0)]))]

@@ -5,8 +5,9 @@ private func prepIsNotFound(_ error: Error) -> Bool {
     (error as? APIError)?.isNotFound ?? false
 }
 
+/// 409 (another day's plan) and 400 (the rep no longer exists): both mean reload today.
 private func prepIsConflict(_ error: Error) -> Bool {
-    if case let .http(statusCode, _)? = error as? APIError { return statusCode == 409 }
+    if case let .http(statusCode, _)? = error as? APIError { return statusCode == 409 || statusCode == 400 }
     return false
 }
 
@@ -26,8 +27,11 @@ final class PrepHomeViewModel {
     @ObservationIgnored private let client: PrepDataClient
     @ObservationIgnored private var generation = 0
 
-    init(client: PrepDataClient) {
+    @ObservationIgnored private let onAPIError: (Error) -> Void
+
+    init(client: PrepDataClient, onAPIError: @escaping (Error) -> Void = { _ in }) {
         self.client = client
+        self.onAPIError = onAPIError
     }
 
     func load() async {
@@ -39,6 +43,7 @@ final class PrepHomeViewModel {
             state = .loaded(home)
         } catch {
             guard token == generation, !prepIsCancellation(error) else { return }
+            onAPIError(error)
             state = prepFailureState(error)
         }
     }
@@ -53,9 +58,12 @@ final class PrepTrackViewModel {
     @ObservationIgnored private let client: PrepDataClient
     @ObservationIgnored private var generation = 0
 
-    init(track: String, client: PrepDataClient) {
+    @ObservationIgnored private let onAPIError: (Error) -> Void
+
+    init(track: String, client: PrepDataClient, onAPIError: @escaping (Error) -> Void = { _ in }) {
         self.track = track
         self.client = client
+        self.onAPIError = onAPIError
     }
 
     func load() async {
@@ -67,6 +75,7 @@ final class PrepTrackViewModel {
             state = .loaded(map)
         } catch {
             guard token == generation, !prepIsCancellation(error) else { return }
+            onAPIError(error)
             state = prepFailureState(error)
         }
     }
@@ -131,8 +140,12 @@ final class PrepRunViewModel {
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var isAdvancing = false
 
-    init(client: PrepDataClient, now: @escaping () -> Date = Date.init) {
+    @ObservationIgnored private let onAPIError: (Error) -> Void
+
+    init(client: PrepDataClient, now: @escaping () -> Date = Date.init,
+         onAPIError: @escaping (Error) -> Void = { _ in }) {
         self.client = client
+        self.onAPIError = onAPIError
         self.now = now
         self.shownAt = now()
     }
@@ -154,6 +167,7 @@ final class PrepRunViewModel {
             await advance(in: loaded, to: loaded.index, token: token)
         } catch {
             guard token == generation, !prepIsCancellation(error) else { return }
+            onAPIError(error)
             phase = prepIsNotFound(error) ? .unavailable : .failed(error.localizedDescription)
         }
     }
@@ -187,17 +201,20 @@ final class PrepRunViewModel {
     }
 
     func `continue`() async {
-        guard !isAdvancing, case let .result(_, result, _) = phase, let run else { return }
+        guard !isAdvancing, case let .result(_, result, answered) = phase, let run else { return }
         isAdvancing = true
         defer { isAdvancing = false }
-        await advance(in: run, to: result.nextIndex, token: generation)
+        await advance(in: run, to: result.nextIndex, after: answered, token: generation)
     }
 
     // MARK: - Private
 
-    private func advance(in run: PrepRun, to target: Int, token: Int) async {
+    /// `answered` is the rep just graded: the server's `next_index` can point at a rep the
+    /// app dropped (unknown drill), so never go back to or before the one just answered.
+    private func advance(in run: PrepRun, to target: Int, after answered: Int? = nil, token: Int) async {
         guard token == generation, !Task.isCancelled else { return }
-        if let rep = run.reps.first(where: { $0.index >= target }) {
+        let floor = answered.map { max(target, $0 + 1) } ?? target
+        if let rep = run.reps.first(where: { $0.index >= floor }) {
             show(rep)
         } else {
             await finish(token: token)
@@ -231,14 +248,14 @@ final class PrepRunViewModel {
             if rep.drill == .primer {
                 // A primer has nothing to grade: advance as `continue()` would, staying
                 // locked until the next rep is in place so "Got it" can't post twice.
-                await advance(in: run, to: result.nextIndex, token: token)
+                await advance(in: run, to: result.nextIndex, after: rep.index, token: token)
                 isSubmitting = false
             } else {
                 isSubmitting = false
                 phase = .result(rep, result, index: rep.index)
             }
         } catch {
-            if prepIsCancellation(error) {
+            if token != generation || prepIsCancellation(error) {
                 isSubmitting = false
             } else if prepIsConflict(error) {
                 // Stay locked until the fresh run is in place, so no submit posts to the stale one.
@@ -246,6 +263,7 @@ final class PrepRunViewModel {
                 isSubmitting = false
             } else {
                 isSubmitting = false
+                onAPIError(error)
                 submitError = "Couldn't save. Try again."
             }
         }
@@ -265,6 +283,7 @@ final class PrepRunViewModel {
             await advance(in: fresh, to: fresh.index, token: token)
         } catch {
             guard token == generation, !prepIsCancellation(error) else { return }
+            onAPIError(error)
             phase = prepIsNotFound(error) ? .unavailable : .failed(error.localizedDescription)
         }
     }
@@ -390,6 +409,13 @@ enum PrepCopy {
         let lead = String(text[..<end.lowerBound]) + String(text[end.lowerBound])
         let rest = String(text[end.upperBound...]).trimmingCharacters(in: .whitespaces)
         return (lead, rest)
+    }
+
+    /// Whether an option is the graded answer, ignoring case and surrounding whitespace.
+    static func isSameChoice(_ optionID: String, _ correctID: String?) -> Bool {
+        guard let correctID else { return false }
+        func norm(_ s: String) -> String { s.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        return norm(optionID) == norm(correctID)
     }
 
     /// Lines a Parsons answer needs: the pool holds the solution plus one decoy.

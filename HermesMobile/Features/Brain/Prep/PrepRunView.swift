@@ -16,9 +16,9 @@ struct PrepRunView: View {
         let id: String
     }
 
-    init(server: URL) {
+    init(server: URL, onAPIError: @escaping (Error) -> Void) {
         _viewModel = State(initialValue: PrepRunViewModel(
-            client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server))))
+            client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
     }
 
     var body: some View {

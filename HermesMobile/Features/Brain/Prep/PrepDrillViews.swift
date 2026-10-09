@@ -167,8 +167,8 @@ struct PrepChoiceView: View {
     @ViewBuilder
     private func row(_ option: PrepOption) -> some View {
         if let grading {
-            let isCorrect = option.id == grading.correctID
-            let isWrongPick = option.id == grading.chosenID && !isCorrect
+            let isCorrect = PrepCopy.isSameChoice(option.id, grading.correctID)
+            let isWrongPick = PrepCopy.isSameChoice(option.id, grading.chosenID) && !isCorrect
             HStack(spacing: BrainStyle.m) {
                 optionTitle(option)
                 if isCorrect {
@@ -182,7 +182,7 @@ struct PrepChoiceView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text(verbatim: option.title))
             .accessibilityValue(Text(verbatim: isCorrect
-                ? (option.id == grading.chosenID ? "Your answer, correct" : "Correct answer")
+                ? (PrepCopy.isSameChoice(option.id, grading.chosenID) ? "Your answer, correct" : "Correct answer")
                 : (isWrongPick ? "Your answer, wrong" : "")))
         } else {
             Button { onChoose(option) } label: {

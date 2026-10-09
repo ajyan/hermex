@@ -8,9 +8,10 @@ struct PrepTrackView: View {
     /// Built once per screen, never in `body`.
     private let cover: BrainCoverSpec
 
-    init(track: String, server: URL) {
+    init(track: String, server: URL, onAPIError: @escaping (Error) -> Void) {
         _viewModel = State(initialValue: PrepTrackViewModel(
-            track: track, client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server))))
+            track: track, client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server)),
+            onAPIError: onAPIError))
         self.cover = BrainCoverSpec.make(id: PrepCopy.coverID(track), tag: "career")
     }
 

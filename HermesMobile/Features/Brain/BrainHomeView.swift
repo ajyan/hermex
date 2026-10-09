@@ -24,7 +24,7 @@ struct BrainHomeView: View {
         _viewModel = State(initialValue: BrainHomeViewModel(client: client, cache: cache, onAPIError: onAPIError))
         _searchViewModel = State(initialValue: BrainSearchViewModel(client: client, onAPIError: onAPIError))
         _prepViewModel = State(initialValue: PrepHomeViewModel(
-            client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server))))
+            client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
         self.push = push
     }
 
