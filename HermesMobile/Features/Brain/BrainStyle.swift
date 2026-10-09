@@ -1,0 +1,312 @@
+import SwiftUI
+import UIKit
+
+/// The one style source for every Brain module (and modules built like it).
+///
+/// Views reference these roles and constants, never raw fonts or numbers, so the
+/// five modules read as one library. Chrome stays neutral `hx*` plus the accent;
+/// only covers and graph headers take a hue, from `coverPalette`.
+enum BrainStyle {
+    // MARK: Type roles (all Dynamic Type text styles)
+
+    /// For in-content headings that stand in for a large navigation title. Screens
+    /// themselves use `.navigationTitle` with the large display mode.
+    static let screenTitle: Font = .largeTitle.weight(.bold)
+    static let sectionCaption: Font = AppFont.footnote()
+    static let rowTitle: Font = AppFont.body()
+    static let rowSubtitle: Font = AppFont.subheadline()
+    static let meta: Font = AppFont.caption()
+    static let readerTitle: Font = AppFont.title(weight: .semibold)
+    /// The only serif in the Brain: highlights and best-quote blocks.
+    static let quote: Font = .system(.body, design: .serif).leading(.loose)
+
+    /// A text role: its font plus its colour (nil keeps the inherited primary colour).
+    enum Role: CaseIterable {
+        case screenTitle, sectionCaption, rowTitle, rowSubtitle, meta, readerTitle, quote
+
+        var font: Font {
+            switch self {
+            case .screenTitle: BrainStyle.screenTitle
+            case .sectionCaption: BrainStyle.sectionCaption
+            case .rowTitle: BrainStyle.rowTitle
+            case .rowSubtitle: BrainStyle.rowSubtitle
+            case .meta: BrainStyle.meta
+            case .readerTitle: BrainStyle.readerTitle
+            case .quote: BrainStyle.quote
+            }
+        }
+
+        var color: Color {
+            switch self {
+            case .sectionCaption, .rowSubtitle, .meta: .hxTextSecondary
+            case .screenTitle, .rowTitle, .readerTitle, .quote: .hxTextPrimary
+            }
+        }
+    }
+
+    // MARK: Spacing (one 4pt grid)
+
+    static let xs: CGFloat = 4
+    static let s: CGFloat = 8
+    static let m: CGFloat = 12
+    static let l: CGFloat = 16
+    static let xl: CGFloat = 24
+
+    // MARK: Shapes (matched to `SectionCard`)
+
+    static let cardCorner: CGFloat = 18
+    static let cardHorizontalPadding: CGFloat = 16
+    static let cardVerticalPadding: CGFloat = 14
+    /// Corner for cover thumbnails and tiles inside rows.
+    static let thumbnailCorner: CGFloat = 8
+    /// Base side of a row's leading thumbnail; scale it with `@ScaledMetric`.
+    static let thumbnailSize: CGFloat = 44
+    /// Width over height for cover art on cards and grids.
+    static let coverAspectRatio: CGFloat = 3 / 2
+
+    static func cardShape() -> RoundedRectangle {
+        RoundedRectangle(cornerRadius: cardCorner, style: .continuous)
+    }
+
+    // MARK: Cover palette
+
+    /// The 8 cover ramps, as `(background, mid, strong)` in `0xRRGGBB`, light then dark.
+    /// Indices 0–5 are pinned to tags in `BrainCoverSpec.tagRamps`.
+    static let coverPaletteValues: [(light: (UInt32, UInt32, UInt32), dark: (UInt32, UInt32, UInt32))] = [
+        (light: (0xE6EEFC, 0xA9C2F0, 0x3F6FD1), dark: (0x16233A, 0x2C4A7A, 0x7FA4EC)), // 0 Nous blue
+        (light: (0xE2F2F1, 0x9FD1CC, 0x2E8A83), dark: (0x12292A, 0x24504E, 0x6CC0B8)), // 1 teal
+        (light: (0xE7F3E8, 0xAED4B2, 0x3E8B4C), dark: (0x172A1B, 0x2D5234, 0x7DC08A)), // 2 green
+        (light: (0xFBEAE5, 0xEFB8A8, 0xC8604A), dark: (0x33201C, 0x5E3830, 0xE79A86)), // 3 coral
+        (light: (0xEEE9F8, 0xC6B7E6, 0x6E54B5), dark: (0x241E36, 0x43385F, 0xA994E0)), // 4 purple
+        (light: (0xFBF1DE, 0xEBCB8E, 0xA9761F), dark: (0x2E2414, 0x574321, 0xDDB062)), // 5 amber
+        (light: (0xFAE8F0, 0xE9B3CB, 0xB4507E), dark: (0x321C27, 0x5A3247, 0xE08DB3)), // 6 pink
+        (light: (0xEEF0F3, 0xC3C9D2, 0x5F6B7A), dark: (0x1E2228, 0x383F49, 0x9AA4B1))  // 7 gray
+    ]
+
+    /// Built once: a fresh dynamic `UIColor` never equals another, so rebuilding per
+    /// view would defeat SwiftUI's diffing (same reasoning as `HermexPalette.colors`).
+    static let coverPalette: [BrainCoverRamp] = coverPaletteValues.map { values in
+        BrainCoverRamp(
+            background: dynamic(values.light.0, values.dark.0),
+            mid: dynamic(values.light.1, values.dark.1),
+            strong: dynamic(values.light.2, values.dark.2)
+        )
+    }
+
+    /// The ramp at `index`, wrapping any out-of-range value.
+    static func coverRamp(_ index: Int) -> BrainCoverRamp {
+        let count = coverPalette.count
+        return coverPalette[((index % count) + count) % count]
+    }
+
+    private static func dynamic(_ light: UInt32, _ dark: UInt32) -> Color {
+        let lightColor = HermexPalette.uiColor(light << 8 | 0xFF)
+        let darkColor = HermexPalette.uiColor(dark << 8 | 0xFF)
+        return Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark ? darkColor : lightColor
+        })
+    }
+}
+
+/// One hue ramp: a light tint for the ground, a mid tone and a strong accent.
+struct BrainCoverRamp: Equatable {
+    let background: Color
+    let mid: Color
+    let strong: Color
+}
+
+extension View {
+    /// Applies a Brain text role's font and colour.
+    func brainText(_ role: BrainStyle.Role) -> some View {
+        font(role.font).foregroundStyle(role.color)
+    }
+}
+
+// MARK: - Shared views
+
+/// The one Brain row: a leading slot (cover thumbnail, avatar or icon), a title, an
+/// optional subtitle and an optional trailing count or badge.
+struct BrainRow<Leading: View>: View {
+    let leading: Leading
+    let title: String
+    let subtitle: String?
+    let trailing: String?
+
+    init(
+        @ViewBuilder leading: () -> Leading,
+        title: String,
+        subtitle: String? = nil,
+        trailing: String? = nil
+    ) {
+        self.leading = leading()
+        self.title = title
+        self.subtitle = subtitle
+        self.trailing = trailing
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: BrainStyle.m) {
+            leading
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: title)
+                    .brainText(.rowTitle)
+                    .lineLimit(2)
+                if let subtitle, !subtitle.isEmpty {
+                    Text(verbatim: subtitle)
+                        .brainText(.rowSubtitle)
+                        .lineLimit(2)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let trailing, !trailing.isEmpty {
+                Text(verbatim: trailing)
+                    .brainText(.meta)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+        }
+        .padding(.vertical, BrainStyle.s)
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+}
+
+extension BrainRow where Leading == EmptyView {
+    init(title: String, subtitle: String? = nil, trailing: String? = nil) {
+        self.init(leading: { EmptyView() }, title: title, subtitle: subtitle, trailing: trailing)
+    }
+}
+
+/// The one Brain card: a cover on top, then the title and a meta line, on the
+/// `SectionCard` corner and padding. Used by the cover grids.
+struct BrainCard: View {
+    let item: BrainItem
+    private let cover: BrainCoverSpec
+
+    init(item: BrainItem) {
+        self.item = item
+        self.cover = BrainCoverSpec.make(id: item.id, tag: item.tags.first)
+    }
+
+    /// The meta line: subtitle (source, kind) and date, whichever are present.
+    static func metaLine(for item: BrainItem) -> String {
+        [item.subtitle, item.date].filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    var body: some View {
+        let shape = BrainStyle.cardShape()
+        let meta = Self.metaLine(for: item)
+        VStack(alignment: .leading, spacing: 0) {
+            BrainCoverView(spec: cover)
+                .aspectRatio(BrainStyle.coverAspectRatio, contentMode: .fit)
+                .drawingGroup()
+            VStack(alignment: .leading, spacing: BrainStyle.xs) {
+                Text(verbatim: item.title)
+                    .brainText(.rowTitle)
+                    .lineLimit(3)
+                    .multilineTextAlignment(.leading)
+                if !meta.isEmpty {
+                    Text(verbatim: meta)
+                        .brainText(.meta)
+                        .lineLimit(2)
+                }
+            }
+            .padding(.horizontal, BrainStyle.cardHorizontalPadding)
+            .padding(.vertical, BrainStyle.cardVerticalPadding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .background(Color.hxSurface, in: shape)
+        .clipShape(shape)
+        .overlay {
+            shape.stroke(Color.hxSeparator.opacity(0.6), lineWidth: 0.7)
+                .allowsHitTesting(false)
+        }
+        .contentShape(shape)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// The one tag chip, for filters and reader tags. Purely visual: wrap it in a
+/// `Button` to make it act. Selected chips take the accent colour.
+struct BrainTagChip: View {
+    let tag: String
+    var selected: Bool = false
+
+    var body: some View {
+        Text(verbatim: tag)
+            .font(BrainStyle.sectionCaption.weight(.medium))
+            .foregroundStyle(selected ? Color.hxOnAccent : Color.hxTextPrimary)
+            .lineLimit(1)
+            .padding(.horizontal, BrainStyle.m)
+            .padding(.vertical, BrainStyle.s)
+            .background {
+                Capsule().fill(selected ? Color.accentColor : Color.hxSurface)
+            }
+            .overlay {
+                Capsule().stroke(selected ? Color.clear : Color.hxSeparator, lineWidth: 0.7)
+            }
+            .contentShape(Capsule())
+            .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+/// The one section header, for list groups, Linked from and Further reading.
+struct BrainSectionHeader: View {
+    let title: String
+    var count: Int?
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: BrainStyle.s) {
+            Text(verbatim: title)
+                .brainText(.sectionCaption)
+                .fontWeight(.semibold)
+            if let count {
+                Text(verbatim: "\(count)")
+                    .brainText(.sectionCaption)
+                    .monospacedDigit()
+            }
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
+#if DEBUG
+#Preview("Rows, cards, chips") {
+    let items = [
+        BrainItem(module: .articles, id: "articles/one.md", title: "How to give feedback that lands",
+                  subtitle: "Harvard Business Review", date: "2026-09-30", tags: ["communication"]),
+        BrainItem(module: .wiki, id: "wiki/agents.md", title: "Agent loops", subtitle: "Concept",
+                  date: "2026-08-12", tags: ["llm"])
+    ]
+    return ScrollView {
+        VStack(alignment: .leading, spacing: BrainStyle.l) {
+            BrainSectionHeader(title: "Further reading", count: 12)
+            ForEach(items) { item in
+                BrainRow(leading: {
+                    BrainCoverView(spec: .make(id: item.id, tag: item.tags.first))
+                        .frame(width: BrainStyle.thumbnailSize, height: BrainStyle.thumbnailSize)
+                        .clipShape(RoundedRectangle(cornerRadius: BrainStyle.thumbnailCorner, style: .continuous))
+                }, title: item.title, subtitle: item.subtitle, trailing: "3")
+            }
+            BrainRow(title: "Sam Rivera", subtitle: "Friend")
+            HStack(spacing: BrainStyle.s) {
+                BrainTagChip(tag: "career", selected: true)
+                BrainTagChip(tag: "habits")
+                BrainTagChip(tag: "llm")
+            }
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: BrainStyle.m), GridItem(.flexible())],
+                      spacing: BrainStyle.m) {
+                ForEach(items) { BrainCard(item: $0) }
+            }
+            Text(verbatim: "The obstacle is the way.")
+                .brainText(.quote)
+        }
+        .padding(BrainStyle.l)
+    }
+    .background(Color.hxCanvas)
+}
+#endif
