@@ -114,7 +114,7 @@ private struct DeckCardView: View {
                 .padding(.top, 22)
                 .textSelection(.enabled)
         }
-        if card.type != .prompt, let question = viewModel.question(for: card) {
+        if !text.leadIsQuestion, let question = viewModel.question(for: card) {
             Text(verbatim: question)
                 .font(AppFont.title3(weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
@@ -132,7 +132,8 @@ private struct DeckCardView: View {
     }
 
     private func leadFont(_ lead: String) -> Font {
-        let style: Font.TextStyle = card.itemKind == "quote" ? .title : lead.count > 220 ? .title3 : .title2
+        let style: Font.TextStyle = card.itemKind == "quote" ? .title
+            : lead.count > 480 ? .body : lead.count > 220 ? .title3 : .title2
         return AppFont.serif(style: style)
     }
 

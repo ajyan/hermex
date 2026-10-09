@@ -314,8 +314,9 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(wiki.attribution, "Atomic Habits")
         XCTAssertEqual(wiki.detail, "Systems beat goals.\n\nWhy you saved it: habit work")
         let prompt = DeckCardText(deck.cards[3])
-        XCTAssertEqual(prompt.lead, "What is the one action?")
-        XCTAssertEqual(prompt.attribution, "Ted's check-in")
+        XCTAssertEqual(prompt.lead, "Long check-in.", "the advisor's whole message leads")
+        XCTAssertEqual(prompt.attribution, "— Ted")
+        XCTAssertFalse(prompt.leadIsQuestion)
         XCTAssertEqual(DeckCardText(deck.cards[4]).lead, "Preparation shows respect", "no body: the title leads")
     }
 
