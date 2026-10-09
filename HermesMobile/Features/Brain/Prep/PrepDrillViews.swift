@@ -49,18 +49,25 @@ struct PrepProblemCard: View {
                 .foregroundStyle(Color.hxTextPrimary)
                 .accessibilityAddTraits(.isHeader)
             if expanded {
-                // Natural height, capped; scrolls only when the content is taller.
-                ScrollView {
-                    detail.background {
-                        GeometryReader { proxy in
-                            Color.clear.preference(key: PrepDetailHeightKey.self, value: proxy.size.height)
-                        }
+                // Natural height, capped; scrolls only when the content is taller. The
+                // height is measured on a hidden copy outside the scroll, so it can't be circular.
+                Group {
+                    if detailHeight > 0 {
+                        ScrollView { detail }
+                            .scrollBounceBehavior(.basedOnSize)
+                            .frame(height: PrepCode.expandedHeight(
+                                natural: detailHeight, cap: max(maxHeight - chrome, 80)))
+                    } else {
+                        detail.fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .scrollBounceBehavior(.basedOnSize)
-                .frame(height: PrepCode.expandedHeight(
-                    natural: detailHeight, cap: max(maxHeight - chrome, 80)))
-                .onPreferenceChange(PrepDetailHeightKey.self) { detailHeight = $0 }
+                .background(alignment: .top) {
+                    detail
+                        .fixedSize(horizontal: false, vertical: true)
+                        .hidden()
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { detailHeight = $0 }
+                        .accessibilityHidden(true)
+                }
             } else if !summary.isEmpty {
                 Text(verbatim: summary)
                     .brainText(.rowSubtitle)
@@ -596,11 +603,6 @@ struct PrepHangingLayout: Layout {
     private static func trailingSpace(_ subview: LayoutSubview) -> CGFloat {
         subview[PrepTrailingSpace.self]
     }
-}
-
-private struct PrepDetailHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 
 private struct PrepTrailingSpace: LayoutValueKey {
