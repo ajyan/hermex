@@ -15,6 +15,9 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
     /// When set, `attempt` signals `started` and then waits on `release`.
     var gate: (started: AsyncStream<Void>.Continuation, release: AsyncStream<Void>)?
 
+    /// Same, for `home()`.
+    var homeGate: (started: AsyncStream<Void>.Continuation, release: AsyncStream<Void>)?
+
     var log: [String] { lock.withLock { _log } }
     var attempts: [PrepAttemptRequest] { lock.withLock { _attempts } }
 
@@ -25,7 +28,13 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
         return try (queue.count > 1 ? queue.removeFirst() : queue[0]).get()
     }
 
-    func home() async throws -> PrepHome { try next("home", &homeResults) }
+    func home() async throws -> PrepHome {
+        if let homeGate {
+            homeGate.started.yield()
+            for await _ in homeGate.release { break }
+        }
+        return try next("home", &homeResults)
+    }
     func today() async throws -> PrepRun { try next("today", &todayResults) }
     func map(track: String) async throws -> PrepTrackMap { try next("map:\(track)", &mapResults) }
 
@@ -278,6 +287,93 @@ final class PrepViewModelsTests: XCTestCase {
         let vm = makeVM(client)
         await vm.load()
         XCTAssertEqual(vm.board?.pool, ["x", "x", "y"])
+    }
+
+    // MARK: Cancellation, conflict, re-entry
+
+    func testCancelledLoadLeavesStateUntouched() async {
+        let client = FakePrepClient()
+        client.homeResults = [.failure(CancellationError())]
+        client.mapResults = [.failure(URLError(.cancelled))]
+        client.todayResults = [.failure(CancellationError())]
+        let home = PrepHomeViewModel(client: client)
+        await home.load()
+        XCTAssertEqual(home.state, .loading)
+        let track = PrepTrackViewModel(track: "dsa", client: client)
+        await track.load()
+        XCTAssertEqual(track.state, .loading)
+        let vm = makeVM(client)
+        await vm.load()
+        XCTAssertEqual(vm.phase, .loading)
+    }
+
+    func testCancelledSubmitSetsNoError() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(run(index: 0, reps: [rep(0)]))]
+        client.mapResults = [.success(map([]))]
+        client.attemptResults = [.failure(CancellationError())]
+        let vm = makeVM(client)
+        await vm.load()
+        await vm.choose(.choice("a"))
+        XCTAssertNil(vm.submitError)
+        XCTAssertFalse(vm.isSubmitting)
+        XCTAssertEqual(currentRep(vm)?.index, 0)
+    }
+
+    func testConflictThenTodayFailureFails() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(run(index: 0, reps: [rep(0)])), .failure(http(500))]
+        client.mapResults = [.success(map([]))]
+        client.attemptResults = [.failure(http(409))]
+        let vm = makeVM(client)
+        await vm.load()
+        await vm.choose(.choice("a"))
+        if case .failed = vm.phase {} else { XCTFail("phase \(vm.phase)") }
+        XCTAssertFalse(vm.isSubmitting)
+    }
+
+    func testContinueIsNotReentrant() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(run(index: 0, reps: [rep(0)]))]
+        client.mapResults = [.success(map([("a", 0.1)]))]
+        client.attemptResults = [.success(result(next: 1, streak: false))]
+        client.homeResults = [.success(decode(PrepHome.self, #"{"streak": {"days": 2, "freezes": 0}, "run": {}, "tracks": []}"#))]
+        let vm = makeVM(client)
+        await vm.load()
+        await vm.choose(.choice("a"))
+        let (started, startedCont) = AsyncStream<Void>.makeStream()
+        let (release, releaseCont) = AsyncStream<Void>.makeStream()
+        client.homeGate = (startedCont, release)
+        let first = Task { await vm.continue() }
+        for await _ in started { break }
+        await vm.continue() // second tap while finishing: ignored
+        releaseCont.yield()
+        releaseCont.yield()
+        await first.value
+        XCTAssertEqual(client.log.filter { $0 == "home" }.count, 1)
+        guard case let .finished(streak, _) = vm.phase else { return XCTFail("phase \(vm.phase)") }
+        XCTAssertEqual(streak.days, 2)
+    }
+
+    func testBoardFrozenWhileSubmitting() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "parsons", extra: #", "lines": ["a", "b"]"#)]))]
+        client.mapResults = [.success(map([]))]
+        client.attemptResults = [.success(result(next: 1))]
+        let (started, startedCont) = AsyncStream<Void>.makeStream()
+        let (release, releaseCont) = AsyncStream<Void>.makeStream()
+        client.gate = (startedCont, release)
+        let vm = makeVM(client)
+        await vm.load()
+        vm.place(poolIndex: 0)
+        let submit = Task { await vm.checkParsons() }
+        for await _ in started { break }
+        vm.place(poolIndex: 1)
+        vm.unplace(at: 0)
+        XCTAssertEqual(vm.board?.placed, ["a"])
+        releaseCont.yield()
+        await submit.value
+        XCTAssertEqual(client.attempts.first?.answer, .lines(["a"]))
     }
 
     // MARK: Parsons board

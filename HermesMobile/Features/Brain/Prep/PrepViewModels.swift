@@ -10,6 +10,10 @@ private func prepIsConflict(_ error: Error) -> Bool {
     return false
 }
 
+private func prepIsCancellation(_ error: Error) -> Bool {
+    error is CancellationError || (error as? URLError)?.code == .cancelled || Task.isCancelled
+}
+
 private func prepFailureState<Value>(_ error: Error) -> BrainLoadState<Value> {
     prepIsNotFound(error) ? .unavailable : .failed(error.localizedDescription)
 }
@@ -20,15 +24,21 @@ private func prepFailureState<Value>(_ error: Error) -> BrainLoadState<Value> {
 final class PrepHomeViewModel {
     private(set) var state: BrainLoadState<PrepHome> = .loading
     @ObservationIgnored private let client: PrepDataClient
+    @ObservationIgnored private var generation = 0
 
     init(client: PrepDataClient) {
         self.client = client
     }
 
     func load() async {
+        generation += 1
+        let token = generation
         do {
-            state = .loaded(try await client.home())
+            let home = try await client.home()
+            guard token == generation, !Task.isCancelled else { return }
+            state = .loaded(home)
         } catch {
+            guard token == generation, !prepIsCancellation(error) else { return }
             state = prepFailureState(error)
         }
     }
@@ -41,6 +51,7 @@ final class PrepTrackViewModel {
     let track: String
     private(set) var state: BrainLoadState<PrepTrackMap> = .loading
     @ObservationIgnored private let client: PrepDataClient
+    @ObservationIgnored private var generation = 0
 
     init(track: String, client: PrepDataClient) {
         self.track = track
@@ -48,9 +59,14 @@ final class PrepTrackViewModel {
     }
 
     func load() async {
+        generation += 1
+        let token = generation
         do {
-            state = .loaded(try await client.map(track: track))
+            let map = try await client.map(track: track)
+            guard token == generation, !Task.isCancelled else { return }
+            state = .loaded(map)
         } catch {
+            guard token == generation, !prepIsCancellation(error) else { return }
             state = prepFailureState(error)
         }
     }
@@ -112,6 +128,8 @@ final class PrepRunViewModel {
     @ObservationIgnored private var shownAt: Date
     @ObservationIgnored private var mapBefore: PrepTrackMap?
     @ObservationIgnored private var lastStreak: PrepStreak?
+    @ObservationIgnored private var generation = 0
+    @ObservationIgnored private var isAdvancing = false
 
     init(client: PrepDataClient, now: @escaping () -> Date = Date.init) {
         self.client = client
@@ -120,15 +138,22 @@ final class PrepRunViewModel {
     }
 
     func load() async {
+        generation += 1
+        let token = generation
         phase = .loading
         submitError = nil
+        mapBefore = nil
+        lastStreak = nil
         do {
             let loaded = try await client.today()
             // Non-fatal: only used to show which skills moved at the end.
-            mapBefore = try? await client.map(track: "dsa")
+            let map = try? await client.map(track: "dsa")
+            guard token == generation, !Task.isCancelled else { return }
+            mapBefore = map
             run = loaded
-            await advance(in: loaded, to: loaded.index)
+            await advance(in: loaded, to: loaded.index, token: token)
         } catch {
+            guard token == generation, !prepIsCancellation(error) else { return }
             phase = prepIsNotFound(error) ? .unavailable : .failed(error.localizedDescription)
         }
     }
@@ -147,10 +172,12 @@ final class PrepRunViewModel {
     }
 
     func place(poolIndex: Int) {
+        guard !isSubmitting else { return }
         board?.place(poolIndex: poolIndex)
     }
 
     func unplace(at position: Int) {
+        guard !isSubmitting else { return }
         board?.unplace(at: position)
     }
 
@@ -160,17 +187,20 @@ final class PrepRunViewModel {
     }
 
     func `continue`() async {
-        guard case let .result(_, result, _) = phase, let run else { return }
-        await advance(in: run, to: result.nextIndex)
+        guard !isAdvancing, case let .result(_, result, _) = phase, let run else { return }
+        isAdvancing = true
+        defer { isAdvancing = false }
+        await advance(in: run, to: result.nextIndex, token: generation)
     }
 
     // MARK: - Private
 
-    private func advance(in run: PrepRun, to target: Int) async {
+    private func advance(in run: PrepRun, to target: Int, token: Int) async {
+        guard token == generation, !Task.isCancelled else { return }
         if let rep = run.reps.first(where: { $0.index >= target }) {
             show(rep)
         } else {
-            await finish()
+            await finish(token: token)
         }
     }
 
@@ -184,6 +214,7 @@ final class PrepRunViewModel {
 
     private func submit(_ answer: PrepAnswer) async {
         guard !isSubmitting, case let .rep(rep, _) = phase, let run else { return }
+        let token = generation
         isSubmitting = true
         submitError = nil
         let elapsed = max(0, Int(now().timeIntervalSince(shownAt) * 1000))
@@ -193,35 +224,49 @@ final class PrepRunViewModel {
         do {
             let result = try await client.attempt(request)
             isSubmitting = false
+            guard token == generation, !Task.isCancelled else { return }
             if let streak = result.streak { lastStreak = streak }
             phase = .result(rep, result, index: rep.index)
         } catch {
-            isSubmitting = false
-            if prepIsConflict(error) {
-                await restart()
+            if prepIsCancellation(error) {
+                isSubmitting = false
+            } else if prepIsConflict(error) {
+                // Stay locked until the fresh run is in place, so no submit posts to the stale one.
+                await restart(token: token)
+                isSubmitting = false
             } else {
-                submitError = String(localized: "Couldn't save. Try again.")
+                isSubmitting = false
+                submitError = "Couldn't save. Try again."
             }
         }
     }
 
     /// The plan belongs to another day: reload it and start at its index.
-    private func restart() async {
+    private func restart(token: Int) async {
+        guard token == generation else { return }
+        mapBefore = nil
+        lastStreak = nil
         do {
             let fresh = try await client.today()
+            let map = try? await client.map(track: "dsa")
+            guard token == generation, !Task.isCancelled else { return }
+            mapBefore = map
             run = fresh
-            await advance(in: fresh, to: fresh.index)
+            await advance(in: fresh, to: fresh.index, token: token)
         } catch {
+            guard token == generation, !prepIsCancellation(error) else { return }
             phase = prepIsNotFound(error) ? .unavailable : .failed(error.localizedDescription)
         }
     }
 
-    private func finish() async {
-        board = nil
+    private func finish(token: Int) async {
         var streak = lastStreak
         if streak == nil { streak = try? await client.home().streak }
         var moved: [PrepSkill] = []
-        if let before = mapBefore, let after = try? await client.map(track: "dsa") {
+        let after = mapBefore == nil ? nil : try? await client.map(track: "dsa")
+        guard token == generation, !Task.isCancelled else { return }
+        board = nil
+        if let before = mapBefore, let after {
             let old = Dictionary(
                 before.levels.flatMap(\.skills).map { ($0.id, $0.mastery) },
                 uniquingKeysWith: { first, _ in first })
