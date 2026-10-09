@@ -94,6 +94,16 @@ _Avoid_: Bulk update, batch operation
 The mode for choosing Cards before applying a Bulk Action.
 _Avoid_: Multi-select, bulk mode
 
+## Brain
+
+**Brain module**:
+One of the Brain's five sections over the server's second-brain vault: People, Wiki, Articles, Journal or Highlights. Each opens a list of its Brain items.
+_Avoid_: Brain section, category, collection
+
+**Brain item**:
+One entry in a Brain module, identified by its module and vault id: a person, wiki page, article, journal day, book or video. It opens in the reader (books in the highlights view).
+_Avoid_: note, document, entry, page (for the item itself)
+
 ## Chat
 
 **Fork**:
