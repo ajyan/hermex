@@ -5,16 +5,18 @@ import SwiftUI
 /// deterministic, so the same graph always lands the same way.
 enum BrainGraphLayout {
     /// The ellipse's radii as shares of the width and height.
-    static let radiusXScale: CGFloat = 0.38
+    static let radiusXScale: CGFloat = 0.20
     static let radiusYScale: CGFloat = 0.30
     /// A label's width as a share of the width; titles truncate inside it.
-    static let labelWidthScale: CGFloat = 0.30
+    static let labelWidthScale: CGFloat = 0.25
     /// More neighbours than this cannot all get a 44pt label row on a 180pt header.
     static let maxNeighbours = 6
     static let centerDot = BrainStyle.l
     static let neighbourDot = BrainStyle.s
-    /// Gap between a dot and its label, wider than the centre dot's radius.
-    static let labelGap = BrainStyle.m
+    /// Gap between a dot and its label, as wide as the centre dot's radius. With
+    /// `radiusXScale + labelWidthScale` at 0.45, a label plus gap and inset fits
+    /// beside its dot on any width of 240pt or more, so no clamp pushes it back.
+    static let labelGap = BrainStyle.s
     /// Labels and their hit-rects stay this far inside the header.
     static let edgeInset = BrainStyle.xs
 
@@ -53,8 +55,8 @@ enum BrainGraphLayout {
     /// Each neighbour's label hit-rect, at least 44pt tall and `labelWidthScale` wide.
     /// A label sits outward from its dot: leading-aligned to the right of dots on the
     /// right half, trailing-aligned to the left of dots on the left half. Each half
-    /// takes at most three labels, stacked so their rects never overlap, and both
-    /// halves keep clear of the centre dot.
+    /// takes at most three labels, stacked so their rects never overlap; the ellipse
+    /// and label widths keep every rect off every dot.
     static func labelFrames(nodeIDs: [String], centerID: String, size: CGSize, labelHeight: CGFloat) -> [String: CGRect] {
         let points = positions(nodeIDs: nodeIDs, centerID: centerID, size: size)
         let midX = size.width / 2

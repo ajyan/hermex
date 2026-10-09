@@ -81,7 +81,7 @@ final class BrainVisualsTests: XCTestCase {
         XCTAssertEqual(positions.count, ids.count)
         XCTAssertEqual(positions["wiki/center.md"], CGPoint(x: 170, y: 90))
         let bounds = CGRect(origin: .zero, size: size)
-        let rx = size.width * 0.38
+        let rx = size.width * 0.20
         let ry = size.height * 0.30
         for id in ids where id != "wiki/center.md" {
             let point = try XCTUnwrap(positions[id])
@@ -121,32 +121,37 @@ final class BrainVisualsTests: XCTestCase {
 
     func testGraphLabelFramesDoNotCollide() throws {
         let centerIDs = ["wiki/virtues.md", "wiki/networking.md", "journal/2026-09-01.md", "a", "b", "c", "d", "e"]
-        let neighbours = (1...6).map { "wiki/a-very-long-title-that-would-never-fit-\($0).md" }
-        for width in [375.0, 320.0] {
-            let size = CGSize(width: width, height: 180)
-            let inner = CGRect(origin: .zero, size: size).insetBy(dx: 4, dy: 4)
-            for centerID in centerIDs {
-                for labelHeight in [16.0, 22.0] {
-                    let ids = [centerID] + neighbours
-                    let frames = BrainGraphLayout.labelFrames(
-                        nodeIDs: ids, centerID: centerID, size: size, labelHeight: labelHeight
-                    )
-                    XCTAssertEqual(Set(frames.keys), Set(neighbours))
-                    XCTAssertNil(frames[centerID])
-                    let center = try XCTUnwrap(
-                        BrainGraphLayout.positions(nodeIDs: ids, centerID: centerID, size: size)[centerID]
-                    )
-                    let side = BrainGraphLayout.centerDot
-                    let centerDot = CGRect(x: center.x - side / 2, y: center.y - side / 2, width: side, height: side)
-                    let rects = neighbours.compactMap { frames[$0] }
-                    for (index, rect) in rects.enumerated() {
-                        let context = "\(centerID) at \(width), label \(index): \(rect)"
-                        XCTAssertGreaterThanOrEqual(rect.height, 44, context)
-                        XCTAssertLessThanOrEqual(rect.width, width * 0.30 + 0.001, context)
-                        XCTAssertTrue(inner.contains(rect), "outside bounds: \(context)")
-                        XCTAssertFalse(rect.intersects(centerDot), "covers the centre: \(context)")
-                        for other in rects[(index + 1)...] {
-                            XCTAssertFalse(rect.intersects(other), "overlaps \(other): \(context)")
+        let allNeighbours = (1...6).map { "wiki/a-very-long-title-that-would-never-fit-\($0).md" }
+        for count in 1...6 {
+            let neighbours = Array(allNeighbours.prefix(count))
+            for width in [375.0, 320.0] {
+                let size = CGSize(width: width, height: 180)
+                let inner = CGRect(origin: .zero, size: size).insetBy(dx: 4, dy: 4)
+                for centerID in centerIDs {
+                    for labelHeight in [16.0, 22.0] {
+                        let ids = [centerID] + neighbours
+                        let frames = BrainGraphLayout.labelFrames(
+                            nodeIDs: ids, centerID: centerID, size: size, labelHeight: labelHeight
+                        )
+                        XCTAssertEqual(Set(frames.keys), Set(neighbours))
+                        XCTAssertNil(frames[centerID])
+                        let dots = BrainGraphLayout.positions(nodeIDs: ids, centerID: centerID, size: size)
+                        let center = try XCTUnwrap(dots[centerID])
+                        let side = BrainGraphLayout.centerDot
+                        let centerDot = CGRect(x: center.x - side / 2, y: center.y - side / 2, width: side, height: side)
+                        let rects = neighbours.compactMap { frames[$0] }
+                        for (index, rect) in rects.enumerated() {
+                            let context = "\(count) neighbours, \(centerID) at \(width), label \(index): \(rect)"
+                            XCTAssertGreaterThanOrEqual(rect.height, 44, context)
+                            XCTAssertLessThanOrEqual(rect.width, width * 0.25 + 0.001, context)
+                            XCTAssertTrue(inner.contains(rect), "outside bounds: \(context)")
+                            XCTAssertFalse(rect.intersects(centerDot), "covers the centre: \(context)")
+                            for (dotID, dot) in dots {
+                                XCTAssertFalse(rect.contains(dot), "covers the dot of \(dotID): \(context)")
+                            }
+                            for other in rects[(index + 1)...] {
+                                XCTAssertFalse(rect.intersects(other), "overlaps \(other): \(context)")
+                            }
                         }
                     }
                 }
