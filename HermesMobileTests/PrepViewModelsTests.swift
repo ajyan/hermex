@@ -50,6 +50,36 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
 
 @MainActor
 final class PrepViewModelsTests: XCTestCase {
+    func testCodeSplitCountsLeadingSpaces() {
+        let parts = PrepCode.split("    return x")
+        XCTAssertEqual(parts.indent, 4)
+        XCTAssertEqual(parts.text, "return x")
+    }
+
+    func testCodeSplitCountsTabsAsFourSpaces() {
+        let parts = PrepCode.split("\t  if x:")
+        XCTAssertEqual(parts.indent, 6)
+        XCTAssertEqual(parts.text, "if x:")
+    }
+
+    func testCodeSplitKeepsInnerSpacesAndTrailingText() {
+        let parts = PrepCode.split("a  =  b ")
+        XCTAssertEqual(parts.indent, 0)
+        XCTAssertEqual(parts.text, "a  =  b ")
+    }
+
+    func testCodeSplitOfBlankLine() {
+        let parts = PrepCode.split("   ")
+        XCTAssertEqual(parts.indent, 3)
+        XCTAssertEqual(parts.text, "")
+    }
+
+    func testCodeWordsRoundTrip() {
+        let text = "for i in  range(n):"
+        XCTAssertEqual(PrepCode.words(text).joined(), text)
+        XCTAssertEqual(PrepCode.words("a b"), ["a ", "b"])
+    }
+
     private func decode<T: Decodable>(_ type: T.Type, _ json: String) -> T {
         try! PrepDecoding.decode(type, from: Data(json.utf8))
     }

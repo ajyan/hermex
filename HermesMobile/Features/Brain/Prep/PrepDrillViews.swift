@@ -5,15 +5,17 @@ import SwiftUI
 
 // MARK: - Problem card
 
-/// The problem being drilled, pinned over the drill: meta, title, summary and a
-/// "Show example" toggle. A primer shows the skill and its worked example instead.
+/// The problem being drilled, pinned over the drill: meta, title, a two-line
+/// summary and a More/Less toggle that reveals the full summary and example. A primer shows the skill and its worked example instead.
 struct PrepProblemCard: View {
     let meta: String
     let title: String
     let summary: String
     let example: String
-    @State private var showsExample = false
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    /// Reset per rep: the run view keys each rep with `.id(rep.index)`.
+    @State private var expanded = false
+
+    private var canExpand: Bool { !example.isEmpty || !summary.isEmpty }
 
     init(rep: PrepRep) {
         let item = rep.item
@@ -42,20 +44,20 @@ struct PrepProblemCard: View {
             if !summary.isEmpty {
                 Text(verbatim: summary)
                     .brainText(.rowSubtitle)
-                    // Pinned, so it must never fill the screen at accessibility sizes.
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : nil)
+                    // Pinned, so compact by default; VoiceOver still reads it in full.
+                    .lineLimit(expanded ? nil : 2)
+                    .accessibilityLabel(Text(verbatim: summary))
             }
-            if showsExample {
+            if expanded, !example.isEmpty {
                 Text(verbatim: example)
                     .font(AppFont.mono(style: .footnote))
                     .foregroundStyle(Color.hxTextPrimary)
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : nil)
             }
-            if !example.isEmpty {
+            if canExpand {
                 Button {
-                    showsExample.toggle()
+                    expanded.toggle()
                 } label: {
-                    Text(verbatim: showsExample ? "Hide example" : "Show example")
+                    Text(verbatim: expanded ? "Less" : "More")
                         .font(BrainStyle.rowSubtitle.weight(.medium))
                         .foregroundStyle(Color.accentColor)
                         .frame(minHeight: BrainStyle.minTapTarget, alignment: .leading)
@@ -67,7 +69,7 @@ struct PrepProblemCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, BrainStyle.cardHorizontalPadding)
         .padding(.top, BrainStyle.cardVerticalPadding)
-        .padding(.bottom, example.isEmpty ? BrainStyle.cardVerticalPadding : 0)
+        .padding(.bottom, canExpand ? 0 : BrainStyle.cardVerticalPadding)
         .brainCardSurface()
     }
 }
@@ -435,16 +437,98 @@ struct PrepCodeCard<Content: View>: View {
     }
 }
 
-/// One line of code, indentation kept, at least a tap target tall.
+/// One line of code with a hanging indent: its leading spaces become padding and
+/// wrapped continuation lines sit one step further in. No truncation, at least a
+/// tap target tall.
 struct PrepCodeLine: View {
     let code: String
+    /// The width of one monospaced space at the footnote size, scaled with Dynamic Type.
+    @ScaledMetric(relativeTo: .footnote) private var step: CGFloat = 7.8
 
     var body: some View {
-        Text(verbatim: code)
-            .font(AppFont.mono(style: .footnote))
-            .foregroundStyle(Color.hxTextPrimary)
-            .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
-            .contentShape(Rectangle())
+        let parts = PrepCode.split(code)
+        PrepHangingLayout(hang: step) {
+            ForEach(Array(PrepCode.words(parts.text).enumerated()), id: \.offset) { _, word in
+                Text(verbatim: word)
+                    .font(AppFont.mono(style: .footnote))
+                    .foregroundStyle(Color.hxTextPrimary)
+            }
+        }
+        .padding(.leading, CGFloat(parts.indent) * step)
+        .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: code))
+    }
+}
+
+/// Splits a code line for rendering with a hanging indent.
+enum PrepCode {
+    /// The leading whitespace as a space count (a tab is 4) and the rest of the line.
+    static func split(_ line: String) -> (indent: Int, text: String) {
+        var indent = 0
+        var rest = Substring(line)
+        while let first = rest.first, first == " " || first == "\t" {
+            indent += first == "\t" ? 4 : 1
+            rest = rest.dropFirst()
+        }
+        return (indent, String(rest))
+    }
+
+    /// The text cut after each space, so each piece carries its trailing space.
+    static func words(_ text: String) -> [String] {
+        var result: [String] = []
+        var current = ""
+        for character in text {
+            current.append(character)
+            if character == " " { result.append(current); current = "" }
+        }
+        if !current.isEmpty { result.append(current) }
+        return result
+    }
+}
+
+/// Lays words out left to right, wrapping at the proposed width; continuation lines
+/// start `hang` in. A word wider than the room left goes on its own line and wraps itself.
+struct PrepHangingLayout: Layout {
+    var hang: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = arrange(width: proposal.width ?? .infinity, subviews: subviews)
+        return CGSize(width: proposal.width ?? result.size.width, height: result.size.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = arrange(width: bounds.width, subviews: subviews)
+        for (index, subview) in subviews.enumerated() {
+            let frame = result.frames[index]
+            subview.place(
+                at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
+                proposal: ProposedViewSize(width: frame.width, height: frame.height))
+        }
+    }
+
+    private func arrange(width: CGFloat, subviews: Subviews) -> (frames: [CGRect], size: CGSize) {
+        var frames: [CGRect] = []
+        var x: CGFloat = 0, y: CGFloat = 0, lineHeight: CGFloat = 0, maxX: CGFloat = 0
+        var lineStart: CGFloat = 0
+        for subview in subviews {
+            var size = subview.sizeThatFits(.unspecified)
+            if x > lineStart, x + size.width > width + 0.5 {
+                y += lineHeight
+                lineStart = hang
+                x = lineStart
+                lineHeight = 0
+            }
+            if x + size.width > width + 0.5 {
+                size = subview.sizeThatFits(ProposedViewSize(width: max(width - x, 1), height: nil))
+            }
+            frames.append(CGRect(origin: CGPoint(x: x, y: y), size: size))
+            x += size.width
+            lineHeight = max(lineHeight, size.height)
+            maxX = max(maxX, x)
+        }
+        return (frames, CGSize(width: maxX, height: y + lineHeight))
     }
 }
 
