@@ -61,6 +61,25 @@ enum HermesDeepLink {
         return components.url
     }
 
+    /// `hermes-agent://daily-brief?date=2026-10-11&kind=weekly` opens that review.
+    static func dailyBriefURL(date: String?, kind: String?) -> URL? {
+        guard var components = dailyBriefURL.flatMap({ URLComponents(url: $0, resolvingAgainstBaseURL: false) }) else { return nil }
+        if let date, let kind {
+            components.queryItems = [URLQueryItem(name: "date", value: date), URLQueryItem(name: "kind", value: kind)]
+        }
+        return components.url
+    }
+
+    /// The (date, kind) a daily-brief link names, when it names a review.
+    static func dailyBriefDeck(from url: URL) -> (date: String, kind: String)? {
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        guard let date = items.first(where: { $0.name == "date" })?.value,
+              let kind = items.first(where: { $0.name == "kind" })?.value,
+              ["weekly", "monthly", "morning"].contains(kind)
+        else { return nil }
+        return (date, kind)
+    }
+
     static func isDailyBriefURL(_ url: URL) -> Bool {
         url.scheme?.lowercased() == scheme
             && url.host?.lowercased() == dailyBriefHost

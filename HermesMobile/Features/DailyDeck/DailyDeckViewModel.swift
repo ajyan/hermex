@@ -48,6 +48,8 @@ final class DailyDeckViewModel {
     private(set) var availableDates: [String] = []
     /// Days whose deck has been filed.
     private(set) var filedDates: Set<String> = []
+    /// Weekly and monthly review decks in `briefs/`, newest first.
+    private(set) var reviews: [DeckReview] = []
     /// The page on screen.
     var index = 0
 
@@ -56,7 +58,18 @@ final class DailyDeckViewModel {
     let today: String
     /// The day of the deck on screen.
     private(set) var date: String
-    let kind = "morning"
+    /// "morning" for the Daily Brief; "weekly" or "monthly" for a review deck.
+    private(set) var kind = "morning"
+
+    var isReview: Bool { kind != "morning" }
+
+    var title: String {
+        switch kind {
+        case "weekly": "Weekly Review"
+        case "monthly": "Monthly Review"
+        default: "Daily Brief"
+        }
+    }
     private let client: any DailyDeckDataClient
     private let store: DailyDeckStore
     private let now: () -> Date
@@ -126,8 +139,9 @@ final class DailyDeckViewModel {
             self.workspace = workspace
             let (sessionID, names) = try await sessionAndBriefs(workspace: workspace)
             self.sessionID = sessionID
-            availableDates = Self.deckDates(in: names ?? [], kind: kind)
-            filedDates = Self.filedDates(in: names ?? [], kind: kind)
+            availableDates = Self.deckDates(in: names ?? [], kind: "morning")
+            filedDates = Self.filedDates(in: names ?? [], kind: "morning")
+            reviews = DeckReview.all(in: names ?? [])
             try await openDeck(names: names ?? [], sessionID: sessionID)
         } catch is CancellationError {
             // A newer load owns the state.
@@ -136,10 +150,11 @@ final class DailyDeckViewModel {
         }
     }
 
-    /// Opens another day's deck from `availableDates`, to reread or edit it.
-    func show(date: String) async {
-        guard date != self.date || state != .ready else { return }
+    /// Opens another deck: a past day's brief to reread or edit, or a review.
+    func show(date: String, kind: String = "morning") async {
+        guard date != self.date || kind != self.kind || state != .ready else { return }
         self.date = date
+        self.kind = kind
         index = 0
         await load()
     }
@@ -218,7 +233,7 @@ final class DailyDeckViewModel {
         }
         let created = try await client.createSession(workspace: workspace)
         store.setSession(created, for: server, date: today)
-        try? await client.renameSession(id: created, title: Self.sessionTitle(for: date))
+        try? await client.renameSession(id: created, title: Self.sessionTitle(for: date, kind: kind))
         return (created, try await briefNames(sessionID: created))
     }
 
@@ -232,9 +247,10 @@ final class DailyDeckViewModel {
 
     private func fileName(_ path: String) -> String { (path as NSString).lastPathComponent }
 
-    /// "Daily Brief · Oct 5" for the deck's day.
-    static func sessionTitle(for day: String) -> String {
-        "Daily Brief · \(DailyDeckPaths.label(day))"
+    /// "Daily Brief · Oct 5" for the deck's day; reviews say which.
+    static func sessionTitle(for day: String, kind: String = "morning") -> String {
+        let name = kind == "weekly" ? "Weekly Review" : kind == "monthly" ? "Monthly Review" : "Daily Brief"
+        return "\(name) · \(DailyDeckPaths.label(day))"
     }
 
     // MARK: Journal
@@ -348,7 +364,7 @@ final class DailyDeckViewModel {
         do {
             let message = try DeckAnswersPayload(deck: deck, answers: answers, completedAt: now()).message(refiling: isFiled)
             let sessionID = try await client.createSession(workspace: workspace)
-            try? await client.renameSession(id: sessionID, title: Self.sessionTitle(for: date))
+            try? await client.renameSession(id: sessionID, title: Self.sessionTitle(for: date, kind: kind))
             store.setSession(sessionID, for: server, date: today)
             self.sessionID = sessionID
             try await client.startChat(sessionID: sessionID, message: message, workspace: workspace)

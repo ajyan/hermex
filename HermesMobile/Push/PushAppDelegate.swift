@@ -83,7 +83,7 @@ final class PushAppDelegate: NSObject, UIApplicationDelegate, UNUserNotification
         Task { @MainActor in
             let activeServer = ServerRegistry.shared.activeServerID.flatMap(URL.init(string:))
             if DailyBriefReminder.isDailyBrief(userInfo) {
-                AppIntentRouter.shared.requestDeepLink(HermesDeepLink.dailyBriefURL)
+                AppIntentRouter.shared.requestDeepLink(DailyBriefReminder.url(for: userInfo))
             } else if let destination = ResponseCompletionNotificationRequest.destination(
                 userInfo: userInfo, servers: ServerRegistry.shared.servers.compactMap { URL(string: $0.id) }) {
                 AppIntentRouter.shared.requestDeepLink(destination.url)

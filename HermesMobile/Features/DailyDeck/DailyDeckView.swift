@@ -18,7 +18,7 @@ struct DailyDeckView: View {
 
     var body: some View {
         content
-            .navigationTitle(Text(verbatim: "Daily Brief"))
+            .navigationTitle(Text(verbatim: viewModel.title))
             .navigationBarTitleDisplayMode(.inline)
             .background(Color.hxCanvas.ignoresSafeArea())
             .toolbar {
@@ -64,18 +64,26 @@ struct DailyDeckView: View {
                 }
             }
             .task {
-                await viewModel.load()
+                if let review = DailyBriefLaunch.take() {
+                    await viewModel.show(date: review.date, kind: review.kind)
+                } else {
+                    await viewModel.load()
+                }
                 await DailyBriefReminder.enableOnFirstOpen()
+            }
+            .onChange(of: DailyBriefLaunch.shared.pending) { _, request in
+                guard request != nil, viewModel.workspace != nil, let review = DailyBriefLaunch.take() else { return }
+                Task { await viewModel.show(date: review.date, kind: review.kind) }
             }
             .onChange(of: viewModel.state) {
                 // Opening today's brief is the answer the 09:00 reminder waits for.
-                if viewModel.state == .ready, viewModel.date == viewModel.today {
+                if viewModel.state == .ready, !viewModel.isReview, viewModel.date == viewModel.today {
                     Task { await DailyBriefReminder.noteOpened() }
                 }
             }
             .sheet(isPresented: $isShowingCalendar) {
-                DeckCalendarView(viewModel: viewModel) { day in
-                    Task { await viewModel.show(date: day) }
+                DeckCalendarView(viewModel: viewModel) { day, kind in
+                    Task { await viewModel.show(date: day, kind: kind) }
                 }
             }
     }
@@ -139,7 +147,11 @@ struct DailyDeckView: View {
             ProgressView(value: Double(viewModel.index + 1), total: Double(max(count, 1)))
                 .tint(.secondary)
             HStack(spacing: 6) {
-                if viewModel.date != viewModel.today {
+                if viewModel.isReview {
+                    Text(verbatim: viewModel.reviews.first { $0.date == viewModel.date && $0.kind == viewModel.kind }?.label
+                         ?? DailyDeckPaths.label(viewModel.date))
+                    Text(verbatim: "·")
+                } else if viewModel.date != viewModel.today {
                     Text(verbatim: DailyDeckPaths.label(viewModel.date))
                     Text(verbatim: "·")
                 }
@@ -185,5 +197,27 @@ struct DailyDeckView: View {
         Task {
             if let sessionID = await viewModel.file() { openSession(sessionID) }
         }
+    }
+}
+
+/// A review a notification tap asked for. The Daily Brief screen opens it when it appears,
+/// or right away when it is already on screen.
+@MainActor
+@Observable
+final class DailyBriefLaunch {
+    struct Request: Equatable {
+        let id = UUID()
+        let date: String
+        let kind: String
+    }
+
+    static let shared = DailyBriefLaunch()
+    private(set) var pending: Request?
+
+    static func request(date: String, kind: String) { shared.pending = Request(date: date, kind: kind) }
+
+    static func take() -> Request? {
+        defer { shared.pending = nil }
+        return shared.pending
     }
 }
