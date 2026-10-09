@@ -561,7 +561,7 @@ final class DailyBriefReminderTests: XCTestCase {
     func testEightOClockRepeatsAndAWeekOfNineOClockRemindersFollow() {
         let plan = DailyBriefReminder.plan(now: at(8, 7), openedOn: nil, calendar: calendar)
         XCTAssertEqual(plan.first, .init(id: "dailyBrief.ready", components: DateComponents(hour: 8, minute: 0), repeats: true, isReminder: false))
-        let reminders = plan.dropFirst()
+        let reminders = plan.filter(\.isReminder)
         XCTAssertEqual(reminders.map(\.id).first, "dailyBrief.reminder.2026-10-08")
         XCTAssertEqual(reminders.count, 7)
         XCTAssertTrue(reminders.allSatisfy { !$0.repeats && $0.components.hour == 9 && $0.components.minute == 0 })
@@ -570,7 +570,8 @@ final class DailyBriefReminderTests: XCTestCase {
     func testOpeningTodaysBriefSkipsOnlyTodaysReminder() {
         let plan = DailyBriefReminder.plan(now: at(8, 8, 30), openedOn: "2026-10-08", calendar: calendar)
         XCTAssertEqual(plan.dropFirst().map(\.id).first, "dailyBrief.reminder.2026-10-09")
-        XCTAssertEqual(plan.count, 1 + 6)
+        XCTAssertEqual(plan.filter(\.isReminder).count, 6)
+        XCTAssertEqual(plan.compactMap(\.review), [.init(date: "2026-10-11", kind: "weekly")], "Sunday's review")
     }
 
     func testAfterNineTodaysReminderIsPast() {
@@ -584,5 +585,52 @@ final class DailyBriefReminderTests: XCTestCase {
         XCTAssertFalse(HermesDeepLink.isNewChatURL(url))
         XCTAssertTrue(DailyBriefReminder.isDailyBrief(["dailyBrief": true]))
         XCTAssertFalse(DailyBriefReminder.isDailyBrief([:]))
+    }
+}
+
+final class DeckReviewTests: XCTestCase {
+    func testReviewsAreFoundInBriefsAndLabelled() {
+        let reviews = DeckReview.all(in: [
+            "2026-10-04.weekly.json", "2026-10-04.weekly.answers.json", "2026-10-11.weekly.json",
+            "2026-09-30.monthly.json", "2026-10-09.morning.json"
+        ])
+        XCTAssertEqual(reviews.map(\.id), ["2026-10-11.weekly", "2026-10-04.weekly", "2026-09-30.monthly"])
+        XCTAssertEqual(reviews.map(\.isFiled), [false, true, false])
+        XCTAssertEqual(reviews[1].label, "Week ending Oct 4")
+        XCTAssertEqual(reviews[2].label, "September review")
+    }
+
+    func testReviewNotificationsComeOnSundaysAndTheFirstAndOpenTheirDeck() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/New_York")!
+        let friday = calendar.date(from: DateComponents(year: 2026, month: 10, day: 30, hour: 7))!
+        let reviews = DailyBriefReminder.plan(now: friday, openedOn: nil, calendar: calendar).compactMap(\.review)
+        XCTAssertEqual(reviews, [
+            .init(date: "2026-11-01", kind: "weekly"),
+            .init(date: "2026-10-31", kind: "monthly")
+        ], "Sunday Nov 1 is both a Sunday and the 1st")
+        let url = try XCTUnwrap(DailyBriefReminder.url(for: ["dailyBrief": true, "date": "2026-11-01", "kind": "weekly"]))
+        XCTAssertTrue(HermesDeepLink.isDailyBriefURL(url))
+        XCTAssertEqual(HermesDeepLink.dailyBriefDeck(from: url)?.date, "2026-11-01")
+        XCTAssertNil(HermesDeepLink.dailyBriefDeck(from: try XCTUnwrap(HermesDeepLink.dailyBriefURL)))
+    }
+
+    @MainActor
+    func testAReviewOpensWithItsOwnTitleAndPaths() async throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "DeckReviewTests.\(UUID().uuidString)"))
+        let server = URL(string: "https://brain.example.test")!
+        let store = DailyDeckStore(defaults: defaults)
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.weekly.json", "2026-10-09.morning.json"],
+                                             deck: #"{"date":"2026-10-04","kind":"weekly","cards":[{"id":"q-proud","type":"prompt","question":"Proud?"},{"id":"close","type":"close"}]}"#)
+        let viewModel = DailyDeckViewModel(server: server, client: client, store: store, now: { Date(timeIntervalSince1970: 1_791_600_000) })
+        await viewModel.show(date: "2026-10-04", kind: "weekly")
+        XCTAssertEqual(viewModel.state, .ready)
+        XCTAssertEqual(viewModel.title, "Weekly Review")
+        XCTAssertTrue(client.readPaths.contains("briefs/2026-10-04.weekly.json"))
+        viewModel.setText("Ran 18 miles.", for: viewModel.cards[0])
+        _ = await viewModel.file()
+        XCTAssertTrue(client.sent.last?.message.contains("`bin/brain brief file 2026-10-04 weekly`") == true)
+        XCTAssertEqual(DailyDeckViewModel.sessionTitle(for: "2026-10-04", kind: "weekly"), "Weekly Review · Oct 4")
     }
 }

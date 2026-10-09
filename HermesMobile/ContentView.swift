@@ -145,6 +145,7 @@ struct ContentView: View {
         }
 
         if HermesDeepLink.isDailyBriefURL(url) {
+            if let deck = HermesDeepLink.dailyBriefDeck(from: url) { DailyBriefLaunch.request(date: deck.date, kind: deck.kind) }
             if reachWebuiServer() { pendingDailyBrief = true }
             return
         }

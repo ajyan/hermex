@@ -398,3 +398,30 @@ struct DeckCardText: Equatable {
         return parts.isEmpty ? nil : parts.joined(separator: "\n\n")
     }
 }
+
+/// A weekly or monthly review deck in `briefs/`: `<date>.weekly.json` (the Sunday that ends the
+/// week) or `<date>.monthly.json` (the month's last day).
+struct DeckReview: Identifiable, Equatable {
+    let date: String
+    let kind: String
+    let isFiled: Bool
+
+    var id: String { "\(date).\(kind)" }
+
+    /// "Week ending Oct 4" or "September review".
+    var label: String {
+        if kind == "weekly" { return "Week ending \(DailyDeckPaths.label(date))" }
+        let parts = date.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3, let day = Calendar.current.date(from: DateComponents(year: parts[0], month: parts[1], day: 1))
+        else { return "Month review" }
+        return "\(day.formatted(.dateTime.month(.wide))) review"
+    }
+
+    static func all(in names: [String]) -> [DeckReview] {
+        ["weekly", "monthly"].flatMap { kind in
+            let filed = DailyDeckViewModel.filedDates(in: names, kind: kind)
+            return DailyDeckViewModel.deckDates(in: names, kind: kind).map { DeckReview(date: $0, kind: kind, isFiled: filed.contains($0)) }
+        }
+        .sorted { ($0.date, $0.kind) > ($1.date, $1.kind) }
+    }
+}

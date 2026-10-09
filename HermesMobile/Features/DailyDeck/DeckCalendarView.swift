@@ -35,18 +35,19 @@ enum DailyDeckJournal {
 }
 
 /// A month at a time: days with a journal entry are tappable and open that day's
-/// entry; a dot marks days with a brief deck (filled once it was filed).
+/// entry; a dot marks days with a brief deck (filled once it was filed). Below the
+/// month, its weekly reviews and the month's own review open as decks.
 struct DeckCalendarView: View {
     let viewModel: DailyDeckViewModel
-    /// Opens a day's brief cards in the deck behind this sheet.
-    let openDeck: (String) -> Void
+    /// Opens a deck (date, kind) behind this sheet: a day's brief, or a review.
+    let openDeck: (String, String) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var year: Int
     @State private var month: Int
     @State private var journalDays: Set<String> = []
     @State private var isLoading = false
 
-    init(viewModel: DailyDeckViewModel, openDeck: @escaping (String) -> Void) {
+    init(viewModel: DailyDeckViewModel, openDeck: @escaping (String, String) -> Void) {
         self.viewModel = viewModel
         self.openDeck = openDeck
         let parts = viewModel.date.split(separator: "-").compactMap { Int($0) }
@@ -66,6 +67,7 @@ struct DeckCalendarView: View {
                         }
                     }
                     legend
+                    reviewList
                 }
                 .padding(16)
             }
@@ -80,7 +82,7 @@ struct DeckCalendarView: View {
             .navigationDestination(for: String.self) { day in
                 DayLogView(day: day, viewModel: viewModel) {
                     dismiss()
-                    openDeck(day)
+                    openDeck(day, "morning")
                 }
             }
             .task(id: "\(year)-\(month)") {
@@ -146,6 +148,44 @@ struct DeckCalendarView: View {
         .buttonStyle(.plain)
         .disabled(!hasEntry && !hasDeck)
         .accessibilityLabel(Text(verbatim: accessibilityLabel(key, hasEntry: hasEntry, hasDeck: hasDeck)))
+    }
+
+    /// This month's reviews: each week that ends in it, and the month itself.
+    @ViewBuilder
+    private var reviewList: some View {
+        let prefix = String(format: "%04d-%02d", year, month)
+        let here = viewModel.reviews.filter { $0.date.hasPrefix(prefix) }
+        if !here.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(verbatim: "Reviews").font(AppFont.headline())
+                ForEach(here) { review in
+                    Button {
+                        dismiss()
+                        openDeck(review.date, review.kind)
+                    } label: {
+                        HStack {
+                            Image(systemName: review.kind == "weekly" ? "calendar.badge.clock" : "calendar")
+                                .foregroundStyle(Color.accentColor)
+                            Text(verbatim: review.label).foregroundStyle(.primary)
+                            Spacer()
+                            if review.isFiled {
+                                Label { Text(verbatim: "Filed") } icon: { Image(systemName: "checkmark") }
+                                    .font(AppFont.footnote())
+                                    .foregroundStyle(.secondary)
+                            }
+                            Image(systemName: "chevron.forward").font(AppFont.footnote(weight: .semibold)).foregroundStyle(.tertiary)
+                        }
+                        .font(AppFont.body())
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 48)
+                        .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 8)
+        }
     }
 
     private var legend: some View {
