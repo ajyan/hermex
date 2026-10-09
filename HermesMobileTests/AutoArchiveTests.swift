@@ -72,6 +72,27 @@ final class AutoArchivePolicyTests: XCTestCase {
         XCTAssertTrue(result.review.isEmpty)
     }
 
+    func testCodingProjectsAlwaysWaitInReviewEvenWithAskingOff() {
+        func idle(_ id: String, title: String = "work", workspace: String? = nil, project: String? = nil) -> SessionSummary {
+            let last = now.timeIntervalSince1970 - 40 * day
+            return SessionSummary(sessionId: id, title: title, workspace: workspace, messageCount: 2,
+                                  createdAt: last - 60, lastMessageAt: last, projectId: project)
+        }
+        var asksOff = AutoArchiveSettings()
+        asksOff.asksBeforeArchivingKeepers = false
+        let result = plan([
+            idle("code-dir", workspace: "~/Code/hermex"),
+            idle("src", workspace: "~/repo/src/main.swift"),
+            idle("projects", workspace: "/Users/a/projects/thing"),
+            idle("modules", workspace: "/app/node_modules/webpack"),
+            idle("project-id", project: "p-1"),
+            idle("chat", title: "how do i code in swift"),
+            idle("plain", title: "help me fix my essay", workspace: "/Users/a/Documents")
+        ], settings: asksOff)
+        XCTAssertEqual(result.review.compactMap(\.sessionId), ["code-dir", "src", "projects", "modules", "project-id"])
+        XCTAssertEqual(result.archive.compactMap(\.sessionId), ["chat", "plain"], "the word \"code\" alone isn't a project")
+    }
+
     func testIdleThresholdIsInclusiveAtExactlyTheThreshold() {
         let atThreshold = session("at", idleDays: 30)
         let justUnder = SessionSummary(
@@ -312,6 +333,25 @@ final class AutoArchiveRunnerTests: XCTestCase {
         XCTAssertTrue(second.isEmpty)
         viewModel.noteAppForegrounded()
         XCTAssertTrue(viewModel.isAutoArchiveDue)
+    }
+
+    @MainActor
+    func testCleanUpNowRunsEvenWithAutoArchiveOff() async throws {
+        let fake = FakeServer(sessions: [
+            row("lookup", title: "Weather in Paris", messages: 2, idleDays: 40),
+            row("long", title: "Planning the garden", messages: 12, idleDays: 40)
+        ])
+        let (viewModel, store) = try makeViewModel(fake)
+        store.defaults.set(false, forKey: AutoArchiveStore.isEnabledKey(for: server))
+        await viewModel.load()
+
+        let automatic = await viewModel.runAutoArchivePassIfDue(excludingSessionID: nil)
+        XCTAssertTrue(automatic.isEmpty, "off means the foreground pass does nothing")
+        XCTAssertTrue(viewModel.archiveReviewCandidates.isEmpty)
+
+        let manual = await viewModel.runAutoArchivePassIfDue(excludingSessionID: nil, now: true)
+        XCTAssertEqual(manual.compactMap(\.sessionId), ["lookup"])
+        XCTAssertEqual(viewModel.archiveReviewCandidates.compactMap(\.sessionId), ["long"])
     }
 
     @MainActor

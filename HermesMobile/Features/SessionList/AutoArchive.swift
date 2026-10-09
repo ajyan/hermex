@@ -271,6 +271,17 @@ enum AutoArchivePolicy {
         return true
     }
 
+    /// A coding project: an explicit project id, or a workspace or worktree path that
+    /// looks like code. Mirrors the webui rule that these get checked before archiving,
+    /// so they always wait in review; the bare word "code" in a title is not enough.
+    static func isCodingProject(_ session: SessionSummary) -> Bool {
+        if let projectId = session.projectId, !projectId.isEmpty { return true }
+        let pattern = #"/code/|/src/|/repo|\.git|node_modules|/projects?/"#
+        return [session.workspace, session.worktreePath]
+            .compactMap { $0 }
+            .contains { $0.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil }
+    }
+
     static func plan(
         sessions: [SessionSummary],
         now: Date,
@@ -288,10 +299,10 @@ enum AutoArchivePolicy {
             keptAt: keptAt,
             excludedSessionIDs: excludedSessionIDs
         ) {
-            // Scheduled-task output is never a conversation worth a digest.
-            if settings.asksBeforeArchivingKeepers,
-               !session.isCronSession,
-               scorer.score(session) >= KeepPreferenceModel.candidateThreshold {
+            // Coding projects always ask. Scheduled-task output is never a conversation worth a digest.
+            if isCodingProject(session) || (settings.asksBeforeArchivingKeepers
+                && !session.isCronSession
+                && scorer.score(session) >= KeepPreferenceModel.candidateThreshold) {
                 plan.review.append(session)
             } else {
                 plan.archive.append(session)
