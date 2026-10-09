@@ -334,13 +334,16 @@ struct DeckCardText: Equatable {
     var lead: String?
     var attribution: String?
     var detail: String?
+    /// The lead is the card's question (a check-in with no message), so it isn't asked twice.
+    var leadIsQuestion = false
 
     init(_ card: DeckCard) {
         switch card.type {
         case .prompt:
-            lead = card.question
-            attribution = card.voice.map { "\($0)'s check-in" }
-            detail = card.context
+            // The advisor's whole message leads; the question follows it.
+            lead = card.context ?? card.question
+            leadIsQuestion = card.context == nil
+            attribution = card.voice.map { "— \($0)" }
         case .reflect:
             switch card.itemKind {
             case "quote":
