@@ -11,6 +11,8 @@ enum BrainReaderLayout {
     /// "<Kind> · <date>", the kind's first letter capitalised and the date in the one
     /// Brain format; either part may be absent.
     static func metaLine(kind: String, date: String, locale: Locale = .current) -> String {
+        // A journal day's title already is its date; repeating it reads as a glitch.
+        if kind == "day" { return "Journal" }
         let capitalised = kind.prefix(1).uppercased() + kind.dropFirst()
         return [capitalised, BrainStyle.displayDate(date, locale: locale)]
             .filter { !$0.isEmpty }

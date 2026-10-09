@@ -289,6 +289,7 @@ final class BrainVisualsTests: XCTestCase {
         XCTAssertEqual(BrainReaderLayout.metaLine(kind: "journal", date: "", locale: us), "Journal")
         XCTAssertEqual(BrainReaderLayout.metaLine(kind: "", date: "2026-10-06", locale: us), "Oct 6, 2026")
         XCTAssertEqual(BrainReaderLayout.metaLine(kind: "", date: "", locale: us), "")
+        XCTAssertEqual(BrainReaderLayout.metaLine(kind: "day", date: "2026-10-08", locale: us), "Journal")
         XCTAssertEqual(BrainReaderLayout.metaLine(kind: "éclair", date: "", locale: us), "Éclair")
         XCTAssertEqual(BrainReaderLayout.metaLine(kind: "note", date: "someday", locale: us), "Note · someday")
     }

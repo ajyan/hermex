@@ -377,9 +377,13 @@ struct BrainCard: View {
         let shape = BrainStyle.cardShape()
         let padding = style == .tile ? BrainStyle.s : BrainStyle.cardHorizontalPadding
         VStack(alignment: .leading, spacing: 0) {
-            BrainCoverView(spec: cover)
+            // A clear box sized by the card's width carries the cover, so the cover
+            // always spans the full card instead of fitting a narrower proposal.
+            Color.clear
                 .aspectRatio(BrainStyle.coverAspectRatio, contentMode: .fit)
-                .drawingGroup()
+                .frame(maxWidth: .infinity)
+                .overlay { BrainCoverView(spec: cover).drawingGroup() }
+                .clipped()
             VStack(alignment: .leading, spacing: BrainStyle.xs) {
                 Text(verbatim: item.title)
                     .brainText(.rowTitle)

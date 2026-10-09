@@ -609,7 +609,8 @@ struct ChatShellView: View {
             )
             .adaptiveSecondaryNavigationTitle()
         case .brainRoute(let route):
-            brainDestination(route)
+            // Keyed by route so a destination's view models can never carry over to another page.
+            brainDestination(route).id(route)
         case .projects:
             ProjectsView(
                 viewModel: viewModel,
@@ -636,14 +637,20 @@ struct ChatShellView: View {
     private func brainDestination(_ route: BrainRoute) -> some View {
         switch route {
         case .module(.highlights):
-            BrainHighlightsView(server: server, modelContext: modelContext, onAPIError: authManager.handleAPIError)
-                .adaptiveSecondaryNavigationTitle()
+            BrainHighlightsView(
+                server: server,
+                modelContext: modelContext,
+                onAPIError: authManager.handleAPIError,
+                push: { navigation.path.append(.brainRoute($0)) }
+            )
+            .adaptiveSecondaryNavigationTitle()
         case .module(let module):
             BrainModuleListView(
                 module: module,
                 server: server,
                 modelContext: modelContext,
-                onAPIError: authManager.handleAPIError
+                onAPIError: authManager.handleAPIError,
+                push: { navigation.path.append(.brainRoute($0)) }
             )
             .adaptiveSecondaryNavigationTitle()
         case .page(let module, let id) where BrainHighlightsBookView.isBook(module: module, id: id):

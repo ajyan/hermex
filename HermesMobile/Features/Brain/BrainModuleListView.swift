@@ -104,14 +104,23 @@ enum BrainListLayout {
 /// Every cell pushes `.brainRoute(.page(module, id))`.
 struct BrainModuleListView: View {
     let module: BrainModuleID
+    /// Pushes onto the shell's stack; grid cards push through this, not `NavigationLink`.
+    private let push: (BrainRoute) -> Void
     @State private var viewModel: BrainListViewModel
     @State private var didLoad = false
     /// The chip bar, frozen from the unfiltered list so filtering never reshuffles it.
     @State private var chipTags: [String] = []
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    init(module: BrainModuleID, server: URL, modelContext: ModelContext, onAPIError: @escaping (Error) -> Void) {
+    init(
+        module: BrainModuleID,
+        server: URL,
+        modelContext: ModelContext,
+        onAPIError: @escaping (Error) -> Void,
+        push: @escaping (BrainRoute) -> Void
+    ) {
         self.module = module
+        self.push = push
         let client = APIClientBrainAdapter(apiClient: APIClient(baseURL: server))
         let cache = BrainCacheHandle(server: server, context: modelContext)
         _viewModel = State(initialValue: BrainListViewModel(
@@ -126,7 +135,8 @@ struct BrainModuleListView: View {
             .background(Color.hxCanvas.ignoresSafeArea())
             .task {
                 // Load once; a pop back from a page keeps the pages already scrolled.
-                guard !didLoad else { return }
+                // Re-run a first load that was cancelled before it finished, or it spins forever.
+                guard !didLoad || viewModel.state == .loading else { return }
                 didLoad = true
                 await viewModel.load()
             }
@@ -259,7 +269,7 @@ struct BrainModuleListView: View {
         BrainCardRows(
             items: items,
             columns: BrainListLayout.columnCount(columns, dynamicType: dynamicTypeSize),
-            destination: link,
+            open: { push(.page(module, $0)) },
             onLastAppear: { if items.last?.id == lastID { loadMore() } }
         )
     }
@@ -331,13 +341,15 @@ struct BrainListStateView<Loaded: View>: View {
 }
 
 /// A cover grid as `List` rows: each row is an `HStack` of up to `columns` cards with
-/// equal widths (a short last row keeps its cards at grid width). Every card is its
-/// own link, so a row of several cards never opens as one.
+/// equal widths (a short last row keeps its cards at grid width). Each card is its own
+/// borderless `Button` calling `open`: a `List` row fires every `NavigationLink` it
+/// holds on one tap, so links here would push the whole row.
 struct BrainCardRows: View {
     let items: [BrainItem]
     let columns: Int
     var style: BrainCard.Style = .standard
-    let destination: (String) -> ShellPushDestination
+    /// Opens one card's item id.
+    let open: (String) -> Void
     /// Called when the last row appears, for pagination.
     let onLastAppear: () -> Void
 
@@ -348,10 +360,11 @@ struct BrainCardRows: View {
         ForEach(chunks, id: \.id) { chunk in
             HStack(alignment: .top, spacing: BrainStyle.m) {
                 ForEach(chunk.items, id: \.id) { item in
-                    NavigationLink(value: destination(item.id)) {
+                    Button { open(item.id) } label: {
                         BrainCard(item: item, style: style)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.borderless)
+                    .tint(.primary)
                     .frame(maxWidth: .infinity)
                 }
                 ForEach(chunk.items.count..<columns, id: \.self) { _ in
