@@ -16,12 +16,20 @@ struct BrainHighlightsView: View {
         }
     }
 
+    /// Pushes onto the shell's stack; book tiles push through this, not `NavigationLink`.
+    private let push: (BrainRoute) -> Void
     @State private var viewModel: BrainListViewModel
     @State private var segment: Segment = .books
     @State private var didLoad = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    init(server: URL, modelContext: ModelContext, onAPIError: @escaping (Error) -> Void) {
+    init(
+        server: URL,
+        modelContext: ModelContext,
+        onAPIError: @escaping (Error) -> Void,
+        push: @escaping (BrainRoute) -> Void
+    ) {
+        self.push = push
         let client = APIClientBrainAdapter(apiClient: APIClient(baseURL: server))
         let cache = BrainCacheHandle(server: server, context: modelContext)
         _viewModel = State(initialValue: BrainListViewModel(
@@ -57,7 +65,8 @@ struct BrainHighlightsView: View {
         .background(Color.hxCanvas.ignoresSafeArea())
         .task {
             // Load once; a pop back from a book keeps the pages already scrolled.
-            guard !didLoad else { return }
+            // Re-run a first load that was cancelled before it finished, or it spins forever.
+            guard !didLoad || viewModel.state == .loading else { return }
             didLoad = true
             await viewModel.load()
         }
@@ -80,7 +89,7 @@ struct BrainHighlightsView: View {
                     items: items,
                     columns: BrainListLayout.columnCount(3, dynamicType: dynamicTypeSize),
                     style: .tile,
-                    destination: { .brainRoute(.page(.highlights, $0)) },
+                    open: { push(.page(.highlights, $0)) },
                     onLastAppear: loadMore
                 )
             } else {
@@ -153,7 +162,8 @@ struct BrainHighlightsBookView: View {
             .navigationBarTitleDisplayMode(.inline)
             .background(Color.hxCanvas.ignoresSafeArea())
             .task {
-                guard !didLoad else { return }
+                // Re-run a first load that was cancelled before it finished, or it spins forever.
+                guard !didLoad || viewModel.state == .loading else { return }
                 didLoad = true
                 await viewModel.load()
             }
