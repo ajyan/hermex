@@ -657,6 +657,9 @@
 		B1A1C0DE00000000000000A3 /* BrainModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000103 /* BrainModels.swift */; };
 		2A8CB7ACCDBA9BBE34E57FDC /* DailyDeckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A997D807C262D12E5491E89 /* DailyDeckTests.swift */; };
 		456FFBA86135A0D6C5707B5E /* DeckCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59FBDD2AD47605DA28200130 /* DeckCalendarView.swift */; };
+		BBEB574715121587294478C7 /* DailyBriefReminder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A01557B2FAEFDDD7C94E6A /* DailyBriefReminder.swift */; };
+		3F522DC0F0540A319E63AB5A /* DeckFeedbackSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85E374D76D0C399DE79819AE /* DeckFeedbackSheet.swift */; };
+		1FE8B00FD19A1F67ACF1CA6C /* DeckStackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4449578C9E4BFBE64D09B3C2 /* DeckStackView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1353,6 +1356,9 @@
 		B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainViewModelTests.swift; sourceTree = "<group>"; };
 		3A997D807C262D12E5491E89 /* DailyDeckTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDeckTests.swift; sourceTree = "<group>"; };
 		59FBDD2AD47605DA28200130 /* DeckCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckCalendarView.swift; sourceTree = "<group>"; };
+		E4A01557B2FAEFDDD7C94E6A /* DailyBriefReminder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyBriefReminder.swift; sourceTree = "<group>"; };
+		85E374D76D0C399DE79819AE /* DeckFeedbackSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckFeedbackSheet.swift; sourceTree = "<group>"; };
+		4449578C9E4BFBE64D09B3C2 /* DeckStackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckStackView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -2322,6 +2328,9 @@
 			isa = PBXGroup;
 			children = (
 				59FBDD2AD47605DA28200130 /* DeckCalendarView.swift */,
+				E4A01557B2FAEFDDD7C94E6A /* DailyBriefReminder.swift */,
+				85E374D76D0C399DE79819AE /* DeckFeedbackSheet.swift */,
+				4449578C9E4BFBE64D09B3C2 /* DeckStackView.swift */,
 				7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */,
 				AD79724DF6D6FD92B594BBC5 /* DailyDeckView.swift */,
 				D71D8CEEBE37C8E43E46A2B4 /* DailyDeckViewModel.swift */,
@@ -2573,6 +2582,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				456FFBA86135A0D6C5707B5E /* DeckCalendarView.swift in Sources */,
+				BBEB574715121587294478C7 /* DailyBriefReminder.swift in Sources */,
+				3F522DC0F0540A319E63AB5A /* DeckFeedbackSheet.swift in Sources */,
+				1FE8B00FD19A1F67ACF1CA6C /* DeckStackView.swift in Sources */,
 				1F2EF7D6C585EAF7E1C46CD2 /* DeckCardView.swift in Sources */,
 				B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */,
 				B1A1C0DE00000000000000A3 /* BrainModels.swift in Sources */,

@@ -3,7 +3,7 @@ import UserNotifications
 
 /// The app's one UIKit delegate. SwiftUI has no scene-level hook for APNs device tokens or
 /// notification taps, so this delegate hands tokens to `PushRegistrar`, relay taps to
-/// `PushNotificationRouter`, and local run alert taps to
+/// `PushNotificationRouter`, Daily Brief reminder taps to the brief, and local run alert taps to
 /// `ResponseCompletionNotificationRequest`. It also gives the scene `AppLockSceneDelegate`.
 /// It also supplies the recording-only iPhone orientation policy.
 final class PushAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
@@ -56,6 +56,10 @@ final class PushAppDelegate: NSObject, UIApplicationDelegate, UNUserNotification
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         let userInfo = notification.request.content.userInfo
+        if DailyBriefReminder.isDailyBrief(userInfo) {
+            completionHandler([.banner, .list, .sound])
+            return
+        }
         Task { @MainActor in
             completionHandler(PushPresence.presentation(
                 userInfo: userInfo, viewer: PushPresence.shared.viewer, pairings: Self.configuredPairings() ?? [:]))
@@ -78,7 +82,9 @@ final class PushAppDelegate: NSObject, UIApplicationDelegate, UNUserNotification
         // The system does not promise a thread here, so hop rather than assume.
         Task { @MainActor in
             let activeServer = ServerRegistry.shared.activeServerID.flatMap(URL.init(string:))
-            if let destination = ResponseCompletionNotificationRequest.destination(
+            if DailyBriefReminder.isDailyBrief(userInfo) {
+                AppIntentRouter.shared.requestDeepLink(HermesDeepLink.dailyBriefURL)
+            } else if let destination = ResponseCompletionNotificationRequest.destination(
                 userInfo: userInfo, servers: ServerRegistry.shared.servers.compactMap { URL(string: $0.id) }) {
                 AppIntentRouter.shared.requestDeepLink(destination.url)
             } else if let pairings = Self.configuredPairings() {

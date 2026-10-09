@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// One swipe of the Daily Deck. Every page fills the screen; on cards that ask for
+/// One card of the Daily Deck stack. Every page fills the stack; on cards that ask for
 /// writing, the answer box takes the room left under the prompt. Content scrolls
-/// inside the page so long text and large Dynamic Type never hide the controls.
+/// inside the page so long text and large Dynamic Type never hide the controls. The
+/// card is opaque so the cards stacked under it never show through its glass.
 struct DeckPageView: View {
     let page: DeckPage
     let viewModel: DailyDeckViewModel
@@ -20,13 +21,18 @@ struct DeckPageView: View {
         }
     }
 
+    /// Under a card's glass, so the cards stacked beneath never show through.
+    static let backing = RoundedRectangle(cornerRadius: 18, style: .continuous)
+
     @ViewBuilder
     private var content: some View {
         switch page {
         case .card(let card):
             DeckCardView(card: card, viewModel: viewModel, file: file)
+                .background(Color.hxCanvas, in: Self.backing)
         case .followUps(let cards):
             FollowUpsPage(cards: cards, viewModel: viewModel)
+                .background(Color.hxCanvas, in: Self.backing)
         }
     }
 }
@@ -37,33 +43,19 @@ private struct DeckCardView: View {
     let viewModel: DailyDeckViewModel
     let file: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        SectionCard(title: eyebrow) {
+        SectionCard {
             VStack(alignment: .leading, spacing: 12) {
                 cardBody
+                if let reason = card.reason {
+                    Text(verbatim: reason)
+                        .font(AppFont.footnote())
+                        .foregroundStyle(.secondary)
+                }
             }
             .frame(maxHeight: .infinity, alignment: .top)
-        }
-    }
-
-    private var eyebrow: String? {
-        switch card.type {
-        case .headline: nil
-        case .prompt: card.voice.map { "\($0) asks" } ?? "Journal"
-        case .reflect: reflectLabel
-        case .item: card.itemKind == "youtube" ? "New videos" : "From your library"
-        case .decision: "Follow-up"
-        case .close: "Done"
-        case .unknown: nil
-        }
-    }
-
-    private var reflectLabel: String {
-        switch card.itemKind {
-        case "book": "Book highlight"
-        case "insight": "Insight"
-        case "video": "Video"
-        default: "From your library"
         }
     }
 
@@ -99,7 +91,7 @@ private struct DeckCardView: View {
             ForEach(card.lines, id: \.self) { line in
                 Text(verbatim: line).font(AppFont.body()).foregroundStyle(.secondary)
             }
-            Text(verbatim: "\(viewModel.pages.count - 2) pages · swipe to start")
+            Text(verbatim: "\(viewModel.visiblePages.count - 2) pages · swipe to start")
                 .font(AppFont.footnote())
                 .foregroundStyle(.tertiary)
                 .padding(.top, 4)
@@ -117,7 +109,7 @@ private struct DeckCardView: View {
         if let body = card.body {
             // The saved words themselves, set apart from the explanation.
             Text(inlineMarkdown(card.itemKind == "book" ? "“\(body)”" : body))
-                .font(AppFont.body())
+                .font(AppFont.serif())
                 .padding(.leading, 12)
                 .overlay(alignment: .leading) {
                     Rectangle().fill(Color.secondary.opacity(0.35)).frame(width: 2)
@@ -138,9 +130,12 @@ private struct DeckCardView: View {
 
     @ViewBuilder
     private var question: some View {
-        if let text = card.question {
+        if let text = viewModel.question(for: card) {
+            // Regenerate swaps only this line, so it alone animates.
             Text(verbatim: text).font(AppFont.headline())
                 .padding(.top, 4)
+                .id(text)
+                .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
         }
     }
 
@@ -197,7 +192,7 @@ private struct FollowUpsPage: View {
     let viewModel: DailyDeckViewModel
 
     var body: some View {
-        SectionCard(title: "Follow-ups · \(cards.count)") {
+        SectionCard {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(cards.enumerated()), id: \.element.id) { offset, card in
                     if offset > 0 { Divider().padding(.vertical, 12) }
@@ -307,5 +302,32 @@ private struct ChoiceButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+extension DeckPage {
+    /// The caption over the stack for this page.
+    var eyebrow: String? {
+        switch self {
+        case .followUps(let cards): return "Follow-ups · \(cards.count)"
+        case .card(let card):
+            switch card.type {
+            case .headline, .unknown: return nil
+            case .prompt: return card.voice.map { "\($0) asks" } ?? "Journal"
+            case .reflect:
+                switch card.itemKind {
+                case "book": return "Book highlight"
+                case "insight": return "Insight"
+                case "video": return "Video"
+                case "on_this_day": return "On this day"
+                case "wiki": return "From your wiki"
+                case "media": return "From your reading"
+                default: return "From your library"
+                }
+            case .item: return card.itemKind == "youtube" ? "New videos" : "From your library"
+            case .decision: return "Follow-up"
+            case .close: return "Done"
+            }
+        }
     }
 }

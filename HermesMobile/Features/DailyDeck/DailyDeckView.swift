@@ -1,12 +1,14 @@
 import SwiftUI
 
-/// Today's brief as a deck: one card at a time, swiped or stepped with the
-/// buttons, with "File it" on the last card. Filing opens today's session so the
+/// Today's brief as a stack of cards, swiped left for the next and right for the
+/// previous, with "File it" on the last card. "Not for Me" lives in the More menu. Filing opens today's session so the
 /// agent's work on the answers is visible. Copy is English-only (personal fork).
 struct DailyDeckView: View {
     @State private var viewModel: DailyDeckViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isShowingCalendar = false
+    @State private var feedbackCard: DeckCard?
+    @AppStorage(DailyBriefReminder.enabledKey) private var notifies = false
     private let openSession: (String) -> Void
 
     init(server: URL, openSession: @escaping (String) -> Void) {
@@ -28,6 +30,25 @@ struct DailyDeckView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
+                        if viewModel.state == .ready {
+                            Section {
+                                if case .card(let card) = viewModel.currentPage, card.takesFeedback {
+                                    Button { feedbackCard = card } label: {
+                                        Label { Text(verbatim: "Not for Me…") } icon: { Image(systemName: "hand.thumbsdown") }
+                                    }
+                                }
+                                if viewModel.skippedCount > 0 {
+                                    Button { withAnimation { viewModel.restoreSkipped() } } label: {
+                                        Label { Text(verbatim: "Restore Skipped Cards (\(viewModel.skippedCount))") } icon: {
+                                            Image(systemName: "arrow.uturn.backward")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Toggle(isOn: Binding(get: { notifies }, set: { on in Task { await DailyBriefReminder.setEnabled(on) } })) {
+                            Label { Text(verbatim: "Notify Me at 8:00") } icon: { Image(systemName: "bell") }
+                        }
                         Button { Task { await viewModel.load() } } label: {
                             Label { Text(verbatim: "Reload") } icon: { Image(systemName: "arrow.clockwise") }
                         }
@@ -42,7 +63,16 @@ struct DailyDeckView: View {
                     .accessibilityLabel(Text(verbatim: "More"))
                 }
             }
-            .task { await viewModel.load() }
+            .task {
+                await viewModel.load()
+                await DailyBriefReminder.enableOnFirstOpen()
+            }
+            .onChange(of: viewModel.state) {
+                // Opening today's brief is the answer the 09:00 reminder waits for.
+                if viewModel.state == .ready, viewModel.date == viewModel.today {
+                    Task { await DailyBriefReminder.noteOpened() }
+                }
+            }
             .sheet(isPresented: $isShowingCalendar) {
                 DeckCalendarView(viewModel: viewModel) { day in
                     Task { await viewModel.show(date: day) }
@@ -98,18 +128,16 @@ struct DailyDeckView: View {
     }
 
     private var deck: some View {
-        let pages = viewModel.pages
-        return VStack(spacing: 0) {
-            progress(count: pages.count)
-            TabView(selection: $viewModel.index) {
-                ForEach(Array(pages.enumerated()), id: \.element.id) { offset, page in
-                    DeckPageView(page: page, viewModel: viewModel, file: file)
-                        .padding(.horizontal, 16)
-                        .tag(offset)
-                }
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            stepper(count: pages.count)
+        VStack(alignment: .leading, spacing: 0) {
+            progress(count: viewModel.visiblePages.count)
+            Text(verbatim: viewModel.currentPage?.eyebrow ?? " ")
+                .textCase(.uppercase)
+                .font(AppFont.caption(weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .accessibilityHidden(viewModel.currentPage?.eyebrow == nil)
+            DeckStackView(viewModel: viewModel, feedbackCard: $feedbackCard, file: file)
         }
     }
 
@@ -122,7 +150,9 @@ struct DailyDeckView: View {
                     Text(verbatim: DailyDeckPaths.label(viewModel.date))
                     Text(verbatim: "·")
                 }
-                Text(verbatim: "\(viewModel.index + 1) of \(count)").monospacedDigit()
+                Text(verbatim: "\(viewModel.index + 1) of \(count)")
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
                 if viewModel.isFiled {
                     Text(verbatim: "·")
                     Label { Text(verbatim: viewModel.hasChanges ? "Edited" : "Filed") } icon: {
@@ -136,31 +166,21 @@ struct DailyDeckView: View {
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
+        .animation(reduceMotion ? nil : .smooth(duration: 0.3), value: viewModel.index)
+        .animation(reduceMotion ? nil : .smooth(duration: 0.3), value: count)
         .accessibilityElement(children: .combine)
-    }
-
-    /// Back and Next for VoiceOver, Switch Control, and anyone who'd rather tap than swipe.
-    private func stepper(count: Int) -> some View {
-        HStack {
-            Button { step(-1) } label: {
-                Label { Text(verbatim: "Back") } icon: { Image(systemName: "chevron.backward") }
+        // Swipe up or down on the counter to move through the deck.
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: step(1)
+            case .decrement: step(-1)
+            @unknown default: break
             }
-            .disabled(viewModel.index == 0)
-            Spacer()
-            Button { step(1) } label: {
-                Label { Text(verbatim: "Next") } icon: { Image(systemName: "chevron.forward") }
-                    .labelStyle(TrailingIconLabelStyle())
-            }
-            .disabled(viewModel.index >= count - 1)
         }
-        .font(AppFont.subheadline(weight: .medium))
-        .padding(.horizontal, 20)
-        .frame(minHeight: 44)
-        .padding(.bottom, 8)
     }
 
     private func step(_ delta: Int) {
-        let target = min(max(viewModel.index + delta, 0), max(viewModel.pages.count - 1, 0))
+        let target = min(max(viewModel.index + delta, 0), max(viewModel.visiblePages.count - 1, 0))
         if reduceMotion {
             viewModel.index = target
         } else {
@@ -171,15 +191,6 @@ struct DailyDeckView: View {
     private func file() {
         Task {
             if let sessionID = await viewModel.file() { openSession(sessionID) }
-        }
-    }
-}
-
-private struct TrailingIconLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 4) {
-            configuration.title
-            configuration.icon
         }
     }
 }

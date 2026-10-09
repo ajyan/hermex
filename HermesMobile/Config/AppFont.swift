@@ -33,6 +33,11 @@ enum AppFont {
         system(.title3, weight: weight)
     }
 
+    /// New York, for quoted words a person saved (book highlights, past journal entries).
+    static func serif(style: Font.TextStyle = .body, weight: Font.Weight? = nil) -> Font {
+        system(style, design: .serif, weight: weight)
+    }
+
     static func mono(style: Font.TextStyle = .body, weight: Font.Weight? = nil) -> Font {
         system(style, design: .monospaced, weight: weight)
     }
