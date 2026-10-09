@@ -51,6 +51,8 @@ enum BrainStyle {
     static let m: CGFloat = 12
     static let l: CGFloat = 16
     static let xl: CGFloat = 24
+    /// The smallest tappable height (Apple's 44pt minimum).
+    static let minTapTarget: CGFloat = 44
 
     // MARK: Shapes (matched to `SectionCard`)
 
@@ -147,7 +149,7 @@ struct BrainRow<Leading: View>: View {
     var body: some View {
         HStack(alignment: .center, spacing: BrainStyle.m) {
             leading
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: BrainStyle.xs) {
                 Text(verbatim: title)
                     .brainText(.rowTitle)
                     .lineLimit(2)
@@ -167,7 +169,7 @@ struct BrainRow<Leading: View>: View {
             }
         }
         .padding(.vertical, BrainStyle.s)
-        .frame(minHeight: 44)
+        .frame(minHeight: BrainStyle.minTapTarget)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }

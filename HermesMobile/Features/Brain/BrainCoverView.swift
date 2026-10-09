@@ -75,9 +75,9 @@ struct SplitMix64: Sendable {
 /// A flat abstract cover (circles, waves or bars) on a light tint of one hue.
 ///
 /// Cheap in lists: the spec is precomputed, drawing is one `Canvas` pass with no
-/// animation, and the view is `Equatable` so SwiftUI skips it when the spec is
-/// unchanged. In grids, apply `.drawingGroup()` at the call site. Decorative only,
-/// so it is hidden from VoiceOver.
+/// animation, and the view's only input is that value-type spec. `Equatable` lets a
+/// caller add `.equatable()` where a parent re-renders often. In grids, apply
+/// `.drawingGroup()` at the call site. Decorative only, so hidden from VoiceOver.
 struct BrainCoverView: View, Equatable {
     let spec: BrainCoverSpec
 
