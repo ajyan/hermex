@@ -249,6 +249,9 @@ enum CacheStore {
             context.delete(cachedMessage)
         }
 
+        // Brain pages are server-keyed too; removing a server removes them.
+        try BrainCache.clear(server: serverURL, in: context)
+
         try context.save()
     }
 
