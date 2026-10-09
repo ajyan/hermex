@@ -366,12 +366,12 @@ struct DeckCardText: Equatable {
             // The advisor's whole message leads; the question follows it.
             lead = card.context ?? card.question
             leadIsQuestion = card.context == nil
-            attribution = card.voice.map { "— \($0)" }
+            attribution = card.voice
         case .reflect:
             switch card.itemKind {
             case "quote":
                 lead = card.body
-                attribution = ["— \(card.title ?? "Unknown")", card.source].compactMap { $0 }.joined(separator: ", ")
+                attribution = [card.title, card.source].compactMap { $0 }.joined(separator: ", ")
                 detail = card.context
             case "book":
                 lead = card.body.map { "“\($0)”" }

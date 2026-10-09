@@ -24,6 +24,7 @@ struct DeckPageView: View {
             }
         }
         .opacity(contentOpacity)
+        .environment(\.colorScheme, .light)  // bright paper in every appearance
         .background(palette.paper, in: Self.shape)
         .clipShape(Self.shape)
         .shadow(color: .black.opacity(0.08), radius: 14, y: 6)
@@ -328,6 +329,7 @@ private struct ReflectionSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
                 TextEditor(text: $text)
                     .font(AppFont.body())
+                    .foregroundStyle(palette.ink)
                     .scrollContentBackground(.hidden)
                     .focused($isFocused)
                     .overlay(alignment: .topLeading) {
@@ -352,6 +354,7 @@ private struct ReflectionSheet: View {
             .toolbarBackground(palette.paper, for: .navigationBar)
         }
         .tint(palette.ink)
+        .environment(\.colorScheme, .light)
         .onAppear {
             text = viewModel.answer(for: card)?.text ?? ""
             isFocused = true
