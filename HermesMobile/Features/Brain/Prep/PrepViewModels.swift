@@ -277,3 +277,112 @@ final class PrepRunViewModel {
         phase = .finished(streak ?? PrepStreak(), moved: moved)
     }
 }
+
+// MARK: - Presentation
+
+/// The Prep screens' copy and small derivations, kept out of the views so they stay
+/// dumb and the wording is testable. English only, sentence case.
+enum PrepCopy {
+    /// What today's run button offers on Prep home.
+    enum RunAction: Equatable { case start, resume, done }
+
+    static func streak(days: Int) -> String { "\(days)-day streak" }
+
+    static func freezes(_ count: Int) -> String {
+        count == 1 ? "1 freeze saved" : "\(count) freezes saved"
+    }
+
+    /// The Brain home row's subtitle.
+    static func homeRowSubtitle(streakDays: Int, remaining: Int) -> String {
+        "\(streak(days: streakDays)) · " + (remaining == 0 ? "run done" : "today's run is ready")
+    }
+
+    /// "32 min · 14 reps · Sliding window, Stack" (the focus part only when present).
+    static func runSubtitle(minutes: Double, reps: Int, focus: [String]) -> String {
+        var parts = ["\(Int(minutes.rounded())) min", "\(reps) reps"]
+        let focus = focus.filter { !$0.isEmpty }
+        if !focus.isEmpty { parts.append(focus.joined(separator: ", ")) }
+        return parts.joined(separator: " · ")
+    }
+
+    /// Start a fresh run, resume one with answered reps, or nothing left today.
+    static func runAction(reps: Int, remaining: Int) -> RunAction {
+        if remaining <= 0 { return .done }
+        return remaining < reps ? .resume : .start
+    }
+
+    static func runActionTitle(_ action: RunAction) -> String {
+        switch action {
+        case .start: "Start"
+        case .resume: "Resume"
+        case .done: "Done"
+        }
+    }
+
+    /// Readiness arrives as a 0–1 fraction or a 0–100 score; shown as a whole score.
+    static func readiness(_ value: Double) -> String {
+        "Readiness \(Int((value <= 1 ? value * 100 : value).rounded()))"
+    }
+
+    static func blockTitle(_ block: String) -> String {
+        switch block {
+        case "warmup": "Warm-up"
+        case "weak": "Weak spot"
+        case "main": "Main rep"
+        case "new": "New"
+        default: block.prefix(1).uppercased() + block.dropFirst()
+        }
+    }
+
+    static func mapTitle(mastered: Int, total: Int) -> String {
+        "\(mastered) of \(total) patterns mastered"
+    }
+
+    static func mapSubtitle(problems: Int, due: Int) -> String {
+        "\(problems) problems · NeetCode order · \(due) reviews due"
+    }
+
+    static func stateWords(_ state: PrepSkillState) -> String {
+        switch state {
+        case .new: "not started"
+        case .inProgress: "in progress"
+        case .weak: "weak"
+        case .locked: "locked"
+        case .mastered: "mastered"
+        case .unknown: ""
+        }
+    }
+
+    /// The skill row's VoiceOver label: "{title}, {state words}, {detail}".
+    static func skillLabel(title: String, state: PrepSkillState, detail: String) -> String {
+        [title, stateWords(state), detail].filter { !$0.isEmpty }.joined(separator: ", ")
+    }
+
+    /// The feedback split after its first sentence, so the lead can be set in bold.
+    static func feedbackParts(_ feedback: String) -> (lead: String, rest: String) {
+        let text = feedback.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let end = text.range(of: #"[.!?](\s|$)"#, options: .regularExpression) else {
+            return (text, "")
+        }
+        let lead = String(text[..<end.lowerBound]) + String(text[end.lowerBound])
+        let rest = String(text[end.upperBound...]).trimmingCharacters(in: .whitespaces)
+        return (lead, rest)
+    }
+
+    /// Lines a Parsons answer needs: the pool holds the solution plus one decoy.
+    static func parsonsTarget(poolCount: Int) -> Int { max(1, poolCount - 1) }
+
+    static func parsonsLineLabel(_ code: String) -> String { "Line: \(code). Double-tap to place." }
+
+    static func parsonsPlacedLabel(position: Int, code: String) -> String {
+        "Position \(position): \(code). Double-tap to remove."
+    }
+
+    /// A moved skill's subtitle on the run-complete screen.
+    static func movedSubtitle(mastery: Double) -> String {
+        "\(Int((mastery * 100).rounded()))% mastered"
+    }
+
+    /// The cover id for a Prep track or skill, seeded apart from Brain pages.
+    static func coverID(_ id: String) -> String { "prep.\(id)" }
+}

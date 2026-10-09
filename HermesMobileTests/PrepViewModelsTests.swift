@@ -403,4 +403,44 @@ final class PrepViewModelsTests: XCTestCase {
         board.unplace(at: 5) // out of range: ignored
         XCTAssertEqual(board.placed, ["a"])
     }
+
+    // MARK: - PrepCopy
+
+    func testHomeRowSubtitleSaysWhetherTheRunIsDone() {
+        XCTAssertEqual(PrepCopy.homeRowSubtitle(streakDays: 12, remaining: 4), "12-day streak · today's run is ready")
+        XCTAssertEqual(PrepCopy.homeRowSubtitle(streakDays: 12, remaining: 0), "12-day streak · run done")
+    }
+
+    func testRunActionStartsResumesOrIsDone() {
+        XCTAssertEqual(PrepCopy.runAction(reps: 14, remaining: 14), .start)
+        XCTAssertEqual(PrepCopy.runAction(reps: 14, remaining: 3), .resume)
+        XCTAssertEqual(PrepCopy.runAction(reps: 14, remaining: 0), .done)
+    }
+
+    func testRunSubtitleRoundsMinutesAndDropsEmptyFocus() {
+        XCTAssertEqual(PrepCopy.runSubtitle(minutes: 31.6, reps: 14, focus: ["Sliding window", "Stack"]),
+                       "32 min · 14 reps · Sliding window, Stack")
+        XCTAssertEqual(PrepCopy.runSubtitle(minutes: 30, reps: 12, focus: []), "30 min · 12 reps")
+    }
+
+    func testBlockTitles() {
+        XCTAssertEqual(["warmup", "weak", "main", "new", "bonus"].map(PrepCopy.blockTitle),
+                       ["Warm-up", "Weak spot", "Main rep", "New", "Bonus"])
+    }
+
+    func testFeedbackSplitsAfterTheFirstSentence() {
+        let parts = PrepCopy.feedbackParts("It's Sliding window. Grow a range on the right. Shrink it.")
+        XCTAssertEqual(parts.lead, "It's Sliding window.")
+        XCTAssertEqual(parts.rest, "Grow a range on the right. Shrink it.")
+        XCTAssertEqual(PrepCopy.feedbackParts("Right.").lead, "Right.")
+        XCTAssertEqual(PrepCopy.feedbackParts("Right.").rest, "")
+        XCTAssertEqual(PrepCopy.feedbackParts("It's O(n log n)").lead, "It's O(n log n)")
+    }
+
+    func testSkillLabelAndParsonsTarget() {
+        XCTAssertEqual(PrepCopy.skillLabel(title: "Sliding Window", state: .weak, detail: "Mixed up with two pointers"),
+                       "Sliding Window, weak, Mixed up with two pointers")
+        XCTAssertEqual(PrepCopy.parsonsTarget(poolCount: 10), 9)
+        XCTAssertEqual(PrepCopy.parsonsTarget(poolCount: 1), 1)
+    }
 }

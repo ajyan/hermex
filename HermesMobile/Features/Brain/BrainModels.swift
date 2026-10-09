@@ -438,4 +438,13 @@ enum BrainRoute: Hashable, Sendable {
     case page(BrainModuleID, String)
     /// Every search result in one module.
     case searchAll(BrainModuleID, query: String)
+    /// A screen in the Prep module (the interview tutor).
+    case prep(PrepRoute)
+}
+
+/// A screen in the Prep module: its home, one track's skill map, or today's run.
+enum PrepRoute: Hashable, Sendable {
+    case home
+    case track(String)
+    case run
 }
