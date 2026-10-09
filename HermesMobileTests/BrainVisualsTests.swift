@@ -186,4 +186,85 @@ final class BrainVisualsTests: XCTestCase {
         XCTAssertEqual(BrainMonogram.initials(for: "Plato"), "P")
         XCTAssertEqual(BrainMonogram.initials(for: ""), "")
     }
+
+    // MARK: List layout
+
+    private func item(_ id: String, _ module: BrainModuleID = .wiki, kind: String = "") -> BrainItem {
+        BrainItem(module: module, id: id, title: id, kind: kind)
+    }
+
+    func testResolveKeepsGroupOrderAndSkipsMissingAndRepeatedIds() {
+        let items = [item("a"), item("b"), item("c")]
+        let resolved = BrainListLayout.resolve(["c", "missing", "a", "c"], in: items)
+        XCTAssertEqual(resolved.map(\.id), ["c", "a"])
+        XCTAssertEqual(BrainListLayout.resolve([], in: items), [])
+    }
+
+    func testSectionsDropEmptyGroupsAndFallBackToAllItems() {
+        let items = [item("a"), item("b"), item("a")]
+        let grouped = BrainList(items: items, groups: [
+            BrainGroup(title: "Concepts", ids: ["b"]),
+            BrainGroup(title: "Sources", ids: ["gone"]),
+            BrainGroup(title: "Comparisons", ids: ["a", "b"])
+        ])
+        let sections = BrainListLayout.sections(grouped)
+        XCTAssertEqual(sections.map(\.title), ["Concepts", "Comparisons"])
+        XCTAssertEqual(sections[1].items.map(\.id), ["a", "b"])
+
+        let flat = BrainListLayout.sections(BrainList(items: items))
+        XCTAssertEqual(flat.count, 1)
+        XCTAssertEqual(flat[0].title, "")
+        XCTAssertEqual(flat[0].items.map(\.id), ["a", "b"])
+    }
+
+    func testSplitHighlightsBooksByKindVideosByGroup() {
+        let items = [
+            item("book:meditations", .highlights, kind: "book"),
+            item("yt:2", .highlights, kind: "video"),
+            item("book:letters", .highlights, kind: "book"),
+            item("yt:1", .highlights, kind: "video")
+        ]
+        let list = BrainList(items: items, groups: [
+            BrainGroup(title: "Books", ids: ["book:meditations", "book:letters"]),
+            BrainGroup(title: "YouTube", ids: ["yt:1", "yt:2", "yt:missing"])
+        ])
+        let split = BrainListLayout.splitHighlights(list)
+        XCTAssertEqual(split.books.map(\.id), ["book:meditations", "book:letters"])
+        XCTAssertEqual(split.videos.map(\.id), ["yt:1", "yt:2"])
+
+        // No YouTube group: every non-book item is a video, in list order.
+        let ungrouped = BrainListLayout.splitHighlights(BrainList(items: items))
+        XCTAssertEqual(ungrouped.books.map(\.id), ["book:meditations", "book:letters"])
+        XCTAssertEqual(ungrouped.videos.map(\.id), ["yt:2", "yt:1"])
+    }
+
+    func testTopTagsRanksByCountCapsAtTwelveAndKeepsSelection() {
+        let tags = (0..<20).map { BrainTagCount(tag: "t\($0)", count: $0 % 5) }
+            + [BrainTagCount(tag: "", count: 99), BrainTagCount(tag: "t4", count: 1)]
+        let top = BrainListLayout.topTags(tags)
+        XCTAssertEqual(top.count, 12)
+        // Count 4 first (t4, t9, t14, t19), ties in server order; blanks and repeats dropped.
+        XCTAssertEqual(Array(top.prefix(4)), ["t4", "t9", "t14", "t19"])
+        XCTAssertFalse(top.contains(""))
+        XCTAssertEqual(Set(top).count, top.count)
+
+        let withSelected = BrainListLayout.topTags(tags, selected: "t0")
+        XCTAssertEqual(withSelected.count, 13)
+        XCTAssertEqual(withSelected.last, "t0")
+        XCTAssertEqual(BrainListLayout.topTags(tags, selected: "t4").count, 12)
+    }
+
+    func testGridColumnsCollapseAtAccessibilitySizes() {
+        XCTAssertEqual(BrainListLayout.columns(3, dynamicType: .xxLarge).count, 3)
+        XCTAssertEqual(BrainListLayout.columns(3, dynamicType: .accessibility2).count, 2)
+        XCTAssertEqual(BrainListLayout.columns(2, dynamicType: .accessibility1).count, 1)
+    }
+
+    func testBookRouteDetection() {
+        XCTAssertTrue(BrainHighlightsBookView.isBook(module: .highlights, id: "book:meditations"))
+        XCTAssertFalse(BrainHighlightsBookView.isBook(module: .highlights, id: "yt:abc"))
+        XCTAssertFalse(BrainHighlightsBookView.isBook(module: .wiki, id: "book:meditations"))
+        XCTAssertEqual(BrainHighlightsBookContent.countLabel(1), "1 highlight")
+        XCTAssertEqual(BrainHighlightsBookContent.countLabel(3), "3 highlights")
+    }
 }

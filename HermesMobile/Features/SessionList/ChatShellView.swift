@@ -618,10 +618,21 @@ struct ChatShellView: View {
     @ViewBuilder
     private func brainDestination(_ route: BrainRoute) -> some View {
         switch route {
-        case .module:
-            EmptyView() // Task 11: BrainModuleListView
+        case .module(.highlights):
+            BrainHighlightsView(server: server, modelContext: modelContext, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
+        case .module(let module):
+            BrainModuleListView(
+                module: module,
+                server: server,
+                modelContext: modelContext,
+                onAPIError: authManager.handleAPIError
+            )
+            .adaptiveSecondaryNavigationTitle()
+        case .page(let module, let id) where BrainHighlightsBookView.isBook(module: module, id: id):
+            BrainHighlightsBookView(id: id, server: server, modelContext: modelContext, onAPIError: authManager.handleAPIError)
         case .page:
-            EmptyView() // Task 12: BrainReaderView / BrainHighlightsBookView
+            EmptyView() // Task 12: BrainReaderView
         case .searchAll(let module, let query):
             BrainSearchView(module: module, query: query, server: server, onAPIError: authManager.handleAPIError)
                 .adaptiveSecondaryNavigationTitle()

@@ -211,17 +211,24 @@ struct BrainRow<Leading: View>: View {
     let title: String
     let subtitle: String?
     let trailing: String?
+    /// A trailing accent capsule (e.g. an upcoming birthday); read by VoiceOver.
+    let badge: String?
+    let subtitleLineLimit: Int
 
     init(
         @ViewBuilder leading: () -> Leading,
         title: String,
         subtitle: String? = nil,
-        trailing: String? = nil
+        trailing: String? = nil,
+        badge: String? = nil,
+        subtitleLineLimit: Int = 2
     ) {
         self.leading = leading()
         self.title = title
         self.subtitle = subtitle
         self.trailing = trailing
+        self.badge = badge
+        self.subtitleLineLimit = subtitleLineLimit
     }
 
     var body: some View {
@@ -234,10 +241,13 @@ struct BrainRow<Leading: View>: View {
                 if let subtitle, !subtitle.isEmpty {
                     Text(verbatim: subtitle)
                         .brainText(.rowSubtitle)
-                        .lineLimit(2)
+                        .lineLimit(subtitleLineLimit)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            if let badge, !badge.isEmpty {
+                BrainBadge(text: badge)
+            }
             if let trailing, !trailing.isEmpty {
                 Text(verbatim: trailing)
                     .brainText(.meta)
@@ -253,20 +263,44 @@ struct BrainRow<Leading: View>: View {
     }
 }
 
+/// A small accent-tinted capsule in the `meta` role, for a row's trailing badge.
+struct BrainBadge: View {
+    let text: String
+
+    var body: some View {
+        Text(verbatim: text)
+            .font(BrainStyle.meta.weight(.semibold))
+            .foregroundStyle(Color.accentColor)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, BrainStyle.s)
+            .padding(.vertical, BrainStyle.xs)
+            .background(Color.accentColor.opacity(0.14), in: Capsule())
+    }
+}
+
 extension BrainRow where Leading == EmptyView {
-    init(title: String, subtitle: String? = nil, trailing: String? = nil) {
-        self.init(leading: { EmptyView() }, title: title, subtitle: subtitle, trailing: trailing)
+    init(title: String, subtitle: String? = nil, trailing: String? = nil, badge: String? = nil,
+         subtitleLineLimit: Int = 2) {
+        self.init(leading: { EmptyView() }, title: title, subtitle: subtitle, trailing: trailing,
+                  badge: badge, subtitleLineLimit: subtitleLineLimit)
     }
 }
 
 /// The one Brain card: a cover on top, then the title and a meta line, on the
-/// `SectionCard` corner and padding. Used by the cover grids.
+/// `SectionCard` corner and padding. Used by the cover grids. The `tile` style
+/// (book grids) drops the visible meta line and tightens the padding; VoiceOver
+/// still reads the meta.
 struct BrainCard: View {
+    enum Style { case standard, tile }
+
     let item: BrainItem
+    private let style: Style
     private let cover: BrainCoverSpec
 
-    init(item: BrainItem) {
+    init(item: BrainItem, style: Style = .standard) {
         self.item = item
+        self.style = style
         self.cover = BrainCoverSpec.make(id: item.id, tag: item.tags.first)
     }
 
@@ -278,6 +312,7 @@ struct BrainCard: View {
     var body: some View {
         let shape = BrainStyle.cardShape()
         let meta = Self.metaLine(for: item)
+        let padding = style == .tile ? BrainStyle.s : BrainStyle.cardHorizontalPadding
         VStack(alignment: .leading, spacing: 0) {
             BrainCoverView(spec: cover)
                 .aspectRatio(BrainStyle.coverAspectRatio, contentMode: .fit)
@@ -285,16 +320,16 @@ struct BrainCard: View {
             VStack(alignment: .leading, spacing: BrainStyle.xs) {
                 Text(verbatim: item.title)
                     .brainText(.rowTitle)
-                    .lineLimit(3)
+                    .lineLimit(2)
                     .multilineTextAlignment(.leading)
-                if !meta.isEmpty {
+                if style == .standard, !meta.isEmpty {
                     Text(verbatim: meta)
                         .brainText(.meta)
                         .lineLimit(2)
                 }
             }
-            .padding(.horizontal, BrainStyle.cardHorizontalPadding)
-            .padding(.vertical, BrainStyle.cardVerticalPadding)
+            .padding(.horizontal, padding)
+            .padding(.vertical, style == .tile ? BrainStyle.s : BrainStyle.cardVerticalPadding)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .background(Color.hxSurface, in: shape)
@@ -304,7 +339,9 @@ struct BrainCard: View {
                 .allowsHitTesting(false)
         }
         .contentShape(shape)
-        .accessibilityElement(children: .combine)
+        // One element reading the title and the meta, in both styles; the cover is decorative.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: [item.title, meta].filter { !$0.isEmpty }.joined(separator: ", ")))
     }
 }
 
