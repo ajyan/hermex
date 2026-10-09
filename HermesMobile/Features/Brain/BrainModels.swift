@@ -383,3 +383,28 @@ enum BrainLink {
         return (module, id)
     }
 }
+
+extension BrainModuleID {
+    /// The module's name when the server's `modules` list isn't at hand
+    /// (search groups carry only the id).
+    var defaultTitle: String {
+        switch self {
+        case .people: "People"
+        case .wiki: "Wiki"
+        case .articles: "Articles"
+        case .journal: "Journal"
+        case .highlights: "Highlights"
+        }
+    }
+}
+
+/// A screen inside the Brain, pushed on the shell's stack as
+/// `ShellPushDestination.brainRoute(_:)`.
+enum BrainRoute: Hashable, Sendable {
+    /// One module's browsable list.
+    case module(BrainModuleID)
+    /// One page, by module and item id.
+    case page(BrainModuleID, String)
+    /// Every search result in one module.
+    case searchAll(BrainModuleID, query: String)
+}

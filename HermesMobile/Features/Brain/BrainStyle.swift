@@ -65,6 +65,10 @@ enum BrainStyle {
     static let thumbnailSize: CGFloat = 44
     /// Width over height for cover art on cards and grids.
     static let coverAspectRatio: CGFloat = 3 / 2
+    /// Base side of a module icon tile (home rows); scale it with `@ScaledMetric`.
+    static let iconSize: CGFloat = 32
+    /// Base side of a search result's cover or avatar; scale it with `@ScaledMetric`.
+    static let searchThumbnailSize: CGFloat = 28
 
     static func cardShape() -> RoundedRectangle {
         RoundedRectangle(cornerRadius: cardCorner, style: .continuous)
@@ -124,7 +128,81 @@ extension View {
     }
 }
 
+extension View {
+    /// The one Brain list look: plain, on `.hxCanvas`.
+    func brainListStyle() -> some View {
+        listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color.hxCanvas.ignoresSafeArea())
+    }
+
+    /// The one Brain list row background: `.hxSurface`.
+    func brainListRow() -> some View {
+        listRowBackground(Color.hxSurface)
+    }
+}
+
+extension BrainModuleID {
+    /// The SF Symbol for the module's icon tile.
+    var symbolName: String {
+        switch self {
+        case .people: "person.2"
+        case .wiki: "books.vertical"
+        case .articles: "newspaper"
+        case .journal: "book.closed"
+        case .highlights: "quote.opening"
+        }
+    }
+}
+
 // MARK: - Shared views
+
+/// A module's SF Symbol in an accent-tinted rounded square, for a row's leading
+/// slot. Decorative: the row's title names the module.
+struct BrainModuleIcon: View {
+    let module: BrainModuleID
+    @ScaledMetric(relativeTo: .body) private var side = BrainStyle.iconSize
+
+    var body: some View {
+        Image(systemName: module.symbolName)
+            .font(BrainStyle.rowSubtitle.weight(.semibold))
+            .foregroundStyle(Color.accentColor)
+            .frame(width: side, height: side)
+            .background(
+                Color.accentColor.opacity(0.14),
+                in: RoundedRectangle(cornerRadius: BrainStyle.thumbnailCorner, style: .continuous)
+            )
+            .accessibilityHidden(true)
+    }
+}
+
+/// A person's initials in a neutral circle, for a row's leading slot. Decorative:
+/// the row's title carries the name.
+struct BrainMonogram: View {
+    let name: String
+    var size: CGFloat = BrainStyle.thumbnailSize
+
+    /// Up to two initials, from the first two words of `name`.
+    static func initials(for name: String) -> String {
+        name.split(whereSeparator: { $0.isWhitespace })
+            .prefix(2)
+            .compactMap(\.first)
+            .map { String($0).uppercased() }
+            .joined()
+    }
+
+    var body: some View {
+        Text(verbatim: Self.initials(for: name))
+            .font(BrainStyle.meta.weight(.semibold))
+            .foregroundStyle(Color.hxTextSecondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+            .frame(width: size, height: size)
+            .background(Color.hxCanvas, in: Circle())
+            .overlay { Circle().stroke(Color.hxSeparator, lineWidth: 0.7) }
+            .accessibilityHidden(true)
+    }
+}
 
 /// The one Brain row: a leading slot (cover thumbnail, avatar or icon), a title, an
 /// optional subtitle and an optional trailing count or badge.

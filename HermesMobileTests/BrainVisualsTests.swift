@@ -158,4 +158,32 @@ final class BrainVisualsTests: XCTestCase {
             }
         }
     }
+
+    // MARK: Routing
+
+    /// Every Brain push rides the shell's typed path, so each route must hash to a
+    /// distinct destination (and equal routes must collapse).
+    func testBrainRouteDestinationsAreDistinct() {
+        let destinations: [ShellPushDestination] = [
+            .brain,
+            .brainRoute(.module(.wiki)),
+            .brainRoute(.module(.people)),
+            .brainRoute(.page(.wiki, "wiki/virtues.md")),
+            .brainRoute(.page(.articles, "wiki/virtues.md")),
+            .brainRoute(.searchAll(.wiki, query: "marcus")),
+            .brainRoute(.searchAll(.wiki, query: "seneca"))
+        ]
+        XCTAssertEqual(Set(destinations).count, destinations.count)
+        XCTAssertEqual(
+            ShellPushDestination.brainRoute(.page(.wiki, "wiki/virtues.md")),
+            ShellPushDestination.brainRoute(.page(.wiki, "wiki/virtues.md"))
+        )
+    }
+
+    func testMonogramInitials() {
+        XCTAssertEqual(BrainMonogram.initials(for: "Sam Rivera"), "SR")
+        XCTAssertEqual(BrainMonogram.initials(for: "  marcus  aurelius antoninus"), "MA")
+        XCTAssertEqual(BrainMonogram.initials(for: "Plato"), "P")
+        XCTAssertEqual(BrainMonogram.initials(for: ""), "")
+    }
 }
