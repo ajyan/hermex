@@ -320,6 +320,16 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(DeckCardText(deck.cards[4]).lead, "Preparation shows respect", "no body: the title leads")
     }
 
+    func testRecapEntriesDecodeAndReplaceThePlainBody() throws {
+        let deck = try DailyDeck.decode(#"{"date":"d","kind":"weekly","cards":[{"id":"r","type":"item","kind":"recap","title":"How the week went","body":"Mon: ran","entries":[{"label":"Mon, Oct 5","text":"Ran."},{"text":"Untitled item"},{"label":7}]}]}"#)
+        XCTAssertEqual(deck.cards[0].entries.map(\.text), ["Ran.", "Untitled item"], "a malformed entry is dropped alone")
+        let good = try DailyDeck.decode(#"{"date":"d","kind":"weekly","cards":[{"id":"r","type":"item","kind":"recap","title":"How the week went","body":"Mon: ran","entries":[{"label":"Mon, Oct 5","text":"Ran."},{"text":"Untitled item"}]}]}"#)
+        XCTAssertEqual(good.cards[0].entries.map(\.label), ["Mon, Oct 5", nil])
+        let text = DeckCardText(good.cards[0])
+        XCTAssertEqual(text.lead, "How the week went")
+        XCTAssertNil(text.detail, "the list replaces the plain copy")
+    }
+
     func testEveryCardKindHasItsOwnPaper() throws {
         let deck = try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"1","type":"reflect","kind":"book"},{"id":"2","type":"reflect","kind":"wiki"},{"id":"3","type":"reflect","kind":"quote"},{"id":"4","type":"headline"}]}"#)
         XCTAssertEqual(deck.cards.map { DeckPalette.of($0).name }, ["Book highlight", "From your wiki", "Quote", "Today"])
