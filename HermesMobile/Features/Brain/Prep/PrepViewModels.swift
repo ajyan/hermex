@@ -223,10 +223,20 @@ final class PrepRunViewModel {
             answer: answer, elapsedMS: elapsed, hintsUsed: hintsShown)
         do {
             let result = try await client.attempt(request)
-            isSubmitting = false
-            guard token == generation, !Task.isCancelled else { return }
+            guard token == generation, !Task.isCancelled else {
+                isSubmitting = false
+                return
+            }
             if let streak = result.streak { lastStreak = streak }
-            phase = .result(rep, result, index: rep.index)
+            if rep.drill == .primer {
+                // A primer has nothing to grade: advance as `continue()` would, staying
+                // locked until the next rep is in place so "Got it" can't post twice.
+                await advance(in: run, to: result.nextIndex, token: token)
+                isSubmitting = false
+            } else {
+                isSubmitting = false
+                phase = .result(rep, result, index: rep.index)
+            }
         } catch {
             if prepIsCancellation(error) {
                 isSubmitting = false

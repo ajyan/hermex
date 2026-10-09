@@ -88,11 +88,6 @@ struct PrepRunView: View {
             scaffold(rep) { repContent(rep) }
                 // Fresh view state (timer start, example toggle) for every rep.
                 .id(rep.index)
-        case .result(let rep, _, _) where rep.drill == .primer:
-            // A primer has nothing to grade: move straight on to the next rep.
-            ProgressView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .task(id: rep.index) { await viewModel.continue() }
         case .result(let rep, let result, _):
             scaffold(rep) {
                 PrepResultView(
@@ -173,8 +168,8 @@ struct PrepRunView: View {
     }
 }
 
-/// A thin bar of one segment per rep: done reps in the accent, the current one
-/// lighter, the rest on the separator. Static, never animated.
+/// A thin bar of one segment per rep: done reps in muted secondary text, the current
+/// one stronger, the rest on the separator. Neutral chrome; static, never animated.
 private struct PrepSegmentBar: View {
     let position: Int
     let count: Int
@@ -192,8 +187,8 @@ private struct PrepSegmentBar: View {
     }
 
     private func color(_ index: Int) -> Color {
-        if index < position { return .accentColor }
-        if index == position { return Color.accentColor.opacity(0.4) }
+        if index < position { return Color.hxTextSecondary.opacity(0.55) }
+        if index == position { return Color.hxTextSecondary.opacity(0.9) }
         return .hxSeparator
     }
 }

@@ -280,6 +280,32 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(client.attempts.first?.drill, .primer)
     }
 
+    func testPrimerAcknowledgeAdvancesWithoutResult() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "primer"), rep(1)]))]
+        client.mapResults = [.success(map([]))]
+        client.attemptResults = [.success(result(next: 1))]
+        let vm = makeVM(client)
+        await vm.load()
+        await vm.acknowledgePrimer()
+        // Straight to the next rep: no result screen for a primer.
+        XCTAssertEqual(currentRep(vm)?.index, 1)
+        XCTAssertFalse(vm.isSubmitting)
+        XCTAssertNil(vm.submitError)
+
+        // A failed primer post keeps the primer up with the inline error.
+        let failing = FakePrepClient()
+        failing.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "primer"), rep(1)]))]
+        failing.mapResults = [.success(map([]))]
+        failing.attemptResults = [.failure(http(500))]
+        let failingVM = makeVM(failing)
+        await failingVM.load()
+        await failingVM.acknowledgePrimer()
+        XCTAssertEqual(currentRep(failingVM)?.index, 0)
+        XCTAssertEqual(failingVM.submitError, "Couldn't save. Try again.")
+        XCTAssertFalse(failingVM.isSubmitting)
+    }
+
     func testParsonsRepBuildsBoardFromLines() async {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "parsons", extra: #", "lines": ["x", "x", "y"]"#)]))]

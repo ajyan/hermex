@@ -99,7 +99,7 @@ private struct PrepSkillRow: View {
             VStack(alignment: .leading, spacing: BrainStyle.xs) {
                 Text(verbatim: skill.title)
                     .font(BrainStyle.rowTitle)
-                    foregroundStyle(state == .locked ? Color.hxTextSecondary : Color.hxTextPrimary)
+                    .foregroundStyle(state == .locked ? Color.hxTextSecondary : Color.hxTextPrimary)
                     .lineLimit(2)
                 if !skill.detail.isEmpty {
                     HStack(alignment: .firstTextBaseline, spacing: BrainStyle.xs + 2) {

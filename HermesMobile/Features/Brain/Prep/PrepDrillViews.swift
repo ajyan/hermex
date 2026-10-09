@@ -95,11 +95,14 @@ struct PrepChoiceView: View {
             HStack(alignment: .firstTextBaseline) {
                 BrainSectionHeader(title: rep.drill == .patternID ? "Which pattern?" : "Time complexity?")
                 if rep.drill == .patternID, grading == nil {
-                    Text(timerInterval: shownAt...shownAt.addingTimeInterval(30), countsDown: true)
+                    let window = shownAt...shownAt.addingTimeInterval(30)
+                    Text(timerInterval: window, countsDown: true)
                         .brainText(.sectionCaption)
                         .monospacedDigit()
                         .fixedSize()
+                        .accessibilityElement(children: .combine)
                         .accessibilityLabel(Text(verbatim: "Time left"))
+                        .accessibilityValue(Text(timerInterval: window, countsDown: true))
                 }
             }
             SectionCard {
