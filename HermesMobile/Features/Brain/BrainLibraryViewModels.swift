@@ -238,6 +238,10 @@ final class BrainSearchViewModel {
         isSearching = false
     }
 
+    /// Re-runs the current query (if it is long enough); call when the screen
+    /// reappears after `cancel()`. Any shown result stays until the new one lands.
+    func resume() { restart() }
+
     private func restart() {
         searchTask?.cancel()
         didFail = false

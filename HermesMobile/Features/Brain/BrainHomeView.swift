@@ -29,17 +29,18 @@ struct BrainHomeView: View {
             .navigationTitle(Text(verbatim: "Brain"))
             .background(Color.hxCanvas.ignoresSafeArea())
             .task {
-                // Coming back from a pushed page keeps what's shown; pull to refresh.
-                guard viewModel.modules.isEmpty else { return }
+                // Every appear refreshes quietly: shown modules stay until the response lands.
+                searchViewModel.resume()
                 await viewModel.load()
             }
+            .onDisappear { searchViewModel.cancel() }
     }
 
     @ViewBuilder
     private var content: some View {
         if viewModel.state == .unavailable {
             ContentUnavailableView {
-                Label { Text(verbatim: "No Brain on This Server") } icon: { Image(systemName: "brain") }
+                Label { Text(verbatim: "No Brain on this server") } icon: { Image(systemName: "brain") }
             } description: {
                 Text(verbatim: "This server doesn't serve the Second Brain. It needs the Brain API from your hermes-webui fork.")
             }
@@ -74,11 +75,11 @@ struct BrainHomeView: View {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             case .failed(let message):
                 ContentUnavailableView {
-                    Label { Text(verbatim: "Couldn't Load the Brain") } icon: { Image(systemName: "exclamationmark.triangle") }
+                    Label { Text(verbatim: "Couldn't load the Brain") } icon: { Image(systemName: "exclamationmark.triangle") }
                 } description: {
                     Text(verbatim: message)
                 } actions: {
-                    Button { Task { await viewModel.load() } } label: { Text(verbatim: "Try Again") }
+                    Button { Task { await viewModel.load() } } label: { Text(verbatim: "Try again") }
                 }
             case .loaded:
                 moduleList
@@ -120,7 +121,7 @@ struct BrainHomeView: View {
         .overlay {
             if viewModel.modules.isEmpty {
                 ContentUnavailableView {
-                    Label { Text(verbatim: "Nothing in the Brain Yet") } icon: { Image(systemName: "brain") }
+                    Label { Text(verbatim: "Nothing in the Brain yet") } icon: { Image(systemName: "brain") }
                 } description: {
                     Text(verbatim: "Modules appear here once the server has notes to show.")
                 }

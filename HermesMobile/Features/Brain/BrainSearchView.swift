@@ -36,11 +36,15 @@ struct BrainSearchView: View {
         )
         .autocorrectionDisabled()
         .task {
-            guard !didStart else { return }
-            didStart = true
-            viewModel.moduleFilter = module
-            viewModel.query = initialQuery
+            guard didStart else {
+                didStart = true
+                viewModel.moduleFilter = module
+                viewModel.query = initialQuery
+                return
+            }
+            viewModel.resume()
         }
+        .onDisappear { viewModel.cancel() }
     }
 }
 
@@ -84,6 +88,7 @@ struct BrainSearchResults: View {
                             .listRowBackground(Color.clear)
                     }
                 } else {
+                    if isSearching { progressRow }
                     ForEach(groups, id: \.module) { group in
                         section(for: group)
                     }

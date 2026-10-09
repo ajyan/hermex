@@ -170,6 +170,45 @@ final class BrainViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.state, .unavailable)
     }
 
+    /// Home refreshes on every appear; a reload over shown modules must never flash a spinner.
+    func testHomeReloadWithModulesNeverPassesThroughLoading() async {
+        let client = FakeBrainClient()
+        let first = [BrainModule(id: .wiki, title: "Wiki", count: 1)]
+        let second = [BrainModule(id: .wiki, title: "Wiki", count: 2)]
+        client.modulesResult = .success(first)
+        let viewModel = BrainHomeViewModel(client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
+        await viewModel.load()
+        XCTAssertEqual(viewModel.state, .loaded(first))
+
+        let gate = Gate()
+        client.modulesGate = gate
+        client.modulesResult = .success(second)
+        let reload = Task { await viewModel.load() }
+        await gate.waitEntered()
+        XCTAssertEqual(viewModel.state, .loaded(first))
+        XCTAssertEqual(viewModel.modules, first)
+        gate.open()
+        await reload.value
+        XCTAssertEqual(viewModel.state, .loaded(second))
+    }
+
+    func testSearchResumeRerunsTheCurrentQueryAfterCancel() async {
+        let client = FakeBrainClient()
+        let viewModel = BrainSearchViewModel(client: client, debounce: .zero)
+        viewModel.query = "marcus"
+        viewModel.cancel()
+        XCTAssertFalse(viewModel.isSearching)
+        viewModel.resume()
+        XCTAssertTrue(viewModel.isSearching)
+        await viewModel.settled()
+        XCTAssertEqual(client.searchQueries, ["marcus"])
+        XCTAssertNotNil(viewModel.result)
+
+        viewModel.query = "m"
+        viewModel.resume()
+        XCTAssertFalse(viewModel.isSearching)
+    }
+
     func testGraphFailureDoesNotFailPage() async {
         let client = FakeBrainClient()
         client.pageResult = .success(samplePage)
@@ -390,6 +429,7 @@ final class FakeBrainClient: BrainDataClient, @unchecked Sendable {
     var failingSearches: Set<String> = []
     var graphGate: Gate?
     var pagedListGate: Gate?
+    var modulesGate: Gate?
     var firstListGate: Gate?
 
     var searchQueries: [String] { lock.withLock { _searchQueries } }
@@ -397,7 +437,11 @@ final class FakeBrainClient: BrainDataClient, @unchecked Sendable {
 
     func people() async throws -> [BrainPerson] { [] }
     func person(file: String) async throws -> BrainPersonFile { BrainPersonFile(content: "", error: nil) }
-    func modules() async throws -> [BrainModule] { try modulesResult.get() }
+    func modules() async throws -> [BrainModule] {
+        let result = modulesResult
+        if let gate = modulesGate { await gate.pass() }
+        return try result.get()
+    }
     func list(module: BrainModuleID, tag: String?, cursor: Int?) async throws -> BrainList {
         let next: Result<BrainList, Error>? = lock.withLock {
             _listCalls.append((tag, cursor))
