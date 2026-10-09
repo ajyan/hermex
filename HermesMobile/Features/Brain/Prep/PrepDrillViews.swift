@@ -50,10 +50,10 @@ struct PrepProblemCard: View {
             if expanded {
                 // Fits when it can; scrolls inside the cap when it can't.
                 ViewThatFits(in: .vertical) {
-                    detail
+                    detail.fixedSize(horizontal: false, vertical: true)
                     ScrollView { detail }
                 }
-                .frame(maxHeight: max(maxHeight - chrome, 80))
+                .frame(maxHeight: max(maxHeight - chrome, 80), alignment: .top)
             } else if !summary.isEmpty {
                 Text(verbatim: summary)
                     .brainText(.rowSubtitle)
@@ -62,7 +62,10 @@ struct PrepProblemCard: View {
             }
             if canExpand {
                 Button {
-                    expanded.toggle()
+                    // Instant: no crossfade between the compact and expanded text.
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) { expanded.toggle() }
                 } label: {
                     Text(verbatim: expanded ? "Less" : "More")
                         .font(BrainStyle.rowSubtitle.weight(.medium))
@@ -79,6 +82,7 @@ struct PrepProblemCard: View {
         .padding(.top, BrainStyle.cardVerticalPadding)
         .padding(.bottom, canExpand ? 0 : BrainStyle.cardVerticalPadding)
         .brainCardSurface()
+        .transaction { $0.animation = nil }
     }
 
     /// The full summary and the example, shown when expanded.
