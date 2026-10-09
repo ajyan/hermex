@@ -173,7 +173,6 @@
 		C03910000000000000000013 /* ModelCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03900000000000000000013 /* ModelCatalogTests.swift */; };
 		C03910000000000000000014 /* MessageActionContextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03900000000000000000014 /* MessageActionContextTests.swift */; };
 		C03910000000000000000015 /* SessionIdentityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03900000000000000000015 /* SessionIdentityTests.swift */; };
-		C1E7000000000000000000C2 /* SessionCleanupClassifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E7000000000000000000C1 /* SessionCleanupClassifierTests.swift */; };
 		C03910000000000000000016 /* TranscriptDisplayModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03900000000000000000016 /* TranscriptDisplayModelTests.swift */; };
 		C14300000000000000000003 /* StreamingMarkdownSupportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C14300000000000000000004 /* StreamingMarkdownSupportTests.swift */; };
 		C13000000000000000000001 /* ChatVerticalScrollAxisGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C13000000000000000000002 /* ChatVerticalScrollAxisGuardTests.swift */; };
@@ -221,9 +220,6 @@
 		A04300000000000000000003 /* SessionMutator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04300000000000000000013 /* SessionMutator.swift */; };
 		A040C0DE0000000000000001 /* ProjectCreationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A040C0DE0000000000000002 /* ProjectCreationSheet.swift */; };
 		A048C0DE0000000000000001 /* SessionRenameSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A048C0DE0000000000000002 /* SessionRenameSheet.swift */; };
-		60009868759850577603239870628 /* SessionCleanupSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E7000000000000000000A3 /* SessionCleanupSheet.swift */; };
-		60009868759850577603239870627 /* SessionCleanupViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E7000000000000000000A2 /* SessionCleanupViewModel.swift */; };
-		60009868759850577603239870626 /* SessionCleanupClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E7000000000000000000A1 /* SessionCleanupClassifier.swift */; };
 		A04200000000000000000001 /* Approval.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04200000000000000000002 /* Approval.swift */; };
 		A04200000000000000000003 /* ApprovalRequestOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04200000000000000000004 /* ApprovalRequestOverlay.swift */; };
 		C1A042000000000000000001 /* Clarification.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A042000000000000000002 /* Clarification.swift */; };
@@ -860,7 +856,6 @@
 		C03900000000000000000013 /* ModelCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogTests.swift; sourceTree = "<group>"; };
 		C03900000000000000000014 /* MessageActionContextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageActionContextTests.swift; sourceTree = "<group>"; };
 		C03900000000000000000015 /* SessionIdentityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionIdentityTests.swift; sourceTree = "<group>"; };
-		C1E7000000000000000000C1 /* SessionCleanupClassifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCleanupClassifierTests.swift; sourceTree = "<group>"; };
 		C03900000000000000000016 /* TranscriptDisplayModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptDisplayModelTests.swift; sourceTree = "<group>"; };
 		C14300000000000000000004 /* StreamingMarkdownSupportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingMarkdownSupportTests.swift; sourceTree = "<group>"; };
 		C13000000000000000000002 /* ChatVerticalScrollAxisGuardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatVerticalScrollAxisGuardTests.swift; sourceTree = "<group>"; };
@@ -908,9 +903,6 @@
 		A04300000000000000000013 /* SessionMutator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionMutator.swift; sourceTree = "<group>"; };
 		A040C0DE0000000000000002 /* ProjectCreationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectCreationSheet.swift; sourceTree = "<group>"; };
 		A048C0DE0000000000000002 /* SessionRenameSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRenameSheet.swift; sourceTree = "<group>"; };
-		C1E7000000000000000000A3 /* SessionCleanupSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCleanupSheet.swift; sourceTree = "<group>"; };
-		C1E7000000000000000000A2 /* SessionCleanupViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCleanupViewModel.swift; sourceTree = "<group>"; };
-		C1E7000000000000000000A1 /* SessionCleanupClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCleanupClassifier.swift; sourceTree = "<group>"; };
 		A04200000000000000000002 /* Approval.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Approval.swift; sourceTree = "<group>"; };
 		A04200000000000000000004 /* ApprovalRequestOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalRequestOverlay.swift; sourceTree = "<group>"; };
 		C1A042000000000000000002 /* Clarification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Clarification.swift; sourceTree = "<group>"; };
@@ -1606,7 +1598,6 @@
 				C03900000000000000000013 /* ModelCatalogTests.swift */,
 				C03900000000000000000014 /* MessageActionContextTests.swift */,
 				C03900000000000000000015 /* SessionIdentityTests.swift */,
-				C1E7000000000000000000C1 /* SessionCleanupClassifierTests.swift */,
 				C03900000000000000000016 /* TranscriptDisplayModelTests.swift */,
 				C14300000000000000000004 /* StreamingMarkdownSupportTests.swift */,
 				C13000000000000000000002 /* ChatVerticalScrollAxisGuardTests.swift */,
@@ -1966,9 +1957,6 @@
 				C08800000000000000000002 /* SessionHaptics.swift */,
 				A040C0DE0000000000000002 /* ProjectCreationSheet.swift */,
 				A048C0DE0000000000000002 /* SessionRenameSheet.swift */,
-				C1E7000000000000000000A3 /* SessionCleanupSheet.swift */,
-				C1E7000000000000000000A2 /* SessionCleanupViewModel.swift */,
-				C1E7000000000000000000A1 /* SessionCleanupClassifier.swift */,
 			);
 			path = SessionList;
 			sourceTree = "<group>";
@@ -2942,9 +2930,6 @@
 				A04300000000000000000003 /* SessionMutator.swift in Sources */,
 				A040C0DE0000000000000001 /* ProjectCreationSheet.swift in Sources */,
 				A048C0DE0000000000000001 /* SessionRenameSheet.swift in Sources */,
-				60009868759850577603239870628 /* SessionCleanupSheet.swift in Sources */,
-				60009868759850577603239870627 /* SessionCleanupViewModel.swift in Sources */,
-				60009868759850577603239870626 /* SessionCleanupClassifier.swift in Sources */,
 				1A2B3C4D5E6F70000000130 /* ContextWindowSnapshot.swift in Sources */,
 				1A2B3C4D5E6F70000000131 /* ContextWindowIndicatorView.swift in Sources */,
 				1A2B3C4D5E6F70000000150 /* UploadResponse.swift in Sources */,
@@ -3117,7 +3102,6 @@
 				C03910000000000000000013 /* ModelCatalogTests.swift in Sources */,
 				C03910000000000000000014 /* MessageActionContextTests.swift in Sources */,
 				C03910000000000000000015 /* SessionIdentityTests.swift in Sources */,
-				C1E7000000000000000000C2 /* SessionCleanupClassifierTests.swift in Sources */,
 				C03910000000000000000016 /* TranscriptDisplayModelTests.swift in Sources */,
 				C14300000000000000000003 /* StreamingMarkdownSupportTests.swift in Sources */,
 				C13000000000000000000001 /* ChatVerticalScrollAxisGuardTests.swift in Sources */,

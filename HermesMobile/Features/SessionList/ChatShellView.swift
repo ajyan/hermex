@@ -91,11 +91,6 @@ struct ChatShellView: View {
     @State private var sessionExportShareItem: SessionExportShareItem?
     @State private var isPresentingProjectCreation = false
     @State private var isPresentingAddServer = false
-    /// "Clean up old conversations" sheet state (see SessionCleanupViewModel).
-    @State private var isPresentingCleanup = false
-    @State private var cleanupIdleDays = 30
-    /// Held so the sheet keeps the same VM (and its loaded candidates) across renders.
-    @State private var cleanupViewModel: SessionCleanupViewModel?
     @State private var projectPendingDeletion: ProjectSummary?
     @State private var projectPendingRename: ProjectSummary?
     @State private var searchText = ""
@@ -229,9 +224,6 @@ struct ChatShellView: View {
                     }
                 }
                 .presentationDetents([.height(180), .medium])
-            }
-            .sheet(isPresented: $isPresentingCleanup) {
-                cleanupSheetView
             }
             .alert("Session Action Failed", isPresented: sessionOpenErrorIsPresented) {
                 Button("OK", role: .cancel) {}
@@ -709,20 +701,6 @@ struct ChatShellView: View {
         )
     }
 
-    /// The "Clean up old conversations" sheet. Kept as its own expression so the
-    /// `.sheet` body stays within the type-checker's time budget.
-    @ViewBuilder
-    private var cleanupSheetView: some View {
-        if let cleanupViewModel {
-            SessionCleanupSheet(
-                viewModel: cleanupViewModel,
-                idleDays: cleanupIdleDays,
-                onCompleted: { Task { await refreshSessionsAndActiveProfile() } },
-                onDismiss: { isPresentingCleanup = false }
-            )
-        }
-    }
-
     private var sessionListSurface: some View {
         ChatDrawerView(
             viewModel: viewModel,
@@ -739,16 +717,7 @@ struct ChatShellView: View {
             serverName: authManager.activeServer?.displayName ?? server.host() ?? server.absoluteString,
             canCreateNewChat: !viewModel.isViewingCachedData && !navigation.isCreatingNewChat,
             onNewChat: openNewChat,
-            onCleanUp: viewModel.isViewingCachedData ? nil : {
-                if cleanupViewModel == nil {
-                    cleanupViewModel = SessionCleanupViewModel(
-                        server: server,
-                        idleDays: cleanupIdleDays,
-                        onAPIError: authManager.handleAPIError
-                    )
-                }
-                isPresentingCleanup = true
-            },
+            onCleanUp: viewModel.isViewingCachedData ? nil : { cleanUpOldChats() },
             onOpen: { navigation.push($0) },
             onReviewArchiveCandidates: { isPresentingArchiveReview = true },
             refresh: { await refreshSessionsAndActiveProfile() }
@@ -999,6 +968,40 @@ struct ChatShellView: View {
             guard !archived.isEmpty else { return }
             pendingAutoArchived = archived
             showPendingAutoArchiveToast()
+        }
+    }
+
+    /// The drawer's "Clean up old chats": an auto-archive pass right now, even with
+    /// auto-archive off. Throwaways archive with the usual Undo toast; keepers and
+    /// coding projects open the review sheet.
+    private func cleanUpOldChats() {
+        guard autoArchiveTask == nil else { return }
+        autoArchiveTask = Task {
+            let archived = await viewModel.runAutoArchivePassIfDue(
+                excludingSessionID: navigation.selectedSessionID,
+                modelContext: modelContext,
+                now: true
+            )
+            autoArchiveTask = nil
+            guard !Task.isCancelled else { return }
+            handleLastError()
+            if !archived.isEmpty {
+                pendingAutoArchived = archived
+                showPendingAutoArchiveToast()
+            }
+            if !viewModel.archiveReviewCandidates.isEmpty {
+                isPresentingArchiveReview = true
+            } else if archived.isEmpty {
+                let days = viewModel.autoArchiveStore.settings(for: server).idleDays
+                let message = String(localized: "No chats idle for \(days)+ days")
+                actionToast.show(ActionToast(
+                    message: message,
+                    systemImage: "archivebox",
+                    accessibilityLabel: message,
+                    actionTitle: String(localized: "Settings"),
+                    action: { navigation.push(.settings(nil)) }
+                ))
+            }
         }
     }
 

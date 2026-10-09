@@ -18,7 +18,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
     let serverName: String
     let canCreateNewChat: Bool
     let onNewChat: () -> Void
-    /// Opens the "Clean up old conversations" sheet. nil hides the row.
+    /// Runs an auto-archive pass now ("Clean up old chats"). nil hides the row.
     var onCleanUp: (() -> Void)? = nil
     let onOpen: (ShellPushDestination) -> Void
     /// Opens the sheet of idle chats waiting for a keep-or-archive decision.
