@@ -18,6 +18,8 @@ struct ChatDrawerView<ServerMenu: View>: View {
     let serverName: String
     let canCreateNewChat: Bool
     let onNewChat: () -> Void
+    /// Opens the "Clean up old conversations" sheet. nil hides the row.
+    var onCleanUp: (() -> Void)? = nil
     let onOpen: (ShellPushDestination) -> Void
     /// Opens the sheet of idle chats waiting for a keep-or-archive decision.
     let onReviewArchiveCandidates: () -> Void
@@ -140,6 +142,9 @@ struct ChatDrawerView<ServerMenu: View>: View {
         drawerRow("Daily Brief", systemImage: "sun.horizon") { onOpen(.dailyDeck) }
         if sectionVisibility.brain {
             drawerRow("Brain", systemImage: "brain") { onOpen(.brain) }
+        }
+        if let onCleanUp {
+            drawerRow(String(localized: "Clean up old chats"), systemImage: "archivebox") { onCleanUp() }
         }
     }
 

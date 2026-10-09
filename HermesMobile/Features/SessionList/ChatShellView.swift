@@ -91,6 +91,11 @@ struct ChatShellView: View {
     @State private var sessionExportShareItem: SessionExportShareItem?
     @State private var isPresentingProjectCreation = false
     @State private var isPresentingAddServer = false
+    /// "Clean up old conversations" sheet state (see SessionCleanupViewModel).
+    @State private var isPresentingCleanup = false
+    @State private var cleanupIdleDays = 30
+    /// Held so the sheet keeps the same VM (and its loaded candidates) across renders.
+    @State private var cleanupViewModel: SessionCleanupViewModel?
     @State private var projectPendingDeletion: ProjectSummary?
     @State private var projectPendingRename: ProjectSummary?
     @State private var searchText = ""
@@ -224,6 +229,9 @@ struct ChatShellView: View {
                     }
                 }
                 .presentationDetents([.height(180), .medium])
+            }
+            .sheet(isPresented: $isPresentingCleanup) {
+                cleanupSheetView
             }
             .alert("Session Action Failed", isPresented: sessionOpenErrorIsPresented) {
                 Button("OK", role: .cancel) {}
@@ -701,6 +709,20 @@ struct ChatShellView: View {
         )
     }
 
+    /// The "Clean up old conversations" sheet. Kept as its own expression so the
+    /// `.sheet` body stays within the type-checker's time budget.
+    @ViewBuilder
+    private var cleanupSheetView: some View {
+        if let cleanupViewModel {
+            SessionCleanupSheet(
+                viewModel: cleanupViewModel,
+                idleDays: cleanupIdleDays,
+                onCompleted: { Task { await refreshSessionsAndActiveProfile() } },
+                onDismiss: { isPresentingCleanup = false }
+            )
+        }
+    }
+
     private var sessionListSurface: some View {
         ChatDrawerView(
             viewModel: viewModel,
@@ -717,6 +739,16 @@ struct ChatShellView: View {
             serverName: authManager.activeServer?.displayName ?? server.host() ?? server.absoluteString,
             canCreateNewChat: !viewModel.isViewingCachedData && !navigation.isCreatingNewChat,
             onNewChat: openNewChat,
+            onCleanUp: viewModel.isViewingCachedData ? nil : {
+                if cleanupViewModel == nil {
+                    cleanupViewModel = SessionCleanupViewModel(
+                        server: server,
+                        idleDays: cleanupIdleDays,
+                        onAPIError: authManager.handleAPIError
+                    )
+                }
+                isPresentingCleanup = true
+            },
             onOpen: { navigation.push($0) },
             onReviewArchiveCandidates: { isPresentingArchiveReview = true },
             refresh: { await refreshSessionsAndActiveProfile() }
