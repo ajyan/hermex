@@ -105,6 +105,9 @@ private struct DeckCardView: View {
                 .foregroundStyle(palette.ink.opacity(0.7))
                 .padding(.top, 12)
         }
+        if !card.entries.isEmpty {
+            RecapList(entries: card.entries, palette: palette).padding(.top, 22)
+        }
         if let detail = text.detail {
             Text(inlineMarkdown(detail))
                 .font(AppFont.body())
@@ -259,6 +262,49 @@ private struct DeckCardView: View {
         .buttonStyle(.plain)
         .disabled(viewModel.filing == .filing || !viewModel.hasChanges)
         .padding(.top, 28)
+    }
+}
+
+/// A recap's entries: each label set small and bold above its text, shown once for a run of
+/// entries that share it (the items under "Career Priorities"), with hairlines between groups.
+private struct RecapList: View {
+    let entries: [DeckEntry]
+    let palette: DeckPalette
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(entries.enumerated()), id: \.offset) { index, entry in
+                let newGroup = index == 0 || entry.label != entries[index - 1].label
+                if newGroup && index > 0 {
+                    Rectangle().fill(palette.ink.opacity(0.12)).frame(height: 0.5).padding(.vertical, 14)
+                }
+                if newGroup, let label = entry.label {
+                    Text(verbatim: label)
+                        .font(AppFont.subheadline(weight: .semibold))
+                        .foregroundStyle(palette.ink.opacity(0.7))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.bottom, 4)
+                }
+                Text(Self.titled(entry.text))
+                    .font(AppFont.serif(style: .body))
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, newGroup ? 0 : 8)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// "Volume Increase: target 8+ applications" with its short title in bold, so a plan scans.
+    static func titled(_ text: String) -> AttributedString {
+        var out = inlineMarkdown(text)
+        guard let colon = text.range(of: ": "),
+              text.distance(from: text.startIndex, to: colon.lowerBound) <= 48,
+              !text[..<colon.lowerBound].contains(where: { ".!?,".contains($0) }),
+              let range = out.range(of: String(text[..<colon.lowerBound]))
+        else { return out }
+        out[range].inlinePresentationIntent = .stronglyEmphasized
+        return out
     }
 }
 

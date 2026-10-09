@@ -56,6 +56,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let reason: String?
     /// Other questions for the same material; Regenerate steps through them.
     let altQuestions: [String]
+    /// A recap's items (a review's days, answers, or last week's plan), each under an optional label.
+    let entries: [DeckEntry]
 
     /// Whether answering this card means typing (prompt and reflect cards).
     var takesText: Bool { type == .prompt || type == .reflect }
@@ -70,7 +72,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case id, type, title, body, source, lines, question, context, voice, why, draft, actions, fallback
-        case reason, altQuestions
+        case reason, altQuestions, entries
         case itemKind = "kind"
     }
 
@@ -92,7 +94,28 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         fallback = try? c.decodeIfPresent(String.self, forKey: .fallback)
         reason = try? c.decodeIfPresent(String.self, forKey: .reason)
         altQuestions = (try? c.decodeIfPresent([String].self, forKey: .altQuestions)) ?? []
+        entries = ((try? c.decodeIfPresent([LossyEntry].self, forKey: .entries)) ?? []).compactMap(\.value)
     }
+}
+
+/// One item in a recap card. An entry that fails to decode is dropped, never the card.
+struct DeckEntry: Decodable, Equatable, Hashable {
+    let label: String?
+    let text: String
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        label = try? c.decodeIfPresent(String.self, forKey: .label)
+        text = try c.decode(String.self, forKey: .text)
+    }
+
+    private enum CodingKeys: String, CodingKey { case label, text }
+}
+
+/// Decodes one entry, or nothing when it is malformed, so a bad item never costs the list.
+private struct LossyEntry: Decodable {
+    let value: DeckEntry?
+    init(from decoder: Decoder) throws { value = try? DeckEntry(from: decoder) }
 }
 
 struct DeckDraft: Decodable, Equatable {
@@ -365,7 +388,8 @@ struct DeckCardText: Equatable {
         case .item, .unknown:
             lead = card.title ?? card.fallback
             attribution = card.source == card.title ? nil : card.source
-            detail = card.body ?? (card.title == nil ? nil : card.fallback)
+            // A recap's entries are laid out as a list; its plain `body` copy is only for older builds.
+            detail = card.entries.isEmpty ? (card.body ?? (card.title == nil ? nil : card.fallback)) : nil
         case .headline, .decision, .close:
             lead = card.title
             detail = card.body
