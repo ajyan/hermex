@@ -46,11 +46,16 @@ final class BrainHomeViewModel {
         self.onAPIError = onAPIError
     }
 
+    /// Bumped by every `load()`, so an older failure never overwrites a newer success.
+    private var generation = 0
+
     func load() async {
+        generation += 1
+        let token = generation
         if modules.isEmpty { state = .loading }
         do {
             let fetched = try await client.modules()
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, token == generation else { return }
             modules = fetched
             state = .loaded(fetched)
             isShowingCachedCopy = false
@@ -58,7 +63,7 @@ final class BrainHomeViewModel {
         } catch is CancellationError {
             // The screen went away; nothing to update.
         } catch {
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, token == generation else { return }
             if brainIsNotFound(error) {
                 state = .unavailable
             } else if let cached = cache.load([BrainModule].self, kind: "modules", id: "") {
@@ -82,12 +87,21 @@ final class BrainListViewModel {
     private(set) var list: BrainList?
     private(set) var isShowingCachedCopy = false
     private(set) var isLoadingMore = false
+    /// True while a first-page load is in flight; `loadMore` waits it out.
+    private(set) var isLoading = false
 
     /// Setting a different tag drops the paging state and reloads.
     var selectedTag: String? {
         didSet {
             guard selectedTag != oldValue else { return }
             tagReloadTask?.cancel()
+            // Drop the old tag's list and cursor so nothing can page or merge into it.
+            generation += 1
+            list = nil
+            state = .loading
+            isShowingCachedCopy = false
+            isLoadingMore = false
+            isLoading = true
             tagReloadTask = Task { [weak self] in await self?.load() }
         }
     }
@@ -116,17 +130,20 @@ final class BrainListViewModel {
         generation += 1
         let token = generation
         isLoadingMore = false
+        isLoading = true
         let tag = selectedTag
         if list == nil { state = .loading }
         do {
             let fetched = try await client.list(module: module, tag: tag, cursor: nil)
             guard !Task.isCancelled, token == generation else { return }
+            isLoading = false
             apply(fetched, cached: false)
             cache.store(fetched, kind: cacheKind, id: tag ?? "")
         } catch is CancellationError {
             // The screen went away; nothing to update.
         } catch {
             guard !Task.isCancelled, token == generation else { return }
+            isLoading = false
             if brainIsNotFound(error) {
                 state = .unavailable
             } else if let cached = cache.load(BrainList.self, kind: cacheKind, id: tag ?? "") {
@@ -138,23 +155,23 @@ final class BrainListViewModel {
         }
     }
 
-    /// Appends the next page; a no-op without a cursor or while a page is in flight.
+    /// Appends the next page; a no-op without a cursor, while a page is in flight,
+    /// or while a first-page load is running.
     func loadMore() async {
-        guard let current = list, let cursor = current.nextCursor, !isLoadingMore,
-              !isShowingCachedCopy else { return }
+        guard !isLoading, !isLoadingMore, !isShowingCachedCopy,
+              let cursor = list?.nextCursor else { return }
         let token = generation
         isLoadingMore = true
+        defer { if token == generation { isLoadingMore = false } }
         do {
             let page = try await client.list(module: module, tag: selectedTag, cursor: cursor)
-            guard !Task.isCancelled, token == generation else { return }
-            isLoadingMore = false
+            guard !Task.isCancelled, token == generation, let current = list else { return }
             let merged = Self.merge(current, page)
             list = merged
             state = .loaded(merged)
         } catch {
-            guard token == generation else { return }
-            isLoadingMore = false
-            if !(error is CancellationError), !Task.isCancelled { onAPIError(error) }
+            guard token == generation, !(error is CancellationError), !Task.isCancelled else { return }
+            onAPIError(error)
         }
     }
 
@@ -189,6 +206,7 @@ final class BrainListViewModel {
 final class BrainSearchViewModel {
     private(set) var result: BrainSearchResult?
     private(set) var isSearching = false
+    private(set) var didFail = false
 
     var query = "" {
         didSet { if query != oldValue { restart() } }
@@ -199,11 +217,14 @@ final class BrainSearchViewModel {
 
     private let client: any BrainDataClient
     private let debounce: Duration
+    private let onAPIError: (Error) -> Void
     private var searchTask: Task<Void, Never>?
 
-    init(client: any BrainDataClient, debounce: Duration = .milliseconds(250)) {
+    init(client: any BrainDataClient, debounce: Duration = .milliseconds(250),
+         onAPIError: @escaping (Error) -> Void = { _ in }) {
         self.client = client
         self.debounce = debounce
+        self.onAPIError = onAPIError
     }
 
     /// Waits for the current search, if any.
@@ -218,6 +239,7 @@ final class BrainSearchViewModel {
 
     private func restart() {
         searchTask?.cancel()
+        didFail = false
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2 else {
             searchTask = nil
@@ -227,16 +249,20 @@ final class BrainSearchViewModel {
         }
         isSearching = true
         let filter = moduleFilter
-        searchTask = Task { [weak self, client, debounce] in
+        searchTask = Task { [weak self, client, debounce, onAPIError] in
             do {
                 try await Task.sleep(for: debounce)
+                try Task.checkCancellation()
                 let found = try await client.search(query: trimmed, module: filter)
                 guard !Task.isCancelled, let self else { return }
                 self.result = found
                 self.isSearching = false
             } catch {
                 guard !Task.isCancelled, let self else { return }
+                self.result = nil
+                self.didFail = true
                 self.isSearching = false
+                onAPIError(error)
             }
         }
     }
@@ -267,23 +293,31 @@ final class BrainPageViewModel {
         self.onAPIError = onAPIError
     }
 
+    /// Bumped by every `load()`, so an older failure never overwrites a newer success.
+    private var generation = 0
+
     func load() async {
+        generation += 1
+        let token = generation
         if page == nil { state = .loading }
         async let fetchedGraph: BrainGraph? = try? client.graph(module: module, id: id)
         do {
             let fetched = try await client.page(module: module, id: id)
-            let loadedGraph = await fetchedGraph
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, token == generation else { return }
             page = fetched
-            graph = loadedGraph
             state = .loaded(fetched)
             isShowingCachedCopy = false
             isMissing = false
             cache.store(fetched, kind: "page", id: id)
+            // The graph is best effort and never holds the page back; a failed
+            // refresh keeps whatever graph was already shown.
+            if let loadedGraph = await fetchedGraph, !Task.isCancelled, token == generation {
+                graph = loadedGraph
+            }
         } catch is CancellationError {
             // The screen went away; nothing to update.
         } catch {
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, token == generation else { return }
             let notFound = brainIsNotFound(error)
             isMissing = notFound
             if let cached = cache.load(BrainPage.self, kind: "page", id: id) {

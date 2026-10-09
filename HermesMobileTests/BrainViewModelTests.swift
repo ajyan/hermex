@@ -203,6 +203,131 @@ final class BrainViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.list?.items.map(\.id), ["a", "b"])
         XCTAssertEqual(client.listCalls.map(\.cursor), [nil, 20])
     }
+
+    func testPage404WithCachedCopyStillShowsIt() async throws {
+        let cache = try makeCache()
+        try BrainCache.store(samplePage, server: cache.server, kind: "page", id: "p1", in: try XCTUnwrap(cache.context))
+        let client = FakeBrainClient()
+        client.pageResult = .failure(APIError.http(statusCode: 404, body: nil))
+        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: cache, onAPIError: { _ in })
+        await viewModel.load()
+        XCTAssertTrue(viewModel.isMissing)
+        XCTAssertEqual(viewModel.state, .loaded(samplePage))
+        XCTAssertTrue(viewModel.isShowingCachedCopy)
+    }
+
+    func testLoadMoreDuringTagChangeCannotOverwriteTheNewList() async {
+        let client = FakeBrainClient()
+        client.listResults = [
+            .success(BrainList(items: [BrainItem(module: .wiki, id: "a")], nextCursor: 20)),
+            .success(BrainList(items: [BrainItem(module: .wiki, id: "x1")], nextCursor: nil)),
+            .success(BrainList(items: [BrainItem(module: .wiki, id: "stale")], nextCursor: nil)),
+        ]
+        let viewModel = BrainListViewModel(module: .wiki, client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
+        await viewModel.load()
+        viewModel.selectedTag = "x"
+        await viewModel.loadMore()
+        await viewModel.settled()
+        XCTAssertEqual(viewModel.list?.items.map(\.id), ["x1"])
+        XCTAssertEqual(client.listCalls.map(\.cursor), [nil, nil])
+    }
+
+    func testCancelledLoadMoreDoesNotWedgeLaterLoadMore() async {
+        let client = FakeBrainClient()
+        client.listResults = [
+            .success(BrainList(items: [BrainItem(module: .wiki, id: "a")], nextCursor: 20)),
+            .success(BrainList(items: [BrainItem(module: .wiki, id: "b")], nextCursor: nil)),
+            .success(BrainList(items: [BrainItem(module: .wiki, id: "c")], nextCursor: nil)),
+        ]
+        let viewModel = BrainListViewModel(module: .wiki, client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
+        await viewModel.load()
+        let gate = Gate()
+        client.pagedListGate = gate
+        let task = Task { await viewModel.loadMore() }
+        await gate.waitEntered()
+        task.cancel()
+        gate.open()
+        await task.value
+        client.pagedListGate = nil
+        await viewModel.loadMore()
+        XCTAssertEqual(client.listCalls.map(\.cursor), [nil, 20, 20])
+        XCTAssertEqual(viewModel.list?.items.map(\.id), ["a", "c"])
+    }
+
+    func testSearchFailureClearsResultAndFlagsFailure() async {
+        let client = FakeBrainClient()
+        client.failingSearches = ["mark"]
+        var reported = 0
+        let viewModel = BrainSearchViewModel(client: client, debounce: .zero, onAPIError: { _ in reported += 1 })
+        viewModel.query = "marc"
+        await viewModel.settled()
+        XCTAssertNotNil(viewModel.result)
+        XCTAssertFalse(viewModel.didFail)
+        viewModel.query = "mark"
+        await viewModel.settled()
+        XCTAssertNil(viewModel.result)
+        XCTAssertTrue(viewModel.didFail)
+        XCTAssertEqual(reported, 1)
+        viewModel.query = "mar"
+        XCTAssertFalse(viewModel.didFail)
+    }
+
+    func testPagePublishesBeforeGraphArrives() async {
+        let client = FakeBrainClient()
+        client.pageResult = .success(samplePage)
+        let graph = BrainGraph(nodes: [BrainGraphNode(module: .wiki, id: "p1")])
+        client.graphResult = .success(graph)
+        let gate = Gate()
+        client.graphGate = gate
+        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
+        let task = Task { await viewModel.load() }
+        await gate.waitEntered()
+        let publishedEarly = viewModel.state == .loaded(samplePage)
+        gate.open()
+        await task.value
+        XCTAssertTrue(publishedEarly, "page should publish before the graph returns")
+        XCTAssertEqual(viewModel.graph, graph)
+    }
+}
+
+final class Gate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var entered = false
+    private var opened = false
+    private var enteredWaiter: CheckedContinuation<Void, Never>?
+    private var openWaiter: CheckedContinuation<Void, Never>?
+
+    /// Called by the fake: marks the request as started and suspends until `open()`.
+    func pass() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            lock.lock()
+            entered = true
+            let waiter = enteredWaiter
+            enteredWaiter = nil
+            if opened { lock.unlock(); waiter?.resume(); continuation.resume(); return }
+            openWaiter = continuation
+            lock.unlock()
+            waiter?.resume()
+        }
+    }
+
+    func waitEntered() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            lock.lock()
+            if entered { lock.unlock(); continuation.resume(); return }
+            enteredWaiter = continuation
+            lock.unlock()
+        }
+    }
+
+    func open() {
+        lock.lock()
+        opened = true
+        let waiter = openWaiter
+        openWaiter = nil
+        lock.unlock()
+        waiter?.resume()
+    }
 }
 
 final class FakeBrainClient: BrainDataClient, @unchecked Sendable {
@@ -210,9 +335,12 @@ final class FakeBrainClient: BrainDataClient, @unchecked Sendable {
     private var _searchQueries: [String] = []
     private var _listCalls: [(tag: String?, cursor: Int?)] = []
     var modulesResult: Result<[BrainModule], Error> = .success([])
-    var pageResult: Result<BrainPage, Error> = .failure(CancellationError())
+    var pageResult: Result<BrainPage, Error> = .failure(URLError(.badServerResponse))
     var graphResult: Result<BrainGraph, Error> = .success(BrainGraph())
     var listResults: [Result<BrainList, Error>] = []
+    var failingSearches: Set<String> = []
+    var graphGate: Gate?
+    var pagedListGate: Gate?
 
     var searchQueries: [String] { lock.withLock { _searchQueries } }
     var listCalls: [(tag: String?, cursor: Int?)] { lock.withLock { _listCalls } }
@@ -225,14 +353,19 @@ final class FakeBrainClient: BrainDataClient, @unchecked Sendable {
             _listCalls.append((tag, cursor))
             return listResults.isEmpty ? nil : listResults.removeFirst()
         }
+        if cursor != nil, let gate = pagedListGate { await gate.pass() }
         return try (next ?? .success(BrainList())).get()
     }
     func page(module: BrainModuleID, id: String) async throws -> BrainPage { try pageResult.get() }
     func search(query: String, module: BrainModuleID?) async throws -> BrainSearchResult {
         lock.withLock { _searchQueries.append(query) }
+        if failingSearches.contains(query) { throw URLError(.timedOut) }
         return BrainSearchResult()
     }
-    func graph(module: BrainModuleID, id: String) async throws -> BrainGraph { try graphResult.get() }
+    func graph(module: BrainModuleID, id: String) async throws -> BrainGraph {
+        if let gate = graphGate { await gate.pass() }
+        return try graphResult.get()
+    }
 }
 
 private struct StubBrainClient: BrainDataClient {
