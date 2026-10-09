@@ -18,6 +18,8 @@ struct ChatDrawerView<ServerMenu: View>: View {
     let serverName: String
     let canCreateNewChat: Bool
     let onNewChat: () -> Void
+    /// Opens the "Clean up old conversations" sheet. nil hides the row.
+    var onCleanUp: (() -> Void)? = nil
     let onOpen: (ShellPushDestination) -> Void
     let refresh: () async -> Void
     @ViewBuilder let serverMenu: () -> ServerMenu
@@ -125,6 +127,9 @@ struct ChatDrawerView<ServerMenu: View>: View {
             drawerRow(String(localized: "Kanban"), systemImage: "rectangle.split.3x1") { onOpen(.kanban) }
         }
         drawerRow("Daily Brief", systemImage: "sun.horizon") { onOpen(.dailyDeck) }
+        if let onCleanUp {
+            drawerRow(String(localized: "Clean up old chats"), systemImage: "archivebox") { onCleanUp() }
+        }
     }
 
     private func drawerRow(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
