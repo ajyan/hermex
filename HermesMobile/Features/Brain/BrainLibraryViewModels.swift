@@ -89,6 +89,8 @@ final class BrainListViewModel {
     private(set) var isLoadingMore = false
     /// True while a first-page load is in flight; `loadMore` waits it out.
     private(set) var isLoading = false
+    /// True when the last `loadMore` failed; cleared by the next attempt, `load()` or a tag change.
+    private(set) var loadMoreFailed = false
 
     /// Setting a different tag drops the paging state and reloads.
     var selectedTag: String? {
@@ -101,6 +103,7 @@ final class BrainListViewModel {
             state = .loading
             isShowingCachedCopy = false
             isLoadingMore = false
+            loadMoreFailed = false
             isLoading = true
             tagReloadTask = Task { [weak self] in await self?.load() }
         }
@@ -130,6 +133,7 @@ final class BrainListViewModel {
         generation += 1
         let token = generation
         isLoadingMore = false
+        loadMoreFailed = false
         isLoading = true
         defer { if token == generation { isLoading = false } }
         let tag = selectedTag
@@ -163,6 +167,7 @@ final class BrainListViewModel {
               let cursor = list?.nextCursor else { return }
         let token = generation
         isLoadingMore = true
+        loadMoreFailed = false
         defer { if token == generation { isLoadingMore = false } }
         do {
             let page = try await client.list(module: module, tag: selectedTag, cursor: cursor)
@@ -172,6 +177,7 @@ final class BrainListViewModel {
             state = .loaded(merged)
         } catch {
             guard token == generation, !(error is CancellationError), !Task.isCancelled else { return }
+            loadMoreFailed = true
             onAPIError(error)
         }
     }

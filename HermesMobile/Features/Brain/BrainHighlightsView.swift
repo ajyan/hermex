@@ -46,7 +46,8 @@ struct BrainHighlightsView: View {
                 Section {
                     EmptyView()
                 } footer: {
-                    BrainListFooter(viewModel: viewModel)
+                    // An empty segment shows the page spinner in its own row instead.
+                    BrainListFooter(viewModel: viewModel, showsPageSpinner: !segmentItems(list).isEmpty)
                 }
             }
         }
@@ -63,14 +64,14 @@ struct BrainHighlightsView: View {
     }
 
     private func segmentSection(_ list: BrainList) -> some View {
-        let split = BrainListLayout.splitHighlights(list)
-        let items = segment == .books ? split.books : split.videos
+        let items = segmentItems(list)
         let lastID = items.last?.id
         return Section {
             if items.isEmpty {
-                emptySegment(hasMore: list.nextCursor != nil)
-                    // This segment may only start on a later page: keep paging until it
-                    // fills or the list runs out, so the empty state is never a false one.
+                emptySegment
+                    // This segment may only start on a later page: page on each time the
+                    // list grows, until it fills or the cursor runs out. A failed page
+                    // stops here and offers a retry.
                     .task(id: list.items.count) {
                         if list.nextCursor != nil { await viewModel.loadMore() }
                     }
@@ -94,11 +95,24 @@ struct BrainHighlightsView: View {
         }
     }
 
-    @ViewBuilder
-    private func emptySegment(hasMore: Bool) -> some View {
+    private func segmentItems(_ list: BrainList) -> [BrainItem] {
+        let split = BrainListLayout.splitHighlights(list)
+        return segment == .books ? split.books : split.videos
+    }
+
+    /// An empty segment: the page spinner while a page loads, a retry when the last
+    /// page failed, otherwise the empty copy.
+    private var emptySegment: some View {
         Group {
-            if hasMore {
+            if viewModel.isLoadingMore {
                 ProgressView()
+            } else if viewModel.loadMoreFailed {
+                VStack(spacing: BrainStyle.s) {
+                    Text(verbatim: "Couldn't load more.")
+                        .brainText(.rowSubtitle)
+                    Button(action: loadMore) { Text(verbatim: "Try again") }
+                        .buttonStyle(.borderless)
+                }
             } else {
                 Text(verbatim: segment == .books ? "No book highlights yet" : "No videos yet")
                     .brainText(.rowSubtitle)

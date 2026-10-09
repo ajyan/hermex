@@ -243,6 +243,35 @@ final class BrainViewModelTests: XCTestCase {
         XCTAssertEqual(client.listCalls.map(\.cursor), [nil, 20])
     }
 
+    func testLoadMoreFailureIsFlaggedAndClearedByRetryOrReload() async {
+        let client = FakeBrainClient()
+        let first = BrainList(items: [BrainItem(module: .highlights, id: "a")], nextCursor: 20)
+        client.listResults = [
+            .success(first),
+            .failure(URLError(.timedOut)),
+            .success(BrainList(items: [BrainItem(module: .highlights, id: "b")], nextCursor: 40)),
+            .failure(URLError(.timedOut)),
+            .success(first),
+        ]
+        let viewModel = BrainListViewModel(module: .highlights, client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
+        await viewModel.load()
+        XCTAssertFalse(viewModel.loadMoreFailed)
+
+        await viewModel.loadMore()
+        XCTAssertTrue(viewModel.loadMoreFailed, "a failing page is flagged")
+        XCTAssertFalse(viewModel.isLoadingMore)
+
+        await viewModel.loadMore()
+        XCTAssertFalse(viewModel.loadMoreFailed, "a later success clears it")
+        XCTAssertEqual(viewModel.list?.items.map(\.id), ["a", "b"])
+
+        await viewModel.loadMore()
+        XCTAssertTrue(viewModel.loadMoreFailed)
+        await viewModel.load()
+        XCTAssertFalse(viewModel.loadMoreFailed, "a reload clears it")
+        XCTAssertEqual(client.listCalls.map(\.cursor), [nil, 20, 20, 40, nil])
+    }
+
     func testPage404WithCachedCopyStillShowsIt() async throws {
         let cache = try makeCache()
         try BrainCache.store(samplePage, server: cache.server, kind: "page", id: "p1", in: try XCTUnwrap(cache.context))

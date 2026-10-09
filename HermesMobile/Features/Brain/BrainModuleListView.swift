@@ -342,7 +342,8 @@ struct BrainCardRows: View {
     let onLastAppear: () -> Void
 
     var body: some View {
-        let chunks = BrainListLayout.chunks(items, size: columns)
+        // De-duped like every other list, so a repeated id never repeats a chunk or card id.
+        let chunks = BrainListLayout.chunks(BrainListLayout.uniqueItems(items), size: columns)
         let lastChunkID = chunks.last?.id
         ForEach(chunks, id: \.id) { chunk in
             HStack(alignment: .top, spacing: BrainStyle.m) {
@@ -372,10 +373,12 @@ struct BrainCardRows: View {
 /// list is a saved copy.
 struct BrainListFooter: View {
     let viewModel: BrainListViewModel
+    /// Off when another row already shows the page spinner.
+    var showsPageSpinner = true
 
     var body: some View {
         VStack(spacing: BrainStyle.s) {
-            if viewModel.isLoadingMore {
+            if showsPageSpinner, viewModel.isLoadingMore {
                 ProgressView()
             }
             if viewModel.isShowingCachedCopy {
