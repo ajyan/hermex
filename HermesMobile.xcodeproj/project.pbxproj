@@ -660,6 +660,7 @@
 		BBEB574715121587294478C7 /* DailyBriefReminder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A01557B2FAEFDDD7C94E6A /* DailyBriefReminder.swift */; };
 		3F522DC0F0540A319E63AB5A /* DeckFeedbackSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85E374D76D0C399DE79819AE /* DeckFeedbackSheet.swift */; };
 		1FE8B00FD19A1F67ACF1CA6C /* DeckStackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4449578C9E4BFBE64D09B3C2 /* DeckStackView.swift */; };
+		39D0697E4167AB61D9640383 /* DeckPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = B87C4558BE2BEAAD59ECCE39 /* DeckPalette.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1359,6 +1360,7 @@
 		E4A01557B2FAEFDDD7C94E6A /* DailyBriefReminder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyBriefReminder.swift; sourceTree = "<group>"; };
 		85E374D76D0C399DE79819AE /* DeckFeedbackSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckFeedbackSheet.swift; sourceTree = "<group>"; };
 		4449578C9E4BFBE64D09B3C2 /* DeckStackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckStackView.swift; sourceTree = "<group>"; };
+		B87C4558BE2BEAAD59ECCE39 /* DeckPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckPalette.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -2331,6 +2333,7 @@
 				E4A01557B2FAEFDDD7C94E6A /* DailyBriefReminder.swift */,
 				85E374D76D0C399DE79819AE /* DeckFeedbackSheet.swift */,
 				4449578C9E4BFBE64D09B3C2 /* DeckStackView.swift */,
+				B87C4558BE2BEAAD59ECCE39 /* DeckPalette.swift */,
 				7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */,
 				AD79724DF6D6FD92B594BBC5 /* DailyDeckView.swift */,
 				D71D8CEEBE37C8E43E46A2B4 /* DailyDeckViewModel.swift */,
@@ -2585,6 +2588,7 @@
 				BBEB574715121587294478C7 /* DailyBriefReminder.swift in Sources */,
 				3F522DC0F0540A319E63AB5A /* DeckFeedbackSheet.swift in Sources */,
 				1FE8B00FD19A1F67ACF1CA6C /* DeckStackView.swift in Sources */,
+				39D0697E4167AB61D9640383 /* DeckPalette.swift in Sources */,
 				1F2EF7D6C585EAF7E1C46CD2 /* DeckCardView.swift in Sources */,
 				B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */,
 				B1A1C0DE00000000000000A3 /* BrainModels.swift in Sources */,

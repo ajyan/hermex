@@ -130,13 +130,6 @@ struct DailyDeckView: View {
     private var deck: some View {
         VStack(alignment: .leading, spacing: 0) {
             progress(count: viewModel.visiblePages.count)
-            Text(verbatim: viewModel.currentPage?.eyebrow ?? " ")
-                .textCase(.uppercase)
-                .font(AppFont.caption(weight: .semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .accessibilityHidden(viewModel.currentPage?.eyebrow == nil)
             DeckStackView(viewModel: viewModel, feedbackCard: $feedbackCard, file: file)
         }
     }

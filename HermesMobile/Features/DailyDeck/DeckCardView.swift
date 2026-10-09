@@ -1,187 +1,345 @@
 import SwiftUI
 
-/// One card of the Daily Deck stack. Every page fills the stack; on cards that ask for
-/// writing, the answer box takes the room left under the prompt. Content scrolls
-/// inside the page so long text and large Dynamic Type never hide the controls. The
-/// card is opaque so the cards stacked under it never show through its glass.
+/// One card of the Daily Deck stack, on its own paper (`DeckPalette`). A card leads with its
+/// quote or takeaway in large serif type and scrolls into the rest: context, the question,
+/// and your reflection. Writing happens in `ReflectionSheet`, so a card never holds a text
+/// field and long text never fights the swipe.
 struct DeckPageView: View {
     let page: DeckPage
     let viewModel: DailyDeckViewModel
     let file: () -> Void
+    /// Cards under the top one show only their paper; their words fade in as they rise.
+    var contentOpacity: Double = 1
+
+    static let shape = RoundedRectangle(cornerRadius: 28, style: .continuous)
 
     var body: some View {
-        GeometryReader { proxy in
-            ScrollView {
-                content
-                    .frame(minHeight: max(proxy.size.height - 24, 0), alignment: .top)
-                    .padding(.vertical, 12)
+        let palette = DeckPalette.of(page)
+        Group {
+            switch page {
+            case .card(let card):
+                DeckCardView(card: card, palette: palette, viewModel: viewModel, file: file)
+            case .followUps(let cards):
+                FollowUpsPage(cards: cards, viewModel: viewModel)
             }
-            .scrollDismissesKeyboard(.interactively)
-            .scrollIndicators(.hidden)
         }
-    }
-
-    /// Under a card's glass, so the cards stacked beneath never show through.
-    static let backing = RoundedRectangle(cornerRadius: 18, style: .continuous)
-
-    @ViewBuilder
-    private var content: some View {
-        switch page {
-        case .card(let card):
-            DeckCardView(card: card, viewModel: viewModel, file: file)
-                .background(Color.hxCanvas, in: Self.backing)
-        case .followUps(let cards):
-            FollowUpsPage(cards: cards, viewModel: viewModel)
-                .background(Color.hxCanvas, in: Self.backing)
-        }
+        .opacity(contentOpacity)
+        .background(palette.paper, in: Self.shape)
+        .clipShape(Self.shape)
+        .shadow(color: .black.opacity(0.08), radius: 14, y: 6)
+        .padding(.vertical, 12)
     }
 }
 
-/// A single card, as a full-height panel.
+/// A single card: lead, attribution, detail, question, reflection.
 private struct DeckCardView: View {
     let card: DeckCard
+    let palette: DeckPalette
     let viewModel: DailyDeckViewModel
     let file: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isWriting = false
+    @State private var overflows = false
 
     var body: some View {
-        SectionCard {
-            VStack(alignment: .leading, spacing: 12) {
-                cardBody
-                if let reason = card.reason {
-                    Text(verbatim: reason)
-                        .font(AppFont.footnote())
-                        .foregroundStyle(.secondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                switch card.type {
+                case .headline: opener
+                case .close: close
+                default: reading
                 }
             }
-            .frame(maxHeight: .infinity, alignment: .top)
+            .padding(.horizontal, 24)
+            .padding(.top, 28)
+            .padding(.bottom, 32)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .scrollIndicators(.hidden)
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentSize.height - geometry.contentOffset.y > geometry.containerSize.height + 8
+        } action: { _, more in
+            overflows = more
+        }
+        .overlay(alignment: .bottom) { moreHint }
+        .overlay(alignment: .topTrailing) {
+            Image(systemName: palette.symbol)
+                .font(.system(.body, weight: .medium))
+                .foregroundStyle(palette.ink.opacity(0.35))
+                .padding(18)
+                .accessibilityHidden(true)
+        }
+        .foregroundStyle(palette.ink)
+        .tint(palette.ink)
+        .sheet(isPresented: $isWriting) {
+            ReflectionSheet(card: card, palette: palette, viewModel: viewModel)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text(verbatim: palette.name))
     }
+
+    // MARK: Reading cards
 
     @ViewBuilder
-    private var cardBody: some View {
-        switch card.type {
-        case .headline:
-            headline
-        case .prompt:
-            if let context = card.context {
-                Text(inlineMarkdown(context)).font(AppFont.subheadline()).foregroundStyle(.secondary)
-            }
-            question
-            AnswerBox(card: card, viewModel: viewModel, prompt: "Your answer")
-        case .reflect:
-            reflect
-        case .item, .decision:
-            titled
-        case .close:
-            close
-        case .unknown:
-            titled
-            if let fallback = card.fallback { Text(verbatim: fallback).font(AppFont.body()) }
+    private var reading: some View {
+        let text = DeckCardText(card)
+        if card.itemKind == "quote" {
+            Image(systemName: "quote.opening")
+                .font(.system(size: 40, weight: .semibold))
+                .foregroundStyle(palette.ink.opacity(0.22))
+                .padding(.bottom, 10)
+                .accessibilityHidden(true)
         }
-    }
-
-    // MARK: Pieces
-
-    private var headline: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(verbatim: card.title ?? "Today")
-                .font(AppFont.title(weight: .semibold))
-            ForEach(card.lines, id: \.self) { line in
-                Text(verbatim: line).font(AppFont.body()).foregroundStyle(.secondary)
-            }
-            Text(verbatim: "\(viewModel.visiblePages.count - 2) pages · swipe to start")
-                .font(AppFont.footnote())
-                .foregroundStyle(.tertiary)
-                .padding(.top, 4)
-        }
-    }
-
-    @ViewBuilder
-    private var reflect: some View {
-        if let title = card.title {
-            Text(verbatim: title).font(AppFont.headline())
-        }
-        if let source = card.source, source != card.title {
-            Text(verbatim: source).font(AppFont.footnote()).foregroundStyle(.secondary)
-        }
-        if let body = card.body {
-            // The saved words themselves, set apart from the explanation.
-            Text(inlineMarkdown(card.itemKind == "book" ? "“\(body)”" : body))
-                .font(AppFont.serif())
-                .padding(.leading, 12)
-                .overlay(alignment: .leading) {
-                    Rectangle().fill(Color.secondary.opacity(0.35)).frame(width: 2)
-                }
+        if let lead = text.lead {
+            Text(inlineMarkdown(lead))
+                .font(leadFont(lead))
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.trailing, 30)
                 .textSelection(.enabled)
         }
-        if let context = card.context {
-            Text(inlineMarkdown(context)).font(AppFont.subheadline()).foregroundStyle(.secondary)
+        if let attribution = text.attribution {
+            Text(verbatim: attribution)
+                .font(AppFont.subheadline(weight: .medium))
+                .foregroundStyle(palette.ink.opacity(0.7))
+                .padding(.top, 12)
         }
-        if let why = card.why {
-            Text(verbatim: "Why you saved it: \(why)")
-                .font(AppFont.footnote())
-                .foregroundStyle(.secondary)
+        if let detail = text.detail {
+            Text(inlineMarkdown(detail))
+                .font(AppFont.body())
+                .lineSpacing(4)
+                .foregroundStyle(palette.ink.opacity(0.86))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 22)
+                .textSelection(.enabled)
         }
-        question
-        AnswerBox(card: card, viewModel: viewModel, prompt: "Your thoughts")
-    }
-
-    @ViewBuilder
-    private var question: some View {
-        if let text = viewModel.question(for: card) {
-            // Regenerate swaps only this line, so it alone animates.
-            Text(verbatim: text).font(AppFont.headline())
-                .padding(.top, 4)
-                .id(text)
+        if card.type != .prompt, let question = viewModel.question(for: card) {
+            Text(verbatim: question)
+                .font(AppFont.title3(weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 28)
+                .id(question)
                 .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
         }
+        if card.takesText { reflection.padding(.top, 16) }
+        if let reason = card.reason {
+            Text(verbatim: reason)
+                .font(AppFont.footnote())
+                .foregroundStyle(palette.ink.opacity(0.62))
+                .padding(.top, 20)
+        }
     }
 
+    private func leadFont(_ lead: String) -> Font {
+        let style: Font.TextStyle = card.itemKind == "quote" ? .title : lead.count > 220 ? .title3 : .title2
+        return AppFont.serif(style: style)
+    }
+
+    /// Your words once written; until then, the way in.
     @ViewBuilder
-    private var titled: some View {
-        if let title = card.title {
-            Text(verbatim: title).font(AppFont.headline())
+    private var reflection: some View {
+        if let text = viewModel.answer(for: card)?.text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            Button { isWriting = true } label: {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(verbatim: text)
+                        .font(AppFont.body())
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Label { Text(verbatim: "Edit") } icon: { Image(systemName: "pencil") }
+                        .font(AppFont.footnote(weight: .semibold))
+                        .foregroundStyle(palette.ink.opacity(0.7))
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(palette.ink.opacity(0.07), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(verbatim: "Your reflection: \(text). Edit"))
+        } else {
+            Button { isWriting = true } label: {
+                Label { Text(verbatim: "Write a reflection") } icon: { Image(systemName: "square.and.pencil") }
+                    .font(AppFont.body(weight: .semibold))
+                    .foregroundStyle(palette.paper)
+                    .frame(maxWidth: .infinity, minHeight: 50)
+                    .background(palette.ink, in: Capsule())
+            }
+            .buttonStyle(.plain)
         }
-        if let body = card.body {
-            Text(verbatim: body).font(AppFont.body()).textSelection(.enabled)
+    }
+
+    /// A soft fade and arrow while there is more card below.
+    @ViewBuilder
+    private var moreHint: some View {
+        if overflows {
+            LinearGradient(colors: [palette.paper.opacity(0), palette.paper], startPoint: .top, endPoint: .bottom)
+                .frame(height: 64)
+                .overlay(alignment: .bottom) {
+                    Image(systemName: "chevron.compact.down")
+                        .font(.system(.title3, weight: .semibold))
+                        .foregroundStyle(palette.ink.opacity(0.45))
+                        .padding(.bottom, 8)
+                }
+                .allowsHitTesting(false)
+                .transition(.opacity)
+                .accessibilityHidden(true)
         }
-        if let source = card.source, source != card.title {
-            Text(verbatim: source).font(AppFont.footnote()).foregroundStyle(.secondary)
+    }
+
+    // MARK: Opener and close
+
+    @ViewBuilder
+    private var opener: some View {
+        Text(verbatim: card.title ?? "Today")
+            .font(AppFont.serif(style: .largeTitle))
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.trailing, 24)
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(card.lines, id: \.self) { line in
+                Text(verbatim: line).font(AppFont.subheadline())
+            }
         }
+        .foregroundStyle(palette.ink.opacity(0.75))
+        .padding(.top, 14)
+        let ahead = viewModel.visiblePages.dropFirst().filter {
+            if case .card(let c) = $0, c.type == .close { return false }
+            return true
+        }
+        FlowRow(spacing: 8) {
+            ForEach(Array(ahead.enumerated()), id: \.element.id) { _, page in
+                let p = DeckPalette.of(page)
+                Text(verbatim: p.name)
+                    .font(AppFont.footnote(weight: .semibold))
+                    .foregroundStyle(p.ink)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(p.paper, in: Capsule())
+                    .overlay(Capsule().stroke(p.ink.opacity(0.15), lineWidth: 0.5))
+            }
+        }
+        .padding(.top, 28)
+        .accessibilityElement(children: .combine)
+        Text(verbatim: "\(ahead.count) cards · swipe to begin")
+            .font(AppFont.footnote())
+            .foregroundStyle(palette.ink.opacity(0.6))
+            .padding(.top, 18)
     }
 
     @ViewBuilder
     private var close: some View {
         let count = viewModel.answeredCount
-        if viewModel.isFiled && !viewModel.hasChanges {
-            Text(verbatim: "Filed").font(AppFont.title3(weight: .semibold))
-            Text(verbatim: "\(count) answered and in your journal. Edit any card and file again to update it.")
-                .font(AppFont.subheadline())
-                .foregroundStyle(.secondary)
-        } else {
-            Text(verbatim: count == 0 ? "Nothing answered yet" : "\(count) answered")
-                .font(AppFont.title3(weight: .semibold))
-            Text(verbatim: viewModel.isFiled
-                 ? "Filing again updates the journal: changed answers replace what was filed, new ones are added, and nothing is deleted."
-                 : "Filing sends your answers to a new session. Atlas writes them into the journal and runs the follow-ups you chose.")
-                .font(AppFont.subheadline())
-                .foregroundStyle(.secondary)
-        }
+        let filed = viewModel.isFiled && !viewModel.hasChanges
+        Text(verbatim: filed ? "Filed" : count == 1 ? "1 reflection" : "\(count) reflections")
+            .font(AppFont.serif(style: .largeTitle))
+        Text(verbatim: filed
+             ? "In your journal. Edit any card and file again to update it."
+             : viewModel.isFiled
+             ? "Filing again updates the journal: changed answers replace what was filed, new ones are added, nothing is deleted."
+             : count == 0
+             ? "Nothing written yet. Swipe back to any card, or file the follow-ups you chose."
+             : "Atlas writes them into today's journal and runs the follow-ups you chose.")
+            .font(AppFont.body())
+            .foregroundStyle(palette.ink.opacity(0.8))
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 12)
         if case .failed(let message) = viewModel.filing {
-            Text(verbatim: message).font(AppFont.footnote()).foregroundStyle(Color.hxDanger)
+            Text(verbatim: message).font(AppFont.footnote()).foregroundStyle(Color.hxDanger).padding(.top, 12)
         }
         Button(action: file) {
             HStack {
-                if viewModel.filing == .filing { ProgressView().tint(Color.hxOnAccent) }
+                if viewModel.filing == .filing { ProgressView().tint(palette.paper) }
                 Text(verbatim: viewModel.isFiled ? "File Changes" : "File It")
             }
             .font(AppFont.body(weight: .semibold))
-            .frame(maxWidth: .infinity, minHeight: 44)
+            .foregroundStyle(palette.paper)
+            .frame(maxWidth: .infinity, minHeight: 50)
+            .background(palette.ink.opacity(filed ? 0.35 : 1), in: Capsule())
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.plain)
         .disabled(viewModel.filing == .filing || !viewModel.hasChanges)
+        .padding(.top, 28)
+    }
+}
+
+/// Writing a reflection: the card's question pinned on its own paper, the whole sheet for words.
+/// Text saves as you type, so closing the sheet any way keeps it.
+private struct ReflectionSheet: View {
+    let card: DeckCard
+    let palette: DeckPalette
+    let viewModel: DailyDeckViewModel
+
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var isFocused: Bool
+    @State private var text = ""
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(verbatim: viewModel.question(for: card) ?? DeckCardText(card).lead ?? "Your thoughts")
+                    .font(AppFont.serif(style: .title3))
+                    .foregroundStyle(palette.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                TextEditor(text: $text)
+                    .font(AppFont.body())
+                    .scrollContentBackground(.hidden)
+                    .focused($isFocused)
+                    .overlay(alignment: .topLeading) {
+                        if text.isEmpty {
+                            Text(verbatim: "Write as much or as little as you like")
+                                .font(AppFont.body())
+                                .foregroundStyle(palette.ink.opacity(0.45))
+                                .padding(.top, 8)
+                                .padding(.leading, 5)
+                                .allowsHitTesting(false)
+                        }
+                    }
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background(palette.paper.ignoresSafeArea())
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button { dismiss() } label: { Text(verbatim: "Done") }
+                }
+            }
+            .toolbarBackground(palette.paper, for: .navigationBar)
+        }
+        .tint(palette.ink)
+        .onAppear {
+            text = viewModel.answer(for: card)?.text ?? ""
+            isFocused = true
+        }
+        .onChange(of: text) { _, new in viewModel.setText(new, for: card) }
+        .presentationDragIndicator(.visible)
+    }
+}
+
+/// Chips left to right, wrapping onto new rows.
+private struct FlowRow: Layout {
+    var spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? .infinity
+        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0, widest: CGFloat = 0
+        for view in subviews {
+            let size = view.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > width { x = 0; y += rowHeight + spacing; rowHeight = 0 }
+            x += size.width + spacing
+            widest = max(widest, x - spacing)
+            rowHeight = max(rowHeight, size.height)
+        }
+        return CGSize(width: proposal.width ?? widest, height: y + rowHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX, y = bounds.minY, rowHeight: CGFloat = 0
+        for view in subviews {
+            let size = view.sizeThatFits(.unspecified)
+            if x > bounds.minX, x + size.width > bounds.maxX { x = bounds.minX; y += rowHeight + spacing; rowHeight = 0 }
+            view.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
     }
 }
 
@@ -192,15 +350,22 @@ private struct FollowUpsPage: View {
     let viewModel: DailyDeckViewModel
 
     var body: some View {
-        SectionCard {
+        ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                Text(verbatim: cards.count == 1 ? "1 follow-up" : "\(cards.count) follow-ups")
+                    .font(AppFont.serif(style: .title))
+                    .padding(.bottom, 20)
                 ForEach(Array(cards.enumerated()), id: \.element.id) { offset, card in
-                    if offset > 0 { Divider().padding(.vertical, 12) }
+                    if offset > 0 { Divider().padding(.vertical, 16) }
                     FollowUpRow(card: card, viewModel: viewModel)
                 }
             }
-            .frame(maxHeight: .infinity, alignment: .top)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 28)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .scrollIndicators(.hidden)
+        .foregroundStyle(DeckPalette.followUps.ink)
     }
 }
 
@@ -305,29 +470,3 @@ private struct ChoiceButton: View {
     }
 }
 
-extension DeckPage {
-    /// The caption over the stack for this page.
-    var eyebrow: String? {
-        switch self {
-        case .followUps(let cards): return "Follow-ups · \(cards.count)"
-        case .card(let card):
-            switch card.type {
-            case .headline, .unknown: return nil
-            case .prompt: return card.voice.map { "\($0) asks" } ?? "Journal"
-            case .reflect:
-                switch card.itemKind {
-                case "book": return "Book highlight"
-                case "insight": return "Insight"
-                case "video": return "Video"
-                case "on_this_day": return "On this day"
-                case "wiki": return "From your wiki"
-                case "media": return "From your reading"
-                default: return "From your library"
-                }
-            case .item: return card.itemKind == "youtube" ? "New videos" : "From your library"
-            case .decision: return "Follow-up"
-            case .close: return "Done"
-            }
-        }
-    }
-}
