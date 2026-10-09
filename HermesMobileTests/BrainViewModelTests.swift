@@ -93,4 +93,9 @@ private struct StubBrainClient: BrainDataClient {
 
     func people() async throws -> [BrainPerson] { try peopleResult.get() }
     func person(file: String) async throws -> BrainPersonFile { try personResult.get() }
+    func modules() async throws -> [BrainModule] { [] }
+    func list(module: BrainModuleID, tag: String?, cursor: Int?) async throws -> BrainList { BrainList() }
+    func page(module: BrainModuleID, id: String) async throws -> BrainPage { throw CancellationError() }
+    func search(query: String, module: BrainModuleID?) async throws -> BrainSearchResult { BrainSearchResult() }
+    func graph(module: BrainModuleID, id: String) async throws -> BrainGraph { BrainGraph() }
 }

@@ -8,6 +8,11 @@ import Observation
 protocol BrainDataClient: Sendable {
     func people() async throws -> [BrainPerson]
     func person(file: String) async throws -> BrainPersonFile
+    func modules() async throws -> [BrainModule]
+    func list(module: BrainModuleID, tag: String?, cursor: Int?) async throws -> BrainList
+    func page(module: BrainModuleID, id: String) async throws -> BrainPage
+    func search(query: String, module: BrainModuleID?) async throws -> BrainSearchResult
+    func graph(module: BrainModuleID, id: String) async throws -> BrainGraph
 }
 
 /// One contact from `GET /api/brain/people` (frontmatter only, no body).
@@ -182,5 +187,26 @@ struct APIClientBrainAdapter: BrainDataClient {
 
     func person(file: String) async throws -> BrainPersonFile {
         try await apiClient.send(endpoint: .brainPerson(file: file), method: "GET")
+    }
+
+    func modules() async throws -> [BrainModule] {
+        let response: BrainModulesResponse = try await apiClient.send(endpoint: .brainModules, method: "GET")
+        return response.modules
+    }
+
+    func list(module: BrainModuleID, tag: String?, cursor: Int?) async throws -> BrainList {
+        try await apiClient.send(endpoint: .brainList(module: module.rawValue, tag: tag, cursor: cursor), method: "GET")
+    }
+
+    func page(module: BrainModuleID, id: String) async throws -> BrainPage {
+        try await apiClient.send(endpoint: .brainPage(module: module.rawValue, id: id), method: "GET")
+    }
+
+    func search(query: String, module: BrainModuleID?) async throws -> BrainSearchResult {
+        try await apiClient.send(endpoint: .brainSearch(query: query, module: module?.rawValue), method: "GET")
+    }
+
+    func graph(module: BrainModuleID, id: String) async throws -> BrainGraph {
+        try await apiClient.send(endpoint: .brainGraph(module: module.rawValue, id: id), method: "GET")
     }
 }
