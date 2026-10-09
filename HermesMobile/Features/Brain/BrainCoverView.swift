@@ -38,6 +38,12 @@ struct BrainCoverSpec: Equatable, Hashable, Sendable {
         return BrainCoverSpec(motif: motif, ramp: ramp, params: params)
     }
 
+    /// A reference's cover: the same recipe as the page it opens, so a ref and its
+    /// page share one hue.
+    static func make(ref: BrainRef) -> BrainCoverSpec {
+        make(id: ref.id, tag: ref.tags.first)
+    }
+
     /// FNV-1a 64-bit over the UTF-8 bytes. Swift's `hashValue` is seeded per launch,
     /// so it must never stand in here.
     static func fnv1a64(_ string: String) -> UInt64 {

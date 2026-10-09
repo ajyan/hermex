@@ -337,6 +337,65 @@ final class BrainViewModelTests: XCTestCase {
     }
 }
 
+extension BrainViewModelTests {
+    func testLoadGraphIfNeededRefetchesALostGraph() async {
+        let client = FakeBrainClient()
+        client.pageResult = .success(samplePage)
+        client.graphResult = .failure(CancellationError())
+        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
+        await viewModel.load()
+        XCTAssertNotNil(viewModel.page)
+        XCTAssertNil(viewModel.graph, "the graph was lost")
+        let graph = BrainGraph(nodes: [BrainGraphNode(module: .wiki, id: "p1"), BrainGraphNode(module: .wiki, id: "p2")])
+        client.graphResult = .success(graph)
+        await viewModel.loadGraphIfNeeded()
+        XCTAssertEqual(viewModel.graph, graph)
+        XCTAssertEqual(client.graphCalls, 2)
+        await viewModel.loadGraphIfNeeded()
+        XCTAssertEqual(client.graphCalls, 2, "a graph already shown is not fetched again")
+    }
+
+    func testLoadGraphIfNeededDoesNothingWithoutAPage() async {
+        let client = FakeBrainClient()
+        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
+        await viewModel.loadGraphIfNeeded()
+        XCTAssertEqual(client.graphCalls, 0)
+        XCTAssertNil(viewModel.graph)
+    }
+
+    func testLoadGraphIfNeededFailureLeavesThePageAlone() async {
+        let client = FakeBrainClient()
+        client.pageResult = .success(samplePage)
+        client.graphResult = .failure(URLError(.timedOut))
+        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
+        await viewModel.load()
+        await viewModel.loadGraphIfNeeded()
+        XCTAssertNil(viewModel.graph)
+        XCTAssertEqual(viewModel.state, .loaded(samplePage))
+    }
+
+    func testStaleGraphRefetchIsDroppedWhenALoadStarts() async {
+        let client = FakeBrainClient()
+        client.pageResult = .success(samplePage)
+        client.graphResult = .failure(URLError(.timedOut))
+        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
+        await viewModel.load()
+        let stale = BrainGraph(nodes: [BrainGraphNode(module: .wiki, id: "stale")])
+        client.graphResult = .success(stale)
+        let gate = Gate()
+        client.graphGate = gate
+        let refetch = Task { await viewModel.loadGraphIfNeeded() }
+        await gate.waitEntered()
+        // A newer load starts (and its own graph fetch fails) while the refetch is suspended.
+        client.graphGate = nil
+        client.graphResult = .failure(URLError(.timedOut))
+        await viewModel.load()
+        gate.open()
+        await refetch.value
+        XCTAssertNil(viewModel.graph, "the older refetch must not land after a newer load")
+    }
+}
+
 final class Gate: @unchecked Sendable {
     private let lock = NSLock()
     private var entered = false
@@ -387,6 +446,8 @@ final class FakeBrainClient: BrainDataClient, @unchecked Sendable {
     var listResults: [Result<BrainList, Error>] = []
     var failingSearches: Set<String> = []
     var graphGate: Gate?
+    private var _graphCalls = 0
+    var graphCalls: Int { lock.withLock { _graphCalls } }
     var pagedListGate: Gate?
     var modulesGate: Gate?
     var firstListGate: Gate?
@@ -415,6 +476,7 @@ final class FakeBrainClient: BrainDataClient, @unchecked Sendable {
         return BrainSearchResult()
     }
     func graph(module: BrainModuleID, id: String) async throws -> BrainGraph {
+        lock.withLock { _graphCalls += 1 }
         if let gate = graphGate { await gate.pass() }
         return try graphResult.get()
     }

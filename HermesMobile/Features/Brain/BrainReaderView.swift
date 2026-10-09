@@ -8,10 +8,35 @@ enum BrainReaderLayout {
     /// The header's height: the graph's, and the cover that stands in for it.
     static let headerHeight: CGFloat = BrainGraphView.height
 
-    /// "<Kind> · <date>", the kind's first letter capitalised; either part may be absent.
-    static func metaLine(kind: String, date: String) -> String {
+    /// "<Kind> · <date>", the kind's first letter capitalised and the date in the one
+    /// Brain format; either part may be absent.
+    static func metaLine(kind: String, date: String, locale: Locale = .current) -> String {
         let capitalised = kind.prefix(1).uppercased() + kind.dropFirst()
-        return [capitalised, date].filter { !$0.isEmpty }.joined(separator: " · ")
+        return [capitalised, BrainStyle.displayDate(date, locale: locale)]
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
+    }
+
+    /// The footer under a saved copy: a page the server no longer has reads as removed.
+    static func cachedCopyFooter(isMissing: Bool) -> String {
+        isMissing ? "Removed from the Brain · saved copy" : "Offline, showing saved copy"
+    }
+
+    enum LinkAction: Equatable {
+        /// An in-app Brain page.
+        case push(BrainRoute)
+        /// A `brain://` link the app can't resolve; dropped rather than handed to the system.
+        case discard
+        /// Any other URL, opened by the system.
+        case system
+    }
+
+    /// What tapping a link in a page's Markdown does.
+    static func linkAction(for url: URL) -> LinkAction {
+        if let ref = BrainLink.ref(from: url) {
+            return .push(.page(ref.0, ref.1))
+        }
+        return url.scheme?.lowercased() == "brain" ? .discard : .system
     }
 
     /// The page's one cover recipe. The graph header takes its ramp, so a page keeps
@@ -71,9 +96,17 @@ struct BrainReaderView: View {
             .navigationBarTitleDisplayMode(.inline)
             .background(Color.hxCanvas.ignoresSafeArea())
             .task {
-                guard !didLoad else { return }
-                didLoad = true
-                await viewModel.load()
+                guard didLoad else {
+                    didLoad = true
+                    await viewModel.load()
+                    return
+                }
+                // Back on screen after an earlier task was cancelled: finish what it dropped.
+                if viewModel.state == .loading {
+                    await viewModel.load()
+                } else {
+                    await viewModel.loadGraphIfNeeded()
+                }
             }
     }
 
@@ -103,6 +136,7 @@ struct BrainReaderView: View {
                 page: page,
                 graph: viewModel.graph,
                 isShowingCachedCopy: viewModel.isShowingCachedCopy,
+                isMissing: viewModel.isMissing,
                 push: push
             )
             .refreshable { await viewModel.load() }
@@ -116,15 +150,18 @@ struct BrainReaderContent: View {
     let page: BrainPage
     let graph: BrainGraph?
     let isShowingCachedCopy: Bool
+    let isMissing: Bool
     let push: (BrainRoute) -> Void
     /// Built once per page, never in `body`.
     private let cover: BrainCoverSpec
     @State private var showsAllBacklinks = false
 
-    init(page: BrainPage, graph: BrainGraph?, isShowingCachedCopy: Bool, push: @escaping (BrainRoute) -> Void) {
+    init(page: BrainPage, graph: BrainGraph?, isShowingCachedCopy: Bool, isMissing: Bool = false,
+         push: @escaping (BrainRoute) -> Void) {
         self.page = page
         self.graph = graph
         self.isShowingCachedCopy = isShowingCachedCopy
+        self.isMissing = isMissing
         self.push = push
         self.cover = BrainReaderLayout.cover(for: page.item)
     }
@@ -146,18 +183,22 @@ struct BrainReaderContent: View {
                 if !page.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     MarkdownRenderer(content: page.content)
                         .environment(\.openURL, OpenURLAction { url in
-                            if let ref = BrainLink.ref(from: url) {
-                                push(.page(ref.0, ref.1))
+                            switch BrainReaderLayout.linkAction(for: url) {
+                            case .push(let route):
+                                push(route)
                                 return .handled
+                            case .discard:
+                                return .discarded
+                            case .system:
+                                return .systemAction
                             }
-                            return .systemAction
                         })
                 }
                 linkedFrom
                 furtherReading
                 journalPaging
                 if isShowingCachedCopy {
-                    Text(verbatim: "Offline, showing saved copy")
+                    Text(verbatim: BrainReaderLayout.cachedCopyFooter(isMissing: isMissing))
                         .brainText(.meta)
                         .frame(maxWidth: .infinity, alignment: .center)
                 }

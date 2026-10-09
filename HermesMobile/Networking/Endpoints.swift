@@ -677,9 +677,16 @@ enum Endpoint {
             return url
         }
 
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        components?.queryItems = queryItems
-        return components?.url ?? url
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return url
+        }
+        components.queryItems = queryItems
+        // `queryItems` leaves `+` raw, and form decoders on the server (Python's
+        // `parse_qs`) read it as a space, so "c++" would arrive as "c". Apple's
+        // documented workaround: encode `+` after assigning the items.
+        components.percentEncodedQuery = components.percentEncodedQuery?
+            .replacingOccurrences(of: "+", with: "%2B")
+        return components.url ?? url
     }
 
     private func kanbanTaskURL(relativeTo baseURL: URL, cardID: String, suffix: String = "") -> URL {

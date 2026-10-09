@@ -122,22 +122,26 @@ struct BrainItem: Codable, Identifiable, Hashable, Sendable {
 
 /// One reference to a Brain item: a link, backlink, further-reading entry, search
 /// hit, or prev/next neighbor. Links arrive with `label` instead of `title`.
+/// `tags` is the target item's tags, so a ref's cover takes the same hue as the page.
 struct BrainRef: Codable, Hashable, Sendable {
     let module: BrainModuleID
     let id: String
     let title: String
     let snippet: String
     let reason: String
+    let tags: [String]
 
-    private enum CodingKeys: String, CodingKey { case module, id, title, snippet, reason }
+    private enum CodingKeys: String, CodingKey { case module, id, title, snippet, reason, tags }
     private enum LabelKey: String, CodingKey { case label }
 
-    init(module: BrainModuleID, id: String, title: String = "", snippet: String = "", reason: String = "") {
+    init(module: BrainModuleID, id: String, title: String = "", snippet: String = "", reason: String = "",
+         tags: [String] = []) {
         self.module = module
         self.id = id
         self.title = title
         self.snippet = snippet
         self.reason = reason
+        self.tags = tags
     }
 
     init(from decoder: Decoder) throws {
@@ -152,6 +156,7 @@ struct BrainRef: Codable, Hashable, Sendable {
         }
         snippet = c.string(.snippet)
         reason = c.string(.reason)
+        tags = c.strings(.tags)
     }
 }
 
@@ -339,14 +344,16 @@ struct BrainGraphNode: Codable, Hashable, Sendable {
     let id: String
     let title: String
     let weight: Int
+    let tags: [String]
 
-    private enum CodingKeys: String, CodingKey { case module, id, title, weight }
+    private enum CodingKeys: String, CodingKey { case module, id, title, weight, tags }
 
-    init(module: BrainModuleID, id: String, title: String = "", weight: Int = 0) {
+    init(module: BrainModuleID, id: String, title: String = "", weight: Int = 0, tags: [String] = []) {
         self.module = module
         self.id = id
         self.title = title
         self.weight = weight
+        self.tags = tags
     }
 
     init(from decoder: Decoder) throws {
@@ -355,6 +362,7 @@ struct BrainGraphNode: Codable, Hashable, Sendable {
         id = c.string(.id)
         title = c.string(.title)
         weight = c.int(.weight)
+        tags = c.strings(.tags)
     }
 }
 

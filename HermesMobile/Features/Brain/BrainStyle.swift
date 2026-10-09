@@ -74,6 +74,38 @@ enum BrainStyle {
         RoundedRectangle(cornerRadius: cardCorner, style: .continuous)
     }
 
+    // MARK: Dates
+
+    /// An ISO day, alone or leading a datetime ("2026-03-25", "2026-03-25T23:30:00Z").
+    private static let isoDatePattern =
+        #"^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$"#
+
+    /// Parses only real `yyyy-MM-dd` days, in UTC so the day never shifts.
+    private static let isoDay: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.isLenient = false
+        return formatter
+    }()
+
+    /// The one Brain date format: an ISO day or datetime as a medium date
+    /// ("Mar 25, 2026"), taking the day as written. Anything else (an impossible
+    /// date, a title such as "Oct 7, 2026", free text) passes through unchanged.
+    static func displayDate(_ iso: String, locale: Locale = .current) -> String {
+        let trimmed = iso.trimmingCharacters(in: .whitespaces)
+        guard trimmed.range(of: isoDatePattern, options: .regularExpression) != nil,
+              let date = isoDay.date(from: String(trimmed.prefix(10)))
+        else { return iso }
+        var style = Date.FormatStyle(date: .abbreviated, time: .omitted)
+        style.locale = locale
+        style.calendar = Calendar(identifier: .gregorian)
+        style.timeZone = TimeZone(identifier: "UTC") ?? .gmt
+        return date.formatted(style)
+    }
+
     // MARK: Cover palette
 
     /// The 8 cover ramps, as `(background, mid, strong)` in `0xRRGGBB`, light then dark.
@@ -323,22 +355,26 @@ struct BrainCard: View {
 
     let item: BrainItem
     private let style: Style
+    /// Built once per card, never in `body`.
     private let cover: BrainCoverSpec
+    private let meta: String
 
     init(item: BrainItem, style: Style = .standard) {
         self.item = item
         self.style = style
         self.cover = BrainCoverSpec.make(id: item.id, tag: item.tags.first)
+        self.meta = Self.metaLine(for: item)
     }
 
     /// The meta line: subtitle (source, kind) and date, whichever are present.
-    static func metaLine(for item: BrainItem) -> String {
-        [item.subtitle, item.date].filter { !$0.isEmpty }.joined(separator: " · ")
+    static func metaLine(for item: BrainItem, locale: Locale = .current) -> String {
+        [item.subtitle, BrainStyle.displayDate(item.date, locale: locale)]
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
     }
 
     var body: some View {
         let shape = BrainStyle.cardShape()
-        let meta = Self.metaLine(for: item)
         let padding = style == .tile ? BrainStyle.s : BrainStyle.cardHorizontalPadding
         VStack(alignment: .leading, spacing: 0) {
             BrainCoverView(spec: cover)

@@ -284,11 +284,13 @@ final class BrainVisualsTests: XCTestCase {
     // MARK: - Reader
 
     func testReaderMetaLineCapitalisesKindAndOmitsEmptyDate() {
-        XCTAssertEqual(BrainReaderLayout.metaLine(kind: "note", date: "2026-10-06"), "Note · 2026-10-06")
-        XCTAssertEqual(BrainReaderLayout.metaLine(kind: "journal", date: ""), "Journal")
-        XCTAssertEqual(BrainReaderLayout.metaLine(kind: "", date: "2026-10-06"), "2026-10-06")
-        XCTAssertEqual(BrainReaderLayout.metaLine(kind: "", date: ""), "")
-        XCTAssertEqual(BrainReaderLayout.metaLine(kind: "éclair", date: ""), "Éclair")
+        let us = Locale(identifier: "en_US")
+        XCTAssertEqual(BrainReaderLayout.metaLine(kind: "note", date: "2026-10-06", locale: us), "Note · Oct 6, 2026")
+        XCTAssertEqual(BrainReaderLayout.metaLine(kind: "journal", date: "", locale: us), "Journal")
+        XCTAssertEqual(BrainReaderLayout.metaLine(kind: "", date: "2026-10-06", locale: us), "Oct 6, 2026")
+        XCTAssertEqual(BrainReaderLayout.metaLine(kind: "", date: "", locale: us), "")
+        XCTAssertEqual(BrainReaderLayout.metaLine(kind: "éclair", date: "", locale: us), "Éclair")
+        XCTAssertEqual(BrainReaderLayout.metaLine(kind: "note", date: "someday", locale: us), "Note · someday")
     }
 
     func testReaderBacklinksShowFiveThenAll() {
@@ -325,12 +327,64 @@ final class BrainVisualsTests: XCTestCase {
         XCTAssertEqual(BrainReaderLayout.cover(for: item).ramp, 2)
     }
 
-    func testFactValuesFormatDatesAndKeepAnythingElse() {
-        let locale = Locale(identifier: "en_US")
-        XCTAssertEqual(BrainPersonCardView.displayValue("1815-12-10", locale: locale), "December 10, 1815")
-        XCTAssertEqual(BrainPersonCardView.displayValue("2026-10-01", locale: locale), "October 1, 2026")
-        XCTAssertEqual(BrainPersonCardView.displayValue("London", locale: locale), "London")
-        XCTAssertEqual(BrainPersonCardView.displayValue("2026-13-45", locale: locale), "2026-13-45")
-        XCTAssertEqual(BrainPersonCardView.displayValue("", locale: locale), "")
+    // MARK: - Final fix wave
+
+    func testDisplayDateRendersISOAsMediumDateInUTC() {
+        let us = Locale(identifier: "en_US")
+        XCTAssertEqual(BrainStyle.displayDate("2026-03-25", locale: us), "Mar 25, 2026")
+        XCTAssertEqual(BrainStyle.displayDate("1815-12-10", locale: us), "Dec 10, 1815")
+        XCTAssertEqual(BrainStyle.displayDate("2026-01-01", locale: us), "Jan 1, 2026", "no day shift at a year edge")
+    }
+
+    func testDisplayDatePassesAnythingElseThrough() {
+        let us = Locale(identifier: "en_US")
+        for raw in ["", "London", "2026-13-45", "2026-02-30", "Oct 7, 2026", "20260325", "2026-3-5"] {
+            XCTAssertEqual(BrainStyle.displayDate(raw, locale: us), raw)
+        }
+    }
+
+    func testDisplayDateTakesTheDateOfADatetime() {
+        let us = Locale(identifier: "en_US")
+        XCTAssertEqual(BrainStyle.displayDate("2026-03-25T23:30:00Z", locale: us), "Mar 25, 2026")
+        XCTAssertEqual(BrainStyle.displayDate("2026-03-25T23:30:00-08:00", locale: us), "Mar 25, 2026")
+        XCTAssertEqual(BrainStyle.displayDate("2026-03-25 08:15", locale: us), "Mar 25, 2026")
+        XCTAssertEqual(BrainStyle.displayDate("2026-03-25Tnonsense", locale: us), "2026-03-25Tnonsense")
+    }
+
+    func testCardMetaLineFormatsTheDate() {
+        let us = Locale(identifier: "en_US")
+        let item = BrainItem(module: .articles, id: "a.md", title: "A", subtitle: "Daily Stoic", date: "2025-03-01")
+        XCTAssertEqual(BrainCard.metaLine(for: item, locale: us), "Daily Stoic · Mar 1, 2025")
+        let undated = BrainItem(module: .articles, id: "b.md", title: "B", subtitle: "Daily Stoic")
+        XCTAssertEqual(BrainCard.metaLine(for: undated, locale: us), "Daily Stoic")
+    }
+
+    func testRefCoverUsesTheRefsFirstTag() {
+        let ref = BrainRef(module: .wiki, id: "wiki/virtues.md", title: "Virtues", tags: ["habits", "stoicism"])
+        XCTAssertEqual(BrainCoverSpec.make(ref: ref), BrainCoverSpec.make(id: ref.id, tag: "habits"))
+        XCTAssertEqual(BrainCoverSpec.make(ref: ref).ramp, 2)
+        let item = BrainItem(module: .wiki, id: "wiki/virtues.md", tags: ["habits"])
+        XCTAssertEqual(BrainCoverSpec.make(ref: ref), BrainReaderLayout.cover(for: item),
+                       "a ref's cover matches the page's own cover")
+        let untagged = BrainRef(module: .wiki, id: "wiki/x.md")
+        XCTAssertEqual(BrainCoverSpec.make(ref: untagged), BrainCoverSpec.make(id: "wiki/x.md", tag: nil))
+    }
+
+    func testCachedCopyFooterSaysRemovedWhenMissing() {
+        XCTAssertEqual(BrainReaderLayout.cachedCopyFooter(isMissing: false), "Offline, showing saved copy")
+        XCTAssertEqual(BrainReaderLayout.cachedCopyFooter(isMissing: true), "Removed from the Brain · saved copy")
+    }
+
+    func testReaderLinkAction() throws {
+        let valid = try XCTUnwrap(URL(string: "brain://wiki/wiki%2Fvirtues.md"))
+        XCTAssertEqual(BrainReaderLayout.linkAction(for: valid), .push(.page(.wiki, "wiki/virtues.md")))
+        let unknownModule = try XCTUnwrap(URL(string: "brain://goals/x"))
+        XCTAssertEqual(BrainReaderLayout.linkAction(for: unknownModule), .discard)
+        let noID = try XCTUnwrap(URL(string: "brain://wiki"))
+        XCTAssertEqual(BrainReaderLayout.linkAction(for: noID), .discard)
+        let web = try XCTUnwrap(URL(string: "https://example.com/a"))
+        XCTAssertEqual(BrainReaderLayout.linkAction(for: web), .system)
+        let mail = try XCTUnwrap(URL(string: "mailto:a@example.com"))
+        XCTAssertEqual(BrainReaderLayout.linkAction(for: mail), .system)
     }
 }

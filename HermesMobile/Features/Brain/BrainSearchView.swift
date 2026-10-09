@@ -150,7 +150,7 @@ struct BrainSearchResultRow: View {
     init(ref: BrainRef, subtitle: String? = nil) {
         self.ref = ref
         self.subtitle = subtitle ?? ref.snippet
-        self.cover = ref.module == .people ? nil : BrainCoverSpec.make(id: ref.id, tag: nil)
+        self.cover = ref.module == .people ? nil : BrainCoverSpec.make(ref: ref)
     }
 
     var body: some View {

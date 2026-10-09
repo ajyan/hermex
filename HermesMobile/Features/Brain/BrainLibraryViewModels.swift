@@ -343,4 +343,16 @@ final class BrainPageViewModel {
             onAPIError(error)
         }
     }
+
+    /// Fetches only the graph when a page is showing without one, e.g. after the
+    /// reader's first task was cancelled before the graph landed. Best effort: a
+    /// failure leaves the cover in place, and a newer `load()` wins over this fetch.
+    func loadGraphIfNeeded() async {
+        guard page != nil, graph == nil else { return }
+        let token = generation
+        guard let fetched = try? await client.graph(module: module, id: id),
+              !Task.isCancelled, token == generation, graph == nil
+        else { return }
+        graph = fetched
+    }
 }
