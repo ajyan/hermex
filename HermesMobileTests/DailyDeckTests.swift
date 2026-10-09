@@ -304,7 +304,7 @@ final class DailyDeckTests: XCTestCase {
         """)
         let quote = DeckCardText(deck.cards[0])
         XCTAssertEqual(quote.lead, "We suffer more in imagination.")
-        XCTAssertEqual(quote.attribution, "— Seneca, Letters")
+        XCTAssertEqual(quote.attribution, "Seneca, Letters")
         let book = DeckCardText(deck.cards[1])
         XCTAssertEqual(book.lead, "“Deep foundations.”")
         XCTAssertEqual(book.attribution, "Outlive by Peter Attia")
@@ -315,7 +315,7 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(wiki.detail, "Systems beat goals.\n\nWhy you saved it: habit work")
         let prompt = DeckCardText(deck.cards[3])
         XCTAssertEqual(prompt.lead, "Long check-in.", "the advisor's whole message leads")
-        XCTAssertEqual(prompt.attribution, "— Ted")
+        XCTAssertEqual(prompt.attribution, "Ted")
         XCTAssertFalse(prompt.leadIsQuestion)
         XCTAssertEqual(DeckCardText(deck.cards[4]).lead, "Preparation shows respect", "no body: the title leads")
     }
