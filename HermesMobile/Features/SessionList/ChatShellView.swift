@@ -631,8 +631,15 @@ struct ChatShellView: View {
             .adaptiveSecondaryNavigationTitle()
         case .page(let module, let id) where BrainHighlightsBookView.isBook(module: module, id: id):
             BrainHighlightsBookView(id: id, server: server, modelContext: modelContext, onAPIError: authManager.handleAPIError)
-        case .page:
-            EmptyView() // Task 12: BrainReaderView
+        case .page(let module, let id):
+            BrainReaderView(
+                module: module,
+                id: id,
+                server: server,
+                modelContext: modelContext,
+                onAPIError: authManager.handleAPIError,
+                push: { navigation.path.append(.brainRoute($0)) }
+            )
         case .searchAll(let module, let query):
             BrainSearchView(module: module, query: query, server: server, onAPIError: authManager.handleAPIError)
                 .adaptiveSecondaryNavigationTitle()

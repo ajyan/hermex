@@ -206,6 +206,8 @@ struct BrainModuleIcon: View {
 struct BrainMonogram: View {
     let name: String
     var size: CGFloat = BrainStyle.thumbnailSize
+    /// The initials' role font; larger avatars (the person card) pass a larger role.
+    var font: Font = BrainStyle.meta
 
     /// Up to two initials, from the first two words of `name`.
     static func initials(for name: String) -> String {
@@ -218,7 +220,7 @@ struct BrainMonogram: View {
 
     var body: some View {
         Text(verbatim: Self.initials(for: name))
-            .font(BrainStyle.meta.weight(.semibold))
+            .font(font.weight(.semibold))
             .foregroundStyle(Color.hxTextSecondary)
             .lineLimit(1)
             .minimumScaleFactor(0.6)

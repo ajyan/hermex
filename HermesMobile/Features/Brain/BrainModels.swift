@@ -173,6 +173,25 @@ struct BrainHighlight: Codable, Hashable, Sendable {
     }
 }
 
+/// One labelled fact on a person page ("Birthday", "1815-12-10"). Values are raw.
+struct BrainFact: Codable, Hashable, Sendable {
+    let label: String
+    let value: String
+
+    private enum CodingKeys: String, CodingKey { case label, value }
+
+    init(label: String, value: String) {
+        self.label = label
+        self.value = value
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        label = c.string(.label)
+        value = c.string(.value)
+    }
+}
+
 struct BrainPage: Codable, Hashable, Sendable {
     let item: BrainItem
     let content: String
@@ -182,14 +201,16 @@ struct BrainPage: Codable, Hashable, Sendable {
     let prev: BrainRef?
     let next: BrainRef?
     let highlights: [BrainHighlight]
+    /// Person pages only: present frontmatter facts, in server order.
+    let facts: [BrainFact]
 
     private enum CodingKeys: String, CodingKey {
-        case item, content, links, backlinks, further, prev, next, highlights
+        case item, content, links, backlinks, further, prev, next, highlights, facts
     }
 
     init(item: BrainItem, content: String = "", links: [BrainRef] = [], backlinks: [BrainRef] = [],
          further: [BrainRef] = [], prev: BrainRef? = nil, next: BrainRef? = nil,
-         highlights: [BrainHighlight] = []) {
+         highlights: [BrainHighlight] = [], facts: [BrainFact] = []) {
         self.item = item
         self.content = content
         self.links = links
@@ -198,6 +219,7 @@ struct BrainPage: Codable, Hashable, Sendable {
         self.prev = prev
         self.next = next
         self.highlights = highlights
+        self.facts = facts
     }
 
     init(from decoder: Decoder) throws {
@@ -210,6 +232,7 @@ struct BrainPage: Codable, Hashable, Sendable {
         prev = c.optional(BrainRef.self, .prev)
         next = c.optional(BrainRef.self, .next)
         highlights = c.lossy(BrainHighlight.self, .highlights)
+        facts = c.lossy(BrainFact.self, .facts)
     }
 }
 

@@ -153,10 +153,6 @@ enum Endpoint {
     case upload
     case transcribe
     case tts
-    /// The Second Brain CRM people list. Fork-only (`api/brain.py` in this user's hermes-webui); stock servers 404.
-    case brainPeople
-    /// One contact's full profile. `file` is the contact's note filename.
-    case brainPerson(file: String)
     /// The Brain module library (`api/brain.py`): module counts, item lists, one page, search, and the link graph.
     case brainModules
     case brainList(module: String, tag: String?, cursor: Int?)
@@ -428,10 +424,6 @@ enum Endpoint {
             return "/api/transcribe"
         case .tts:
             return "/api/tts"
-        case .brainPeople:
-            return "/api/brain/people"
-        case .brainPerson:
-            return "/api/brain/person"
         case .brainModules:
             return "/api/brain/modules"
         case .brainList:
@@ -639,8 +631,6 @@ enum Endpoint {
                 items.append(URLQueryItem(name: "file", value: file))
             }
             return items
-        case let .brainPerson(file):
-            return [URLQueryItem(name: "file", value: file)]
         case let .brainList(module, tag, cursor):
             var items = [URLQueryItem(name: "module", value: module)]
             if let tag { items.append(URLQueryItem(name: "tag", value: tag)) }

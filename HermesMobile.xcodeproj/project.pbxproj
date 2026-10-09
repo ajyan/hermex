@@ -640,7 +640,6 @@
 		0D0A3A284474E49DBDD0F9E9 /* DailyDeckViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71D8CEEBE37C8E43E46A2B4 /* DailyDeckViewModel.swift */; };
 		218E7F5B009F877FF54BA04A /* DailyDeckView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD79724DF6D6FD92B594BBC5 /* DailyDeckView.swift */; };
 		1F2EF7D6C585EAF7E1C46CD2 /* DeckCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */; };
-		B1A1C0DE0000000000000001 /* BrainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000101 /* BrainView.swift */; };
 		B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000102 /* BrainViewModel.swift */; };
 		B1A1C0DE0000000000000201 /* BrainViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */; };
 		B1A1C0DE0000000000000203 /* BrainModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000204 /* BrainModelsTests.swift */; };
@@ -649,6 +648,8 @@
 		B1A1C0DE0000000000000A03 /* BrainSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000A04 /* BrainSearchView.swift */; };
 		B1A1C0DE0000000000000B01 /* BrainModuleListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000B02 /* BrainModuleListView.swift */; };
 		B1A1C0DE0000000000000B03 /* BrainHighlightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000B04 /* BrainHighlightsView.swift */; };
+		B1A1C0DE0000000000000C01 /* BrainReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000C02 /* BrainReaderView.swift */; };
+		B1A1C0DE0000000000000C03 /* BrainPersonCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000C04 /* BrainPersonCardView.swift */; };
 		B1A1C0DE0000000000000903 /* BrainCoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000904 /* BrainCoverView.swift */; };
 		B1A1C0DE0000000000000905 /* BrainGraphView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000906 /* BrainGraphView.swift */; };
 		B1A1C0DE0000000000000907 /* BrainVisualsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000908 /* BrainVisualsTests.swift */; };
@@ -1334,7 +1335,6 @@
 		22112FC4500BC48A8D86A376 /* DailyDeck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDeck.swift; sourceTree = "<group>"; };
 		D71D8CEEBE37C8E43E46A2B4 /* DailyDeckViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDeckViewModel.swift; sourceTree = "<group>"; };
 		AD79724DF6D6FD92B594BBC5 /* DailyDeckView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDeckView.swift; sourceTree = "<group>"; };
-		B1A1C0DE0000000000000101 /* BrainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainView.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000102 /* BrainViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainViewModel.swift; sourceTree = "<group>"; };
 		7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckCardView.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000204 /* BrainModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainModelsTests.swift; sourceTree = "<group>"; };
@@ -1343,6 +1343,8 @@
 		B1A1C0DE0000000000000A04 /* BrainSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainSearchView.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000B02 /* BrainModuleListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainModuleListView.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000B04 /* BrainHighlightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainHighlightsView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000C02 /* BrainReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainReaderView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000C04 /* BrainPersonCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainPersonCardView.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000904 /* BrainCoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainCoverView.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000906 /* BrainGraphView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainGraphView.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000908 /* BrainVisualsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainVisualsTests.swift; sourceTree = "<group>"; };
@@ -2331,7 +2333,6 @@
 		B1A1C0DE0000000000000003 /* Brain */ = {
 			isa = PBXGroup;
 			children = (
-				B1A1C0DE0000000000000101 /* BrainView.swift */,
 				B1A1C0DE0000000000000102 /* BrainViewModel.swift */,
 				B1A1C0DE0000000000000103 /* BrainModels.swift */,
 				B1A1C0DE0000000000000802 /* BrainLibraryViewModels.swift */,
@@ -2342,6 +2343,8 @@
 				B1A1C0DE0000000000000A04 /* BrainSearchView.swift */,
 				B1A1C0DE0000000000000B02 /* BrainModuleListView.swift */,
 				B1A1C0DE0000000000000B04 /* BrainHighlightsView.swift */,
+				B1A1C0DE0000000000000C02 /* BrainReaderView.swift */,
+				B1A1C0DE0000000000000C04 /* BrainPersonCardView.swift */,
 			);
 			path = Brain;
 			sourceTree = "<group>";
@@ -2571,7 +2574,6 @@
 			files = (
 				456FFBA86135A0D6C5707B5E /* DeckCalendarView.swift in Sources */,
 				1F2EF7D6C585EAF7E1C46CD2 /* DeckCardView.swift in Sources */,
-				B1A1C0DE0000000000000001 /* BrainView.swift in Sources */,
 				B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */,
 				B1A1C0DE00000000000000A3 /* BrainModels.swift in Sources */,
 				B1A1C0DE0000000000000801 /* BrainLibraryViewModels.swift in Sources */,
@@ -2582,6 +2584,8 @@
 				B1A1C0DE0000000000000A03 /* BrainSearchView.swift in Sources */,
 				B1A1C0DE0000000000000B01 /* BrainModuleListView.swift in Sources */,
 				B1A1C0DE0000000000000B03 /* BrainHighlightsView.swift in Sources */,
+				B1A1C0DE0000000000000C01 /* BrainReaderView.swift in Sources */,
+				B1A1C0DE0000000000000C03 /* BrainPersonCardView.swift in Sources */,
 				218E7F5B009F877FF54BA04A /* DailyDeckView.swift in Sources */,
 				0D0A3A284474E49DBDD0F9E9 /* DailyDeckViewModel.swift in Sources */,
 				E38C2C7CB2630EE82E7754E8 /* DailyDeck.swift in Sources */,

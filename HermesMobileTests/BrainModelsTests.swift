@@ -39,6 +39,23 @@ final class BrainModelsTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(BrainPage.self, from: data), page)
     }
 
+    func testPageDecodesFacts() throws {
+        let json = #"""
+        {"item": {"module": "people", "id": "crm/contacts/Ada.md", "title": "Ada"},
+         "facts": [{"label": "Last contacted", "value": "2026-10-01"},
+                   {"label": "Birthday", "value": "1815-12-10"},
+                   {"label": 3}]}
+        """#
+        let page = try JSONDecoder().decode(BrainPage.self, from: Data(json.utf8))
+        XCTAssertEqual(page.facts, [BrainFact(label: "Last contacted", value: "2026-10-01"),
+                                    BrainFact(label: "Birthday", value: "1815-12-10"),
+                                    BrainFact(label: "", value: "")])
+        let data = try JSONEncoder().encode(page)
+        XCTAssertEqual(try JSONDecoder().decode(BrainPage.self, from: data), page)
+        let bare = try JSONDecoder().decode(BrainPage.self, from: Data(pageJSON.utf8))
+        XCTAssertEqual(bare.facts, [])
+    }
+
     func testDecodeToleratesMissingFieldsAndUnknownModule() throws {
         let json = #"""
         {"items": [{"module": "people", "id": "p1", "title": "Ada"},

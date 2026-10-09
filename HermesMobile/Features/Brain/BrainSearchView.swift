@@ -137,16 +137,19 @@ struct BrainSearchResults: View {
     }
 }
 
-/// One search hit: a monogram for people, a small cover for everything else, the
-/// title, and the matching snippet as the subtitle.
+/// One reference row (search hits, the reader's Linked from and Further reading): a
+/// monogram for people, a small cover for everything else, the title, and a subtitle
+/// (the matching snippet unless the caller passes another).
 struct BrainSearchResultRow: View {
     let ref: BrainRef
+    private let subtitle: String?
     /// Built once per row, never in `body`.
     private let cover: BrainCoverSpec?
     @ScaledMetric(relativeTo: .body) private var side = BrainStyle.searchThumbnailSize
 
-    init(ref: BrainRef) {
+    init(ref: BrainRef, subtitle: String? = nil) {
         self.ref = ref
+        self.subtitle = subtitle ?? ref.snippet
         self.cover = ref.module == .people ? nil : BrainCoverSpec.make(id: ref.id, tag: nil)
     }
 
@@ -154,7 +157,7 @@ struct BrainSearchResultRow: View {
         BrainRow(
             leading: { leading },
             title: ref.title.isEmpty ? ref.id : ref.title,
-            subtitle: ref.snippet
+            subtitle: subtitle
         )
     }
 

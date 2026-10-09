@@ -280,4 +280,57 @@ final class BrainVisualsTests: XCTestCase {
         XCTAssertEqual(BrainHighlightsBookContent.countLabel(1), "1 highlight")
         XCTAssertEqual(BrainHighlightsBookContent.countLabel(3), "3 highlights")
     }
+
+    // MARK: - Reader
+
+    func testReaderMetaLineCapitalisesKindAndOmitsEmptyDate() {
+        XCTAssertEqual(BrainReaderLayout.metaLine(kind: "note", date: "2026-10-06"), "Note · 2026-10-06")
+        XCTAssertEqual(BrainReaderLayout.metaLine(kind: "journal", date: ""), "Journal")
+        XCTAssertEqual(BrainReaderLayout.metaLine(kind: "", date: "2026-10-06"), "2026-10-06")
+        XCTAssertEqual(BrainReaderLayout.metaLine(kind: "", date: ""), "")
+        XCTAssertEqual(BrainReaderLayout.metaLine(kind: "éclair", date: ""), "Éclair")
+    }
+
+    func testReaderBacklinksShowFiveThenAll() {
+        let refs = (1...7).map { BrainRef(module: .wiki, id: "w\($0)", title: "W\($0)") }
+        XCTAssertEqual(BrainReaderLayout.visibleBacklinks(refs, expanded: false).map(\.id), ["w1", "w2", "w3", "w4", "w5"])
+        XCTAssertEqual(BrainReaderLayout.visibleBacklinks(refs, expanded: true).count, 7)
+        XCTAssertTrue(BrainReaderLayout.hasMoreBacklinks(refs, expanded: false))
+        XCTAssertFalse(BrainReaderLayout.hasMoreBacklinks(refs, expanded: true))
+        XCTAssertFalse(BrainReaderLayout.hasMoreBacklinks(Array(refs.prefix(5)), expanded: false))
+        XCTAssertEqual(BrainReaderLayout.showAllTitle(refs.count), "Show all 7")
+    }
+
+    func testReaderBacklinkSubtitleIsTheJournalSnippetOnly() {
+        let day = BrainRef(module: .journal, id: "j", title: "Oct 6", snippet: "met Ada")
+        let wiki = BrainRef(module: .wiki, id: "w", title: "W", snippet: "mentions")
+        XCTAssertEqual(BrainReaderLayout.backlinkSubtitle(day), "met Ada")
+        XCTAssertNil(BrainReaderLayout.backlinkSubtitle(wiki))
+    }
+
+    func testReaderSectionTitlesAndGraphThreshold() {
+        XCTAssertEqual(BrainReaderLayout.linkedFromTitle(.people), "Mentioned in")
+        XCTAssertEqual(BrainReaderLayout.linkedFromTitle(.wiki), "Linked from")
+        let center = BrainGraphNode(module: .wiki, id: "a")
+        let other = BrainGraphNode(module: .wiki, id: "b")
+        XCTAssertFalse(BrainReaderLayout.showsGraph(nil, centerID: "a"))
+        XCTAssertFalse(BrainReaderLayout.showsGraph(BrainGraph(nodes: [center]), centerID: "a"))
+        XCTAssertFalse(BrainReaderLayout.showsGraph(BrainGraph(nodes: [center, center]), centerID: "a"))
+        XCTAssertTrue(BrainReaderLayout.showsGraph(BrainGraph(nodes: [center, other]), centerID: "a"))
+    }
+
+    func testReaderGraphRampMatchesTheCover() {
+        let item = BrainItem(module: .wiki, id: "wiki/virtues.md", tags: ["habits"])
+        XCTAssertEqual(BrainReaderLayout.cover(for: item), BrainCoverSpec.make(id: item.id, tag: "habits"))
+        XCTAssertEqual(BrainReaderLayout.cover(for: item).ramp, 2)
+    }
+
+    func testFactValuesFormatDatesAndKeepAnythingElse() {
+        let locale = Locale(identifier: "en_US")
+        XCTAssertEqual(BrainPersonCardView.displayValue("1815-12-10", locale: locale), "December 10, 1815")
+        XCTAssertEqual(BrainPersonCardView.displayValue("2026-10-01", locale: locale), "October 1, 2026")
+        XCTAssertEqual(BrainPersonCardView.displayValue("London", locale: locale), "London")
+        XCTAssertEqual(BrainPersonCardView.displayValue("2026-13-45", locale: locale), "2026-13-45")
+        XCTAssertEqual(BrainPersonCardView.displayValue("", locale: locale), "")
+    }
 }
