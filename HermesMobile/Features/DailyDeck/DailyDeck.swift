@@ -327,3 +327,71 @@ struct DailyDeckStore {
         }
     }
 }
+
+/// How a card reads top to bottom: the line it leads with (the quote, the takeaway), the
+/// line saying where it came from, and everything else to scroll into.
+struct DeckCardText: Equatable {
+    var lead: String?
+    var attribution: String?
+    var detail: String?
+
+    init(_ card: DeckCard) {
+        switch card.type {
+        case .prompt:
+            lead = card.question
+            attribution = card.voice.map { "\($0)'s check-in" }
+            detail = card.context
+        case .reflect:
+            switch card.itemKind {
+            case "quote":
+                lead = card.body
+                attribution = ["— \(card.title ?? "Unknown")", card.source].compactMap { $0 }.joined(separator: ", ")
+                detail = card.context
+            case "book":
+                lead = card.body.map { "“\($0)”" }
+                attribution = card.source ?? card.title
+                detail = card.context
+            default:
+                let (first, rest) = Self.split(card.body)
+                lead = first ?? card.title
+                attribution = first == nil ? card.source : [card.title, card.source == card.title ? nil : card.source]
+                    .compactMap { $0 }.joined(separator: " · ")
+                detail = Self.join(rest, card.context)
+            }
+            if let why = card.why { detail = Self.join(detail, "Why you saved it: \(why)") }
+        case .item, .unknown:
+            lead = card.title ?? card.fallback
+            attribution = card.source == card.title ? nil : card.source
+            detail = card.body ?? (card.title == nil ? nil : card.fallback)
+        case .headline, .decision, .close:
+            lead = card.title
+            detail = card.body
+        }
+        if attribution?.isEmpty == true { attribution = nil }
+    }
+
+    /// The opening sentence (two, when the first is a fragment) and the rest of `text`.
+    static func split(_ text: String?) -> (String?, String?) {
+        guard let text = text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return (nil, nil) }
+        var sentences: [String] = []
+        var current = ""
+        for character in text {
+            current.append(character)
+            if ".!?".contains(character) {
+                sentences.append(current)
+                current = ""
+            }
+        }
+        if !current.trimmingCharacters(in: .whitespaces).isEmpty { sentences.append(current) }
+        var count = 1
+        while count < sentences.count, sentences.prefix(count).joined().count < 40 { count += 1 }
+        let lead = sentences.prefix(count).joined().trimmingCharacters(in: .whitespaces)
+        let rest = sentences.dropFirst(count).joined().trimmingCharacters(in: .whitespacesAndNewlines)
+        return (lead, rest.isEmpty ? nil : rest)
+    }
+
+    private static func join(_ a: String?, _ b: String?) -> String? {
+        let parts = [a, b].compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: "\n\n")
+    }
+}

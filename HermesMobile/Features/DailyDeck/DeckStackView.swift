@@ -20,6 +20,11 @@ struct DeckStackView: View {
     /// Feedback chosen in the sheet, applied once the sheet has finished closing.
     @State private var pendingFeedback: (card: DeckCard, feedback: DeckFeedback)?
 
+    /// A page's resting tilt in the stack: about two degrees, left or right, fixed per page.
+    static func tilt(of page: DeckPage) -> Double {
+        page.id.unicodeScalars.reduce(0) { $0 + Int($1.value) } % 2 == 0 ? 2.2 : -1.8
+    }
+
     /// How far past the edge a card flies, as a multiple of the stack's width.
     private static let fly: CGFloat = 1.4
     private static let peek: CGFloat = 8
@@ -96,15 +101,19 @@ struct DeckStackView: View {
         let dropping = layer.page.id == droppingID
         Group {
             if layer.depth < 1.5 {
-                DeckPageView(page: layer.page, viewModel: viewModel, file: file)
+                DeckPageView(page: layer.page, viewModel: viewModel, file: file,
+                             contentOpacity: max(0, 1 - Double(layer.depth) * 1.6))
             } else {
-                DeckPageView.backing
-                    .fill(Color.hxCanvas)
-                    .overlay(DeckPageView.backing.stroke(Color.primary.opacity(0.06), lineWidth: 0.7))
+                // Far down the stack only the card's paper shows, peeking out askew.
+                DeckPageView.shape
+                    .fill(DeckPalette.of(layer.page).paper)
+                    .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
                     .padding(.vertical, 12)
             }
         }
         .scaleEffect((1 - 0.04 * max(layer.depth, 0)) * (dropping ? 0.85 : 1), anchor: .bottom)
+        // Cards under the top one sit a little askew, like a real deck; they straighten as they rise.
+        .rotationEffect(.degrees(Self.tilt(of: layer.page) * min(max(layer.depth, 0), 1)))
         .offset(x: layer.x, y: Self.peek * max(layer.depth, 0) + (dropping ? 140 : 0))
         .rotationEffect(.degrees(Double(layer.x / width) * 12), anchor: .bottom)
         .opacity(dropping ? 0 : 1)

@@ -290,6 +290,40 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(store.answers(for: server, date: "2026-10-04", kind: "morning")["advisor"]?.text, "Ship it.")
     }
 
+    // MARK: - Card text
+
+    func testCardsLeadWithTheQuoteOrTakeawayAndScrollIntoTheRest() throws {
+        let deck = try DailyDeck.decode("""
+        {"date": "d", "kind": "morning", "cards": [
+          {"id": "q", "type": "reflect", "kind": "quote", "title": "Seneca", "body": "We suffer more in imagination.", "source": "Letters"},
+          {"id": "b", "type": "reflect", "kind": "book", "title": "Outlive", "body": "Deep foundations.", "source": "Outlive by Peter Attia", "context": "Stability first."},
+          {"id": "w", "type": "reflect", "kind": "wiki", "title": "Atomic Habits", "body": "Habits. Results are lagging measures of your inputs. Systems beat goals.", "why": "habit work"},
+          {"id": "p", "type": "prompt", "voice": "Ted", "context": "Long check-in.", "question": "What is the one action?"},
+          {"id": "e", "type": "reflect", "kind": "insight", "title": "Preparation shows respect"}
+        ]}
+        """)
+        let quote = DeckCardText(deck.cards[0])
+        XCTAssertEqual(quote.lead, "We suffer more in imagination.")
+        XCTAssertEqual(quote.attribution, "— Seneca, Letters")
+        let book = DeckCardText(deck.cards[1])
+        XCTAssertEqual(book.lead, "“Deep foundations.”")
+        XCTAssertEqual(book.attribution, "Outlive by Peter Attia")
+        XCTAssertEqual(book.detail, "Stability first.")
+        let wiki = DeckCardText(deck.cards[2])
+        XCTAssertEqual(wiki.lead, "Habits. Results are lagging measures of your inputs.", "a fragment pulls in the next sentence")
+        XCTAssertEqual(wiki.attribution, "Atomic Habits")
+        XCTAssertEqual(wiki.detail, "Systems beat goals.\n\nWhy you saved it: habit work")
+        let prompt = DeckCardText(deck.cards[3])
+        XCTAssertEqual(prompt.lead, "What is the one action?")
+        XCTAssertEqual(prompt.attribution, "Ted's check-in")
+        XCTAssertEqual(DeckCardText(deck.cards[4]).lead, "Preparation shows respect", "no body: the title leads")
+    }
+
+    func testEveryCardKindHasItsOwnPaper() throws {
+        let deck = try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"1","type":"reflect","kind":"book"},{"id":"2","type":"reflect","kind":"wiki"},{"id":"3","type":"reflect","kind":"quote"},{"id":"4","type":"headline"}]}"#)
+        XCTAssertEqual(deck.cards.map { DeckPalette.of($0).name }, ["Book highlight", "From your wiki", "Quote", "Today"])
+    }
+
     // MARK: - Not for Me and questions
 
     func testDecodesReasonAndAlternativeQuestions() throws {
