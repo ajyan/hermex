@@ -667,6 +667,14 @@ struct ChatShellView: View {
         case .searchAll(let module, let query):
             BrainSearchView(module: module, query: query, server: server, onAPIError: authManager.handleAPIError)
                 .adaptiveSecondaryNavigationTitle()
+        case .prep(.home):
+            PrepHomeView(server: server, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
+        case .prep(.track(let track)):
+            PrepTrackView(track: track, server: server, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
+        case .prep(.run):
+            PrepRunView(server: server, onAPIError: authManager.handleAPIError)
         }
     }
 

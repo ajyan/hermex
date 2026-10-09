@@ -8,6 +8,8 @@ import SwiftUI
 struct BrainHomeView: View {
     @State private var viewModel: BrainHomeViewModel
     @State private var searchViewModel: BrainSearchViewModel
+    /// Prep's summary for its row; the row shows only once it loads.
+    @State private var prepViewModel: PrepHomeViewModel
     /// Programmatic pushes (graph nodes, `brain://` links) for the screens below.
     private let push: (BrainRoute) -> Void
 
@@ -21,6 +23,8 @@ struct BrainHomeView: View {
         let cache = BrainCacheHandle(server: server, context: modelContext)
         _viewModel = State(initialValue: BrainHomeViewModel(client: client, cache: cache, onAPIError: onAPIError))
         _searchViewModel = State(initialValue: BrainSearchViewModel(client: client, onAPIError: onAPIError))
+        _prepViewModel = State(initialValue: PrepHomeViewModel(
+            client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
         self.push = push
     }
 
@@ -33,6 +37,8 @@ struct BrainHomeView: View {
                 searchViewModel.resume()
                 await viewModel.load()
             }
+            // Alongside the modules; a server without Prep just never shows the row.
+            .task { await prepViewModel.load() }
             .onDisappear { searchViewModel.cancel() }
     }
 
@@ -94,6 +100,11 @@ struct BrainHomeView: View {
         )
     }
 
+    private var isShowingPrepRow: Bool {
+        if case .loaded = prepViewModel.state { return true }
+        return false
+    }
+
     private var moduleList: some View {
         List {
             Section {
@@ -104,6 +115,17 @@ struct BrainHomeView: View {
                             title: module.title.isEmpty ? module.id.defaultTitle : module.title,
                             subtitle: module.subtitle,
                             trailing: "\(module.count)"
+                        )
+                    }
+                    .brainListRow()
+                }
+                if case .loaded(let home) = prepViewModel.state {
+                    NavigationLink(value: ShellPushDestination.brainRoute(.prep(.home))) {
+                        BrainRow(
+                            leading: { BrainModuleIcon(systemName: "target") },
+                            title: "Interview prep",
+                            subtitle: PrepCopy.homeRowSubtitle(
+                                streakDays: home.streak.days, remaining: home.run.remaining)
                         )
                     }
                     .brainListRow()
@@ -119,7 +141,7 @@ struct BrainHomeView: View {
         }
         .brainListStyle()
         .overlay {
-            if viewModel.modules.isEmpty {
+            if viewModel.modules.isEmpty, !isShowingPrepRow {
                 ContentUnavailableView {
                     Label { Text(verbatim: "Nothing in the Brain yet") } icon: { Image(systemName: "brain") }
                 } description: {
@@ -127,6 +149,10 @@ struct BrainHomeView: View {
                 }
             }
         }
-        .refreshable { await viewModel.load() }
+        .refreshable {
+            async let prep: Void = prepViewModel.load()
+            await viewModel.load()
+            await prep
+        }
     }
 }

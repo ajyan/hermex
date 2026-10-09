@@ -217,11 +217,19 @@ extension BrainModuleID {
 /// A module's SF Symbol in an accent-tinted rounded square, for a row's leading
 /// slot. Decorative: the row's title names the module.
 struct BrainModuleIcon: View {
-    let module: BrainModuleID
+    let symbolName: String
     @ScaledMetric(relativeTo: .body) private var side = BrainStyle.iconSize
 
+    init(module: BrainModuleID) {
+        self.symbolName = module.symbolName
+    }
+
+    init(systemName: String) {
+        self.symbolName = systemName
+    }
+
     var body: some View {
-        Image(systemName: module.symbolName)
+        Image(systemName: symbolName)
             .font(BrainStyle.rowSubtitle.weight(.semibold))
             .foregroundStyle(Color.accentColor)
             .frame(width: side, height: side)
@@ -431,10 +439,11 @@ struct BrainTagChip: View {
     }
 }
 
-/// The one section header, for list groups, Linked from and Further reading.
+/// The one section header (list groups, Linked from, Further reading), with an optional trailing note.
 struct BrainSectionHeader: View {
     let title: String
     var count: Int?
+    var trailing: String?
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: BrainStyle.s) {
@@ -447,6 +456,10 @@ struct BrainSectionHeader: View {
                     .monospacedDigit()
             }
             Spacer(minLength: 0)
+            if let trailing, !trailing.isEmpty {
+                Text(verbatim: trailing)
+                    .brainText(.sectionCaption)
+            }
         }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)

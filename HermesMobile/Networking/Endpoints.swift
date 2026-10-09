@@ -159,6 +159,12 @@ enum Endpoint {
     case brainPage(module: String, id: String)
     case brainSearch(query: String, module: String?)
     case brainGraph(module: String, id: String)
+    /// The Prep interview tutor (`api/tutor.py`): today's run, home, a track map, one item, and answer submission.
+    case tutorHome
+    case tutorToday
+    case tutorMap(track: String)
+    case tutorItem(id: String)
+    case tutorAttempt
 
     var path: String {
         switch self {
@@ -434,6 +440,16 @@ enum Endpoint {
             return "/api/brain/search"
         case .brainGraph:
             return "/api/brain/graph"
+        case .tutorHome:
+            return "/api/tutor/home"
+        case .tutorToday:
+            return "/api/tutor/today"
+        case .tutorMap:
+            return "/api/tutor/map"
+        case .tutorItem:
+            return "/api/tutor/item"
+        case .tutorAttempt:
+            return "/api/tutor/attempt"
         }
     }
 
@@ -642,6 +658,10 @@ enum Endpoint {
             var items = [URLQueryItem(name: "q", value: query)]
             if let module { items.append(URLQueryItem(name: "module", value: module)) }
             return items
+        case let .tutorMap(track):
+            return [URLQueryItem(name: "track", value: track)]
+        case let .tutorItem(id):
+            return [URLQueryItem(name: "id", value: id)]
         default:
             return []
         }

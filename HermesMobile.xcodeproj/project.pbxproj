@@ -7,6 +7,15 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B1A1C0DE0000000000000E17 /* PrepViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E18 /* PrepViewModels.swift */; };
+		B1A1C0DE0000000000000E21 /* PrepHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E22 /* PrepHomeView.swift */; };
+		B1A1C0DE0000000000000E23 /* PrepTrackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E24 /* PrepTrackView.swift */; };
+		B1A1C0DE0000000000000E25 /* PrepRunView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E26 /* PrepRunView.swift */; };
+		B1A1C0DE0000000000000E27 /* PrepDrillViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E28 /* PrepDrillViews.swift */; };
+		B1A1C0DE0000000000000E01 /* PrepModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E02 /* PrepModels.swift */; };
+		B1A1C0DE0000000000000E03 /* PrepDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E04 /* PrepDataClient.swift */; };
+		B1A1C0DE0000000000000E15 /* PrepViewModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E16 /* PrepViewModelsTests.swift */; };
+		B1A1C0DE0000000000000E05 /* PrepModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E06 /* PrepModelsTests.swift */; };
 		B15C1E3E39CB8EAC55E8BD67 /* VoiceCallFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F42EE649B1547E6CBDC22A5A /* VoiceCallFlowTests.swift */; };
 		A1C0FFEE0000000000000B02 /* VoiceCallAudioLevelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE0000000000000F02 /* VoiceCallAudioLevelsTests.swift */; };
 		E229069D4B665D7B3CF24038 /* VoiceCallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC46CE9BD5B6A700B716CE0 /* VoiceCallView.swift */; };
@@ -711,6 +720,15 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		B1A1C0DE0000000000000E18 /* PrepViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepViewModels.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000E22 /* PrepHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepHomeView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000E24 /* PrepTrackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepTrackView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000E26 /* PrepRunView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepRunView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000E28 /* PrepDrillViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepDrillViews.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000E02 /* PrepModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepModels.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000E04 /* PrepDataClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepDataClient.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000E16 /* PrepViewModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepViewModelsTests.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000E06 /* PrepModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepModelsTests.swift; sourceTree = "<group>"; };
 		F42EE649B1547E6CBDC22A5A /* VoiceCallFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallFlowTests.swift; sourceTree = "<group>"; };
 		A1C0FFEE0000000000000F02 /* VoiceCallAudioLevelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallAudioLevelsTests.swift; sourceTree = "<group>"; };
 		DEC46CE9BD5B6A700B716CE0 /* VoiceCallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallView.swift; sourceTree = "<group>"; };
@@ -1409,6 +1427,20 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		B1A1C0DE0000000000000E10 /* Prep */ = {
+			isa = PBXGroup;
+			children = (
+				B1A1C0DE0000000000000E02 /* PrepModels.swift */,
+				B1A1C0DE0000000000000E04 /* PrepDataClient.swift */,
+				B1A1C0DE0000000000000E18 /* PrepViewModels.swift */,
+				B1A1C0DE0000000000000E22 /* PrepHomeView.swift */,
+				B1A1C0DE0000000000000E24 /* PrepTrackView.swift */,
+				B1A1C0DE0000000000000E26 /* PrepRunView.swift */,
+				B1A1C0DE0000000000000E28 /* PrepDrillViews.swift */,
+			);
+			path = Prep;
+			sourceTree = "<group>";
+		};
 		9BAF7D8BBF390913B4F060B0 /* VoiceCall */ = {
 			isa = PBXGroup;
 			children = (
@@ -1496,6 +1528,8 @@
 				3A997D807C262D12E5491E89 /* DailyDeckTests.swift */,
 				B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */,
 				B1A1C0DE0000000000000204 /* BrainModelsTests.swift */,
+				B1A1C0DE0000000000000E06 /* PrepModelsTests.swift */,
+				B1A1C0DE0000000000000E16 /* PrepViewModelsTests.swift */,
 				B1A1C0DE0000000000000908 /* BrainVisualsTests.swift */,
 				F42EE649B1547E6CBDC22A5A /* VoiceCallFlowTests.swift */,
 				A1C0FFEE0000000000000F02 /* VoiceCallAudioLevelsTests.swift */,
@@ -2357,6 +2391,7 @@
 				B1A1C0DE0000000000000B04 /* BrainHighlightsView.swift */,
 				B1A1C0DE0000000000000C02 /* BrainReaderView.swift */,
 				B1A1C0DE0000000000000C04 /* BrainPersonCardView.swift */,
+				B1A1C0DE0000000000000E10 /* Prep */,
 			);
 			path = Brain;
 			sourceTree = "<group>";
@@ -2592,6 +2627,13 @@
 				1F2EF7D6C585EAF7E1C46CD2 /* DeckCardView.swift in Sources */,
 				B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */,
 				B1A1C0DE00000000000000A3 /* BrainModels.swift in Sources */,
+				B1A1C0DE0000000000000E01 /* PrepModels.swift in Sources */,
+				B1A1C0DE0000000000000E03 /* PrepDataClient.swift in Sources */,
+				B1A1C0DE0000000000000E17 /* PrepViewModels.swift in Sources */,
+				B1A1C0DE0000000000000E21 /* PrepHomeView.swift in Sources */,
+				B1A1C0DE0000000000000E23 /* PrepTrackView.swift in Sources */,
+				B1A1C0DE0000000000000E25 /* PrepRunView.swift in Sources */,
+				B1A1C0DE0000000000000E27 /* PrepDrillViews.swift in Sources */,
 				B1A1C0DE0000000000000801 /* BrainLibraryViewModels.swift in Sources */,
 				B1A1C0DE0000000000000905 /* BrainGraphView.swift in Sources */,
 				B1A1C0DE0000000000000903 /* BrainCoverView.swift in Sources */,
@@ -3008,6 +3050,8 @@
 				2A8CB7ACCDBA9BBE34E57FDC /* DailyDeckTests.swift in Sources */,
 				B1A1C0DE0000000000000201 /* BrainViewModelTests.swift in Sources */,
 				B1A1C0DE0000000000000203 /* BrainModelsTests.swift in Sources */,
+				B1A1C0DE0000000000000E05 /* PrepModelsTests.swift in Sources */,
+				B1A1C0DE0000000000000E15 /* PrepViewModelsTests.swift in Sources */,
 				B1A1C0DE0000000000000907 /* BrainVisualsTests.swift in Sources */,
 				B15C1E3E39CB8EAC55E8BD67 /* VoiceCallFlowTests.swift in Sources */,
 				A1C0FFEE0000000000000B02 /* VoiceCallAudioLevelsTests.swift in Sources */,
