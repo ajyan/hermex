@@ -550,7 +550,7 @@ struct PrepHangingLayout: Layout {
     }
 
     private func arrange(width fullWidth: CGFloat, subviews: Subviews) -> (frames: [CGRect], size: CGSize) {
-        let lead = PrepCode.clampedIndent(indent, width: fullWidth.isFinite ? fullWidth : indent)
+        let lead = fullWidth.isFinite ? PrepCode.clampedIndent(indent, width: fullWidth) : indent
         let width = fullWidth - lead
         var frames: [CGRect] = []
         var x: CGFloat = 0, y: CGFloat = 0, lineHeight: CGFloat = 0, maxX: CGFloat = 0
@@ -558,7 +558,7 @@ struct PrepHangingLayout: Layout {
         for subview in subviews {
             var size = subview.sizeThatFits(.unspecified)
             // Fit is judged without the trailing space, which may hang past the edge.
-            let trailing = Self.trailingSpace(subview, size: size)
+            let trailing = Self.trailingSpace(subview)
             if x > lineStart, x + size.width - trailing > width + 0.5 {
                 y += lineHeight
                 lineStart = hang
@@ -577,7 +577,7 @@ struct PrepHangingLayout: Layout {
     }
 
     /// The width of a word's trailing space, from the layout value set by `PrepCodeLine`.
-    private static func trailingSpace(_ subview: LayoutSubview, size: CGSize) -> CGFloat {
+    private static func trailingSpace(_ subview: LayoutSubview) -> CGFloat {
         subview[PrepTrailingSpace.self]
     }
 }
