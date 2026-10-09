@@ -50,6 +50,18 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
 
 @MainActor
 final class PrepViewModelsTests: XCTestCase {
+    func testCodeCanExpandNeedsExampleOrLongSummary() {
+        XCTAssertFalse(PrepCode.canExpand(summary: "Short", example: ""))
+        XCTAssertFalse(PrepCode.canExpand(summary: String(repeating: "a", count: 140), example: ""))
+        XCTAssertTrue(PrepCode.canExpand(summary: String(repeating: "a", count: 141), example: ""))
+        XCTAssertTrue(PrepCode.canExpand(summary: "", example: "x = 1"))
+    }
+
+    func testCodeClampedIndentCapsAtHalfWidth() {
+        XCTAssertEqual(PrepCode.clampedIndent(20, width: 300), 20)
+        XCTAssertEqual(PrepCode.clampedIndent(400, width: 300), 150)
+    }
+
     func testCodeSplitCountsLeadingSpaces() {
         let parts = PrepCode.split("    return x")
         XCTAssertEqual(parts.indent, 4)

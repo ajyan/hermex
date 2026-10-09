@@ -15,9 +15,15 @@ struct PrepProblemCard: View {
     /// Reset per rep: the run view keys each rep with `.id(rep.index)`.
     @State private var expanded = false
 
-    private var canExpand: Bool { !example.isEmpty || !summary.isEmpty }
+    /// The most height the expanded card may take; the rest scrolls inside it.
+    let maxHeight: CGFloat
+    /// Room for the meta line, title and More button inside `maxHeight`.
+    @ScaledMetric(relativeTo: .body) private var chrome: CGFloat = 110
 
-    init(rep: PrepRep) {
+    private var canExpand: Bool { PrepCode.canExpand(summary: summary, example: example) }
+
+    init(rep: PrepRep, maxHeight: CGFloat = .infinity) {
+        self.maxHeight = maxHeight
         let item = rep.item
         if rep.drill == .primer {
             meta = "Primer"
@@ -41,17 +47,18 @@ struct PrepProblemCard: View {
                 .font(AppFont.headline())
                 .foregroundStyle(Color.hxTextPrimary)
                 .accessibilityAddTraits(.isHeader)
-            if !summary.isEmpty {
+            if expanded {
+                // Fits when it can; scrolls inside the cap when it can't.
+                ViewThatFits(in: .vertical) {
+                    detail
+                    ScrollView { detail }
+                }
+                .frame(maxHeight: max(maxHeight - chrome, 80))
+            } else if !summary.isEmpty {
                 Text(verbatim: summary)
                     .brainText(.rowSubtitle)
-                    // Pinned, so compact by default; VoiceOver still reads it in full.
-                    .lineLimit(expanded ? nil : 2)
+                    .lineLimit(2)
                     .accessibilityLabel(Text(verbatim: summary))
-            }
-            if expanded, !example.isEmpty {
-                Text(verbatim: example)
-                    .font(AppFont.mono(style: .footnote))
-                    .foregroundStyle(Color.hxTextPrimary)
             }
             if canExpand {
                 Button {
@@ -64,6 +71,7 @@ struct PrepProblemCard: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityValue(Text(verbatim: expanded ? "Expanded" : "Collapsed"))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -71,6 +79,23 @@ struct PrepProblemCard: View {
         .padding(.top, BrainStyle.cardVerticalPadding)
         .padding(.bottom, canExpand ? 0 : BrainStyle.cardVerticalPadding)
         .brainCardSurface()
+    }
+
+    /// The full summary and the example, shown when expanded.
+    private var detail: some View {
+        VStack(alignment: .leading, spacing: BrainStyle.xs) {
+            if !summary.isEmpty {
+                Text(verbatim: summary)
+                    .brainText(.rowSubtitle)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if !example.isEmpty {
+                Text(verbatim: example)
+                    .font(AppFont.mono(style: .footnote))
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
     }
 }
 
@@ -447,14 +472,14 @@ struct PrepCodeLine: View {
 
     var body: some View {
         let parts = PrepCode.split(code)
-        PrepHangingLayout(hang: step) {
+        PrepHangingLayout(hang: step, indent: CGFloat(parts.indent) * step) {
             ForEach(Array(PrepCode.words(parts.text).enumerated()), id: \.offset) { _, word in
                 Text(verbatim: word)
                     .font(AppFont.mono(style: .footnote))
                     .foregroundStyle(Color.hxTextPrimary)
+                    .layoutValue(key: PrepTrailingSpace.self, value: word.hasSuffix(" ") ? step : 0)
             }
         }
-        .padding(.leading, CGFloat(parts.indent) * step)
         .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
@@ -464,6 +489,18 @@ struct PrepCodeLine: View {
 
 /// Splits a code line for rendering with a hanging indent.
 enum PrepCode {
+    /// More/Less only appears when there is something to reveal: an example or a summary
+    /// longer than the two compact lines.
+    static func canExpand(summary: String, example: String) -> Bool {
+        !example.isEmpty || summary.count > 140
+    }
+
+    /// The leading indent in points, never more than half the width so deep nesting
+    /// can't starve the text.
+    static func clampedIndent(_ points: CGFloat, width: CGFloat) -> CGFloat {
+        min(points, width * 0.5)
+    }
+
     /// The leading whitespace as a space count (a tab is 4) and the rest of the line.
     static func split(_ line: String) -> (indent: Int, text: String) {
         var indent = 0
@@ -492,10 +529,14 @@ enum PrepCode {
 /// start `hang` in. A word wider than the room left goes on its own line and wraps itself.
 struct PrepHangingLayout: Layout {
     var hang: CGFloat
+    /// The unclamped leading indent, in points.
+    var indent: CGFloat
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = arrange(width: proposal.width ?? .infinity, subviews: subviews)
-        return CGSize(width: proposal.width ?? result.size.width, height: result.size.height)
+        let width = proposal.width ?? .infinity
+        let result = arrange(width: width, subviews: subviews)
+        // An unbounded proposal gets the content width, never infinity.
+        return CGSize(width: width.isFinite ? width : result.size.width, height: result.size.height)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
@@ -508,28 +549,41 @@ struct PrepHangingLayout: Layout {
         }
     }
 
-    private func arrange(width: CGFloat, subviews: Subviews) -> (frames: [CGRect], size: CGSize) {
+    private func arrange(width fullWidth: CGFloat, subviews: Subviews) -> (frames: [CGRect], size: CGSize) {
+        let lead = PrepCode.clampedIndent(indent, width: fullWidth.isFinite ? fullWidth : indent)
+        let width = fullWidth - lead
         var frames: [CGRect] = []
         var x: CGFloat = 0, y: CGFloat = 0, lineHeight: CGFloat = 0, maxX: CGFloat = 0
         var lineStart: CGFloat = 0
         for subview in subviews {
             var size = subview.sizeThatFits(.unspecified)
-            if x > lineStart, x + size.width > width + 0.5 {
+            // Fit is judged without the trailing space, which may hang past the edge.
+            let trailing = Self.trailingSpace(subview, size: size)
+            if x > lineStart, x + size.width - trailing > width + 0.5 {
                 y += lineHeight
                 lineStart = hang
                 x = lineStart
                 lineHeight = 0
             }
-            if x + size.width > width + 0.5 {
+            if x + size.width - trailing > width + 0.5 {
                 size = subview.sizeThatFits(ProposedViewSize(width: max(width - x, 1), height: nil))
             }
-            frames.append(CGRect(origin: CGPoint(x: x, y: y), size: size))
+            frames.append(CGRect(x: x + lead, y: y, width: size.width, height: size.height))
             x += size.width
             lineHeight = max(lineHeight, size.height)
-            maxX = max(maxX, x)
+            maxX = max(maxX, x + lead)
         }
         return (frames, CGSize(width: maxX, height: y + lineHeight))
     }
+
+    /// The width of a word's trailing space, from the layout value set by `PrepCodeLine`.
+    private static func trailingSpace(_ subview: LayoutSubview, size: CGSize) -> CGFloat {
+        subview[PrepTrailingSpace.self]
+    }
+}
+
+private struct PrepTrailingSpace: LayoutValueKey {
+    static let defaultValue: CGFloat = 0
 }
 
 /// Wraps its children onto as many lines as the proposed width needs, leading aligned.
@@ -537,8 +591,10 @@ struct PrepFlowLayout: Layout {
     var spacing: CGFloat = 8
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = arrange(width: proposal.width ?? .infinity, subviews: subviews)
-        return CGSize(width: proposal.width ?? result.size.width, height: result.size.height)
+        let width = proposal.width ?? .infinity
+        let result = arrange(width: width, subviews: subviews)
+        // An unbounded proposal gets the content width, never infinity.
+        return CGSize(width: width.isFinite ? width : result.size.width, height: result.size.height)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {

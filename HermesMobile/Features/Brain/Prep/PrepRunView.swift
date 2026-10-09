@@ -9,6 +9,7 @@ struct PrepRunView: View {
     /// The option tapped on a choice rep, kept to mark it once graded.
     @State private var chosen: ChosenOption?
     @Environment(\.dismiss) private var dismiss
+    @State private var screenHeight: CGFloat = 800
 
     private struct ChosenOption: Equatable {
         let rep: Int
@@ -42,6 +43,13 @@ struct PrepRunView: View {
                 }
             }
             .background(Color.hxCanvas.ignoresSafeArea())
+            .background {
+                GeometryReader { proxy in
+                    Color.clear
+                        .onAppear { screenHeight = proxy.size.height }
+                        .onChange(of: proxy.size.height) { _, height in screenHeight = height }
+                }
+            }
             .task {
                 guard !didLoad else { return }
                 didLoad = true
@@ -110,7 +118,9 @@ struct PrepRunView: View {
     private func scaffold<Content: View, Bottom: View>(
         _ rep: PrepRep, hasAction: Bool, @ViewBuilder content: () -> Content, @ViewBuilder bottom: () -> Bottom
     ) -> some View {
-        ScrollView {
+        // The expanded card is capped at 45% of the screen; its detail scrolls inside.
+        let availableHeight = screenHeight
+        return ScrollView {
             VStack(alignment: .leading, spacing: BrainStyle.xl) {
                 content()
             }
@@ -122,7 +132,7 @@ struct PrepRunView: View {
                 if let progress {
                     PrepSegmentBar(position: progress.position, count: progress.count)
                 }
-                PrepProblemCard(rep: rep)
+                PrepProblemCard(rep: rep, maxHeight: availableHeight * 0.45)
             }
             .padding(.horizontal, BrainStyle.l)
             .padding(.bottom, BrainStyle.s)
