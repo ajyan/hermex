@@ -320,6 +320,8 @@ extension DeckPage {
                 case "insight": return "Insight"
                 case "video": return "Video"
                 case "on_this_day": return "On this day"
+                case "wiki": return "From your wiki"
+                case "media": return "From your reading"
                 default: return "From your library"
                 }
             case .item: return card.itemKind == "youtube" ? "New videos" : "From your library"
