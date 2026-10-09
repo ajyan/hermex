@@ -14,6 +14,7 @@ struct PrepProblemCard: View {
     let example: String
     /// Reset per rep: the run view keys each rep with `.id(rep.index)`.
     @State private var expanded = false
+    @State private var detailHeight: CGFloat = 0
 
     /// The most height the expanded card may take; the rest scrolls inside it.
     let maxHeight: CGFloat
@@ -48,12 +49,18 @@ struct PrepProblemCard: View {
                 .foregroundStyle(Color.hxTextPrimary)
                 .accessibilityAddTraits(.isHeader)
             if expanded {
-                // Fits when it can; scrolls inside the cap when it can't.
-                ViewThatFits(in: .vertical) {
-                    detail.fixedSize(horizontal: false, vertical: true)
-                    ScrollView { detail }
+                // Natural height, capped; scrolls only when the content is taller.
+                ScrollView {
+                    detail.background {
+                        GeometryReader { proxy in
+                            Color.clear.preference(key: PrepDetailHeightKey.self, value: proxy.size.height)
+                        }
+                    }
                 }
-                .frame(maxHeight: max(maxHeight - chrome, 80), alignment: .top)
+                .scrollBounceBehavior(.basedOnSize)
+                .frame(height: PrepCode.expandedHeight(
+                    natural: detailHeight, cap: max(maxHeight - chrome, 80)))
+                .onPreferenceChange(PrepDetailHeightKey.self) { detailHeight = $0 }
             } else if !summary.isEmpty {
                 Text(verbatim: summary)
                     .brainText(.rowSubtitle)
@@ -493,6 +500,11 @@ struct PrepCodeLine: View {
 
 /// Splits a code line for rendering with a hanging indent.
 enum PrepCode {
+    /// The expanded detail's height: its natural height, never above the cap.
+    static func expandedHeight(natural: CGFloat, cap: CGFloat) -> CGFloat {
+        min(natural, cap)
+    }
+
     /// More/Less only appears when there is something to reveal: an example or a summary
     /// longer than the two compact lines.
     static func canExpand(summary: String, example: String) -> Bool {
@@ -584,6 +596,11 @@ struct PrepHangingLayout: Layout {
     private static func trailingSpace(_ subview: LayoutSubview) -> CGFloat {
         subview[PrepTrailingSpace.self]
     }
+}
+
+private struct PrepDetailHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 
 private struct PrepTrailingSpace: LayoutValueKey {

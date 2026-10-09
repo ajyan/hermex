@@ -50,6 +50,11 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
 
 @MainActor
 final class PrepViewModelsTests: XCTestCase {
+    func testCodeExpandedHeightHugsContentUpToCap() {
+        XCTAssertEqual(PrepCode.expandedHeight(natural: 80, cap: 300), 80)
+        XCTAssertEqual(PrepCode.expandedHeight(natural: 500, cap: 300), 300)
+    }
+
     func testCodeCanExpandNeedsExampleOrLongSummary() {
         XCTAssertFalse(PrepCode.canExpand(summary: "Short", example: ""))
         XCTAssertFalse(PrepCode.canExpand(summary: String(repeating: "a", count: 140), example: ""))
