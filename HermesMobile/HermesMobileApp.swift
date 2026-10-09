@@ -92,14 +92,7 @@ struct HermesMobileApp: App {
     var body: some Scene {
         WindowGroup {
             #if DEBUG
-            // Launch argument hook so the Streaming Lab can be opened without
-            // UI navigation (agent-driven simulator diagnosis, issue #234):
-            // `xcrun simctl launch <udid> com.uzairansar.hermesmobile --streaming-lab`
-            if ProcessInfo.processInfo.arguments.contains("--streaming-lab") {
-                NavigationStack {
-                    StreamingLabView()
-                }
-            } else if ProcessInfo.processInfo.arguments.contains("--voice-call-lab") {
+            if ProcessInfo.processInfo.arguments.contains("--voice-call-lab") {
                 VoiceCallLab()
             } else {
                 ContentView(authManager: authManager)
