@@ -1,11 +1,12 @@
 import SwiftUI
 
-/// One personal goal: why it matters, this week's commitments with one-tap check-ins for
-/// today or yesterday, daily checks, milestones, and the consistency heatmap.
+/// One personal goal: its paper hero (with the week strip that picks today or yesterday),
+/// one-tap check-ins, daily checks, milestones, and a calendar of every day to the deadline.
 /// Pushed as `.goal(slug)`.
 struct GoalDetailView: View {
     @State private var viewModel: GoalDetailViewModel
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.colorScheme) private var colorScheme
 
     init(slug: String, server: URL, onAPIError: @escaping (Error) -> Void) {
         _viewModel = State(initialValue: GoalDetailViewModel(
@@ -24,10 +25,8 @@ struct GoalDetailView: View {
             }
     }
 
-    private var navigationTitle: String {
-        if case .loaded(let d) = viewModel.state { return d.summary.title }
-        return "Goal"
-    }
+    /// The hero card carries the goal's title; the bar just says where you are.
+    private var navigationTitle: String { "Goal" }
 
     @ViewBuilder
     private var content: some View {
@@ -45,28 +44,29 @@ struct GoalDetailView: View {
                 Task { await viewModel.load() }
             }
         case .loaded(let detail):
+            let tint = GoalTint(GoalPaper.palette(for: detail.summary), scheme: colorScheme)
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
-                    header(detail)
-                    ForEach(detail.summary.flags.escalations, id: \.check) { escalation in
-                        PrepNoteCard {
-                            Label { Text(verbatim: escalation.say) } icon: {
-                                Image(systemName: "exclamationmark.triangle").foregroundStyle(Color.hxWarning)
-                            }
-                            .font(BrainStyle.rowTitle)
+                    VStack(alignment: .leading, spacing: BrainStyle.m) {
+                        GoalHeroCard(
+                            goal: detail.summary,
+                            why: detail.why,
+                            selection: (detail.today, detail.yesterday, viewModel.day),
+                            onSelect: { viewModel.day = $0 }
+                        )
+                        ForEach(detail.summary.flags.escalations, id: \.check) { escalation in
+                            GoalNote(systemImage: "exclamationmark.triangle", tint: .hxWarning, text: escalation.say)
+                        }
+                        ForEach(detail.summary.flags.unlockReady, id: \.id) { unlock in
+                            GoalNote(systemImage: "sparkles", tint: tint.fill, text: GoalDetailCopy.unlockOffer(unlock, in: detail.summary))
                         }
                     }
-                    ForEach(detail.summary.flags.unlockReady, id: \.id) { unlock in
-                        PrepNoteCard {
-                            Text(verbatim: GoalDetailCopy.unlockOffer(unlock, in: detail.summary))
-                                .font(BrainStyle.rowSubtitle)
-                                .foregroundStyle(Color.hxTextPrimary)
-                        }
+                    commitmentsSection(detail, tint: tint)
+                    ForEach(detail.summary.dailyChecks) { check in
+                        checkSection(check, tint: tint)
                     }
-                    weekSection(detail)
-                    if !detail.summary.dailyChecks.isEmpty { checksSection(detail) }
-                    if !detail.milestones.isEmpty { milestonesSection(detail) }
-                    consistencySection(detail)
+                    if !detail.milestones.isEmpty { milestonesSection(detail, tint: tint) }
+                    consistencySection(detail, tint: tint)
                     planSection(detail)
                 }
                 .padding(BrainStyle.l)
@@ -76,35 +76,11 @@ struct GoalDetailView: View {
         }
     }
 
-    // MARK: Header
+    // MARK: Check-ins
 
-    private func header(_ d: GoalDetail) -> some View {
+    private func commitmentsSection(_ d: GoalDetail, tint: GoalTint) -> some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
-            Text(verbatim: d.summary.title).brainText(.readerTitle)
-            if !d.summary.identity.isEmpty {
-                Text(verbatim: d.summary.identity.prefix(1).uppercased() + d.summary.identity.dropFirst())
-                    .brainText(.quote)
-            }
-            if !d.why.isEmpty { Text(verbatim: d.why).brainText(.rowSubtitle) }
-            if let days = d.summary.daysLeft, let deadline = d.summary.deadline {
-                Text(verbatim: "\(days) days · \(deadline)").brainText(.meta).monospacedDigit()
-            }
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    // MARK: This week
-
-    private func weekSection(_ d: GoalDetail) -> some View {
-        VStack(alignment: .leading, spacing: BrainStyle.s) {
-            BrainSectionHeader(title: "This week")
-            Picker(selection: $viewModel.day) {
-                Text(verbatim: "Yesterday").tag(GoalDay.yesterday)
-                Text(verbatim: "Today").tag(GoalDay.today)
-            } label: {
-                Text(verbatim: "Check in for")
-            }
-            .pickerStyle(.segmented)
+            BrainSectionHeader(title: viewModel.day == .today ? "Today" : "Yesterday")
             SectionCard {
                 VStack(spacing: 0) {
                     ForEach(Array(d.summary.week.commitments.enumerated()), id: \.element.id) { offset, row in
@@ -112,7 +88,7 @@ struct GoalDetailView: View {
                         GoalCommitmentRow(
                             row: row,
                             day: viewModel.day,
-                            missTwice: d.summary.flags.missTwice.contains(row.id),
+                            tint: tint,
                             isPending: viewModel.pending.contains(row.id)
                         ) { status in
                             Task { await viewModel.checkIn(commitment: row.id, status: status) }
@@ -120,56 +96,50 @@ struct GoalDetailView: View {
                     }
                 }
             }
+            if viewModel.day == .today, let missed = d.summary.week.commitments.first(where: { d.summary.flags.missTwice.contains($0.id) }) {
+                Text(verbatim: "Missed \(GoalsCopy.shortName(missed.action).lowercased()) last night. Even the 2-min version counts.")
+                    .font(BrainStyle.meta)
+                    .foregroundStyle(Color.hxWarning)
+            }
             if let error = viewModel.error {
                 Text(verbatim: error).font(BrainStyle.meta).foregroundStyle(Color.hxDanger)
             }
         }
     }
 
-    private func checksSection(_ d: GoalDetail) -> some View {
+    private func checkSection(_ check: GoalDailyCheck, tint: GoalTint) -> some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
-            BrainSectionHeader(title: "Daily checks")
+            BrainSectionHeader(title: GoalDetailCopy.checkTitle(check.question))
             SectionCard {
-                VStack(spacing: 0) {
-                    ForEach(Array(d.summary.dailyChecks.enumerated()), id: \.element.id) { offset, check in
-                        if offset > 0 { PrepRowDivider() }
-                        VStack(alignment: .leading, spacing: BrainStyle.s) {
-                            Text(verbatim: check.question).brainText(.rowTitle)
-                            let selected = viewModel.day == .today ? check.today : check.yesterday
-                            GoalChoiceRow(
-                                options: check.options.map { ($0, $0.capitalized) },
-                                selected: selected,
-                                isDisabled: viewModel.pending.contains(check.id),
-                                accessibilityPrefix: check.question
-                            ) { value in
-                                Task { await viewModel.checkIn(check: check.id, value: value) }
-                            }
-                        }
-                        .padding(.vertical, BrainStyle.s)
-                    }
+                GoalChoiceRow(
+                    options: check.options.map { ($0, $0.capitalized) },
+                    selected: viewModel.day == .today ? check.today : check.yesterday,
+                    tint: tint,
+                    isDisabled: viewModel.pending.contains(check.id),
+                    accessibilityPrefix: check.question
+                ) { value in
+                    Task { await viewModel.checkIn(check: check.id, value: value) }
                 }
+                .padding(.vertical, BrainStyle.xs)
             }
         }
     }
 
     // MARK: Milestones, consistency, plan
 
-    private func milestonesSection(_ d: GoalDetail) -> some View {
+    private func milestonesSection(_ d: GoalDetail, tint: GoalTint) -> some View {
         let nextID = d.milestones.first { $0.done == nil }?.id
         return VStack(alignment: .leading, spacing: BrainStyle.s) {
             BrainSectionHeader(title: "Milestones")
             SectionCard {
                 VStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(d.milestones.enumerated()), id: \.element.id) { offset, m in
-                        if offset > 0 { PrepRowDivider() }
-                        BrainRow(
-                            leading: {
-                                Image(systemName: m.done != nil ? "checkmark.circle.fill" : (m.id == nextID ? "circle.inset.filled" : "circle"))
-                                    .foregroundStyle(m.done != nil ? Color.hxSuccess : Color.hxTextSecondary)
-                                    .accessibilityHidden(true)
-                            },
-                            title: m.title,
-                            subtitle: m.done != nil ? "Done" : m.due.map { GoalsCopy.relativeDay($0, today: d.today).capitalizingFirst }
+                    ForEach(Array(d.milestones.enumerated()), id: \.offset) { offset, m in
+                        GoalMilestoneRow(
+                            milestone: m,
+                            today: d.today,
+                            isNext: m.id == nextID,
+                            isLast: offset == d.milestones.count - 1,
+                            tint: tint
                         )
                     }
                 }
@@ -177,111 +147,156 @@ struct GoalDetailView: View {
         }
     }
 
-    private func consistencySection(_ d: GoalDetail) -> some View {
-        VStack(alignment: .leading, spacing: BrainStyle.s) {
+    private func consistencySection(_ d: GoalDetail, tint: GoalTint) -> some View {
+        let shown = GoalCalendar.shownUp(heatmap: d.heatmap, today: d.today)
+        return VStack(alignment: .leading, spacing: BrainStyle.s) {
             BrainSectionHeader(title: "Consistency")
             SectionCard {
                 VStack(alignment: .leading, spacing: BrainStyle.m) {
-                    Text(verbatim: GoalDetailCopy.consistencyLine(d.consistency)).brainText(.rowTitle)
-                    GoalHeatmapView(days: d.heatmap)
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(verbatim: GoalsCopy.streakTitle(d.streak.days)).brainText(.rowTitle)
+                        Spacer(minLength: BrainStyle.s)
+                        Text(verbatim: GoalDetailCopy.shownUpLine(shown)).brainText(.meta).monospacedDigit()
+                    }
+                    GoalCalendarGrid(
+                        weeks: GoalCalendar.weeks(heatmap: d.heatmap, today: d.today, deadline: d.summary.deadline),
+                        tint: tint
+                    )
                 }
-                .padding(.vertical, BrainStyle.s)
+                .padding(.vertical, BrainStyle.xs)
             }
         }
     }
 
     private func planSection(_ d: GoalDetail) -> some View {
-        DisclosureGroup {
-            VStack(alignment: .leading, spacing: BrainStyle.s) {
-                if !d.objective.isEmpty { Text(verbatim: d.objective).brainText(.rowSubtitle) }
-                ForEach(d.doneWhen, id: \.text) { item in
-                    Label {
-                        Text(verbatim: item.text).brainText(.rowSubtitle)
-                    } icon: {
-                        Image(systemName: item.checked ? "checkmark.square" : "square")
-                            .foregroundStyle(Color.hxTextSecondary)
+        SectionCard {
+            DisclosureGroup {
+                VStack(alignment: .leading, spacing: BrainStyle.s) {
+                    if !d.objective.isEmpty { Text(verbatim: d.objective).brainText(.rowSubtitle) }
+                    ForEach(Array(d.doneWhen.enumerated()), id: \.offset) { _, item in
+                        Label {
+                            Text(verbatim: item.text).brainText(.rowSubtitle)
+                        } icon: {
+                            Image(systemName: item.checked ? "checkmark.square" : "square")
+                                .foregroundStyle(Color.hxTextSecondary)
+                        }
                     }
+                    if !d.obstacle.isEmpty { Text(verbatim: "Watch for: \(d.obstacle)").brainText(.meta) }
                 }
-                if !d.obstacle.isEmpty { Text(verbatim: "Watch for: \(d.obstacle)").brainText(.meta) }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, BrainStyle.s)
+            } label: {
+                Text(verbatim: "Plan").brainText(.rowTitle)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, BrainStyle.s)
-        } label: {
-            Text(verbatim: "Plan").brainText(.sectionCaption).fontWeight(.semibold)
+            .tint(Color.hxTextSecondary)
+            .padding(.vertical, BrainStyle.xs)
         }
     }
 }
 
-/// One commitment: name, this week's count, cue and 2-minute version, then the four
-/// status buttons for the selected day.
+/// One commitment: short name and cue, with a check circle that marks Done on tap and
+/// offers the 2-minute version, Skip and Missed on long press.
 private struct GoalCommitmentRow: View {
     let row: GoalCommitmentProgress
     let day: GoalDay
-    let missTwice: Bool
+    let tint: GoalTint
     let isPending: Bool
     let onSelect: (GoalStatus) -> Void
 
     var body: some View {
         let isDue = day == .today ? row.dueToday : row.dueYesterday
         let selected = day == .today ? row.today : row.yesterday
-        VStack(alignment: .leading, spacing: BrainStyle.s) {
+        HStack(spacing: BrainStyle.m) {
             VStack(alignment: .leading, spacing: BrainStyle.xs) {
-                Text(verbatim: row.action).brainText(.rowTitle)
-                Text(verbatim: GoalDetailCopy.countLine(row)).brainText(.meta).monospacedDigit()
-                if !row.cue.isEmpty { Text(verbatim: row.cue).brainText(.rowSubtitle) }
-                if !row.minimum.isEmpty { Text(verbatim: "2-min: \(row.minimum)").brainText(.meta) }
+                Text(verbatim: GoalsCopy.shortTitle(row.action)).brainText(.rowTitle)
+                if !row.cue.isEmpty { Text(verbatim: row.cue).brainText(.rowSubtitle).lineLimit(2) }
             }
-            .accessibilityElement(children: .combine)
-            .opacity(isDue ? 1 : 0.6)
-            GoalChoiceRow(
-                options: GoalDetailCopy.statusOptions,
-                selected: selected?.rawValue,
-                disabledValues: GoalDetailCopy.skipDisabled(row, selected: selected) ? ["skip"] : [],
-                isDisabled: isPending,
-                accessibilityPrefix: row.action
-            ) { value in
-                onSelect(GoalStatus(rawValue: value) ?? .done)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .opacity(isDue || selected != nil ? 1 : 0.55)
+            Menu {
+                ForEach(GoalDetailCopy.statusOptions, id: \.value) { option in
+                    let status = GoalStatus(rawValue: option.value) ?? .done
+                    Button {
+                        onSelect(status)
+                    } label: {
+                        Label(GoalDetailCopy.menuTitle(status, row: row), systemImage: GoalDetailCopy.symbol(status))
+                    }
+                    .disabled(status == .skip && GoalDetailCopy.skipDisabled(row, selected: selected))
+                }
+            } label: {
+                GoalCheckCircle(status: selected, tint: tint, isPending: isPending)
+            } primaryAction: {
+                onSelect(.done)
             }
-            if missTwice, day == .today {
-                Text(verbatim: "Missed yesterday — even the 2-min version counts today.")
-                    .font(BrainStyle.meta)
-                    .foregroundStyle(Color.hxWarning)
-            }
+            .disabled(isPending)
+            .accessibilityLabel(Text(verbatim: "\(GoalsCopy.shortTitle(row.action)), \(GoalDetailCopy.spoken(selected))"))
+            .accessibilityHint(Text(verbatim: "Double-tap to mark done. Hold for more options."))
         }
         .padding(.vertical, BrainStyle.s)
+        .frame(minHeight: BrainStyle.minTapTarget)
     }
 }
 
-/// A row of capsule buttons; the selected one is filled with the accent.
+/// The check circle: empty until checked in, then filled in the goal's tint (or amber for Missed).
+private struct GoalCheckCircle: View {
+    let status: GoalStatus?
+    let tint: GoalTint
+    let isPending: Bool
+    @ScaledMetric(relativeTo: .body) private var side: CGFloat = 32
+
+    var body: some View {
+        ZStack {
+            switch status {
+            case .some(.done), .some(.min):
+                Circle().fill(status == .done ? tint.fill : tint.fill.opacity(0.55))
+                Image(systemName: GoalDetailCopy.symbol(status!))
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(tint.on)
+            case .some(.skip):
+                Circle().fill(Color.hxSeparator.opacity(0.7))
+                Image(systemName: GoalDetailCopy.symbol(.skip)).font(.footnote.weight(.semibold)).foregroundStyle(Color.hxTextSecondary)
+            case .some(.miss):
+                Circle().strokeBorder(Color.hxWarning, lineWidth: 2)
+                Image(systemName: GoalDetailCopy.symbol(.miss)).font(.footnote.weight(.bold)).foregroundStyle(Color.hxWarning)
+            default:
+                Circle().strokeBorder(tint.fill.opacity(0.7), lineWidth: 1.5)
+            }
+            if isPending { ProgressView().controlSize(.small) }
+        }
+        .frame(width: side, height: side)
+        .frame(width: BrainStyle.minTapTarget, height: BrainStyle.minTapTarget)
+        .contentShape(Rectangle())
+    }
+}
+
+/// A row of capsule choices, the selected one filled with the goal's tint. Wraps to two
+/// columns at accessibility text sizes.
 private struct GoalChoiceRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let options: [(value: String, label: String)]
     let selected: String?
-    var disabledValues: Set<String> = []
+    let tint: GoalTint
     let isDisabled: Bool
     let accessibilityPrefix: String
     let onSelect: (String) -> Void
 
     var body: some View {
-        // Four capsules don't fit one row at accessibility sizes; two rows of two do.
         let columns = dynamicTypeSize.isAccessibilitySize ? 2 : max(options.count, 1)
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: BrainStyle.s), count: columns),
                   spacing: BrainStyle.s) {
             ForEach(options, id: \.value) { option in
                 let isSelected = option.value == selected
-                let isOff = isDisabled || (disabledValues.contains(option.value) && !isSelected)
                 Button { onSelect(option.value) } label: {
                     Text(verbatim: option.label)
-                        .font(BrainStyle.rowSubtitle.weight(.semibold))
+                        .font(BrainStyle.rowSubtitle.weight(.medium))
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
-                        .foregroundStyle(isSelected ? Color.hxOnAccent : Color.hxTextPrimary)
+                        .foregroundStyle(isSelected ? tint.on : Color.hxTextPrimary)
                         .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget - 8)
-                        .background(isSelected ? Color.accentColor : Color.hxSeparator.opacity(0.5), in: Capsule())
+                        .background(isSelected ? tint.fill : Color.hxSeparator.opacity(0.45), in: Capsule())
                 }
                 .buttonStyle(.plain)
-                .disabled(isOff)
-                .opacity(isOff && !isSelected ? 0.5 : 1)
+                .disabled(isDisabled)
                 .accessibilityLabel(Text(verbatim: "\(accessibilityPrefix), \(option.label)"))
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
@@ -289,38 +304,99 @@ private struct GoalChoiceRow: View {
     }
 }
 
-/// Every day since the goal began, as week columns of seven squares (Monday on top).
-private struct GoalHeatmapView: View {
-    let days: [GoalHeatDay]
-    @ScaledMetric(relativeTo: .caption) private var side: CGFloat = 10
+/// One milestone on a vertical line: filled when done, ringed when next, hollow later.
+private struct GoalMilestoneRow: View {
+    let milestone: GoalMilestone
+    let today: String
+    let isNext: Bool
+    let isLast: Bool
+    let tint: GoalTint
 
     var body: some View {
-        let columns = GoalDetailCopy.heatmapColumns(days)
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(alignment: .top, spacing: 3) {
-                ForEach(Array(columns.enumerated()), id: \.offset) { _, week in
-                    VStack(spacing: 3) {
-                        ForEach(0..<7, id: \.self) { i in
-                            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                                .fill(week[i].map(Self.color) ?? Color.clear)
-                                .frame(width: side, height: side)
-                        }
-                    }
+        HStack(alignment: .top, spacing: BrainStyle.m) {
+            VStack(spacing: 0) {
+                Circle()
+                    .fill(milestone.done != nil || isNext ? tint.fill : Color.clear)
+                    .overlay(Circle().strokeBorder(tint.fill.opacity(milestone.done != nil || isNext ? 1 : 0.4), lineWidth: 2))
+                    .frame(width: 12, height: 12)
+                    .padding(.top, 5)
+                if !isLast {
+                    Rectangle().fill(tint.fill.opacity(0.25)).frame(width: 2).frame(maxHeight: .infinity)
+                }
+            }
+            .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: milestone.title).brainText(.rowTitle)
+                Text(verbatim: GoalDetailCopy.milestoneSubtitle(milestone, today: today)).brainText(.meta)
+            }
+            .padding(.bottom, isLast ? 0 : BrainStyle.m)
+        }
+        .padding(.vertical, BrainStyle.xs)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Every day from the goal's start to its deadline, Monday first, in the goal's tint.
+private struct GoalCalendarGrid: View {
+    let weeks: [[GoalCalendarDay?]]
+    let tint: GoalTint
+
+    var body: some View {
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 5), count: 7)
+        LazyVGrid(columns: columns, spacing: 5) {
+            ForEach(Array(["M", "T", "W", "T", "F", "S", "S"].enumerated()), id: \.offset) { _, letter in
+                Text(verbatim: letter).font(.caption2).foregroundStyle(Color.hxTextSecondary)
+            }
+            ForEach(Array(weeks.joined().enumerated()), id: \.offset) { _, day in
+                if let day {
+                    GoalCalendarCell(day: day, tint: tint)
+                } else {
+                    Color.clear.aspectRatio(1, contentMode: .fit)
                 }
             }
         }
-        .defaultScrollAnchor(.trailing)
-        .accessibilityElement()
-        .accessibilityLabel(Text(verbatim: GoalDetailCopy.heatmapSummary(days)))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: GoalDetailCopy.calendarSummary(weeks)))
     }
+}
 
-    private static func color(_ status: GoalStatus) -> Color {
-        switch status {
-        case .done: Color.hxSuccess
-        case .min: Color.hxSuccess.opacity(0.5)
-        case .skip: Color.hxTextSecondary.opacity(0.35)
-        case .miss: Color.hxDanger.opacity(0.45)
-        case .none, .unknown: Color.hxSeparator
+private struct GoalCalendarCell: View {
+    let day: GoalCalendarDay
+    let tint: GoalTint
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
+        let filled = !day.isFuture && (day.status != .none || day.isToday)
+        ZStack {
+            if day.isFuture {
+                shape.strokeBorder(Color.hxSeparator, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+            } else {
+                shape.fill(GoalPaper.fill(day.status, ink: tint.fill))
+            }
+            if day.isToday { shape.strokeBorder(tint.fill, lineWidth: 2) }
+            if day.isDeadline {
+                Image(systemName: "flag.checkered").font(.caption2.weight(.semibold)).foregroundStyle(tint.fill)
+            } else {
+                Text(verbatim: "\(day.dayOfMonth)")
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(filled && day.status.isShown ? tint.on : Color.hxTextSecondary)
+            }
+        }
+        .aspectRatio(1, contentMode: .fit)
+    }
+}
+
+/// A one-line note under the hero: an escalation or an unlock offer.
+private struct GoalNote: View {
+    let systemImage: String
+    let tint: Color
+    let text: String
+
+    var body: some View {
+        PrepNoteCard {
+            Label { Text(verbatim: text).font(BrainStyle.rowSubtitle).foregroundStyle(Color.hxTextPrimary) } icon: {
+                Image(systemName: systemImage).foregroundStyle(tint)
+            }
         }
     }
 }
@@ -342,32 +418,64 @@ enum GoalDetailCopy {
         selected != .skip && row.skipped >= row.skips
     }
 
-    static func consistencyLine(_ c: GoalConsistency) -> String {
-        c.weeks == 0 ? "First week in progress" : "\(c.weeksHit) of \(c.weeks) weeks hit"
+    static func menuTitle(_ status: GoalStatus, row: GoalCommitmentProgress) -> String {
+        switch status {
+        case .done: return "Done"
+        case .min: return row.minimum.isEmpty ? "2-minute version" : "2-minute version: \(row.minimum)"
+        case .skip:
+            let left = max(0, row.skips - row.skipped)
+            return left == 1 ? "Skip (1 left)" : "Skip (\(left) left)"
+        case .miss: return "Missed"
+        case .none, .unknown: return ""
+        }
+    }
+
+    static func symbol(_ status: GoalStatus) -> String {
+        switch status {
+        case .done: "checkmark"
+        case .min: "timer"
+        case .skip: "arrow.uturn.forward"
+        case .miss: "xmark"
+        case .none, .unknown: "circle"
+        }
+    }
+
+    static func spoken(_ status: GoalStatus?) -> String {
+        switch status {
+        case .some(.done): "done"
+        case .some(.min): "2-minute version"
+        case .some(.skip): "skipped"
+        case .some(.miss): "missed"
+        default: "not checked in"
+        }
+    }
+
+    /// "Foot today: better, same, or worse?" → "Foot today".
+    static func checkTitle(_ question: String) -> String {
+        let head = question.split(separator: ":").first.map(String.init) ?? question
+        return head.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "?", with: "")
+    }
+
+    static func milestoneSubtitle(_ m: GoalMilestone, today: String) -> String {
+        if m.done != nil { return "Done" }
+        guard let due = m.due else { return "" }
+        let relative = GoalsCopy.relativeDay(due, today: today)
+        return relative.prefix(1).uppercased() + relative.dropFirst()
     }
 
     static func unlockOffer(_ unlock: GoalUnlock, in goal: GoalSummary) -> String {
         let after = goal.week.commitments.first { $0.id == unlock.after }?.action ?? unlock.after
-        return "You held \(after.lowercased()) for a week. Ready to add \(unlock.action.lowercased())? Tell Atlas in chat."
+        return "You held \(GoalsCopy.shortTitle(after).lowercased()) for a week. Ready to add \(unlock.action.lowercased())? Tell Atlas in chat."
     }
 
-    /// Week columns of seven optional days, Monday first, padded before the first day.
-    static func heatmapColumns(_ days: [GoalHeatDay]) -> [[GoalStatus?]] {
-        guard let first = days.first, let start = GoalsCopy.isoDay(first.date) else { return [] }
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: "UTC")!
-        let lead = (cal.component(.weekday, from: start) + 5) % 7  // Monday = 0
-        var cells: [GoalStatus?] = Array(repeating: nil, count: lead) + days.map { $0.status }
-        while cells.count % 7 != 0 { cells.append(nil) }
-        return stride(from: 0, to: cells.count, by: 7).map { Array(cells[$0..<$0 + 7]) }
+    static func shownUpLine(_ shown: (shown: Int, total: Int)) -> String {
+        shown.total == 0 ? "Starts today" : "\(shown.shown) of \(shown.total) days"
     }
 
-    static func heatmapSummary(_ days: [GoalHeatDay]) -> String {
-        let shown = days.filter { $0.status.isShown }.count
-        return "\(shown) days shown up of \(days.count)"
+    static func calendarSummary(_ weeks: [[GoalCalendarDay?]]) -> String {
+        let past = weeks.joined().compactMap { $0 }.filter { !$0.isFuture }
+        let shown = past.filter { $0.status.isShown }.count
+        let left = weeks.joined().compactMap { $0 }.filter(\.isFuture).count
+        return "\(shown) of \(past.count) days shown up, \(left) days to go"
     }
-}
-
-private extension String {
-    var capitalizingFirst: String { prefix(1).uppercased() + dropFirst() }
 }

@@ -181,16 +181,16 @@ final class GoalsCopyTests: XCTestCase {
         XCTAssertEqual(GoalsCopy.relativeDay("2026-10-08", today: "2026-10-10"), "2 days ago")
     }
 
-    func testHeatmapColumnsStartOnMonday() {
-        // 2026-10-10 is a Saturday: five blank cells, then Sat, Sun; then Mon starts a new column.
-        let days = ["2026-10-10", "2026-10-11", "2026-10-12"].map {
-            try! PrepDecoding.decode(GoalHeatDay.self, from: Data(#"{"date":"\#($0)","status":"done"}"#.utf8))
-        }
-        let columns = GoalDetailCopy.heatmapColumns(days)
-        XCTAssertEqual(columns.count, 2)
-        XCTAssertEqual(columns[0].prefix(5).compactMap { $0 }.count, 0)
-        XCTAssertEqual(columns[0][5], .done)
-        XCTAssertEqual(columns[1][0], .done)
+    func testShortTitleDropsParenthetical() {
+        XCTAssertEqual(GoalsCopy.shortTitle("Nightly stretch (knee hugs, figure-4 twists, open books)"), "Nightly stretch")
+        XCTAssertEqual(GoalsCopy.shortTitle("Finish the NYC Marathon, uninjured"), "Finish the NYC Marathon, uninjured")
+    }
+
+    func testCheckTitleAndWeekSummary() throws {
+        XCTAssertEqual(GoalDetailCopy.checkTitle("Foot today: better, same, or worse?"), "Foot today")
+        let home = try PrepDecoding.decode(GoalsHome.self, from: Data(GoalsModelsTests.homeSample.utf8))
+        XCTAssertEqual(GoalHeroCopy.weekSummary(home.goals[0].week.commitments), "Stretch 0/6 · Run 0/1 · 1 skip left")
+        XCTAssertEqual(GoalHeroCopy.countdown(home.goals[0]), "22 days · Sun Nov 1")
     }
 
     func testSkipDisabledWhenBudgetSpentUnlessAlreadySkipped() throws {
