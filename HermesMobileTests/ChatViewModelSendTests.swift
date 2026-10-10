@@ -2909,6 +2909,60 @@ final class ChatViewModelSendTests: XCTestCase {
     }
 
     @MainActor
+    func testColdReopenReplayDoesNotRepeatEarlierTrimmedSegmentsOfTheTurn() async throws {
+        ChatViewModel.resetActiveStreamSnapshotsForTesting()
+        let streamClient = SpySSEStreamingClient()
+        let viewModel = try makeViewModel(streamClient: streamClient) { request in
+            switch request.url?.path {
+            case "/api/session":
+                return apiTestJSONResponse("""
+                {
+                  "session": {
+                    "session_id": "session-abc",
+                    "active_stream_id": "stream-123",
+                    "messages": [
+                      {"role": "user", "content": "Find notes", "timestamp": 1, "message_id": "user-1"},
+                      {"role": "assistant", "content": "I'll search your notes.", "timestamp": 2},
+                      {"role": "tool", "content": "{}", "tool_call_id": "call-1", "timestamp": 3},
+                      {"role": "assistant", "content": "Let me look closer.", "timestamp": 4},
+                      {"role": "tool", "content": "{}", "tool_call_id": "call-2", "timestamp": 5}
+                    ]
+                  }
+                }
+                """, for: request)
+            case "/api/chat/stream/status":
+                return apiTestJSONResponse("""
+                {"active": true, "stream_id": "stream-123", "replay_available": true}
+                """, for: request)
+            default:
+                XCTFail("Unexpected request path: \(request.url?.path ?? "nil")")
+                throw URLError(.badURL)
+            }
+        }
+
+        await viewModel.loadMessages()
+        await viewModel.reconnectStreamIfNeeded()
+
+        // The journal replays every segment with the whitespace the server trimmed.
+        streamClient.emit(.token("\n\nI"), lastEventID: "stream-123:1")
+        streamClient.emit(.token("'ll search your notes.\n\n"), lastEventID: "stream-123:2")
+        streamClient.emit(.token("\n"), lastEventID: "stream-123:3")
+        streamClient.emit(.token("\n\nLet me look"), lastEventID: "stream-123:4")
+        streamClient.emit(.token(" closer.\n\n"), lastEventID: "stream-123:5")
+        XCTAssertTrue(viewModel.isActiveStreamReplayConnection)
+        streamClient.emit(.token("\n\nHere's what"), lastEventID: "stream-123:6")
+        streamClient.emit(.token(" I found."), lastEventID: "stream-123:7")
+        viewModel.flushPendingStreamingContent()
+
+        XCTAssertFalse(viewModel.isActiveStreamReplayConnection)
+        XCTAssertEqual(viewModel.messages.filter { $0.role == "assistant" }.compactMap(\.content), [
+            "I'll search your notes.",
+            "Let me look closer.",
+            "Here's what I found."
+        ])
+    }
+
+    @MainActor
     func testColdReopenActiveStreamReplaysFromStartWithoutDuplicatingLoadedState() async throws {
         ChatViewModel.resetActiveStreamSnapshotsForTesting()
         let streamClient = SpySSEStreamingClient()
