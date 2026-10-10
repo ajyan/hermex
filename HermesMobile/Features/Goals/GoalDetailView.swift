@@ -223,14 +223,23 @@ private struct GoalCommitmentRow: View {
                     }
                     .disabled(status == .skip && GoalDetailCopy.skipDisabled(row, selected: selected))
                 }
+                if selected != nil {
+                    Divider()
+                    Button(role: .destructive) { onSelect(.clear) } label: {
+                        Label("Clear check-in", systemImage: "arrow.uturn.backward")
+                    }
+                }
             } label: {
                 GoalCheckCircle(status: selected, tint: tint, isPending: isPending)
             } primaryAction: {
-                onSelect(.done)
+                // Tap checks in as done; tapping a checked circle clears it.
+                onSelect(selected == nil ? .done : .clear)
             }
             .disabled(isPending)
             .accessibilityLabel(Text(verbatim: "\(GoalsCopy.shortTitle(row.action)), \(GoalDetailCopy.spoken(selected))"))
-            .accessibilityHint(Text(verbatim: "Double-tap to mark done. Hold for more options."))
+            .accessibilityHint(Text(verbatim: selected == nil
+                ? "Double-tap to mark done. Hold for more options."
+                : "Double-tap to clear. Hold for more options."))
         }
         .padding(.vertical, BrainStyle.s)
         .frame(minHeight: BrainStyle.minTapTarget)
@@ -286,7 +295,8 @@ private struct GoalChoiceRow: View {
                   spacing: BrainStyle.s) {
             ForEach(options, id: \.value) { option in
                 let isSelected = option.value == selected
-                Button { onSelect(option.value) } label: {
+                // Tapping the selected answer again clears it.
+                Button { onSelect(isSelected ? GoalCheckValue.clear : option.value) } label: {
                     Text(verbatim: option.label)
                         .font(BrainStyle.rowSubtitle.weight(.medium))
                         .lineLimit(1)
@@ -426,7 +436,7 @@ enum GoalDetailCopy {
             let left = max(0, row.skips - row.skipped)
             return left == 1 ? "Skip (1 left)" : "Skip (\(left) left)"
         case .miss: return "Missed"
-        case .none, .unknown: return ""
+        case .none, .clear, .unknown: return ""
         }
     }
 
@@ -436,6 +446,7 @@ enum GoalDetailCopy {
         case .min: "timer"
         case .skip: "arrow.uturn.forward"
         case .miss: "xmark"
+        case .clear: "arrow.uturn.backward"
         case .none, .unknown: "circle"
         }
     }

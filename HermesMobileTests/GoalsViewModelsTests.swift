@@ -41,6 +41,22 @@ private func detail() throws -> GoalDetail {
     try PrepDecoding.decode(GoalDetail.self, from: Data(GoalsModelsTests.detailJSON().utf8))
 }
 
+/// The detail fixture with tonight's stretch already done and the foot marked worse today.
+private func checkedDetail() throws -> GoalDetail {
+    var goal = try JSONSerialization.jsonObject(with: Data(GoalsModelsTests.detailJSON().utf8)) as! [String: Any]
+    var week = goal["week"] as! [String: Any]
+    var commitments = week["commitments"] as! [[String: Any]]
+    commitments[0]["today"] = "done"
+    commitments[0]["done"] = 1
+    commitments[0]["remaining"] = 5
+    week["commitments"] = commitments
+    goal["week"] = week
+    var checks = goal["daily_checks"] as! [[String: Any]]
+    checks[0]["today"] = "worse"
+    goal["daily_checks"] = checks
+    return try PrepDecoding.decode(GoalDetail.self, from: JSONSerialization.data(withJSONObject: goal))
+}
+
 /// A check-in response whose first commitment reports `done` completions and `today` status.
 private func result(done: Int, today: String) throws -> GoalCheckInResult {
     let home = try JSONSerialization.jsonObject(with: Data(GoalsModelsTests.homeSample.utf8)) as! [String: Any]
@@ -140,6 +156,60 @@ final class GoalsViewModelsTests: XCTestCase {
         let vm = try await loadedViewModel(client)
         await vm.checkIn(commitment: "stretch-pm", status: .done)
         XCTAssertEqual(client.log, ["detail:nyc-marathon-2026", "checkIn", "detail:nyc-marathon-2026"])
+    }
+
+    func testClearIsOptimisticAndPostsClear() async throws {
+        let client = FakeGoalsClient()
+        let (started, startedCont) = AsyncStream<Void>.makeStream()
+        let (release, releaseCont) = AsyncStream<Void>.makeStream()
+        client.gate = (startedCont, release)
+        client.detailResults = [.success(try checkedDetail())]
+        client.checkInResults = [.success(try result(done: 0, today: "done"))]
+        let vm = GoalDetailViewModel(slug: "nyc-marathon-2026", client: client)
+        await vm.load()
+        vm.day = .today
+        let tap = Task { await vm.checkIn(commitment: "stretch-pm", status: .clear) }
+        for await _ in started { break }
+        XCTAssertNil(stretch(vm)?.today)
+        XCTAssertEqual(stretch(vm)?.done, 0)
+        XCTAssertEqual(stretch(vm)?.remaining, 6)
+        releaseCont.yield()
+        await tap.value
+        XCTAssertEqual(client.checkIns, [
+            .commitment(slug: "nyc-marathon-2026", date: "2026-10-13", asOf: "2026-10-13", id: "stretch-pm", status: .clear),
+        ])
+    }
+
+    func testClearFailureRestoresTheCheck() async throws {
+        let client = FakeGoalsClient()
+        client.detailResults = [.success(try checkedDetail())]
+        client.checkInResults = [.failure(URLError(.notConnectedToInternet))]
+        let vm = GoalDetailViewModel(slug: "nyc-marathon-2026", client: client)
+        await vm.load()
+        vm.day = .today
+        await vm.checkIn(commitment: "stretch-pm", status: .clear)
+        XCTAssertEqual(stretch(vm)?.today, .done)
+        XCTAssertEqual(stretch(vm)?.done, 1)
+        XCTAssertEqual(vm.error, "Couldn't save. Try again.")
+    }
+
+    func testClearDailyCheck() async throws {
+        let client = FakeGoalsClient()
+        let (started, startedCont) = AsyncStream<Void>.makeStream()
+        let (release, releaseCont) = AsyncStream<Void>.makeStream()
+        client.gate = (startedCont, release)
+        client.detailResults = [.success(try checkedDetail())]
+        client.checkInResults = [.success(try result(done: 1, today: "done"))]
+        let vm = GoalDetailViewModel(slug: "nyc-marathon-2026", client: client)
+        await vm.load()
+        vm.day = .today
+        let tap = Task { await vm.checkIn(check: "foot", value: GoalCheckValue.clear) }
+        for await _ in started { break }
+        guard case .loaded(let d) = vm.state else { return XCTFail("not loaded") }
+        XCTAssertNil(d.summary.dailyChecks.first?.today)
+        releaseCont.yield()
+        await tap.value
+        XCTAssertEqual(client.checkIns, [.check(slug: "nyc-marathon-2026", date: "2026-10-13", asOf: "2026-10-13", id: "foot", value: "clear")])
     }
 
     func testDoubleTapPostsOnce() async throws {
