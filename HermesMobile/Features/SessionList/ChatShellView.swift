@@ -79,6 +79,8 @@ struct ChatShellView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var viewModel: SessionListViewModel
     @State private var navigation = ShellNavigationState()
+    /// Lets chat replies open Brain pages (`brain://` links) on this stack.
+    @State private var brainRouteOpener = OpenBrainRouteAction()
     /// The drawer is built on first open and kept alive, so it keeps its scroll position.
     @State private var hasOpenedDrawer = false
     /// False while ChatView pushes its own screens (Files, forks), which the typed path cannot see.
@@ -500,8 +502,10 @@ struct ChatShellView: View {
     }
 
     private var mainStack: some View {
-        NavigationStack(path: $navigation.path) {
+        brainRouteOpener.handler = { navigation.path.append(.brainRoute($0)) }
+        return NavigationStack(path: $navigation.path) {
             rootView
+                .environment(\.openBrainRoute, brainRouteOpener)
                 .toolbar { shellToolbar }
                 .onAppear { isRootVisible = true }
                 .onDisappear { isRootVisible = false }
