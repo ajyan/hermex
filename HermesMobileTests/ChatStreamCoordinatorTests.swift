@@ -2543,6 +2543,7 @@ final class ChatStreamCoordinatorTests: APIClientTestCase {
         let container = try ModelContainer(
             for: CachedSession.self,
             CachedMessage.self,
+            CachedBrainEntry.self,
             configurations: configuration
         )
         return ModelContext(container)

@@ -94,6 +94,74 @@ final class SSEClientTests: XCTestCase {
         )
     }
 
+    /// A server or proxy that closes a resumed chat stream cleanly must not let
+    /// LDSwiftEventSource reopen the same URL: its `after_seq` is stale by then,
+    /// the server replays everything after it, and the transcript shows the
+    /// already-rendered text twice. The close surfaces as a transport error so
+    /// the coordinator resumes from its latest cursor instead.
+    func testServerCloseIsReportedInsteadOfReopeningTheStaleResumeURL() async {
+        DelayedSSEURLProtocol.configure(chunks: [
+            DelayedSSEChunk(
+                text: "id: stream-123:6\nevent: token\ndata: {\"text\":\"Alpha \"}\n\n",
+                delayNanoseconds: 0
+            )
+        ])
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [DelayedSSEURLProtocol.self]
+        let client = SSEClient(urlSessionConfiguration: configuration, reconnectsAfterServerClose: false)
+        let closed = expectation(description: "server close reported")
+        var tokens: [String] = []
+
+        client.start(
+            url: URL(string: "https://example.test/api/chat/stream?stream_id=stream-123&replay=1&after_seq=5")!
+        ) { event in
+            switch event {
+            case .token(let text):
+                tokens.append(text)
+            case .transportError:
+                closed.fulfill()
+            default:
+                break
+            }
+        }
+
+        await fulfillment(of: [closed], timeout: 5)
+
+        XCTAssertEqual(tokens, ["Alpha "])
+        XCTAssertEqual(DelayedSSEURLProtocol.capturedRequests().count, 1)
+        XCTAssertEqual(client.lastEventID, "stream-123:6", "the coordinator resumes from this cursor")
+        client.stop()
+    }
+
+    /// Stopping a connection (to reconnect or finish) is not a server close:
+    /// nothing from the stopped connection reaches its handler afterwards.
+    func testStoppedConnectionReportsNothingAfterStop() async {
+        DelayedSSEURLProtocol.configure(chunks: [
+            DelayedSSEChunk(text: ": heartbeat\n\n", delayNanoseconds: 0),
+            DelayedSSEChunk(text: "event: token\ndata: {\"text\":\"late\"}\n\n", delayNanoseconds: 30_000_000_000)
+        ])
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [DelayedSSEURLProtocol.self]
+        let client = SSEClient(urlSessionConfiguration: configuration, reconnectsAfterServerClose: false)
+        let firstHeartbeat = expectation(description: "first connection opened")
+        let secondHeartbeat = expectation(description: "second connection opened")
+        var firstEvents: [SSEEvent] = []
+
+        client.start(url: URL(string: "https://example.test/api/chat/stream?stream_id=stream-123")!) { event in
+            firstEvents.append(event)
+            if event == .heartbeat { firstHeartbeat.fulfill() }
+        }
+        await fulfillment(of: [firstHeartbeat], timeout: 5)
+
+        client.start(url: URL(string: "https://example.test/api/chat/stream?stream_id=stream-123")!) { event in
+            if event == .heartbeat { secondHeartbeat.fulfill() }
+        }
+        await fulfillment(of: [secondHeartbeat], timeout: 5)
+        client.stop()
+
+        XCTAssertEqual(firstEvents, [.heartbeat])
+    }
+
     func testSSEClientForwardsHeartbeatComments() async {
         DelayedSSEURLProtocol.configure(chunks: [
             DelayedSSEChunk(text: ": heartbeat\n\n", delayNanoseconds: 0)
@@ -682,28 +750,32 @@ private struct DelayedSSEChunk {
 private final class DelayedSSEURLProtocol: URLProtocol {
     private static let lock = NSLock()
     private static var chunks: [DelayedSSEChunk] = []
-    private static var lastRequest: URLRequest?
+    private static var requests: [URLRequest] = []
 
     private var loadingTask: Task<Void, Never>?
 
     static func configure(chunks: [DelayedSSEChunk]) {
         lock.lock()
         self.chunks = chunks
-        lastRequest = nil
+        requests = []
         lock.unlock()
     }
 
     static func reset() {
         lock.lock()
         chunks = []
-        lastRequest = nil
+        requests = []
         lock.unlock()
     }
 
     static func capturedRequest() -> URLRequest? {
+        capturedRequests().last
+    }
+
+    static func capturedRequests() -> [URLRequest] {
         lock.lock()
         defer { lock.unlock() }
-        return lastRequest
+        return requests
     }
 
     override class func canInit(with request: URLRequest) -> Bool {
@@ -717,7 +789,7 @@ private final class DelayedSSEURLProtocol: URLProtocol {
     override func startLoading() {
         let chunks: [DelayedSSEChunk]
         Self.lock.lock()
-        Self.lastRequest = request
+        Self.requests.append(request)
         chunks = Self.chunks
         Self.lock.unlock()
 

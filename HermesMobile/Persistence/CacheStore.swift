@@ -250,6 +250,11 @@ enum CacheStore {
         }
 
         try context.save()
+
+        // Brain pages are server-keyed too; removing a server removes them.
+        // Runs after the session/message purge is saved so a Brain failure
+        // cannot block it.
+        try BrainCache.clear(server: serverURL, in: context)
     }
 
     /// Saves a cache write, then enforces the TTL and the message cap. The write

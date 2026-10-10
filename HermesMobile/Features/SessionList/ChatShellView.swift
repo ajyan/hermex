@@ -64,6 +64,7 @@ struct ChatShellView: View {
     private let openNextSharedImport: () -> Void
     @Binding private var pendingDeepLinkedSessionID: String?
     @Binding private var requestedNewChat: NewChatRequest?
+    @Binding private var requestedDailyBrief: Bool
     /// The bot a deep link named. Non-nil flips this screen to the Bots inbox, which
     /// resolves it against its live roster and clears it (#554).
     @Binding private var pendingBotDestination: BotDestination?
@@ -99,6 +100,11 @@ struct ChatShellView: View {
     @State private var returnRefreshID: UUID?
     @State private var actionToast = ActionToastState()
     @State private var archiveToastRoute = SessionListArchiveToastRoute()
+    /// The running auto-archive pass; owned here so it ends with the shell.
+    @State private var autoArchiveTask: Task<Void, Never>?
+    /// Chats the last pass archived, held until the drawer (the toast's host) is open.
+    @State private var pendingAutoArchived: [SessionSummary] = []
+    @State private var isPresentingArchiveReview = false
     @FocusState private var searchFieldIsFocused: Bool
     @AppStorage(SessionRowDisplaySettings.showMessageCountKey) private var showsSessionMessageCount = true
     @AppStorage(SessionRowDisplaySettings.showWorkspaceKey) private var showsSessionWorkspace = true
@@ -131,6 +137,7 @@ struct ChatShellView: View {
         openNextSharedImport: @escaping () -> Void = {},
         pendingDeepLinkedSessionID: Binding<String?> = .constant(nil),
         requestedNewChat: Binding<NewChatRequest?> = .constant(nil),
+        requestedDailyBrief: Binding<Bool> = .constant(false),
         pendingBotDestination: Binding<BotDestination?> = .constant(nil),
         pendingWebuiPush: Binding<WebuiPushDestination?> = .constant(nil),
         draftStore: ChatDraftStore? = nil
@@ -144,6 +151,7 @@ struct ChatShellView: View {
         self.draftStore = draftStore ?? .shared
         _pendingDeepLinkedSessionID = pendingDeepLinkedSessionID
         _requestedNewChat = requestedNewChat
+        _requestedDailyBrief = requestedDailyBrief
         _pendingBotDestination = pendingBotDestination
         _pendingWebuiPush = pendingWebuiPush
         _viewModel = State(initialValue: SessionListViewModel(server: server))
@@ -165,6 +173,7 @@ struct ChatShellView: View {
                 }
                 if phase == .active, wasBackgrounded {
                     wasBackgrounded = false
+                    viewModel.noteAppForegrounded()
                     if foregroundRefresh.appReturned(
                         didCompleteInitialLoad: didCompleteInitialLoad,
                         isLoading: viewModel.isLoading
@@ -284,6 +293,11 @@ struct ChatShellView: View {
                 }
                 .presentationDetents([.medium])
             }
+            .sheet(isPresented: $isPresentingArchiveReview) {
+                ArchiveReviewSheet(viewModel: viewModel) { session in
+                    removeSessionFromNavigation(session)
+                }
+            }
             .sheet(isPresented: $isPresentingAddServer) {
                 // Reuse #17's add-server flow directly as a power-user shortcut.
                 // On success `addServer` switches the active server, which
@@ -333,10 +347,12 @@ struct ChatShellView: View {
             .onAppear {
                 openPendingSharedImportIfNeeded()
                 openRequestedNewChatIfNeeded()
+                openRequestedDailyBriefIfNeeded()
                 refreshAfterReturningIfNeeded()
             }
             .onDisappear {
                 sessionOpenTask?.cancel()
+                autoArchiveTask?.cancel()
                 viewModel.invalidateSessionOpening()
                 actionToast.dismiss()
             }
@@ -354,6 +370,9 @@ struct ChatShellView: View {
             }
             .onChange(of: requestedNewChat) {
                 openRequestedNewChatIfNeeded()
+            }
+            .onChange(of: requestedDailyBrief) {
+                openRequestedDailyBriefIfNeeded()
             }
             .onChange(of: navigation.root) { oldValue, newValue in
                 if case .session(let previous) = oldValue, previous.sessionId != navigation.selectedSessionID {
@@ -373,6 +392,7 @@ struct ChatShellView: View {
                 // Closing by any path (scrim, Esc, picking a row) must not leave the
                 // keyboard typing into the hidden search field.
                 if !isOpen { searchFieldIsFocused = false }
+                if isOpen { showPendingAutoArchiveToast() }
                 guard ShellNavigationState.drawerOpenRequestsRefresh(wasOpen: wasOpen, isOpen: isOpen) else { return }
                 refreshAfterReturningIfNeeded()
             }
@@ -503,7 +523,10 @@ struct ChatShellView: View {
                 server: server,
                 onAPIError: authManager.handleAPIError,
                 callRequest: callRequest,
-                draftStore: draftStore
+                draftStore: draftStore,
+                onSessionRenamed: { sessionID, title in
+                    viewModel.applyConfirmedRename(sessionID: sessionID, title: title, modelContext: modelContext)
+                }
             )
             .id(session.id)
         case .newChat(let route):
@@ -547,7 +570,7 @@ struct ChatShellView: View {
                 .disabled(viewModel.isViewingCachedData)
                 .accessibilityLabel("Call Atlas")
             } else {
-                // In a conversation, call on it; New Chat stays in the drawer and on long press.
+                // In a conversation, call on it; New Chat stays on the drawer's compose button and on long press.
                 Button { callRequest += 1 } label: {
                     Image(systemName: "phone")
                 }
@@ -577,6 +600,23 @@ struct ChatShellView: View {
             DailyDeckView(server: server) { sessionID in
                 Task { await openDeepLinkedSession(id: sessionID) }
             }
+        case .brain:
+            BrainHomeView(
+                server: server,
+                modelContext: modelContext,
+                onAPIError: authManager.handleAPIError,
+                push: { navigation.path.append(.brainRoute($0)) }
+            )
+            .adaptiveSecondaryNavigationTitle()
+        case .goals:
+            GoalsHomeView(server: server, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
+        case .goal(let slug):
+            GoalDetailView(slug: slug, server: server, onAPIError: authManager.handleAPIError)
+                .id(slug)
+        case .brainRoute(let route):
+            // Keyed by route so a destination's view models can never carry over to another page.
+            brainDestination(route).id(route)
         case .projects:
             ProjectsView(
                 viewModel: viewModel,
@@ -596,6 +636,51 @@ struct ChatShellView: View {
                 showsWorkspace: showsSessionWorkspace,
                 startChat: { selectDestination(PendingNewChatRoute(projectID: projectID)) }
             )
+        }
+    }
+
+    @ViewBuilder
+    private func brainDestination(_ route: BrainRoute) -> some View {
+        switch route {
+        case .module(.highlights):
+            BrainHighlightsView(
+                server: server,
+                modelContext: modelContext,
+                onAPIError: authManager.handleAPIError,
+                push: { navigation.path.append(.brainRoute($0)) }
+            )
+            .adaptiveSecondaryNavigationTitle()
+        case .module(let module):
+            BrainModuleListView(
+                module: module,
+                server: server,
+                modelContext: modelContext,
+                onAPIError: authManager.handleAPIError,
+                push: { navigation.path.append(.brainRoute($0)) }
+            )
+            .adaptiveSecondaryNavigationTitle()
+        case .page(let module, let id) where BrainHighlightsBookView.isBook(module: module, id: id):
+            BrainHighlightsBookView(id: id, server: server, modelContext: modelContext, onAPIError: authManager.handleAPIError)
+        case .page(let module, let id):
+            BrainReaderView(
+                module: module,
+                id: id,
+                server: server,
+                modelContext: modelContext,
+                onAPIError: authManager.handleAPIError,
+                push: { navigation.path.append(.brainRoute($0)) }
+            )
+        case .searchAll(let module, let query):
+            BrainSearchView(module: module, query: query, server: server, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
+        case .prep(.home):
+            PrepHomeView(server: server, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
+        case .prep(.track(let track)):
+            PrepTrackView(track: track, server: server, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
+        case .prep(.run):
+            PrepRunView(server: server, onAPIError: authManager.handleAPIError)
         }
     }
 
@@ -621,7 +706,13 @@ struct ChatShellView: View {
             switchActiveProfile: { profile in
                 Task { await switchActiveProfile(profile) }
             },
-            pendingBotDestination: $pendingBotDestination
+            pendingBotDestination: $pendingBotDestination,
+            onCleanUpOldChats: viewModel.isViewingCachedData ? nil : {
+                // Back to the chat list, where the Undo toast and review sheet live.
+                navigation.path.removeAll()
+                setDrawerOpen(true)
+                cleanUpOldChats()
+            }
         )
         .adaptiveSecondaryNavigationTitle()
     }
@@ -654,6 +745,7 @@ struct ChatShellView: View {
             canCreateNewChat: !viewModel.isViewingCachedData && !navigation.isCreatingNewChat,
             onNewChat: openNewChat,
             onOpen: { navigation.push($0) },
+            onReviewArchiveCandidates: { isPresentingArchiveReview = true },
             refresh: { await refreshSessionsAndActiveProfile() }
         ) {
             AvatarServerSwitcherMenu(
@@ -693,7 +785,8 @@ struct ChatShellView: View {
             memory: showsMemorySection,
             insights: showsInsightsSection,
             activeProfile: showsActiveProfileSection,
-            projects: showsProjectsSection
+            projects: showsProjectsSection,
+            brain: true
         )
     }
 
@@ -739,6 +832,9 @@ struct ChatShellView: View {
             },
             archive: { session in
                 Task { await archive(session) }
+            },
+            summarizeAndArchive: { session in
+                Task { await summarizeAndArchive(session) }
             },
             delete: { session in
                 sessionPendingDeletion = session
@@ -880,6 +976,108 @@ struct ChatShellView: View {
         await viewModel.load(modelContext: modelContext)
         guard !Task.isCancelled else { return }
         handleLastError()
+        startAutoArchivePassIfDue()
+    }
+
+    /// Starts this foreground's auto-archive pass after a live load. It runs
+    /// in its own task so a refresh that replaces the load task can't cut it short.
+    private func startAutoArchivePassIfDue() {
+        guard viewModel.isAutoArchiveDue, autoArchiveTask == nil else { return }
+        autoArchiveTask = Task {
+            let archived = await viewModel.runAutoArchivePassIfDue(
+                excludingSessionID: navigation.selectedSessionID,
+                modelContext: modelContext
+            )
+            autoArchiveTask = nil
+            guard !Task.isCancelled else { return }
+            handleLastError()
+            guard !archived.isEmpty else { return }
+            pendingAutoArchived = archived
+            showPendingAutoArchiveToast()
+        }
+    }
+
+    /// Settings' "Clean Up Old Chats Now": an auto-archive pass right now, even with
+    /// auto-archive off. Throwaways archive with the usual Undo toast; keepers and
+    /// coding projects open the review sheet.
+    private func cleanUpOldChats() {
+        guard autoArchiveTask == nil else { return }
+        autoArchiveTask = Task {
+            let archived = await viewModel.runAutoArchivePassIfDue(
+                excludingSessionID: navigation.selectedSessionID,
+                modelContext: modelContext,
+                now: true
+            )
+            autoArchiveTask = nil
+            guard !Task.isCancelled else { return }
+            handleLastError()
+            if !archived.isEmpty {
+                pendingAutoArchived = archived
+                showPendingAutoArchiveToast()
+            }
+            if !viewModel.archiveReviewCandidates.isEmpty {
+                isPresentingArchiveReview = true
+            } else if archived.isEmpty {
+                let days = viewModel.autoArchiveStore.settings(for: server).idleDays
+                let message = String(localized: "No chats idle for \(days)+ days")
+                actionToast.show(ActionToast(
+                    message: message,
+                    systemImage: "archivebox",
+                    accessibilityLabel: message,
+                    actionTitle: String(localized: "Settings"),
+                    action: { navigation.push(.settings(nil)) }
+                ))
+            }
+        }
+    }
+
+    /// "Archived N idle chats · Undo", shown once the drawer is open.
+    private func showPendingAutoArchiveToast() {
+        guard navigation.isDrawerOpen, !pendingAutoArchived.isEmpty else { return }
+        let batch = pendingAutoArchived
+        pendingAutoArchived = []
+        let message = String(localized: "Archived \(batch.count) idle chats")
+        actionToast.show(
+            ActionToast(
+                message: message,
+                systemImage: "archivebox",
+                accessibilityLabel: message,
+                actionTitle: String(localized: "Undo"),
+                action: {
+                    Task {
+                        _ = await viewModel.undoAutoArchive(batch, modelContext: modelContext)
+                        handleLastError()
+                    }
+                }
+            )
+        )
+    }
+
+    /// The row menu's Summarize & Archive. A failure leaves the chat in place
+    /// and says why in a toast that can retry.
+    private func summarizeAndArchive(_ session: SessionSummary) async {
+        if let failure = await viewModel.summarizeAndArchive(session, modelContext: modelContext) {
+            handleLastError()
+            actionToast.show(
+                ActionToast(
+                    message: String(localized: "Summary failed"),
+                    systemImage: "exclamationmark.triangle",
+                    accessibilityLabel: String.localizedStringWithFormat(
+                        String(localized: "%@, %@"),
+                        SessionRowView.displayTitle(for: session),
+                        failure
+                    ),
+                    actionTitle: String(localized: "Retry"),
+                    action: {
+                        Task { await summarizeAndArchive(session) }
+                    }
+                )
+            )
+            return
+        }
+        guard !viewModel.sessions.contains(where: { $0.sessionId == session.sessionId }) else { return }
+        removeSessionFromNavigation(session)
+        SessionHaptics.archiveStateChanged(isEnabled: isHapticsEnabled)
     }
 
     /// Skipped while the list shows cached rows: the server was unreachable a
@@ -919,6 +1117,7 @@ struct ChatShellView: View {
         handleLastError()
 
         if didArchive {
+            viewModel.recordManualArchive(session)
             removeSessionFromNavigation(session)
             SessionHaptics.archiveStateChanged(isEnabled: isHapticsEnabled)
             if archiveToastRoute.archiveConfirmed(archiveNumber, isListShowing: isArchiveToastHostShowing) {
@@ -960,6 +1159,7 @@ struct ChatShellView: View {
         handleLastError()
 
         if didUnarchive {
+            viewModel.forgetManualArchive(session)
             SessionHaptics.archiveStateChanged(isEnabled: isHapticsEnabled)
         }
     }
@@ -1126,6 +1326,13 @@ struct ChatShellView: View {
     /// mirroring the "+" button. Carries `autoStartsVoiceInput` so the voice variant begins
     /// dictation once the composer appears. The request is cleared so it fires once per
     /// invocation.
+    /// A Daily Brief notification tap: show the brief over whatever chat is open.
+    private func openRequestedDailyBriefIfNeeded() {
+        guard requestedDailyBrief else { return }
+        requestedDailyBrief = false
+        if navigation.path.last != .dailyDeck { navigation.showOnly(.dailyDeck) }
+    }
+
     private func openRequestedNewChatIfNeeded() {
         guard let request = requestedNewChat else { return }
         requestedNewChat = nil

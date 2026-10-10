@@ -22,6 +22,8 @@ struct SettingsView: View {
     /// the Active Profile row (Bot-mode servers have none).
     let profileViewModel: SessionListViewModel?
     let switchActiveProfile: (ProfileSummary) -> Void
+    /// Runs an auto-archive pass now, back in the chat list. Nil while showing cached data.
+    let onCleanUpOldChats: (() -> Void)?
     /// A bot deep link waiting for the Bots inbox; Settings pushes Bots for it.
     @Binding var pendingBotDestination: BotDestination?
 
@@ -32,7 +34,8 @@ struct SettingsView: View {
         onDefaultProfileSelected: @escaping (DefaultProfileSelection) -> Void = { _ in },
         profileViewModel: SessionListViewModel? = nil,
         switchActiveProfile: @escaping (ProfileSummary) -> Void = { _ in },
-        pendingBotDestination: Binding<BotDestination?> = .constant(nil)
+        pendingBotDestination: Binding<BotDestination?> = .constant(nil),
+        onCleanUpOldChats: (() -> Void)? = nil
     ) {
         self.authManager = authManager
         self.server = server
@@ -40,6 +43,7 @@ struct SettingsView: View {
         self.onDefaultProfileSelected = onDefaultProfileSelected
         self.profileViewModel = profileViewModel
         self.switchActiveProfile = switchActiveProfile
+        self.onCleanUpOldChats = onCleanUpOldChats
         _pendingBotDestination = pendingBotDestination
         // The CLI-sessions toggle is server-synced (#19): loads adopt the
         // server's `show_cli_sessions`, toggles POST it back, failures revert.
@@ -547,6 +551,8 @@ struct SettingsView: View {
                             SettingsFootnote(String(localized: "Session visibility is synced with this server, so the WebUI follows it too."))
                         }
                     }
+
+                    AutoArchiveSettingsCard(server: server, onCleanUpNow: onCleanUpOldChats)
                 }
 
                 SettingsCard(title: String(localized: "Siri & Shortcuts")) {
@@ -2825,5 +2831,83 @@ struct AddServerView: View {
 #Preview {
     NavigationStack {
         SettingsView(authManager: AuthManager(), server: URL(staticString: "https://webui.example.test"))
+    }
+}
+
+/// This server's auto-archive preferences (per server, like the CLI toggle):
+/// whether idle chats are archived on open, after how long, and whether chats
+/// worth keeping wait for review. Reset clears what the keep model learned.
+private struct AutoArchiveSettingsCard: View {
+    let server: URL
+    let onCleanUpNow: (() -> Void)?
+    @AppStorage private var isEnabled: Bool
+    @AppStorage private var idleDays: Int
+    @AppStorage private var asksBeforeArchivingKeepers: Bool
+    @State private var isConfirmingReset = false
+
+    init(server: URL, onCleanUpNow: (() -> Void)?) {
+        self.server = server
+        self.onCleanUpNow = onCleanUpNow
+        let defaults = AutoArchiveSettings()
+        _isEnabled = AppStorage(wrappedValue: defaults.isEnabled, AutoArchiveStore.isEnabledKey(for: server))
+        _idleDays = AppStorage(wrappedValue: defaults.idleDays, AutoArchiveStore.idleDaysKey(for: server))
+        _asksBeforeArchivingKeepers = AppStorage(
+            wrappedValue: defaults.asksBeforeArchivingKeepers,
+            AutoArchiveStore.asksBeforeArchivingKeepersKey(for: server)
+        )
+    }
+
+    var body: some View {
+        SettingsCard(title: String(localized: "Auto-Archive")) {
+            SettingsToggleRow(
+                title: String(localized: "Auto-Archive Idle Chats"),
+                systemImage: "archivebox",
+                isOn: $isEnabled
+            )
+
+            SettingsDivider()
+
+            SettingsPickerRow(
+                title: String(localized: "Archive After"),
+                systemImage: "clock",
+                selection: $idleDays
+            ) {
+                Text("7 days").tag(7)
+                Text("14 days").tag(14)
+                Text("30 days").tag(30)
+                Text("60 days").tag(60)
+            }
+            .disabled(!isEnabled)
+
+            SettingsDivider()
+
+            SettingsToggleRow(
+                title: String(localized: "Ask Before Archiving Chats Worth Keeping"),
+                systemImage: "text.badge.checkmark",
+                isOn: $asksBeforeArchivingKeepers
+            )
+            .disabled(!isEnabled)
+
+            SettingsFootnote(String(localized: "Idle chats are archived when you open the app. Chats that look worth keeping wait for your review instead, and your choices teach Atlas what you keep. Archived chats stay in Archived Sessions."))
+
+            if let onCleanUpNow {
+                SettingsButton(String(localized: "Clean Up Old Chats Now")) { onCleanUpNow() }
+            }
+
+            SettingsButton(String(localized: "Reset Learned Preferences"), role: .destructive) {
+                isConfirmingReset = true
+            }
+            .confirmationDialog(
+                String(localized: "Reset Learned Preferences"),
+                isPresented: $isConfirmingReset,
+                titleVisibility: .visible
+            ) {
+                Button(String(localized: "Reset Learned Preferences"), role: .destructive) {
+                    AutoArchiveStore().resetModel(for: server)
+                }
+            } message: {
+                Text("Atlas forgets which chats you kept or archived on this server.")
+            }
+        }
     }
 }

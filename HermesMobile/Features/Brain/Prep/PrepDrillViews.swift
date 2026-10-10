@@ -1,0 +1,647 @@
+import SwiftUI
+
+// The drills inside `PrepRunView`. Each view is handed values and closures by the
+// run view and owns only presentation state (a timer start, an example toggle).
+
+// MARK: - Problem card
+
+/// The problem being drilled, pinned over the drill: meta, title, a two-line
+/// summary and a More/Less toggle that reveals the full summary and example. A primer shows the skill and its worked example instead.
+struct PrepProblemCard: View {
+    let meta: String
+    let title: String
+    let summary: String
+    let example: String
+    /// Reset per rep: the run view keys each rep with `.id(rep.index)`.
+    @State private var expanded = false
+    @State private var detailHeight: CGFloat = 0
+
+    /// The most height the expanded card may take; the rest scrolls inside it.
+    let maxHeight: CGFloat
+    /// Room for the meta line, title and More button inside `maxHeight`.
+    @ScaledMetric(relativeTo: .body) private var chrome: CGFloat = 110
+
+    private var canExpand: Bool { PrepCode.canExpand(summary: summary, example: example) }
+
+    init(rep: PrepRep, maxHeight: CGFloat = .infinity) {
+        self.maxHeight = maxHeight
+        let item = rep.item
+        if rep.drill == .primer {
+            meta = "Primer"
+            title = item.skillTitle.flatMap { $0.isEmpty ? nil : $0 } ?? item.title
+            summary = "Worked example: \(item.title)"
+            example = ""
+        } else {
+            meta = [item.skillTitle ?? "", item.difficulty].filter { !$0.isEmpty }.joined(separator: " · ")
+            title = item.title
+            summary = item.summary
+            example = item.example
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BrainStyle.xs) {
+            if !meta.isEmpty {
+                Text(verbatim: meta).brainText(.meta)
+            }
+            Text(verbatim: title)
+                .font(AppFont.headline())
+                .foregroundStyle(Color.hxTextPrimary)
+                .accessibilityAddTraits(.isHeader)
+            if expanded {
+                // Natural height, capped; scrolls only when the content is taller. The
+                // height is measured on a hidden copy outside the scroll, so it can't be circular.
+                Group {
+                    if detailHeight > 0 {
+                        ScrollView { detail }
+                            .scrollBounceBehavior(.basedOnSize)
+                            .frame(height: PrepCode.expandedHeight(
+                                natural: detailHeight, cap: max(maxHeight - chrome, 80)))
+                    } else {
+                        detail.fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .background(alignment: .top) {
+                    detail
+                        .fixedSize(horizontal: false, vertical: true)
+                        .hidden()
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { detailHeight = $0 }
+                        .accessibilityHidden(true)
+                }
+            } else if !summary.isEmpty {
+                Text(verbatim: summary)
+                    .brainText(.rowSubtitle)
+                    .lineLimit(2)
+                    .accessibilityLabel(Text(verbatim: summary))
+            }
+            if canExpand {
+                Button {
+                    // Instant: no crossfade between the compact and expanded text.
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) { expanded.toggle() }
+                } label: {
+                    Text(verbatim: expanded ? "Less" : "More")
+                        .font(BrainStyle.rowSubtitle.weight(.medium))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(minHeight: BrainStyle.minTapTarget, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityValue(Text(verbatim: expanded ? "Expanded" : "Collapsed"))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, BrainStyle.cardHorizontalPadding)
+        .padding(.top, BrainStyle.cardVerticalPadding)
+        .padding(.bottom, canExpand ? 0 : BrainStyle.cardVerticalPadding)
+        .brainCardSurface()
+        .transaction { $0.animation = nil }
+    }
+
+    /// The full summary and the example, shown when expanded.
+    private var detail: some View {
+        VStack(alignment: .leading, spacing: BrainStyle.xs) {
+            if !summary.isEmpty {
+                Text(verbatim: summary)
+                    .brainText(.rowSubtitle)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if !example.isEmpty {
+                Text(verbatim: example)
+                    .font(AppFont.mono(style: .footnote))
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+}
+
+// MARK: - Choice (pattern_id, complexity)
+
+/// The options as card rows. While answering, a pattern rep shows a 30-second
+/// countdown (system-driven text, no repainting of ours). Once graded, the chosen
+/// wrong option shows a red cross and the correct one a green check.
+struct PrepChoiceView: View {
+    struct Grading {
+        let chosenID: String?
+        let correctID: String?
+    }
+
+    let rep: PrepRep
+    let grading: Grading?
+    var isSubmitting = false
+    var submitError: String?
+    let onChoose: (PrepOption) -> Void
+    @State private var shownAt = Date()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BrainStyle.s) {
+            HStack(alignment: .firstTextBaseline) {
+                BrainSectionHeader(title: rep.drill == .patternID ? "Which pattern?" : "Time complexity?")
+                if rep.drill == .patternID, grading == nil {
+                    let window = shownAt...shownAt.addingTimeInterval(30)
+                    Text(timerInterval: window, countsDown: true)
+                        .brainText(.sectionCaption)
+                        .monospacedDigit()
+                        .fixedSize()
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(Text(verbatim: "Time left"))
+                        .accessibilityValue(Text(timerInterval: window, countsDown: true))
+                }
+            }
+            SectionCard {
+                VStack(spacing: 0) {
+                    ForEach(Array(rep.item.options.enumerated()), id: \.offset) { offset, option in
+                        if offset > 0 { PrepRowDivider() }
+                        row(option)
+                    }
+                }
+            }
+            if let submitError {
+                PrepSubmitError(message: submitError)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func row(_ option: PrepOption) -> some View {
+        if let grading {
+            let isCorrect = PrepCopy.isSameChoice(option.id, grading.correctID)
+            let isWrongPick = PrepCopy.isSameChoice(option.id, grading.chosenID) && !isCorrect
+            HStack(spacing: BrainStyle.m) {
+                optionTitle(option)
+                if isCorrect {
+                    Image(systemName: "checkmark").foregroundStyle(Color.hxSuccess)
+                } else if isWrongPick {
+                    Image(systemName: "xmark").foregroundStyle(Color.hxDanger)
+                }
+            }
+            .font(BrainStyle.rowTitle.weight(.semibold))
+            .frame(minHeight: BrainStyle.minTapTarget)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(verbatim: option.title))
+            .accessibilityValue(Text(verbatim: isCorrect
+                ? (PrepCopy.isSameChoice(option.id, grading.chosenID) ? "Your answer, correct" : "Correct answer")
+                : (isWrongPick ? "Your answer, wrong" : "")))
+        } else {
+            Button { onChoose(option) } label: {
+                optionTitle(option)
+                    .frame(minHeight: BrainStyle.minTapTarget)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(isSubmitting)
+        }
+    }
+
+    private func optionTitle(_ option: PrepOption) -> some View {
+        Text(verbatim: option.title)
+            .brainText(.rowTitle)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, BrainStyle.s)
+    }
+}
+
+// MARK: - Parsons
+
+/// Tap-to-place Parsons: the placed solution on top, the remaining lines below,
+/// hints on request, and Check order once enough lines are placed.
+struct PrepParsonsView: View {
+    let hints: [String]
+    let board: ParsonsBoard
+    let hintsShown: Int
+    let isSubmitting: Bool
+    let place: (Int) -> Void
+    let unplace: (Int) -> Void
+    let showHint: () -> Void
+
+    private var target: Int { PrepCopy.parsonsTarget(poolCount: board.pool.count) }
+
+    var body: some View {
+        Text(verbatim: "Order the lines. One doesn't belong.")
+            .brainText(.rowSubtitle)
+
+        VStack(alignment: .leading, spacing: BrainStyle.s) {
+            BrainSectionHeader(title: "Your solution", trailing: "\(board.placedIndices.count) / \(target)")
+            PrepCodeCard {
+                if board.placedIndices.isEmpty {
+                    Text(verbatim: "Tap a line below to start")
+                        .brainText(.rowSubtitle)
+                        .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
+                } else {
+                    ForEach(Array(board.placedIndices.enumerated()), id: \.element) { position, poolIndex in
+                        let code = board.pool[poolIndex]
+                        Button { unplace(position) } label: { PrepCodeLine(code: code) }
+                            .buttonStyle(.plain)
+                            .disabled(isSubmitting)
+                            .accessibilityLabel(Text(verbatim: PrepCopy.parsonsPlacedLabel(position: position + 1, code: code)))
+                    }
+                }
+            }
+        }
+
+        if !board.remaining.isEmpty {
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                BrainSectionHeader(title: "Lines")
+                PrepCodeCard {
+                    ForEach(board.remaining, id: \.self) { poolIndex in
+                        let code = board.pool[poolIndex]
+                        Button { place(poolIndex) } label: { PrepCodeLine(code: code) }
+                            .buttonStyle(.plain)
+                            .disabled(isSubmitting)
+                            .accessibilityLabel(Text(verbatim: PrepCopy.parsonsLineLabel(code)))
+                    }
+                }
+            }
+        }
+
+        if hintsShown > 0 {
+            PrepNoteCard {
+                ForEach(0..<min(hintsShown, hints.count), id: \.self) { index in
+                    PrepLeadText(lead: "Hint \(index + 1) of \(hints.count).", rest: hints[index])
+                }
+            }
+        }
+
+        if hintsShown < hints.count {
+            Button(action: showHint) {
+                Text(verbatim: "Show a hint")
+                    .font(BrainStyle.rowTitle)
+                    .foregroundStyle(Color.accentColor)
+                    .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+}
+
+// MARK: - Primer
+
+/// A new skill's primer: its signals, template, invariant and complexity, then
+/// the worked example. "Got it" records it as seen.
+struct PrepPrimerView: View {
+    let item: PrepItemExcerpt
+
+    var body: some View {
+        if let primer = item.primer {
+            if !primer.signals.isEmpty {
+                VStack(alignment: .leading, spacing: BrainStyle.s) {
+                    BrainSectionHeader(title: "Signals")
+                    PrepFlowLayout(spacing: BrainStyle.s) {
+                        ForEach(Array(primer.signals.enumerated()), id: \.offset) { _, signal in
+                            BrainTagChip(tag: signal)
+                        }
+                    }
+                }
+            }
+            if !primer.template.isEmpty {
+                VStack(alignment: .leading, spacing: BrainStyle.s) {
+                    BrainSectionHeader(title: "Template")
+                    PrepCodeCard {
+                        Text(verbatim: primer.template)
+                            .font(AppFont.mono(style: .footnote))
+                            .foregroundStyle(Color.hxTextPrimary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, BrainStyle.s)
+                    }
+                }
+            }
+            if !primer.invariant.isEmpty || !primer.complexity.isEmpty {
+                SectionCard {
+                    VStack(spacing: 0) {
+                        if !primer.invariant.isEmpty {
+                            BrainRow(title: "Invariant", subtitle: primer.invariant, subtitleLineLimit: 8)
+                        }
+                        if !primer.invariant.isEmpty, !primer.complexity.isEmpty {
+                            PrepRowDivider()
+                        }
+                        if !primer.complexity.isEmpty {
+                            BrainRow(title: "Complexity", subtitle: primer.complexity, subtitleLineLimit: 4)
+                        }
+                    }
+                }
+            }
+        }
+        if let reference = item.referenceMD, !reference.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                BrainSectionHeader(title: "Worked example")
+                Text(verbatim: item.title)
+                    .brainText(.rowTitle)
+                    .fontWeight(.semibold)
+                MarkdownRenderer(content: reference)
+            }
+        }
+    }
+}
+
+// MARK: - Result
+
+/// A graded rep: the graded options or the submitted lines, the feedback with its
+/// first sentence in bold, the solution and video when the server sends them, and
+/// Continue.
+struct PrepResultView: View {
+    let rep: PrepRep
+    let result: PrepAttemptResult
+    let chosenID: String?
+    let placedLines: [String]
+
+    var body: some View {
+        switch rep.drill {
+        case .patternID, .complexity:
+            PrepChoiceView(rep: rep, grading: .init(chosenID: chosenID, correctID: correctChoice)) { _ in }
+        case .parsons where !placedLines.isEmpty:
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                BrainSectionHeader(title: "Your solution")
+                PrepCodeCard {
+                    ForEach(Array(placedLines.enumerated()), id: \.offset) { _, line in
+                        PrepCodeLine(code: line)
+                    }
+                }
+            }
+        default:
+            EmptyView()
+        }
+
+        let feedback = PrepCopy.feedbackParts(result.feedback)
+        if !feedback.lead.isEmpty {
+            PrepNoteCard {
+                PrepLeadText(lead: feedback.lead, rest: feedback.rest)
+            }
+        }
+
+        if let reference = result.referenceMD, !reference.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            DisclosureGroup {
+                MarkdownRenderer(content: reference)
+                    .padding(.top, BrainStyle.s)
+            } label: {
+                Text(verbatim: "See the solution")
+                    .font(BrainStyle.rowTitle)
+                    .foregroundStyle(Color.hxTextPrimary)
+            }
+            .tint(Color.hxTextSecondary)
+        }
+
+        if let video = (result.links["video"] ?? rep.item.links["video"]).flatMap(URL.init(string:)) {
+            Link(destination: video) {
+                Label { Text(verbatim: "Watch NeetCode") } icon: { Image(systemName: "play.rectangle") }
+                    .font(BrainStyle.rowTitle)
+                    .frame(minHeight: BrainStyle.minTapTarget)
+            }
+        }
+    }
+
+    private var correctChoice: String? {
+        if case let .choice(id)? = result.correct { return id }
+        return nil
+    }
+}
+
+// MARK: - Small pieces
+
+/// The run's full-width primary action.
+struct PrepPrimaryButton: View {
+    let title: String
+    var enabled = true
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(verbatim: title)
+                .font(AppFont.body(weight: .semibold))
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .buttonBorderShape(.capsule)
+        .controlSize(.large)
+        .disabled(!enabled)
+    }
+}
+
+/// An inline save failure under the primary action; never an alert.
+struct PrepSubmitError: View {
+    let message: String
+
+    var body: some View {
+        Text(verbatim: message)
+            .font(BrainStyle.meta)
+            .foregroundStyle(Color.hxDanger)
+            .frame(maxWidth: .infinity, alignment: .center)
+    }
+}
+
+/// A feedback or hint note on the card surface.
+struct PrepNoteCard<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BrainStyle.s) {
+            content
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, BrainStyle.cardHorizontalPadding)
+        .padding(.vertical, BrainStyle.cardVerticalPadding)
+        .brainCardSurface()
+    }
+}
+
+/// A bold lead sentence followed by the rest, as one run of text.
+struct PrepLeadText: View {
+    let lead: String
+    let rest: String
+
+    var body: some View {
+        Text(Self.attributed(lead: lead, rest: rest))
+            .font(BrainStyle.rowTitle)
+            .foregroundStyle(Color.hxTextPrimary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    static func attributed(lead: String, rest: String) -> AttributedString {
+        var bold = AttributedString(lead)
+        bold.inlinePresentationIntent = .stronglyEmphasized
+        return rest.isEmpty ? bold : bold + AttributedString(" " + rest)
+    }
+}
+
+/// Monospaced lines on the code background, in the card shape.
+struct PrepCodeCard<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            content
+        }
+        .padding(.horizontal, BrainStyle.m)
+        .padding(.vertical, BrainStyle.xs)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.hxCodeBackground, in: BrainStyle.cardShape())
+    }
+}
+
+/// One line of code with a hanging indent: its leading spaces become padding and
+/// wrapped continuation lines sit one step further in. No truncation, at least a
+/// tap target tall.
+struct PrepCodeLine: View {
+    let code: String
+    /// The width of one monospaced space at the footnote size, scaled with Dynamic Type.
+    @ScaledMetric(relativeTo: .footnote) private var step: CGFloat = 7.8
+
+    var body: some View {
+        let parts = PrepCode.split(code)
+        PrepHangingLayout(hang: step, indent: CGFloat(parts.indent) * step) {
+            ForEach(Array(PrepCode.words(parts.text).enumerated()), id: \.offset) { _, word in
+                Text(verbatim: word)
+                    .font(AppFont.mono(style: .footnote))
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .layoutValue(key: PrepTrailingSpace.self, value: word.hasSuffix(" ") ? step : 0)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: code))
+    }
+}
+
+/// Splits a code line for rendering with a hanging indent.
+enum PrepCode {
+    /// The expanded detail's height: its natural height, never above the cap.
+    static func expandedHeight(natural: CGFloat, cap: CGFloat) -> CGFloat {
+        min(natural, cap)
+    }
+
+    /// More/Less only appears when there is something to reveal: an example or a summary
+    /// longer than the two compact lines.
+    static func canExpand(summary: String, example: String) -> Bool {
+        !example.isEmpty || summary.count > 140
+    }
+
+    /// The leading indent in points, never more than half the width so deep nesting
+    /// can't starve the text.
+    static func clampedIndent(_ points: CGFloat, width: CGFloat) -> CGFloat {
+        min(points, width * 0.5)
+    }
+
+    /// The leading whitespace as a space count (a tab is 4) and the rest of the line.
+    static func split(_ line: String) -> (indent: Int, text: String) {
+        var indent = 0
+        var rest = Substring(line)
+        while let first = rest.first, first == " " || first == "\t" {
+            indent += first == "\t" ? 4 : 1
+            rest = rest.dropFirst()
+        }
+        return (indent, String(rest))
+    }
+
+    /// The text cut after each space, so each piece carries its trailing space.
+    static func words(_ text: String) -> [String] {
+        var result: [String] = []
+        var current = ""
+        for character in text {
+            current.append(character)
+            if character == " " { result.append(current); current = "" }
+        }
+        if !current.isEmpty { result.append(current) }
+        return result
+    }
+}
+
+/// Lays words out left to right, wrapping at the proposed width; continuation lines
+/// start `hang` in. A word wider than the room left goes on its own line and wraps itself.
+struct PrepHangingLayout: Layout {
+    var hang: CGFloat
+    /// The unclamped leading indent, in points.
+    var indent: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? .infinity
+        let result = arrange(width: width, subviews: subviews)
+        // An unbounded proposal gets the content width, never infinity.
+        return CGSize(width: width.isFinite ? width : result.size.width, height: result.size.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = arrange(width: bounds.width, subviews: subviews)
+        for (index, subview) in subviews.enumerated() {
+            let frame = result.frames[index]
+            subview.place(
+                at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
+                proposal: ProposedViewSize(width: frame.width, height: frame.height))
+        }
+    }
+
+    private func arrange(width fullWidth: CGFloat, subviews: Subviews) -> (frames: [CGRect], size: CGSize) {
+        let lead = fullWidth.isFinite ? PrepCode.clampedIndent(indent, width: fullWidth) : indent
+        let width = fullWidth - lead
+        var frames: [CGRect] = []
+        var x: CGFloat = 0, y: CGFloat = 0, lineHeight: CGFloat = 0, maxX: CGFloat = 0
+        var lineStart: CGFloat = 0
+        for subview in subviews {
+            var size = subview.sizeThatFits(.unspecified)
+            // Fit is judged without the trailing space, which may hang past the edge.
+            let trailing = Self.trailingSpace(subview)
+            if x > lineStart, x + size.width - trailing > width + 0.5 {
+                y += lineHeight
+                lineStart = hang
+                x = lineStart
+                lineHeight = 0
+            }
+            if x + size.width - trailing > width + 0.5 {
+                size = subview.sizeThatFits(ProposedViewSize(width: max(width - x, 1), height: nil))
+            }
+            frames.append(CGRect(x: x + lead, y: y, width: size.width, height: size.height))
+            x += size.width
+            lineHeight = max(lineHeight, size.height)
+            maxX = max(maxX, x + lead)
+        }
+        return (frames, CGSize(width: maxX, height: y + lineHeight))
+    }
+
+    /// The width of a word's trailing space, from the layout value set by `PrepCodeLine`.
+    private static func trailingSpace(_ subview: LayoutSubview) -> CGFloat {
+        subview[PrepTrailingSpace.self]
+    }
+}
+
+private struct PrepTrailingSpace: LayoutValueKey {
+    static let defaultValue: CGFloat = 0
+}
+
+/// Wraps its children onto as many lines as the proposed width needs, leading aligned.
+struct PrepFlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? .infinity
+        let result = arrange(width: width, subviews: subviews)
+        // An unbounded proposal gets the content width, never infinity.
+        return CGSize(width: width.isFinite ? width : result.size.width, height: result.size.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = arrange(width: bounds.width, subviews: subviews)
+        for (subview, origin) in zip(subviews, result.origins) {
+            subview.place(at: CGPoint(x: bounds.minX + origin.x, y: bounds.minY + origin.y), proposal: .unspecified)
+        }
+    }
+
+    private func arrange(width: CGFloat, subviews: Subviews) -> (origins: [CGPoint], size: CGSize) {
+        var origins: [CGPoint] = []
+        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0, maxX: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > width {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            origins.append(CGPoint(x: x, y: y))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+            maxX = max(maxX, x - spacing)
+        }
+        return (origins, CGSize(width: maxX, height: y + rowHeight))
+    }
+}

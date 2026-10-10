@@ -13,6 +13,14 @@ enum ShellPushDestination: Hashable {
     case tasks
     case kanban
     case dailyDeck
+    /// The Brain home, from the drawer.
+    case brain
+    /// Any screen inside the Brain, pushed from the home or another Brain screen.
+    case brainRoute(BrainRoute)
+    /// Goals home, from the drawer.
+    case goals
+    /// One personal goal, by slug.
+    case goal(String)
     case settings(SettingsScrollAnchor?)
 }
 

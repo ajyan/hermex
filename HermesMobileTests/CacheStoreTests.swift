@@ -1028,11 +1028,25 @@ final class CacheStoreTests: XCTestCase {
         XCTAssertEqual(try CacheStore.cachedSession(id: "parent", serverURL: serverA, in: context)?.title, "On server A")
     }
 
+    func testClearCacheAlsoClearsThatServersBrainEntries() throws {
+        let context = try makeContext()
+        let serverA = URL(string: "https://a.example")!
+        let serverB = URL(string: "https://b.example")!
+        try BrainCache.store("a", server: serverA, kind: "page", id: "p", in: context)
+        try BrainCache.store("b", server: serverB, kind: "page", id: "p", in: context)
+
+        try CacheStore.clearCache(for: serverA, in: context)
+
+        XCTAssertNil(try BrainCache.load(String.self, server: serverA, kind: "page", id: "p", in: context))
+        XCTAssertEqual(try BrainCache.load(String.self, server: serverB, kind: "page", id: "p", in: context), "b")
+    }
+
     private func makeContext() throws -> ModelContext {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(
             for: CachedSession.self,
             CachedMessage.self,
+            CachedBrainEntry.self,
             configurations: configuration
         )
         return ModelContext(container)

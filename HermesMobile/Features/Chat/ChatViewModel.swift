@@ -495,6 +495,8 @@ final class ChatViewModel {
     private(set) var hasActivatedGoalCommand = false
 
     private let sessionID: String?
+    /// Whether the chat title offers rename: a live, server-backed session.
+    var canRenameSession: Bool { sessionID != nil && !isViewingCachedData }
     /// The workspace this chat's session is pointed at. `/workspace` and the
     /// composer's picker move it without the session id changing, and every
     /// `@path` the chat has confirmed was confirmed against the old root.
@@ -645,7 +647,9 @@ final class ChatViewModel {
         isCLISession = session.isCliSession == true
         self.server = server
         let resolvedClient = client ?? APIClient(baseURL: server)
-        let resolvedStreamClient = streamClient ?? SSEClient()
+        // The coordinator owns chat stream reconnects so a resume replays from
+        // its latest cursor with replay dedup armed.
+        let resolvedStreamClient = streamClient ?? SSEClient(reconnectsAfterServerClose: false)
         let resolvedLiveActivityManager = liveActivityManager ?? AgentLiveActivityManager.shared
         self.client = resolvedClient
         self.streamCoordinator = ChatStreamCoordinator(
@@ -3346,12 +3350,32 @@ final class ChatViewModel {
             return .executed(message: String(localized: "Current title: **\(displayTitle)**\n\nUse `/title <text>` to rename this session."))
         }
 
-        guard let sessionID else {
-            return .unsupported(friendlyMessage: String(localized: "The server did not provide a session ID."))
+        switch await renameSession(to: title) {
+        case .renamed:
+            return .executed(message: String(localized: "Title set to **\(displayTitle)**."))
+        case .failed(let message):
+            return .unsupported(friendlyMessage: message)
         }
+    }
 
+    enum SessionRenameResult: Equatable {
+        /// The server confirmed the rename; carries the title it stored, for the session list.
+        case renamed(String)
+        case failed(String)
+    }
+
+    /// Renames this session for `/title` and the tappable chat title. The title
+    /// changes only after the server confirms, so a failure leaves it untouched.
+    func renameSession(to rawTitle: String) async -> SessionRenameResult {
+        let title = rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else {
+            return .failed(String(localized: "Enter a session title."))
+        }
+        guard let sessionID else {
+            return .failed(String(localized: "The server did not provide a session ID."))
+        }
         guard activeStreamID == nil else {
-            return .unsupported(friendlyMessage: String(localized: "Wait for the current response to finish before renaming the session."))
+            return .failed(String(localized: "Wait for the current response to finish before renaming the session."))
         }
 
         lastError = nil
@@ -3360,13 +3384,14 @@ final class ChatViewModel {
         do {
             let response = try await client.renameSession(id: sessionID, title: title)
             if let error = response.error {
-                return .unsupported(friendlyMessage: error)
+                return .failed(error)
             }
-            displayTitle = Self.displayTitle(from: response.session?.title ?? title)
-            return .executed(message: String(localized: "Title set to **\(displayTitle)**."))
+            let storedTitle = Self.nonEmpty(response.session?.title) ?? title
+            displayTitle = Self.displayTitle(from: storedTitle)
+            return .renamed(storedTitle)
         } catch {
             lastError = error
-            return .unsupported(friendlyMessage: error.localizedDescription)
+            return .failed(error.localizedDescription)
         }
     }
 

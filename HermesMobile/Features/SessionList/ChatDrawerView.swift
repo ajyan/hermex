@@ -18,12 +18,19 @@ struct ChatDrawerView<ServerMenu: View>: View {
     let serverName: String
     let canCreateNewChat: Bool
     let onNewChat: () -> Void
+    /// Runs an auto-archive pass now ("Clean up old chats"). nil hides the row.
     let onOpen: (ShellPushDestination) -> Void
+    /// Opens the sheet of idle chats waiting for a keep-or-archive decision.
+    let onReviewArchiveCandidates: () -> Void
     let refresh: () async -> Void
     @ViewBuilder let serverMenu: () -> ServerMenu
 
+    @ScaledMetric(relativeTo: .title2) private var composeButtonSize: CGFloat = 56
+
     var body: some View {
-        VStack(spacing: 0) {
+        let sections = DrawerSessionSections(sessions, isSearching: isSearching)
+
+        return VStack(spacing: 0) {
             // Containers (search, selected row) sit 8pt in; their content lines up at 20pt.
             searchField
                 .padding(.horizontal, 8)
@@ -40,6 +47,16 @@ struct ChatDrawerView<ServerMenu: View>: View {
                             .sessionsScreenListRow()
                     }
 
+                    if !viewModel.archiveReviewCandidates.isEmpty {
+                        archiveReviewBanner(count: viewModel.archiveReviewCandidates.count)
+                            .padding(.top, 8)
+                            .sessionsScreenListRow()
+                    }
+
+                    if !sections.pinned.isEmpty {
+                        pinnedSection(sections.pinned)
+                    }
+
                     recentsHeader
                         .sessionsScreenListRow()
                 }
@@ -52,7 +69,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
                 SessionListRowsSection(
                     viewModel: viewModel,
                     searchText: searchText,
-                    sessions: sessions,
+                    sessions: sections.recents,
                     emptyTitle: isSearching ? String(localized: "No matching sessions") : String(localized: "No sessions yet"),
                     emptyDescription: isSearching ? String(localized: "Try another search.") : nil,
                     isSearchActive: isSearching,
@@ -60,7 +77,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
                     showsWorkspace: showsWorkspace,
                     selectedSessionID: selectedSessionID,
                     actions: actions,
-                    suppressEmptyState: showsFilterEmptyState,
+                    suppressEmptyState: showsFilterEmptyState || !sections.pinned.isEmpty,
                     showsHeader: isSearching
                 )
             }
@@ -71,6 +88,11 @@ struct ChatDrawerView<ServerMenu: View>: View {
             .environment(\.defaultMinListRowHeight, 0)
             .scrollContentBackground(.hidden)
             .scrollDismissesKeyboard(.interactively)
+            // Room below the last row so the compose button never hides it.
+            .contentMargins(.bottom, composeButtonSize + 32, for: .scrollContent)
+            .overlay(alignment: .bottomTrailing) {
+                if !isSearching { composeButton }
+            }
 
             settingsBar
         }
@@ -107,8 +129,6 @@ struct ChatDrawerView<ServerMenu: View>: View {
 
     @ViewBuilder
     private var navigationRows: some View {
-        drawerRow(String(localized: "New Chat"), systemImage: "square.and.pencil", action: onNewChat)
-            .disabled(!canCreateNewChat)
         if sectionVisibility.projects {
             drawerRow(String(localized: "Projects"), systemImage: "folder") { onOpen(.projects) }
         }
@@ -119,6 +139,27 @@ struct ChatDrawerView<ServerMenu: View>: View {
             drawerRow(String(localized: "Kanban"), systemImage: "rectangle.split.3x1") { onOpen(.kanban) }
         }
         drawerRow("Daily Brief", systemImage: "sun.horizon") { onOpen(.dailyDeck) }
+        if sectionVisibility.brain {
+            drawerRow("Brain", systemImage: "brain") { onOpen(.brain) }
+        }
+        drawerRow("Goals", systemImage: "flag.checkered") { onOpen(.goals) }
+    }
+
+    /// Floating bottom-right New Chat, where messaging apps put compose.
+    private var composeButton: some View {
+        Button(action: onNewChat) {
+            Image(systemName: "square.and.pencil")
+                .font(.title2.weight(.medium))
+                .frame(width: composeButtonSize, height: composeButtonSize)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.primary)
+        .adaptiveGlass(isInteractive: true, in: Circle())
+        .disabled(!canCreateNewChat)
+        .accessibilityLabel(String(localized: "New Chat"))
+        .padding(.trailing, 16)
+        .padding(.bottom, 16)
     }
 
     private func drawerRow(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
@@ -132,6 +173,54 @@ struct ChatDrawerView<ServerMenu: View>: View {
         .buttonStyle(.plain)
         .padding(.horizontal, 20)
         .sessionsScreenListRow()
+    }
+
+    /// "N chats to review before archiving", above the chat rows.
+    private func archiveReviewBanner(count: Int) -> some View {
+        Button(action: onReviewArchiveCandidates) {
+            HStack(spacing: 10) {
+                Image(systemName: "archivebox")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                Text("\(count) chats to review before archiving")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.forward")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 12)
+            .frame(minHeight: 44)
+            .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 8)
+    }
+
+    @ViewBuilder
+    private func pinnedSection(_ pinned: [SessionSummary]) -> some View {
+        Text("Pinned")
+            .font(.headline)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .accessibilityAddTraits(.isHeader)
+            .sessionsScreenListRow()
+
+        ForEach(pinned) { session in
+            SessionInteractiveRow(
+                viewModel: viewModel,
+                session: session,
+                showsMessageCount: showsMessageCount,
+                showsWorkspace: showsWorkspace,
+                selectedSessionID: selectedSessionID,
+                actions: actions
+            )
+        }
     }
 
     private var recentsHeader: some View {
@@ -228,5 +317,22 @@ struct ChatDrawerView<ServerMenu: View>: View {
                 .fill(Color.hxSeparator)
                 .frame(height: 1 / UIScreen.main.scale)
         }
+    }
+}
+
+/// Splits the drawer's rows into a Pinned section above Recents, each keeping
+/// the incoming order. Search shows one flat list of matches instead.
+struct DrawerSessionSections: Equatable {
+    let pinned: [SessionSummary]
+    let recents: [SessionSummary]
+
+    init(_ sessions: [SessionSummary], isSearching: Bool) {
+        guard !isSearching else {
+            pinned = []
+            recents = sessions
+            return
+        }
+        pinned = sessions.filter { $0.pinned == true }
+        recents = sessions.filter { $0.pinned != true }
     }
 }

@@ -7,6 +7,7 @@ struct SessionListRowActions {
     let toggleUnread: (SessionSummary) -> Void
     let togglePinned: (SessionSummary) -> Void
     let archive: (SessionSummary) -> Void
+    let summarizeAndArchive: (SessionSummary) -> Void
     let delete: (SessionSummary) -> Void
     let rename: (SessionSummary) -> Void
     let duplicate: (SessionSummary) -> Void
@@ -88,6 +89,8 @@ struct SidebarSectionVisibility: Equatable {
     var insights: Bool
     var activeProfile: Bool
     var projects: Bool
+    /// The second brain's read-only CRM tab (personal fork).
+    var brain: Bool
 
     /// Show every row, primarily for previews and tests.
     static let showAll = SidebarSectionVisibility(
@@ -98,7 +101,8 @@ struct SidebarSectionVisibility: Equatable {
         memory: true,
         insights: true,
         activeProfile: true,
-        projects: true
+        projects: true,
+        brain: true
     )
 
     /// The plain links share one List row, so that row is dropped entirely
@@ -260,6 +264,14 @@ struct SessionInteractiveRow: View {
             )
         }
         .buttonStyle(.plain)
+        .overlay(alignment: .trailing) {
+            if viewModel.isSummarizing(session) {
+                ProgressView()
+                    .controlSize(.small)
+                    .padding(.trailing, 12)
+                    .accessibilityLabel(Text("Summarizing"))
+            }
+        }
         .id(session.id)
         .background(
             session.sessionId == selectedSessionID
@@ -447,6 +459,15 @@ struct SessionRowContextMenu: View {
                 Label("Archive", systemImage: "archivebox")
             }
             .disabled(!canShowSessionMutationActions || isMutating)
+
+            if !session.requiresExternalImport {
+                Button {
+                    actions.summarizeAndArchive(session)
+                } label: {
+                    Label("Summarize & Archive", systemImage: "text.badge.checkmark")
+                }
+                .disabled(!canShowSessionMutationActions || isMutating)
+            }
 
             Button(role: .destructive) {
                 actions.delete(session)

@@ -14,6 +14,7 @@ struct ContentView: View {
     /// live roster (#554).
     @State private var pendingBotDestination: BotDestination?
     @State private var pendingNewChatRequest: NewChatRequest?
+    @State private var pendingDailyBrief = false
     /// Shown when a new chat, session link or share arrives while a Hermes server is
     /// active and no webui server is configured to take it (#899).
     @State private var isShowingNoWebuiServer = false
@@ -65,6 +66,8 @@ struct ContentView: View {
                 // #248: the foreground pass stays silent — the in-session run-end
                 // paths own notifications while the app is alive.
                 Task { await reconcileOrphanedLiveActivities(notifiesOnCompletion: false) }
+                // Keeps a week of Daily Brief reminders queued ahead.
+                Task { await DailyBriefReminder.refresh() }
             }
             .alert("Add a WebUI server to start a chat.", isPresented: $isShowingNoWebuiServer) {
                 if let share = unroutableShare {
@@ -109,6 +112,7 @@ struct ContentView: View {
                 openNextSharedImport: openNextSharedImport,
                 pendingDeepLinkedSessionID: $pendingDeepLinkedSessionID,
                 requestedNewChat: $pendingNewChatRequest,
+                requestedDailyBrief: $pendingDailyBrief,
                 pendingBotDestination: $pendingBotDestination,
                 pendingWebuiPush: $pendingWebuiPush
             )
@@ -137,6 +141,12 @@ struct ContentView: View {
         // `autoStartsVoiceInput` so the composer begins dictation once it appears (#338).
         if HermesDeepLink.isNewChatVoiceURL(url) {
             if reachWebuiServer() { pendingNewChatRequest = NewChatRequest(autoStartsVoiceInput: true) }
+            return
+        }
+
+        if HermesDeepLink.isDailyBriefURL(url) {
+            if let deck = HermesDeepLink.dailyBriefDeck(from: url) { DailyBriefLaunch.request(date: deck.date, kind: deck.kind) }
+            if reachWebuiServer() { pendingDailyBrief = true }
             return
         }
 

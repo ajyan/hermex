@@ -7,6 +7,22 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B1A1C0DE00000000000F000F /* GoalDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F000E /* GoalDetailView.swift */; };
+		B1A1C0DE00000000000F000D /* GoalsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F000C /* GoalsHomeView.swift */; };
+		B1A1C0DE00000000000F000B /* GoalsViewModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */; };
+		B1A1C0DE00000000000F0009 /* GoalsViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */; };
+		B1A1C0DE00000000000F0007 /* GoalsModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */; };
+		B1A1C0DE00000000000F0005 /* GoalsDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0004 /* GoalsDataClient.swift */; };
+		B1A1C0DE00000000000F0003 /* GoalsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0002 /* GoalsModels.swift */; };
+		B1A1C0DE0000000000000E17 /* PrepViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E18 /* PrepViewModels.swift */; };
+		B1A1C0DE0000000000000E21 /* PrepHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E22 /* PrepHomeView.swift */; };
+		B1A1C0DE0000000000000E23 /* PrepTrackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E24 /* PrepTrackView.swift */; };
+		B1A1C0DE0000000000000E25 /* PrepRunView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E26 /* PrepRunView.swift */; };
+		B1A1C0DE0000000000000E27 /* PrepDrillViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E28 /* PrepDrillViews.swift */; };
+		B1A1C0DE0000000000000E01 /* PrepModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E02 /* PrepModels.swift */; };
+		B1A1C0DE0000000000000E03 /* PrepDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E04 /* PrepDataClient.swift */; };
+		B1A1C0DE0000000000000E15 /* PrepViewModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E16 /* PrepViewModelsTests.swift */; };
+		B1A1C0DE0000000000000E05 /* PrepModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E06 /* PrepModelsTests.swift */; };
 		B15C1E3E39CB8EAC55E8BD67 /* VoiceCallFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F42EE649B1547E6CBDC22A5A /* VoiceCallFlowTests.swift */; };
 		A1C0FFEE0000000000000B02 /* VoiceCallAudioLevelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE0000000000000F02 /* VoiceCallAudioLevelsTests.swift */; };
 		E229069D4B665D7B3CF24038 /* VoiceCallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC46CE9BD5B6A700B716CE0 /* VoiceCallView.swift */; };
@@ -163,6 +179,7 @@
 		6A782D4CAA2AF88D5F94A780 /* ShellNavigationStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 456E58BC75E2EBE335416D28 /* ShellNavigationStateTests.swift */; };
 		8ED1BF0E83115706BFB110A4 /* DrawerSettleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3A55225279372080EAE5602 /* DrawerSettleTests.swift */; };
 		C2067E557A82E018C2421DC8 /* RecentsFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E6E51C25647DF0AB97836D6 /* RecentsFilterTests.swift */; };
+		BDADA90E35426E18B6B4C495 /* AutoArchiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A6E520F53A63761084F83A3 /* AutoArchiveTests.swift */; };
 		19C1150000000000000000A3 /* CliSessionsSyncModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19C1150000000000000000A4 /* CliSessionsSyncModelTests.swift */; };
 		C03910000000000000000010 /* APIEndpointContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03900000000000000000010 /* APIEndpointContractTests.swift */; };
 		C03910000000000000000011 /* CronManagementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03900000000000000000011 /* CronManagementTests.swift */; };
@@ -211,6 +228,10 @@
 		304FA3D5BBF98F6499CB988D /* ProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A7827505CB6DC88368DBB98 /* ProjectsView.swift */; };
 		D02817A0E87BEF62EF5E23F0 /* DrawerSettle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6501C5C136AD44341F12A22 /* DrawerSettle.swift */; };
 		93E10058E8552A4AA439B3A1 /* RecentsFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96B6ABCB2B2999629CD767C8 /* RecentsFilter.swift */; };
+		17C6736606E293C99BE86638 /* ArchiveReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 840C11CB0B65C68095DDD79D /* ArchiveReviewSheet.swift */; };
+		3EC76C98C56F0B12B4BBF9E9 /* SessionListViewModel+AutoArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 429F8EA2085D0C07166ED24E /* SessionListViewModel+AutoArchive.swift */; };
+		815BBD42E72D0ED334DEF769 /* ChatDigestSummarizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FFFED4F8D6A1138AD6D62B8 /* ChatDigestSummarizer.swift */; };
+		DAB4490B2F44EE0F00EABE6C /* AutoArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22A3FB95B3192EE1048414D0 /* AutoArchive.swift */; };
 		A04300000000000000000002 /* SessionListActionConfirmations.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04300000000000000000012 /* SessionListActionConfirmations.swift */; };
 		A04300000000000000000003 /* SessionMutator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04300000000000000000013 /* SessionMutator.swift */; };
 		A040C0DE0000000000000001 /* ProjectCreationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A040C0DE0000000000000002 /* ProjectCreationSheet.swift */; };
@@ -323,6 +344,8 @@
 		1A2B3C4D5E6F7000000000ED /* CachedMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000EF /* CachedMessage.swift */; };
 		1A2B3C4D5E6F7000000000F1 /* CacheStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000F3 /* CacheStore.swift */; };
 		1A2B3C4D5E6F7000000000F2 /* CacheStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000F4 /* CacheStoreTests.swift */; };
+		B1A1C0DE0000000000000701 /* BrainCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000703 /* BrainCache.swift */; };
+		B1A1C0DE0000000000000702 /* BrainCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000704 /* BrainCacheTests.swift */; };
 		C28702000000000000000001 /* ChatDraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C28702000000000000000002 /* ChatDraftStore.swift */; };
 		C28702000000000000000003 /* ChatDraftStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C28702000000000000000004 /* ChatDraftStoreTests.swift */; };
 		C28702000000000000000005 /* ChatDraftAttachmentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C28702000000000000000006 /* ChatDraftAttachmentStore.swift */; };
@@ -637,7 +660,29 @@
 		0D0A3A284474E49DBDD0F9E9 /* DailyDeckViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71D8CEEBE37C8E43E46A2B4 /* DailyDeckViewModel.swift */; };
 		218E7F5B009F877FF54BA04A /* DailyDeckView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD79724DF6D6FD92B594BBC5 /* DailyDeckView.swift */; };
 		1F2EF7D6C585EAF7E1C46CD2 /* DeckCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */; };
+		B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000102 /* BrainViewModel.swift */; };
+		B1A1C0DE0000000000000201 /* BrainViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */; };
+		B1A1C0DE0000000000000203 /* BrainModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000204 /* BrainModelsTests.swift */; };
+		B1A1C0DE0000000000000901 /* BrainStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000902 /* BrainStyle.swift */; };
+		B1A1C0DE0000000000000A01 /* BrainHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000A02 /* BrainHomeView.swift */; };
+		B1A1C0DE0000000000000A03 /* BrainSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000A04 /* BrainSearchView.swift */; };
+		B1A1C0DE0000000000000B01 /* BrainModuleListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000B02 /* BrainModuleListView.swift */; };
+		B1A1C0DE0000000000000B03 /* BrainHighlightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000B04 /* BrainHighlightsView.swift */; };
+		B1A1C0DE0000000000000C01 /* BrainReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000C02 /* BrainReaderView.swift */; };
+		B1A1C0DE0000000000000D01 /* BrainArticleDigest.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000D02 /* BrainArticleDigest.swift */; };
+		B1A1C0DE0000000000000C03 /* BrainPersonCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000C04 /* BrainPersonCardView.swift */; };
+		B1A1C0DE0000000000000903 /* BrainCoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000904 /* BrainCoverView.swift */; };
+		B1A1C0DE0000000000000905 /* BrainGraphView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000906 /* BrainGraphView.swift */; };
+		B1A1C0DE0000000000000907 /* BrainVisualsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000908 /* BrainVisualsTests.swift */; };
+		B1A1C0DE0000000000000D03 /* BrainArticleDigestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000D04 /* BrainArticleDigestTests.swift */; };
+		B1A1C0DE0000000000000801 /* BrainLibraryViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000802 /* BrainLibraryViewModels.swift */; };
+		B1A1C0DE00000000000000A3 /* BrainModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000103 /* BrainModels.swift */; };
 		2A8CB7ACCDBA9BBE34E57FDC /* DailyDeckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A997D807C262D12E5491E89 /* DailyDeckTests.swift */; };
+		456FFBA86135A0D6C5707B5E /* DeckCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59FBDD2AD47605DA28200130 /* DeckCalendarView.swift */; };
+		BBEB574715121587294478C7 /* DailyBriefReminder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A01557B2FAEFDDD7C94E6A /* DailyBriefReminder.swift */; };
+		3F522DC0F0540A319E63AB5A /* DeckFeedbackSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85E374D76D0C399DE79819AE /* DeckFeedbackSheet.swift */; };
+		1FE8B00FD19A1F67ACF1CA6C /* DeckStackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4449578C9E4BFBE64D09B3C2 /* DeckStackView.swift */; };
+		39D0697E4167AB61D9640383 /* DeckPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = B87C4558BE2BEAAD59ECCE39 /* DeckPalette.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -688,6 +733,22 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		B1A1C0DE00000000000F000E /* GoalDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalDetailView.swift; sourceTree = "<group>"; };
+		B1A1C0DE00000000000F000C /* GoalsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsHomeView.swift; sourceTree = "<group>"; };
+		B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsViewModelsTests.swift; sourceTree = "<group>"; };
+		B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsViewModels.swift; sourceTree = "<group>"; };
+		B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsModelsTests.swift; sourceTree = "<group>"; };
+		B1A1C0DE00000000000F0004 /* GoalsDataClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsDataClient.swift; sourceTree = "<group>"; };
+		B1A1C0DE00000000000F0002 /* GoalsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsModels.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000E18 /* PrepViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepViewModels.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000E22 /* PrepHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepHomeView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000E24 /* PrepTrackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepTrackView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000E26 /* PrepRunView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepRunView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000E28 /* PrepDrillViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepDrillViews.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000E02 /* PrepModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepModels.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000E04 /* PrepDataClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepDataClient.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000E16 /* PrepViewModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepViewModelsTests.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000E06 /* PrepModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepModelsTests.swift; sourceTree = "<group>"; };
 		F42EE649B1547E6CBDC22A5A /* VoiceCallFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallFlowTests.swift; sourceTree = "<group>"; };
 		A1C0FFEE0000000000000F02 /* VoiceCallAudioLevelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallAudioLevelsTests.swift; sourceTree = "<group>"; };
 		DEC46CE9BD5B6A700B716CE0 /* VoiceCallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallView.swift; sourceTree = "<group>"; };
@@ -824,6 +885,7 @@
 		456E58BC75E2EBE335416D28 /* ShellNavigationStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellNavigationStateTests.swift; sourceTree = "<group>"; };
 		B3A55225279372080EAE5602 /* DrawerSettleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawerSettleTests.swift; sourceTree = "<group>"; };
 		6E6E51C25647DF0AB97836D6 /* RecentsFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentsFilterTests.swift; sourceTree = "<group>"; };
+		6A6E520F53A63761084F83A3 /* AutoArchiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoArchiveTests.swift; sourceTree = "<group>"; };
 		19C1150000000000000000A4 /* CliSessionsSyncModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CliSessionsSyncModelTests.swift; sourceTree = "<group>"; };
 		C03900000000000000000010 /* APIEndpointContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIEndpointContractTests.swift; sourceTree = "<group>"; };
 		C03900000000000000000011 /* CronManagementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CronManagementTests.swift; sourceTree = "<group>"; };
@@ -872,6 +934,10 @@
 		7A7827505CB6DC88368DBB98 /* ProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsView.swift; sourceTree = "<group>"; };
 		C6501C5C136AD44341F12A22 /* DrawerSettle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawerSettle.swift; sourceTree = "<group>"; };
 		96B6ABCB2B2999629CD767C8 /* RecentsFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentsFilter.swift; sourceTree = "<group>"; };
+		840C11CB0B65C68095DDD79D /* ArchiveReviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveReviewSheet.swift; sourceTree = "<group>"; };
+		429F8EA2085D0C07166ED24E /* SessionListViewModel+AutoArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SessionListViewModel+AutoArchive.swift"; sourceTree = "<group>"; };
+		3FFFED4F8D6A1138AD6D62B8 /* ChatDigestSummarizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatDigestSummarizer.swift; sourceTree = "<group>"; };
+		22A3FB95B3192EE1048414D0 /* AutoArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoArchive.swift; sourceTree = "<group>"; };
 		A04300000000000000000012 /* SessionListActionConfirmations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListActionConfirmations.swift; sourceTree = "<group>"; };
 		A04300000000000000000013 /* SessionMutator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionMutator.swift; sourceTree = "<group>"; };
 		A040C0DE0000000000000002 /* ProjectCreationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectCreationSheet.swift; sourceTree = "<group>"; };
@@ -984,6 +1050,8 @@
 		1A2B3C4D5E6F7000000000EF /* CachedMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedMessage.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7000000000F3 /* CacheStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheStore.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7000000000F4 /* CacheStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheStoreTests.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000703 /* BrainCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainCache.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000704 /* BrainCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainCacheTests.swift; sourceTree = "<group>"; };
 		C28702000000000000000002 /* ChatDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatDraftStore.swift; sourceTree = "<group>"; };
 		C28702000000000000000004 /* ChatDraftStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatDraftStoreTests.swift; sourceTree = "<group>"; };
 		C28702000000000000000006 /* ChatDraftAttachmentStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatDraftAttachmentStore.swift; sourceTree = "<group>"; };
@@ -1312,8 +1380,30 @@
 		22112FC4500BC48A8D86A376 /* DailyDeck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDeck.swift; sourceTree = "<group>"; };
 		D71D8CEEBE37C8E43E46A2B4 /* DailyDeckViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDeckViewModel.swift; sourceTree = "<group>"; };
 		AD79724DF6D6FD92B594BBC5 /* DailyDeckView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDeckView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000102 /* BrainViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainViewModel.swift; sourceTree = "<group>"; };
 		7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckCardView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000204 /* BrainModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainModelsTests.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000902 /* BrainStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainStyle.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000A02 /* BrainHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainHomeView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000A04 /* BrainSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainSearchView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000B02 /* BrainModuleListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainModuleListView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000B04 /* BrainHighlightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainHighlightsView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000C02 /* BrainReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainReaderView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000D02 /* BrainArticleDigest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainArticleDigest.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000C04 /* BrainPersonCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainPersonCardView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000904 /* BrainCoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainCoverView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000906 /* BrainGraphView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainGraphView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000908 /* BrainVisualsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainVisualsTests.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000D04 /* BrainArticleDigestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainArticleDigestTests.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000802 /* BrainLibraryViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainLibraryViewModels.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000103 /* BrainModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainModels.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainViewModelTests.swift; sourceTree = "<group>"; };
 		3A997D807C262D12E5491E89 /* DailyDeckTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDeckTests.swift; sourceTree = "<group>"; };
+		59FBDD2AD47605DA28200130 /* DeckCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckCalendarView.swift; sourceTree = "<group>"; };
+		E4A01557B2FAEFDDD7C94E6A /* DailyBriefReminder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyBriefReminder.swift; sourceTree = "<group>"; };
+		85E374D76D0C399DE79819AE /* DeckFeedbackSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckFeedbackSheet.swift; sourceTree = "<group>"; };
+		4449578C9E4BFBE64D09B3C2 /* DeckStackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckStackView.swift; sourceTree = "<group>"; };
+		B87C4558BE2BEAAD59ECCE39 /* DeckPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckPalette.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1362,6 +1452,32 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		B1A1C0DE00000000000F0001 /* Goals */ = {
+			isa = PBXGroup;
+			children = (
+				B1A1C0DE00000000000F000E /* GoalDetailView.swift */,
+				B1A1C0DE00000000000F000C /* GoalsHomeView.swift */,
+				B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */,
+				B1A1C0DE00000000000F0004 /* GoalsDataClient.swift */,
+				B1A1C0DE00000000000F0002 /* GoalsModels.swift */,
+			);
+			path = Goals;
+			sourceTree = "<group>";
+		};
+		B1A1C0DE0000000000000E10 /* Prep */ = {
+			isa = PBXGroup;
+			children = (
+				B1A1C0DE0000000000000E02 /* PrepModels.swift */,
+				B1A1C0DE0000000000000E04 /* PrepDataClient.swift */,
+				B1A1C0DE0000000000000E18 /* PrepViewModels.swift */,
+				B1A1C0DE0000000000000E22 /* PrepHomeView.swift */,
+				B1A1C0DE0000000000000E24 /* PrepTrackView.swift */,
+				B1A1C0DE0000000000000E26 /* PrepRunView.swift */,
+				B1A1C0DE0000000000000E28 /* PrepDrillViews.swift */,
+			);
+			path = Prep;
+			sourceTree = "<group>";
+		};
 		9BAF7D8BBF390913B4F060B0 /* VoiceCall */ = {
 			isa = PBXGroup;
 			children = (
@@ -1447,6 +1563,14 @@
 			isa = PBXGroup;
 			children = (
 				3A997D807C262D12E5491E89 /* DailyDeckTests.swift */,
+				B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */,
+				B1A1C0DE0000000000000204 /* BrainModelsTests.swift */,
+				B1A1C0DE0000000000000E06 /* PrepModelsTests.swift */,
+				B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */,
+				B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */,
+				B1A1C0DE0000000000000E16 /* PrepViewModelsTests.swift */,
+				B1A1C0DE0000000000000908 /* BrainVisualsTests.swift */,
+				B1A1C0DE0000000000000D04 /* BrainArticleDigestTests.swift */,
 				F42EE649B1547E6CBDC22A5A /* VoiceCallFlowTests.swift */,
 				A1C0FFEE0000000000000F02 /* VoiceCallAudioLevelsTests.swift */,
 				CC7685CE580C850A7254B14E /* VoiceCallChatSnapshotTests.swift */,
@@ -1540,6 +1664,7 @@
 				456E58BC75E2EBE335416D28 /* ShellNavigationStateTests.swift */,
 				B3A55225279372080EAE5602 /* DrawerSettleTests.swift */,
 				6E6E51C25647DF0AB97836D6 /* RecentsFilterTests.swift */,
+				6A6E520F53A63761084F83A3 /* AutoArchiveTests.swift */,
 				19C1150000000000000000A4 /* CliSessionsSyncModelTests.swift */,
 				C03900000000000000000010 /* APIEndpointContractTests.swift */,
 				C03900000000000000000011 /* CronManagementTests.swift */,
@@ -1573,6 +1698,7 @@
 				C15300000000000000000006 /* KanbanCardEditorStateTests.swift */,
 				C1A042000000000000000006 /* ClarificationTests.swift */,
 				1A2B3C4D5E6F7000000000F4 /* CacheStoreTests.swift */,
+				B1A1C0DE0000000000000704 /* BrainCacheTests.swift */,
 				C04400000000000000000004 /* CacheFallbackPolicyTests.swift */,
 				C86900000000000000000004 /* NetworkPathMonitorTests.swift */,
 				1A2B3C4D5E6F700000000103 /* AppThemeTests.swift */,
@@ -1763,6 +1889,8 @@
 		1A2B3C4D5E6F7000000000C3 /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				B1A1C0DE0000000000000003 /* Brain */,
+				B1A1C0DE00000000000F0001 /* Goals */,
 				12A06408B1B8DA1A340CBD38 /* DailyDeck */,
 				9BAF7D8BBF390913B4F060B0 /* VoiceCall */,
 				AA0200000000000000000006 /* Activity */,
@@ -1898,6 +2026,10 @@
 				7A7827505CB6DC88368DBB98 /* ProjectsView.swift */,
 				C6501C5C136AD44341F12A22 /* DrawerSettle.swift */,
 				96B6ABCB2B2999629CD767C8 /* RecentsFilter.swift */,
+				840C11CB0B65C68095DDD79D /* ArchiveReviewSheet.swift */,
+				429F8EA2085D0C07166ED24E /* SessionListViewModel+AutoArchive.swift */,
+				3FFFED4F8D6A1138AD6D62B8 /* ChatDigestSummarizer.swift */,
+				22A3FB95B3192EE1048414D0 /* AutoArchive.swift */,
 				A04300000000000000000012 /* SessionListActionConfirmations.swift */,
 				A04300000000000000000013 /* SessionMutator.swift */,
 				C08800000000000000000002 /* SessionHaptics.swift */,
@@ -2075,6 +2207,7 @@
 				C28702000000000000000002 /* ChatDraftStore.swift */,
 				C28702000000000000000006 /* ChatDraftAttachmentStore.swift */,
 				1A2B3C4D5E6F7000000000F3 /* CacheStore.swift */,
+				B1A1C0DE0000000000000703 /* BrainCache.swift */,
 				1A2B3C4D5E6F7000000000EE /* CachedSession.swift */,
 				1A2B3C4D5E6F7000000000EF /* CachedMessage.swift */,
 			);
@@ -2274,12 +2407,38 @@
 		12A06408B1B8DA1A340CBD38 /* DailyDeck */ = {
 			isa = PBXGroup;
 			children = (
+				59FBDD2AD47605DA28200130 /* DeckCalendarView.swift */,
+				E4A01557B2FAEFDDD7C94E6A /* DailyBriefReminder.swift */,
+				85E374D76D0C399DE79819AE /* DeckFeedbackSheet.swift */,
+				4449578C9E4BFBE64D09B3C2 /* DeckStackView.swift */,
+				B87C4558BE2BEAAD59ECCE39 /* DeckPalette.swift */,
 				7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */,
 				AD79724DF6D6FD92B594BBC5 /* DailyDeckView.swift */,
 				D71D8CEEBE37C8E43E46A2B4 /* DailyDeckViewModel.swift */,
 				22112FC4500BC48A8D86A376 /* DailyDeck.swift */,
 			);
 			path = DailyDeck;
+			sourceTree = "<group>";
+		};
+		B1A1C0DE0000000000000003 /* Brain */ = {
+			isa = PBXGroup;
+			children = (
+				B1A1C0DE0000000000000102 /* BrainViewModel.swift */,
+				B1A1C0DE0000000000000103 /* BrainModels.swift */,
+				B1A1C0DE0000000000000802 /* BrainLibraryViewModels.swift */,
+				B1A1C0DE0000000000000906 /* BrainGraphView.swift */,
+				B1A1C0DE0000000000000904 /* BrainCoverView.swift */,
+				B1A1C0DE0000000000000902 /* BrainStyle.swift */,
+				B1A1C0DE0000000000000A02 /* BrainHomeView.swift */,
+				B1A1C0DE0000000000000A04 /* BrainSearchView.swift */,
+				B1A1C0DE0000000000000B02 /* BrainModuleListView.swift */,
+				B1A1C0DE0000000000000B04 /* BrainHighlightsView.swift */,
+				B1A1C0DE0000000000000C02 /* BrainReaderView.swift */,
+				B1A1C0DE0000000000000D02 /* BrainArticleDigest.swift */,
+				B1A1C0DE0000000000000C04 /* BrainPersonCardView.swift */,
+				B1A1C0DE0000000000000E10 /* Prep */,
+			);
+			path = Brain;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -2505,7 +2664,37 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				456FFBA86135A0D6C5707B5E /* DeckCalendarView.swift in Sources */,
+				BBEB574715121587294478C7 /* DailyBriefReminder.swift in Sources */,
+				3F522DC0F0540A319E63AB5A /* DeckFeedbackSheet.swift in Sources */,
+				1FE8B00FD19A1F67ACF1CA6C /* DeckStackView.swift in Sources */,
+				39D0697E4167AB61D9640383 /* DeckPalette.swift in Sources */,
 				1F2EF7D6C585EAF7E1C46CD2 /* DeckCardView.swift in Sources */,
+				B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */,
+				B1A1C0DE00000000000000A3 /* BrainModels.swift in Sources */,
+				B1A1C0DE0000000000000E01 /* PrepModels.swift in Sources */,
+				B1A1C0DE00000000000F000F /* GoalDetailView.swift in Sources */,
+				B1A1C0DE00000000000F000D /* GoalsHomeView.swift in Sources */,
+				B1A1C0DE00000000000F0009 /* GoalsViewModels.swift in Sources */,
+				B1A1C0DE00000000000F0005 /* GoalsDataClient.swift in Sources */,
+				B1A1C0DE00000000000F0003 /* GoalsModels.swift in Sources */,
+				B1A1C0DE0000000000000E03 /* PrepDataClient.swift in Sources */,
+				B1A1C0DE0000000000000E17 /* PrepViewModels.swift in Sources */,
+				B1A1C0DE0000000000000E21 /* PrepHomeView.swift in Sources */,
+				B1A1C0DE0000000000000E23 /* PrepTrackView.swift in Sources */,
+				B1A1C0DE0000000000000E25 /* PrepRunView.swift in Sources */,
+				B1A1C0DE0000000000000E27 /* PrepDrillViews.swift in Sources */,
+				B1A1C0DE0000000000000801 /* BrainLibraryViewModels.swift in Sources */,
+				B1A1C0DE0000000000000905 /* BrainGraphView.swift in Sources */,
+				B1A1C0DE0000000000000903 /* BrainCoverView.swift in Sources */,
+				B1A1C0DE0000000000000901 /* BrainStyle.swift in Sources */,
+				B1A1C0DE0000000000000A01 /* BrainHomeView.swift in Sources */,
+				B1A1C0DE0000000000000A03 /* BrainSearchView.swift in Sources */,
+				B1A1C0DE0000000000000B01 /* BrainModuleListView.swift in Sources */,
+				B1A1C0DE0000000000000B03 /* BrainHighlightsView.swift in Sources */,
+				B1A1C0DE0000000000000C01 /* BrainReaderView.swift in Sources */,
+				B1A1C0DE0000000000000D01 /* BrainArticleDigest.swift in Sources */,
+				B1A1C0DE0000000000000C03 /* BrainPersonCardView.swift in Sources */,
 				218E7F5B009F877FF54BA04A /* DailyDeckView.swift in Sources */,
 				0D0A3A284474E49DBDD0F9E9 /* DailyDeckViewModel.swift in Sources */,
 				E38C2C7CB2630EE82E7754E8 /* DailyDeck.swift in Sources */,
@@ -2690,6 +2879,7 @@
 				1A2B3C4D5E6F7000000000EC /* CachedSession.swift in Sources */,
 				1A2B3C4D5E6F7000000000ED /* CachedMessage.swift in Sources */,
 				1A2B3C4D5E6F7000000000F1 /* CacheStore.swift in Sources */,
+				B1A1C0DE0000000000000701 /* BrainCache.swift in Sources */,
 				C28702000000000000000001 /* ChatDraftStore.swift in Sources */,
 				C28702000000000000000005 /* ChatDraftAttachmentStore.swift in Sources */,
 				1A2B3C4D5E6F7000000000F5 /* SettingsView.swift in Sources */,
@@ -2830,6 +3020,10 @@
 				304FA3D5BBF98F6499CB988D /* ProjectsView.swift in Sources */,
 				D02817A0E87BEF62EF5E23F0 /* DrawerSettle.swift in Sources */,
 				93E10058E8552A4AA439B3A1 /* RecentsFilter.swift in Sources */,
+				17C6736606E293C99BE86638 /* ArchiveReviewSheet.swift in Sources */,
+				3EC76C98C56F0B12B4BBF9E9 /* SessionListViewModel+AutoArchive.swift in Sources */,
+				815BBD42E72D0ED334DEF769 /* ChatDigestSummarizer.swift in Sources */,
+				DAB4490B2F44EE0F00EABE6C /* AutoArchive.swift in Sources */,
 				A04300000000000000000002 /* SessionListActionConfirmations.swift in Sources */,
 				A04300000000000000000003 /* SessionMutator.swift in Sources */,
 				A040C0DE0000000000000001 /* ProjectCreationSheet.swift in Sources */,
@@ -2906,6 +3100,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				2A8CB7ACCDBA9BBE34E57FDC /* DailyDeckTests.swift in Sources */,
+				B1A1C0DE0000000000000201 /* BrainViewModelTests.swift in Sources */,
+				B1A1C0DE0000000000000203 /* BrainModelsTests.swift in Sources */,
+				B1A1C0DE0000000000000E05 /* PrepModelsTests.swift in Sources */,
+				B1A1C0DE00000000000F000B /* GoalsViewModelsTests.swift in Sources */,
+				B1A1C0DE00000000000F0007 /* GoalsModelsTests.swift in Sources */,
+				B1A1C0DE0000000000000E15 /* PrepViewModelsTests.swift in Sources */,
+				B1A1C0DE0000000000000907 /* BrainVisualsTests.swift in Sources */,
+				B1A1C0DE0000000000000D03 /* BrainArticleDigestTests.swift in Sources */,
 				B15C1E3E39CB8EAC55E8BD67 /* VoiceCallFlowTests.swift in Sources */,
 				A1C0FFEE0000000000000B02 /* VoiceCallAudioLevelsTests.swift in Sources */,
 				BF7E56FE3F4B476686A0DCEF /* VoiceCallChatSnapshotTests.swift in Sources */,
@@ -2993,6 +3195,7 @@
 				6A782D4CAA2AF88D5F94A780 /* ShellNavigationStateTests.swift in Sources */,
 				8ED1BF0E83115706BFB110A4 /* DrawerSettleTests.swift in Sources */,
 				C2067E557A82E018C2421DC8 /* RecentsFilterTests.swift in Sources */,
+				BDADA90E35426E18B6B4C495 /* AutoArchiveTests.swift in Sources */,
 				19C1150000000000000000A3 /* CliSessionsSyncModelTests.swift in Sources */,
 				C03910000000000000000010 /* APIEndpointContractTests.swift in Sources */,
 				C03910000000000000000011 /* CronManagementTests.swift in Sources */,
@@ -3026,6 +3229,7 @@
 				C15300000000000000000005 /* KanbanCardEditorStateTests.swift in Sources */,
 				C1A042000000000000000005 /* ClarificationTests.swift in Sources */,
 				1A2B3C4D5E6F7000000000F2 /* CacheStoreTests.swift in Sources */,
+				B1A1C0DE0000000000000702 /* BrainCacheTests.swift in Sources */,
 				C04400000000000000000003 /* CacheFallbackPolicyTests.swift in Sources */,
 				C86900000000000000000003 /* NetworkPathMonitorTests.swift in Sources */,
 				1A2B3C4D5E6F700000000102 /* AppThemeTests.swift in Sources */,

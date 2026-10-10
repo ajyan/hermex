@@ -153,6 +153,22 @@ enum Endpoint {
     case upload
     case transcribe
     case tts
+    /// The Brain module library (`api/brain.py`): module counts, item lists, one page, search, and the link graph.
+    case brainModules
+    case brainList(module: String, tag: String?, cursor: Int?)
+    case brainPage(module: String, id: String)
+    case brainSearch(query: String, module: String?)
+    case brainGraph(module: String, id: String)
+    /// The Prep interview tutor (`api/tutor.py`): today's run, home, a track map, one item, and answer submission.
+    case tutorHome
+    case tutorToday
+    case tutorMap(track: String)
+    case tutorItem(id: String)
+    case tutorAttempt
+    /// Personal goals from the vault (`api/vault_goals.py`): home, one goal, and a check-in.
+    case goalsHome
+    case goalDetail(slug: String)
+    case goalCheckIn
 
     var path: String {
         switch self {
@@ -418,6 +434,32 @@ enum Endpoint {
             return "/api/transcribe"
         case .tts:
             return "/api/tts"
+        case .brainModules:
+            return "/api/brain/modules"
+        case .brainList:
+            return "/api/brain/list"
+        case .brainPage:
+            return "/api/brain/page"
+        case .brainSearch:
+            return "/api/brain/search"
+        case .brainGraph:
+            return "/api/brain/graph"
+        case .tutorHome:
+            return "/api/tutor/home"
+        case .tutorToday:
+            return "/api/tutor/today"
+        case .tutorMap:
+            return "/api/tutor/map"
+        case .tutorItem:
+            return "/api/tutor/item"
+        case .tutorAttempt:
+            return "/api/tutor/attempt"
+        case .goalsHome:
+            return "/api/goals"
+        case .goalDetail:
+            return "/api/goals/detail"
+        case .goalCheckIn:
+            return "/api/goals/checkin"
         }
     }
 
@@ -615,6 +657,23 @@ enum Endpoint {
                 items.append(URLQueryItem(name: "file", value: file))
             }
             return items
+        case let .brainList(module, tag, cursor):
+            var items = [URLQueryItem(name: "module", value: module)]
+            if let tag { items.append(URLQueryItem(name: "tag", value: tag)) }
+            if let cursor { items.append(URLQueryItem(name: "cursor", value: String(cursor))) }
+            return items
+        case let .brainPage(module, id), let .brainGraph(module, id):
+            return [URLQueryItem(name: "module", value: module), URLQueryItem(name: "id", value: id)]
+        case let .brainSearch(query, module):
+            var items = [URLQueryItem(name: "q", value: query)]
+            if let module { items.append(URLQueryItem(name: "module", value: module)) }
+            return items
+        case let .tutorMap(track):
+            return [URLQueryItem(name: "track", value: track)]
+        case let .tutorItem(id):
+            return [URLQueryItem(name: "id", value: id)]
+        case let .goalDetail(slug):
+            return [URLQueryItem(name: "slug", value: slug)]
         default:
             return []
         }
@@ -650,9 +709,16 @@ enum Endpoint {
             return url
         }
 
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        components?.queryItems = queryItems
-        return components?.url ?? url
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return url
+        }
+        components.queryItems = queryItems
+        // `queryItems` leaves `+` raw, and form decoders on the server (Python's
+        // `parse_qs`) read it as a space, so "c++" would arrive as "c". Apple's
+        // documented workaround: encode `+` after assigning the items.
+        components.percentEncodedQuery = components.percentEncodedQuery?
+            .replacingOccurrences(of: "+", with: "%2B")
+        return components.url ?? url
     }
 
     private func kanbanTaskURL(relativeTo baseURL: URL, cardID: String, suffix: String = "") -> URL {

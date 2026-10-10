@@ -18,11 +18,10 @@ enum DailyDeckState: Equatable {
     case loading
     /// No workspace chosen yet and the server has several: the user picks one.
     case needsWorkspace([String])
-    /// The workspace has no deck for today (the brief has not run, or was skipped).
+    /// The workspace has no deck for that day (the brief has not run, or was skipped).
     case noDeck
+    /// A deck is on screen: to answer, or to reread and edit once filed (`isFiled`).
     case ready
-    /// Today's answers are already filed.
-    case filed
     case failed(String)
 }
 
@@ -43,12 +42,34 @@ final class DailyDeckViewModel {
     private(set) var filing: DailyDeckFilingState = .idle
     private(set) var sessionID: String?
     private(set) var workspace: String?
+    /// What was last filed for the deck on screen; nil until it is filed.
+    private(set) var filedAnswers: [String: DeckAnswer]?
+    /// Days with a deck in `briefs/`, newest first.
+    private(set) var availableDates: [String] = []
+    /// Days whose deck has been filed.
+    private(set) var filedDates: Set<String> = []
+    /// Weekly and monthly review decks in `briefs/`, newest first.
+    private(set) var reviews: [DeckReview] = []
     /// The page on screen.
     var index = 0
 
     let server: URL
-    let date: String
-    let kind = "morning"
+    /// The user's today: its deck opens first.
+    let today: String
+    /// The day of the deck on screen.
+    private(set) var date: String
+    /// "morning" for the Daily Brief; "weekly" or "monthly" for a review deck.
+    private(set) var kind = "morning"
+
+    var isReview: Bool { kind != "morning" }
+
+    var title: String {
+        switch kind {
+        case "weekly": "Weekly Review"
+        case "monthly": "Monthly Review"
+        default: "Daily Brief"
+        }
+    }
     private let client: any DailyDeckDataClient
     private let store: DailyDeckStore
     private let now: () -> Date
@@ -58,7 +79,8 @@ final class DailyDeckViewModel {
         self.client = client
         self.store = store
         self.now = now
-        self.date = DailyDeckPaths.day(now())
+        self.today = DailyDeckPaths.day(now())
+        self.date = today
     }
 
     convenience init(server: URL) {
@@ -67,13 +89,49 @@ final class DailyDeckViewModel {
 
     var cards: [DeckCard] { deck?.cards ?? [] }
 
-    /// Cards with something to send (the headline and close cards never count).
-    var answeredCount: Int { cards.filter { answers[$0.id]?.isMeaningful(for: $0) == true }.count }
+    /// Cards answered (the headline and close cards never count, nor feedback alone).
+    var answeredCount: Int { cards.filter { answers[$0.id]?.isAnswer(for: $0) == true }.count }
+
+    /// What the deck shows: every page but cards marked "Not for Me". `index` counts these.
+    var visiblePages: [DeckPage] {
+        pages.filter { page in
+            guard case .card(let card) = page else { return true }
+            return answers[card.id]?.feedback == nil
+        }
+    }
+
+    var currentPage: DeckPage? {
+        let visible = visiblePages
+        return visible.indices.contains(index) ? visible[index] : nil
+    }
+
+    /// Cards on this deck marked "Not for Me".
+    var skippedCount: Int { cards.filter { answers[$0.id]?.feedback != nil }.count }
+
+    /// The last card marked "Not for Me" and its answer before that, for Undo.
+    private(set) var lastDismissal: (card: DeckCard, previous: DeckAnswer?)?
 
     func answer(for card: DeckCard) -> DeckAnswer? { answers[card.id] }
 
+    var isFiled: Bool { filedAnswers != nil }
+
+    /// Whether the answers differ from what was filed (always true before the first filing).
+    var hasChanges: Bool {
+        guard let filedAnswers else { return true }
+        return meaningful(answers) != meaningful(filedAnswers)
+    }
+
+    private func meaningful(_ answers: [String: DeckAnswer]) -> [String: DeckAnswer] {
+        Dictionary(uniqueKeysWithValues: cards.compactMap { card in
+            guard var answer = answers[card.id], answer.isMeaningful(for: card) else { return nil }
+            answer.text = answer.text?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return (card.id, answer)
+        })
+    }
+
     // MARK: Loading
 
+    /// Finds the brief's folder, then opens the deck for `date` (today on first load).
     func load() async {
         state = .loading
         do {
@@ -81,27 +139,61 @@ final class DailyDeckViewModel {
             self.workspace = workspace
             let (sessionID, names) = try await sessionAndBriefs(workspace: workspace)
             self.sessionID = sessionID
-            guard let names else { state = .noDeck; return }
-            if names.contains(fileName(DailyDeckPaths.answers(date: date, kind: kind))) {
-                state = .filed
-                return
-            }
-            guard names.contains(fileName(DailyDeckPaths.deck(date: date, kind: kind))) else {
-                state = .noDeck
-                return
-            }
-            let content = try await client.fileContent(sessionID: sessionID, path: DailyDeckPaths.deck(date: date, kind: kind))
-            let decoded = try DailyDeck.decode(content)
-            deck = decoded
-            pages = DeckPage.pages(for: decoded.cards)
-            answers = store.answers(for: server, date: date, kind: kind)
-            index = min(index, max(pages.count - 1, 0))
-            state = .ready
+            availableDates = Self.deckDates(in: names ?? [], kind: "morning")
+            filedDates = Self.filedDates(in: names ?? [], kind: "morning")
+            reviews = DeckReview.all(in: names ?? [])
+            try await openDeck(names: names ?? [], sessionID: sessionID)
         } catch is CancellationError {
             // A newer load owns the state.
         } catch {
             state = .failed(error.localizedDescription)
         }
+    }
+
+    /// Opens another deck: a past day's brief to reread or edit, or a review.
+    func show(date: String, kind: String = "morning") async {
+        guard date != self.date || kind != self.kind || state != .ready else { return }
+        self.date = date
+        self.kind = kind
+        index = 0
+        await load()
+    }
+
+    /// Loads the deck and, when it was filed, the filed answers. Unsent edits on this
+    /// device win over the filed copy, so leaving mid-edit loses nothing.
+    private func openDeck(names: [String], sessionID: String) async throws {
+        deck = nil
+        pages = []
+        filedAnswers = nil
+        guard names.contains(fileName(DailyDeckPaths.deck(date: date, kind: kind))) else {
+            state = .noDeck
+            return
+        }
+        let content = try await client.fileContent(sessionID: sessionID, path: DailyDeckPaths.deck(date: date, kind: kind))
+        let decoded = try DailyDeck.decode(content)
+        if names.contains(fileName(DailyDeckPaths.answers(date: date, kind: kind))) {
+            let filed = try await client.fileContent(sessionID: sessionID, path: DailyDeckPaths.answers(date: date, kind: kind))
+            filedAnswers = DeckAnswersFile.decodeAnswers(filed)
+        }
+        deck = decoded
+        pages = DeckPage.pages(for: decoded.cards)
+        let draft = store.answers(for: server, date: date, kind: kind)
+        answers = draft.isEmpty ? (filedAnswers ?? [:]) : draft
+        index = min(index, max(visiblePages.count - 1, 0))
+        lastDismissal = nil
+        state = .ready
+    }
+
+    /// Days with `<date>.<kind>.answers.json`, the file the agent saves when a deck is filed.
+    nonisolated static func filedDates(in names: [String], kind: String) -> Set<String> {
+        let suffix = ".\(kind).answers.json"
+        return Set(names.filter { $0.hasSuffix(suffix) }.map { String($0.dropLast(suffix.count)) })
+    }
+
+    /// `2026-10-05` from `2026-10-05.morning.json`, newest first.
+    nonisolated static func deckDates(in names: [String], kind: String) -> [String] {
+        let suffix = ".\(kind).json"
+        return names.filter { $0.hasSuffix(suffix) }.map { String($0.dropLast(suffix.count)) }.sorted(by: >)
     }
 
     func chooseWorkspace(_ path: String) async {
@@ -129,10 +221,10 @@ final class DailyDeckViewModel {
         return nil
     }
 
-    /// Today's session and the names in `briefs/` (nil when the folder is missing).
-    /// A remembered session the server no longer knows is replaced once.
+    /// A session to read `briefs/` through (today's, whichever deck is shown) and the names
+    /// in it (nil when the folder is missing). A session the server lost is replaced once.
     private func sessionAndBriefs(workspace: String) async throws -> (String, [String]?) {
-        if let stored = store.session(for: server, date: date) {
+        if let stored = store.session(for: server, date: today) {
             do {
                 return (stored, try await briefNames(sessionID: stored))
             } catch let error as APIError where error.isVanishedSession {
@@ -140,8 +232,8 @@ final class DailyDeckViewModel {
             }
         }
         let created = try await client.createSession(workspace: workspace)
-        store.setSession(created, for: server, date: date)
-        try? await client.renameSession(id: created, title: Self.sessionTitle(for: now()))
+        store.setSession(created, for: server, date: today)
+        try? await client.renameSession(id: created, title: Self.sessionTitle(for: date, kind: kind))
         return (created, try await briefNames(sessionID: created))
     }
 
@@ -155,8 +247,40 @@ final class DailyDeckViewModel {
 
     private func fileName(_ path: String) -> String { (path as NSString).lastPathComponent }
 
-    static func sessionTitle(for date: Date) -> String {
-        "Daily Brief · \(date.formatted(.dateTime.month(.abbreviated).day()))"
+    /// "Daily Brief · Oct 5" for the deck's day; reviews say which.
+    static func sessionTitle(for day: String, kind: String = "morning") -> String {
+        let name = kind == "weekly" ? "Weekly Review" : kind == "monthly" ? "Monthly Review" : "Daily Brief"
+        return "\(name) · \(DailyDeckPaths.label(day))"
+    }
+
+    // MARK: Journal
+
+    /// Days in `year`-`month` with a journal entry (`journal/YYYY/MM-Month/YYYY-MM-DD.md`).
+    /// The month folder is found by its `MM-` prefix, whatever the month is spelled as.
+    func journalDays(year: Int, month: Int) async -> Set<String> {
+        guard let sessionID, let folder = await monthFolder(year: year, month: month, sessionID: sessionID),
+              let names = try? await client.entryNames(sessionID: sessionID, path: folder)
+        else { return [] }
+        let prefix = String(format: "%04d-%02d-", year, month)
+        return Set(names.filter { $0.hasPrefix(prefix) && $0.hasSuffix(".md") }.map { String($0.dropLast(3)) })
+    }
+
+    /// That day's journal entry as Markdown, without machine markers.
+    func journalEntry(for day: String) async throws -> String {
+        let parts = day.split(separator: "-").compactMap { Int($0) }
+        guard let sessionID, parts.count == 3,
+              let folder = await monthFolder(year: parts[0], month: parts[1], sessionID: sessionID)
+        else { throw DailyDeckJournalError.missing }
+        let text = try await client.fileContent(sessionID: sessionID, path: "\(folder)/\(day).md")
+        return DailyDeckJournal.readable(text)
+    }
+
+    private func monthFolder(year: Int, month: Int, sessionID: String) async -> String? {
+        let base = "journal/\(year)"
+        guard let names = try? await client.entryNames(sessionID: sessionID, path: base),
+              let folder = names.first(where: { $0.hasPrefix(String(format: "%02d-", month)) })
+        else { return nil }
+        return "\(base)/\(folder)"
     }
 
     // MARK: Answering
@@ -173,6 +297,54 @@ final class DailyDeckViewModel {
         }
     }
 
+    /// The question on screen: the user's or a regenerated one, else the card's.
+    func question(for card: DeckCard) -> String? {
+        answers[card.id]?.question ?? card.question
+    }
+
+    /// Steps to the card's next question, wrapping back to its own.
+    func regenerateQuestion(for card: DeckCard) {
+        let options = [card.question].compactMap { $0 } + card.altQuestions
+        guard options.count > 1 else { return }
+        let current = options.firstIndex(of: question(for: card) ?? "") ?? 0
+        let next = options[(current + 1) % options.count]
+        update(card) { $0.question = next == card.question ? nil : next }
+    }
+
+    /// Replaces the card's question with the user's own; an empty one restores the card's.
+    func setOwnQuestion(_ text: String, for card: DeckCard) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        update(card) { $0.question = trimmed.isEmpty || trimmed == card.question ? nil : trimmed }
+    }
+
+    /// Marks a card "Not for Me": it leaves the deck and its feedback is filed with the answers.
+    func dismiss(_ card: DeckCard, feedback: DeckFeedback) {
+        var feedback = feedback
+        feedback.note = feedback.note?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if feedback.note?.isEmpty == true { feedback.note = nil }
+        lastDismissal = (card, answers[card.id])
+        update(card) { $0.feedback = feedback }
+        index = min(index, max(visiblePages.count - 1, 0))
+    }
+
+    /// Puts the last dismissed card back where it was and shows it.
+    func undoDismissal() {
+        guard let (card, previous) = lastDismissal else { return }
+        lastDismissal = nil
+        update(card) { $0 = previous ?? DeckAnswer(card: card.id) }
+        if let position = visiblePages.firstIndex(where: { $0.id == card.id }) { index = position }
+    }
+
+    func clearDismissal() { lastDismissal = nil }
+
+    /// Brings back every card marked "Not for Me" on this deck, dropping their feedback.
+    func restoreSkipped() {
+        lastDismissal = nil
+        for card in cards where answers[card.id]?.feedback != nil {
+            update(card) { $0.feedback = nil }
+        }
+    }
+
     private func update(_ card: DeckCard, _ change: (inout DeckAnswer) -> Void) {
         var answer = answers[card.id] ?? DeckAnswer(card: card.id)
         change(&answer)
@@ -183,21 +355,22 @@ final class DailyDeckViewModel {
     // MARK: Filing
 
     /// Sends the answers in a fresh session, so the chat it opens holds only this filing
-    /// (never an earlier, stopped attempt). Returns that session's id on success so the
-    /// caller can open it and watch the agent file them.
+    /// (never an earlier, stopped attempt). Filing again sends every answer; the server
+    /// updates only what changed. Returns the session id on success so the caller can
+    /// open it and watch the agent file them.
     func file() async -> String? {
         guard let deck, let workspace, filing != .filing else { return nil }
         filing = .filing
         do {
-            let message = try DeckAnswersPayload(deck: deck, answers: answers, completedAt: now()).message()
+            let message = try DeckAnswersPayload(deck: deck, answers: answers, completedAt: now()).message(refiling: isFiled)
             let sessionID = try await client.createSession(workspace: workspace)
-            try? await client.renameSession(id: sessionID, title: Self.sessionTitle(for: now()))
-            store.setSession(sessionID, for: server, date: date)
+            try? await client.renameSession(id: sessionID, title: Self.sessionTitle(for: date, kind: kind))
+            store.setSession(sessionID, for: server, date: today)
             self.sessionID = sessionID
             try await client.startChat(sessionID: sessionID, message: message, workspace: workspace)
             store.setAnswers([:], for: server, date: date, kind: kind)
+            filedAnswers = answers
             filing = .idle
-            state = .filed
             return sessionID
         } catch {
             filing = .failed(error.localizedDescription)
