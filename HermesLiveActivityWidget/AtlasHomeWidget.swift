@@ -2,41 +2,46 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
-/// Home Screen "Ask Atlas" widget: a launcher into the app's existing new-chat,
-/// voice, and call deep links. It reads no server data, so it never needs the
-/// active server's credentials and stays correct across server switches.
+/// Home Screen "Ask Atlas" widget: an ask bar into the app's new-chat and voice deep
+/// links, plus the most recent sessions the app last published (`AtlasWidgetRecents`).
+/// It never calls the server; each recent row opens through its own server's route.
 struct AtlasHomeWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "AtlasAskWidget", provider: AtlasHomeProvider()) { _ in
-            AtlasHomeWidgetView()
+        StaticConfiguration(kind: AtlasWidgetRecentsStore.widgetKind, provider: AtlasHomeProvider()) { entry in
+            AtlasHomeWidgetView(entry: entry)
                 .containerBackground(for: .widget) {
                     Color(uiColor: .secondarySystemGroupedBackground)
                 }
         }
         .configurationDisplayName("Ask Atlas")
-        .description("Start a chat, dictate, or call Atlas.")
+        .description("Start a chat, dictate, or jump back into a recent one.")
         .supportedFamilies([.systemMedium, .accessoryCircular])
     }
 }
 
 struct AtlasHomeEntry: TimelineEntry {
     let date: Date
+    let recents: AtlasWidgetRecents?
 }
 
 struct AtlasHomeProvider: TimelineProvider {
-    func placeholder(in context: Context) -> AtlasHomeEntry { AtlasHomeEntry(date: .now) }
+    func placeholder(in context: Context) -> AtlasHomeEntry { AtlasHomeEntry(date: .now, recents: nil) }
 
     func getSnapshot(in context: Context, completion: @escaping (AtlasHomeEntry) -> Void) {
-        completion(AtlasHomeEntry(date: .now))
+        completion(AtlasHomeEntry(date: .now, recents: AtlasWidgetRecentsStore().load()))
     }
 
+    /// The app reloads this when recents change; the periodic refresh only keeps the
+    /// relative times honest.
     func getTimeline(in context: Context, completion: @escaping (Timeline<AtlasHomeEntry>) -> Void) {
-        completion(Timeline(entries: [AtlasHomeEntry(date: .now)], policy: .never))
+        let entry = AtlasHomeEntry(date: .now, recents: AtlasWidgetRecentsStore().load())
+        completion(Timeline(entries: [entry], policy: .after(.now.addingTimeInterval(30 * 60))))
     }
 }
 
 private struct AtlasHomeWidgetView: View {
     @Environment(\.widgetFamily) private var family
+    let entry: AtlasHomeEntry
 
     var body: some View {
         switch family {
@@ -47,48 +52,100 @@ private struct AtlasHomeWidgetView: View {
             }
             .widgetURL(HermesDeepLink.newChatURL)
         default:
-            AtlasAskMediumView()
+            AtlasAskMediumView(entry: entry)
         }
     }
 }
 
 private struct AtlasAskMediumView: View {
+    let entry: AtlasHomeEntry
+
     var body: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 7) {
-                AtlasMark(lineWidth: 1.7).frame(width: 18, height: 18).widgetAccentable()
-                Text("Atlas").font(.subheadline.weight(.semibold))
-                Spacer()
-            }
+        VStack(alignment: .leading, spacing: 8) {
+            askBar
 
-            Link(destination: HermesDeepLink.newChatURL ?? Self.fallbackURL) {
-                HStack(spacing: 8) {
-                    Text("Ask Atlas…")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Image(systemName: "arrow.up")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Color(uiColor: .systemBackground))
-                        .frame(width: 32, height: 32)
-                        .background(Color.primary, in: Circle())
-                        .widgetAccentable()
+            if let recents = entry.recents, !recents.sessions.isEmpty {
+                ForEach(recents.sessions, id: \.id) { session in
+                    AtlasRecentRow(session: session, server: recents.server, now: entry.date)
                 }
-                .padding(.leading, 16)
-                .padding(.trailing, 6)
-                .frame(height: 44)
-                .background(Color.primary.opacity(0.1), in: Capsule())
+            } else {
+                HStack(spacing: 8) {
+                    AtlasActionChip(symbol: "phone", label: "Call Atlas", url: HermesDeepLink.newCallURL)
+                    AtlasActionChip(symbol: "square.and.pencil", label: "New chat", url: HermesDeepLink.newChatURL)
+                }
             }
-
-            HStack(spacing: 8) {
-                AtlasActionChip(symbol: "mic", label: "Dictate", url: HermesDeepLink.newChatVoiceURL)
-                AtlasActionChip(symbol: "phone", label: "Call Atlas", url: HermesDeepLink.newCallURL)
-                AtlasActionChip(symbol: "square.and.pencil", label: "New chat", url: HermesDeepLink.newChatURL)
-            }
+            Spacer(minLength: 0)
         }
     }
 
+    private var askBar: some View {
+        HStack(spacing: 8) {
+            Link(destination: HermesDeepLink.newChatURL ?? Self.fallbackURL) {
+                HStack(spacing: 8) {
+                    AtlasMark(lineWidth: 1.5).frame(width: 16, height: 16).widgetAccentable()
+                    Text("Ask Atlas…")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                }
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
+            }
+
+            Link(destination: HermesDeepLink.newChatVoiceURL ?? Self.fallbackURL) {
+                Image(systemName: "mic")
+                    .font(.system(size: 15, weight: .medium))
+                    .frame(width: 32, height: 32)
+                    .background(Color.primary.opacity(0.1), in: Circle())
+            }
+            .accessibilityLabel("Dictate")
+        }
+        .padding(.leading, 12)
+        .padding(.trailing, 5)
+        .frame(height: 42)
+        .background(Color.primary.opacity(0.1), in: Capsule())
+    }
+
     fileprivate static let fallbackURL = URL(string: "\(HermesDeepLink.scheme)://")!
+}
+
+private struct AtlasRecentRow: View {
+    let session: AtlasWidgetRecents.Session
+    let server: URL
+    let now: Date
+
+    var body: some View {
+        Link(destination: HermesDeepLink.webuiSessionURL(server: server, sessionID: session.id)
+            ?? AtlasAskMediumView.fallbackURL) {
+            HStack(spacing: 8) {
+                Image(systemName: "bubble.left")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.tertiary)
+                Text(session.title)
+                    .font(.subheadline)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                if let age = Self.age(of: session.lastActivity, now: now) {
+                    Text(age)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 4)
+            .frame(maxWidth: .infinity, minHeight: 28)
+            .contentShape(Rectangle())
+        }
+    }
+
+    /// "12m", "2h", "3d": one abbreviated unit, localized.
+    private static func age(of date: Date, now: Date) -> String? {
+        let interval = max(now.timeIntervalSince(date), 60)
+        let formatter = DateComponentsFormatter()
+        formatter.unitsStyle = .abbreviated
+        formatter.maximumUnitCount = 1
+        formatter.allowedUnits = [.minute, .hour, .day, .weekOfMonth]
+        return formatter.string(from: interval)
+    }
 }
 
 private struct AtlasActionChip: View {
