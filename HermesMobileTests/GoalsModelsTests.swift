@@ -17,8 +17,8 @@ final class GoalsModelsTests: XCTestCase {
         goal["consistency"] = try! JSONSerialization.jsonObject(with: Data(consistency.utf8))
         goal["heatmap"] = [["date": "2026-10-10", "status": "done"], ["date": "2026-10-11", "status": "none"]]
         goal["check_history"] = ["foot": [["date": "2026-10-10", "value": "same"]]]
-        goal["today"] = "2026-10-11"
-        goal["yesterday"] = "2026-10-10"
+        goal["today"] = "2026-10-13"
+        goal["yesterday"] = "2026-10-12"
         goal["streak"] = ["days": 1, "at_risk": false]
         let data = try! JSONSerialization.data(withJSONObject: goal)
         return String(decoding: data, as: UTF8.self)
@@ -52,7 +52,7 @@ final class GoalsModelsTests: XCTestCase {
         XCTAssertEqual(detail.milestones.first?.done, nil)
         XCTAssertEqual(detail.checkHistory["foot"]?.first?.value, "same")
         XCTAssertEqual(detail.doneWhen.first?.text, "Finished")
-        XCTAssertEqual(detail.today, "2026-10-11")
+        XCTAssertEqual(detail.today, "2026-10-13")
         XCTAssertEqual(detail.streak.days, 1)
     }
 
