@@ -706,7 +706,13 @@ struct ChatShellView: View {
             switchActiveProfile: { profile in
                 Task { await switchActiveProfile(profile) }
             },
-            pendingBotDestination: $pendingBotDestination
+            pendingBotDestination: $pendingBotDestination,
+            onCleanUpOldChats: viewModel.isViewingCachedData ? nil : {
+                // Back to the chat list, where the Undo toast and review sheet live.
+                navigation.path.removeAll()
+                setDrawerOpen(true)
+                cleanUpOldChats()
+            }
         )
         .adaptiveSecondaryNavigationTitle()
     }
@@ -738,7 +744,6 @@ struct ChatShellView: View {
             serverName: authManager.activeServer?.displayName ?? server.host() ?? server.absoluteString,
             canCreateNewChat: !viewModel.isViewingCachedData && !navigation.isCreatingNewChat,
             onNewChat: openNewChat,
-            onCleanUp: viewModel.isViewingCachedData ? nil : { cleanUpOldChats() },
             onOpen: { navigation.push($0) },
             onReviewArchiveCandidates: { isPresentingArchiveReview = true },
             refresh: { await refreshSessionsAndActiveProfile() }
@@ -992,7 +997,7 @@ struct ChatShellView: View {
         }
     }
 
-    /// The drawer's "Clean up old chats": an auto-archive pass right now, even with
+    /// Settings' "Clean Up Old Chats Now": an auto-archive pass right now, even with
     /// auto-archive off. Throwaways archive with the usual Undo toast; keepers and
     /// coding projects open the review sheet.
     private func cleanUpOldChats() {
