@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B1A1C0DE00000000000F0015 /* GoalHeroCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0014 /* GoalHeroCard.swift */; };
+		B1A1C0DE00000000000F0013 /* GoalsDesignTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0012 /* GoalsDesignTests.swift */; };
+		B1A1C0DE00000000000F0011 /* GoalPaper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0010 /* GoalPaper.swift */; };
 		B1A1C0DE00000000000F000F /* GoalDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F000E /* GoalDetailView.swift */; };
 		B1A1C0DE00000000000F000D /* GoalsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F000C /* GoalsHomeView.swift */; };
 		B1A1C0DE00000000000F000B /* GoalsViewModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */; };
@@ -735,6 +738,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		B1A1C0DE00000000000F0014 /* GoalHeroCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalHeroCard.swift; sourceTree = "<group>"; };
+		B1A1C0DE00000000000F0012 /* GoalsDesignTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsDesignTests.swift; sourceTree = "<group>"; };
+		B1A1C0DE00000000000F0010 /* GoalPaper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalPaper.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F000E /* GoalDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalDetailView.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F000C /* GoalsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsHomeView.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsViewModelsTests.swift; sourceTree = "<group>"; };
@@ -1459,6 +1465,8 @@
 		B1A1C0DE00000000000F0001 /* Goals */ = {
 			isa = PBXGroup;
 			children = (
+				B1A1C0DE00000000000F0014 /* GoalHeroCard.swift */,
+				B1A1C0DE00000000000F0010 /* GoalPaper.swift */,
 				B1A1C0DE00000000000F000E /* GoalDetailView.swift */,
 				B1A1C0DE00000000000F000C /* GoalsHomeView.swift */,
 				B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */,
@@ -1571,6 +1579,7 @@
 				B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */,
 				B1A1C0DE0000000000000204 /* BrainModelsTests.swift */,
 				B1A1C0DE0000000000000E06 /* PrepModelsTests.swift */,
+				B1A1C0DE00000000000F0012 /* GoalsDesignTests.swift */,
 				B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */,
 				B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */,
 				B1A1C0DE0000000000000E16 /* PrepViewModelsTests.swift */,
@@ -2679,6 +2688,8 @@
 				B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */,
 				B1A1C0DE00000000000000A3 /* BrainModels.swift in Sources */,
 				B1A1C0DE0000000000000E01 /* PrepModels.swift in Sources */,
+				B1A1C0DE00000000000F0015 /* GoalHeroCard.swift in Sources */,
+				B1A1C0DE00000000000F0011 /* GoalPaper.swift in Sources */,
 				B1A1C0DE00000000000F000F /* GoalDetailView.swift in Sources */,
 				B1A1C0DE00000000000F000D /* GoalsHomeView.swift in Sources */,
 				B1A1C0DE00000000000F0009 /* GoalsViewModels.swift in Sources */,
@@ -3110,6 +3121,7 @@
 				B1A1C0DE0000000000000201 /* BrainViewModelTests.swift in Sources */,
 				B1A1C0DE0000000000000203 /* BrainModelsTests.swift in Sources */,
 				B1A1C0DE0000000000000E05 /* PrepModelsTests.swift in Sources */,
+				B1A1C0DE00000000000F0013 /* GoalsDesignTests.swift in Sources */,
 				B1A1C0DE00000000000F000B /* GoalsViewModelsTests.swift in Sources */,
 				B1A1C0DE00000000000F0007 /* GoalsModelsTests.swift in Sources */,
 				B1A1C0DE0000000000000E15 /* PrepViewModelsTests.swift in Sources */,

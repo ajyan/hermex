@@ -43,9 +43,9 @@ struct GoalsHomeView: View {
             }
         case .loaded(let home):
             ScrollView {
-                VStack(alignment: .leading, spacing: BrainStyle.xl) {
-                    streakCard(home.streak)
+                VStack(alignment: .leading, spacing: BrainStyle.l) {
                     if !home.goals.isEmpty || !home.errors.isEmpty { activeSection(home) }
+                    streakLine(home.streak)
                     if !home.agentGoals.isEmpty { agentSection(home.agentGoals) }
                 }
                 .padding(BrainStyle.l)
@@ -55,31 +55,43 @@ struct GoalsHomeView: View {
         }
     }
 
-    private func streakCard(_ streak: GoalStreak) -> some View {
-        SectionCard {
-            BrainRow(
-                leading: { BrainModuleIcon(systemName: "flame") },
-                title: GoalsCopy.streakTitle(streak.days),
-                subtitle: streak.atRisk ? "Yesterday's empty — show up today to keep it" : nil
-            )
+    private func streakLine(_ streak: GoalStreak) -> some View {
+        HStack(spacing: BrainStyle.s) {
+            if streak.atRisk {
+                Circle().fill(Color.hxWarning).frame(width: 6, height: 6).accessibilityHidden(true)
+            }
+            Text(verbatim: streak.atRisk
+                 ? "\(GoalsCopy.streakTitle(streak.days)) · show up today to keep it"
+                 : GoalsCopy.streakTitle(streak.days))
+                .brainText(.meta)
         }
+        .padding(.horizontal, BrainStyle.xs)
     }
 
     private func activeSection(_ home: GoalsHome) -> some View {
-        VStack(alignment: .leading, spacing: BrainStyle.s) {
-            BrainSectionHeader(title: "Active")
-            SectionCard {
-                VStack(spacing: 0) {
-                    ForEach(Array(home.goals.enumerated()), id: \.element.id) { offset, goal in
-                        if offset > 0 { PrepRowDivider() }
-                        NavigationLink(value: ShellPushDestination.goal(goal.slug)) {
-                            GoalHomeRow(goal: goal, today: home.today)
+        VStack(alignment: .leading, spacing: BrainStyle.m) {
+            ForEach(home.goals) { goal in
+                NavigationLink(value: ShellPushDestination.goal(goal.slug)) {
+                    VStack(alignment: .leading, spacing: BrainStyle.s) {
+                        GoalHeroCard(goal: goal, isCompact: true, today: home.today)
+                        if GoalsCopy.needsAttention(goal) {
+                            Text(verbatim: "Needs attention: open to check in")
+                                .font(BrainStyle.meta)
+                                .foregroundStyle(Color.hxWarning)
+                                .padding(.horizontal, BrainStyle.xs)
                         }
-                        .buttonStyle(.plain)
                     }
-                    ForEach(home.errors) { error in
-                        PrepRowDivider()
-                        BrainRow(title: error.slug, subtitle: "Can't read this goal — fix in chat")
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(Text(verbatim: "Opens the goal"))
+            }
+            if !home.errors.isEmpty {
+                SectionCard {
+                    VStack(spacing: 0) {
+                        ForEach(Array(home.errors.enumerated()), id: \.element.id) { offset, error in
+                            if offset > 0 { PrepRowDivider() }
+                            BrainRow(title: error.slug, subtitle: "Can't read this goal — fix in chat")
+                        }
                     }
                 }
             }
@@ -93,51 +105,15 @@ struct GoalsHomeView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(goals.enumerated()), id: \.element.id) { offset, goal in
                         if offset > 0 { PrepRowDivider() }
-                        BrainRow(title: goal.title, subtitle: goal.status.capitalized)
-                            .foregroundStyle(Color.hxTextSecondary)
+                        BrainRow(
+                            leading: { BrainModuleIcon(systemName: "sparkles") },
+                            title: goal.title,
+                            subtitle: goal.status.capitalized
+                        )
                     }
                 }
             }
         }
-    }
-}
-
-/// One active goal: title, next milestone, and this week's counts, with a warning dot
-/// when a second miss or an escalation is pending.
-private struct GoalHomeRow: View {
-    let goal: GoalSummary
-    let today: String
-
-    var body: some View {
-        HStack(alignment: .center, spacing: BrainStyle.m) {
-            VStack(alignment: .leading, spacing: BrainStyle.xs) {
-                HStack(spacing: BrainStyle.s) {
-                    if GoalsCopy.needsAttention(goal) {
-                        Circle().fill(Color.hxWarning).frame(width: 6, height: 6).accessibilityHidden(true)
-                    }
-                    Text(verbatim: goal.title).brainText(.rowTitle).lineLimit(2)
-                }
-                if let milestone = goal.nextMilestone {
-                    Text(verbatim: GoalsCopy.milestoneLine(milestone, today: today))
-                        .brainText(.rowSubtitle).lineLimit(2)
-                }
-                Text(verbatim: GoalsCopy.weekLine(goal.week.commitments))
-                    .brainText(.meta).monospacedDigit()
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            if let days = goal.daysLeft {
-                Text(verbatim: "\(days)d").brainText(.meta).monospacedDigit()
-            }
-            Image(systemName: "chevron.right")
-                .font(BrainStyle.meta)
-                .foregroundStyle(Color.hxTextSecondary)
-                .accessibilityHidden(true)
-        }
-        .padding(.vertical, BrainStyle.s)
-        .frame(minHeight: BrainStyle.minTapTarget)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-        .accessibilityHint(GoalsCopy.needsAttention(goal) ? Text(verbatim: "Needs attention") : Text(verbatim: ""))
     }
 }
 
@@ -159,13 +135,13 @@ enum GoalsCopy {
         return word.prefix(1).uppercased() + word.dropFirst()
     }
 
-    static func weekLine(_ commitments: [GoalCommitmentProgress]) -> String {
-        commitments.map { "\(shortName($0.action)) \($0.done + $0.min)/\($0.target)" }.joined(separator: " · ")
+    /// An action without its parenthetical: "Nightly stretch (knee hugs…)" → "Nightly stretch".
+    static func shortTitle(_ action: String) -> String {
+        (action.split(separator: "(").first.map(String.init) ?? action).trimmingCharacters(in: .whitespaces)
     }
 
-    static func milestoneLine(_ milestone: GoalMilestone, today: String) -> String {
-        guard let due = milestone.due else { return milestone.title }
-        return "\(milestone.title) · \(relativeDay(due, today: today))"
+    static func weekLine(_ commitments: [GoalCommitmentProgress]) -> String {
+        commitments.map { "\(shortName($0.action)) \($0.done + $0.min)/\($0.target)" }.joined(separator: " · ")
     }
 
     /// "today", "tomorrow", "in 6 days", "yesterday", "3 days ago", from ISO days.

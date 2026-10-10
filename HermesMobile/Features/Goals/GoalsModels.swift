@@ -132,8 +132,10 @@ struct GoalWeek: Decodable, Hashable, Sendable {
     var start: String = ""
     var end: String = ""
     var commitments: [GoalCommitmentProgress] = []
+    /// Monday to Sunday: each day's best check-in across commitments.
+    var days: [GoalHeatDay] = []
 
-    private enum CodingKeys: String, CodingKey { case start, end, commitments }
+    private enum CodingKeys: String, CodingKey { case start, end, commitments, days }
 
     init() {}
 
@@ -142,6 +144,7 @@ struct GoalWeek: Decodable, Hashable, Sendable {
         start = c.string(.start)
         end = c.string(.end)
         commitments = c.lossy(GoalCommitmentProgress.self, .commitments)
+        days = c.lossy(GoalHeatDay.self, .days)
     }
 }
 
@@ -219,6 +222,10 @@ struct GoalSummary: Decodable, Hashable, Sendable, Identifiable {
     let deadline: String?
     let daysLeft: Int?
     let identity: String
+    /// A Daily Brief paper name ("wiki", "quote", …); empty lets `GoalPaper` pick one.
+    let color: String
+    /// An SF Symbol name; empty shows a flag.
+    let icon: String
     let nextMilestone: GoalMilestone?
     var week: GoalWeek
     var dailyChecks: [GoalDailyCheck]
@@ -227,7 +234,7 @@ struct GoalSummary: Decodable, Hashable, Sendable, Identifiable {
     var id: String { slug }
 
     private enum CodingKeys: String, CodingKey {
-        case slug, title, status, deadline, identity, week, flags
+        case slug, title, status, deadline, identity, week, flags, color, icon
         case daysLeft = "days_left", nextMilestone = "next_milestone", dailyChecks = "daily_checks"
     }
 
@@ -239,6 +246,8 @@ struct GoalSummary: Decodable, Hashable, Sendable, Identifiable {
         deadline = c.optional(String.self, .deadline)
         daysLeft = c.optional(Int.self, .daysLeft)
         identity = c.string(.identity)
+        color = c.string(.color)
+        icon = c.string(.icon)
         nextMilestone = c.optional(GoalMilestone.self, .nextMilestone)
         week = c.optional(GoalWeek.self, .week) ?? GoalWeek()
         dailyChecks = c.lossy(GoalDailyCheck.self, .dailyChecks)
