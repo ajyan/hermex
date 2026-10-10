@@ -477,6 +477,7 @@
 		478D7672FD98529438EE4481 /* HermexColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49A8CFA21E6B5DAE7B38D48C /* HermexColors.swift */; };
 		A04500000000000000000005 /* HermesDeepLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000011 /* HermesDeepLink.swift */; };
 		A04500000000000000000006 /* AgentRunLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000013 /* AgentRunLiveActivityWidget.swift */; };
+		A04500000000000000000090 /* AtlasHomeWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000091 /* AtlasHomeWidget.swift */; };
 		A04500000000000000000007 /* HermesLiveActivityWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = A04500000000000000000017 /* HermesLiveActivityWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A04500000000000000000008 /* LiveActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000018 /* LiveActivityTests.swift */; };
 		2BE8F2B38F094C4C9EB18301 /* SkillsViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BE8F2B38F094C4C9EB18300 /* SkillsViewModelTests.swift */; };
@@ -1183,6 +1184,7 @@
 		A04500000000000000000011 /* HermesDeepLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesDeepLink.swift; sourceTree = "<group>"; };
 		A04500000000000000000012 /* AgentLiveActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentLiveActivityManager.swift; sourceTree = "<group>"; };
 		A04500000000000000000013 /* AgentRunLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentRunLiveActivityWidget.swift; sourceTree = "<group>"; };
+		A04500000000000000000091 /* AtlasHomeWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasHomeWidget.swift; sourceTree = "<group>"; };
 		A04500000000000000000014 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		4890A0000000000000000012 /* HermesLiveActivityWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HermesLiveActivityWidget.entitlements; sourceTree = "<group>"; };
 		A04500000000000000000017 /* HermesLiveActivityWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HermesLiveActivityWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -2180,6 +2182,7 @@
 			isa = PBXGroup;
 			children = (
 				A04500000000000000000013 /* AgentRunLiveActivityWidget.swift */,
+				A04500000000000000000091 /* AtlasHomeWidget.swift */,
 				A04500000000000000000022 /* Resources */,
 			);
 			path = HermesLiveActivityWidget;
@@ -3131,6 +3134,7 @@
 				478D7672FD98529438EE4481 /* HermexColors.swift in Sources */,
 				A04500000000000000000005 /* HermesDeepLink.swift in Sources */,
 				A04500000000000000000006 /* AgentRunLiveActivityWidget.swift in Sources */,
+				A04500000000000000000090 /* AtlasHomeWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
