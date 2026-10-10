@@ -124,7 +124,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
         }
         .padding(.horizontal, 12)
         .frame(minHeight: 40)
-        .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
     }
 
     @ViewBuilder
@@ -193,7 +193,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
             }
             .padding(.horizontal, 12)
             .frame(minHeight: 44)
-            .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

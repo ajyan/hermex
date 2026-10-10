@@ -326,6 +326,8 @@ struct ChatDecisionButtonStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.isEnabled) private var isEnabled
+    /// On a paper, primary fills with its ink and secondary washes in it.
+    @Environment(\.hxPaper) private var paper
 
     func makeBody(configuration: Configuration) -> some View {
         let isPressed = isEnabled && configuration.isPressed
@@ -353,8 +355,10 @@ struct ChatDecisionButtonStyle: ButtonStyle {
 
         switch emphasis {
         case .primary:
+            if let paper { return paper.paper }
             return colorScheme == .dark ? .black : .white
         case .secondary:
+            if let paper { return paper.ink }
             return .primary
         case .destructive:
             return .hxDanger
@@ -368,8 +372,10 @@ struct ChatDecisionButtonStyle: ButtonStyle {
 
         switch emphasis {
         case .primary:
+            if let paper { return paper.ink }
             return colorScheme == .dark ? .white : .black
         case .secondary:
+            if let paper { return paper.ink.opacity(isPressed ? 0.12 : 0.08) }
             return colorScheme == .dark ? Color.white.opacity(isPressed ? 0.12 : 0.08) : Color.black.opacity(isPressed ? 0.07 : 0.045)
         case .destructive:
             return Color.hxDanger.opacity(isPressed ? 0.16 : 0.10)

@@ -13,7 +13,7 @@ struct GoalHeroCard: View {
     var selection: (today: String, yesterday: String, selected: GoalDay)?
     var onSelect: (GoalDay) -> Void = { _ in }
 
-    private static let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+    private static let shape = RoundedRectangle(cornerRadius: HXRadius.xl, style: .continuous)
 
     var body: some View {
         let palette = GoalPaper.palette(for: goal)
@@ -56,6 +56,7 @@ struct GoalHeroCard: View {
         .padding(BrainStyle.l)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(palette.paper, in: Self.shape)
+        .hxShadow(.paper)
         .environment(\.colorScheme, .light)  // bright paper in every appearance, like the Brief
     }
 }

@@ -503,16 +503,19 @@ private enum SessionRowStateBadgeKind: String, Identifiable {
     }
 }
 
+/// Where an imported chat came from (Claude Code, Telegram), on plain paper: a label,
+/// not a control, so it stays out of the accent.
 private struct SessionSourceBadge: View {
     let label: String
 
     var body: some View {
         Text(label)
             .font(AppFont.caption2(weight: .semibold))
-            .foregroundStyle(Color.accentColor)
-            .padding(.horizontal, 5)
+            .foregroundStyle(HermexPaper.plain.ink)
+            .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(Color.accentColor.opacity(0.12), in: Capsule())
+            .background(HermexPaper.plain.paper, in: Capsule())
+            .environment(\.colorScheme, .light)
             .accessibilityHidden(true)
     }
 }

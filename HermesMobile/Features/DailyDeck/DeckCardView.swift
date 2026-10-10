@@ -11,7 +11,7 @@ struct DeckPageView: View {
     /// Cards under the top one show only their paper; their words fade in as they rise.
     var contentOpacity: Double = 1
 
-    static let shape = RoundedRectangle(cornerRadius: 28, style: .continuous)
+    static let shape = RoundedRectangle(cornerRadius: HXRadius.xl, style: .continuous)
 
     var body: some View {
         let palette = DeckPalette.of(page)
@@ -27,7 +27,7 @@ struct DeckPageView: View {
         .environment(\.colorScheme, .light)  // bright paper in every appearance
         .background(palette.paper, in: Self.shape)
         .clipShape(Self.shape)
-        .shadow(color: .black.opacity(0.08), radius: 14, y: 6)
+        .hxShadow(.paper)
         .padding(.vertical, 12)
     }
 }
@@ -361,35 +361,6 @@ private struct ReflectionSheet: View {
         }
         .onChange(of: text) { _, new in viewModel.setText(new, for: card) }
         .presentationDragIndicator(.visible)
-    }
-}
-
-/// Chips left to right, wrapping onto new rows.
-private struct FlowRow: Layout {
-    var spacing: CGFloat
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? .infinity
-        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0, widest: CGFloat = 0
-        for view in subviews {
-            let size = view.sizeThatFits(.unspecified)
-            if x > 0, x + size.width > width { x = 0; y += rowHeight + spacing; rowHeight = 0 }
-            x += size.width + spacing
-            widest = max(widest, x - spacing)
-            rowHeight = max(rowHeight, size.height)
-        }
-        return CGSize(width: proposal.width ?? widest, height: y + rowHeight)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x = bounds.minX, y = bounds.minY, rowHeight: CGFloat = 0
-        for view in subviews {
-            let size = view.sizeThatFits(.unspecified)
-            if x > bounds.minX, x + size.width > bounds.maxX { x = bounds.minX; y += rowHeight + spacing; rowHeight = 0 }
-            view.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
     }
 }
 
