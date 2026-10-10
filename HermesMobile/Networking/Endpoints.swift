@@ -165,6 +165,10 @@ enum Endpoint {
     case tutorMap(track: String)
     case tutorItem(id: String)
     case tutorAttempt
+    /// Personal goals from the vault (`api/vault_goals.py`): home, one goal, and a check-in.
+    case goalsHome
+    case goalDetail(slug: String)
+    case goalCheckIn
 
     var path: String {
         switch self {
@@ -450,6 +454,12 @@ enum Endpoint {
             return "/api/tutor/item"
         case .tutorAttempt:
             return "/api/tutor/attempt"
+        case .goalsHome:
+            return "/api/goals"
+        case .goalDetail:
+            return "/api/goals/detail"
+        case .goalCheckIn:
+            return "/api/goals/checkin"
         }
     }
 
@@ -662,6 +672,8 @@ enum Endpoint {
             return [URLQueryItem(name: "track", value: track)]
         case let .tutorItem(id):
             return [URLQueryItem(name: "id", value: id)]
+        case let .goalDetail(slug):
+            return [URLQueryItem(name: "slug", value: slug)]
         default:
             return []
         }

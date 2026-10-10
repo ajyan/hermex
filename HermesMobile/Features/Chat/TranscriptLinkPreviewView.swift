@@ -287,3 +287,82 @@ private extension TranscriptLinkPreviewView {
         snapshot?.displayURL ?? url
     }
 }
+
+/// A Brain page a reply cites with a Markdown link: `[Title](brain://wiki/id)`.
+struct BrainCitation: Equatable, Identifiable {
+    let title: String
+    let url: URL
+    let module: BrainModuleID
+
+    var id: String { url.absoluteString }
+
+    /// Most cards a reply shows; the rest stay inline links.
+    static let limit = 3
+
+    private static let pattern = try? NSRegularExpression(pattern: #"\[([^\]\n]+)\]\((brain://[^)\s]+)\)"#)
+
+    /// The distinct Brain pages `markdown` links to, in order, up to `limit`.
+    static func citations(in markdown: String) -> [BrainCitation] {
+        guard markdown.contains("brain://"), let pattern else { return [] }
+        var seen: Set<String> = []
+        var result: [BrainCitation] = []
+        let range = NSRange(markdown.startIndex..., in: markdown)
+        for match in pattern.matches(in: markdown, range: range) {
+            guard let titleRange = Range(match.range(at: 1), in: markdown),
+                  let urlRange = Range(match.range(at: 2), in: markdown),
+                  let url = URL(string: String(markdown[urlRange])),
+                  let (module, _) = BrainLink.ref(from: url),
+                  seen.insert(url.absoluteString).inserted
+            else { continue }
+            let title = markdown[titleRange].trimmingCharacters(in: .whitespaces)
+            result.append(BrainCitation(title: title.isEmpty ? module.defaultTitle : title, url: url, module: module))
+            if result.count == limit { break }
+        }
+        return result
+    }
+}
+
+/// The Brain pages a reply cites, as knowledge-paper cards under it (DESIGN.md § Components).
+/// Tapping one opens it through the transcript's link router, like the inline link.
+struct BrainCitationCards: View {
+    let citations: [BrainCitation]
+
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(citations) { citation in
+                Button {
+                    openURL(citation.url)
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "leaf")
+                            .font(AppFont.subheadline(weight: .semibold))
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(verbatim: citation.title)
+                                .font(AppFont.subheadline(weight: .semibold))
+                                .lineLimit(1)
+                            Text(verbatim: citation.module.defaultTitle)
+                                .font(AppFont.caption())
+                                .foregroundStyle(HermexPaper.knowledge.secondaryInk)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(AppFont.caption(weight: .semibold))
+                            .foregroundStyle(HermexPaper.knowledge.secondaryInk)
+                            .accessibilityHidden(true)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .frame(maxWidth: 320, alignment: .leading)
+                    .paperSurface(.knowledge, cornerRadius: HXRadius.md)
+                    .contentShape(RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
+                }
+                .buttonStyle(.chatTactile(.card))
+                .accessibilityElement(children: .combine)
+                .accessibilityHint(Text("Opens the Brain page"))
+            }
+        }
+    }
+}

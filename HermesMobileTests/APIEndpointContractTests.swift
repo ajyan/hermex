@@ -304,7 +304,16 @@ final class ContractReadinessTests: XCTestCase {
                 path: "/api/tutor/item",
                 query: ["id": "dsa.0217"]
             ),
-            .init(name: "tutor attempt", method: "POST", endpoint: .tutorAttempt, path: "/api/tutor/attempt")
+            .init(name: "tutor attempt", method: "POST", endpoint: .tutorAttempt, path: "/api/tutor/attempt"),
+            .init(name: "goals home", method: "GET", endpoint: .goalsHome, path: "/api/goals"),
+            .init(
+                name: "goal detail",
+                method: "GET",
+                endpoint: .goalDetail(slug: "nyc-marathon-2026"),
+                path: "/api/goals/detail",
+                query: ["slug": "nyc-marathon-2026"]
+            ),
+            .init(name: "goal check-in", method: "POST", endpoint: .goalCheckIn, path: "/api/goals/checkin")
         ]
 
         let baseURL = URL(string: "https://example.test")!

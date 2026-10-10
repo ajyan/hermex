@@ -13,7 +13,7 @@ extension SessionListViewModel {
     /// Runs the pass if one is due and the list holds live rows. Returns the
     /// chats it archived, for the "Archived N idle chats" toast. A failed load
     /// leaves the pass due, so the next successful load runs it. `now` is the
-    /// drawer's "Clean up old chats": it runs regardless, even with auto-archive off.
+    /// Settings' "Clean Up Old Chats Now": it runs regardless, even with auto-archive off.
     func runAutoArchivePassIfDue(
         excludingSessionID excludedSessionID: String?,
         modelContext: ModelContext? = nil,

@@ -18,7 +18,7 @@ enum BrainStyle {
     static let meta: Font = AppFont.caption()
     static let readerTitle: Font = AppFont.title(weight: .semibold)
     /// The only serif in the Brain: highlights and best-quote blocks.
-    static let quote: Font = .system(.body, design: .serif).leading(.loose)
+    static let quote: Font = AppFont.serif().leading(.loose)
 
     /// A text role: its font plus its colour (nil keeps the inherited primary colour).
     enum Role: CaseIterable {

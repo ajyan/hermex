@@ -1415,17 +1415,18 @@ import XCTest
         // during known work skip the refresh), so nothing signals when the
         // LazyVStack has materialized it — any fixed pass count is a guess.
         let shown = try await screenshot(window, name: "bot-activity-cards-on",
-                                         awaiting: ["Ran", "Thinking", "Updated", "Plan"])
+                                         awaiting: ["Ran", "Thinking", "reply-delivery.md", "Plan"])
         XCTAssertTrue(shown.contains("Ran"), shown)
         XCTAssertTrue(shown.contains("Thinking"), shown)
-        XCTAssertTrue(shown.contains("Updated"), shown)
+        // A live call shows as a chip naming its target.
+        XCTAssertTrue(shown.contains("reply-delivery.md"), shown)
         XCTAssertTrue(shown.contains("Plan"), shown)
         XCTAssertTrue(shown.contains("1 of 2"), shown)
         defaults.set(false, forKey: key)
         await settle(window)
         let hidden = try screenshot(window, name: "bot-activity-cards-off")
         XCTAssertFalse(hidden.contains("Thinking"), hidden)
-        XCTAssertFalse(hidden.contains("Updated"), hidden)
+        XCTAssertFalse(hidden.contains("reply-delivery.md"), hidden)
         XCTAssertTrue(hidden.contains("Plan"), "work progress stays visible with cards off: " + hidden)
     }
 

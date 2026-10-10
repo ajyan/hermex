@@ -219,6 +219,13 @@ struct MessageBubbleView: View {
                 } action: { responseIsVisible = $0 }
             }
 
+            if !isStreaming {
+                let citations = BrainCitation.citations(in: messageText)
+                if !citations.isEmpty {
+                    BrainCitationCards(citations: citations)
+                }
+            }
+
             linkPreview(linkPreviewURL)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -740,16 +747,14 @@ private struct GridAttachmentCell: View {
     private var fileCell: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(.secondarySystemBackground))
+                .fill(HermexPaper.file.paper)
 
             VStack(spacing: 5) {
                 Image(systemName: fileIconName)
                     .font(.system(size: 28, weight: .semibold))
-                    .foregroundStyle(fileBadgeColor)
 
                 Text(fileDisplayName)
                     .font(.caption2.weight(.medium))
-                    .foregroundStyle(Color(.label))
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                     .truncationMode(.middle)
@@ -757,15 +762,13 @@ private struct GridAttachmentCell: View {
 
                 Text(fileExtensionLabel)
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(fileBadgeColor)
+                    .foregroundStyle(HermexPaper.file.secondaryInk)
                     .lineLimit(1)
             }
+            .foregroundStyle(HermexPaper.file.ink)
         }
         .frame(width: size, height: size)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color(.separator).opacity(0.25), lineWidth: 0.5)
-        )
+        .environment(\.colorScheme, .light)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("File attachment \(fileDisplayName), \(fileExtensionLabel)")
     }
@@ -828,18 +831,6 @@ private struct GridAttachmentCell: View {
         }
     }
 
-    private var fileBadgeColor: Color {
-        switch URL(fileURLWithPath: attachment.name ?? "").pathExtension.lowercased() {
-        case "csv", "tsv", "xls", "xlsx":
-            Color.green
-        case "pdf":
-            Color.red
-        case "json", "md", "txt", "log", "xml", "yaml", "yml":
-            Color.blue
-        default:
-            Color.accentColor
-        }
-    }
 }
 
 // MARK: - Remote image loading with cookie-aware session

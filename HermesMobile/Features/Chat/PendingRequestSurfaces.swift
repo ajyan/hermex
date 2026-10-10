@@ -5,18 +5,16 @@ import SwiftUI
 /// Sessions clarification pins above the composer, the Bot card sits in the
 /// transcript. What the user reads and taps does not.
 extension View {
+    /// The request paper: something waiting on the user (DESIGN.md § The object key).
     /// Opaque on purpose: these cards float over live transcript text, and a
     /// translucent surface would render the request on top of whatever message
     /// happens to sit underneath.
     func pendingRequestCardSurface(cornerRadius: CGFloat) -> some View {
-        background(
-            Color(.secondarySystemBackground),
-            in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .stroke(.primary.opacity(0.10), lineWidth: 1)
-        )
+        paperSurface(.request, cornerRadius: cornerRadius)
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(HermexPaper.request.ink.opacity(0.10), lineWidth: 1)
+            )
     }
 
     /// The recessed block a question or a command sits in, inside a card.
@@ -61,13 +59,16 @@ struct PendingRequestSubmitButton: View {
     let action: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.hxPaper) private var paper
     @ScaledMetric(relativeTo: .body) private var size: CGFloat = 40
 
     /// Also the response field's caret colour, so the pair reads as one control.
-    static func fill(canSubmit: Bool, colorScheme: ColorScheme) -> Color {
+    /// On a paper the control takes the paper's ink.
+    static func fill(canSubmit: Bool, colorScheme: ColorScheme, paper: HermexPaper? = nil) -> Color {
         guard canSubmit else {
             return colorScheme == .dark ? Color.white.opacity(0.18) : Color.black.opacity(0.12)
         }
+        if let paper { return paper.ink }
         return colorScheme == .dark ? .white : .black
     }
 
@@ -75,7 +76,7 @@ struct PendingRequestSubmitButton: View {
         Button(action: action) {
             label
                 .frame(width: size, height: size)
-                .background(Self.fill(canSubmit: canSubmit, colorScheme: colorScheme))
+                .background(Self.fill(canSubmit: canSubmit, colorScheme: colorScheme, paper: paper))
                 .foregroundStyle(foreground)
                 .clipShape(Circle())
         }
@@ -94,6 +95,7 @@ struct PendingRequestSubmitButton: View {
 
     private var foreground: Color {
         guard canSubmit else { return Color(.secondaryLabel) }
+        if let paper { return paper.paper }
         return colorScheme == .dark ? .black : .white
     }
 }
