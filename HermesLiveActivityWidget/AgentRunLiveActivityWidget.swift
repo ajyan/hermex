@@ -7,6 +7,7 @@ struct HermesLiveActivityWidgetBundle: WidgetBundle {
     var body: some Widget {
         AgentRunLiveActivityWidget()
         AtlasHomeWidget()
+        AtlasGoalsWidget()
         AtlasNewChatControl()
     }
 }

@@ -4,8 +4,10 @@ import SwiftUI
 /// progress, and the goals Atlas works on. Pushed from the drawer as `.goals`.
 struct GoalsHomeView: View {
     @State private var viewModel: GoalsHomeViewModel
+    private let server: URL
 
     init(server: URL, onAPIError: @escaping (Error) -> Void) {
+        self.server = server
         _viewModel = State(initialValue: GoalsHomeViewModel(
             client: APIClientGoalsAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
     }
@@ -15,7 +17,13 @@ struct GoalsHomeView: View {
             .navigationTitle(Text(verbatim: "Goals"))
             .background(Color.hxCanvas.ignoresSafeArea())
             // Every appear refreshes, so check-ins made in a goal show on the way back.
-            .task { await viewModel.load() }
+            .task {
+                await viewModel.load()
+                // The Goals widget shows the same day, so hand it what just loaded.
+                if case .loaded(let home) = viewModel.state {
+                    AtlasWidgetGoalsStore().save(AtlasWidgetGoals(server: server, home: home))
+                }
+            }
     }
 
     @ViewBuilder

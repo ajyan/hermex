@@ -39,6 +39,7 @@ struct ContentView: View {
                 // Warm launch: the intent set the deep link after the view appeared.
                 drainPendingIntentDeepLink()
             }
+            .task(id: authManager.state) { refreshGoalsWidget() }
             .onChange(of: authManager.state) {
                 // A held conversation link resolves again once sign-in or a server switch
                 // changes what it can reach.
@@ -68,6 +69,7 @@ struct ContentView: View {
                 Task { await reconcileOrphanedLiveActivities(notifiesOnCompletion: false) }
                 // Keeps a week of Daily Brief reminders queued ahead.
                 Task { await DailyBriefReminder.refresh() }
+                refreshGoalsWidget()
             }
             .alert("Add a WebUI server to start a chat.", isPresented: $isShowingNoWebuiServer) {
                 if let share = unroutableShare {
@@ -77,6 +79,12 @@ struct ContentView: View {
                     Button("OK", role: .cancel) {}
                 }
             }
+    }
+
+    /// Keeps the Goals widget on the active webui server's today (throttled in `GoalsWidgetSync`).
+    private func refreshGoalsWidget() {
+        guard case let .loggedIn(server) = authManager.state, authManager.kind(of: server) == .webui else { return }
+        Task { await GoalsWidgetSync.refresh(server: server) }
     }
 
     private func reconcileOrphanedLiveActivities(notifiesOnCompletion: Bool) async {

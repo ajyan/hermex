@@ -13,6 +13,7 @@
 		B1A1C0DE00000000000F0009 /* GoalsViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */; };
 		B1A1C0DE00000000000F0007 /* GoalsModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */; };
 		B1A1C0DE00000000000F0005 /* GoalsDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0004 /* GoalsDataClient.swift */; };
+		A045000000000000000000A1 /* GoalsWidgetSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = A045000000000000000000A0 /* GoalsWidgetSync.swift */; };
 		B1A1C0DE00000000000F0003 /* GoalsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0002 /* GoalsModels.swift */; };
 		B1A1C0DE0000000000000E17 /* PrepViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E18 /* PrepViewModels.swift */; };
 		B1A1C0DE0000000000000E21 /* PrepHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E22 /* PrepHomeView.swift */; };
@@ -495,17 +496,18 @@
 		B5A100000000000000000006 /* HermesShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B5A100000000000000000017 /* HermesShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A04500000000000000000001 /* AgentRunActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000010 /* AgentRunActivityAttributes.swift */; };
 		A04500000000000000000002 /* HermesDeepLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000011 /* HermesDeepLink.swift */; };
-		A04500000000000000000094 /* AtlasWidgetRecents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000093 /* AtlasWidgetRecents.swift */; };
-		A04500000000000000000095 /* AtlasWidgetRecents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000093 /* AtlasWidgetRecents.swift */; };
+		A04500000000000000000094 /* AtlasWidgetSnapshots.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000093 /* AtlasWidgetSnapshots.swift */; };
+		A04500000000000000000095 /* AtlasWidgetSnapshots.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000093 /* AtlasWidgetSnapshots.swift */; };
 		A04500000000000000000003 /* AgentLiveActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000012 /* AgentLiveActivityManager.swift */; };
 		A04500000000000000000004 /* AgentRunActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000010 /* AgentRunActivityAttributes.swift */; };
 		478D7672FD98529438EE4481 /* HermexColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49A8CFA21E6B5DAE7B38D48C /* HermexColors.swift */; };
 		A04500000000000000000005 /* HermesDeepLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000011 /* HermesDeepLink.swift */; };
 		A04500000000000000000006 /* AgentRunLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000013 /* AgentRunLiveActivityWidget.swift */; };
 		A04500000000000000000090 /* AtlasHomeWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000091 /* AtlasHomeWidget.swift */; };
+		A04500000000000000000099 /* AtlasGoalsWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000098 /* AtlasGoalsWidget.swift */; };
 		A04500000000000000000007 /* HermesLiveActivityWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = A04500000000000000000017 /* HermesLiveActivityWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A04500000000000000000008 /* LiveActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000018 /* LiveActivityTests.swift */; };
-		A04500000000000000000096 /* AtlasWidgetRecentsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000097 /* AtlasWidgetRecentsTests.swift */; };
+		A04500000000000000000096 /* AtlasWidgetSnapshotsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04500000000000000000097 /* AtlasWidgetSnapshotsTests.swift */; };
 		2BE8F2B38F094C4C9EB18301 /* SkillsViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BE8F2B38F094C4C9EB18300 /* SkillsViewModelTests.swift */; };
 		22AB000000000000000000B3 /* WorkspaceRegistryViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22AB000000000000000000F3 /* WorkspaceRegistryViewModelTests.swift */; };
 		36CD9EF0B0734E5F8C28BB92 /* SlashCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA59130ED4141049177576C /* SlashCommand.swift */; };
@@ -739,6 +741,7 @@
 		B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsViewModels.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsModelsTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0004 /* GoalsDataClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsDataClient.swift; sourceTree = "<group>"; };
+		A045000000000000000000A0 /* GoalsWidgetSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsWidgetSync.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0002 /* GoalsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsModels.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E18 /* PrepViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepViewModels.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E22 /* PrepHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepHomeView.swift; sourceTree = "<group>"; };
@@ -1253,15 +1256,16 @@
 		B5A100000000000000000017 /* HermesShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HermesShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A04500000000000000000010 /* AgentRunActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentRunActivityAttributes.swift; sourceTree = "<group>"; };
 		A04500000000000000000011 /* HermesDeepLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesDeepLink.swift; sourceTree = "<group>"; };
-		A04500000000000000000093 /* AtlasWidgetRecents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasWidgetRecents.swift; sourceTree = "<group>"; };
+		A04500000000000000000093 /* AtlasWidgetSnapshots.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasWidgetSnapshots.swift; sourceTree = "<group>"; };
 		A04500000000000000000012 /* AgentLiveActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentLiveActivityManager.swift; sourceTree = "<group>"; };
 		A04500000000000000000013 /* AgentRunLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentRunLiveActivityWidget.swift; sourceTree = "<group>"; };
 		A04500000000000000000091 /* AtlasHomeWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasHomeWidget.swift; sourceTree = "<group>"; };
+		A04500000000000000000098 /* AtlasGoalsWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasGoalsWidget.swift; sourceTree = "<group>"; };
 		A04500000000000000000014 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		4890A0000000000000000012 /* HermesLiveActivityWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HermesLiveActivityWidget.entitlements; sourceTree = "<group>"; };
 		A04500000000000000000017 /* HermesLiveActivityWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HermesLiveActivityWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A04500000000000000000018 /* LiveActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityTests.swift; sourceTree = "<group>"; };
-		A04500000000000000000097 /* AtlasWidgetRecentsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasWidgetRecentsTests.swift; sourceTree = "<group>"; };
+		A04500000000000000000097 /* AtlasWidgetSnapshotsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasWidgetSnapshotsTests.swift; sourceTree = "<group>"; };
 		C0CAM000000000000000B002 /* CameraPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPickerView.swift; sourceTree = "<group>"; };
 		C0MED100000000000000B002 /* CustomAttachmentPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomAttachmentPicker.swift; sourceTree = "<group>"; };
 		C0DEC0DE0000000000000002 /* ChatComposerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatComposerView.swift; sourceTree = "<group>"; };
@@ -1459,6 +1463,7 @@
 				B1A1C0DE00000000000F000C /* GoalsHomeView.swift */,
 				B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */,
 				B1A1C0DE00000000000F0004 /* GoalsDataClient.swift */,
+				A045000000000000000000A0 /* GoalsWidgetSync.swift */,
 				B1A1C0DE00000000000F0002 /* GoalsModels.swift */,
 			);
 			path = Goals;
@@ -1774,7 +1779,7 @@
 				C0DE3400000000000000000C /* TranscriptMediaPreviewViewModelTests.swift */,
 				C0DE12000000000000000004 /* TranscriptLinkPreviewTests.swift */,
 				A04500000000000000000018 /* LiveActivityTests.swift */,
-				A04500000000000000000097 /* AtlasWidgetRecentsTests.swift */,
+				A04500000000000000000097 /* AtlasWidgetSnapshotsTests.swift */,
 				559000000000000000000016 /* PushPreviewTests.swift */,
 				C0DE88500000000000000004 /* AppLockTests.swift */,
 				1A2B3C4D5E6F700000000340 /* AppIntentNewChatTests.swift */,
@@ -2285,7 +2290,7 @@
 			children = (
 				A04500000000000000000010 /* AgentRunActivityAttributes.swift */,
 				A04500000000000000000011 /* HermesDeepLink.swift */,
-				A04500000000000000000093 /* AtlasWidgetRecents.swift */,
+				A04500000000000000000093 /* AtlasWidgetSnapshots.swift */,
 				A04500000000000000000012 /* AgentLiveActivityManager.swift */,
 			);
 			path = LiveActivities;
@@ -2323,6 +2328,7 @@
 			children = (
 				A04500000000000000000013 /* AgentRunLiveActivityWidget.swift */,
 				A04500000000000000000091 /* AtlasHomeWidget.swift */,
+				A04500000000000000000098 /* AtlasGoalsWidget.swift */,
 				A04500000000000000000022 /* Resources */,
 			);
 			path = HermesLiveActivityWidget;
@@ -2677,6 +2683,7 @@
 				B1A1C0DE00000000000F000D /* GoalsHomeView.swift in Sources */,
 				B1A1C0DE00000000000F0009 /* GoalsViewModels.swift in Sources */,
 				B1A1C0DE00000000000F0005 /* GoalsDataClient.swift in Sources */,
+				A045000000000000000000A1 /* GoalsWidgetSync.swift in Sources */,
 				B1A1C0DE00000000000F0003 /* GoalsModels.swift in Sources */,
 				B1A1C0DE0000000000000E03 /* PrepDataClient.swift in Sources */,
 				B1A1C0DE0000000000000E17 /* PrepViewModels.swift in Sources */,
@@ -2798,7 +2805,7 @@
 				1A2B3C4D5E6F700000000300 /* ServerAccount.swift in Sources */,
 				A04500000000000000000001 /* AgentRunActivityAttributes.swift in Sources */,
 				A04500000000000000000002 /* HermesDeepLink.swift in Sources */,
-				A04500000000000000000094 /* AtlasWidgetRecents.swift in Sources */,
+				A04500000000000000000094 /* AtlasWidgetSnapshots.swift in Sources */,
 				A04500000000000000000003 /* AgentLiveActivityManager.swift in Sources */,
 				1A2B3C4D5E6F7000000000A2 /* APIClient.swift in Sources */,
 				C04000000000000000000001 /* APIClient+Sessions.swift in Sources */,
@@ -3309,7 +3316,7 @@
 				C0DE3400000000000000000B /* TranscriptMediaPreviewViewModelTests.swift in Sources */,
 				C0DE12000000000000000003 /* TranscriptLinkPreviewTests.swift in Sources */,
 				A04500000000000000000008 /* LiveActivityTests.swift in Sources */,
-				A04500000000000000000096 /* AtlasWidgetRecentsTests.swift in Sources */,
+				A04500000000000000000096 /* AtlasWidgetSnapshotsTests.swift in Sources */,
 				559000000000000000000006 /* PushPreviewTests.swift in Sources */,
 				C0DE88500000000000000003 /* AppLockTests.swift in Sources */,
 				1A2B3C4D5E6F700000000341 /* AppIntentNewChatTests.swift in Sources */,
@@ -3346,9 +3353,10 @@
 				A04500000000000000000004 /* AgentRunActivityAttributes.swift in Sources */,
 				478D7672FD98529438EE4481 /* HermexColors.swift in Sources */,
 				A04500000000000000000005 /* HermesDeepLink.swift in Sources */,
-				A04500000000000000000095 /* AtlasWidgetRecents.swift in Sources */,
+				A04500000000000000000095 /* AtlasWidgetSnapshots.swift in Sources */,
 				A04500000000000000000006 /* AgentRunLiveActivityWidget.swift in Sources */,
 				A04500000000000000000090 /* AtlasHomeWidget.swift in Sources */,
+				A04500000000000000000099 /* AtlasGoalsWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -7,7 +7,7 @@ import WidgetKit
 /// It never calls the server; each recent row opens through its own server's route.
 struct AtlasHomeWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: AtlasWidgetRecentsStore.widgetKind, provider: AtlasHomeProvider()) { entry in
+        StaticConfiguration(kind: AtlasWidgetRecents.widgetKind, provider: AtlasHomeProvider()) { entry in
             AtlasHomeWidgetView(entry: entry)
                 .containerBackground(for: .widget) {
                     Color(uiColor: .secondarySystemGroupedBackground)

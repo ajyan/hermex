@@ -86,6 +86,7 @@ struct HermesMobileApp: App {
         // Record installation age even before a server has been configured.
         _ = RatingPromptState.shared
         NetworkPathMonitor.shared.start()
+        GoalsWidgetSync.install()
     }
 
     var body: some Scene {

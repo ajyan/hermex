@@ -426,6 +426,7 @@ final class AuthManager {
         SessionUnreadStore().remove(for: active)
         DailyDeckStore().remove(for: active)
         AtlasWidgetRecentsStore().remove(for: active)
+        AtlasWidgetGoalsStore().remove(for: active)
         await ChatDraftStore.shared.discardBotDrafts(server: active)
         await PushRegistrar.shared?.forget(for: active)
         advanceAfterRemoving(activeServer: active)
@@ -441,6 +442,7 @@ final class AuthManager {
         SessionUnreadStore().remove(for: serverURL)
         DailyDeckStore().remove(for: serverURL)
         AtlasWidgetRecentsStore().remove(for: serverURL)
+        AtlasWidgetGoalsStore().remove(for: serverURL)
         AutoArchiveStore().remove(for: serverURL)
         await ChatDraftStore.shared.discardBotDrafts(server: serverURL)
         // A Hermes server has no push pairing until #706, so the relay is never called for one.
