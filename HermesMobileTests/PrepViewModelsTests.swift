@@ -101,7 +101,7 @@ final class PrepViewModelsTests: XCTestCase {
         try! PrepDecoding.decode(type, from: Data(json.utf8))
     }
 
-    private func rep(_ index: Int, drill: String = "pattern_id", extra: String = "") -> String {
+    private func rep(_ index: Int, drill: String = "approach", extra: String = "") -> String {
         #"{"index": \#(index), "block": "new", "drill": "\#(drill)", "item": {"id": "dsa.\#(index)", "hints": ["h1", "h2"]\#(extra)}}"#
     }
 
@@ -199,7 +199,7 @@ final class PrepViewModelsTests: XCTestCase {
         let sent = try! XCTUnwrap(client.attempts.first)
         XCTAssertEqual(sent.index, 2)
         XCTAssertEqual(sent.item, "dsa.2")
-        XCTAssertEqual(sent.drill, .patternID)
+        XCTAssertEqual(sent.drill, .approach)
         XCTAssertEqual(sent.date, "2026-10-09")
         XCTAssertEqual(sent.answer, .choice("dsa.stack"))
         XCTAssertEqual(sent.elapsedMS, 8250)
@@ -230,21 +230,19 @@ final class PrepViewModelsTests: XCTestCase {
 
     func testSubmitFailureKeepsAnswerAndDoesNotAdvance() async {
         let client = FakePrepClient()
-        client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "parsons", extra: #", "lines": ["a", "b"]"#)]))]
+        client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "complexity")]))]
         client.mapResults = [.success(map([]))]
         client.attemptResults = [.failure(URLError(.notConnectedToInternet)), .success(result(next: 1))]
         let vm = makeVM(client)
         await vm.load()
-        vm.place(poolIndex: 0)
-        await vm.checkParsons()
+        await vm.choose(.choice("a"))
         XCTAssertEqual(vm.submitError, "Couldn't save. Try again.")
         XCTAssertFalse(vm.isSubmitting)
-        XCTAssertEqual(vm.board?.placed, ["a"])
         XCTAssertEqual(currentRep(vm)?.index, 0)
         // Retrying works and clears the error.
-        await vm.checkParsons()
+        await vm.choose(.choice("a"))
         XCTAssertNil(vm.submitError)
-        XCTAssertEqual(client.attempts.last?.answer, .lines(["a"]))
+        XCTAssertEqual(client.attempts.last?.answer, .choice("a"))
         if case .result = vm.phase {} else { XCTFail("phase \(vm.phase)") }
     }
 
@@ -433,15 +431,6 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertFalse(failingVM.isSubmitting)
     }
 
-    func testParsonsRepBuildsBoardFromLines() async {
-        let client = FakePrepClient()
-        client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "parsons", extra: #", "lines": ["x", "x", "y"]"#)]))]
-        client.mapResults = [.success(map([]))]
-        let vm = makeVM(client)
-        await vm.load()
-        XCTAssertEqual(vm.board?.pool, ["x", "x", "y"])
-    }
-
     // MARK: Cancellation, conflict, re-entry
 
     func testCancelledLoadLeavesStateUntouched() async {
@@ -508,55 +497,6 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(streak.days, 2)
     }
 
-    func testBoardFrozenWhileSubmitting() async {
-        let client = FakePrepClient()
-        client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "parsons", extra: #", "lines": ["a", "b"]"#)]))]
-        client.mapResults = [.success(map([]))]
-        client.attemptResults = [.success(result(next: 1))]
-        let (started, startedCont) = AsyncStream<Void>.makeStream()
-        let (release, releaseCont) = AsyncStream<Void>.makeStream()
-        client.gate = (startedCont, release)
-        let vm = makeVM(client)
-        await vm.load()
-        vm.place(poolIndex: 0)
-        let submit = Task { await vm.checkParsons() }
-        for await _ in started { break }
-        vm.place(poolIndex: 1)
-        vm.unplace(at: 0)
-        XCTAssertEqual(vm.board?.placed, ["a"])
-        releaseCont.yield()
-        await submit.value
-        XCTAssertEqual(client.attempts.first?.answer, .lines(["a"]))
-    }
-
-    // MARK: Parsons board
-
-    func testParsonsBoardDuplicatesTrackedByIndex() {
-        var board = ParsonsBoard(pool: ["x", "x", "y"])
-        board.place(poolIndex: 1)
-        XCTAssertEqual(board.placed, ["x"])
-        XCTAssertEqual(board.remaining, [0, 2])
-        board.place(poolIndex: 1) // already placed: ignored
-        XCTAssertEqual(board.placed, ["x"])
-        board.place(poolIndex: 0)
-        XCTAssertEqual(board.placed, ["x", "x"])
-        XCTAssertEqual(board.remaining, [2])
-        XCTAssertFalse(board.isFull(target: 3))
-        board.place(poolIndex: 2)
-        XCTAssertTrue(board.isFull(target: 3))
-    }
-
-    func testParsonsBoardUnplaceReturnsLineToPool() {
-        var board = ParsonsBoard(pool: ["a", "b", "c"])
-        board.place(poolIndex: 2)
-        board.place(poolIndex: 0)
-        board.unplace(at: 0)
-        XCTAssertEqual(board.placed, ["a"])
-        XCTAssertEqual(board.remaining, [1, 2])
-        board.unplace(at: 5) // out of range: ignored
-        XCTAssertEqual(board.placed, ["a"])
-    }
-
     // MARK: - PrepCopy
 
     func testHomeRowSubtitleSaysWhetherTheRunIsDone() {
@@ -600,10 +540,8 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(PrepCopy.feedbackParts("It's O(n log n)").lead, "It's O(n log n)")
     }
 
-    func testSkillLabelAndParsonsTarget() {
+    func testSkillLabel() {
         XCTAssertEqual(PrepCopy.skillLabel(title: "Sliding Window", state: .weak, detail: "Mixed up with two pointers"),
                        "Sliding Window, weak, Mixed up with two pointers")
-        XCTAssertEqual(PrepCopy.parsonsTarget(poolCount: 10), 9)
-        XCTAssertEqual(PrepCopy.parsonsTarget(poolCount: 1), 1)
     }
 }

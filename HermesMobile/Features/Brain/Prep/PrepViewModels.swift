@@ -81,36 +81,6 @@ final class PrepTrackViewModel {
     }
 }
 
-/// Tap-to-place Parsons answer. Lines are tracked by their index in the pool so
-/// duplicate strings stay distinct.
-struct ParsonsBoard: Equatable {
-    let pool: [String]
-    private(set) var placedIndices: [Int] = []
-
-    init(pool: [String]) {
-        self.pool = pool
-    }
-
-    var placed: [String] { placedIndices.map { pool[$0] } }
-
-    /// Pool indices not yet placed, in pool order.
-    var remaining: [Int] {
-        pool.indices.filter { !placedIndices.contains($0) }
-    }
-
-    mutating func place(poolIndex: Int) {
-        guard pool.indices.contains(poolIndex), !placedIndices.contains(poolIndex) else { return }
-        placedIndices.append(poolIndex)
-    }
-
-    mutating func unplace(at position: Int) {
-        guard placedIndices.indices.contains(position) else { return }
-        placedIndices.remove(at: position)
-    }
-
-    func isFull(target: Int) -> Bool { placedIndices.count >= target }
-}
-
 /// Today's run: one rep at a time, a result after each answer. Reps are always
 /// found by `rep.index`, never by array position.
 @MainActor
@@ -127,7 +97,6 @@ final class PrepRunViewModel {
 
     private(set) var phase: Phase = .loading
     private(set) var run: PrepRun?
-    private(set) var board: ParsonsBoard?
     private(set) var hintsShown = 0
     private(set) var submitError: String?
     private(set) var isSubmitting = false
@@ -180,21 +149,6 @@ final class PrepRunViewModel {
         await submit(.choice("seen"))
     }
 
-    func checkParsons() async {
-        guard let board else { return }
-        await submit(.lines(board.placed))
-    }
-
-    func place(poolIndex: Int) {
-        guard !isSubmitting else { return }
-        board?.place(poolIndex: poolIndex)
-    }
-
-    func unplace(at position: Int) {
-        guard !isSubmitting else { return }
-        board?.unplace(at: position)
-    }
-
     func showHint() {
         guard case let .rep(rep, _) = phase, hintsShown < rep.item.hints.count else { return }
         hintsShown += 1
@@ -224,7 +178,6 @@ final class PrepRunViewModel {
     private func show(_ rep: PrepRep) {
         hintsShown = 0
         submitError = nil
-        board = rep.drill == .parsons ? ParsonsBoard(pool: rep.item.lines) : nil
         shownAt = now()
         phase = .rep(rep, index: rep.index)
     }
@@ -294,7 +247,6 @@ final class PrepRunViewModel {
         var moved: [PrepSkill] = []
         let after = mapBefore == nil ? nil : try? await client.map(track: "dsa")
         guard token == generation, !Task.isCancelled else { return }
-        board = nil
         if let before = mapBefore, let after {
             let old = Dictionary(
                 before.levels.flatMap(\.skills).map { ($0.id, $0.mastery) },
@@ -416,15 +368,6 @@ enum PrepCopy {
         guard let correctID else { return false }
         func norm(_ s: String) -> String { s.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
         return norm(optionID) == norm(correctID)
-    }
-
-    /// Lines a Parsons answer needs: the pool holds the solution plus one decoy.
-    static func parsonsTarget(poolCount: Int) -> Int { max(1, poolCount - 1) }
-
-    static func parsonsLineLabel(_ code: String) -> String { "Line: \(code). Double-tap to place." }
-
-    static func parsonsPlacedLabel(position: Int, code: String) -> String {
-        "Position \(position): \(code). Double-tap to remove."
     }
 
     /// A moved skill's subtitle on the run-complete screen.

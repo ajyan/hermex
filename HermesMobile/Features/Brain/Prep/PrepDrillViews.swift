@@ -117,11 +117,10 @@ struct PrepProblemCard: View {
     }
 }
 
-// MARK: - Choice (pattern_id, complexity)
+// MARK: - Choice (complexity)
 
-/// The options as card rows. While answering, a pattern rep shows a 30-second
-/// countdown (system-driven text, no repainting of ours). Once graded, the chosen
-/// wrong option shows a red cross and the correct one a green check.
+/// The options as card rows. Once graded, the chosen wrong option shows a red cross
+/// and the correct one a green check.
 struct PrepChoiceView: View {
     struct Grading {
         let chosenID: String?
@@ -133,22 +132,11 @@ struct PrepChoiceView: View {
     var isSubmitting = false
     var submitError: String?
     let onChoose: (PrepOption) -> Void
-    @State private var shownAt = Date()
 
     var body: some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
             HStack(alignment: .firstTextBaseline) {
-                BrainSectionHeader(title: rep.drill == .patternID ? "Which pattern?" : "Time complexity?")
-                if rep.drill == .patternID, grading == nil {
-                    let window = shownAt...shownAt.addingTimeInterval(30)
-                    Text(timerInterval: window, countsDown: true)
-                        .brainText(.sectionCaption)
-                        .monospacedDigit()
-                        .fixedSize()
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel(Text(verbatim: "Time left"))
-                        .accessibilityValue(Text(timerInterval: window, countsDown: true))
-                }
+                BrainSectionHeader(title: "Time complexity?")
             }
             SectionCard {
                 VStack(spacing: 0) {
@@ -200,80 +188,6 @@ struct PrepChoiceView: View {
             .brainText(.rowTitle)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, BrainStyle.s)
-    }
-}
-
-// MARK: - Parsons
-
-/// Tap-to-place Parsons: the placed solution on top, the remaining lines below,
-/// hints on request, and Check order once enough lines are placed.
-struct PrepParsonsView: View {
-    let hints: [String]
-    let board: ParsonsBoard
-    let hintsShown: Int
-    let isSubmitting: Bool
-    let place: (Int) -> Void
-    let unplace: (Int) -> Void
-    let showHint: () -> Void
-
-    private var target: Int { PrepCopy.parsonsTarget(poolCount: board.pool.count) }
-
-    var body: some View {
-        Text(verbatim: "Order the lines. One doesn't belong.")
-            .brainText(.rowSubtitle)
-
-        VStack(alignment: .leading, spacing: BrainStyle.s) {
-            BrainSectionHeader(title: "Your solution", trailing: "\(board.placedIndices.count) / \(target)")
-            PrepCodeCard {
-                if board.placedIndices.isEmpty {
-                    Text(verbatim: "Tap a line below to start")
-                        .brainText(.rowSubtitle)
-                        .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
-                } else {
-                    ForEach(Array(board.placedIndices.enumerated()), id: \.element) { position, poolIndex in
-                        let code = board.pool[poolIndex]
-                        Button { unplace(position) } label: { PrepCodeLine(code: code) }
-                            .buttonStyle(.plain)
-                            .disabled(isSubmitting)
-                            .accessibilityLabel(Text(verbatim: PrepCopy.parsonsPlacedLabel(position: position + 1, code: code)))
-                    }
-                }
-            }
-        }
-
-        if !board.remaining.isEmpty {
-            VStack(alignment: .leading, spacing: BrainStyle.s) {
-                BrainSectionHeader(title: "Lines")
-                PrepCodeCard {
-                    ForEach(board.remaining, id: \.self) { poolIndex in
-                        let code = board.pool[poolIndex]
-                        Button { place(poolIndex) } label: { PrepCodeLine(code: code) }
-                            .buttonStyle(.plain)
-                            .disabled(isSubmitting)
-                            .accessibilityLabel(Text(verbatim: PrepCopy.parsonsLineLabel(code)))
-                    }
-                }
-            }
-        }
-
-        if hintsShown > 0 {
-            PrepNoteCard {
-                ForEach(0..<min(hintsShown, hints.count), id: \.self) { index in
-                    PrepLeadText(lead: "Hint \(index + 1) of \(hints.count).", rest: hints[index])
-                }
-            }
-        }
-
-        if hintsShown < hints.count {
-            Button(action: showHint) {
-                Text(verbatim: "Show a hint")
-                    .font(BrainStyle.rowTitle)
-                    .foregroundStyle(Color.accentColor)
-                    .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-        }
     }
 }
 
@@ -345,21 +259,11 @@ struct PrepResultView: View {
     let rep: PrepRep
     let result: PrepAttemptResult
     let chosenID: String?
-    let placedLines: [String]
 
     var body: some View {
         switch rep.drill {
-        case .patternID, .complexity:
+        case .complexity:
             PrepChoiceView(rep: rep, grading: .init(chosenID: chosenID, correctID: correctChoice)) { _ in }
-        case .parsons where !placedLines.isEmpty:
-            VStack(alignment: .leading, spacing: BrainStyle.s) {
-                BrainSectionHeader(title: "Your solution")
-                PrepCodeCard {
-                    ForEach(Array(placedLines.enumerated()), id: \.offset) { _, line in
-                        PrepCodeLine(code: line)
-                    }
-                }
-            }
         default:
             EmptyView()
         }

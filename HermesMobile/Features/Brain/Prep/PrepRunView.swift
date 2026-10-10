@@ -101,8 +101,7 @@ struct PrepRunView: View {
                 PrepResultView(
                     rep: rep,
                     result: result,
-                    chosenID: chosen?.rep == rep.index ? chosen?.id : nil,
-                    placedLines: viewModel.board?.placed ?? []
+                    chosenID: chosen?.rep == rep.index ? chosen?.id : nil
                 )
             } bottom: {
                 PrepPrimaryButton(title: "Continue") { Task { await viewModel.continue() } }
@@ -157,7 +156,7 @@ struct PrepRunView: View {
 
     private func hasAction(_ rep: PrepRep) -> Bool {
         switch rep.drill {
-        case .parsons, .primer: true
+        case .primer: true
         default: false
         }
     }
@@ -166,14 +165,6 @@ struct PrepRunView: View {
     @ViewBuilder
     private func repAction(_ rep: PrepRep) -> some View {
         switch rep.drill {
-        case .parsons:
-            if let board = viewModel.board {
-                PrepPrimaryButton(
-                    title: "Check order",
-                    enabled: board.isFull(target: PrepCopy.parsonsTarget(poolCount: board.pool.count))
-                        && !viewModel.isSubmitting
-                ) { Task { await viewModel.checkParsons() } }
-            }
         case .primer:
             PrepPrimaryButton(title: "Got it", enabled: !viewModel.isSubmitting) {
                 Task { await viewModel.acknowledgePrimer() }
@@ -186,7 +177,7 @@ struct PrepRunView: View {
     @ViewBuilder
     private func repContent(_ rep: PrepRep) -> some View {
         switch rep.drill {
-        case .patternID, .complexity:
+        case .complexity:
             PrepChoiceView(
                 rep: rep,
                 grading: nil,
@@ -196,21 +187,10 @@ struct PrepRunView: View {
                 chosen = ChosenOption(rep: rep.index, id: option.id)
                 Task { await viewModel.choose(.choice(option.id)) }
             }
-        case .parsons:
-            if let board = viewModel.board {
-                PrepParsonsView(
-                    hints: rep.item.hints,
-                    board: board,
-                    hintsShown: viewModel.hintsShown,
-                    isSubmitting: viewModel.isSubmitting,
-                    place: { viewModel.place(poolIndex: $0) },
-                    unplace: { viewModel.unplace(at: $0) },
-                    showHint: { viewModel.showHint() }
-                )
-            }
         case .primer:
             PrepPrimerView(item: rep.item)
-        case .unknown:
+        case .approach, .spotBug, .trace, .unknown:
+            // Task 9 replaces this placeholder with the new drill views.
             EmptyView()
         }
     }
