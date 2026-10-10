@@ -175,13 +175,6 @@ final class GoalsCopyTests: XCTestCase {
         XCTAssertEqual(GoalsCopy.weekLine(home.goals[0].week.commitments), "Stretch 0/6 · Run 0/1")
     }
 
-    func testToCheckInCountsOnlyYesterdaysDueCommitments() throws {
-        let home = try PrepDecoding.decode(GoalsHome.self, from: Data(GoalsModelsTests.homeSample.utf8))
-        // stretch-pm is due yesterday with no check-in; long-run isn't due yesterday.
-        XCTAssertEqual(GoalsCopy.toCheckIn(home), 1)
-        XCTAssertEqual(GoalsCopy.brainRowSubtitle(home), "0-day streak · 1 to check in")
-    }
-
     func testRelativeDay() {
         XCTAssertEqual(GoalsCopy.relativeDay("2026-10-17", today: "2026-10-10"), "in 7 days")
         XCTAssertEqual(GoalsCopy.relativeDay("2026-10-11", today: "2026-10-10"), "tomorrow")

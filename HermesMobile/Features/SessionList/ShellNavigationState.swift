@@ -17,6 +17,10 @@ enum ShellPushDestination: Hashable {
     case brain
     /// Any screen inside the Brain, pushed from the home or another Brain screen.
     case brainRoute(BrainRoute)
+    /// Goals home, from the drawer.
+    case goals
+    /// One personal goal, by slug.
+    case goal(String)
     case settings(SettingsScrollAnchor?)
 }
 

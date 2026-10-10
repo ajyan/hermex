@@ -2,7 +2,7 @@ import SwiftUI
 
 /// One personal goal: why it matters, this week's commitments with one-tap check-ins for
 /// today or yesterday, daily checks, milestones, and the consistency heatmap.
-/// Pushed as `.brainRoute(.goals(.detail(slug)))`.
+/// Pushed as `.goal(slug)`.
 struct GoalDetailView: View {
     @State private var viewModel: GoalDetailViewModel
     @Environment(\.scenePhase) private var scenePhase

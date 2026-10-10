@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Goals' landing screen: the show-up streak, active personal goals with this week's
-/// progress, and the goals Atlas works on. Pushed as `.brainRoute(.goals(.home))`.
+/// progress, and the goals Atlas works on. Pushed from the drawer as `.goals`.
 struct GoalsHomeView: View {
     @State private var viewModel: GoalsHomeViewModel
 
@@ -64,7 +64,7 @@ struct GoalsHomeView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(home.goals.enumerated()), id: \.element.id) { offset, goal in
                         if offset > 0 { PrepRowDivider() }
-                        NavigationLink(value: ShellPushDestination.brainRoute(.goals(.detail(goal.slug)))) {
+                        NavigationLink(value: ShellPushDestination.goal(goal.slug)) {
                             GoalHomeRow(goal: goal, today: home.today)
                         }
                         .buttonStyle(.plain)
@@ -133,23 +133,10 @@ private struct GoalHomeRow: View {
     }
 }
 
-/// Goals copy and small derivations shared by the Brain row, Goals home and goal detail.
+/// Goals copy and small derivations shared by Goals home and goal detail.
 enum GoalsCopy {
     static func streakTitle(_ days: Int) -> String {
         days == 1 ? "1-day show-up streak" : "\(days)-day show-up streak"
-    }
-
-    /// Commitments that were due yesterday and still have no check-in. Today's aren't late yet.
-    static func toCheckIn(_ home: GoalsHome) -> Int {
-        home.goals.reduce(0) { total, goal in
-            total + goal.week.commitments.filter { $0.dueYesterday && $0.yesterday == nil }.count
-        }
-    }
-
-    static func brainRowSubtitle(_ home: GoalsHome) -> String {
-        let pending = toCheckIn(home)
-        let tail = pending == 0 ? "all checked in" : "\(pending) to check in"
-        return "\(home.streak.days)-day streak · \(tail)"
     }
 
     static func needsAttention(_ goal: GoalSummary) -> Bool {

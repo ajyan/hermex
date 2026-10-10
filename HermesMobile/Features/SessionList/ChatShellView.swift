@@ -608,6 +608,12 @@ struct ChatShellView: View {
                 push: { navigation.path.append(.brainRoute($0)) }
             )
             .adaptiveSecondaryNavigationTitle()
+        case .goals:
+            GoalsHomeView(server: server, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
+        case .goal(let slug):
+            GoalDetailView(slug: slug, server: server, onAPIError: authManager.handleAPIError)
+                .id(slug)
         case .brainRoute(let route):
             // Keyed by route so a destination's view models can never carry over to another page.
             brainDestination(route).id(route)
@@ -675,11 +681,6 @@ struct ChatShellView: View {
                 .adaptiveSecondaryNavigationTitle()
         case .prep(.run):
             PrepRunView(server: server, onAPIError: authManager.handleAPIError)
-        case .goals(.home):
-            GoalsHomeView(server: server, onAPIError: authManager.handleAPIError)
-                .adaptiveSecondaryNavigationTitle()
-        case .goals(.detail(let slug)):
-            GoalDetailView(slug: slug, server: server, onAPIError: authManager.handleAPIError)
         }
     }
 

@@ -1882,6 +1882,7 @@
 			isa = PBXGroup;
 			children = (
 				B1A1C0DE0000000000000003 /* Brain */,
+				B1A1C0DE00000000000F0001 /* Goals */,
 				12A06408B1B8DA1A340CBD38 /* DailyDeck */,
 				9BAF7D8BBF390913B4F060B0 /* VoiceCall */,
 				AA0200000000000000000006 /* Activity */,
@@ -2426,7 +2427,6 @@
 				B1A1C0DE0000000000000D02 /* BrainArticleDigest.swift */,
 				B1A1C0DE0000000000000C04 /* BrainPersonCardView.swift */,
 				B1A1C0DE0000000000000E10 /* Prep */,
-				B1A1C0DE00000000000F0001 /* Goals */,
 			);
 			path = Brain;
 			sourceTree = "<group>";

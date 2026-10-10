@@ -143,6 +143,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
         if sectionVisibility.brain {
             drawerRow("Brain", systemImage: "brain") { onOpen(.brain) }
         }
+        drawerRow("Goals", systemImage: "flag.checkered") { onOpen(.goals) }
         if let onCleanUp {
             drawerRow(String(localized: "Clean up old chats"), systemImage: "archivebox") { onCleanUp() }
         }
