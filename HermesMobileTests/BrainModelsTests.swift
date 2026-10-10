@@ -130,4 +130,25 @@ final class BrainModelsTests: XCTestCase {
         XCTAssertEqual(URLComponents(url: plus, resolvingAgainstBaseURL: false)?.queryItems?.first?.value, "c++",
                        "the encoded query still decodes back to the original value")
     }
+
+    func testChatOpensValidBrainLinksAndLeavesOthersAlone() throws {
+        let valid = try XCTUnwrap(URL(string: "brain://articles/email_ingest%2Fsummaries%2Fapi-gateway-summary.md"))
+        XCTAssertEqual(BrainLink.chatAction(for: valid, canOpen: true),
+                       .open(.page(.articles, "email_ingest/summaries/api-gateway-summary.md")))
+        // No shell listening (e.g. a preview): swallow rather than hand brain:// to iOS.
+        XCTAssertEqual(BrainLink.chatAction(for: valid, canOpen: false), .discard)
+        XCTAssertEqual(BrainLink.chatAction(for: try XCTUnwrap(URL(string: "brain://goals/x.md")), canOpen: true), .discard)
+        XCTAssertNil(BrainLink.chatAction(for: try XCTUnwrap(URL(string: "https://example.com")), canOpen: true))
+        XCTAssertNil(BrainLink.chatAction(for: try XCTUnwrap(URL(string: "file:///tmp/a.swift")), canOpen: true))
+    }
+
+    func testOpenBrainRouteActionCallsItsHandler() {
+        let action = OpenBrainRouteAction()
+        XCTAssertFalse(action.isAvailable)
+        var opened: [BrainRoute] = []
+        action.handler = { opened.append($0) }
+        action(.page(.wiki, "wiki/virtues.md"))
+        XCTAssertTrue(action.isAvailable)
+        XCTAssertEqual(opened, [.page(.wiki, "wiki/virtues.md")])
+    }
 }

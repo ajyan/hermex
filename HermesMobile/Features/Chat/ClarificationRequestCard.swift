@@ -95,7 +95,6 @@ struct ClarificationRequestBar: View {
     let onExpand: () -> Void
     let onStop: () -> Void
 
-    @Environment(\.colorScheme) private var colorScheme
     @ScaledMetric(relativeTo: .body) private var stopButtonSize: CGFloat = 32
 
     /// The first non-empty line of a question, so a multi-line prompt reads
@@ -144,7 +143,7 @@ struct ClarificationRequestBar: View {
                 Image(systemName: "stop.fill")
                     .font(.system(size: 12, weight: .semibold))
                     .frame(width: stopButtonSize, height: stopButtonSize)
-                    .background(Color.hxDanger.opacity(colorScheme == .dark ? 0.22 : 0.12))
+                    .background(Color.hxDanger.opacity(0.12))
                     .foregroundStyle(.hxDanger)
                     .clipShape(Circle())
             }
@@ -174,7 +173,6 @@ struct ClarificationRequestCard: View {
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorScheme) private var colorScheme
     @ScaledMetric(relativeTo: .body) private var collapseButtonSize: CGFloat = 28
     @ScaledMetric(relativeTo: .body) private var minimumBodyHeight: CGFloat = 44
     @State private var headerHeight: CGFloat?
@@ -290,7 +288,7 @@ struct ClarificationRequestCard: View {
             TextField("Type a response", text: $draftResponse, axis: .vertical)
                 .textFieldStyle(.plain)
                 .lineLimit(2...5)
-                .tint(PendingRequestSubmitButton.fill(canSubmit: canSubmit, colorScheme: colorScheme))
+                .tint(PendingRequestSubmitButton.fill(canSubmit: canSubmit, colorScheme: .light, paper: .request))
                 .pendingRequestFieldSurface()
                 .disabled(isResponding)
 
@@ -422,7 +420,7 @@ struct ClarificationRequestCard: View {
     }
 
     private var progressFill: Color {
-        colorScheme == .dark ? Color.white.opacity(0.72) : Color.black.opacity(0.58)
+        HermexPaper.request.ink.opacity(0.58)
     }
 
     private func submitDraft() {

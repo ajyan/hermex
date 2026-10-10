@@ -8,7 +8,6 @@ enum ChatComposerMetrics {
 }
 
 struct ChatComposerSurfaceStyle: ViewModifier {
-    @Environment(\.colorScheme) private var colorScheme
     let isExpanded: Bool
 
     private var shape: RoundedRectangle {
@@ -23,7 +22,7 @@ struct ChatComposerSurfaceStyle: ViewModifier {
         content
             .adaptiveGlass(.regular, isInteractive: true, fallbackMaterial: .ultraThinMaterial, in: shape)
             .clipShape(shape)
-            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.28 : 0.12), radius: 14, y: 6)
+            .hxShadow(.float)
     }
 }
 

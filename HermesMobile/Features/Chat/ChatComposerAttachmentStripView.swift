@@ -259,7 +259,7 @@ private struct ComposerAttachmentThumbnailView: View {
     private var fileBadge: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(fileBadgeColor.opacity(0.15))
+                .fill(HermexPaper.file.paper)
 
             VStack(spacing: 3) {
                 Image(systemName: fileIconName)
@@ -268,7 +268,7 @@ private struct ComposerAttachmentThumbnailView: View {
                     .font(.system(size: 9, weight: .bold))
                     .lineLimit(1)
             }
-            .foregroundStyle(fileBadgeColor)
+            .foregroundStyle(HermexPaper.file.ink)
         }
         .frame(width: documentBadgeSize.width, height: documentBadgeSize.height)
     }
@@ -298,18 +298,6 @@ private struct ComposerAttachmentThumbnailView: View {
         }
     }
 
-    private var fileBadgeColor: Color {
-        switch URL(fileURLWithPath: attachment.name).pathExtension.lowercased() {
-        case "csv", "tsv", "xls", "xlsx":
-            Color.green
-        case "pdf":
-            Color.red
-        case "json", "md", "txt", "log", "xml", "yaml", "yml":
-            Color.blue
-        default:
-            Color.accentColor
-        }
-    }
 
     private var fileDetailText: String {
         if let size = attachment.size {

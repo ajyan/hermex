@@ -33,19 +33,14 @@ struct ApprovalRequestOverlay: View {
         }
         .padding(16)
         .frame(maxWidth: 520, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(.primary.opacity(0.10), lineWidth: 1)
-        )
+        .paperSurface(.request, cornerRadius: HXRadius.lg)
         .shadow(color: .black.opacity(0.22), radius: 18, x: 0, y: 12)
         .padding(.horizontal, 18)
     }
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.hxWarning)
+            Image(systemName: "hand.raised.fill")
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Approval required")
@@ -75,7 +70,7 @@ struct ApprovalRequestOverlay: View {
                         .padding(10)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 8))
+                .background(.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
             }
 
             if let scope = prompt.scopeLine {

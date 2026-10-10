@@ -202,7 +202,6 @@ private struct BotQuestionRequestBody: View {
     let onSkip: () -> Void
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.colorScheme) private var colorScheme
     /// Choice ids picked per question id, and the free text typed for it.
     @State private var picked: [String: Set<Int>] = [:]
     @State private var typed: [String: String] = [:]
@@ -315,7 +314,7 @@ private struct BotQuestionRequestBody: View {
             TextField("Type a response", text: binding(for: item), axis: .vertical)
                 .textFieldStyle(.plain)
                 .lineLimit(2...5)
-                .tint(PendingRequestSubmitButton.fill(canSubmit: canSubmit, colorScheme: colorScheme))
+                .tint(PendingRequestSubmitButton.fill(canSubmit: canSubmit, colorScheme: .light, paper: .request))
                 .pendingRequestFieldSurface()
                 .disabled(!isEnabled || isAnswering)
 
@@ -377,7 +376,6 @@ private struct BotCredentialRequestBody: View {
     let isAnswering: Bool
     let onCredential: (String) -> Void
 
-    @Environment(\.colorScheme) private var colorScheme
     @FocusState private var focus: Field?
     /// The masked value: a password, secret or code.
     @State private var value = ""
@@ -421,7 +419,7 @@ private struct BotCredentialRequestBody: View {
                     .submitLabel(.next)
                     .focused($focus, equals: .identifier)
                     .onSubmit { focus = .value }
-                    .tint(PendingRequestSubmitButton.fill(canSubmit: canSubmit, colorScheme: colorScheme))
+                    .tint(PendingRequestSubmitButton.fill(canSubmit: canSubmit, colorScheme: .light, paper: .request))
                     .pendingRequestFieldSurface()
                     .disabled(!canEdit)
             }
@@ -433,7 +431,7 @@ private struct BotCredentialRequestBody: View {
                     .submitLabel(.send)
                     .focused($focus, equals: .value)
                     .onSubmit(submit)
-                    .tint(PendingRequestSubmitButton.fill(canSubmit: canSubmit, colorScheme: colorScheme))
+                    .tint(PendingRequestSubmitButton.fill(canSubmit: canSubmit, colorScheme: .light, paper: .request))
                     .pendingRequestFieldSurface()
                     .disabled(!canEdit)
 

@@ -12,6 +12,8 @@ struct ToolCallLogRow: Equatable {
         case interrupted
     }
 
+    /// What kind of tool ran; picks the row's paper (`HermexPaper.forTool`).
+    let kind: ToolCallSummaryFormatter.Kind
     /// SF Symbol for the leading icon column.
     let icon: String
     /// The verb ("Ran", "Read", …) or, for unrecognised tools, the short tool name.
@@ -82,6 +84,7 @@ enum ToolCallSummaryFormatter {
         }
 
         return ToolCallLogRow(
+            kind: toolKind,
             icon: icon(kind: toolKind, name: name),
             summary: summary(kind: toolKind, name: name),
             detail: detail,
