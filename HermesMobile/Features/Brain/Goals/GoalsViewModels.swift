@@ -80,29 +80,29 @@ final class GoalDetailViewModel {
     }
 
     func checkIn(commitment id: String, status: GoalStatus) async {
-        await send(id: id) { detail, date in
+        await send(id: id) { detail, date, asOf in
             Self.apply(status, to: id, on: date, in: &detail)
-            return .commitment(slug: self.slug, date: date, id: id, status: status)
+            return .commitment(slug: self.slug, date: date, asOf: asOf, id: id, status: status)
         }
     }
 
     func checkIn(check id: String, value: String) async {
-        await send(id: id) { detail, date in
+        await send(id: id) { detail, date, asOf in
             if let i = detail.summary.dailyChecks.firstIndex(where: { $0.id == id }) {
                 if date == detail.today { detail.summary.dailyChecks[i].today = value }
                 if date == detail.yesterday { detail.summary.dailyChecks[i].yesterday = value }
             }
-            return .check(slug: self.slug, date: date, id: id, value: value)
+            return .check(slug: self.slug, date: date, asOf: asOf, id: id, value: value)
         }
     }
 
     /// Applies the optimistic edit, posts, then takes the server's summary or restores the snapshot.
-    private func send(id: String, edit: (inout GoalDetail, String) -> GoalCheckInRequest) async {
+    private func send(id: String, edit: (inout GoalDetail, String, String) -> GoalCheckInRequest) async {
         guard case .loaded(let snapshot) = state, !pending.contains(id) else { return }
         // The server's dates, never the phone's: the server decides what "today" is.
         let date = day == .today ? snapshot.today : snapshot.yesterday
         var optimistic = snapshot
-        let request = edit(&optimistic, date)
+        let request = edit(&optimistic, date, snapshot.today)
         state = .loaded(optimistic)
         pending.insert(id)
         error = nil
@@ -113,10 +113,13 @@ final class GoalDetailViewModel {
             current.summary = result.goal
             current.streak = result.streak
             state = .loaded(current)
+            // The heatmap, consistency and check history come only with the full detail.
+            await load()
         } catch {
             guard !goalsIsCancellation(error) else { return }
             if case .http(409, _)? = error as? APIError {
                 await load()
+                self.error = "The day changed. Check in again."
                 return
             }
             onAPIError(error)

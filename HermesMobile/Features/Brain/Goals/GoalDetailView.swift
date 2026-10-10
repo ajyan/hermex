@@ -5,6 +5,7 @@ import SwiftUI
 /// Pushed as `.brainRoute(.goals(.detail(slug)))`.
 struct GoalDetailView: View {
     @State private var viewModel: GoalDetailViewModel
+    @Environment(\.scenePhase) private var scenePhase
 
     init(slug: String, server: URL, onAPIError: @escaping (Error) -> Void) {
         _viewModel = State(initialValue: GoalDetailViewModel(
@@ -17,6 +18,10 @@ struct GoalDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .background(Color.hxCanvas.ignoresSafeArea())
             .task { await viewModel.load() }
+            // Back from the background, the server's today may have moved on.
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { Task { await viewModel.load() } }
+            }
     }
 
     private var navigationTitle: String {
@@ -249,6 +254,7 @@ private struct GoalCommitmentRow: View {
 
 /// A row of capsule buttons; the selected one is filled with the accent.
 private struct GoalChoiceRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let options: [(value: String, label: String)]
     let selected: String?
     var disabledValues: Set<String> = []
@@ -257,7 +263,10 @@ private struct GoalChoiceRow: View {
     let onSelect: (String) -> Void
 
     var body: some View {
-        HStack(spacing: BrainStyle.s) {
+        // Four capsules don't fit one row at accessibility sizes; two rows of two do.
+        let columns = dynamicTypeSize.isAccessibilitySize ? 2 : max(options.count, 1)
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: BrainStyle.s), count: columns),
+                  spacing: BrainStyle.s) {
             ForEach(options, id: \.value) { option in
                 let isSelected = option.value == selected
                 let isOff = isDisabled || (disabledValues.contains(option.value) && !isSelected)

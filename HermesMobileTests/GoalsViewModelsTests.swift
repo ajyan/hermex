@@ -87,8 +87,8 @@ final class GoalsViewModelsTests: XCTestCase {
         vm.day = .today
         await vm.checkIn(commitment: "stretch-pm", status: .min)
         XCTAssertEqual(client.checkIns, [
-            .commitment(slug: "nyc-marathon-2026", date: "2026-10-12", id: "stretch-pm", status: .done),
-            .commitment(slug: "nyc-marathon-2026", date: "2026-10-13", id: "stretch-pm", status: .min),
+            .commitment(slug: "nyc-marathon-2026", date: "2026-10-12", asOf: "2026-10-13", id: "stretch-pm", status: .done),
+            .commitment(slug: "nyc-marathon-2026", date: "2026-10-13", asOf: "2026-10-13", id: "stretch-pm", status: .min),
         ])
     }
 
@@ -107,10 +107,11 @@ final class GoalsViewModelsTests: XCTestCase {
         XCTAssertTrue(vm.pending.contains("stretch-pm"))
         releaseCont.yield()
         await tap.value
-        XCTAssertEqual(stretch(vm)?.done, 3)
+        // The optimistic 1 gives way to the server: its reloaded detail reports 0.
+        XCTAssertEqual(stretch(vm)?.done, 0)
         XCTAssertFalse(vm.pending.contains("stretch-pm"))
         guard case .loaded(let d) = vm.state else { return XCTFail("not loaded") }
-        XCTAssertEqual(d.streak.days, 4)
+        XCTAssertEqual(d.streak.days, 1)
     }
 
     func testFailureRollsBackAndSetsError() async throws {
@@ -130,7 +131,15 @@ final class GoalsViewModelsTests: XCTestCase {
         let vm = try await loadedViewModel(client)
         await vm.checkIn(commitment: "stretch-pm", status: .done)
         XCTAssertEqual(client.log, ["detail:nyc-marathon-2026", "checkIn", "detail:nyc-marathon-2026"])
-        XCTAssertNil(vm.error)
+        XCTAssertEqual(vm.error, "The day changed. Check in again.")
+    }
+
+    func testSuccessReloadsDetailSoHistoryIsFresh() async throws {
+        let client = FakeGoalsClient()
+        client.checkInResults = [.success(try result(done: 1, today: "done"))]
+        let vm = try await loadedViewModel(client)
+        await vm.checkIn(commitment: "stretch-pm", status: .done)
+        XCTAssertEqual(client.log, ["detail:nyc-marathon-2026", "checkIn", "detail:nyc-marathon-2026"])
     }
 
     func testDoubleTapPostsOnce() async throws {
@@ -154,7 +163,7 @@ final class GoalsViewModelsTests: XCTestCase {
         let vm = try await loadedViewModel(client)
         vm.day = .today
         await vm.checkIn(check: "foot", value: "worse")
-        XCTAssertEqual(client.checkIns, [.check(slug: "nyc-marathon-2026", date: "2026-10-13", id: "foot", value: "worse")])
+        XCTAssertEqual(client.checkIns, [.check(slug: "nyc-marathon-2026", date: "2026-10-13", asOf: "2026-10-13", id: "foot", value: "worse")])
     }
 }
 

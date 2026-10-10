@@ -64,12 +64,12 @@ final class GoalsModelsTests: XCTestCase {
     }
 
     func testCheckInRequestEncodesBothShapes() throws {
-        let commitment = GoalCheckInRequest.commitment(slug: "m", date: "2026-10-10", id: "stretch-pm", status: .min)
-        let check = GoalCheckInRequest.check(slug: "m", date: "2026-10-10", id: "foot", value: "worse")
+        let commitment = GoalCheckInRequest.commitment(slug: "m", date: "2026-10-10", asOf: "2026-10-11", id: "stretch-pm", status: .min)
+        let check = GoalCheckInRequest.check(slug: "m", date: "2026-10-10", asOf: "2026-10-11", id: "foot", value: "worse")
         let a = try JSONSerialization.jsonObject(with: JSONEncoder().encode(commitment)) as! [String: String]
         let b = try JSONSerialization.jsonObject(with: JSONEncoder().encode(check)) as! [String: String]
-        XCTAssertEqual(a, ["slug": "m", "date": "2026-10-10", "commitment": "stretch-pm", "status": "min"])
-        XCTAssertEqual(b, ["slug": "m", "date": "2026-10-10", "check": "foot", "value": "worse"])
+        XCTAssertEqual(a, ["slug": "m", "date": "2026-10-10", "as_of": "2026-10-11", "commitment": "stretch-pm", "status": "min"])
+        XCTAssertEqual(b, ["slug": "m", "date": "2026-10-10", "as_of": "2026-10-11", "check": "foot", "value": "worse"])
     }
 
     func testMissingFieldsDefault() throws {

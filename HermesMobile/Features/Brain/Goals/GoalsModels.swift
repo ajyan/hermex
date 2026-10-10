@@ -405,22 +405,28 @@ struct GoalDetail: Decodable, Hashable, Sendable {
 // MARK: - Check-in
 
 enum GoalCheckInRequest: Encodable, Equatable, Sendable {
-    case commitment(slug: String, date: String, id: String, status: GoalStatus)
-    case check(slug: String, date: String, id: String, value: String)
+    /// `asOf` is the server's today from the screen's last load; the server answers 409
+    /// when its day has moved on, so a stale screen never writes to the wrong day.
+    case commitment(slug: String, date: String, asOf: String, id: String, status: GoalStatus)
+    case check(slug: String, date: String, asOf: String, id: String, value: String)
 
-    private enum CodingKeys: String, CodingKey { case slug, date, commitment, status, check, value }
+    private enum CodingKeys: String, CodingKey {
+        case slug, date, commitment, status, check, value, asOf = "as_of"
+    }
 
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case let .commitment(slug, date, id, status):
+        case let .commitment(slug, date, asOf, id, status):
             try c.encode(slug, forKey: .slug)
             try c.encode(date, forKey: .date)
+            try c.encode(asOf, forKey: .asOf)
             try c.encode(id, forKey: .commitment)
             try c.encode(status.rawValue, forKey: .status)
-        case let .check(slug, date, id, value):
+        case let .check(slug, date, asOf, id, value):
             try c.encode(slug, forKey: .slug)
             try c.encode(date, forKey: .date)
+            try c.encode(asOf, forKey: .asOf)
             try c.encode(id, forKey: .check)
             try c.encode(value, forKey: .value)
         }
