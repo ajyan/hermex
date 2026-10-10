@@ -10,6 +10,8 @@ struct BrainHomeView: View {
     @State private var searchViewModel: BrainSearchViewModel
     /// Prep's summary for its row; the row shows only once it loads.
     @State private var prepViewModel: PrepHomeViewModel
+    /// Goals' summary for its row; the row shows only once it loads.
+    @State private var goalsViewModel: GoalsHomeViewModel
     /// Programmatic pushes (graph nodes, `brain://` links) for the screens below.
     private let push: (BrainRoute) -> Void
 
@@ -25,6 +27,8 @@ struct BrainHomeView: View {
         _searchViewModel = State(initialValue: BrainSearchViewModel(client: client, onAPIError: onAPIError))
         _prepViewModel = State(initialValue: PrepHomeViewModel(
             client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
+        _goalsViewModel = State(initialValue: GoalsHomeViewModel(
+            client: APIClientGoalsAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
         self.push = push
     }
 
@@ -39,6 +43,7 @@ struct BrainHomeView: View {
             }
             // Alongside the modules; a server without Prep just never shows the row.
             .task { await prepViewModel.load() }
+            .task { await goalsViewModel.load() }
             .onDisappear { searchViewModel.cancel() }
     }
 
@@ -100,8 +105,9 @@ struct BrainHomeView: View {
         )
     }
 
-    private var isShowingPrepRow: Bool {
+    private var isShowingExtraRows: Bool {
         if case .loaded = prepViewModel.state { return true }
+        if case .loaded = goalsViewModel.state { return true }
         return false
     }
 
@@ -115,6 +121,16 @@ struct BrainHomeView: View {
                             title: module.title.isEmpty ? module.id.defaultTitle : module.title,
                             subtitle: module.subtitle,
                             trailing: "\(module.count)"
+                        )
+                    }
+                    .brainListRow()
+                }
+                if case .loaded(let goals) = goalsViewModel.state {
+                    NavigationLink(value: ShellPushDestination.brainRoute(.goals(.home))) {
+                        BrainRow(
+                            leading: { BrainModuleIcon(systemName: "flag.checkered") },
+                            title: "Goals",
+                            subtitle: GoalsCopy.brainRowSubtitle(goals)
                         )
                     }
                     .brainListRow()
@@ -141,7 +157,7 @@ struct BrainHomeView: View {
         }
         .brainListStyle()
         .overlay {
-            if viewModel.modules.isEmpty, !isShowingPrepRow {
+            if viewModel.modules.isEmpty, !isShowingExtraRows {
                 ContentUnavailableView {
                     Label { Text(verbatim: "Nothing in the Brain yet") } icon: { Image(systemName: "brain") }
                 } description: {
@@ -151,8 +167,10 @@ struct BrainHomeView: View {
         }
         .refreshable {
             async let prep: Void = prepViewModel.load()
+            async let goals: Void = goalsViewModel.load()
             await viewModel.load()
             await prep
+            await goals
         }
     }
 }

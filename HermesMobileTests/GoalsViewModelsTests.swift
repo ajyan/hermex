@@ -157,3 +157,46 @@ final class GoalsViewModelsTests: XCTestCase {
         XCTAssertEqual(client.checkIns, [.check(slug: "nyc-marathon-2026", date: "2026-10-13", id: "foot", value: "worse")])
     }
 }
+
+final class GoalsCopyTests: XCTestCase {
+    func testShortNameAndWeekLine() throws {
+        XCTAssertEqual(GoalsCopy.shortName("Nightly stretch (knee hugs, figure-4 twists, open books)"), "Stretch")
+        XCTAssertEqual(GoalsCopy.shortName("Saturday taper run (~12 mi easy)"), "Run")
+        let home = try PrepDecoding.decode(GoalsHome.self, from: Data(GoalsModelsTests.homeSample.utf8))
+        XCTAssertEqual(GoalsCopy.weekLine(home.goals[0].week.commitments), "Stretch 0/6 · Run 0/1")
+    }
+
+    func testToCheckInCountsOnlyYesterdaysDueCommitments() throws {
+        let home = try PrepDecoding.decode(GoalsHome.self, from: Data(GoalsModelsTests.homeSample.utf8))
+        // stretch-pm is due yesterday with no check-in; long-run isn't due yesterday.
+        XCTAssertEqual(GoalsCopy.toCheckIn(home), 1)
+        XCTAssertEqual(GoalsCopy.brainRowSubtitle(home), "0-day streak · 1 to check in")
+    }
+
+    func testRelativeDay() {
+        XCTAssertEqual(GoalsCopy.relativeDay("2026-10-17", today: "2026-10-10"), "in 7 days")
+        XCTAssertEqual(GoalsCopy.relativeDay("2026-10-11", today: "2026-10-10"), "tomorrow")
+        XCTAssertEqual(GoalsCopy.relativeDay("2026-10-08", today: "2026-10-10"), "2 days ago")
+    }
+
+    func testHeatmapColumnsStartOnMonday() {
+        // 2026-10-10 is a Saturday: five blank cells, then Sat, Sun; then Mon starts a new column.
+        let days = ["2026-10-10", "2026-10-11", "2026-10-12"].map {
+            try! PrepDecoding.decode(GoalHeatDay.self, from: Data(#"{"date":"\#($0)","status":"done"}"#.utf8))
+        }
+        let columns = GoalDetailCopy.heatmapColumns(days)
+        XCTAssertEqual(columns.count, 2)
+        XCTAssertEqual(columns[0].prefix(5).compactMap { $0 }.count, 0)
+        XCTAssertEqual(columns[0][5], .done)
+        XCTAssertEqual(columns[1][0], .done)
+    }
+
+    func testSkipDisabledWhenBudgetSpentUnlessAlreadySkipped() throws {
+        var row = try PrepDecoding.decode(GoalCommitmentProgress.self, from: Data(#"{"id":"x","skips":1,"skipped":1}"#.utf8))
+        XCTAssertTrue(GoalDetailCopy.skipDisabled(row, selected: nil))
+        XCTAssertFalse(GoalDetailCopy.skipDisabled(row, selected: .skip))
+        row.skipped = 0
+        XCTAssertFalse(GoalDetailCopy.skipDisabled(row, selected: nil))
+        XCTAssertEqual(GoalDetailCopy.countLine(row), "0/0 · 1 skip left")
+    }
+}

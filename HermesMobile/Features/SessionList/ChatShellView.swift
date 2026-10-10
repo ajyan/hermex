@@ -675,6 +675,11 @@ struct ChatShellView: View {
                 .adaptiveSecondaryNavigationTitle()
         case .prep(.run):
             PrepRunView(server: server, onAPIError: authManager.handleAPIError)
+        case .goals(.home):
+            GoalsHomeView(server: server, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
+        case .goals(.detail(let slug)):
+            GoalDetailView(slug: slug, server: server, onAPIError: authManager.handleAPIError)
         }
     }
 

@@ -440,6 +440,8 @@ enum BrainRoute: Hashable, Sendable {
     case searchAll(BrainModuleID, query: String)
     /// A screen in the Prep module (the interview tutor).
     case prep(PrepRoute)
+    /// A screen in the Goals module (personal goals from the vault).
+    case goals(GoalsRoute)
 }
 
 /// A screen in the Prep module: its home, one track's skill map, or today's run.
@@ -447,4 +449,10 @@ enum PrepRoute: Hashable, Sendable {
     case home
     case track(String)
     case run
+}
+
+/// A screen in the Goals module: its home or one goal, by slug.
+enum GoalsRoute: Hashable, Sendable {
+    case home
+    case detail(String)
 }

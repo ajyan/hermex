@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B1A1C0DE00000000000F000F /* GoalDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F000E /* GoalDetailView.swift */; };
+		B1A1C0DE00000000000F000D /* GoalsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F000C /* GoalsHomeView.swift */; };
 		B1A1C0DE00000000000F000B /* GoalsViewModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */; };
 		B1A1C0DE00000000000F0009 /* GoalsViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */; };
 		B1A1C0DE00000000000F0007 /* GoalsModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */; };
@@ -727,6 +729,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		B1A1C0DE00000000000F000E /* GoalDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalDetailView.swift; sourceTree = "<group>"; };
+		B1A1C0DE00000000000F000C /* GoalsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsHomeView.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsViewModelsTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsViewModels.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsModelsTests.swift; sourceTree = "<group>"; };
@@ -1444,6 +1448,8 @@
 		B1A1C0DE00000000000F0001 /* Goals */ = {
 			isa = PBXGroup;
 			children = (
+				B1A1C0DE00000000000F000E /* GoalDetailView.swift */,
+				B1A1C0DE00000000000F000C /* GoalsHomeView.swift */,
 				B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */,
 				B1A1C0DE00000000000F0004 /* GoalsDataClient.swift */,
 				B1A1C0DE00000000000F0002 /* GoalsModels.swift */,
@@ -2657,6 +2663,8 @@
 				B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */,
 				B1A1C0DE00000000000000A3 /* BrainModels.swift in Sources */,
 				B1A1C0DE0000000000000E01 /* PrepModels.swift in Sources */,
+				B1A1C0DE00000000000F000F /* GoalDetailView.swift in Sources */,
+				B1A1C0DE00000000000F000D /* GoalsHomeView.swift in Sources */,
 				B1A1C0DE00000000000F0009 /* GoalsViewModels.swift in Sources */,
 				B1A1C0DE00000000000F0005 /* GoalsDataClient.swift in Sources */,
 				B1A1C0DE00000000000F0003 /* GoalsModels.swift in Sources */,
