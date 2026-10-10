@@ -604,6 +604,13 @@ final class ChatViewModel {
     private var activeStreamReplayMatchedInterimLength = 0
     private var activeStreamReplayMatchedReasoningLength = 0
     private var activeStreamReplayLoadedReasoningText = ""
+    // A replay from the start re-sends the whole run, which the loaded transcript
+    // already holds trimmed and split into one assistant message per segment.
+    // Replayed tokens match these non-whitespace characters of the current
+    // turn's assistant text first; empty once the replay diverges or catches up.
+    private var activeStreamReplayLoadedTurnText: [Character] = []
+    private var activeStreamReplayLoadedTurnTextCursor = 0
+    private var activeStreamReplaySkippedWhitespace = ""
     private var activeStreamReplayLoadedToolCalls: [ToolCall] = []
     private var activeStreamReplayLoadedToolMatchIndex = 0
     private var activeStreamReplayPendingLoadedToolMatchIndex: Int?
@@ -5424,9 +5431,16 @@ final class ChatViewModel {
         let remainder: String
         if isActiveStreamReplayConnection {
             let messageID = ensureStreamingAssistantMessage()
-            let flushedContent = messages.first(where: { $0.messageId == messageID })?.content ?? ""
-            let effectiveContent = flushedContent + pendingAssistantTokenChunks.joined()
-            remainder = deduplicatedReplayToken(token, existingContent: effectiveContent)
+            if let loadedTurnRemainder = loadedTurnReplayRemainder(for: token) {
+                if !loadedTurnRemainder.isEmpty {
+                    resetActiveStreamReplayTokenState()
+                }
+                remainder = loadedTurnRemainder
+            } else {
+                let flushedContent = messages.first(where: { $0.messageId == messageID })?.content ?? ""
+                let effectiveContent = flushedContent + pendingAssistantTokenChunks.joined()
+                remainder = deduplicatedReplayToken(token, existingContent: effectiveContent)
+            }
         } else {
             _ = ensureStreamingAssistantMessage()
             remainder = token
@@ -5500,6 +5514,52 @@ final class ChatViewModel {
             )
         )
         return true
+    }
+
+    /// Matches a replayed token against the loaded turn text, ignoring whitespace.
+    /// Returns "" while the token only repeats loaded text, the new text once the
+    /// replay runs past the end of it, or nil when the token diverges so the
+    /// per-message matcher decides.
+    private func loadedTurnReplayRemainder(for token: String) -> String? {
+        guard !activeStreamReplayLoadedTurnText.isEmpty else { return nil }
+
+        var cursor = activeStreamReplayLoadedTurnTextCursor
+        var skippedWhitespace = activeStreamReplaySkippedWhitespace
+        for index in token.indices {
+            let character = token[index]
+            if character.isWhitespace {
+                skippedWhitespace.append(character)
+                continue
+            }
+            guard cursor < activeStreamReplayLoadedTurnText.count else {
+                activeStreamReplayLoadedTurnText = []
+                // Keep the skipped separator only where the streaming message
+                // doesn't already end in one, as a trimmed loaded segment does.
+                let content = (messages.first { $0.messageId == streamingAssistantMessageID }?.content ?? "")
+                    + pendingAssistantTokenChunks.joined()
+                let separator = content.last.map { !$0.isWhitespace } == true ? skippedWhitespace : ""
+                return separator + token[index...]
+            }
+            guard activeStreamReplayLoadedTurnText[cursor] == character else {
+                activeStreamReplayLoadedTurnText = []
+                return nil
+            }
+            cursor += 1
+            skippedWhitespace = ""
+        }
+        activeStreamReplayLoadedTurnTextCursor = cursor
+        activeStreamReplaySkippedWhitespace = skippedWhitespace
+        return ""
+    }
+
+    private func loadedReplayTurnText() -> [Character] {
+        let startIndex = messages.lastIndex(where: TranscriptTurnClassifier.isUserTurnBoundary)
+            .map { messages.index(after: $0) } ?? messages.startIndex
+        let assistantText = messages[startIndex...]
+            .filter { $0.role == "assistant" }
+            .compactMap(\.content)
+            .joined()
+        return (assistantText + pendingAssistantTokenChunks.joined()).filter { !$0.isWhitespace }
     }
 
     private func deduplicatedReplayToken(_ token: String, existingContent: String) -> String {
@@ -6178,6 +6238,9 @@ extension ChatViewModel: ChatStreamCoordinatorDelegate {
         activeStreamReplayMatchedReasoningLength = 0
         activeStreamReplayLoadedReasoningText = isReplay ? loadedReplayReasoningText() : ""
         activeStreamReplayLoadedToolCalls = isReplay ? loadedReplayToolCalls() : []
+        activeStreamReplayLoadedTurnText = isReplay ? loadedReplayTurnText() : []
+        activeStreamReplayLoadedTurnTextCursor = 0
+        activeStreamReplaySkippedWhitespace = ""
         activeStreamReplayLoadedToolMatchIndex = 0
         activeStreamReplayPendingLoadedToolMatchIndex = nil
         activeStreamReplayToolMatchIndex = 0
@@ -6190,6 +6253,9 @@ extension ChatViewModel: ChatStreamCoordinatorDelegate {
         activeStreamReplayMatchedReasoningLength = 0
         activeStreamReplayLoadedReasoningText = ""
         activeStreamReplayLoadedToolCalls = []
+        activeStreamReplayLoadedTurnText = []
+        activeStreamReplayLoadedTurnTextCursor = 0
+        activeStreamReplaySkippedWhitespace = ""
         activeStreamReplayLoadedToolMatchIndex = 0
         activeStreamReplayPendingLoadedToolMatchIndex = nil
         activeStreamReplayToolMatchIndex = 0
