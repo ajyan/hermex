@@ -79,6 +79,8 @@ struct ChatShellView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var viewModel: SessionListViewModel
     @State private var navigation = ShellNavigationState()
+    /// Lets chat replies open Brain pages (`brain://` links) on this stack.
+    @State private var brainRouteOpener = OpenBrainRouteAction()
     /// The drawer is built on first open and kept alive, so it keeps its scroll position.
     @State private var hasOpenedDrawer = false
     /// False while ChatView pushes its own screens (Files, forks), which the typed path cannot see.
@@ -500,8 +502,10 @@ struct ChatShellView: View {
     }
 
     private var mainStack: some View {
-        NavigationStack(path: $navigation.path) {
+        brainRouteOpener.handler = { navigation.path.append(.brainRoute($0)) }
+        return NavigationStack(path: $navigation.path) {
             rootView
+                .environment(\.openBrainRoute, brainRouteOpener)
                 .toolbar { shellToolbar }
                 .onAppear { isRootVisible = true }
                 .onDisappear { isRootVisible = false }
@@ -608,6 +612,12 @@ struct ChatShellView: View {
                 push: { navigation.path.append(.brainRoute($0)) }
             )
             .adaptiveSecondaryNavigationTitle()
+        case .goals:
+            GoalsHomeView(server: server, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
+        case .goal(let slug):
+            GoalDetailView(slug: slug, server: server, onAPIError: authManager.handleAPIError)
+                .id(slug)
         case .brainRoute(let route):
             // Keyed by route so a destination's view models can never carry over to another page.
             brainDestination(route).id(route)
@@ -700,7 +710,13 @@ struct ChatShellView: View {
             switchActiveProfile: { profile in
                 Task { await switchActiveProfile(profile) }
             },
-            pendingBotDestination: $pendingBotDestination
+            pendingBotDestination: $pendingBotDestination,
+            onCleanUpOldChats: viewModel.isViewingCachedData ? nil : {
+                // Back to the chat list, where the Undo toast and review sheet live.
+                navigation.path.removeAll()
+                setDrawerOpen(true)
+                cleanUpOldChats()
+            }
         )
         .adaptiveSecondaryNavigationTitle()
     }
@@ -732,7 +748,6 @@ struct ChatShellView: View {
             serverName: authManager.activeServer?.displayName ?? server.host() ?? server.absoluteString,
             canCreateNewChat: !viewModel.isViewingCachedData && !navigation.isCreatingNewChat,
             onNewChat: openNewChat,
-            onCleanUp: viewModel.isViewingCachedData ? nil : { cleanUpOldChats() },
             onOpen: { navigation.push($0) },
             onReviewArchiveCandidates: { isPresentingArchiveReview = true },
             refresh: { await refreshSessionsAndActiveProfile() }
@@ -986,7 +1001,7 @@ struct ChatShellView: View {
         }
     }
 
-    /// The drawer's "Clean up old chats": an auto-archive pass right now, even with
+    /// Settings' "Clean Up Old Chats Now": an auto-archive pass right now, even with
     /// auto-archive off. Throwaways archive with the usual Undo toast; keepers and
     /// coding projects open the review sheet.
     private func cleanUpOldChats() {

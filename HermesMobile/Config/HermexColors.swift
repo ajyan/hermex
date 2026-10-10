@@ -85,3 +85,31 @@ extension ShapeStyle where Self == Color {
     static var hxDanger: Color { Color(hermexToken: .danger) }
     static var hxOnAccent: Color { Color(hermexToken: .onAccent) }
 }
+
+/// A paper and the ink drawn on it: the Daily Brief's card colors, which also mark objects by
+/// kind across the app (DESIGN.md § Color). The same in light and dark appearance, like index
+/// cards on a dark desk; every pair keeps ink-on-paper body text above 7:1. Built once each,
+/// since SwiftUI compares colors when diffing.
+struct HermexPaper: Equatable {
+    let paper: Color
+    let ink: Color
+
+    /// Supporting text on the paper: the ink, lighter, never `hxTextSecondary`.
+    var secondaryInk: Color { ink.opacity(0.7) }
+
+    private init(paper: UInt32, ink: UInt32) {
+        self.paper = Color(uiColor: HermexPalette.uiColor(paper << 8 | 0xFF))
+        self.ink = Color(uiColor: HermexPalette.uiColor(ink << 8 | 0xFF))
+    }
+
+    static let opener = HermexPaper(paper: 0xFFF1DC, ink: 0x3A2410)
+    static let quote = HermexPaper(paper: 0xD9E8FF, ink: 0x0E3264)
+    static let book = HermexPaper(paper: 0xFFDCE6, ink: 0x6B1534)
+    static let wiki = HermexPaper(paper: 0xD3F2E2, ink: 0x0E4A33)
+    static let reading = HermexPaper(paper: 0xFFE4D1, ink: 0x5A2A0C)
+    static let notes = HermexPaper(paper: 0xE6DCFF, ink: 0x33197A)
+    static let video = HermexPaper(paper: 0xD2F0F4, ink: 0x0B4650)
+    static let past = HermexPaper(paper: 0xFFEFC2, ink: 0x4E3A00)
+    static let advisor = HermexPaper(paper: 0xE4EEF6, ink: 0x14324A)
+    static let plain = HermexPaper(paper: 0xF4F0E8, ink: 0x2A2A28)
+}

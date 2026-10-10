@@ -19,7 +19,6 @@ struct ChatDrawerView<ServerMenu: View>: View {
     let canCreateNewChat: Bool
     let onNewChat: () -> Void
     /// Runs an auto-archive pass now ("Clean up old chats"). nil hides the row.
-    var onCleanUp: (() -> Void)? = nil
     let onOpen: (ShellPushDestination) -> Void
     /// Opens the sheet of idle chats waiting for a keep-or-archive decision.
     let onReviewArchiveCandidates: () -> Void
@@ -125,7 +124,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
         }
         .padding(.horizontal, 12)
         .frame(minHeight: 40)
-        .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
     }
 
     @ViewBuilder
@@ -143,9 +142,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
         if sectionVisibility.brain {
             drawerRow("Brain", systemImage: "brain") { onOpen(.brain) }
         }
-        if let onCleanUp {
-            drawerRow(String(localized: "Clean up old chats"), systemImage: "archivebox") { onCleanUp() }
-        }
+        drawerRow("Goals", systemImage: "flag.checkered") { onOpen(.goals) }
     }
 
     /// Floating bottom-right New Chat, where messaging apps put compose.
@@ -196,7 +193,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
             }
             .padding(.horizontal, 12)
             .frame(minHeight: 44)
-            .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

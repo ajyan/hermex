@@ -301,6 +301,7 @@ struct ChatView: View {
     /// Called with the session ID and stored title after the server confirms a
     /// rename from the chat title, so the session list can show it.
     let onSessionRenamed: (String, String) -> Void
+    @Environment(\.openBrainRoute) private var openBrainRoute
 
     /// The composer's draft. Never read it in `body` or wrap it in a get/set
     /// binding for the composer: either re-runs this whole screen on every
@@ -705,10 +706,20 @@ struct ChatView: View {
         )
     }
 
-    /// A chat link that names a workspace file opens the source viewer at its line; every
+    /// A `brain://` link (the agent citing a vault note) opens that Brain page on the shell's
+    /// stack. A chat link that names a workspace file opens the source viewer at its line; every
     /// other link returns nil for `transcriptLinks` to open. The viewer's own error state
     /// covers a path the server no longer has, so the tap never waits on a fetch.
     private func handleTranscriptLink(_ url: URL) -> OpenURLAction.Result? {
+        switch BrainLink.chatAction(for: url, canOpen: openBrainRoute.isAvailable) {
+        case .open(let route):
+            openBrainRoute(route)
+            return .handled
+        case .discard:
+            return .discarded
+        case nil:
+            break
+        }
         guard let reference = FileReference.parse(url.absoluteString, workspaceRoot: session.workspace) else {
             return nil
         }

@@ -45,7 +45,7 @@ struct DisplayMathView: View {
     private var fallback: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             Text(approximation)
-                .font(.system(.body, design: .serif))
+                .font(AppFont.serif())
                 .lineSpacing(4)
                 .fixedSize(horizontal: true, vertical: true)
                 .padding(.vertical, 8)

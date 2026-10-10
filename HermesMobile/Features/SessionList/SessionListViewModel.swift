@@ -58,6 +58,8 @@ final class SessionListViewModel {
     private(set) var sessionLoadError: Error?
     internal(set) var lastError: Error?
     private(set) var activeProfileName: String?
+    /// Where the Ask Atlas widget's recent sessions are published after each load.
+    var widgetRecentsStore = AtlasWidgetRecentsStore()
     private(set) var activeProfileDisplayName: String?
     private(set) var activeProfileModel: String?
     private(set) var activeProfileProvider: String?
@@ -303,6 +305,7 @@ final class SessionListViewModel {
             pruneArchiveReviewCandidates(present: visibleSessions)
             applySessions(visibleSessions, archivedCount: response.archivedCount, animation: animation)
             isViewingCachedData = false
+            widgetRecentsStore.save(AtlasWidgetRecents(server: server, sessions: visibleSessions))
 
             if let modelContext {
                 do {
@@ -1635,4 +1638,25 @@ final class SessionListViewModel {
         return urlError.code == .cancelled
     }
 
+}
+
+extension AtlasWidgetRecents {
+    /// The most recently active sessions, newest first.
+    init(server: URL, sessions: [SessionSummary]) {
+        self.server = server
+        self.sessions = sessions
+            .compactMap { summary -> Session? in
+                guard let id = summary.sessionId, !id.isEmpty else { return nil }
+                let timestamp = summary.lastMessageAt ?? summary.updatedAt ?? summary.createdAt ?? 0
+                let title = summary.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                return Session(
+                    id: id,
+                    title: title.isEmpty ? "Untitled" : title,
+                    lastActivity: Date(timeIntervalSince1970: timestamp)
+                )
+            }
+            .sorted { $0.lastActivity > $1.lastActivity }
+            .prefix(Self.limit)
+            .map { $0 }
+    }
 }

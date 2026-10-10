@@ -107,7 +107,7 @@ struct DeckStackView: View {
                 // Far down the stack only the card's paper shows, peeking out askew.
                 DeckPageView.shape
                     .fill(DeckPalette.of(layer.page).paper)
-                    .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
+                    .hxShadow(.stacked)
                     .padding(.vertical, 12)
             }
         }

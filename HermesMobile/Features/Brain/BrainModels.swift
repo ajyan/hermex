@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // Models for the Brain module API (`/api/brain/{modules,list,page,search,graph}`).
 // Every model is `Codable` so the module screens can cache them as JSON, and every
@@ -447,4 +448,43 @@ enum PrepRoute: Hashable, Sendable {
     case home
     case track(String)
     case run
+}
+
+/// Opens a Brain page on the shell's stack from outside Brain (a `brain://` link in a
+/// chat reply). A reference, like `ChatDisclosureToggleAction`: the shell keeps one
+/// instance and refreshes `handler`, so chat readers never see a new value.
+final class OpenBrainRouteAction {
+    var handler: ((BrainRoute) -> Void)?
+
+    /// True when a shell is listening; without one, Brain links can't open.
+    var isAvailable: Bool { handler != nil }
+
+    func callAsFunction(_ route: BrainRoute) { handler?(route) }
+}
+
+struct OpenBrainRouteKey: EnvironmentKey {
+    static let defaultValue = OpenBrainRouteAction()
+}
+
+extension EnvironmentValues {
+    var openBrainRoute: OpenBrainRouteAction {
+        get { self[OpenBrainRouteKey.self] }
+        set { self[OpenBrainRouteKey.self] = newValue }
+    }
+}
+
+extension BrainLink {
+    enum ChatAction: Equatable {
+        case open(BrainRoute)
+        /// A `brain://` link that can't open (malformed, or no shell listening): swallow it
+        /// rather than hand an unknown scheme to iOS.
+        case discard
+    }
+
+    /// What a tapped link does in a chat reply; nil for any link that isn't `brain://`.
+    static func chatAction(for url: URL, canOpen: Bool) -> ChatAction? {
+        guard url.scheme == "brain" else { return nil }
+        guard canOpen, let (module, id) = ref(from: url) else { return .discard }
+        return .open(.page(module, id))
+    }
 }
