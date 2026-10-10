@@ -132757,7 +132757,2553 @@
     "Summary failed" : { "localizations" : { "ar" : { "stringUnit" : { "state" : "needs_review", "value" : "تعذّر التلخيص" } }, "de" : { "stringUnit" : { "state" : "needs_review", "value" : "Zusammenfassung fehlgeschlagen" } }, "en" : { "stringUnit" : { "state" : "translated", "value" : "Summary failed" } }, "es" : { "stringUnit" : { "state" : "needs_review", "value" : "Error al resumir" } }, "fr" : { "stringUnit" : { "state" : "needs_review", "value" : "Échec du résumé" } }, "he" : { "stringUnit" : { "state" : "needs_review", "value" : "הסיכום נכשל" } }, "it" : { "stringUnit" : { "state" : "needs_review", "value" : "Riepilogo non riuscito" } }, "ja" : { "stringUnit" : { "state" : "needs_review", "value" : "要約に失敗しました" } }, "ko" : { "stringUnit" : { "state" : "needs_review", "value" : "요약 실패" } }, "nl" : { "stringUnit" : { "state" : "needs_review", "value" : "Samenvatting mislukt" } }, "pl" : { "stringUnit" : { "state" : "needs_review", "value" : "Podsumowanie nie powiodło się" } }, "pt-BR" : { "stringUnit" : { "state" : "needs_review", "value" : "Falha no resumo" } }, "ru" : { "stringUnit" : { "state" : "needs_review", "value" : "Не удалось составить сводку" } }, "tr" : { "stringUnit" : { "state" : "needs_review", "value" : "Özet başarısız" } }, "ur" : { "stringUnit" : { "state" : "needs_review", "value" : "خلاصہ ناکام" } }, "zh-HK" : { "stringUnit" : { "state" : "needs_review", "value" : "摘要失敗" } }, "zh-Hans" : { "stringUnit" : { "state" : "needs_review", "value" : "总结失败" } }, "zh-Hant" : { "stringUnit" : { "state" : "needs_review", "value" : "摘要失敗" } } } },
     "The summary did not finish, so the chat was not archived." : { "localizations" : { "ar" : { "stringUnit" : { "state" : "needs_review", "value" : "لم يكتمل التلخيص، لذا لم تُؤرشف الدردشة." } }, "de" : { "stringUnit" : { "state" : "needs_review", "value" : "Die Zusammenfassung wurde nicht fertig, daher wurde der Chat nicht archiviert." } }, "en" : { "stringUnit" : { "state" : "translated", "value" : "The summary did not finish, so the chat was not archived." } }, "es" : { "stringUnit" : { "state" : "needs_review", "value" : "El resumen no terminó, así que el chat no se archivó." } }, "fr" : { "stringUnit" : { "state" : "needs_review", "value" : "Le résumé n’a pas abouti, la discussion n’a donc pas été archivée." } }, "he" : { "stringUnit" : { "state" : "needs_review", "value" : "הסיכום לא הסתיים, לכן הצ׳אט לא הועבר לארכיון." } }, "it" : { "stringUnit" : { "state" : "needs_review", "value" : "Il riepilogo non è terminato, quindi la chat non è stata archiviata." } }, "ja" : { "stringUnit" : { "state" : "needs_review", "value" : "要約が完了しなかったため、チャットはアーカイブされませんでした。" } }, "ko" : { "stringUnit" : { "state" : "needs_review", "value" : "요약이 완료되지 않아 채팅을 보관하지 않았습니다." } }, "nl" : { "stringUnit" : { "state" : "needs_review", "value" : "De samenvatting is niet afgerond, dus de chat is niet gearchiveerd." } }, "pl" : { "stringUnit" : { "state" : "needs_review", "value" : "Podsumowanie się nie zakończyło, więc czat nie został zarchiwizowany." } }, "pt-BR" : { "stringUnit" : { "state" : "needs_review", "value" : "O resumo não terminou, então a conversa não foi arquivada." } }, "ru" : { "stringUnit" : { "state" : "needs_review", "value" : "Сводка не была завершена, поэтому чат не архивирован." } }, "tr" : { "stringUnit" : { "state" : "needs_review", "value" : "Özet tamamlanmadı, bu yüzden sohbet arşivlenmedi." } }, "ur" : { "stringUnit" : { "state" : "needs_review", "value" : "خلاصہ مکمل نہیں ہوا، اس لیے چیٹ آرکائیو نہیں ہوئی۔" } }, "zh-HK" : { "stringUnit" : { "state" : "needs_review", "value" : "摘要未完成，所以對話沒有封存。" } }, "zh-Hans" : { "stringUnit" : { "state" : "needs_review", "value" : "总结未完成，因此聊天未归档。" } }, "zh-Hant" : { "stringUnit" : { "state" : "needs_review", "value" : "摘要未完成，所以對話沒有封存。" } } } },
     "Archived %lld idle chats" : { "localizations" : { "ar" : { "variations" : { "plural" : { "zero" : { "stringUnit" : { "state" : "needs_review", "value" : "تمت أرشفة %lld دردشة خاملة" } }, "one" : { "stringUnit" : { "state" : "needs_review", "value" : "تمت أرشفة %lld دردشة خاملة" } }, "two" : { "stringUnit" : { "state" : "needs_review", "value" : "تمت أرشفة %lld دردشة خاملة" } }, "few" : { "stringUnit" : { "state" : "needs_review", "value" : "تمت أرشفة %lld دردشات خاملة" } }, "many" : { "stringUnit" : { "state" : "needs_review", "value" : "تمت أرشفة %lld دردشة خاملة" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "تمت أرشفة %lld دردشة خاملة" } } } } }, "de" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld inaktiver Chat archiviert" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld inaktive Chats archiviert" } } } } }, "en" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "Archived %lld idle chat" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "Archived %lld idle chats" } } } } }, "es" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld chat inactivo archivado" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld chats inactivos archivados" } } } } }, "fr" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld discussion inactive archivée" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld discussions inactives archivées" } } } } }, "he" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "צ׳אט לא פעיל %lld הועבר לארכיון" } }, "two" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld צ׳אטים לא פעילים הועברו לארכיון" } }, "many" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld צ׳אטים לא פעילים הועברו לארכיון" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld צ׳אטים לא פעילים הועברו לארכיון" } } } } }, "it" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld chat inattiva archiviata" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld chat inattive archiviate" } } } } }, "ja" : { "variations" : { "plural" : { "other" : { "stringUnit" : { "state" : "needs_review", "value" : "放置されたチャットを%lld件アーカイブしました" } } } } }, "ko" : { "variations" : { "plural" : { "other" : { "stringUnit" : { "state" : "needs_review", "value" : "유휴 채팅 %lld개를 보관함" } } } } }, "nl" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld inactieve chat gearchiveerd" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld inactieve chats gearchiveerd" } } } } }, "pl" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "Zarchiwizowano %lld nieaktywny czat" } }, "few" : { "stringUnit" : { "state" : "needs_review", "value" : "Zarchiwizowano %lld nieaktywne czaty" } }, "many" : { "stringUnit" : { "state" : "needs_review", "value" : "Zarchiwizowano %lld nieaktywnych czatów" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "Zarchiwizowano %lld nieaktywnego czatu" } } } } }, "pt-BR" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld conversa inativa arquivada" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld conversas inativas arquivadas" } } } } }, "ru" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "Архивирован %lld неактивный чат" } }, "few" : { "stringUnit" : { "state" : "needs_review", "value" : "Архивировано %lld неактивных чата" } }, "many" : { "stringUnit" : { "state" : "needs_review", "value" : "Архивировано %lld неактивных чатов" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "Архивировано %lld неактивного чата" } } } } }, "tr" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld boştaki sohbet arşivlendi" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld boştaki sohbet arşivlendi" } } } } }, "ur" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld غیر فعال چیٹ آرکائیو ہوئی" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld غیر فعال چیٹس آرکائیو ہوئیں" } } } } }, "zh-HK" : { "variations" : { "plural" : { "other" : { "stringUnit" : { "state" : "needs_review", "value" : "已封存 %lld 個閒置對話" } } } } }, "zh-Hans" : { "variations" : { "plural" : { "other" : { "stringUnit" : { "state" : "needs_review", "value" : "已归档 %lld 个闲置聊天" } } } } }, "zh-Hant" : { "variations" : { "plural" : { "other" : { "stringUnit" : { "state" : "needs_review", "value" : "已封存 %lld 個閒置對話" } } } } } } },
-    "%lld chats to review before archiving" : { "localizations" : { "ar" : { "variations" : { "plural" : { "zero" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld دردشة للمراجعة قبل الأرشفة" } }, "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld دردشة للمراجعة قبل الأرشفة" } }, "two" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld دردشة للمراجعة قبل الأرشفة" } }, "few" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld دردشات للمراجعة قبل الأرشفة" } }, "many" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld دردشة للمراجعة قبل الأرشفة" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld دردشة للمراجعة قبل الأرشفة" } } } } }, "de" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld Chat vor dem Archivieren prüfen" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld Chats vor dem Archivieren prüfen" } } } } }, "en" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld chat to review before archiving" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld chats to review before archiving" } } } } }, "es" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld chat para revisar antes de archivar" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld chats para revisar antes de archivar" } } } } }, "fr" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld discussion à examiner avant l’archivage" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld discussions à examiner avant l’archivage" } } } } }, "he" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "צ׳אט %lld לסקירה לפני העברה לארכיון" } }, "two" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld צ׳אטים לסקירה לפני העברה לארכיון" } }, "many" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld צ׳אטים לסקירה לפני העברה לארכיון" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld צ׳אטים לסקירה לפני העברה לארכיון" } } } } }, "it" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld chat da rivedere prima dell’archiviazione" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld chat da rivedere prima dell’archiviazione" } } } } }, "ja" : { "variations" : { "plural" : { "other" : { "stringUnit" : { "state" : "needs_review", "value" : "アーカイブ前に確認するチャット: %lld件" } } } } }, "ko" : { "variations" : { "plural" : { "other" : { "stringUnit" : { "state" : "needs_review", "value" : "보관 전 검토할 채팅 %lld개" } } } } }, "nl" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld chat om te controleren voor archiveren" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld chats om te controleren voor archiveren" } } } } }, "pl" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld czat do przejrzenia przed archiwizacją" } }, "few" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld czaty do przejrzenia przed archiwizacją" } }, "many" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld czatów do przejrzenia przed archiwizacją" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld czatu do przejrzenia przed archiwizacją" } } } } }, "pt-BR" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld conversa para revisar antes de arquivar" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld conversas para revisar antes de arquivar" } } } } }, "ru" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld чат для проверки перед архивацией" } }, "few" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld чата для проверки перед архивацией" } }, "many" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld чатов для проверки перед архивацией" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld чата для проверки перед архивацией" } } } } }, "tr" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "Arşivlemeden önce incelenecek %lld sohbet" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "Arşivlemeden önce incelenecek %lld sohbet" } } } } }, "ur" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "آرکائیو سے پہلے جائزے کے لیے %lld چیٹ" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "آرکائیو سے پہلے جائزے کے لیے %lld چیٹس" } } } } }, "zh-HK" : { "variations" : { "plural" : { "other" : { "stringUnit" : { "state" : "needs_review", "value" : "封存前有 %lld 個對話待檢視" } } } } }, "zh-Hans" : { "variations" : { "plural" : { "other" : { "stringUnit" : { "state" : "needs_review", "value" : "归档前有 %lld 个聊天待审阅" } } } } }, "zh-Hant" : { "variations" : { "plural" : { "other" : { "stringUnit" : { "state" : "needs_review", "value" : "封存前有 %lld 個對話待檢視" } } } } } } }
+    "%lld chats to review before archiving" : { "localizations" : { "ar" : { "variations" : { "plural" : { "zero" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld دردشة للمراجعة قبل الأرشفة" } }, "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld دردشة للمراجعة قبل الأرشفة" } }, "two" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld دردشة للمراجعة قبل الأرشفة" } }, "few" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld دردشات للمراجعة قبل الأرشفة" } }, "many" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld دردشة للمراجعة قبل الأرشفة" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld دردشة للمراجعة قبل الأرشفة" } } } } }, "de" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld Chat vor dem Archivieren prüfen" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld Chats vor dem Archivieren prüfen" } } } } }, "en" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld chat to review before archiving" } }, "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld chats to review before archiving" } } } } }, "es" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld chat para revisar antes de archivar" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld chats para revisar antes de archivar" } } } } }, "fr" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld discussion à examiner avant l’archivage" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld discussions à examiner avant l’archivage" } } } } }, "he" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "צ׳אט %lld לסקירה לפני העברה לארכיון" } }, "two" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld צ׳אטים לסקירה לפני העברה לארכיון" } }, "many" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld צ׳אטים לסקירה לפני העברה לארכיון" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld צ׳אטים לסקירה לפני העברה לארכיון" } } } } }, "it" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld chat da rivedere prima dell’archiviazione" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld chat da rivedere prima dell’archiviazione" } } } } }, "ja" : { "variations" : { "plural" : { "other" : { "stringUnit" : { "state" : "needs_review", "value" : "アーカイブ前に確認するチャット: %lld件" } } } } }, "ko" : { "variations" : { "plural" : { "other" : { "stringUnit" : { "state" : "needs_review", "value" : "보관 전 검토할 채팅 %lld개" } } } } }, "nl" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld chat om te controleren voor archiveren" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld chats om te controleren voor archiveren" } } } } }, "pl" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld czat do przejrzenia przed archiwizacją" } }, "few" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld czaty do przejrzenia przed archiwizacją" } }, "many" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld czatów do przejrzenia przed archiwizacją" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld czatu do przejrzenia przed archiwizacją" } } } } }, "pt-BR" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld conversa para revisar antes de arquivar" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld conversas para revisar antes de arquivar" } } } } }, "ru" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld чат для проверки перед архивацией" } }, "few" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld чата для проверки перед архивацией" } }, "many" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld чатов для проверки перед архивацией" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "%lld чата для проверки перед архивацией" } } } } }, "tr" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "Arşivlemeden önce incelenecek %lld sohbet" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "Arşivlemeden önce incelenecek %lld sohbet" } } } } }, "ur" : { "variations" : { "plural" : { "one" : { "stringUnit" : { "state" : "needs_review", "value" : "آرکائیو سے پہلے جائزے کے لیے %lld چیٹ" } }, "other" : { "stringUnit" : { "state" : "needs_review", "value" : "آرکائیو سے پہلے جائزے کے لیے %lld چیٹس" } } } } }, "zh-HK" : { "variations" : { "plural" : { "other" : { "stringUnit" : { "state" : "needs_review", "value" : "封存前有 %lld 個對話待檢視" } } } } }, "zh-Hans" : { "variations" : { "plural" : { "other" : { "stringUnit" : { "state" : "needs_review", "value" : "归档前有 %lld 个聊天待审阅" } } } } }, "zh-Hant" : { "variations" : { "plural" : { "other" : { "stringUnit" : { "state" : "needs_review", "value" : "封存前有 %lld 個對話待檢視" } } } } } } },
+    "ATLAS" : { "shouldTranslate" : false },
+    "Hermes" : { "shouldTranslate" : false },
+    "%lld of %lld this week" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld من %lld هذا الأسبوع"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld von %lld diese Woche"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld de %lld esta semana"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld sur %lld cette semaine"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld מתוך %lld השבוע"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld su %lld questa settimana"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "今週 %lld / %lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "이번 주 %lld / %lld"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld van %lld deze week"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld z %lld w tym tygodniu"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld de %lld nesta semana"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld из %lld на этой неделе"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Bu hafta %lld / %lld"
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "اس ہفتے %lld میں سے %lld"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "本週 %lld / %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "本周 %lld / %lld"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "本週 %lld / %lld"
+          }
+        }
+      }
+    },
+    "%lld steps" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld خطوات"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld Schritte"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld pasos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld étapes"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld שלבים"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld passaggi"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld ステップ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld단계"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld stappen"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Kroki: %lld"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld etapas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Шагов: %lld"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld adım"
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld مراحل"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld 個步驟"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld 个步骤"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld 個步驟"
+          }
+        }
+      }
+    },
+    "%lld-day streak" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "سلسلة %lld يوم"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld Tage in Folge"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Racha de %lld días"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Série de %lld jours"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "רצף של %lld ימים"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Serie di %lld giorni"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld日連続"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld일 연속"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld dagen op rij"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Seria: %lld dni"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Sequência de %lld dias"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Серия: %lld дн."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld günlük seri"
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld دن کا سلسلہ"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "連續 %lld 日"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "连续 %lld 天"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "連續 %lld 天"
+          }
+        }
+      }
+    },
+    "Ask Atlas…" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "اسأل Atlas…"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Atlas fragen …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Pregunta a Atlas…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Demander à Atlas…"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "שאל את Atlas…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Chiedi ad Atlas…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Atlasに質問…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Atlas에게 묻기…"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Vraag het Atlas…"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Zapytaj Atlas…"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Pergunte ao Atlas…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Спросить Atlas…"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Atlas'a sor…"
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Atlas سے پوچھیں…"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "問 Atlas…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "问 Atlas…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "問 Atlas…"
+          }
+        }
+      }
+    },
+    "Calls speak with your server's OpenAI-compatible voice, such as a local Kokoro server. If it can't be reached, the call switches to the on-device voice." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "تتحدث المكالمات بصوت خادمك المتوافق مع OpenAI، مثل خادم Kokoro محلي. إذا تعذّر الوصول إليه، تنتقل المكالمة إلى الصوت الموجود على الجهاز."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Anrufe sprechen mit der OpenAI-kompatiblen Stimme deines Servers, etwa einem lokalen Kokoro-Server. Ist er nicht erreichbar, wechselt der Anruf zur Stimme auf dem Gerät."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Las llamadas hablan con la voz compatible con OpenAI de tu servidor, como un servidor Kokoro local. Si no se puede acceder a él, la llamada cambia a la voz del dispositivo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Les appels utilisent la voix compatible OpenAI de votre serveur, comme un serveur Kokoro local. S’il est injoignable, l’appel bascule sur la voix de l’appareil."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "השיחות משתמשות בקול התואם ל-OpenAI של השרת שלך, למשל שרת Kokoro מקומי. אם אין אליו גישה, השיחה עוברת לקול שבמכשיר."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Le chiamate usano la voce compatibile con OpenAI del tuo server, come un server Kokoro locale. Se non è raggiungibile, la chiamata passa alla voce del dispositivo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "通話では、ローカルのKokoroサーバなど、サーバのOpenAI互換の音声を使います。接続できない場合は、デバイス上の音声に切り替わります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "통화는 로컬 Kokoro 서버 같은 서버의 OpenAI 호환 음성을 사용합니다. 연결할 수 없으면 기기 내 음성으로 전환됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Gesprekken gebruiken de OpenAI-compatibele stem van je server, zoals een lokale Kokoro-server. Als die niet bereikbaar is, schakelt het gesprek over op de stem op het apparaat."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Rozmowy używają głosu zgodnego z OpenAI z Twojego serwera, np. lokalnego serwera Kokoro. Jeśli jest nieosiągalny, rozmowa przełącza się na głos na urządzeniu."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "As chamadas usam a voz compatível com OpenAI do seu servidor, como um servidor Kokoro local. Se ele não estiver acessível, a chamada muda para a voz do dispositivo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "В звонках используется OpenAI-совместимый голос вашего сервера, например локального сервера Kokoro. Если он недоступен, звонок переключится на голос устройства."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Aramalar, yerel bir Kokoro sunucusu gibi sunucunuzun OpenAI uyumlu sesini kullanır. Sunucuya ulaşılamazsa arama cihazdaki sese geçer."
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "کالز آپ کے سرور کی OpenAI سے مطابقت رکھنے والی آواز استعمال کرتی ہیں، جیسے مقامی Kokoro سرور۔ اگر اس تک رسائی نہ ہو تو کال ڈیوائس کی آواز پر منتقل ہو جاتی ہے۔"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "通話會使用伺服器兼容 OpenAI 嘅語音，例如本機 Kokoro 伺服器。如果連唔到，通話會改用裝置上嘅語音。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "通话使用服务器兼容 OpenAI 的语音，例如本地 Kokoro 服务器。如果无法连接，通话会切换到设备上的语音。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "通話會使用伺服器相容 OpenAI 的語音，例如本機 Kokoro 伺服器。如果無法連線，通話會切換到裝置上的語音。"
+          }
+        }
+      }
+    },
+    "Check In Goal" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "تسجيل الهدف"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ziel abhaken"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Registrar objetivo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Pointer l’objectif"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "סימון יעד"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Registra obiettivo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "目標をチェックイン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "목표 체크인"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Doel afvinken"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Odhacz cel"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Registrar meta"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Отметить цель"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Hedefi işaretle"
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "ہدف چیک اِن کریں"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "登記目標"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "打卡目标"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "登記目標"
+          }
+        }
+      }
+    },
+    "Check off today's goal commitments and see your streak." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "ضع علامة على التزامات أهدافك اليوم واطّلع على سلسلتك."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Hake die heutigen Zielvorhaben ab und sieh deine Serie."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Marca los compromisos de hoy y consulta tu racha."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Cochez les engagements du jour et voyez votre série."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "סמן את התחייבויות היעד של היום וראה את הרצף שלך."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Spunta gli impegni di oggi e guarda la tua serie."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "今日の目標をチェックして、連続記録を確認します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "오늘의 목표 약속을 체크하고 연속 기록을 확인하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Vink de doelen van vandaag af en bekijk je reeks."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Odhacz dzisiejsze zobowiązania i zobacz swoją serię."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Marque os compromissos de hoje e veja sua sequência."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Отмечайте сегодняшние цели и следите за серией."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Bugünkü hedef taahhütlerini işaretle ve serini gör."
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "آج کے ہدف کے وعدے چیک کریں اور اپنا سلسلہ دیکھیں۔"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "剔低今日嘅目標承諾，睇吓你嘅連續紀錄。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "勾选今天的目标承诺，查看连续记录。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "勾選今天的目標承諾，查看連續紀錄。"
+          }
+        }
+      }
+    },
+    "Clean Up Old Chats Now" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "تنظيف المحادثات القديمة الآن"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Alte Chats jetzt aufräumen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Limpiar chats antiguos ahora"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nettoyer les anciennes discussions maintenant"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "ניקוי צ׳אטים ישנים עכשיו"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Pulisci ora le chat vecchie"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "古いチャットを今すぐ整理"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "지금 오래된 채팅 정리"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Oude chats nu opruimen"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Wyczyść teraz stare czaty"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Limpar conversas antigas agora"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Очистить старые чаты сейчас"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Eski sohbetleri şimdi temizle"
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "پرانی چیٹس ابھی صاف کریں"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "立即清理舊對話"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "立即清理旧聊天"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "立即清理舊聊天"
+          }
+        }
+      }
+    },
+    "Commitment" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "الالتزام"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Vorhaben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Compromiso"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Engagement"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "התחייבות"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Impegno"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "コミットメント"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "약속"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Toezegging"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Zobowiązanie"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Compromisso"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Обязательство"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Taahhüt"
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "وعدہ"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "承諾"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "承诺"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "承諾"
+          }
+        }
+      }
+    },
+    "Couldn't sync" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "تعذّرت المزامنة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Synchronisierung fehlgeschlagen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "No se pudo sincronizar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Synchronisation impossible"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "הסנכרון נכשל"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Impossibile sincronizzare"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "同期できませんでした"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "동기화할 수 없음"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Synchroniseren mislukt"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nie udało się zsynchronizować"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Não foi possível sincronizar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Не удалось синхронизировать"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Eşitlenemedi"
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "ہم آہنگ نہیں ہو سکا"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "同步唔到"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "无法同步"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "無法同步"
+          }
+        }
+      }
+    },
+    "Dictate" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "إملاء"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Diktieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Dictar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Dicter"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "הכתבה"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Detta"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "音声入力"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "받아쓰기"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Dicteren"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Dyktuj"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ditar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Диктовка"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Dikte et"
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "املا کریں"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "語音輸入"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "听写"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "聽寫"
+          }
+        }
+      }
+    },
+    "Goals" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "الأهداف"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ziele"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Objetivos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Objectifs"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "יעדים"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Obiettivi"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "目標"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "목표"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Doelen"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Cele"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Metas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Цели"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Hedefler"
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "اہداف"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "目標"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "目标"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "目標"
+          }
+        }
+      }
+    },
+    "Mark %@ done" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "وضع علامة مكتمل على %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%@ als erledigt markieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Marcar %@ como hecho"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Marquer %@ comme fait"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "סמן את %@ כבוצע"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Segna %@ come fatto"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%@を完了にする"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%@ 완료로 표시"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%@ als gedaan markeren"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Oznacz %@ jako zrobione"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Marcar %@ como feito"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Отметить «%@» выполненным"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%@ tamamlandı olarak işaretle"
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%@ کو مکمل نشان زد کریں"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "將 %@ 標記為完成"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "将 %@ 标记为完成"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "將 %@ 標記為完成"
+          }
+        }
+      }
+    },
+    "New Atlas Chat" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "محادثة Atlas جديدة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Neuer Atlas-Chat"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nuevo chat de Atlas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nouvelle discussion Atlas"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "צ׳אט Atlas חדש"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nuova chat Atlas"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "新しいAtlasチャット"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "새 Atlas 채팅"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nieuwe Atlas-chat"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nowy czat Atlas"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nova conversa no Atlas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Новый чат Atlas"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Yeni Atlas sohbeti"
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "نئی Atlas چیٹ"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "新 Atlas 對話"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "新 Atlas 聊天"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "新 Atlas 聊天"
+          }
+        }
+      }
+    },
+    "No chats idle for %lld+ days" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "لا توجد محادثات خاملة منذ %lld+ يوم"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Keine Chats seit %lld+ Tagen inaktiv"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "No hay chats inactivos desde hace %lld+ días"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Aucune discussion inactive depuis %lld+ jours"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "אין צ׳אטים שלא היו פעילים %lld+ ימים"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nessuna chat inattiva da %lld+ giorni"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld日以上使われていないチャットはありません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld일 이상 사용하지 않은 채팅 없음"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Geen chats die %lld+ dagen inactief zijn"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Brak czatów nieaktywnych od %lld+ dni"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nenhuma conversa inativa há %lld+ dias"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Нет чатов без активности %lld+ дн."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld+ gündür boşta sohbet yok"
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%lld+ دن سے غیر فعال کوئی چیٹ نہیں"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "冇閒置超過 %lld 日嘅對話"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "没有闲置 %lld+ 天的聊天"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "沒有閒置 %lld+ 天的聊天"
+          }
+        }
+      }
+    },
+    "Nothing due today." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "لا شيء مستحق اليوم."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Heute ist nichts fällig."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nada pendiente para hoy."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Rien à faire aujourd’hui."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "אין משהו להיום."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Niente in scadenza oggi."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "今日の予定はありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "오늘 할 일이 없습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Niets voor vandaag."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Na dziś nic."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nada para hoje."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "На сегодня ничего."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Bugün yapılacak bir şey yok."
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "آج کچھ واجب نہیں۔"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "今日冇嘢要做。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "今天没有待办。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "今天沒有待辦。"
+          }
+        }
+      }
+    },
+    "Open Atlas on a new chat." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "افتح Atlas على محادثة جديدة."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Öffne Atlas mit einem neuen Chat."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Abre Atlas en un chat nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ouvrez Atlas sur une nouvelle discussion."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "פתח את Atlas בצ׳אט חדש."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Apri Atlas su una nuova chat."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Atlasを新しいチャットで開きます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "새 채팅으로 Atlas를 엽니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Open Atlas met een nieuwe chat."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Otwórz Atlas z nowym czatem."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Abra o Atlas em uma nova conversa."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Открыть Atlas в новом чате."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Atlas'ı yeni bir sohbetle aç."
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Atlas کو نئی چیٹ پر کھولیں۔"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "喺新對話打開 Atlas。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "在新聊天中打开 Atlas。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "在新聊天中打開 Atlas。"
+          }
+        }
+      }
+    },
+    "Open Atlas to load today's goals." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "افتح Atlas لتحميل أهداف اليوم."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Öffne Atlas, um die heutigen Ziele zu laden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Abre Atlas para cargar los objetivos de hoy."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ouvrez Atlas pour charger les objectifs du jour."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "פתח את Atlas כדי לטעון את יעדי היום."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Apri Atlas per caricare gli obiettivi di oggi."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Atlasを開いて今日の目標を読み込みます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Atlas를 열어 오늘의 목표를 불러오세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Open Atlas om de doelen van vandaag te laden."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Otwórz Atlas, aby wczytać dzisiejsze cele."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Abra o Atlas para carregar as metas de hoje."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Откройте Atlas, чтобы загрузить цели на сегодня."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Bugünün hedeflerini yüklemek için Atlas'ı aç."
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "آج کے اہداف لوڈ کرنے کے لیے Atlas کھولیں۔"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "打開 Atlas 載入今日嘅目標。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "打开 Atlas 以加载今天的目标。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "打開 Atlas 以載入今天的目標。"
+          }
+        }
+      }
+    },
+    "Open Goals in Atlas to show them here." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "افتح الأهداف في Atlas لعرضها هنا."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Öffne Ziele in Atlas, um sie hier anzuzeigen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Abre Objetivos en Atlas para mostrarlos aquí."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ouvrez Objectifs dans Atlas pour les afficher ici."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "פתח את היעדים ב-Atlas כדי להציג אותם כאן."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Apri Obiettivi in Atlas per mostrarli qui."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Atlasで目標を開くと、ここに表示されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Atlas에서 목표를 열면 여기에 표시됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Open Doelen in Atlas om ze hier te tonen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Otwórz Cele w Atlas, aby pokazać je tutaj."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Abra Metas no Atlas para mostrá-las aqui."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Откройте «Цели» в Atlas, чтобы показать их здесь."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Burada göstermek için Atlas'ta Hedefler'i aç."
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "یہاں دکھانے کے لیے Atlas میں اہداف کھولیں۔"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "喺 Atlas 打開目標，就會喺度顯示。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "在 Atlas 中打开目标即可在此显示。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "在 Atlas 中打開目標即可在此顯示。"
+          }
+        }
+      }
+    },
+    "Opens the Brain page" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "يفتح صفحة Brain"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Öffnet die Brain-Seite"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Abre la página de Brain"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ouvre la page Brain"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "פותח את דף Brain"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Apre la pagina Brain"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Brainのページを開きます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Brain 페이지를 엽니다"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Opent de Brain-pagina"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Otwiera stronę Brain"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Abre a página do Brain"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Открывает страницу Brain"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Brain sayfasını açar"
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Brain صفحہ کھولتا ہے"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "打開 Brain 頁面"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "打开 Brain 页面"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "打開 Brain 頁面"
+          }
+        }
+      }
+    },
+    "Server Voice for Calls" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "صوت الخادم للمكالمات"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Serverstimme für Anrufe"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Voz del servidor para llamadas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Voix du serveur pour les appels"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "קול השרת לשיחות"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Voce del server per le chiamate"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "通話にサーバの音声を使用"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "통화에 서버 음성 사용"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Serverstem voor gesprekken"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Głos serwera w rozmowach"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Voz do servidor nas chamadas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Голос сервера для звонков"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Aramalar için sunucu sesi"
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "کالز کے لیے سرور کی آواز"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "通話用伺服器語音"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "通话使用服务器语音"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "通話使用伺服器語音"
+          }
+        }
+      }
+    },
+    "Shows every tool call" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "يعرض كل استدعاءات الأدوات"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Zeigt alle Tool-Aufrufe"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Muestra todas las llamadas a herramientas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Affiche tous les appels d’outils"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "מציג את כל קריאות הכלים"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mostra tutte le chiamate agli strumenti"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "すべてのツール呼び出しを表示します"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "모든 도구 호출을 표시합니다"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Toont alle toolaanroepen"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Pokazuje wszystkie wywołania narzędzi"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mostra todas as chamadas de ferramentas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Показывает все вызовы инструментов"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Tüm araç çağrılarını gösterir"
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "تمام ٹول کالز دکھاتا ہے"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "顯示所有工具調用"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "显示所有工具调用"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "顯示所有工具呼叫"
+          }
+        }
+      }
+    },
+    "Start a chat, dictate, or jump back into a recent one." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "ابدأ محادثة أو أملِ أو عُد إلى محادثة حديثة."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Starte einen Chat, diktiere oder kehre zu einem aktuellen zurück."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Inicia un chat, dicta o vuelve a uno reciente."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Démarrez une discussion, dictez ou reprenez une discussion récente."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "התחל צ׳אט, הכתב, או חזור לצ׳אט אחרון."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Avvia una chat, detta o torna a una recente."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "チャットを始める、音声入力する、最近のチャットに戻る。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "채팅을 시작하거나 받아쓰거나 최근 채팅으로 돌아가세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Start een chat, dicteer of ga terug naar een recente."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Rozpocznij czat, dyktuj lub wróć do ostatniego."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Comece uma conversa, dite ou volte a uma recente."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Начните чат, надиктуйте или вернитесь к недавнему."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Sohbet başlat, dikte et ya da son sohbete dön."
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "چیٹ شروع کریں، املا کریں یا کسی حالیہ چیٹ پر واپس جائیں۔"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "開始對話、語音輸入，或返去最近嘅對話。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "开始聊天、听写，或返回最近的聊天。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "開始聊天、聽寫，或返回最近的聊天。"
+          }
+        }
+      }
+    },
+    "This page moved or was removed" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "تم نقل هذه الصفحة أو إزالتها"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Diese Seite wurde verschoben oder entfernt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Esta página se movió o se eliminó"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Cette page a été déplacée ou supprimée"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "הדף הזה הועבר או הוסר"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Questa pagina è stata spostata o rimossa"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "このページは移動または削除されました"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "이 페이지가 이동되었거나 삭제되었습니다"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Deze pagina is verplaatst of verwijderd"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ta strona została przeniesiona lub usunięta"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Esta página foi movida ou removida"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Эта страница перемещена или удалена"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Bu sayfa taşındı veya kaldırıldı"
+          }
+        },
+        "ur" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "یہ صفحہ منتقل یا ہٹا دیا گیا"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "呢頁已經搬走或者刪除咗"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "此页面已移动或删除"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "此頁面已移動或刪除"
+          }
+        }
+      }
+    }
   },
   "version" : "1.0"
 }
