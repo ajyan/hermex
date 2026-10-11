@@ -31,6 +31,14 @@ final class FeedbackAvailability {
 @Observable
 final class FeedbackPresentation {
     var isPresented = false
+    /// The screen as it looked when Send feedback was tapped; dropped when the sheet closes.
+    @ObservationIgnored var screenshot: UIImage?
+
+    /// Shows the sheet with `screenshot`, taken before the sheet covers the screen.
+    func present(screenshot: UIImage?) {
+        self.screenshot = screenshot
+        isPresented = true
+    }
 }
 
 private struct FeedbackContextKey: EnvironmentKey {
@@ -63,9 +71,9 @@ private struct FeedbackContextHost: ViewModifier {
         content
             .environment(\.feedbackContext, context)
             .environment(presentation)
-            .sheet(isPresented: Bindable(presentation).isPresented) {
+            .sheet(isPresented: Bindable(presentation).isPresented, onDismiss: { presentation.screenshot = nil }) {
                 if let availability {
-                    FeedbackSheet(context: context, client: availability.client)
+                    FeedbackSheet(context: context, client: availability.client, screenshot: presentation.screenshot)
                 }
             }
     }
@@ -81,7 +89,7 @@ struct FeedbackMenuItem: View {
     var body: some View {
         if context != nil, let presentation, availability?.isAvailable == true {
             Button {
-                presentation.isPresented = true
+                presentation.present(screenshot: FeedbackScreenshot.capture(FeedbackScreenshot.keyWindow()))
             } label: {
                 Label { Text(verbatim: "Send feedback") } icon: { Image(systemName: "message") }
             }

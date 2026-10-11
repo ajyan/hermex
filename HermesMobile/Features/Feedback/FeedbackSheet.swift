@@ -1,14 +1,15 @@
 import SwiftUI
 
 /// Send feedback about the screen it was opened from: the screen's context in plain words,
-/// then what should change. Presented by `.feedbackContext(_:)`. Copy is English-only (personal fork).
+/// what goes along (a removable screenshot, screen state), then what should change.
+/// Presented by `.feedbackContext(_:)`. Copy is English-only (personal fork).
 struct FeedbackSheet: View {
     @State private var viewModel: FeedbackSheetViewModel
     @FocusState private var isEditing: Bool
     @Environment(\.dismiss) private var dismiss
 
-    init(context: FeedbackContext, client: any FeedbackDataClient) {
-        _viewModel = State(initialValue: FeedbackSheetViewModel(context: context, client: client))
+    init(context: FeedbackContext, client: any FeedbackDataClient, screenshot: UIImage? = nil) {
+        _viewModel = State(initialValue: FeedbackSheetViewModel(context: context, client: client, screenshot: screenshot))
     }
 
     var body: some View {
@@ -18,6 +19,11 @@ struct FeedbackSheet: View {
                     .font(AppFont.body())
                     .foregroundStyle(Color.hxTextPrimary)
                     .listRowBackground(Color.hxSurface)
+
+                if let summary = viewModel.attachmentSummary {
+                    attachmentRow(summary)
+                        .listRowBackground(Color.hxSurface)
+                }
             } header: {
                 Text(verbatim: "About")
             }
@@ -68,6 +74,40 @@ struct FeedbackSheet: View {
         .padding(.horizontal, 12)
         .padding(.top, 8)
         .background(Color.hxCanvas)
+    }
+
+    /// The screenshot's thumbnail and ✕, then a line naming everything that goes along.
+    private func attachmentRow(_ summary: String) -> some View {
+        HStack(spacing: 12) {
+            if let screenshot = viewModel.screenshot {
+                Image(uiImage: screenshot)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 64)
+                    .clipShape(RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous))
+                    .accessibilityHidden(true)
+            }
+            Text(verbatim: summary)
+                .font(AppFont.footnote())
+                .foregroundStyle(Color.hxTextSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if viewModel.screenshot != nil {
+                Button {
+                    viewModel.removeScreenshot()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.hxTextSecondary)
+                        .frame(width: 24, height: 24)
+                        .background(Color(uiColor: .tertiarySystemFill), in: Circle())
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(viewModel.isSending)
+                .accessibilityLabel(Text(verbatim: "Remove screenshot"))
+            }
+        }
     }
 
     private var closeButton: some View {

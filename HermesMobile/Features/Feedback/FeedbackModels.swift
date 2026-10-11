@@ -66,6 +66,21 @@ private struct FeedbackLossy<Value: Decodable>: Decodable {
     init(from decoder: Decoder) throws { value = try? Value(from: decoder) }
 }
 
+/// A file the server stored with an entry: `screenshot.jpg` (kind `screenshot`) or
+/// `context.json` (kind `context`). Listed only; the app doesn't fetch them in v1.
+struct FeedbackAttachment: Decodable, Hashable, Sendable {
+    let name: String
+    let kind: String?
+
+    private enum CodingKeys: String, CodingKey { case name, kind }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decode(String.self, forKey: .name)
+        kind = try? c.decodeIfPresent(String.self, forKey: .kind)
+    }
+}
+
 struct FeedbackEntry: Decodable, Identifiable, Hashable, Sendable {
     let id: String
     let ts: String?
@@ -85,10 +100,11 @@ struct FeedbackEntry: Decodable, Identifiable, Hashable, Sendable {
     let summary: String?
     let size: String?
     let planRepo: String?
+    let attachments: [FeedbackAttachment]
 
     private enum CodingKeys: String, CodingKey {
         case id, ts, feature, screen, item, build, text, status, updated, notes
-        case branch, repo, tests, error, title, summary, size
+        case branch, repo, tests, error, title, summary, size, attachments
         case planRepo = "plan_repo"
     }
 
@@ -113,19 +129,30 @@ struct FeedbackEntry: Decodable, Identifiable, Hashable, Sendable {
         summary = str(.summary)
         size = str(.size)
         planRepo = str(.planRepo)
+        attachments = ((try? c.decodeIfPresent([FeedbackLossy<FeedbackAttachment>].self, forKey: .attachments)) ?? []).compactMap(\.value)
     }
 }
 
 /// Where in the app the feedback is about. Each feature screen provides one.
 struct FeedbackContext: Hashable, Sendable {
+    /// The server rejects a state value longer than this.
+    static let maxStateValueLength = 2000
+
     let feature: String
     let screen: String
     let item: String?
+    /// Small facts about what the screen was showing, e.g. `session_id` on Chat. Nil and
+    /// empty values are dropped and each value is capped at `maxStateValueLength`.
+    let state: [String: String]
 
-    init(feature: String, screen: String, item: String? = nil) {
+    init(feature: String, screen: String, item: String? = nil, state: [String: String?] = [:]) {
         self.feature = feature
         self.screen = screen
         self.item = item
+        self.state = state.compactMapValues { value in
+            guard let value, !value.isEmpty else { return nil }
+            return String(value.prefix(Self.maxStateValueLength))
+        }
     }
 
     /// Plain words for the sheet's About row, e.g. "Prep · Spot the bug · Longest Substring".
@@ -137,20 +164,26 @@ struct FeedbackContext: Hashable, Sendable {
     }
 }
 
-/// The body of `POST /api/feedback`.
+/// The body of `POST /api/feedback`. `state` and `screenshot` are left out when empty;
+/// servers that predate them ignore unknown fields.
 struct FeedbackCreate: Encodable, Sendable {
     let feature: String
     let screen: String
     let item: String?
     let build: String?
     let text: String
+    let state: [String: String]?
+    /// Base64 JPEG.
+    let screenshot: String?
 
-    init(context: FeedbackContext, build: String?, text: String) {
+    init(context: FeedbackContext, build: String?, text: String, screenshot: String? = nil) {
         feature = context.feature
         screen = context.screen
         item = context.item
         self.build = build
         self.text = text
+        state = context.state.isEmpty ? nil : context.state
+        self.screenshot = screenshot
     }
 }
 
