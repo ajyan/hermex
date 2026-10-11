@@ -119,6 +119,18 @@ final class FeedbackInboxViewModelTests: XCTestCase {
         XCTAssertEqual(withDecisions, [.planned, .ready, .failed])
     }
 
+    func testPlannedReadyAndFailedCanBeRejected() {
+        let rejectable = [FeedbackStatus.new, .planning, .planned, .approved, .building, .ready, .failed, .rejected, .merged, .unknown]
+            .filter(\.canReject)
+        XCTAssertEqual(rejectable, [.planned, .ready, .failed])
+    }
+
+    func testMissingPlanTextTellsAFailedEntryWhatToDo() {
+        XCTAssertEqual(FeedbackStatus.failed.noPlanText, "No plan. Retry to try again, or reject it.")
+        XCTAssertEqual(FeedbackStatus.new.noPlanText, "No plan yet. One comes back tonight.")
+        XCTAssertEqual(FeedbackStatus.planning.noPlanText, "No plan yet. One comes back tonight.")
+    }
+
     func testOtherFailureKeepsEntryAndShowsError() async throws {
         let client = InboxStubClient(entries: [entry("b", status: "planned", ts: "2026-10-02T10:00:00Z")])
         await client.failDecisions(with: APIError.http(statusCode: 500, body: nil))

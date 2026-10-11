@@ -104,7 +104,7 @@ struct FeedbackDetailView: View {
         case .loading:
             ProgressView().frame(maxWidth: .infinity, alignment: .leading)
         case .unavailable:
-            Text(verbatim: "No plan yet. One comes back tonight.")
+            Text(verbatim: viewModel.entry(id: entryID)?.status.noPlanText ?? FeedbackStatus.new.noPlanText)
                 .font(AppFont.body())
                 .foregroundStyle(Color.hxTextSecondary)
         case .failed(let message):
@@ -200,20 +200,20 @@ struct FeedbackDetailView: View {
             Button { replyTarget = entry } label: { wide("Reply") }
                 .buttonStyle(.bordered)
                 .tint(Color.hxTextPrimary)
-            Button(role: .destructive) { isConfirmingReject = true } label: { wide("Reject") }
-                .buttonStyle(.bordered)
         case .ready:
             Button { decide(entry, .merged) } label: { wide("Mark merged") }
                 .buttonStyle(.bordered)
                 .tint(Color.hxTextPrimary)
-            Button(role: .destructive) { isConfirmingReject = true } label: { wide("Reject") }
-                .buttonStyle(.bordered)
         case .failed:
             Button { decide(entry, .retry) } label: { wide("Retry") }
                 .buttonStyle(.bordered)
                 .tint(Color.hxTextPrimary)
         default:
             EmptyView()
+        }
+        if entry.status.canReject {
+            Button(role: .destructive) { isConfirmingReject = true } label: { wide("Reject") }
+                .buttonStyle(.bordered)
         }
     }
 

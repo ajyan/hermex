@@ -104,7 +104,8 @@ final class FeedbackInboxViewModel {
 
     /// Groups by status, newest first within each group.
     static func grouped(_ entries: [FeedbackEntry]) -> [FeedbackGroup: [FeedbackEntry]] {
-        // `ts` is the server's uniform ISO-8601 UTC string, so string order is time order.
+        // `ts` is ISO-8601 with the server's local offset, so string order is time order except
+        // across a DST change, where it can be off by up to an hour. Good enough for an inbox.
         let newestFirst = entries.sorted { ($0.ts ?? "") > ($1.ts ?? "") }
         return Dictionary(grouping: newestFirst, by: \.status.group)
     }
@@ -132,9 +133,17 @@ extension FeedbackGroup {
 
 extension FeedbackStatus {
     /// Whether the user has a decision to make: planned (approve, reply, reject),
-    /// ready (mark merged, reject) or failed (retry).
+    /// ready (mark merged, reject) or failed (retry, reject).
     var hasDecisions: Bool {
         self == .planned || self == .ready || self == .failed
+    }
+
+    /// Whether Reject is one of those decisions; it is for every status that has any.
+    var canReject: Bool { hasDecisions }
+
+    /// What the detail's Plan block says when there is no plan to show.
+    var noPlanText: String {
+        self == .failed ? "No plan. Retry to try again, or reject it." : "No plan yet. One comes back tonight."
     }
 }
 
