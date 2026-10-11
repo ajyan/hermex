@@ -131,7 +131,7 @@ struct BrainModuleListView: View {
 
     var body: some View {
         content
-            .navigationTitle(Text(verbatim: module.defaultTitle))
+            .hxNavigationTitle(module.defaultTitle)
             .background(Color.hxCanvas.ignoresSafeArea())
             .task {
                 // Load once; a pop back from a page keeps the pages already scrolled.

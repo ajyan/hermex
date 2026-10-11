@@ -12,31 +12,36 @@ struct AtlasRulesView: View {
         List {
             if let errorMessage {
                 Text(errorMessage).foregroundStyle(.hxWarning)
+                    .listRowBackground(Color.hxSurface)
             }
             ForEach(rules, id: \.id) { rule in
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text(rule.id).font(.subheadline.weight(.semibold))
+                        Text(rule.id).font(AppFont.subheadline(weight: .semibold))
+                            .foregroundStyle(Color.hxTextPrimary)
                         Spacer()
                         Text(rule.action.capitalized)
-                            .font(.caption.weight(.semibold))
+                            .font(AppFont.caption(weight: .semibold))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
                             .background(.hxSeparator.opacity(0.4), in: Capsule())
                     }
                     Text(rule.description)
-                        .font(.footnote)
+                        .font(AppFont.footnote())
                         .foregroundStyle(.hxTextSecondary)
                 }
                 .accessibilityElement(children: .combine)
             }
+            .listRowBackground(Color.hxSurface)
         }
+        .scrollContentBackground(.hidden)
+        .background(Color.hxCanvas.ignoresSafeArea())
         .overlay {
             if isLoaded, rules.isEmpty, errorMessage == nil {
                 ContentUnavailableView("No rules", systemImage: "list.bullet.clipboard")
             }
         }
-        .navigationTitle("Rules")
+        .hxNavigationTitle(String(localized: "Rules"))
         .task { await load() }
         .refreshable { await load() }
     }

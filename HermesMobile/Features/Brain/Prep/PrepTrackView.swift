@@ -17,7 +17,7 @@ struct PrepTrackView: View {
 
     var body: some View {
         content
-            .navigationTitle(Text(verbatim: title))
+            .hxNavigationTitle(title)
             .background(Color.hxCanvas.ignoresSafeArea())
             .task { await viewModel.load() }
     }

@@ -7,7 +7,7 @@ import SwiftUI
 ///
 /// Call sites take a preset rather than assembling a pile of booleans.
 struct ModelPickerConfiguration {
-    let navigationTitle: LocalizedStringKey
+    let navigationTitle: LocalizedStringResource
     let dismissTitle: LocalizedStringKey
     let dismissPlacement: ToolbarItemPlacement
     /// Label on the custom entry's commit button.

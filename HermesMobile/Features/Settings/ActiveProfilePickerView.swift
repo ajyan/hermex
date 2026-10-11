@@ -8,36 +8,41 @@ struct ActiveProfilePickerView: View {
 
     var body: some View {
         List {
-            if viewModel.isLoadingActiveProfile && viewModel.profileOptions.isEmpty {
-                CompactStatusRow(title: String(localized: "Loading profiles..."), systemImage: "person.crop.circle")
-            } else if viewModel.profileOptions.isEmpty {
-                CompactStatusRow(
-                    title: viewModel.activeProfileErrorMessage == nil
-                        ? String(localized: "No profiles")
-                        : String(localized: "Could not load profiles"),
-                    systemImage: "exclamationmark.triangle"
-                )
-            } else {
-                ForEach(viewModel.profileOptions) { profile in
-                    let profileIsActive = isActive(profile)
-                    ActiveProfilePickerRow(
-                        profile: profile,
-                        isSelected: profileIsActive,
-                        isSwitching: viewModel.isSwitchingActiveProfile
-                            && viewModel.switchingActiveProfileName == profile.normalizedName
-                    ) {
-                        guard !profileIsActive else { return }
-                        onSwitch(profile)
-                    }
-                    .disabled(
-                        viewModel.isViewingCachedData
-                            || viewModel.isSwitchingActiveProfile
-                            || profile.normalizedName == nil
+            Group {
+                if viewModel.isLoadingActiveProfile && viewModel.profileOptions.isEmpty {
+                    CompactStatusRow(title: String(localized: "Loading profiles..."), systemImage: "person.crop.circle")
+                } else if viewModel.profileOptions.isEmpty {
+                    CompactStatusRow(
+                        title: viewModel.activeProfileErrorMessage == nil
+                            ? String(localized: "No profiles")
+                            : String(localized: "Could not load profiles"),
+                        systemImage: "exclamationmark.triangle"
                     )
+                } else {
+                    ForEach(viewModel.profileOptions) { profile in
+                        let profileIsActive = isActive(profile)
+                        ActiveProfilePickerRow(
+                            profile: profile,
+                            isSelected: profileIsActive,
+                            isSwitching: viewModel.isSwitchingActiveProfile
+                                && viewModel.switchingActiveProfileName == profile.normalizedName
+                        ) {
+                            guard !profileIsActive else { return }
+                            onSwitch(profile)
+                        }
+                        .disabled(
+                            viewModel.isViewingCachedData
+                                || viewModel.isSwitchingActiveProfile
+                                || profile.normalizedName == nil
+                        )
+                    }
                 }
             }
+            .listRowBackground(Color.hxSurface)
         }
-        .navigationTitle("Active Profile")
+        .scrollContentBackground(.hidden)
+        .background(Color.hxCanvas.ignoresSafeArea())
+        .hxNavigationTitle(String(localized: "Active Profile"))
         .task { await viewModel.loadActiveProfile() }
     }
 

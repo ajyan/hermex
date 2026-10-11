@@ -123,8 +123,9 @@ private struct ProjectFormSheet: View {
                     .padding(.vertical, 4)
                 }
             }
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
+            .scrollContentBackground(.hidden)
+            .background(Color.hxCanvas)
+            .hxNavigationTitle(title)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)
@@ -172,12 +173,12 @@ private struct ProjectFormSheet: View {
                     .frame(width: 40, height: 40)
                     .overlay {
                         Circle()
-                            .strokeBorder(Color(.separator).opacity(0.3), lineWidth: 0.5)
+                            .strokeBorder(Color.hxSeparator, lineWidth: 0.5)
                     }
 
                 if isSelected {
                     Image(systemName: "checkmark")
-                        .font(.body.weight(.bold))
+                        .font(AppFont.body(weight: .bold))
                         .foregroundStyle(checkmarkColor(for: option.hex))
                 }
             }

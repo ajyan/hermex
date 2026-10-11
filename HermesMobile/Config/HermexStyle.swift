@@ -94,6 +94,38 @@ extension HermexPaper {
     }
 }
 
+/// A section's title above its rows or card (DESIGN.md § Components): the rounded display
+/// voice in sentence case, like the Brief opener's "Today · 8 cards". Never uppercase.
+struct HXSectionHeader: View {
+    let title: String
+    var trailing: String?
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(verbatim: title)
+                .font(AppFont.display(style: .subheadline, weight: .semibold))
+                .foregroundStyle(Color.hxTextPrimary)
+            Spacer(minLength: 8)
+            if let trailing {
+                Text(verbatim: trailing)
+                    .font(AppFont.caption())
+                    .foregroundStyle(Color.hxTextSecondary)
+            }
+        }
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
+extension View {
+    /// The neutral card (DESIGN.md § Components): `hxSurface` with an `hxSeparator` hairline,
+    /// `lg` corners by default. Settings sections, list groups, and the Brief opener use it.
+    func hxCard(cornerRadius radius: CGFloat = HXRadius.lg) -> some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        return background(Color.hxSurface, in: shape)
+            .overlay(shape.strokeBorder(Color.hxSeparator, lineWidth: 0.5))
+    }
+}
+
 /// The one header title (DESIGN.md § Header): centered, the rounded display voice, an optional
 /// subtitle under it. Sits in the toolbar's principal slot, between the leading glass circle
 /// and the trailing glass capsule.

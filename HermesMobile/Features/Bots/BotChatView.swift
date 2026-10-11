@@ -228,6 +228,7 @@ import SwiftUI
                 .safeAreaInset(edge: .bottom, spacing: 0) { composer }
             }
         }
+        .background(Color.hxCanvas.ignoresSafeArea())
         .navigationTitle(model.profile.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -239,7 +240,7 @@ import SwiftUI
                         BotAvatarView(profile: model.profile,
                                       avatar: BotAvatarStore.shared.images(connectionID: model.connection.id)[model.profile.id],
                                       size: 30, motion: titleFaceMotion, expression: model.titleFace.expression)
-                        Text(model.profile.name).font(.headline).foregroundStyle(.primary).lineLimit(1)
+                        Text(model.profile.name).font(AppFont.display(style: .subheadline)).foregroundStyle(Color.hxTextPrimary).lineLimit(1)
                     }
                     .modifier(BotChatTitlePillFallback())
                 }

@@ -28,20 +28,20 @@ import SwiftUI
                     // here would be a lie. Edit the bot afterwards instead.
                     card {
                         TextField("Name your bot", text: Binding(get: { creator.draft.title }, set: { creator.setTitle($0); cue = BotFaceCue(.glanceDown) }))
-                            .font(.title3).multilineTextAlignment(.center)
+                            .font(AppFont.title3()).multilineTextAlignment(.center)
                             .textInputAutocapitalization(.words)
                             .submitLabel(.done)
                             .disabled(creator.hasStarted)
                             .padding(16)
                     }
                     if let problem = creator.nameProblem {
-                        Text(problem).font(.caption).foregroundStyle(.hxDanger).padding(.top, 8).padding(.horizontal, 12)
+                        Text(problem).font(AppFont.caption()).foregroundStyle(.hxDanger).padding(.top, 8).padding(.horizontal, 12)
                     } else if !creator.name.isEmpty, !creator.hasStarted {
-                        Text(verbatim: creator.name).font(.caption).foregroundStyle(.tertiary).padding(.top, 8)
+                        Text(verbatim: creator.name).font(AppFont.caption()).foregroundStyle(.tertiary).padding(.top, 8)
                     }
                     if let source = creator.source {
                         Text("Copies \(source.name)’s instructions, settings and skills. Its chat stays with the original.")
-                            .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                            .font(AppFont.caption()).foregroundStyle(.secondary).multilineTextAlignment(.center)
                             .padding(.top, 10).padding(.horizontal, 12)
                     }
 
@@ -50,7 +50,7 @@ import SwiftUI
                     sectionLabel("Setup")
                     card {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Role").font(.caption).foregroundStyle(.secondary)
+                            Text("Role").font(AppFont.caption()).foregroundStyle(.secondary)
                             TextField("What this bot is for (optional)", text: Binding(get: { creator.draft.role }, set: { creator.setRole($0) }), axis: .vertical)
                                 .lineLimit(1...3)
                         }
@@ -69,7 +69,7 @@ import SwiftUI
                     Text(creator.draft.sharesCredentials
                          ? "The bot signs in with the keys already saved on the host. Nothing is copied to this phone."
                          : "The bot starts with no API keys. Add them in Hermes Desktop before it can answer.")
-                        .font(.caption2).foregroundStyle(.tertiary).padding(.horizontal, 12).padding(.top, 7)
+                        .font(AppFont.caption2()).foregroundStyle(.tertiary).padding(.horizontal, 12).padding(.top, 7)
 
                     // A duplicate copies the source's instructions and skills, so these are new-bot only.
                     if !creator.isDuplicate { startingPoint.disabled(creator.hasStarted) }
@@ -89,15 +89,14 @@ import SwiftUI
                         else if creator.phase == .created { Text("Done") }
                         else { Text(creator.hasStarted ? "Try Again" : creator.isDuplicate ? "Duplicate" : "Create") }
                     }
-                    .font(.headline).frame(maxWidth: .infinity).frame(height: 30)
+                    .font(AppFont.headline()).frame(maxWidth: .infinity).frame(height: 30)
                 }
                 .buttonStyle(.borderedProminent).buttonBorderShape(.capsule)
                 .disabled(!creator.canCreate && creator.phase != .created)
                 .padding(.horizontal, 24).padding(.vertical, 12)
                 .background(.bar)
             }
-            .navigationTitle(creator.isDuplicate ? "Duplicate Bot" : "New Bot")
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(creator.isDuplicate ? String(localized: "Duplicate Bot") : String(localized: "New Bot"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close", systemImage: "xmark") { dismiss() }
@@ -151,7 +150,7 @@ import SwiftUI
 
     /// Footnote under a card, leading-aligned however short it is.
     private func caption(_ text: LocalizedStringKey) -> some View {
-        Text(text).font(.caption2).foregroundStyle(.tertiary)
+        Text(text).font(AppFont.caption2()).foregroundStyle(.tertiary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12).padding(.top, 7)
     }
@@ -165,7 +164,7 @@ import SwiftUI
                             .frame(maxWidth: .infinity, minHeight: 50)
                             .overlay {
                                 if creator.draft.appearance.shape == shape.rawValue {
-                                    RoundedRectangle(cornerRadius: 12).stroke(.secondary, lineWidth: 2)
+                                    RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous).stroke(.secondary, lineWidth: 2)
                                 }
                             }
                     }
@@ -198,20 +197,20 @@ import SwiftUI
     /// Per-step outcomes after an attempt, mirroring the editor's save results.
     private var results: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(creator.phase == .created ? (creator.needsAttention ? "Created, with a note" : "Created") : "Needs Attention").font(.headline)
+            Text(creator.phase == .created ? (creator.needsAttention ? "Created, with a note" : "Created") : "Needs Attention").font(AppFont.display(style: .headline))
             ForEach(BotCreator.Step.allCases.filter { creator.outcomes[$0] != nil }) { step in
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: icon(creator.outcomes[step]!)).foregroundStyle(color(creator.outcomes[step]!)).frame(width: 20)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(step.title).font(.subheadline.weight(.semibold))
-                        Text(text(creator.outcomes[step]!)).font(.caption).foregroundStyle(.secondary)
+                        Text(step.title).font(AppFont.subheadline(weight: .semibold))
+                        Text(text(creator.outcomes[step]!)).font(AppFont.caption()).foregroundStyle(.secondary)
                     }
                 }
             }
-            if let note = creator.note { Text(note).font(.caption).foregroundStyle(.secondary) }
+            if let note = creator.note { Text(note).font(AppFont.caption()).foregroundStyle(.secondary) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16).background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
+        .padding(16).hxCard()
         .padding(.bottom, 16)
     }
 
@@ -228,7 +227,7 @@ import SwiftUI
                 }
             }
         }
-        .navigationTitle("Expression").navigationBarTitleDisplayMode(.inline)
+        .hxNavigationTitle(String(localized: "Expression"))
     }
 
     private var modelPicker: some View {
@@ -246,15 +245,14 @@ import SwiftUI
         )
     }
 
-    private func sectionLabel(_ title: LocalizedStringKey) -> some View {
-        Text(title).font(.subheadline).foregroundStyle(.tertiary)
-            .frame(maxWidth: .infinity, alignment: .leading)
+    private func sectionLabel(_ title: String.LocalizationValue) -> some View {
+        HXSectionHeader(title: String(localized: title))
             .padding(.leading, 10).padding(.top, 24).padding(.bottom, 8)
     }
 
     private func card<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         VStack(spacing: 0, content: content)
-            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .hxCard()
     }
 
     private func navigationRow(_ title: String, subtitle: String?, value: String, systemImage: String,
@@ -264,11 +262,11 @@ import SwiftUI
                 Image(systemName: systemImage).foregroundStyle(.secondary).frame(width: 24)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).foregroundStyle(.primary)
-                    if let subtitle, !subtitle.isEmpty { Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                    if let subtitle, !subtitle.isEmpty { Text(subtitle).font(AppFont.caption()).foregroundStyle(.secondary).lineLimit(1) }
                 }
                 Spacer(minLength: 8)
-                Text(value).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
-                Image(systemName: "chevron.forward").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                Text(value).font(AppFont.subheadline()).foregroundStyle(.secondary).lineLimit(1)
+                Image(systemName: "chevron.forward").font(AppFont.caption(weight: .semibold)).foregroundStyle(.tertiary)
             }
             .padding(16).contentShape(Rectangle())
         }

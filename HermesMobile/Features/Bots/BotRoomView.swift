@@ -50,10 +50,10 @@ import SwiftUI
                                 .disabled(!hasHiddenEvents && (reader.loadingEarlier || reader.link != .live))
                         }
                         if reader.foreignAuthority {
-                            Text("Managed by another Hermes").font(.caption).foregroundStyle(.secondary)
+                            Text("Managed by another Hermes").font(AppFont.caption()).foregroundStyle(.secondary)
                         }
                         if threadID != nil, reader.threads.first(where: { $0.id == threadID })?.root == nil {
-                            Text("Earlier messages not loaded").font(.caption).foregroundStyle(.secondary)
+                            Text("Earlier messages not loaded").font(AppFont.caption()).foregroundStyle(.secondary)
                         }
                         let gapStarts = showsThreadOverview ? Set<Int>() : BotRoomEvent.gapStarts(in: transcriptEvents[start...])
                         let rows = Array(transcriptEvents[start...])
@@ -165,6 +165,7 @@ import SwiftUI
         }
         .onChange(of: errorTexts) { _, current in dismissedErrors.formIntersection(current) }
         .onChange(of: reader.busy) { _, busy in if busy { dismissedErrors = [] } }
+        .background(Color.hxCanvas.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(removing: .title)
         .toolbar {
@@ -173,8 +174,8 @@ import SwiftUI
                     HStack(spacing: 8) {
                         BotRoomAvatars(room: reader.room, roster: roster, avatars: avatars, size: 30)
                         VStack(alignment: .leading, spacing: 0) {
-                            if threadID != nil { Text("Thread").font(.headline) }
-                            Text(reader.room.name).font(threadID == nil ? .headline : .caption).lineLimit(1)
+                            if threadID != nil { Text("Thread").font(AppFont.display(style: .subheadline)) }
+                            Text(reader.room.name).font(threadID == nil ? AppFont.display(style: .subheadline) : AppFont.caption2()).lineLimit(1)
                         }
                     }
                     .modifier(BotChatTitlePillFallback())
@@ -299,7 +300,7 @@ private struct BotRoomThreadPreview: View {
                 HStack { author; Spacer(); activity }
                 VStack(alignment: .leading) { author; activity }
             }
-            .font(.caption).foregroundStyle(.secondary)
+            .font(AppFont.caption()).foregroundStyle(.secondary)
             if let root = thread.root {
                 Text(root.payload["text"].text ?? "").lineLimit(2)
             } else {
@@ -314,10 +315,10 @@ private struct BotRoomThreadPreview: View {
                 Spacer()
                 Image(systemName: "chevron.forward").accessibilityHidden(true)
             }
-            .font(.caption).foregroundStyle(.secondary)
+            .font(AppFont.caption()).foregroundStyle(.secondary)
         }
         .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-        .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 12))
+        .hxCard(cornerRadius: HXRadius.md)
         .contentShape(Rectangle()).accessibilityElement(children: .combine)
     }
     @ViewBuilder private var author: some View {
@@ -424,7 +425,7 @@ private struct BotRoomEventView: View {
                 HStack(alignment: .bottom, spacing: 8) {
                     BotRoomMemberAvatar(member: event.member(in: room), roster: roster, avatars: avatars, size: 26)
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(event.sender(in: room)).font(.caption).foregroundStyle(.secondary)
+                        Text(event.sender(in: room)).font(AppFont.caption()).foregroundStyle(.secondary)
                         ResponseTextSelection(identity: messageText, collectsGlyphs: responseIsVisible) {
                             MarkdownRenderer(content: messageText)
                                 // The bubble's fill is translucent, so no solid fade matches it.
@@ -445,7 +446,7 @@ private struct BotRoomEventView: View {
                 footer.padding(.leading, 34)
             }
         } else {
-            Text(event.systemText).font(.caption).foregroundStyle(.secondary)
+            Text(event.systemText).font(AppFont.caption()).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity).multilineTextAlignment(.center)
         }
     }
@@ -527,7 +528,7 @@ struct BotRoomWelcomeView: View {
                             ForEach(row) { member in
                                 VStack(spacing: 6) {
                                     BotRoomMemberAvatar(member: member, roster: roster, avatars: avatars, size: 44)
-                                    Text(member.name).font(.caption).lineLimit(1).truncationMode(.middle)
+                                    Text(member.name).font(AppFont.caption()).lineLimit(1).truncationMode(.middle)
                                 }
                                 .frame(maxWidth: 100)
                             }
@@ -537,7 +538,7 @@ struct BotRoomWelcomeView: View {
             }
             if showsPrompt {
                 Text("Say something to the group")
-                    .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    .font(AppFont.subheadline()).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
         }
         .frame(maxWidth: .infinity)
@@ -568,10 +569,10 @@ struct BotRoomInboxRow: View {
     var body: some View {
         HStack(spacing: 14) {
             BotRoomAvatars(room: room, roster: roster, avatars: avatars, size: 32).frame(width: 44)
-            Text(room.name).font(.headline)
+            Text(room.name).font(AppFont.headline())
             Spacer(minLength: 8)
             if let date = room.updatedAt {
-                Text(BotInboxDateLabel.text(for: date)).font(.subheadline).foregroundStyle(.secondary)
+                Text(BotInboxDateLabel.text(for: date)).font(AppFont.subheadline()).foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 12)

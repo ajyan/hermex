@@ -67,8 +67,8 @@ struct TaskDetailView: View {
             }
             .padding()
         }
-        .navigationTitle(viewModel.job.displayName)
-        .navigationBarTitleDisplayMode(.inline)
+        .background(Color.hxCanvas)
+        .hxNavigationTitle(viewModel.job.displayName)
         .refreshable { await loadDetail() }
         .toolbar { toolbarContent }
         .sheet(isPresented: $isPresentingEditTask) {
@@ -116,12 +116,12 @@ struct TaskDetailView: View {
             HStack(spacing: 8) {
                 ProgressView()
                 Text("Updating task...")
-                    .font(.footnote)
+                    .font(AppFont.footnote())
                     .foregroundStyle(.secondary)
             }
         } else if let actionErrorMessage = viewModel.actionErrorMessage {
             Text(actionErrorMessage)
-                .font(.footnote)
+                .font(AppFont.footnote())
                 .foregroundStyle(.hxDanger)
         }
     }
@@ -152,7 +152,7 @@ struct TaskDetailView: View {
            !content.isEmpty {
             SectionCard(title: String(localized: "Run Output")) {
                 Text(content.strippingANSIEscapes())
-                    .font(.system(.footnote, design: .monospaced))
+                    .font(AppFont.mono(style: .footnote))
                     .textSelection(.enabled)
                     .lineLimit(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -195,7 +195,7 @@ struct TaskDetailView: View {
                     }
                 }
             }
-            .font(.footnote)
+            .font(AppFont.footnote())
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }

@@ -31,7 +31,7 @@ struct WorkspaceManagerView: View {
                 if let errorMessage = viewModel.errorMessage {
                     Section {
                         Label(errorMessage, systemImage: "exclamationmark.triangle")
-                            .font(.footnote)
+                            .font(AppFont.footnote())
                             .foregroundStyle(.hxDanger)
                     }
                 }
@@ -39,7 +39,7 @@ struct WorkspaceManagerView: View {
                 if viewModel.managementUnavailable {
                     Section {
                         Text("Workspace management isn't available on this server.")
-                            .font(.footnote)
+                            .font(AppFont.footnote())
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -77,8 +77,9 @@ struct WorkspaceManagerView: View {
                     }
                 }
             }
-            .navigationTitle("Manage Workspaces")
-            .navigationBarTitleDisplayMode(.inline)
+            .scrollContentBackground(.hidden)
+            .background(Color.hxCanvas)
+            .hxNavigationTitle(String(localized: "Manage Workspaces"))
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Done") {
@@ -161,11 +162,11 @@ struct WorkspaceManagerView: View {
     private func workspaceRow(_ workspace: WorkspaceRoot) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(displayName(for: workspace))
-                .font(.body)
+                .font(AppFont.body())
 
             if let path = workspace.path {
                 Text(path)
-                    .font(.caption)
+                    .font(AppFont.caption())
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
@@ -242,7 +243,7 @@ private struct WorkspaceAddSheet: View {
                 if let errorMessage = viewModel.errorMessage {
                     Section {
                         Label(errorMessage, systemImage: "exclamationmark.triangle")
-                            .font(.footnote)
+                            .font(AppFont.footnote())
                             .foregroundStyle(.hxDanger)
                     }
                 }
@@ -255,10 +256,14 @@ private struct WorkspaceAddSheet: View {
                             } label: {
                                 HStack(spacing: 12) {
                                     Image(systemName: "folder")
-                                        .foregroundStyle(Color(.secondaryLabel))
+                                        .font(AppFont.footnote(weight: .medium))
+                                        .foregroundStyle(HermexPaper.file.glow)
+                                        .frame(width: 26, height: 26)
+                                        .background(HermexPaper.file.wash, in: RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous))
+                                        .accessibilityHidden(true)
                                     Text(suggestion)
                                         .font(.callout)
-                                        .foregroundStyle(.primary)
+                                        .foregroundStyle(Color.hxTextPrimary)
                                         .lineLimit(2)
                                 }
                             }
@@ -267,8 +272,9 @@ private struct WorkspaceAddSheet: View {
                     }
                 }
             }
-            .navigationTitle("Add Workspace")
-            .navigationBarTitleDisplayMode(.inline)
+            .scrollContentBackground(.hidden)
+            .background(Color.hxCanvas)
+            .hxNavigationTitle(String(localized: "Add Workspace"))
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") {

@@ -28,8 +28,9 @@ struct KanbanCardEditorView: View {
                 submissionSection
             }
             .disabled(state.submission.isInFlight)
-            .navigationTitle(state.isEditing ? String(localized: "Edit Card") : String(localized: "New Card"))
-            .navigationBarTitleDisplayMode(.inline)
+            .scrollContentBackground(.hidden)
+            .background(Color.hxCanvas)
+            .hxNavigationTitle(state.isEditing ? String(localized: "Edit Card") : String(localized: "New Card"))
             .toolbar { editorToolbar }
             .interactiveDismissDisabled(state.submission.isInFlight)
             .onChange(of: state.submission) { _, submission in

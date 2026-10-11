@@ -28,7 +28,7 @@ struct BrainSearchView: View {
             )
         }
         .brainListStyle()
-        .navigationTitle(Text(verbatim: module.defaultTitle))
+        .hxNavigationTitle(module.defaultTitle)
         .searchable(
             text: $viewModel.query,
             placement: .navigationBarDrawer(displayMode: .always),

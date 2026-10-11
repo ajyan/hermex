@@ -783,8 +783,8 @@ struct SettingsView: View {
             .padding(.bottom, 36)
             .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
         }
-        .background(Color.hxCanvas)
-        .navigationTitle("Settings")
+        .background(Color.hxCanvas.ignoresSafeArea())
+        .hxNavigationTitle(String(localized: "Settings"))
         .task {
             // A Hermes server has no webui to load from, so no webui 401 can sign it out (#899).
             if isHermesServer {
@@ -980,11 +980,11 @@ struct SettingsView: View {
     private func agentRow(_ row: AgentRow) -> some View {
         switch row {
         case .skills:
-            agentLink(String(localized: "Skills"), systemImage: "hammer") {
+            agentLink(String(localized: "Skills"), systemImage: "hammer", paper: .recall) {
                 SkillsView(server: server, onAPIError: authManager.handleAPIError)
             }
         case .memory:
-            agentLink(String(localized: "Memory"), systemImage: "brain") {
+            agentLink(String(localized: "Memory"), systemImage: "brain", paper: .recall) {
                 MemoryView(server: server, onAPIError: authManager.handleAPIError)
             }
         case .usage:
@@ -1025,12 +1025,13 @@ struct SettingsView: View {
     private func agentLink<Destination: View>(
         _ title: String,
         systemImage: String,
+        paper: HermexPaper? = nil,
         @ViewBuilder destination: @escaping () -> Destination
     ) -> some View {
         NavigationLink {
             destination()
         } label: {
-            SettingsAccessoryRow(title: title, systemImage: systemImage)
+            SettingsAccessoryRow(title: title, systemImage: systemImage, paper: paper)
         }
         .buttonStyle(.plain)
     }
@@ -1744,19 +1745,19 @@ private struct HeaderLogoColorSettings: View {
                 Spacer(minLength: 12)
 
                 Text(selectedColorName)
-                    .font(.caption.weight(.medium))
+                    .font(AppFont.caption(weight: .medium))
                     .foregroundStyle(.secondary)
             }
-            .font(.subheadline)
+            .font(AppFont.subheadline())
 
             HermesHeaderLogo(selectedColor: HeaderLogoColor.color(for: selectedHex))
                 .frame(maxWidth: .infinity)
                 .frame(height: 48)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
-                .background(Color.black.opacity(0.26), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(Color.black.opacity(0.26), in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                         .stroke(Color.white.opacity(0.08), lineWidth: 1)
                 )
                 .accessibilityHidden(true)
@@ -1774,7 +1775,7 @@ private struct HeaderLogoColorSettings: View {
             }
 
             ColorPicker("Custom", selection: customColor, supportsOpacity: false)
-                .font(.subheadline)
+                .font(AppFont.subheadline())
         }
     }
 }
@@ -1793,7 +1794,7 @@ private struct HeaderLogoColorPresetButton: View {
 
                 if isSelected {
                     Image(systemName: "checkmark")
-                        .font(.caption.weight(.bold))
+                        .font(AppFont.caption(weight: .bold))
                         .foregroundStyle(preset.hex == "#FFFFFF" ? .black : .white)
                         .accessibilityHidden(true)
                 }
@@ -1810,8 +1811,6 @@ private struct HeaderLogoColorPresetButton: View {
 }
 
 private struct SettingsCard<Content: View>: View {
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @ScaledMetric(relativeTo: .body) private var contentSpacing: CGFloat = 12
 
     let title: String
@@ -1823,13 +1822,8 @@ private struct SettingsCard<Content: View>: View {
     }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
-
         VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .textCase(.uppercase)
-                .font(AppFont.caption(weight: .semibold))
-                .foregroundStyle(.secondary)
+            HXSectionHeader(title: title)
                 .padding(.horizontal, 4)
                 .padding(.bottom, 8)
 
@@ -1839,28 +1833,8 @@ private struct SettingsCard<Content: View>: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background {
-                shape.fill(Color(.secondarySystemBackground).opacity(cardFillOpacity))
-            }
-            .adaptiveGlass(
-                .regular,
-                fallbackMaterial: .regularMaterial,
-                in: shape
-            )
-            .overlay {
-                shape
-                    .stroke(Color.primary.opacity(cardStrokeOpacity), lineWidth: 0.7)
-                    .allowsHitTesting(false)
-            }
+            .hxCard()
         }
-    }
-
-    private var cardFillOpacity: Double {
-        reduceTransparency ? 1 : 0.34
-    }
-
-    private var cardStrokeOpacity: Double {
-        colorSchemeContrast == .increased ? 0.16 : 0.06
     }
 }
 
@@ -2042,6 +2016,9 @@ private struct SettingsAccessoryRow: View {
     let title: String
     var value: String?
     let systemImage: String
+    /// The object kind this row opens (Skills and Memory are `.recall`); its icon sits on
+    /// the paper's glow tile. `nil` keeps the icon neutral.
+    var paper: HermexPaper?
     var accessorySystemImage = "chevron.forward"
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -2093,8 +2070,9 @@ private struct SettingsAccessoryRow: View {
         HStack(spacing: 10) {
             Image(systemName: systemImage)
                 .font(AppFont.subheadline(weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 24)
+                .foregroundStyle(paper?.glow ?? Color.hxTextSecondary)
+                .frame(width: 24, height: paper == nil ? nil : 24)
+                .background(paper?.wash ?? Color.clear, in: RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous))
                 .accessibilityHidden(true)
 
             Text(title)
@@ -2130,8 +2108,8 @@ private struct CustomHeadersSettingsView: View {
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .navigationTitle("Connection Headers")
-        .navigationBarTitleDisplayMode(.inline)
+        .background(Color.hxCanvas.ignoresSafeArea())
+        .hxNavigationTitle(String(localized: "Connection Headers"))
         // Live-refresh the network clients on every edit (cheap, in-memory only)
         // but defer the slow Keychain write until the editor is dismissed so
         // typing never stutters.
@@ -2217,7 +2195,7 @@ private struct SettingsButton: View {
     }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        let shape = Capsule(style: .continuous)
 
         Button(role: role, action: action) {
             Group {
@@ -2228,22 +2206,15 @@ private struct SettingsButton: View {
                 }
             }
             .font(AppFont.subheadline(weight: .medium))
-            .foregroundStyle(role == .destructive ? .hxDanger : .primary)
+            .foregroundStyle(role == .destructive ? Color.hxDanger : Color.hxTextPrimary)
             .frame(maxWidth: .infinity)
             .frame(minHeight: 46)
             .background {
                 shape.fill((role == .destructive ? Color.hxDanger : Color.primary).opacity(0.08))
             }
-            .adaptiveGlass(
-                .regular,
-                isInteractive: true,
-                tint: role == .destructive ? .hxDanger.opacity(0.08) : nil,
-                fallbackMaterial: .thinMaterial,
-                in: shape
-            )
             .overlay {
                 shape
-                    .stroke((role == .destructive ? Color.hxDanger : Color.primary).opacity(strokeOpacity), lineWidth: 0.7)
+                    .stroke(role == .destructive ? Color.hxDanger.opacity(strokeOpacity) : Color.hxSeparator, lineWidth: 0.7)
                     .allowsHitTesting(false)
             }
             .contentShape(shape)
@@ -2509,9 +2480,8 @@ private struct ServerDetailView: View {
             .padding(.top, 18)
             .padding(.bottom, 36)
         }
-        .background(Color.hxCanvas)
-        .navigationTitle(displayName.isEmpty ? hostFallback : displayName)
-        .navigationBarTitleDisplayMode(.inline)
+        .background(Color.hxCanvas.ignoresSafeArea())
+        .hxNavigationTitle(displayName.isEmpty ? hostFallback : displayName)
         // Persist identity edits to this server's registry entry. When it's the
         // active server, the registry mirrors them into the global @AppStorage so
         // the avatar / header tint update live (#17).
@@ -2657,9 +2627,8 @@ struct AddServerView: View {
                 .padding(.top, 18)
                 .padding(.bottom, 36)
             }
-            .background(Color.hxCanvas)
-            .navigationTitle("Add Server")
-            .navigationBarTitleDisplayMode(.inline)
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .hxNavigationTitle(String(localized: "Add Server"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -2794,7 +2763,7 @@ struct AddServerView: View {
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .hxCard(cornerRadius: HXRadius.md)
         }
 
         if let errorMessage = form.errorMessage {

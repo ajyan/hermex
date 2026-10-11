@@ -7,7 +7,7 @@ struct HeroBadge: View {
 
     var body: some View {
         Label(title, systemImage: systemImage)
-            .font(.caption.weight(.medium))
+            .font(AppFont.caption(weight: .medium))
             .foregroundStyle(.white.opacity(0.68))
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
@@ -27,7 +27,7 @@ struct SetupStepRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Text(number)
-                .font(.caption.weight(.bold))
+                .font(AppFont.caption(weight: .bold))
                 .foregroundStyle(.white)
                 .frame(width: 23, height: 23)
                 .background(Color.accentColor, in: Circle())
@@ -35,11 +35,11 @@ struct SetupStepRow: View {
 
             VStack(alignment: .leading, spacing: 7) {
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(AppFont.subheadline(weight: .semibold))
                     .foregroundStyle(.white)
 
                 Text(subtitle)
-                    .font(.footnote)
+                    .font(AppFont.footnote())
                     .foregroundStyle(.white.opacity(0.5))
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -83,21 +83,21 @@ struct OnboardingCommandPill: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(didCopy ? Color.hxSuccess : .white.opacity(0.76))
                         .frame(width: 28, height: 28)
-                        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(didCopy ? String(localized: "Copied Web UI repository link") : String(localized: "Copy Web UI repository link"))
             }
         }
-        .font(.system(.caption, design: .monospaced, weight: .medium))
+        .font(AppFont.mono(style: .caption, weight: .medium))
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                 .fill(Color.white.opacity(0.055))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
     }
@@ -111,25 +111,25 @@ struct OnboardingField<Content: View>: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: systemImage)
-                .font(.system(size: 15, weight: .semibold))
+                .font(AppFont.subheadline(weight: .semibold))
                 .foregroundStyle(Color.accentColor)
                 .frame(width: 24)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.caption.weight(.semibold))
+                    .font(AppFont.caption(weight: .semibold))
                     .foregroundStyle(.white.opacity(0.5))
 
                 content
-                    .font(.body.weight(.medium))
+                    .font(AppFont.body(weight: .medium))
                     .foregroundStyle(.white)
             }
         }
         .padding(.horizontal, 13)
         .padding(.vertical, 12)
-        .background(Color.black.opacity(0.24), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(Color.black.opacity(0.24), in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
     }
@@ -154,16 +154,16 @@ struct OnboardingStatusBanner: View {
             }
 
             Text(text)
-                .font(.footnote.weight(.medium))
+                .font(AppFont.footnote(weight: .medium))
                 .foregroundStyle(.white.opacity(0.76))
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 11)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                 .stroke(tint.opacity(0.18), lineWidth: 1)
         )
     }
@@ -174,7 +174,7 @@ struct OnboardingPrimaryButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.subheadline.weight(.semibold))
+            .font(AppFont.subheadline(weight: .semibold))
             // White reads on the Nous blue accent in both appearances.
             .foregroundStyle(.white.opacity(isEnabled ? 1 : 0.6))
             .lineLimit(1)
@@ -182,7 +182,7 @@ struct OnboardingPrimaryButtonStyle: ButtonStyle {
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 10)
             .padding(.vertical, 15)
-            .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(Color.accentColor, in: Capsule())
             .opacity(configuration.isPressed ? 0.78 : 1)
     }
 }
@@ -202,29 +202,29 @@ struct OnboardingStepHeader: View {
                 .foregroundStyle(.white)
                 .frame(width: 80, height: 80)
                 .background(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous)
                         .fill(Color.white.opacity(0.06))
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous)
                         .stroke(accent.opacity(0.35), lineWidth: 1)
                 )
                 .accessibilityHidden(true)
 
             VStack(spacing: 10) {
                 Text("STEP \(stepNumber)")
-                    .font(.caption2.weight(.bold))
+                    .font(AppFont.caption2(weight: .bold))
                     .foregroundStyle(accent.opacity(0.8))
                     .kerning(1.5)
 
                 Text(title)
-                    .font(.system(size: 28, weight: .bold))
+                    .font(AppFont.display(style: .title))
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text(description)
-                    .font(.subheadline)
+                    .font(AppFont.subheadline())
                     .foregroundStyle(.white.opacity(0.45))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -244,7 +244,7 @@ struct OnboardingAgentPromptCard: View {
         VStack(alignment: .leading, spacing: 12) {
             ScrollView(.vertical, showsIndicators: true) {
                 Text(prompt)
-                    .font(.system(.footnote, design: .monospaced))
+                    .font(AppFont.mono(style: .footnote))
                     .foregroundStyle(.white.opacity(0.82))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled)
@@ -260,7 +260,7 @@ struct OnboardingAgentPromptCard: View {
                 }
             } label: {
                 Label(didCopyRecently ? String(localized: "Copied") : String(localized: "Copy prompt"), systemImage: didCopyRecently ? "checkmark" : "doc.on.doc")
-                    .font(.subheadline.weight(.semibold))
+                    .font(AppFont.subheadline(weight: .semibold))
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(OnboardingPrimaryButtonStyle())
@@ -268,11 +268,11 @@ struct OnboardingAgentPromptCard: View {
         }
         .padding(16)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous)
                 .fill(Color.white.opacity(0.055))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous)
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
     }
@@ -301,18 +301,15 @@ struct OnboardingPageIndicator: View {
 struct OnboardingSecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.subheadline.weight(.semibold))
+            .font(AppFont.subheadline(weight: .semibold))
             .foregroundStyle(.white.opacity(0.84))
             .lineLimit(1)
             .minimumScaleFactor(0.78)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 10)
             .padding(.vertical, 15)
-            .background(Color.white.opacity(0.065), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
-            )
+            .background(Color.white.opacity(0.065), in: Capsule())
+            .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
             .opacity(configuration.isPressed ? 0.72 : 1)
     }
 }

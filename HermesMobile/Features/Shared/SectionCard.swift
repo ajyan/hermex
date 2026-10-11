@@ -1,17 +1,14 @@
 import SwiftUI
 
-/// A card container: an optional uppercase title over a glass panel. Shared by
-/// Usage and Task Detail, and matched to the Settings card chrome, so the
-/// screens read as one app.
+/// A card container: an optional sentence-case `HXSectionHeader` over a neutral
+/// `.hxCard()` body (DESIGN.md § Components). Shared by Usage, Task Detail, and
+/// Settings, so the screens read as one app.
 ///
 /// An optional `footer` sits flush against the card's bottom edge, under a
 /// full-width divider and outside the content's padding — the shape a row of
 /// card actions wants. Passing it here rather than cancelling the padding at
 /// the call site keeps the card's insets its own business.
 struct SectionCard<Content: View, Footer: View>: View {
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
-
     let title: String?
     @ViewBuilder let content: Content
     @ViewBuilder let footer: Footer
@@ -31,14 +28,11 @@ struct SectionCard<Content: View, Footer: View>: View {
     }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous)
 
         VStack(alignment: .leading, spacing: 0) {
             if let title {
-                Text(title)
-                    .textCase(.uppercase)
-                    .font(AppFont.caption(weight: .semibold))
-                    .foregroundStyle(.secondary)
+                HXSectionHeader(title: title)
                     .padding(.horizontal, 4)
                     .padding(.bottom, 8)
             }
@@ -51,19 +45,12 @@ struct SectionCard<Content: View, Footer: View>: View {
 
                 if hasFooter {
                     Divider()
+                        .overlay(Color.hxSeparator)
                     footer
                 }
             }
-            .background {
-                shape.fill(Color(.secondarySystemBackground).opacity(reduceTransparency ? 1 : 0.34))
-            }
-            .adaptiveGlass(.regular, fallbackMaterial: .regularMaterial, in: shape)
             .clipShape(shape)
-            .overlay {
-                shape
-                    .stroke(Color.primary.opacity(colorSchemeContrast == .increased ? 0.16 : 0.06), lineWidth: 0.7)
-                    .allowsHitTesting(false)
-            }
+            .hxCard()
         }
     }
 }

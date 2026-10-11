@@ -77,12 +77,11 @@ struct SourceFileSurface: View {
             Spacer()
             Text("Plain text")
                 .font(AppFont.caption2(weight: .medium))
-                .textCase(.uppercase)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.hxTextSecondary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
-        .background(Color(.secondarySystemBackground))
+        .background(Color.hxSurface)
     }
 
     private func selectionBar(count: Int) -> some View {
@@ -93,16 +92,16 @@ struct SourceFileSurface: View {
             Spacer(minLength: 8)
             Button("Clear") { selection.clear() }
                 .font(AppFont.footnote())
-            // A label-coloured pill needs a background-coloured title, or dark mode
-            // draws white on white.
+            // The primary action: a Nous blue capsule.
             Button(action: copySelection) {
                 Text("Copy")
                     .font(AppFont.footnote(weight: .semibold))
-                    .foregroundStyle(Color(.systemBackground))
+                    .foregroundStyle(Color.hxOnAccent)
             }
             .buttonStyle(.borderedProminent)
+            .buttonBorderShape(.capsule)
         }
-        .tint(.primary)
+        .tint(Color.accentColor)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(.bar)

@@ -107,8 +107,7 @@ struct BrainReaderView: View {
 
     var body: some View {
         content
-            .navigationTitle(Text(verbatim: viewModel.page?.item.title ?? ""))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(viewModel.page?.item.title ?? "")
             .toolbar { ToolbarItem(placement: .topBarTrailing) { FeedbackMoreMenu() } }
             .feedbackContext(FeedbackContext(
                 feature: "Brain", screen: viewModel.module.defaultTitle, item: viewModel.page?.item.title ?? viewModel.id))

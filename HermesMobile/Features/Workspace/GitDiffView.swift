@@ -56,8 +56,7 @@ struct GitDiffView: View {
     var body: some View {
         NavigationStack {
             content
-                .navigationTitle(title)
-                .navigationBarTitleDisplayMode(.inline)
+                .hxNavigationTitle(title)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } }
                 }
@@ -108,6 +107,7 @@ struct GitDiffView: View {
                 Button("Add to prompt", action: addToPrompt)
                     .font(AppFont.footnote(weight: .semibold))
                     .buttonStyle(.borderedProminent)
+                    .buttonBorderShape(.capsule)
             }
         }
         .padding(.horizontal, 16)

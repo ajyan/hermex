@@ -220,7 +220,7 @@ import SwiftUI
                 .foregroundStyle(isDone ? Color.hxSuccess : .secondary)
             Text(step.title).fontWeight(isRunning ? .semibold : .regular)
         }
-        .font(.footnote)
+        .font(AppFont.footnote())
         .foregroundStyle(isDone || isRunning ? Color.primary : .secondary)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(isDone ? String(localized: "\(step.title): done")
@@ -244,7 +244,7 @@ import SwiftUI
                 }
                 .font(AppFont.footnote())
                 .padding(.vertical, 10).padding(.horizontal, 12)
-                .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 12))
+                .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
             }
             .buttonStyle(.plain)
         }
@@ -321,7 +321,7 @@ import SwiftUI
         }
         .font(AppFont.footnote())
         .padding(.vertical, 10).padding(.horizontal, 12)
-        .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 12))
+        .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
         if action != nil {
             Button(action: perform) { card }
                 .buttonStyle(.plain)
@@ -367,8 +367,8 @@ import SwiftUI
 
     private func failureRow(_ failure: HermexPushProvisioner.Failure) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(failure.title).font(.footnote.weight(.semibold))
-            Text(failure.message).font(.footnote)
+            Text(failure.title).font(AppFont.footnote(weight: .semibold))
+            Text(failure.message).font(AppFont.footnote())
         }
         .foregroundStyle(.hxDanger)
         .accessibilityElement(children: .combine)

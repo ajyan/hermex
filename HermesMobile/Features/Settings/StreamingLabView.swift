@@ -38,9 +38,8 @@ struct StreamingLabView: View {
                 proxy.scrollTo(Self.tailAnchorID, anchor: .bottom)
             }
         }
-        .background(Color.hxCanvas)
-        .navigationTitle(Text(verbatim: "Streaming Lab"))
-        .navigationBarTitleDisplayMode(.inline)
+        .background(Color.hxCanvas.ignoresSafeArea())
+        .hxNavigationTitle("Streaming Lab")
         .task(id: replayID) {
             await replayFixture()
         }
@@ -72,14 +71,14 @@ struct StreamingLabView: View {
             }
 
             Toggle(isOn: $followsTail) { Text(verbatim: "Follow tail while streaming") }
-                .font(.subheadline)
+                .font(AppFont.subheadline())
 
             Toggle(isOn: $isStreamedTextAnimationEnabled) { Text(verbatim: "Streamed text animation (user setting)") }
-                .font(.subheadline)
+                .font(AppFont.subheadline())
 
             if !isStreamedTextAnimationEnabled {
                 Text(verbatim: "Animation is off — the knobs below have no visible effect until it's re-enabled.")
-                    .font(.caption)
+                    .font(AppFont.caption())
                     .foregroundStyle(.hxWarning)
             }
 
@@ -133,7 +132,7 @@ struct StreamingLabView: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
                 Text(title)
-                    .font(.subheadline.weight(.medium))
+                    .font(AppFont.subheadline(weight: .medium))
 
                 Spacer()
 
@@ -156,14 +155,14 @@ struct StreamingLabView: View {
             static let maxStampLead: TimeInterval = \(String(format: "%.3f", maxStampLead))
             """
         )
-        .font(.caption.monospaced())
+        .font(AppFont.mono(style: .caption))
         .foregroundStyle(.secondary)
         .textSelection(.enabled)
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color(.secondarySystemBackground))
+            RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
+                .fill(Color.hxSurface)
         )
     }
 

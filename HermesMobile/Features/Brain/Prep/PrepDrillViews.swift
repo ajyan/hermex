@@ -45,7 +45,7 @@ struct PrepProblemCard: View {
                 Text(verbatim: meta).brainText(.meta)
             }
             Text(verbatim: title)
-                .font(AppFont.headline())
+                .font(AppFont.display(style: .headline))
                 .foregroundStyle(Color.hxTextPrimary)
                 .accessibilityAddTraits(.isHeader)
             if expanded {
@@ -221,7 +221,7 @@ struct PrepApproachView: View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
             BrainSectionHeader(title: "Your approach")
             TextEditor(text: $text)
-                .font(.body)
+                .font(AppFont.body())
                 .foregroundStyle(Color.hxTextPrimary)
                 .scrollContentBackground(.hidden)
                 .frame(minHeight: editorHeight)
@@ -230,7 +230,7 @@ struct PrepApproachView: View {
                 .overlay(alignment: .topLeading) {
                     if text.isEmpty {
                         Text(verbatim: "How would you solve this?")
-                            .font(.body)
+                            .font(AppFont.body())
                             .foregroundStyle(Color.hxTextSecondary)
                             .padding(.horizontal, BrainStyle.m + 5)
                             .padding(.vertical, BrainStyle.s + 8)
@@ -609,9 +609,7 @@ struct PrepApproachGradeView: View {
         }
         if !grade.strongAnswer.isEmpty {
             PrepNoteCard {
-                Text(verbatim: "What a strong answer says")
-                    .brainText(.sectionCaption)
-                    .accessibilityAddTraits(.isHeader)
+                HXSectionHeader(title: "What a strong answer says")
                 Text(verbatim: grade.strongAnswer)
                     .brainText(.rowTitle)
                     .fixedSize(horizontal: false, vertical: true)

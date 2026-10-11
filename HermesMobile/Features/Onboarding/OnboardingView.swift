@@ -38,7 +38,7 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Color.hxCanvas.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 TabView(selection: $currentPage) {
@@ -102,16 +102,13 @@ struct OnboardingView: View {
             } else {
                 Button(action: handlePrimaryAction) {
                     Text(OnboardingFlowPolicy.primaryButtonTitle(for: currentPage))
-                        .font(.subheadline.weight(.semibold))
+                        .font(AppFont.subheadline(weight: .semibold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 15)
-                        .background(
-                            Color.accentColor,
-                            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        )
+                        .background(Color.accentColor, in: Capsule())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(OnboardingFlowPolicy.primaryButtonTitle(for: currentPage))
@@ -120,7 +117,7 @@ struct OnboardingView: View {
                     Button("Already have a server?") {
                         jumpToConnectPage()
                     }
-                    .font(.footnote.weight(.medium))
+                    .font(AppFont.footnote(weight: .medium))
                     .foregroundStyle(.white.opacity(0.55))
                     .buttonStyle(.plain)
                     .accessibilityHint("Skips setup and opens the connect screen.")
@@ -132,7 +129,7 @@ struct OnboardingView: View {
         .padding(.bottom, 12)
         .background(
             LinearGradient(
-                colors: [.clear, .black.opacity(0.6), .black],
+                colors: [.clear, Color.hxCanvas.opacity(0.6), Color.hxCanvas],
                 startPoint: .top,
                 endPoint: .bottom
             )

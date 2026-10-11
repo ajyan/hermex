@@ -85,7 +85,7 @@ struct BotsInboxHome {
             .overlay(alignment: .bottom) {
                 if let toast {
                     Text(toast).font(.callout).padding()
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
                         .padding().accessibilityAddTraits(.updatesFrequently)
                 }
             }
@@ -162,7 +162,7 @@ struct BotsInboxHome {
                     Button(inbox.showsHidden ? "Hide hidden" : "Show hidden (\(inbox.hiddenCount))") {
                         inbox.showsHidden.toggle()
                     }
-                    .font(.subheadline).foregroundStyle(.secondary)
+                    .font(AppFont.subheadline()).foregroundStyle(.secondary)
                     .listRowSeparator(.hidden)
                 }
             } else {
@@ -170,6 +170,8 @@ struct BotsInboxHome {
             }
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Color.hxCanvas.ignoresSafeArea())
         .overlay {
             if inbox.connection == nil {
                 GeometryReader { geometry in
@@ -252,12 +254,8 @@ struct BotsInboxHome {
                     chatRows(section.chats)
                 } header: {
                     // A Desktop name is the user's own text, never a catalog key.
-                    Group {
-                        if let name = section.name { Text(verbatim: name) } else { Text("Other chats") }
-                    }
-                    .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
-                    .lineLimit(1).truncationMode(.tail).textCase(nil)
-                    .accessibilityAddTraits(.isHeader)
+                    HXSectionHeader(title: section.name ?? String(localized: "Other chats"))
+                        .lineLimit(1).truncationMode(.tail).textCase(nil)
                 }
             } else {
                 chatRows(section.chats)
@@ -600,37 +598,19 @@ extension BotsInboxView {
     }
 }
 
-/// The inbox's title. Pushed from the session list's Bots row, the back button and the
-/// toolbar are the whole header, so the pinned tiles sit at the top; the title still
-/// names the screen for VoiceOver and for a pushed chat's back button, with only its
-/// visible text removed. As a Hermes server's home, the server's name titles it, leading,
-/// with its host under it on iOS 26.
+/// The inbox's title, in the shared header (DESIGN.md § Header). Pushed from the session
+/// list's Bots row it reads "Bots"; as a Hermes server's home, the server's name titles
+/// it with its host under it.
 private struct BotsInboxTitle: ViewModifier {
     let home: BotsInboxHome?
 
     func body(content: Content) -> some View {
         if let home {
             content
-                .navigationTitle(home.title)
-                .toolbarTitleDisplayMode(.inlineLarge)
-                .modifier(BotsInboxSubtitle(subtitle: home.subtitle))
+                .hxNavigationTitle(home.title, subtitle: home.subtitle)
         } else {
             content
-                .navigationTitle("Bots")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar(removing: .title)
-        }
-    }
-}
-
-private struct BotsInboxSubtitle: ViewModifier {
-    let subtitle: String?
-
-    func body(content: Content) -> some View {
-        if #available(iOS 26, *), let subtitle {
-            content.navigationSubtitle(subtitle)
-        } else {
-            content
+                .hxNavigationTitle(String(localized: "Bots"))
         }
     }
 }
@@ -662,8 +642,7 @@ private struct BotSectionOrderView: View {
                 }
             }
             .environment(\.editMode, .constant(.active))
-            .navigationTitle("Reorder Sections")
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(String(localized: "Reorder Sections"))
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
@@ -696,7 +675,7 @@ private struct BotHeroTile: View {
             BotAvatarView(profile: profile, avatar: avatar, size: 84)
             VStack(spacing: 4) {
                 HStack(spacing: 6) {
-                    Text(profile.name).font(.body).foregroundStyle(.secondary).lineLimit(1)
+                    Text(profile.name).font(AppFont.body()).foregroundStyle(.secondary).lineLimit(1)
                     if unread { BotUnreadDot() }
                 }
                 if let status {
@@ -719,7 +698,7 @@ private struct BotRoomHeroTile: View {
     var body: some View {
         VStack(spacing: 14) {
             BotRoomAvatars(room: room, roster: roster, avatars: avatars, size: 60).frame(height: 84)
-            Text(room.name).font(.body).foregroundStyle(.secondary).lineLimit(1)
+            Text(room.name).font(AppFont.body()).foregroundStyle(.secondary).lineLimit(1)
         }
         .frame(maxWidth: 132)
         .accessibilityElement(children: .combine)
@@ -764,7 +743,7 @@ private struct BotInboxRow: View {
                     }
                 }
                 HStack(spacing: 8) {
-                    Text(subline).font(.body).foregroundStyle(.secondary).lineLimit(1)
+                    Text(subline).font(AppFont.body()).foregroundStyle(.secondary).lineLimit(1)
                     Spacer(minLength: 0)
                     if unread { BotUnreadDot() }
                 }
@@ -774,11 +753,11 @@ private struct BotInboxRow: View {
     }
 
     @ViewBuilder private var nameAndChip: some View {
-        Text(profile.name).font(.headline).lineLimit(1)
+        Text(profile.name).font(AppFont.headline()).foregroundStyle(Color.hxTextPrimary).lineLimit(1)
         if let chip {
-            Text(chip).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+            Text(chip).font(AppFont.footnote()).foregroundStyle(.secondary).lineLimit(1)
                 .padding(.horizontal, 8).padding(.vertical, 3)
-                .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 6))
+                .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous))
                 .layoutPriority(-1)
         }
     }
@@ -790,7 +769,7 @@ private struct BotInboxRow: View {
             BotLiveStatusLabel(status: status, font: .subheadline.weight(.semibold))
                 .fixedSize(horizontal: !dynamicTypeSize.isAccessibilitySize, vertical: false)
         } else if let date = profile.lastActive {
-            Text(BotInboxDateLabel.text(for: date)).font(.subheadline).foregroundStyle(.secondary)
+            Text(BotInboxDateLabel.text(for: date)).font(AppFont.subheadline()).foregroundStyle(.secondary)
         }
     }
 }
@@ -817,11 +796,11 @@ private struct BotInboxSkeletonRow: View {
             Circle().fill(.fill.tertiary).frame(width: 44, height: 44)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(verbatim: "Chief of Staff").font(.headline)
+                    Text(verbatim: "Chief of Staff").font(AppFont.headline())
                     Spacer(minLength: 8)
-                    Text(verbatim: "Saturday").font(.subheadline)
+                    Text(verbatim: "Saturday").font(AppFont.subheadline())
                 }
-                Text(verbatim: "Reading the latest conversation").font(.body)
+                Text(verbatim: "Reading the latest conversation").font(AppFont.body())
             }
             .redacted(reason: .placeholder)
         }
