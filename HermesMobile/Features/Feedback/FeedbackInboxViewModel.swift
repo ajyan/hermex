@@ -44,15 +44,23 @@ final class FeedbackInboxViewModel {
     /// The row's secondary text. An entry merged into another entry's plan names that entry
     /// instead of "Rejected", e.g. "Daily Deck · Merged into Fix the question".
     func metaLine(for entry: FeedbackEntry) -> String {
-        guard entry.status == .rejected, let mainID = entry.mergedInto else { return entry.metaLine }
+        guard entry.isMerged, let mainID = entry.mergedInto else { return entry.metaLine }
         return entry.metaLine(status: "Merged into " + (self.entry(id: mainID)?.headline ?? "another note"))
     }
 
     /// The entry a tap opens: for a merged entry, the entry whose plan covers it when that is
     /// loaded; otherwise the entry itself.
     func openedID(for entry: FeedbackEntry) -> String {
-        guard entry.status == .rejected, let mainID = entry.mergedInto, self.entry(id: mainID) != nil else { return entry.id }
+        guard entry.isMerged, let mainID = entry.mergedInto, self.entry(id: mainID) != nil else { return entry.id }
         return mainID
+    }
+
+    /// The loaded entries merged into `id`'s plan, oldest first. Each can be unmerged.
+    func mergedNotes(into id: String) -> [FeedbackEntry] {
+        guard case .loaded(let groups) = state else { return [] }
+        return (groups[.done] ?? [])
+            .filter { $0.isMerged && $0.mergedInto == id }
+            .sorted { ($0.ts ?? "") < ($1.ts ?? "") }
     }
 
     func load() async {

@@ -59,6 +59,7 @@ final class FeedbackModelsTests: XCTestCase {
         XCTAssertEqual(try json(.reject), ["decision": "reject"])
         XCTAssertEqual(try json(.retry), ["decision": "retry"])
         XCTAssertEqual(try json(.merged), ["decision": "merged"])
+        XCTAssertEqual(try json(.unmerge), ["decision": "unmerge"])
     }
 
     func testAboutJoinsContext() {

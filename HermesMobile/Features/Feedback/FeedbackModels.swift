@@ -104,6 +104,9 @@ struct FeedbackEntry: Decodable, Identifiable, Hashable, Sendable {
     /// Set on a `rejected` entry the nightly job folded into another entry's plan: that entry's id.
     let mergedInto: String?
 
+    /// Whether the nightly job folded this entry into another entry's plan.
+    var isMerged: Bool { status == .rejected && mergedInto != nil }
+
     private enum CodingKeys: String, CodingKey {
         case id, ts, feature, screen, item, build, text, status, updated, notes
         case branch, repo, tests, error, title, summary, size, attachments
@@ -198,6 +201,8 @@ enum FeedbackDecision: Encodable, Hashable, Sendable {
     case reply(String)
     case retry
     case merged
+    /// Takes an entry the nightly job merged into another entry's plan back to `new`.
+    case unmerge
 
     private enum CodingKeys: String, CodingKey { case decision, note }
 
@@ -211,6 +216,7 @@ enum FeedbackDecision: Encodable, Hashable, Sendable {
             try c.encode(note, forKey: .note)
         case .retry: try c.encode("retry", forKey: .decision)
         case .merged: try c.encode("merged", forKey: .decision)
+        case .unmerge: try c.encode("unmerge", forKey: .decision)
         }
     }
 }
