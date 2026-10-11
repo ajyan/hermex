@@ -242,6 +242,11 @@ struct PrepApproachView: View {
                 .disabled(isSubmitting)
                 .accessibilityLabel(Text(verbatim: "Your approach"))
                 .accessibilityHint(Text(verbatim: "How would you solve this?"))
+            if PrepCopy.isAtApproachLimit(text) {
+                Text(verbatim: "\(PrepCopy.approachMaxLength) characters max")
+                    .brainText(.meta)
+                    .foregroundStyle(Color.hxTextSecondary)
+            }
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -528,11 +533,12 @@ struct PrepResultView: View {
     }
 
     /// The code with the bug's line in green (and a wrong pick in red), then the fix.
+    /// The server's feedback names the line, so the header doesn't repeat it.
     @ViewBuilder
     private var spotBugReveal: some View {
         let bug = correctBugFix
         VStack(alignment: .leading, spacing: BrainStyle.s) {
-            BrainSectionHeader(title: bug.map { "The bug is on line \($0.line + 1)" } ?? "The code")
+            BrainSectionHeader(title: "The code")
             PrepNumberedCode(code: rep.item.code, tint: { index in
                 if index == bug?.line { return Color.hxSuccess.opacity(0.18) }
                 if index == chosenLine { return Color.hxDanger.opacity(0.15) }

@@ -230,7 +230,7 @@ struct PrepRunView: View {
             PrepApproachView(
                 text: Binding(
                     get: { draft(for: rep).text },
-                    set: { text in updateDraft(rep) { $0.text = text } }),
+                    set: { text in updateDraft(rep) { $0.text = PrepCopy.cappedApproach(text) } }),
                 hints: rep.item.hints,
                 hintsShown: viewModel.hintsShown,
                 isSubmitting: viewModel.isSubmitting,

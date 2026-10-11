@@ -150,9 +150,9 @@ final class PrepRunViewModel {
         await submit(.choice("seen"))
     }
 
-    /// An approach rep's written answer; graded by the server before it returns.
+    /// An approach rep's written answer, capped to the server's limit; graded by the server before it returns.
     func submitApproach(_ text: String) async {
-        await submit(.choice(text))
+        await submit(.choice(PrepCopy.cappedApproach(text)))
     }
 
     /// A spot-the-bug answer: `line` is a 0-based index into `item.code`.
@@ -401,6 +401,20 @@ enum PrepCopy {
 
     /// The approach soft limit, in seconds; past it the server caps the rating.
     static let approachLimit: TimeInterval = 90
+
+    /// The longest approach answer the server accepts. It counts Unicode scalars (Python `len`).
+    static let approachMaxLength = 4000
+
+    /// An approach draft cut to `approachMaxLength` scalars, so a submit is never rejected as too long.
+    static func cappedApproach(_ text: String) -> String {
+        guard text.unicodeScalars.count > approachMaxLength else { return text }
+        return String(String.UnicodeScalarView(text.unicodeScalars.prefix(approachMaxLength)))
+    }
+
+    /// Whether the draft has reached the cap, to show the "4000 characters max" note.
+    static func isAtApproachLimit(_ text: String) -> Bool {
+        text.unicodeScalars.count >= approachMaxLength
+    }
 
     /// The approach clock: time left as "m:ss", then the overrun as "+m:ss".
     static func approachClock(elapsed: TimeInterval) -> (text: String, isOver: Bool) {

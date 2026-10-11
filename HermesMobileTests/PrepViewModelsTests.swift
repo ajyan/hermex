@@ -628,6 +628,18 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(PrepCopy.approachClock(elapsed: 161).text, "+1:11")
     }
 
+    func testApproachDraftIsCappedAtTheServerLimit() {
+        XCTAssertEqual(PrepCopy.approachMaxLength, 4000)
+        let long = String(repeating: "x", count: 4001)
+        XCTAssertEqual(PrepCopy.cappedApproach(long).count, 4000)
+        XCTAssertEqual(PrepCopy.cappedApproach("short"), "short")
+        // The server counts Unicode scalars (Python len), so a multi-scalar emoji counts as several.
+        let flags = String(repeating: "🇺🇸", count: 2001)
+        XCTAssertEqual(PrepCopy.cappedApproach(flags).unicodeScalars.count, 4000)
+        XCTAssertFalse(PrepCopy.isAtApproachLimit("short"))
+        XCTAssertTrue(PrepCopy.isAtApproachLimit(PrepCopy.cappedApproach(long)))
+    }
+
     func testRubricTitle() {
         XCTAssertEqual(PrepCopy.rubricTitle("edge_cases"), "Edge cases")
         XCTAssertEqual(PrepCopy.rubricTitle("pattern"), "Pattern")
