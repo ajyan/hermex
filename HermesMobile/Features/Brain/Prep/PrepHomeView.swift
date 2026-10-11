@@ -14,6 +14,8 @@ struct PrepHomeView: View {
     var body: some View {
         content
             .hxNavigationTitle("Interview prep")
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { FeedbackMoreMenu() } }
+            .feedbackContext(FeedbackContext(feature: "Prep", screen: "Home"))
             .background(Color.hxCanvas.ignoresSafeArea())
             // Every appear refreshes quietly, so a finished run shows on the way back.
             .task { await viewModel.load() }

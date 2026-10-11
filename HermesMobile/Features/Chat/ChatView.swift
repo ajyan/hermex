@@ -970,6 +970,8 @@ struct ChatView: View {
                                 if showsGitControls, gitAvailabilityViewModel.hasRepository {
                                     gitActionsMenu
                                 }
+
+                                FeedbackMenuItem()
                             } label: {
                                 Label("More", systemImage: "ellipsis")
                             }
@@ -1094,7 +1096,7 @@ struct ChatView: View {
             // The navy canvas behind every chat state (empty, loading, transcript), not the
             // system's pure black.
             .background(Color.hxCanvas.ignoresSafeArea())
-            .preference(key: ChatBottomChromeHeightKey.self, value: bottomChromeHeight)
+            .feedbackContext(FeedbackContext(feature: "Chat", screen: "Chat", item: displayTitle))
             .alert(
                 "Discard Later Messages?",
                 isPresented: $showEditDiscardConfirmation
@@ -3630,15 +3632,5 @@ struct ChatNavigationBackground: ViewModifier {
             return AnyShapeStyle(.regularMaterial)
         }
         return AnyShapeStyle(Color.hxCanvas)
-    }
-}
-
-/// How tall a chat's bottom-docked chrome (composer, accessory row, clarification) is, so
-/// the shell's floating New Chat button can sit above it instead of on the send button.
-struct ChatBottomChromeHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
     }
 }

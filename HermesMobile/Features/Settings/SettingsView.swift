@@ -129,6 +129,8 @@ struct SettingsView: View {
     @AppStorage(BotQuickReplyStore.storageKey) private var storedQuickReplies = ""
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    /// Set by the chat shell; nil (no Feedback row) where Settings opens outside it.
+    @Environment(FeedbackAvailability.self) private var feedbackAvailability: FeedbackAvailability?
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -955,7 +957,7 @@ struct SettingsView: View {
     }
 
     private enum AgentRow: Hashable {
-        case skills, memory, usage, activeProfile, bots, archivedSessions, activity
+        case skills, memory, usage, activeProfile, bots, archivedSessions, activity, feedback
     }
 
     /// The Agent card's rows, in order, filtered by the Main Page visibility toggles.
@@ -970,6 +972,7 @@ struct SettingsView: View {
         if isBotModeEnabled { rows.append(.bots) }
         rows.append(.archivedSessions)
         rows.append(.activity)
+        if feedbackAvailability?.isAvailable == true { rows.append(.feedback) }
         return rows
     }
 
@@ -1008,6 +1011,13 @@ struct SettingsView: View {
         case .activity:
             agentLink(String(localized: "Activity"), systemImage: "list.bullet.rectangle") {
                 ActivityView(server: server)
+            }
+        case .feedback:
+            if let feedbackAvailability {
+                // English-only like the other fork features: a plain String is not localized.
+                agentLink("Feedback", systemImage: "message") {
+                    FeedbackInboxView(client: feedbackAvailability.client)
+                }
             }
         }
     }

@@ -165,6 +165,10 @@ enum Endpoint {
     case tutorMap(track: String)
     case tutorItem(id: String)
     case tutorAttempt
+    /// The feedback loop (`api/feedback.py`): list or create entries, read a plan, decide on an entry.
+    case feedbackList
+    case feedbackPlan(id: String)
+    case feedbackDecision(id: String)
     /// Personal goals from the vault (`api/vault_goals.py`): home, one goal, and a check-in.
     case goalsHome
     case goalDetail(slug: String)
@@ -454,6 +458,12 @@ enum Endpoint {
             return "/api/tutor/item"
         case .tutorAttempt:
             return "/api/tutor/attempt"
+        case .feedbackList:
+            return "/api/feedback"
+        case let .feedbackPlan(id):
+            return "/api/feedback/\(id)/plan"
+        case let .feedbackDecision(id):
+            return "/api/feedback/\(id)/decision"
         case .goalsHome:
             return "/api/goals"
         case .goalDetail:

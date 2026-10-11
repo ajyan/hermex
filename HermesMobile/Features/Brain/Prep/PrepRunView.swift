@@ -57,7 +57,9 @@ struct PrepRunView: View {
                             .accessibilityLabel(Text(verbatim: "Rep \(progress.position + 1) of \(progress.count)"))
                     }
                 }
+                ToolbarItem(placement: .topBarTrailing) { FeedbackMoreMenu() }
             }
+            .feedbackContext(feedbackContext)
             .background(Color.hxCanvas.ignoresSafeArea())
             .background {
                 GeometryReader { proxy in
@@ -85,6 +87,23 @@ struct PrepRunView: View {
     private var title: String {
         if case .finished = viewModel.phase { return "Run complete" }
         return currentRep.map { PrepCopy.blockTitle($0.block) } ?? ""
+    }
+
+    /// "Prep · Spot the bug · Longest Substring" on a rep; just the run around it.
+    private var feedbackContext: FeedbackContext {
+        guard let rep = currentRep else { return FeedbackContext(feature: "Prep", screen: "Run") }
+        return FeedbackContext(feature: "Prep", screen: Self.drillTitle(rep.drill), item: rep.item.title)
+    }
+
+    private static func drillTitle(_ drill: PrepDrill) -> String {
+        switch drill {
+        case .approach: "Approach"
+        case .complexity: "Complexity"
+        case .spotBug: "Spot the bug"
+        case .trace: "Trace"
+        case .primer: "Primer"
+        case .unknown: "Run"
+        }
     }
 
     /// The rep's position among today's reps (not its stable index, which can skip).
