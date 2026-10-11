@@ -1082,8 +1082,8 @@ import XCTest
         let window = try show(NavigationStack { BotChatView(model: model) }.environment(\.scenePhase, .active))
         defer { model.suspend(); close(window) }
         await model.recover()
-        await settle(window)
-        let shown = try screenshot(window, name: "bot-approval-card")
+        // The request card draws in layers (wash, edge, buttons); read until it has.
+        let shown = try await screenshot(window, name: "bot-approval-card", awaiting: ["Approval required", "Deny"])
         XCTAssertTrue(shown.contains("Approval required"), shown)
         XCTAssertTrue(shown.contains("recursive delete"), shown)
         XCTAssertTrue(shown.contains("Allow once"), shown)
@@ -1415,8 +1415,9 @@ import XCTest
         // during known work skip the refresh), so nothing signals when the
         // LazyVStack has materialized it — any fixed pass count is a guess.
         let shown = try await screenshot(window, name: "bot-activity-cards-on",
-                                         awaiting: ["Ran", "Thinking", "reply-delivery.md", "Plan"])
-        XCTAssertTrue(shown.contains("Ran"), shown)
+                                         awaiting: ["1 command", "Thinking", "reply-delivery.md", "Plan"])
+        // A settled run shows a chip per kind of tool.
+        XCTAssertTrue(shown.contains("1 command"), shown)
         XCTAssertTrue(shown.contains("Thinking"), shown)
         // A live call shows as a chip naming its target.
         XCTAssertTrue(shown.contains("reply-delivery.md"), shown)
@@ -1467,8 +1468,8 @@ import XCTest
         let sheet = try show(BotDelegationResultsSheet(completion: completion))
         sheet.overrideUserInterfaceStyle = .dark
         defer { close(sheet) }
-        await settle(sheet)
-        let expanded = try screenshot(sheet, name: "477-delegation-results-sheet")
+        let expanded = try await screenshot(sheet, name: "477-delegation-results-sheet",
+                                            awaiting: ["Delegated work", "Unique full worker result body"])
         XCTAssertTrue(expanded.contains("Delegated work"), expanded)
         XCTAssertTrue(expanded.contains("Unique full worker result body"), expanded)
         // The toolbar's backing differs by build SDK: the button can surface

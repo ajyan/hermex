@@ -503,7 +503,7 @@ private enum SessionRowStateBadgeKind: String, Identifiable {
     }
 }
 
-/// Where an imported chat came from (Claude Code, Telegram), on plain paper: a label,
+/// Where an imported chat came from (Claude Code, Telegram), in the tool glow: a label,
 /// not a control, so it stays out of the accent.
 private struct SessionSourceBadge: View {
     let label: String
@@ -511,11 +511,10 @@ private struct SessionSourceBadge: View {
     var body: some View {
         Text(label)
             .font(AppFont.caption2(weight: .semibold))
-            .foregroundStyle(HermexPaper.plain.ink)
+            .foregroundStyle(HermexPaper.tool.glow)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(HermexPaper.plain.paper, in: Capsule())
-            .environment(\.colorScheme, .light)
+            .background(HermexPaper.tool.wash, in: Capsule())
             .accessibilityHidden(true)
     }
 }

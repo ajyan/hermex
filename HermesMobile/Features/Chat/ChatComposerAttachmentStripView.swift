@@ -259,7 +259,7 @@ private struct ComposerAttachmentThumbnailView: View {
     private var fileBadge: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(HermexPaper.file.paper)
+                .fill(HermexPaper.file.wash)
 
             VStack(spacing: 3) {
                 Image(systemName: fileIconName)
@@ -268,7 +268,7 @@ private struct ComposerAttachmentThumbnailView: View {
                     .font(.system(size: 9, weight: .bold))
                     .lineLimit(1)
             }
-            .foregroundStyle(HermexPaper.file.ink)
+            .foregroundStyle(HermexPaper.file.glow)
         }
         .frame(width: documentBadgeSize.width, height: documentBadgeSize.height)
     }

@@ -1091,6 +1091,9 @@ struct ChatView: View {
 
     var body: some View {
         chatContent
+            // The navy canvas behind every chat state (empty, loading, transcript), not the
+            // system's pure black.
+            .background(Color.hxCanvas.ignoresSafeArea())
             .alert(
                 "Discard Later Messages?",
                 isPresented: $showEditDiscardConfirmation
@@ -3647,6 +3650,6 @@ struct ChatNavigationBackground: ViewModifier {
         if #available(iOS 26, *), !reduceTransparency {
             return AnyShapeStyle(.regularMaterial)
         }
-        return AnyShapeStyle(Color(uiColor: .systemBackground))
+        return AnyShapeStyle(Color.hxCanvas)
     }
 }
