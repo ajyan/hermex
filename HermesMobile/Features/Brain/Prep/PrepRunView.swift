@@ -89,13 +89,28 @@ struct PrepRunView: View {
         return currentRep.map { PrepCopy.blockTitle($0.block) } ?? ""
     }
 
-    /// "Prep · Spot the bug · Longest Substring" on a rep; just the run around it.
     private var feedbackContext: FeedbackContext {
-        guard let rep = currentRep else { return FeedbackContext(feature: "Prep", screen: "Run") }
-        return FeedbackContext(feature: "Prep", screen: Self.drillTitle(rep.drill), item: rep.item.title)
+        var result: PrepAttemptResult?
+        if case .result(_, let graded, _) = viewModel.phase { result = graded }
+        return .prepRun(rep: currentRep, answer: currentRep.flatMap(answer(for:)), result: result)
     }
 
-    private static func drillTitle(_ drill: PrepDrill) -> String {
+    /// The answer on screen for a rep: the option tapped, the approach draft, or the bug pick.
+    private func answer(for rep: PrepRep) -> PrepAnswer? {
+        switch rep.drill {
+        case .complexity, .trace:
+            return chosen?.rep == rep.index ? chosen.map { .choice($0.id) } : nil
+        case .approach:
+            return .choice(draft(for: rep).text)
+        case .spotBug:
+            let draft = draft(for: rep)
+            return draft.line.map { .bugFix(line: $0, fix: draft.fix ?? "") }
+        case .primer, .unknown:
+            return nil
+        }
+    }
+
+    fileprivate static func drillTitle(_ drill: PrepDrill) -> String {
         switch drill {
         case .approach: "Approach"
         case .complexity: "Complexity"
@@ -354,5 +369,28 @@ struct PrepRunCompleteView: View {
             .padding(BrainStyle.l)
             .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
         }
+    }
+}
+
+extension FeedbackContext {
+    /// "Prep · Spot the bug · Longest Substring" on a rep; just the run around it. State
+    /// carries the rep, the answer on screen and, once graded, the verdict and feedback.
+    static func prepRun(rep: PrepRep?, answer: PrepAnswer?, result: PrepAttemptResult?) -> FeedbackContext {
+        guard let rep else { return FeedbackContext(feature: "Prep", screen: "Run") }
+        let answerText: String? = switch answer {
+        case .choice(let text): text
+        case .bugFix(let line, let fix): "line \(line + 1): \(fix)"
+        case nil: nil
+        }
+        return FeedbackContext(
+            feature: "Prep", screen: PrepRunView.drillTitle(rep.drill), item: rep.item.title,
+            state: [
+                "item_id": rep.item.id,
+                "drill": rep.drill.rawValue,
+                "rep_index": String(rep.index),
+                "answer": answerText,
+                "verdict": result?.verdict,
+                "feedback": result?.feedback,
+            ])
     }
 }

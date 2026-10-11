@@ -1096,7 +1096,8 @@ struct ChatView: View {
             // The navy canvas behind every chat state (empty, loading, transcript), not the
             // system's pure black.
             .background(Color.hxCanvas.ignoresSafeArea())
-            .feedbackContext(FeedbackContext(feature: "Chat", screen: "Chat", item: displayTitle))
+            .feedbackContext(FeedbackContext(
+                feature: "Chat", screen: "Chat", item: displayTitle, state: ["session_id": transcriptMediaSessionID]))
             .alert(
                 "Discard Later Messages?",
                 isPresented: $showEditDiscardConfirmation

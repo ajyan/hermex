@@ -89,11 +89,8 @@ struct DailyDeckView: View {
             }
     }
 
-    /// "Daily Deck · Daily Brief · <card title>" on a card; the deck alone elsewhere.
     private var feedbackContext: FeedbackContext {
-        var card: String?
-        if case .card(let current) = viewModel.currentPage { card = current.title }
-        return FeedbackContext(feature: "Daily Deck", screen: viewModel.title, item: card)
+        .dailyDeck(title: viewModel.title, date: viewModel.date, kind: viewModel.kind, page: viewModel.currentPage)
     }
 
     @ViewBuilder
@@ -221,5 +218,17 @@ final class DailyBriefLaunch {
     static func take() -> Request? {
         defer { shared.pending = nil }
         return shared.pending
+    }
+}
+
+extension FeedbackContext {
+    /// "Daily Deck · Daily Brief · <card title>" on a card; the deck alone elsewhere. State
+    /// names the deck file (`slot`, "<date>.<kind>") and the page on display (`card`).
+    static func dailyDeck(title: String, date: String, kind: String, page: DeckPage?) -> FeedbackContext {
+        var cardTitle: String?
+        if case .card(let card) = page { cardTitle = card.title }
+        return FeedbackContext(
+            feature: "Daily Deck", screen: title, item: cardTitle,
+            state: ["slot": "\(date).\(kind)", "card": page?.id])
     }
 }

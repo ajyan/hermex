@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 @testable import HermesMobile
 
 @MainActor
@@ -115,6 +116,80 @@ final class FeedbackSheetViewModelTests: XCTestCase {
         XCTAssertTrue(availability.isAvailable)
         let checks = await client.availabilityChecks
         XCTAssertEqual(checks, 1)
+    }
+    // MARK: Attachments
+
+    private func solidImage(_ size: CGSize = CGSize(width: 40, height: 80)) -> UIImage {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: size, format: format).image { context in
+            UIColor.systemTeal.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+        }
+    }
+
+    private func isJPEG(base64: String?) -> Bool {
+        guard let base64, let data = Data(base64Encoded: base64) else { return false }
+        return data.starts(with: [0xFF, 0xD8, 0xFF])
+    }
+
+    func testBodyIncludesScreenshotWhenKept() async throws {
+        let client = StubFeedbackClient()
+        let viewModel = FeedbackSheetViewModel(context: context, client: client, build: nil, screenshot: solidImage())
+        viewModel.text = "The hint covers the code."
+
+        let didSend = await viewModel.send()
+
+        XCTAssertTrue(didSend)
+        let created = await client.created
+        let body = try XCTUnwrap(created.first)
+        XCTAssertTrue(isJPEG(base64: body.screenshot), "the kept screenshot goes up as base64 JPEG")
+    }
+
+    func testRemovingScreenshotOmitsIt() async throws {
+        let client = StubFeedbackClient()
+        let viewModel = FeedbackSheetViewModel(context: context, client: client, build: nil, screenshot: solidImage())
+        viewModel.text = "The hint covers the code."
+
+        viewModel.removeScreenshot()
+        XCTAssertNil(viewModel.screenshot)
+        _ = await viewModel.send()
+
+        let created = await client.created
+        let body = try XCTUnwrap(created.first)
+        XCTAssertNil(body.screenshot)
+    }
+
+    func testSummaryLine() {
+        let chat = FeedbackContext(feature: "Chat", screen: "Chat", item: "Fix login", state: ["session_id": "abc123"])
+        let withShot = FeedbackSheetViewModel(context: chat, client: StubFeedbackClient(), build: nil, screenshot: solidImage())
+        XCTAssertEqual(withShot.attachmentSummary, "Screenshot · Chat session (last turn)")
+
+        withShot.removeScreenshot()
+        XCTAssertEqual(withShot.attachmentSummary, "Chat session (last turn)")
+
+        let prep = FeedbackContext(feature: "Prep", screen: "Trace", state: ["item_id": "two-sum"])
+        XCTAssertEqual(FeedbackSheetViewModel(context: prep, client: StubFeedbackClient(), build: nil, screenshot: solidImage()).attachmentSummary,
+                       "Screenshot · Screen state")
+
+        let bare = FeedbackSheetViewModel(context: FeedbackContext(feature: "Prep", screen: "Home"), client: StubFeedbackClient(), build: nil)
+        XCTAssertNil(bare.attachmentSummary, "nothing attached, no summary line")
+    }
+
+    func testScaledToMax1600() throws {
+        let tall = try XCTUnwrap(FeedbackScreenshot.capture(UIWindow(frame: CGRect(x: 0, y: 0, width: 1000, height: 2000)), displayScale: 3))
+        XCTAssertEqual(tall.size.width * tall.scale, 800, accuracy: 1)
+        XCTAssertEqual(tall.size.height * tall.scale, 1600, accuracy: 1)
+
+        let small = try XCTUnwrap(FeedbackScreenshot.capture(UIWindow(frame: CGRect(x: 0, y: 0, width: 300, height: 600)), displayScale: 2))
+        XCTAssertEqual(small.size.height * small.scale, 1200, accuracy: 1, "never scaled up")
+
+        XCTAssertTrue(isJPEG(base64: FeedbackScreenshot.jpegBase64(tall)))
+    }
+
+    func testNoWindowMeansNoScreenshot() {
+        XCTAssertNil(FeedbackScreenshot.capture(nil))
+        XCTAssertNil(FeedbackScreenshot.capture(UIWindow(frame: .zero)), "a window with no size has nothing to show")
     }
 }
 

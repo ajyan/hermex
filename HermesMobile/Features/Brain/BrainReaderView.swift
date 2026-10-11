@@ -110,7 +110,8 @@ struct BrainReaderView: View {
             .hxNavigationTitle(viewModel.page?.item.title ?? "")
             .toolbar { ToolbarItem(placement: .topBarTrailing) { FeedbackMoreMenu() } }
             .feedbackContext(FeedbackContext(
-                feature: "Brain", screen: viewModel.module.defaultTitle, item: viewModel.page?.item.title ?? viewModel.id))
+                feature: "Brain", screen: viewModel.module.defaultTitle, item: viewModel.page?.item.title ?? viewModel.id,
+                state: ["module": viewModel.module.rawValue, "item_id": viewModel.id]))
             .background(Color.hxCanvas.ignoresSafeArea())
             .task {
                 guard didLoad else {

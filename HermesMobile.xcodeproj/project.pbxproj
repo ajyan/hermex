@@ -705,6 +705,7 @@
 		FEEDB0DE00000000000000A5 /* FeedbackModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000A6 /* FeedbackModelsTests.swift */; };
 		FEEDB0DE00000000000000A7 /* FeedbackSheetViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000A8 /* FeedbackSheetViewModelTests.swift */; };
 		FEEDB0DE00000000000000A9 /* FeedbackSheetViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000AA /* FeedbackSheetViewModel.swift */; };
+		FEEDB0DE00000000000000B9 /* FeedbackScreenshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000BA /* FeedbackScreenshot.swift */; };
 		FEEDB0DE00000000000000AB /* FeedbackSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000AC /* FeedbackSheet.swift */; };
 		FEEDB0DE00000000000000B1 /* FeedbackInboxViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000B2 /* FeedbackInboxViewModelTests.swift */; };
 		FEEDB0DE00000000000000B3 /* FeedbackInboxViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000B4 /* FeedbackInboxViewModel.swift */; };
@@ -1454,6 +1455,7 @@
 		FEEDB0DE00000000000000A6 /* FeedbackModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackModelsTests.swift; sourceTree = "<group>"; };
 		FEEDB0DE00000000000000A8 /* FeedbackSheetViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackSheetViewModelTests.swift; sourceTree = "<group>"; };
 		FEEDB0DE00000000000000AA /* FeedbackSheetViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackSheetViewModel.swift; sourceTree = "<group>"; };
+		FEEDB0DE00000000000000BA /* FeedbackScreenshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackScreenshot.swift; sourceTree = "<group>"; };
 		FEEDB0DE00000000000000AC /* FeedbackSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackSheet.swift; sourceTree = "<group>"; };
 		FEEDB0DE00000000000000B2 /* FeedbackInboxViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackInboxViewModelTests.swift; sourceTree = "<group>"; };
 		FEEDB0DE00000000000000B4 /* FeedbackInboxViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackInboxViewModel.swift; sourceTree = "<group>"; };
@@ -2529,6 +2531,7 @@
 				FEEDB0DE00000000000000B4 /* FeedbackInboxViewModel.swift */,
 				FEEDB0DE00000000000000AC /* FeedbackSheet.swift */,
 				FEEDB0DE00000000000000AA /* FeedbackSheetViewModel.swift */,
+				FEEDB0DE00000000000000BA /* FeedbackScreenshot.swift */,
 			);
 			path = Feedback;
 			sourceTree = "<group>";
@@ -2773,6 +2776,7 @@
 				FEEDB0DE00000000000000B3 /* FeedbackInboxViewModel.swift in Sources */,
 				FEEDB0DE00000000000000AB /* FeedbackSheet.swift in Sources */,
 				FEEDB0DE00000000000000A9 /* FeedbackSheetViewModel.swift in Sources */,
+				FEEDB0DE00000000000000B9 /* FeedbackScreenshot.swift in Sources */,
 				B1A1C0DE00000000000F0015 /* GoalHeroCard.swift in Sources */,
 				B1A1C0DE00000000000F0011 /* GoalPaper.swift in Sources */,
 				B1A1C0DE00000000000F000F /* GoalDetailView.swift in Sources */,
