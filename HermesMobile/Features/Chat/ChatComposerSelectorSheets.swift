@@ -116,7 +116,7 @@ struct ComposerWorkspacePickerSheet: View {
         } label: {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: path == effectiveSelectedWorkspacePath ? "checkmark.circle.fill" : "folder")
-                    .foregroundStyle(path == effectiveSelectedWorkspacePath ? Color.accentColor : Color(.secondaryLabel))
+                    .foregroundStyle(path == effectiveSelectedWorkspacePath ? Color.accentColor : Color.hxTextSecondary)
                     .padding(.top, 2)
 
                 VStack(alignment: .leading, spacing: 3) {

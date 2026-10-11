@@ -147,8 +147,8 @@ final class ChatNavigationBackgroundTests: XCTestCase {
                           "Chat must request a native material behind the title even at the scroll edge")
         } else {
             XCTAssertEqual(appearance.backgroundColor?.resolvedColor(with: host.traitCollection),
-                           UIColor.systemBackground.resolvedColor(with: host.traitCollection),
-                           "Reduce Transparency and older systems must cover the navigation and status-bar region with an opaque background")
+                           UIColor(Color.hxCanvas).resolvedColor(with: host.traitCollection),
+                           "Reduce Transparency and older systems must cover the navigation and status-bar region with the opaque canvas")
         }
     }
 

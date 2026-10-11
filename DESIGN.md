@@ -83,10 +83,10 @@ One radius scale, as `HXRadius`:
 | `xs` | 6 | Inline code, thumbnails, log icon tiles |
 | `sm` | 10 | Rows, attachment tiles, buttons, drawer icon tiles |
 | `md` | 14 | Inset blocks, choice buttons |
-| `lg` | 18 | Section cards, action cards, the expanded composer |
+| `lg` | 18 | Section cards, action cards (approval overlay, Bot request card) |
 | `xl` | 28 | Hero papers |
 
-Use `.continuous` corners everywhere. Chips are capsules.
+Use `.continuous` corners everywhere. Chips are capsules. The composer keeps its own geometry (`ChatComposerMetrics`: a pill, and 26 pt when expanded), and the clarification card that docks on it uses the same 26 so the two read as one surface.
 
 ## Elevation
 
@@ -100,13 +100,17 @@ Everything inline in chat is flat.
 
 ## Type
 
-- SF Pro through `AppFont` and Dynamic Type styles. No `.system(size:)` in new or touched code.
+- SF Pro through `AppFont` and Dynamic Type styles. No `.system(size:)` on text. The one exception: an SF Symbol inside a fixed-size control (a round button, a media control) keeps a fixed point size, since a growing glyph would break the control.
 - Serif (New York) through `AppFont.serif` only, for Brief and Goal display text and quoted words a person saved. Chat content stays SF.
 
 ## Motion
 
 A live chip fades in as its call arrives (off for replays and under Reduce Motion), and opening the log uses the chat disclosure motion. Nothing loops or repaints continuously.
 
-## Still to migrate
+## Decisions and exceptions
 
-New and touched code uses the tokens; older one-offs move when their screen is next touched. As of 2026-10-10 (`Features/`): Chat has about 50 `.system(size:)`, 67 literal corner radii, and 100 UIKit system colors; Bots has its own `BotProfileAppearance` hexes; Brain has a second tile palette in `BrainStyle` (it should move to the papers); request-card corners still use 26 (clarification) and 14 (Bot) instead of `lg`. Inline `brain://` links inside reply text still draw in the accent blue, not the knowledge glow.
+- **Links stay Nous blue**, `brain://` ones included: a link is a control (principle 4). The reply's Brain chips carry the Brain color. Coloring individual inline links would also mean replacing the Markdown renderer's link style.
+- **Brain covers** derive their ramps from the papers (`BrainStyle.coverPaletteValues`): light is the paper, its hue, its light glow; dark is the hue at 16% and 38% over the navy canvas, then its dark glow.
+- **Bot avatar colors** (`BotAvatarColor.palette`) are server data shared with Hermes Desktop, not app chrome, so they keep Desktop's hexes.
+- **Project colors** come from the server (`Color(hexString:)`) and are the user's, not the system's.
+- **Translucent fills** (`systemFill` family), `tertiaryLabel`, and `placeholderText` stay UIKit: there is no `hx` equivalent and they adapt correctly.

@@ -72,7 +72,7 @@ private struct ChatActiveRunStatusPreviewStack: View {
             )
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.hxCanvas)
     }
 }
 

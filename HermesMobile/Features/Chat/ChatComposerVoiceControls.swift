@@ -182,7 +182,7 @@ struct ComposerVoiceRecordingBar: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                 .fill(Color(.secondarySystemBackground))
         )
         .accessibilityElement(children: .ignore)

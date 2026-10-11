@@ -132,7 +132,7 @@ struct ImageLightboxView<Actions: View>: View {
         case let .failure(message):
             VStack(spacing: 14) {
                 Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 30))
+                    .font(AppFont.title())
                     .foregroundStyle(.white.opacity(0.6))
                 Text(message)
                     .font(.subheadline)

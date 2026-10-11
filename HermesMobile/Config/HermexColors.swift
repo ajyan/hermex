@@ -106,8 +106,8 @@ struct HermexPaper: Equatable {
     let edge: Color
     /// Text on a solid `glow` fill (a request's primary button).
     let onGlow: Color
-    /// The paper's identity, for equality.
-    private let key: UInt32
+    /// The raw values, for surfaces that derive their own ramps (Brain covers).
+    let values: (paper: UInt32, ink: UInt32, glowLight: UInt32, glowDark: UInt32, hue: UInt32)
 
     /// Supporting text on the paper: the ink, lighter, never `hxTextSecondary`.
     var secondaryInk: Color { ink.opacity(0.75) }
@@ -123,10 +123,10 @@ struct HermexPaper: Equatable {
         wash = Color(uiColor: color(hue, alpha: 0x29))
         edge = dynamic(light: color(glowLight, alpha: 0x4D), dark: color(glowDark, alpha: 0x47))
         onGlow = dynamic(light: color(0xFFFFFF), dark: color(ink))
-        key = paper
+        values = (paper, ink, glowLight, glowDark, hue)
     }
 
-    static func == (lhs: HermexPaper, rhs: HermexPaper) -> Bool { lhs.key == rhs.key }
+    static func == (lhs: HermexPaper, rhs: HermexPaper) -> Bool { lhs.values.paper == rhs.values.paper }
 
     static let opener = HermexPaper(paper: 0xFFF1DC, ink: 0x3A2410, glowLight: 0x8A5200, glowDark: 0xF6C77E, hue: 0xF2B45A)
     static let quote = HermexPaper(paper: 0xD9E8FF, ink: 0x0E3264, glowLight: 0x1D4FB8, glowDark: 0x8DB4FF, hue: 0x6E9BFF)

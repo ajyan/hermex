@@ -3498,7 +3498,7 @@ private struct LegacyToolbarClusterStyle: ViewModifier {
                 .clipShape(Capsule())
                 .overlay {
                     Capsule()
-                        .stroke(Color(.separator).opacity(colorScheme == .dark ? 0.38 : 0.24), lineWidth: 0.5)
+                        .stroke(Color.hxSeparator.opacity(colorScheme == .dark ? 0.38 : 0.24), lineWidth: 0.5)
                         .allowsHitTesting(false)
                 }
         }
