@@ -35,6 +35,7 @@ struct DeckPalette: Equatable {
     static let theme = DeckPalette(.past, symbol: "quote.bubble", name: "Theme")
     static let mood = DeckPalette(.advisor, symbol: "waveform.path", name: "Energy and mood")
     static let lessons = DeckPalette(.notes, symbol: "lightbulb", name: "Lessons")
+    static let recap = DeckPalette(.plain, symbol: "list.bullet", name: "Recap")
 
     static func of(_ page: DeckPage) -> DeckPalette {
         switch page {
@@ -54,6 +55,7 @@ struct DeckPalette: Equatable {
             case "theme": return .theme
             case "mood": return .mood
             case "lessons": return .lessons
+            case "recap": return .recap
             case "goals":
                 let goal = GoalPaper.palette(named: card.color ?? "", slug: card.meters.first?.group ?? card.id)
                 return DeckPalette(goal.colors, symbol: "flag", name: "Goals")

@@ -350,6 +350,7 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertNil(DeckCardText(deck.cards[2]).detail, "the chart replaces the plain copy")
         XCTAssertNil(DeckCardText(deck.cards[3]).detail, "the meters replace the plain copy")
         XCTAssertEqual(deck.cards.map { DeckPalette.of($0).name }, ["Today", "Theme", "Energy and mood", "Goals"])
+        XCTAssertEqual(DeckPalette.of(try DailyDeck.decode(#"{"date":"d","kind":"weekly","cards":[{"id":"r","type":"item","kind":"recap"}]}"#).cards[0]).name, "Recap")
         XCTAssertEqual(DeckPalette.of(deck.cards[3]).colors, HermexPaper.wiki, "the goals card wears its goal's paper")
     }
 
