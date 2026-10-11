@@ -38,7 +38,7 @@ enum GoalPaper {
         case .min: ink.opacity(0.45)
         case .skip: Color.hxTextSecondary.opacity(0.25)
         case .miss: Color.hxWarning.opacity(0.55)
-        case .none, .unknown: Color.hxSeparator.opacity(0.6)
+        case .none, .clear, .unknown: Color.hxSeparator.opacity(0.6)
         }
     }
 }

@@ -72,6 +72,12 @@ final class GoalsModelsTests: XCTestCase {
         XCTAssertEqual(b, ["slug": "m", "date": "2026-10-10", "as_of": "2026-10-11", "check": "foot", "value": "worse"])
     }
 
+    func testClearEncodesAsClear() throws {
+        let r = GoalCheckInRequest.commitment(slug: "m", date: "d", asOf: "d", id: "x", status: .clear)
+        let a = try JSONSerialization.jsonObject(with: JSONEncoder().encode(r)) as! [String: String]
+        XCTAssertEqual(a["status"], "clear")
+    }
+
     func testMissingFieldsDefault() throws {
         let home = try PrepDecoding.decode(GoalsHome.self, from: Data(#"{"goals":[{"slug":"a"}, 5]}"#.utf8))
         XCTAssertEqual(home.goals.map(\.slug), ["a"])

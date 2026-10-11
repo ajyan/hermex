@@ -222,7 +222,7 @@ struct MessageBubbleView: View {
             if !isStreaming {
                 let citations = BrainCitation.citations(in: messageText)
                 if !citations.isEmpty {
-                    BrainCitationCards(citations: citations)
+                    BrainCitationChips(citations: citations)
                 }
             }
 
@@ -745,30 +745,26 @@ private struct GridAttachmentCell: View {
     }
 
     private var fileCell: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(HermexPaper.file.paper)
+        VStack(spacing: 5) {
+            Image(systemName: fileIconName)
+                .font(AppFont.title(weight: .semibold))
+                .foregroundStyle(HermexPaper.file.glow)
 
-            VStack(spacing: 5) {
-                Image(systemName: fileIconName)
-                    .font(.system(size: 28, weight: .semibold))
+            Text(fileDisplayName)
+                .font(AppFont.caption2(weight: .medium))
+                .foregroundStyle(Color.hxTextPrimary)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .truncationMode(.middle)
+                .frame(maxWidth: size - 18)
 
-                Text(fileDisplayName)
-                    .font(.caption2.weight(.medium))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-                    .truncationMode(.middle)
-                    .frame(maxWidth: size - 18)
-
-                Text(fileExtensionLabel)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(HermexPaper.file.secondaryInk)
-                    .lineLimit(1)
-            }
-            .foregroundStyle(HermexPaper.file.ink)
+            Text(fileExtensionLabel)
+                .font(AppFont.caption2(weight: .bold))
+                .foregroundStyle(HermexPaper.file.glow)
+                .lineLimit(1)
         }
         .frame(width: size, height: size)
-        .environment(\.colorScheme, .light)
+        .glowSurface(.file, cornerRadius: HXRadius.sm)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("File attachment \(fileDisplayName), \(fileExtensionLabel)")
     }

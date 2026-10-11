@@ -35,9 +35,10 @@ private extension KeyedDecodingContainer {
     }
 }
 
-/// One day's check-in for a commitment. `none` appears only in the heatmap.
+/// One day's check-in for a commitment. `none` appears only in the heatmap; `clear` is only
+/// sent, to undo the day's check-in.
 enum GoalStatus: String, Hashable, Sendable, Decodable {
-    case done, min, skip, miss, none, unknown
+    case done, min, skip, miss, none, clear, unknown
 
     init(from decoder: Decoder) throws {
         self = GoalStatus(rawValue: (try? decoder.singleValueContainer().decode(String.self)) ?? "") ?? .unknown
@@ -347,6 +348,9 @@ struct GoalHeatDay: Decodable, Hashable, Sendable {
 }
 
 struct GoalCheckValue: Decodable, Hashable, Sendable {
+    /// The value that undoes a daily check's answer for the day.
+    static let clear = "clear"
+
     let date: String
     let value: String
 

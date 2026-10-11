@@ -158,7 +158,7 @@ enum GoalHeroCopy {
         case .min: "2-minute version"
         case .skip: "skipped"
         case .miss: "missed"
-        case .none, .unknown: "not checked in"
+        case .none, .clear, .unknown: "not checked in"
         }
         return "\(name), \(state)"
     }

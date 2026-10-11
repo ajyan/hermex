@@ -10,11 +10,7 @@ extension View {
     /// translucent surface would render the request on top of whatever message
     /// happens to sit underneath.
     func pendingRequestCardSurface(cornerRadius: CGFloat) -> some View {
-        paperSurface(.request, cornerRadius: cornerRadius)
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(HermexPaper.request.ink.opacity(0.10), lineWidth: 1)
-            )
+        glowSurface(.request, cornerRadius: cornerRadius, opaque: true)
     }
 
     /// The recessed block a question or a command sits in, inside a card.
@@ -63,12 +59,12 @@ struct PendingRequestSubmitButton: View {
     @ScaledMetric(relativeTo: .body) private var size: CGFloat = 40
 
     /// Also the response field's caret colour, so the pair reads as one control.
-    /// On a paper the control takes the paper's ink.
+    /// On a glow surface the control takes the paper's hue.
     static func fill(canSubmit: Bool, colorScheme: ColorScheme, paper: HermexPaper? = nil) -> Color {
+        if let paper { return canSubmit ? paper.glow : paper.edge }
         guard canSubmit else {
             return colorScheme == .dark ? Color.white.opacity(0.18) : Color.black.opacity(0.12)
         }
-        if let paper { return paper.ink }
         return colorScheme == .dark ? .white : .black
     }
 
@@ -95,7 +91,7 @@ struct PendingRequestSubmitButton: View {
 
     private var foreground: Color {
         guard canSubmit else { return Color(.secondaryLabel) }
-        if let paper { return paper.paper }
+        if let paper { return paper.onGlow }
         return colorScheme == .dark ? .black : .white
     }
 }

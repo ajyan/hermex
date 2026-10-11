@@ -322,45 +322,27 @@ struct BrainCitation: Equatable, Identifiable {
     }
 }
 
-/// The Brain pages a reply cites, as knowledge-paper cards under it (DESIGN.md § Components).
-/// Tapping one opens it through the transcript's link router, like the inline link.
-struct BrainCitationCards: View {
+/// The Brain pages a reply cites, as one row of knowledge chips under it (DESIGN.md
+/// § Components). Tapping one opens it through the transcript's link router, like the
+/// inline link.
+struct BrainCitationChips: View {
     let citations: [BrainCitation]
 
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        FlowRow(spacing: 6) {
             ForEach(citations) { citation in
                 Button {
                     openURL(citation.url)
                 } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "leaf")
-                            .font(AppFont.subheadline(weight: .semibold))
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(verbatim: citation.title)
-                                .font(AppFont.subheadline(weight: .semibold))
-                                .lineLimit(1)
-                            Text(verbatim: citation.module.defaultTitle)
-                                .font(AppFont.caption())
-                                .foregroundStyle(HermexPaper.knowledge.secondaryInk)
-                        }
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.right")
-                            .font(AppFont.caption(weight: .semibold))
-                            .foregroundStyle(HermexPaper.knowledge.secondaryInk)
-                            .accessibilityHidden(true)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
-                    .frame(maxWidth: 320, alignment: .leading)
-                    .paperSurface(.knowledge, cornerRadius: HXRadius.md)
-                    .contentShape(RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
+                    // A taller hit area than the chip draws, so a dense row still gets
+                    // near-44 pt targets.
+                    HXChip(paper: .knowledge, symbol: "leaf", label: citation.title)
+                        .contentShape(.interaction, Capsule().inset(by: -7))
                 }
-                .buttonStyle(.chatTactile(.card))
-                .accessibilityElement(children: .combine)
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(verbatim: "\(citation.title), \(citation.module.defaultTitle)"))
                 .accessibilityHint(Text("Opens the Brain page"))
             }
         }

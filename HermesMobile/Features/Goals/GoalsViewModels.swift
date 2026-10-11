@@ -89,8 +89,9 @@ final class GoalDetailViewModel {
     func checkIn(check id: String, value: String) async {
         await send(id: id) { detail, date, asOf in
             if let i = detail.summary.dailyChecks.firstIndex(where: { $0.id == id }) {
-                if date == detail.today { detail.summary.dailyChecks[i].today = value }
-                if date == detail.yesterday { detail.summary.dailyChecks[i].yesterday = value }
+                let shown = value == GoalCheckValue.clear ? nil : value
+                if date == detail.today { detail.summary.dailyChecks[i].today = shown }
+                if date == detail.yesterday { detail.summary.dailyChecks[i].yesterday = shown }
             }
             return .check(slug: self.slug, date: date, asOf: asOf, id: id, value: value)
         }
@@ -135,11 +136,12 @@ final class GoalDetailViewModel {
         let old: GoalStatus? = date == detail.today ? row.today : row.yesterday
         if date >= detail.summary.week.start, date <= detail.summary.week.end {
             adjust(&row, old, by: -1)
-            adjust(&row, status, by: 1)
+            if status != .clear { adjust(&row, status, by: 1) }
             row.remaining = max(0, row.target - row.done - row.min)
             row.hit = row.done + row.min >= row.target
         }
-        if date == detail.today { row.today = status } else { row.yesterday = status }
+        let shown: GoalStatus? = status == .clear ? nil : status
+        if date == detail.today { row.today = shown } else { row.yesterday = shown }
         detail.summary.week.commitments[i] = row
     }
 
