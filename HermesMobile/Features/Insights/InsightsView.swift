@@ -17,7 +17,9 @@ struct InsightsView: View {
 
     var body: some View {
         content
-            .navigationTitle("Usage")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .hxNavigationTitle(String(localized: "Usage"))
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -129,7 +131,7 @@ struct InsightsView: View {
 
                 Text(viewModel.sourceDescription)
                     .font(AppFont.caption())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.hxTextSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, 16)

@@ -16,8 +16,8 @@ import SwiftUI
                 if naming { nameStep }
                 else { membersStep }
             }
-            .navigationTitle("New Group Chat")
-            .navigationBarTitleDisplayMode(.inline)
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .hxNavigationTitle(String(localized: "New Group Chat"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(naming && !creator.locked ? "Back" : "Cancel",
@@ -81,6 +81,7 @@ import SwiftUI
             }
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
     }
     private var chips: some View {
         HStack(spacing: 8) { ForEach(creator.selected) { bot in chip(bot) } }
@@ -91,7 +92,7 @@ import SwiftUI
             HStack(spacing: 6) {
                 BotAvatarView(profile: bot, avatar: avatars[bot.id], size: 24, motion: .still)
                 Text(bot.name)
-                Image(systemName: "xmark").font(.caption)
+                Image(systemName: "xmark").font(AppFont.caption())
             }
             .padding(8).background(.quaternary, in: Capsule())
         }
@@ -104,20 +105,20 @@ import SwiftUI
                 BotRoomAvatars(room: creator.preview, roster: creator.roster, avatars: avatars, size: 84)
                     .padding(.top, 48)
                 TextField("Group name", text: $creator.name)
-                    .font(.title2.bold()).multilineTextAlignment(.center)
-                    .padding(20).background(.quaternary, in: RoundedRectangle(cornerRadius: 20))
+                    .font(AppFont.display(style: .title2)).multilineTextAlignment(.center)
+                    .padding(20).hxCard()
                     .focused($focused, equals: .name).disabled(creator.locked)
                     .submitLabel(.done)
                     .onSubmit { if creator.mayCreate { Task { await creator.create() } } }
                 if !BotRoomRPC.validName(creator.name) {
-                    Text("Enter a name of up to 200 characters.").font(.caption).foregroundStyle(.secondary)
+                    Text("Enter a name of up to 200 characters.").font(AppFont.caption()).foregroundStyle(.secondary)
                 }
                 if let message = creator.message { Text(message).font(.callout) }
                 Button(creator.busy ? "Creating…" : creator.locked ? "Try Again" : "Create") {
                     focused = nil
                     Task { await creator.create() }
                 }
-                .buttonStyle(.borderedProminent).controlSize(.large)
+                .buttonStyle(.borderedProminent).buttonBorderShape(.capsule).controlSize(.large)
                 .disabled(!creator.mayCreate)
             }
             .padding(20)

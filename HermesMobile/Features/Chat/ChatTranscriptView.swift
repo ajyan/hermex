@@ -213,7 +213,7 @@ struct ChatTranscriptView: View {
                     }
                 }
                 .animation(ChatMotion.quickState(reduceMotion: reduceMotion), value: showsScrollToBottomButton)
-                .background(Color(.systemBackground))
+                .background(Color.hxCanvas)
                 .background {
                     StreamingFollowTrigger(trigger: streamingScrollTrigger) {
                         if isFollowingLatestContent {
@@ -994,7 +994,7 @@ struct LoadOlderMessagesButton: View {
             .background(.regularMaterial, in: Capsule(style: .continuous))
             .overlay(
                 Capsule(style: .continuous)
-                    .stroke(Color(.separator).opacity(0.32), lineWidth: 0.5)
+                    .stroke(Color.hxSeparator.opacity(0.32), lineWidth: 0.5)
             )
         }
         .buttonStyle(.chatTactile(.capsule))

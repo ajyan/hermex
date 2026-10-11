@@ -8,6 +8,8 @@ struct PrepRunView: View {
     @State private var didLoad = false
     /// The option tapped on a choice rep, kept to mark it once graded.
     @State private var chosen: ChosenOption?
+    /// The unsent answer on an approach or spot-the-bug rep.
+    @State private var draft = Draft(rep: -1)
     @Environment(\.dismiss) private var dismiss
     @State private var screenHeight: CGFloat = 800
 
@@ -16,19 +18,33 @@ struct PrepRunView: View {
         let id: String
     }
 
+    /// Belongs to one rep; any other rep reads a fresh one.
+    private struct Draft: Equatable {
+        let rep: Int
+        var text = ""
+        var line: Int?
+        var fix: String?
+    }
+
     init(server: URL, onAPIError: @escaping (Error) -> Void) {
-        _viewModel = State(initialValue: PrepRunViewModel(
+        self.init(viewModel: PrepRunViewModel(
             client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
+    }
+
+    init(viewModel: PrepRunViewModel) {
+        _viewModel = State(initialValue: viewModel)
     }
 
     var body: some View {
         content
-            .navigationTitle(Text(verbatim: title))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(title)
             .navigationBarBackButtonHidden(true)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { dismiss() } label: {
+                    Button {
+                        viewModel.leave()
+                        dismiss()
+                    } label: {
                         Image(systemName: "xmark")
                     }
                     .accessibilityLabel(Text(verbatim: "Save and quit"))
@@ -102,7 +118,7 @@ struct PrepRunView: View {
                     rep: rep,
                     result: result,
                     chosenID: chosen?.rep == rep.index ? chosen?.id : nil,
-                    placedLines: viewModel.board?.placed ?? []
+                    chosenLine: draft(for: rep).line
                 )
             } bottom: {
                 PrepPrimaryButton(title: "Continue") { Task { await viewModel.continue() } }
@@ -157,8 +173,8 @@ struct PrepRunView: View {
 
     private func hasAction(_ rep: PrepRep) -> Bool {
         switch rep.drill {
-        case .parsons, .primer: true
-        default: false
+        case .primer, .approach, .spotBug, .unknown: true
+        case .complexity, .trace: false
         }
     }
 
@@ -166,19 +182,28 @@ struct PrepRunView: View {
     @ViewBuilder
     private func repAction(_ rep: PrepRep) -> some View {
         switch rep.drill {
-        case .parsons:
-            if let board = viewModel.board {
-                PrepPrimaryButton(
-                    title: "Check order",
-                    enabled: board.isFull(target: PrepCopy.parsonsTarget(poolCount: board.pool.count))
-                        && !viewModel.isSubmitting
-                ) { Task { await viewModel.checkParsons() } }
-            }
         case .primer:
             PrepPrimaryButton(title: "Got it", enabled: !viewModel.isSubmitting) {
                 Task { await viewModel.acknowledgePrimer() }
             }
-        default:
+        case .approach:
+            let text = draft(for: rep).text.trimmingCharacters(in: .whitespacesAndNewlines)
+            PrepPrimaryButton(
+                title: viewModel.isSubmitting ? "Grading…" : "Submit",
+                enabled: !text.isEmpty && !viewModel.isSubmitting
+            ) { Task { await viewModel.submitApproach(text) } }
+        case .spotBug:
+            let answer = draft(for: rep)
+            PrepPrimaryButton(
+                title: "Submit",
+                enabled: PrepCopy.canSubmitBugFix(line: answer.line, fix: answer.fix) && !viewModel.isSubmitting
+            ) {
+                guard let line = answer.line, let fix = answer.fix else { return }
+                Task { await viewModel.submitBugFix(line: line, fix: fix) }
+            }
+        case .unknown:
+            PrepPrimaryButton(title: "Skip") { Task { await viewModel.skip() } }
+        case .complexity, .trace:
             EmptyView()
         }
     }
@@ -186,33 +211,66 @@ struct PrepRunView: View {
     @ViewBuilder
     private func repContent(_ rep: PrepRep) -> some View {
         switch rep.drill {
-        case .patternID, .complexity:
+        case .complexity:
             PrepChoiceView(
-                rep: rep,
+                title: "Time complexity?",
+                options: rep.item.options,
                 grading: nil,
                 isSubmitting: viewModel.isSubmitting,
                 submitError: viewModel.submitError
-            ) { option in
-                chosen = ChosenOption(rep: rep.index, id: option.id)
-                Task { await viewModel.choose(.choice(option.id)) }
-            }
-        case .parsons:
-            if let board = viewModel.board {
-                PrepParsonsView(
-                    hints: rep.item.hints,
-                    board: board,
-                    hintsShown: viewModel.hintsShown,
-                    isSubmitting: viewModel.isSubmitting,
-                    place: { viewModel.place(poolIndex: $0) },
-                    unplace: { viewModel.unplace(at: $0) },
-                    showHint: { viewModel.showHint() }
-                )
-            }
+            ) { option in choose(option, in: rep) }
+        case .trace:
+            PrepTraceView(
+                item: rep.item,
+                isSubmitting: viewModel.isSubmitting,
+                submitError: viewModel.submitError
+            ) { option in choose(option, in: rep) }
+        case .approach:
+            PrepApproachView(
+                text: Binding(
+                    get: { draft(for: rep).text },
+                    set: { text in updateDraft(rep) { $0.text = PrepCopy.cappedApproach(text) } }),
+                hints: rep.item.hints,
+                hintsShown: viewModel.hintsShown,
+                isSubmitting: viewModel.isSubmitting,
+                showHint: { viewModel.showHint() },
+                shownAt: viewModel.shownAt
+            )
+        case .spotBug:
+            let answer = draft(for: rep)
+            PrepSpotBugView(
+                code: rep.item.code,
+                fixes: rep.item.fixes,
+                selectedLine: answer.line,
+                selectedFix: answer.fix,
+                isSubmitting: viewModel.isSubmitting,
+                selectLine: { line in updateDraft(rep) { $0.line = line } },
+                selectFix: { fix in updateDraft(rep) { $0.fix = fix } }
+            )
         case .primer:
             PrepPrimerView(item: rep.item)
         case .unknown:
-            EmptyView()
+            PrepNoteCard {
+                Text(verbatim: "Update Atlas to do this rep")
+                    .font(BrainStyle.rowTitle)
+                    .foregroundStyle(Color.hxTextPrimary)
+            }
         }
+    }
+
+    private func choose(_ option: PrepOption, in rep: PrepRep) {
+        chosen = ChosenOption(rep: rep.index, id: option.id)
+        Task { await viewModel.choose(.choice(option.id)) }
+    }
+
+    private func draft(for rep: PrepRep) -> Draft {
+        draft.rep == rep.index ? draft : Draft(rep: rep.index)
+    }
+
+    private func updateDraft(_ rep: PrepRep, _ change: (inout Draft) -> Void) {
+        var next = draft(for: rep)
+        change(&next)
+        draft = next
     }
 }
 

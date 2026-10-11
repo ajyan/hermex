@@ -13,7 +13,7 @@ struct PrepHomeView: View {
 
     var body: some View {
         content
-            .navigationTitle(Text(verbatim: "Interview prep"))
+            .hxNavigationTitle("Interview prep")
             .background(Color.hxCanvas.ignoresSafeArea())
             // Every appear refreshes quietly, so a finished run shows on the way back.
             .task { await viewModel.load() }
@@ -148,8 +148,8 @@ private struct PrepRunButton: View {
     }
 }
 
-/// A track as a Brain card: cover, title, the server's subtitle, and a thin
-/// progress bar. Built from the same pieces and constants as `BrainCard`.
+/// A track as a Brain glow card (the `.knowledge` paper): cover, title, the server's
+/// subtitle, and a thin progress bar. Built from the same pieces and constants as `BrainCard`.
 private struct PrepTrackCard: View {
     let track: PrepTrackSummary
     /// Built once per card, never in `body`.
@@ -161,6 +161,8 @@ private struct PrepTrackCard: View {
     }
 
     var body: some View {
+        let paper = HermexPaper.knowledge
+        let shape = BrainStyle.cardShape()
         VStack(alignment: .leading, spacing: 0) {
             // The clear base takes the card's full width at the cover ratio; the art
             // is an overlay so it can never be narrower than the card.
@@ -170,15 +172,17 @@ private struct PrepTrackCard: View {
                 .clipped()
             VStack(alignment: .leading, spacing: BrainStyle.xs) {
                 Text(verbatim: track.title)
-                    .brainText(.rowTitle)
+                    .font(AppFont.display(style: .body))
+                    .foregroundStyle(paper.glow)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                 if !track.subtitle.isEmpty {
                     Text(verbatim: track.subtitle)
-                        .brainText(.meta)
+                        .font(BrainStyle.meta)
+                        .foregroundStyle(paper.glow)
                         .lineLimit(2)
                 }
-                PrepProgressBar(fraction: track.progress)
+                PrepProgressBar(fraction: track.progress, tint: paper.glow)
                     .padding(.top, BrainStyle.xs)
             }
             .padding(.horizontal, BrainStyle.cardHorizontalPadding)
@@ -186,17 +190,20 @@ private struct PrepTrackCard: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .brainCardSurface()
-        .contentShape(BrainStyle.cardShape())
+        .clipShape(shape)
+        .background(paper.card, in: shape)
+        .overlay(shape.strokeBorder(paper.edge, lineWidth: 0.5))
+        .contentShape(shape)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: [track.title, track.subtitle].filter { !$0.isEmpty }.joined(separator: ", ")))
         .accessibilityValue(Text(verbatim: "\(Int((min(max(track.progress, 0), 1) * 100).rounded())) percent"))
     }
 }
 
-/// A 3pt bar: the filled share in `.hxTextSecondary` at 55% on a separator track.
+/// A 3pt bar: the filled share in `tint` on a separator track.
 struct PrepProgressBar: View {
     let fraction: Double
+    var tint: Color = .hxTextSecondary.opacity(0.55)
 
     var body: some View {
         let clamped = min(max(fraction, 0), 1)
@@ -206,7 +213,7 @@ struct PrepProgressBar: View {
             .overlay(alignment: .leading) {
                 GeometryReader { proxy in
                     Capsule()
-                        .fill(Color.hxTextSecondary.opacity(0.55))
+                        .fill(tint)
                         .frame(width: proxy.size.width * clamped)
                 }
             }

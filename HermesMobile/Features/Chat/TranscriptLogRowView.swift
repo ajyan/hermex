@@ -172,7 +172,7 @@ struct TranscriptLogRowView<Icon: View, Accessory: View, Status: View, ExpandedB
         .frame(minHeight: TranscriptLogRowMetrics.minimumHeight)
         .background(
             Color.primary.opacity(isPressed ? 0.06 : 0),
-            in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+            in: RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous)
         )
         .contentShape(Rectangle())
         .onTapGesture(perform: toggle)

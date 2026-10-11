@@ -31,7 +31,7 @@ struct DefaultProfilePickerView: View {
             List {
                 if let saveError {
                     Text(verbatim: saveError)
-                        .font(.caption)
+                        .font(AppFont.caption())
                         .foregroundStyle(.hxDanger)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 0, trailing: 12))
@@ -57,8 +57,8 @@ struct DefaultProfilePickerView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
-            .navigationTitle("Default Profile")
-            .navigationBarTitleDisplayMode(.inline)
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .hxNavigationTitle(String(localized: "Default Profile"))
             .searchable(
                 text: $searchText,
                 placement: .navigationBarDrawer(displayMode: .always),
@@ -126,7 +126,7 @@ struct DefaultProfilePickerView: View {
             showsCreateProfile = true
         } label: {
             Label("New Profile", systemImage: "plus")
-                .font(.body.weight(.semibold))
+                .font(AppFont.body(weight: .semibold))
                 .frame(maxWidth: .infinity, minHeight: PickerRowMetrics.minHeight, alignment: .leading)
                 .contentShape(Rectangle())
         }
@@ -185,7 +185,7 @@ struct DefaultProfilePickerView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(profile.displayName)
-                            .font(.body)
+                            .font(AppFont.body())
                             .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
 
                         if selected {
@@ -197,7 +197,7 @@ struct DefaultProfilePickerView: View {
 
                     if let details = profileDetails(profile) {
                         Text(details)
-                            .font(.caption)
+                            .font(AppFont.caption())
                             .foregroundStyle(
                                 selected ? Color(.systemBackground).opacity(0.7) : Color.secondary
                             )
@@ -213,7 +213,7 @@ struct DefaultProfilePickerView: View {
                         .tint(selected ? Color(.systemBackground) : Color.primary)
                 } else if selected {
                     Image(systemName: "checkmark")
-                        .font(.body.weight(.semibold))
+                        .font(AppFont.body(weight: .semibold))
                         .accessibilityHidden(true)
                 }
             }
@@ -404,14 +404,15 @@ private struct CreateProfileSheet: View {
                 if let errorMessage {
                     Section {
                         Text(errorMessage)
-                            .font(.caption)
+                            .font(AppFont.caption())
                             .foregroundStyle(.hxDanger)
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Color.hxCanvas.ignoresSafeArea())
             .disabled(isCreating)
-            .navigationTitle("New Profile")
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(String(localized: "New Profile"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -529,7 +530,7 @@ private struct ProfileStatusBadge: View {
 
     var body: some View {
         Text(title)
-            .font(.caption2.weight(.semibold))
+            .font(AppFont.caption2(weight: .semibold))
             .foregroundStyle(isInverted ? Color(.systemBackground) : Color.accentColor)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)

@@ -5,18 +5,19 @@ import UIKit
 ///
 /// Views reference these roles and constants, never raw fonts or numbers, so the
 /// five modules read as one library. Chrome stays neutral `hx*` plus the accent;
-/// only covers and graph headers take a hue, from `coverPalette`.
+/// covers and graph headers take a hue from `coverPalette`, and module icons wear the
+/// Brain's object paper, `HermexPaper.knowledge`.
 enum BrainStyle {
     // MARK: Type roles (all Dynamic Type text styles)
 
-    /// For in-content headings that stand in for a large navigation title. Screens
-    /// themselves use `.navigationTitle` with the large display mode.
-    static let screenTitle: Font = .largeTitle.weight(.bold)
+    /// For in-content headings that stand in for a large title. Screens themselves use
+    /// the shared header, `.hxNavigationTitle`.
+    static let screenTitle: Font = AppFont.display(style: .largeTitle)
     static let sectionCaption: Font = AppFont.footnote()
     static let rowTitle: Font = AppFont.body()
     static let rowSubtitle: Font = AppFont.subheadline()
     static let meta: Font = AppFont.caption()
-    static let readerTitle: Font = AppFont.title(weight: .semibold)
+    static let readerTitle: Font = AppFont.display(style: .title)
     /// The only serif in the Brain: highlights and best-quote blocks.
     static let quote: Font = AppFont.serif().leading(.loose)
 
@@ -56,11 +57,11 @@ enum BrainStyle {
 
     // MARK: Shapes (matched to `SectionCard`)
 
-    static let cardCorner: CGFloat = 18
+    static let cardCorner: CGFloat = HXRadius.lg
     static let cardHorizontalPadding: CGFloat = 16
     static let cardVerticalPadding: CGFloat = 14
     /// Corner for cover thumbnails and tiles inside rows.
-    static let thumbnailCorner: CGFloat = 8
+    static let thumbnailCorner: CGFloat = HXRadius.xs
     /// Base side of a row's leading thumbnail; scale it with `@ScaledMetric`.
     static let thumbnailSize: CGFloat = 44
     /// Width over height for cover art on cards and grids.
@@ -108,18 +109,19 @@ enum BrainStyle {
 
     // MARK: Cover palette
 
-    /// The 8 cover ramps, as `(background, mid, strong)` in `0xRRGGBB`, light then dark.
-    /// Indices 0–5 are pinned to tags in `BrainCoverSpec.tagRamps`.
-    static let coverPaletteValues: [(light: (UInt32, UInt32, UInt32), dark: (UInt32, UInt32, UInt32))] = [
-        (light: (0xE6EEFC, 0xA9C2F0, 0x3F6FD1), dark: (0x16233A, 0x2C4A7A, 0x7FA4EC)), // 0 Nous blue
-        (light: (0xE2F2F1, 0x9FD1CC, 0x2E8A83), dark: (0x12292A, 0x24504E, 0x6CC0B8)), // 1 teal
-        (light: (0xE7F3E8, 0xAED4B2, 0x3E8B4C), dark: (0x172A1B, 0x2D5234, 0x7DC08A)), // 2 green
-        (light: (0xFBEAE5, 0xEFB8A8, 0xC8604A), dark: (0x33201C, 0x5E3830, 0xE79A86)), // 3 coral
-        (light: (0xEEE9F8, 0xC6B7E6, 0x6E54B5), dark: (0x241E36, 0x43385F, 0xA994E0)), // 4 purple
-        (light: (0xFBF1DE, 0xEBCB8E, 0xA9761F), dark: (0x2E2414, 0x574321, 0xDDB062)), // 5 amber
-        (light: (0xFAE8F0, 0xE9B3CB, 0xB4507E), dark: (0x321C27, 0x5A3247, 0xE08DB3)), // 6 pink
-        (light: (0xEEF0F3, 0xC3C9D2, 0x5F6B7A), dark: (0x1E2228, 0x383F49, 0x9AA4B1))  // 7 gray
-    ]
+    /// The 8 cover ramps, as `(background, mid, strong)` in `0xRRGGBB`, light then dark, drawn
+    /// from the shared papers (DESIGN.md § Color) so a cover's hue is the same one the Brief
+    /// and chat use. Light: the paper, its hue, its light glow. Dark: the hue faint and stronger
+    /// over the navy canvas, then its dark glow. Indices 0–5 are pinned to tags in
+    /// `BrainCoverSpec.tagRamps`.
+    static let coverPaletteValues: [(light: (UInt32, UInt32, UInt32), dark: (UInt32, UInt32, UInt32))] =
+        [HermexPaper.quote, .video, .wiki, .reading, .notes, .opener, .book, .plain].map { paper in
+            let v = paper.values
+            let canvas: UInt32 = 0x0D1117
+            return (light: (v.paper, HermexPaper.mix(v.hue, over: 0xFFFFFF, 0.55), v.glowLight),
+                    dark: (HermexPaper.mix(v.hue, over: canvas, 0.16), HermexPaper.mix(v.hue, over: canvas, 0.38), v.glowDark))
+        }
+
 
     /// Built once: a fresh dynamic `UIColor` never equals another, so rebuilding per
     /// view would defeat SwiftUI's diffing (same reasoning as `HermexPalette.colors`).
@@ -171,6 +173,7 @@ extension View {
     /// The one Brain list row background: `.hxSurface`.
     func brainListRow() -> some View {
         listRowBackground(Color.hxSurface)
+            .listRowSeparatorTint(Color.hxSeparator)
     }
 
     /// A list row that sits on the canvas without a separator: chip bars, pickers,
@@ -186,16 +189,10 @@ extension View {
         }
     }
 
-    /// The one card surface: `.hxSurface` in the 18pt continuous card shape with a
-    /// hairline `hxSeparator` stroke. Shared by `BrainCard` and the quote cards.
+    /// The one card surface: the neutral `.hxCard()`, clipped to its shape so covers
+    /// keep the corners. Shared by `BrainCard` and the quote cards.
     func brainCardSurface() -> some View {
-        let shape = BrainStyle.cardShape()
-        return background(Color.hxSurface, in: shape)
-            .clipShape(shape)
-            .overlay {
-                shape.stroke(Color.hxSeparator.opacity(0.6), lineWidth: 0.7)
-                    .allowsHitTesting(false)
-            }
+        clipShape(BrainStyle.cardShape()).hxCard(cornerRadius: BrainStyle.cardCorner)
     }
 }
 
@@ -214,29 +211,32 @@ extension BrainModuleID {
 
 // MARK: - Shared views
 
-/// A module's SF Symbol in an accent-tinted rounded square, for a row's leading
-/// slot. Decorative: the row's title names the module.
+/// A module's SF Symbol on a glow tile in its paper (the Brain's `.knowledge` for a
+/// module), or a neutral tile without one, for a row's leading slot. Decorative: the
+/// row's title names the module.
 struct BrainModuleIcon: View {
     let symbolName: String
+    let paper: HermexPaper?
     @ScaledMetric(relativeTo: .body) private var side = BrainStyle.iconSize
 
     init(module: BrainModuleID) {
         self.symbolName = module.symbolName
+        self.paper = .knowledge
     }
 
-    init(systemName: String) {
+    init(systemName: String, paper: HermexPaper? = nil) {
         self.symbolName = systemName
+        self.paper = paper
     }
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
         Image(systemName: symbolName)
             .font(BrainStyle.rowSubtitle.weight(.semibold))
-            .foregroundStyle(Color.accentColor)
+            .foregroundStyle(paper?.glow ?? Color.hxTextSecondary)
             .frame(width: side, height: side)
-            .background(
-                Color.accentColor.opacity(0.14),
-                in: RoundedRectangle(cornerRadius: BrainStyle.thumbnailCorner, style: .continuous)
-            )
+            .background(paper?.wash ?? Color.hxCanvas, in: shape)
+            .overlay(shape.strokeBorder(paper?.edge ?? Color.hxSeparator, lineWidth: 0.5))
             .accessibilityHidden(true)
     }
 }
@@ -266,7 +266,7 @@ struct BrainMonogram: View {
             .minimumScaleFactor(0.6)
             .frame(width: size, height: size)
             .background(Color.hxCanvas, in: Circle())
-            .overlay { Circle().stroke(Color.hxSeparator, lineWidth: 0.7) }
+            .overlay { Circle().strokeBorder(Color.hxSeparator, lineWidth: 0.5) }
             .accessibilityHidden(true)
     }
 }
@@ -330,19 +330,21 @@ struct BrainRow<Leading: View>: View {
     }
 }
 
-/// A small accent-tinted capsule in the `meta` role, for a row's trailing badge.
+/// A small capsule in the Brain's glow and the `meta` role, for a row's trailing badge.
 struct BrainBadge: View {
     let text: String
 
     var body: some View {
+        let paper = HermexPaper.knowledge
         Text(verbatim: text)
             .font(BrainStyle.meta.weight(.semibold))
-            .foregroundStyle(Color.accentColor)
+            .foregroundStyle(paper.glow)
             .lineLimit(1)
             .fixedSize()
             .padding(.horizontal, BrainStyle.s)
             .padding(.vertical, BrainStyle.xs)
-            .background(Color.accentColor.opacity(0.14), in: Capsule())
+            .background(paper.wash, in: Capsule())
+            .overlay(Capsule().strokeBorder(paper.edge, lineWidth: 0.5))
     }
 }
 
@@ -433,14 +435,15 @@ struct BrainTagChip: View {
                 Capsule().fill(selected ? Color.accentColor : Color.hxSurface)
             }
             .overlay {
-                Capsule().stroke(selected ? Color.clear : Color.hxSeparator, lineWidth: 0.7)
+                Capsule().strokeBorder(selected ? Color.clear : Color.hxSeparator, lineWidth: 0.5)
             }
             .contentShape(Capsule())
             .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
-/// The one section header (list groups, Linked from, Further reading), with an optional trailing note.
+/// The one section header (list groups, Linked from, Further reading), with an optional
+/// count and trailing note. The title matches `HXSectionHeader`: rounded display, sentence case.
 struct BrainSectionHeader: View {
     let title: String
     var count: Int?
@@ -449,8 +452,8 @@ struct BrainSectionHeader: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: BrainStyle.s) {
             Text(verbatim: title)
-                .brainText(.sectionCaption)
-                .fontWeight(.semibold)
+                .font(AppFont.display(style: .subheadline, weight: .semibold))
+                .foregroundStyle(Color.hxTextPrimary)
             if let count {
                 Text(verbatim: "\(count)")
                     .brainText(.sectionCaption)

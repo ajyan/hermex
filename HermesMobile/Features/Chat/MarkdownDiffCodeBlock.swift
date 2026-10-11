@@ -238,7 +238,7 @@ struct DiffCodeBlockText: View {
                     .accessibilityLabel(Self.accessibilityLabel(for: line))
             }
         }
-        .font(.system(size: 13, weight: .regular, design: .monospaced))
+        .font(AppFont.mono(style: .footnote))
     }
 
     @ViewBuilder

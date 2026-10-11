@@ -7,7 +7,6 @@ import SwiftUI
 /// diff surface and each file row opens that surface at the file. The host owns the
 /// actual sheet presentation.
 struct GitTurnChangesCard: View {
-    @Environment(\.colorScheme) private var colorScheme
     @AppStorage(AppHaptics.isEnabledKey) private var isHapticsEnabled = true
     @State private var isExpanded = true
 
@@ -17,8 +16,8 @@ struct GitTurnChangesCard: View {
     /// Open a single file's diff (per-row tap). Only called for rows with a status match.
     let onOpenFile: (GitFile) -> Void
 
-    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: 12, style: .continuous) }
-    private var dividerColor: Color { Color(.separator).opacity(colorScheme == .dark ? 0.8 : 1.0) }
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous) }
+    private var dividerColor: Color { Color.hxSeparator }
     private var showsTotals: Bool { summary.totalAdditions > 0 || summary.totalDeletions > 0 }
 
     var body: some View {
@@ -36,20 +35,23 @@ struct GitTurnChangesCard: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemBackground), in: shape)
-        .overlay { shape.stroke(dividerColor, lineWidth: 0.5) }
         .clipShape(shape)
+        .hxCard(cornerRadius: HXRadius.md)
     }
 
     private var header: some View {
         HStack(spacing: 8) {
+            // Changed files are `.file` objects: the icon sits on a log-sized glow tile.
             Image(systemName: "square.and.pencil")
-                .font(.system(size: 14, weight: .regular))
-                .foregroundStyle(.secondary)
+                .font(AppFont.caption(weight: .semibold))
+                .foregroundStyle(HermexPaper.file.glow)
+                .frame(width: 20, height: 20)
+                .background(HermexPaper.file.wash, in: RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous))
+                .accessibilityHidden(true)
 
             Text("File changes")
                 .font(AppFont.subheadline())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.hxTextSecondary)
 
             if showsTotals {
                 DiffCountsLabel(additions: summary.totalAdditions, deletions: summary.totalDeletions)
@@ -106,7 +108,7 @@ struct GitTurnChangesCard: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(change.gitFile?.displayPath ?? change.path)
                     .font(AppFont.subheadline())
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.hxTextPrimary)
                     .lineLimit(1)
                     .truncationMode(.middle)
 

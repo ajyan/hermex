@@ -42,7 +42,7 @@ struct BotQuickRepliesEditorView: View {
                     }
                     addButton
                 } header: {
-                    Text("Replies")
+                    HXSectionHeader(title: String(localized: "Replies")).textCase(nil)
                 } footer: {
                     Text("Shown above the Bot Chat composer when the draft is empty and the bot is idle. Same list on every server and bot. A tap fills the draft; it never sends.")
                 }
@@ -66,13 +66,14 @@ struct BotQuickRepliesEditorView: View {
                     .disabled(isAdded)
                 }
             } header: {
-                Text("Suggestions")
+                HXSectionHeader(title: String(localized: "Suggestions")).textCase(nil)
             } footer: {
                 Text("Adding a suggestion saves it as your own text. Edit it freely.")
             }
         }
-        .navigationTitle("Quick Replies")
-        .navigationBarTitleDisplayMode(.inline)
+        .scrollContentBackground(.hidden)
+        .background(Color.hxCanvas.ignoresSafeArea())
+        .hxNavigationTitle(String(localized: "Quick Replies"))
         .toolbar {
             if !replies.isEmpty { EditButton() }
         }
@@ -152,8 +153,9 @@ private struct BotQuickReplyEditSheet: View {
                     Text("Text only. It fills the Bot Chat draft; a leading /skill runs as a skill when you send.")
                 }
             }
-            .navigationTitle(isNew ? Text("Add Reply") : Text("Edit Reply"))
-            .navigationBarTitleDisplayMode(.inline)
+            .scrollContentBackground(.hidden)
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .hxNavigationTitle(isNew ? String(localized: "Add Reply") : String(localized: "Edit Reply"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

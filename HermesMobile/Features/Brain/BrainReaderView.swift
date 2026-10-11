@@ -107,8 +107,7 @@ struct BrainReaderView: View {
 
     var body: some View {
         content
-            .navigationTitle(Text(verbatim: viewModel.page?.item.title ?? ""))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(viewModel.page?.item.title ?? "")
             .background(Color.hxCanvas.ignoresSafeArea())
             .task {
                 guard didLoad else {

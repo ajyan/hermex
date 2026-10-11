@@ -1,105 +1,132 @@
 # Design
 
-Hermex's look: **calm chat, colorful objects.** The reading surface stays quiet and neutral so long agent output is easy on the eyes. Color lives on discrete *things*: a tool step, a goal, a Brain page, an approval. Each kind of thing always wears the same paper, the same one it wears in the Daily Brief, so the brief, Goals, and chat read as one app.
+Hermex's look: **calm chat, colorful objects, one voice.** The reading surface stays quiet and neutral so long agent output is easy on the eyes. Color lives on discrete *things*: a tool step, a goal, a Brain page, an approval, a Brief card. Each kind of thing always wears the same color, rendered the same way everywhere (a glow), and every screen shares one type voice (SF Pro Rounded for display) and one header, so the Brief, Goals, and chat read as one app.
 
 ## Principles
 
-1. **Neutral ground, paper objects.** Canvases, bubbles, and body text use the `hx*` neutrals. Paper color appears only on an object you could tap, link, or act on.
-2. **A color means a kind.** Paper is assigned by object type, never by sequence, position, or status. If two things share a paper, they are the same kind of thing.
-3. **Papers are papers in any light.** Paper and ink values are the same in light and dark appearance, like index cards on a dark desk. Content on a paper renders with `.environment(\.colorScheme, .light)`.
-4. **Nous blue means interactive.** `Color.accentColor` (`#0053FD` / `#4A84FE`) is the tint for controls, the send button, links, and "Atlas is working". It is never a paper.
-5. **Status colors stay semantic.** `hxSuccess`, `hxWarning`, and `hxDanger` mark outcomes (done, needs care, failed). They are not object colors.
+1. **Neutral ground, colored objects.** Canvases, bubbles, and body text use the `hx*` neutrals. Color appears only on an object you could tap, link, or act on.
+2. **A color means a kind.** Color is assigned by object type, never by sequence, position, or status. If two things share a color, they are the same kind of thing.
+3. **One material: glow.** Every colored thing is its hue on a wash of itself, deep in light mode and bright in dark mode, at two strengths: a faint `wash` for small objects (chips, request cards, drawer and log icons) and an opaque medium `card` fill for whole cards (Brief cards, the Goal hero). There are no fixed light papers anymore.
+4. **Glow text is full strength.** Text in a hue is never faded; hierarchy comes from size and weight. Fading is for decorative marks only (corner icons, dividers). Faded glow fails contrast.
+5. **Nous blue means interactive.** `Color.accentColor` (`#0053FD` / `#4A84FE`) is the tint for controls, the send button, links, and "Atlas is working". It is never an object color.
+6. **Status colors stay semantic.** `hxSuccess`, `hxWarning`, and `hxDanger` mark outcomes (done, needs care, failed). They are not object colors.
 
 ## Color
 
-### Neutrals (existing, `Config/HermexColors.swift`)
+### Neutrals (`Config/HermexColors.swift`)
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `hxCanvas` | `#F8FAFF` | `#0D1117` | Screen background |
-| `hxSurface` | `#FFFFFF` | `#161B22` | Rows, composer, neutral cards |
+| `hxCanvas` | `#F8FAFF` | `#0D1117` | Every screen background, chat included (navy-tinted, never pure black) |
+| `hxSurface` | `#FFFFFF` | `#161B22` | Rows, composer, the opaque base under floating cards |
 | `hxTextPrimary` | `#17171A` | `#E6EDF3` | Body text |
-| `hxTextSecondary` | `#666678` | `#7D8590` | Metadata, run summaries |
+| `hxTextSecondary` | `#666678` | `#7D8590` | Metadata |
 | `hxSeparator` | `#D0D7DE` | `#30363D` | Hairlines |
 | `hxUserBubble` | `#DAE7FD` | `#17243A` | User messages |
 
-Prefer `hx*` over UIKit system colors (`secondarySystemBackground`, `.label`, `.separator`) in new and touched code.
+Prefer `hx*` over UIKit system colors (`systemBackground`, `secondarySystemBackground`, `.label`, `.separator`) in new and touched code.
 
 ### Papers (`HermexPaper`, `Config/HermexColors.swift`)
 
-`DeckPalette` and `GoalPaper` read these; draw on one with `.paperSurface(_:cornerRadius:)` (`Config/HermexStyle.swift`), which also forces light appearance and puts the paper in `\.hxPaper` so decision buttons and submit controls take its ink.
+Each paper is one hue rendered as a glow that adapts to the appearance:
 
-| Paper | Paper | Ink | Brief card |
+- `glow`: text and symbols in the hue (the "Glow" column below).
+- `wash`: the hue at 16%, behind small objects.
+- `card`: a whole card's opaque fill, the hue at 20% over `hxCanvas`. **Warm hues** (`opener`, `reading`, `past`, `plain`) go 12% over `hxSurface` in dark mode instead, because warm mixed into navy reads as muddy brown.
+- `edge`: a 0.5 pt hairline in the hue, so a wash or card keeps its edge on the light canvas.
+- `onGlow`: text on a solid `glow` fill (a primary button).
+
+`glow` clears 4.5:1 on both `wash` and `card` in both appearances (`DesignSystemTests` checks every paper). `paper` and `ink` are the original light index-card values, kept as each hue's source.
+
+| Paper | Paper / ink | Glow light / dark | Brief card |
 |---|---|---|---|
-| `opener` | `#FFF1DC` | `#3A2410` | Today |
-| `quote` | `#D9E8FF` | `#0E3264` | Quote |
-| `book` | `#FFDCE6` | `#6B1534` | Book highlight |
-| `wiki` | `#D3F2E2` | `#0E4A33` | From your wiki |
-| `reading` | `#FFE4D1` | `#5A2A0C` | From your reading |
-| `notes` | `#E6DCFF` | `#33197A` | From your notes |
-| `video` | `#D2F0F4` | `#0B4650` | Video |
-| `past` | `#FFEFC2` | `#4E3A00` | On this day |
-| `advisor` | `#E4EEF6` | `#14324A` | Check-in |
-| `plain` | `#F4F0E8` | `#2A2A28` | Library, follow-ups |
+| `opener` | `#FFF1DC` / `#3A2410` | `#8A5200` / `#F6C77E` | Today (accents only; see the opener) |
+| `quote` | `#D9E8FF` / `#0E3264` | `#1D4FB8` / `#8DB4FF` | Quote |
+| `book` | `#FFDCE6` / `#6B1534` | `#A8335E` / `#F59AB8` | Book highlight |
+| `wiki` | `#D3F2E2` / `#0E4A33` | `#137049` / `#5FD3A0` | From your wiki |
+| `reading` | `#FFE4D1` / `#5A2A0C` | `#9A4410` / `#F5A37A` | From your reading |
+| `notes` | `#E6DCFF` / `#33197A` | `#5B3FC4` / `#B39DFF` | From your notes |
+| `video` | `#D2F0F4` / `#0B4650` | `#0E6D7A` / `#5CCFE0` | Video |
+| `past` | `#FFEFC2` / `#4E3A00` | `#7A5C00` / `#E8C55A` | On this day |
+| `advisor` | `#E4EEF6` / `#14324A` | `#2E5878` / `#9DBEDD` | Check-in |
+| `plain` | `#F4F0E8` / `#2A2A28` | `#5E5646` / `#D6CDBB` | Library, follow-ups |
 
-Every pair keeps ink-on-paper body text above 7:1. Secondary text on a paper is the ink at 0.7 opacity, never `hxTextSecondary`.
+### The object key
 
-### The object key (chat and drawer)
-
-Named in `HermexStyle.swift`; `HermexPaper.forTool(_:)` maps tool kinds.
+Named in `Config/HermexStyle.swift`; `HermexPaper.forTool(_:)` maps tool kinds.
 
 | Object | Name | Paper |
 |---|---|---|
 | Approval, clarification, anything waiting on the user | `.request` | `opener` |
-| Brain or wiki page (`brain://` citation), a search | `.knowledge` | `wiki` |
-| File read, written, or listed; file attachments | `.file` | `notes` |
+| Brain or wiki page (`brain://` citation) | `.knowledge` | `wiki` |
+| File read, written, listed, or searched (grep, find); file attachments | `.file` | `notes` |
 | Web search or fetch | `.web` | `video` |
 | Memory or skill | `.recall` | `advisor` |
 | Shell, code, delegation, everything else; chat source badges | `.tool` | `plain` |
 | Goal | the goal's own paper (`GoalPaper`) | any |
+| Drawer sections: Daily Brief, Brain, Goals | `opener`, `.knowledge`, `book` | |
 
-A failed tool step keeps its paper and adds an `hxDanger` symbol and label. The paper never turns red.
+Add a new kind of object here and in the code together. A failed tool step keeps its color and adds an `hxDanger` mark; the color never turns red.
 
 ## Components
 
-- **Tool chip** (`ToolCallChip`). A capsule in the call's paper: symbol, target (cut at 24 characters), and an ellipsis while running or a red `xmark` after failing. A live group shows its newest four, with older calls behind a `+N` chip on `hxSurface`.
-- **Run summary.** A settled group folds to one `hxTextSecondary` line: up to three paper dots, the call itself or `N steps`, a red `N failed` when any did, and a chevron. Tapping chips or the summary opens the full log; "Expand Tools by Default" starts it open.
-- **Object card** (`BrainCitationCards`). Each Brain page a reply links (up to three) gets a `knowledge` card under it: radius `md`, symbol, ink title, ink 0.7 module name. It opens through the same router as the inline link.
-- **Action card.** An approval or clarification: `request` paper. Primary decision buttons fill with ink and paper-colored text; secondary ones wash in ink at 0.08.
-- **Hero paper.** A Daily Brief card or Goal hero: radius `xl` with the `paper` shadow. It is the only lifted paper.
+- **`HXChip`** (`Config/HermexStyle.swift`): the one chip. A capsule with the wash, edge, and glow, an optional symbol, a label (caption medium, one line, middle-truncated), and an optional trailing mark. Tool calls, run counts, Brain citations, and `+N` all use it. Lay chips out with `FlowRow`, which wraps and offers an over-wide chip the row's width so large text truncates instead of overflowing.
+- **Live run.** While Atlas works, each call is a `ToolCallChip`: its target (cut at 24 characters), an ellipsis while running, a red `xmark` after failing. The newest four show; older calls sit behind `+N`.
+- **Finished run.** One chip per kind of tool with its count, in the order each kind first ran ("3 commands", "2 searches"), plus a red `xmark` on a kind with failures. Tapping the row opens the full log; "Expand Tools by Default" starts it open. The row is at least 44 pt tall.
+- **Tool log rows.** Each row's icon sits on a 20 pt tile in its kind's wash and glow, so the log matches the chip that opened it.
+- **Brain citations** (`BrainCitationChips`). Each Brain page a reply links (up to three) gets a knowledge chip under the reply, opening through the same router as the inline link. Hit areas extend 7 pt past the chip.
+- **Request cards.** Approvals and clarifications use `.glowSurface(.request, cornerRadius:, opaque: true)`: the wash over `hxSurface` (opaque because they float over transcript text), the edge, and the paper in `\.hxPaper`. Their title and symbol take the glow. Primary decision buttons fill with `glow` and `onGlow` text; secondary ones use the wash and edge.
+- **File attachments.** A tile on `.glowSurface(.file, …)`: glow icon and extension, neutral file name.
+- **Drawer.** Sections with their own paper show their icon on a 30 pt glow tile; the rest stay neutral so the colored ones stand out.
+- **Glow card.** A Daily Brief card or Goal hero: `card` fill, `edge` hairline, radius `xl`, the `paper` shadow; headline in `AppFont.display` semibold in the hue, body text in `hxTextPrimary`, everything else full-strength glow. Its buttons follow the button rules.
+- **Brief opener.** A neutral card (`hxSurface`, `hxSeparator` edge) with amber (`opener` glow) accents, since it summarizes the day rather than being one kind of thing: the date and advisor, the day's title, a **Yesterday** line (the brief's `recap`, one sentence from yesterday's journal and goal check-ins; hidden when absent), then **Today · N cards**, a list of the cards ahead, each with its kind's icon on a wash tile, its title (or question), and its one-word kind (`DeckPalette.shortName`). The list is for orientation only; it isn't tappable.
+- **Neutral card** (`.hxCard()`): `hxSurface` with an `hxSeparator` hairline, `lg` corners. Grouped content on any screen (Settings sections, list groups, detail panels) sits in one; rows inside use `sm` corners or hairline dividers. No translucent or glass cards in content; glass is for floating controls only.
+- **Section header** (`HXSectionHeader`): `AppFont.display(.subheadline, .semibold)` in sentence case above a card or rows, with an optional secondary trailing note. Never uppercase.
+- **Header** (`HXNavigationTitle`, `.hxNavigationTitle(_:subtitle:)`). Every screen: a glass circle on the left (menu or back), a centered title in `AppFont.display(.subheadline, .semibold)` with an optional `caption2` subtitle (the chat's project, the Brief's "3 of 10 · Filed"), and one glass capsule of actions on the right. Chat, Daily Brief, and Goals use it.
+- **Buttons.** Primary: a capsule filled with the object's `glow`, `onGlow` text (Allow, Answer, Write a reflection, File it). Secondary: a capsule in the object's `wash` and `edge`. On the app's own surfaces (no object), the primary is Nous blue. Icon actions are glass circles. `ChatDecisionButtonStyle` draws capsules.
 
 ## Shape
 
-One radius scale, as `HXRadius` in `Config/`:
+One radius scale, as `HXRadius`:
 
 | Token | pt | Use |
 |---|---|---|
-| `xs` | 6 | Inline code, thumbnails, small tiles |
-| `sm` | 10 | Rows, attachment tiles, tool-log rows |
-| `md` | 14 | Object cards, chips' containers, quote chips |
-| `lg` | 18 | Section cards, action cards, the expanded composer |
-| `xl` | 28 | Hero papers (Deck cards, the Goal hero) |
+| `xs` | 6 | Inline code, thumbnails, log icon tiles |
+| `sm` | 10 | Rows, attachment tiles, buttons, drawer icon tiles |
+| `md` | 14 | Inset blocks, choice buttons |
+| `lg` | 18 | Section cards, action cards (approval overlay, Bot request card) |
+| `xl` | 28 | Glow cards (Brief cards, Goal hero) |
 
-Use `.continuous` corners everywhere. Capsules are capsules, not a large radius.
+Use `.continuous` corners everywhere. Chips are capsules. The composer keeps its own geometry (`ChatComposerMetrics`: a pill, and 26 pt when expanded), and the clarification card that docks on it uses the same 26 so the two read as one surface.
 
 ## Elevation
 
 Shadows, as `.hxShadow(_:)`:
 
-- **`paper`**: black at 0.08, radius 14, y 6. Only for hero papers. **`stacked`** (0.06, radius 10, y 4) for deck cards waiting behind the top one.
-- **`float`**: black at 0.12 (light) or 0.28 (dark), radius 14, y 6. Only for the composer and floating glass controls.
+- **`paper`**: black at 0.08, radius 14, y 6, for glow cards. **`stacked`** (0.06, 10, y 4) for deck cards waiting behind the top one.
+- **`float`**: black at 0.12 (light) or 0.28 (dark), radius 14, y 6, for the composer and floating glass controls.
+- **`modal`**: black at 0.22, radius 18, y 12, for a card over a dimmed screen (the approval overlay).
 
 Everything inline in chat is flat.
 
 ## Type
 
-- SF Pro through `AppFont` and Dynamic Type styles. No `.system(size:)` in new or touched code. Tool rows move to `.footnote` and `.caption`.
-- Serif (New York) through `AppFont.serif` only, for brief and goal display text and quoted words a person saved. Chat content stays SF.
+One voice, three faces, all Dynamic Type through `AppFont`:
+
+- **Display: SF Pro Rounded** (`AppFont.display`): screen titles, card headlines, Brief questions, Goal titles, and headings in Atlas's replies (the Markdown theme's headings use `FontFamily(.system(.rounded))`). Semibold.
+- **Body: SF Pro**: everything you read at length, controls, metadata.
+- **Saved words: New York** (`AppFont.serif`), only for words a person saved: quotes, book highlights, past journal entries, and recap answers. Nothing else is serif.
+
+No `.system(size:)` on text. The one exception: an SF Symbol inside a fixed-size control (a round button, a media control) keeps a fixed point size, since a growing glyph would break the control.
 
 ## Motion
 
 A live chip fades in as its call arrives (off for replays and under Reduce Motion), and opening the log uses the chat disclosure motion. Nothing loops or repaints continuously.
 
-## Still to migrate
+## Decisions and exceptions
 
-New and touched code uses the tokens; older one-offs move when their screen is next touched: chat's inner radii (8, 9, 12, 16, 20), Settings cards and rows, Kanban and Tasks status tints, `BotProfileAppearance` hexes, and the Voice Call orb's own blue.
+- **Links stay Nous blue**, `brain://` ones included: a link is a control (principle 4). The reply's Brain chips carry the Brain color. Coloring individual inline links would also mean replacing the Markdown renderer's link style.
+- **Brain covers** derive their ramps from the papers (`BrainStyle.coverPaletteValues`): light is the paper, its hue, its light glow; dark is the hue at 16% and 38% over the navy canvas, then its dark glow.
+- **Bot avatar colors** (`BotAvatarColor.palette`) are server data shared with Hermes Desktop, not app chrome, so they keep Desktop's hexes.
+- **Project colors** come from the server (`Color(hexString:)`) and are the user's, not the system's.
+- **Translucent fills** (`systemFill` family), `tertiaryLabel`, and `placeholderText` stay UIKit: there is no `hx` equivalent and they adapt correctly.

@@ -86,30 +86,72 @@ extension ShapeStyle where Self == Color {
     static var hxOnAccent: Color { Color(hermexToken: .onAccent) }
 }
 
-/// A paper and the ink drawn on it: the Daily Brief's card colors, which also mark objects by
-/// kind across the app (DESIGN.md § Color). The same in light and dark appearance, like index
-/// cards on a dark desk; every pair keeps ink-on-paper body text above 7:1. Built once each,
-/// since SwiftUI compares colors when diffing.
+/// A paper: one hue that marks a kind of object across the app (DESIGN.md § Color), rendered
+/// as a **glow** that adapts to the appearance: a deep hue in light, a bright hue in dark.
+/// - Small objects (chips, request cards, drawer icons) use `wash` behind `glow` text, with an
+///   `edge` hairline.
+/// - Whole cards (Brief, Goal hero) use `card`, the same hue at medium strength made opaque, so
+///   stacked cards never show through each other.
+/// `paper` and `ink` are the original light index-card values, kept as the hue's source and
+/// for surfaces that must stay light (widgets). Glow text clears 4.5:1 on wash and card.
+/// Colors are built once each, since SwiftUI compares colors when diffing.
 struct HermexPaper: Equatable {
     let paper: Color
     let ink: Color
+    /// Text and symbols on the canvas in this paper's hue.
+    let glow: Color
+    /// The faint fill behind glow text: the hue at 16% over the canvas.
+    let wash: Color
+    /// A whole card's fill, opaque: the hue at 20% over `hxCanvas`. In dark mode a warm hue
+    /// (amber, orange, gold, sand) goes 12% over `hxSurface` instead, since warm over navy reads
+    /// as muddy brown.
+    let card: Color
+    /// A hairline in the hue, so a wash keeps its edge on a light canvas.
+    let edge: Color
+    /// Text on a solid `glow` fill (a request's primary button).
+    let onGlow: Color
+    /// The raw values, for surfaces that derive their own ramps (Brain covers).
+    let values: (paper: UInt32, ink: UInt32, glowLight: UInt32, glowDark: UInt32, hue: UInt32)
 
     /// Supporting text on the paper: the ink, lighter, never `hxTextSecondary`.
-    var secondaryInk: Color { ink.opacity(0.7) }
+    var secondaryInk: Color { ink.opacity(0.75) }
 
-    private init(paper: UInt32, ink: UInt32) {
-        self.paper = Color(uiColor: HermexPalette.uiColor(paper << 8 | 0xFF))
-        self.ink = Color(uiColor: HermexPalette.uiColor(ink << 8 | 0xFF))
+    private init(paper: UInt32, ink: UInt32, glowLight: UInt32, glowDark: UInt32, hue: UInt32, warm: Bool = false) {
+        func color(_ rgb: UInt32, alpha: UInt32 = 0xFF) -> UIColor { HermexPalette.uiColor(rgb << 8 | alpha) }
+        func dynamic(light: UIColor, dark: UIColor) -> Color {
+            Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? dark : light })
+        }
+        self.paper = Color(uiColor: color(paper))
+        self.ink = Color(uiColor: color(ink))
+        glow = dynamic(light: color(glowLight), dark: color(glowDark))
+        wash = Color(uiColor: color(hue, alpha: 0x29))
+        let darkCard = warm ? Self.mix(hue, over: 0x161B22, 0.12) : Self.mix(hue, over: 0x0D1117, 0.2)
+        card = dynamic(light: color(Self.mix(hue, over: 0xF8FAFF, 0.2)), dark: color(darkCard))
+        edge = dynamic(light: color(glowLight, alpha: 0x4D), dark: color(glowDark, alpha: 0x47))
+        onGlow = dynamic(light: color(0xFFFFFF), dark: color(ink))
+        values = (paper, ink, glowLight, glowDark, hue)
     }
 
-    static let opener = HermexPaper(paper: 0xFFF1DC, ink: 0x3A2410)
-    static let quote = HermexPaper(paper: 0xD9E8FF, ink: 0x0E3264)
-    static let book = HermexPaper(paper: 0xFFDCE6, ink: 0x6B1534)
-    static let wiki = HermexPaper(paper: 0xD3F2E2, ink: 0x0E4A33)
-    static let reading = HermexPaper(paper: 0xFFE4D1, ink: 0x5A2A0C)
-    static let notes = HermexPaper(paper: 0xE6DCFF, ink: 0x33197A)
-    static let video = HermexPaper(paper: 0xD2F0F4, ink: 0x0B4650)
-    static let past = HermexPaper(paper: 0xFFEFC2, ink: 0x4E3A00)
-    static let advisor = HermexPaper(paper: 0xE4EEF6, ink: 0x14324A)
-    static let plain = HermexPaper(paper: 0xF4F0E8, ink: 0x2A2A28)
+    static func == (lhs: HermexPaper, rhs: HermexPaper) -> Bool { lhs.values.paper == rhs.values.paper }
+
+    /// `top` at `alpha` over `bottom`, both `0xRRGGBB`.
+    static func mix(_ top: UInt32, over bottom: UInt32, _ alpha: Double) -> UInt32 {
+        [16, 8, 0].reduce(UInt32(0)) { result, shift in
+            let t = Double((top >> UInt32(shift)) & 0xFF), b = Double((bottom >> UInt32(shift)) & 0xFF)
+            return result | UInt32((t * alpha + b * (1 - alpha)).rounded()) << UInt32(shift)
+        }
+    }
+
+    static let opener = HermexPaper(paper: 0xFFF1DC, ink: 0x3A2410, glowLight: 0x8A5200, glowDark: 0xF6C77E, hue: 0xF2B45A, warm: true)
+    static let quote = HermexPaper(paper: 0xD9E8FF, ink: 0x0E3264, glowLight: 0x1D4FB8, glowDark: 0x8DB4FF, hue: 0x6E9BFF)
+    static let book = HermexPaper(paper: 0xFFDCE6, ink: 0x6B1534, glowLight: 0xA8335E, glowDark: 0xF59AB8, hue: 0xF27BA0)
+    static let wiki = HermexPaper(paper: 0xD3F2E2, ink: 0x0E4A33, glowLight: 0x137049, glowDark: 0x5FD3A0, hue: 0x3FBF8A)
+    static let reading = HermexPaper(paper: 0xFFE4D1, ink: 0x5A2A0C, glowLight: 0x9A4410, glowDark: 0xF5A37A, hue: 0xF08A55, warm: true)
+    static let notes = HermexPaper(paper: 0xE6DCFF, ink: 0x33197A, glowLight: 0x5B3FC4, glowDark: 0xB39DFF, hue: 0x9B7BFF)
+    static let video = HermexPaper(paper: 0xD2F0F4, ink: 0x0B4650, glowLight: 0x0E6D7A, glowDark: 0x5CCFE0, hue: 0x3BB8C9)
+    static let past = HermexPaper(paper: 0xFFEFC2, ink: 0x4E3A00, glowLight: 0x7A5C00, glowDark: 0xE8C55A, hue: 0xD9AE2E, warm: true)
+    static let advisor = HermexPaper(paper: 0xE4EEF6, ink: 0x14324A, glowLight: 0x2E5878, glowDark: 0x9DBEDD, hue: 0x7FA6C9)
+    static let plain = HermexPaper(paper: 0xF4F0E8, ink: 0x2A2A28, glowLight: 0x5E5646, glowDark: 0xD6CDBB, hue: 0xA09680, warm: true)
+
+    static let all: [HermexPaper] = [.opener, .quote, .book, .wiki, .reading, .notes, .video, .past, .advisor, .plain]
 }

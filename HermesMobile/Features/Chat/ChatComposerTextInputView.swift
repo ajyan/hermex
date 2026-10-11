@@ -160,7 +160,7 @@ private struct ComposerCollapsedDraft: View {
         line
             .lineLimit(1)
             .truncationMode(.tail)
-            .foregroundStyle(draft.isEmpty ? Color(.placeholderText) : Color(.label))
+            .foregroundStyle(draft.isEmpty ? Color(.placeholderText) : Color.hxTextPrimary)
             .accessibilityLabel(Text(spokenDraft))
     }
 

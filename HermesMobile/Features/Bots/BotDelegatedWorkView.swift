@@ -12,7 +12,7 @@ import UIKit
                 if let error = work.errorMessage {
                     Section {
                         Label(error, systemImage: "exclamationmark.triangle")
-                            .font(.footnote)
+                            .font(AppFont.footnote())
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -33,7 +33,7 @@ import UIKit
                             workerRow(worker)
                         }
                     } header: {
-                        Text("Active workers")
+                        HXSectionHeader(title: String(localized: "Active workers")).textCase(nil)
                     } footer: {
                         if work.omittedWorkerCount > 0 {
                             Text("Showing the first \(BotDelegatedWork.maximumWorkers) workers. \(work.omittedWorkerCount) more are active.")
@@ -44,8 +44,9 @@ import UIKit
                 }
             }
             .listStyle(.insetGrouped)
-            .navigationTitle("Delegated work")
-            .navigationBarTitleDisplayMode(.inline)
+            .scrollContentBackground(.hidden)
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .hxNavigationTitle(String(localized: "Delegated work"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
@@ -94,11 +95,11 @@ import UIKit
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(worker.goal)
-                    .font(.body.weight(.semibold))
+                    .font(AppFont.body(weight: .semibold))
                     .foregroundStyle(.primary)
                 Spacer(minLength: 8)
                 Text(worker.status.localizedUppercase)
-                    .font(.caption2.weight(.bold))
+                    .font(AppFont.caption2(weight: .bold))
                     .foregroundStyle(.secondary)
             }
 
@@ -112,13 +113,13 @@ import UIKit
                     Label("\(count) tools", systemImage: "hammer")
                 }
             }
-            .font(.caption)
+            .font(AppFont.caption())
             .foregroundStyle(.secondary)
             .lineLimit(1)
 
             if work.loadingTail == worker.identity {
                 Text("Loading tail…")
-                    .font(.caption)
+                    .font(AppFont.caption())
                     .foregroundStyle(.secondary)
             } else if let tail = work.tail, tail.worker == worker.identity {
                 tailView(tail)
@@ -139,7 +140,7 @@ import UIKit
 
                 if work.interruptedWorker == worker.identity {
                     Label("Interrupt sent", systemImage: "stop.circle")
-                        .font(.caption.weight(.semibold))
+                        .font(AppFont.caption(weight: .semibold))
                         .foregroundStyle(.secondary)
                 } else {
                     Button("Interrupt", role: .destructive) {
@@ -160,22 +161,22 @@ import UIKit
             VStack(alignment: .leading, spacing: 6) {
                 ScrollView(.vertical) {
                     Text(tail.text.isEmpty ? String(localized: "No output yet.") : tail.text)
-                        .font(.system(.caption, design: .monospaced))
+                        .font(AppFont.mono(style: .caption))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxHeight: 180)
                 if tail.truncated {
                     Label("Showing the latest 16 KB", systemImage: "scissors")
-                        .font(.caption2)
+                        .font(AppFont.caption2())
                         .foregroundStyle(.secondary)
                 }
             }
             .padding(10)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
         } else {
             Text("Live output is no longer available for this worker.")
-                .font(.caption)
+                .font(AppFont.caption())
                 .foregroundStyle(.secondary)
         }
     }
@@ -195,21 +196,21 @@ struct BotDelegationCompletionCard: View {
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(iconColor)
                         .frame(width: 28, height: 28)
-                        .background(iconColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 9))
+                        .background(iconColor.opacity(0.14), in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(title)
-                            .font(.subheadline.weight(.semibold))
+                            .font(AppFont.subheadline(weight: .semibold))
                             .foregroundStyle(.primary)
                         Text(summary)
-                            .font(.caption)
+                            .font(AppFont.caption())
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                     Image(systemName: "chevron.forward")
-                        .font(.caption.weight(.semibold))
+                        .font(AppFont.caption(weight: .semibold))
                         .foregroundStyle(.tertiary)
                         .padding(.top, 6)
                 }
@@ -217,26 +218,22 @@ struct BotDelegationCompletionCard: View {
                 HStack(spacing: 8) {
                     if let delegationID = completion.delegationID {
                         Text(delegationID)
-                            .font(.caption2.monospaced())
+                            .font(AppFont.mono(style: .caption2))
                             .foregroundStyle(.tertiary)
                             .lineLimit(1)
                             .truncationMode(.middle)
                     }
                     Spacer(minLength: 8)
                     Text("View results")
-                        .font(.caption.weight(.semibold))
+                        .font(AppFont.caption(weight: .semibold))
                         .foregroundStyle(.tint)
                 }
                 .padding(.top, 9)
                 .overlay(alignment: .top) { Divider() }
             }
             .padding(12)
-            .contentShape(RoundedRectangle(cornerRadius: 15))
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 15))
-            .overlay {
-                RoundedRectangle(cornerRadius: 15)
-                    .stroke(.quaternary, lineWidth: 1)
-            }
+            .contentShape(RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
+            .hxCard()
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
@@ -300,11 +297,11 @@ struct BotDelegationResultsSheet: View {
                               : "checkmark.circle.fill")
                             .foregroundStyle(completion.hasFailures ? .hxWarning : .hxSuccess)
                     }
-                    .font(.subheadline.weight(.semibold))
+                    .font(AppFont.subheadline(weight: .semibold))
 
                     if let delegationID = completion.delegationID {
                         Text(delegationID)
-                            .font(.caption.monospaced())
+                            .font(AppFont.mono(style: .caption))
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)
                     }
@@ -326,8 +323,8 @@ struct BotDelegationResultsSheet: View {
                 }
                 .padding(16)
             }
-            .navigationTitle("Delegated work")
-            .navigationBarTitleDisplayMode(.inline)
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .hxNavigationTitle(String(localized: "Delegated work"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }

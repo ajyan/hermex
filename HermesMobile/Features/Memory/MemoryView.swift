@@ -15,7 +15,9 @@ struct MemoryView: View {
 
     var body: some View {
         content
-            .navigationTitle("Memory")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .hxNavigationTitle(String(localized: "Memory"))
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -67,45 +69,62 @@ struct MemoryView: View {
         } else if !viewModel.hasLoaded {
             ProgressView("Loading memory...")
         } else {
-            List {
-                ForEach(MemorySection.allCases) { section in
-                    Section {
-                        MemorySectionContent(
-                            section: section,
-                            content: viewModel.content(for: section)
-                        )
-                            .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
-                    } header: {
-                        MemorySectionHeader(
-                            section: section,
-                            modifiedAt: viewModel.modifiedAt(for: section),
-                            isEditingDisabled: viewModel.isSaving
-                        ) {
-                            viewModel.clearActionError()
-                            editingSection = section
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 24) {
+                    ForEach(MemorySection.allCases) { section in
+                        VStack(alignment: .leading, spacing: 8) {
+                            MemorySectionHeader(
+                                section: section,
+                                modifiedAt: viewModel.modifiedAt(for: section),
+                                isEditingDisabled: viewModel.isSaving
+                            ) {
+                                viewModel.clearActionError()
+                                editingSection = section
+                            }
+                            .padding(.horizontal, 4)
+
+                            MemorySectionContent(
+                                section: section,
+                                content: viewModel.content(for: section)
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .hxCard()
+                        }
+                    }
+
+                    if viewModel.showsProjectContext {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ProjectContextSectionHeader(modifiedAt: viewModel.projectContextMtime)
+                                .padding(.horizontal, 4)
+
+                            MarkdownRenderer(content: viewModel.projectContextText ?? "")
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .hxCard()
+
+                            ProjectContextSectionFooter(
+                                detail: viewModel.projectContextDetail,
+                                isShadowed: viewModel.isProjectContextShadowed
+                            )
+                            .font(AppFont.footnote())
+                            .foregroundStyle(Color.hxTextSecondary)
+                            .padding(.horizontal, 4)
                         }
                     }
                 }
-
-                if viewModel.showsProjectContext {
-                    Section {
-                        MarkdownRenderer(content: viewModel.projectContextText ?? "")
-                            .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
-                    } header: {
-                        ProjectContextSectionHeader(modifiedAt: viewModel.projectContextMtime)
-                    } footer: {
-                        ProjectContextSectionFooter(
-                            detail: viewModel.projectContextDetail,
-                            isShadowed: viewModel.isProjectContextShadowed
-                        )
-                    }
-                }
+                .padding(.horizontal, 16)
+                .padding(.top, 18)
+                .padding(.bottom, 32)
             }
+            .adaptiveReadableScrollContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
             .refreshable {
                 await loadMemory()
             }
-            // Wide tables fade into the grouped row they sit on.
-            .environment(\.markdownTableEdgeFadeColor, Color(.secondarySystemGroupedBackground))
+            // Wide tables fade into the card they sit on.
+            .environment(\.markdownTableEdgeFadeColor, Color.hxSurface)
         }
     }
 
@@ -126,12 +145,12 @@ private struct MemorySectionHeader: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Label(section.title, systemImage: section.systemImage)
+            MemoryHeaderTitle(title: section.title, systemImage: section.systemImage)
             Spacer()
             if let modifiedAt {
                 Text("Modified \(modifiedAt, style: .relative) ago")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(AppFont.caption())
+                    .foregroundStyle(Color.hxTextSecondary)
             }
             Button(action: onEdit) {
                 Label("Edit \(section.title)", systemImage: "pencil")
@@ -143,6 +162,30 @@ private struct MemorySectionHeader: View {
     }
 }
 
+/// A Memory section's title: its icon on the `.recall` glow tile (DESIGN.md § The object
+/// key) beside the rounded display voice in sentence case.
+private struct MemoryHeaderTitle: View {
+    let title: String
+    let systemImage: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: systemImage)
+                .font(AppFont.caption(weight: .semibold))
+                .foregroundStyle(HermexPaper.recall.glow)
+                .frame(width: 24, height: 24)
+                .background(HermexPaper.recall.wash, in: RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous))
+                .accessibilityHidden(true)
+
+            Text(verbatim: title)
+                .font(AppFont.display(style: .subheadline, weight: .semibold))
+                .foregroundStyle(Color.hxTextPrimary)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
 /// Header for the read-only project-context document: no edit affordance — the
 /// server has no write path for this section — so a lock icon marks it read-only.
 private struct ProjectContextSectionHeader: View {
@@ -150,11 +193,11 @@ private struct ProjectContextSectionHeader: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Label("Project Context", systemImage: "folder.badge.gearshape")
+            MemoryHeaderTitle(title: String(localized: "Project Context"), systemImage: "folder.badge.gearshape")
             Spacer()
             if let modifiedAt {
                 Text("Modified \(modifiedAt, style: .relative) ago")
-                    .font(.caption)
+                    .font(AppFont.caption())
                     .foregroundStyle(.secondary)
             }
             Image(systemName: "lock.fill")
@@ -221,26 +264,30 @@ private struct MemoryEditSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section(section.title) {
+                Section {
                     TextEditor(text: $content)
-                        .font(.system(.body, design: .monospaced))
+                        .font(AppFont.mono(style: .body))
                         .frame(minHeight: 320)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .disabled(isSaving)
                         .accessibilityLabel(section.title)
+                } header: {
+                    HXSectionHeader(title: section.title)
+                        .textCase(nil)
                 }
 
                 if let errorMessage {
                     Section {
                         Text(errorMessage)
-                            .font(.footnote)
+                            .font(AppFont.footnote())
                             .foregroundStyle(.hxDanger)
                     }
                 }
             }
-            .navigationTitle("Edit \(section.title)")
-            .navigationBarTitleDisplayMode(.inline)
+            .scrollContentBackground(.hidden)
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .hxNavigationTitle(String(localized: "Edit \(section.title)"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

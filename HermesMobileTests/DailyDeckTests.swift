@@ -643,4 +643,12 @@ final class DeckReviewTests: XCTestCase {
         XCTAssertTrue(client.sent.last?.message.contains("`bin/brain brief file 2026-10-04 weekly`") == true)
         XCTAssertEqual(DailyDeckViewModel.sessionTitle(for: "2026-10-04", kind: "weekly"), "Weekly Review · Oct 4")
     }
+
+    // MARK: - Opener
+
+    func testHeadlineDecodesTheRecapOfYesterdayAndIgnoresABlankOne() throws {
+        let deck = try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"headline","type":"headline","title":"T","recap":"You ran 21 miles."},{"id":"x","type":"headline","recap":"  "}]}"#)
+        XCTAssertEqual(deck.cards[0].recap, "You ran 21 miles.")
+        XCTAssertNil(deck.cards[1].recap)
+    }
 }

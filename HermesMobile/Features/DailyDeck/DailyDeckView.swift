@@ -18,8 +18,7 @@ struct DailyDeckView: View {
 
     var body: some View {
         content
-            .navigationTitle(Text(verbatim: viewModel.title))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(viewModel.title, subtitle: viewModel.state == .ready ? progressSubtitle : nil)
             .background(Color.hxCanvas.ignoresSafeArea())
             .toolbar {
                 if viewModel.workspace != nil {
@@ -142,32 +141,26 @@ struct DailyDeckView: View {
         }
     }
 
+    /// "Oct 9 · 3 of 10 · Filed": which day (when it isn't today), where you are, and whether
+    /// it's filed. The header's subtitle.
+    private var progressSubtitle: String {
+        var parts: [String] = []
+        if viewModel.isReview {
+            parts.append(viewModel.reviews.first { $0.date == viewModel.date && $0.kind == viewModel.kind }?.label
+                         ?? DailyDeckPaths.label(viewModel.date))
+        } else if viewModel.date != viewModel.today {
+            parts.append(DailyDeckPaths.label(viewModel.date))
+        }
+        parts.append("\(viewModel.index + 1) of \(viewModel.visiblePages.count)")
+        if viewModel.isFiled { parts.append(viewModel.hasChanges ? "Edited" : "Filed") }
+        return parts.joined(separator: " · ")
+    }
+
     private func progress(count: Int) -> some View {
         VStack(spacing: 6) {
             ProgressView(value: Double(viewModel.index + 1), total: Double(max(count, 1)))
-                .tint(.secondary)
-            HStack(spacing: 6) {
-                if viewModel.isReview {
-                    Text(verbatim: viewModel.reviews.first { $0.date == viewModel.date && $0.kind == viewModel.kind }?.label
-                         ?? DailyDeckPaths.label(viewModel.date))
-                    Text(verbatim: "·")
-                } else if viewModel.date != viewModel.today {
-                    Text(verbatim: DailyDeckPaths.label(viewModel.date))
-                    Text(verbatim: "·")
-                }
-                Text(verbatim: "\(viewModel.index + 1) of \(count)")
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-                if viewModel.isFiled {
-                    Text(verbatim: "·")
-                    Label { Text(verbatim: viewModel.hasChanges ? "Edited" : "Filed") } icon: {
-                        Image(systemName: viewModel.hasChanges ? "pencil" : "checkmark")
-                    }
-                    .labelStyle(.titleAndIcon)
-                }
-            }
-            .font(AppFont.caption())
-            .foregroundStyle(.secondary)
+                .tint(viewModel.currentPage.map { DeckPalette.of($0).ink } ?? .secondary)
+                .accessibilityValue(Text(verbatim: progressSubtitle))
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)

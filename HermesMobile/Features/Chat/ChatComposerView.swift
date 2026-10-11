@@ -55,11 +55,11 @@ private struct ComposerStatusView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                 .fill(backgroundColor)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                 .stroke(borderColor, lineWidth: 0.5)
         )
         .padding(.horizontal, 16)
@@ -90,7 +90,7 @@ private struct ComposerStatusView: View {
     }
 
     private var textColor: Color {
-        isError ? Color(.label) : Color.secondary
+        isError ? Color.hxTextPrimary : Color.secondary
     }
 
     private var backgroundColor: Color {
@@ -98,7 +98,7 @@ private struct ComposerStatusView: View {
     }
 
     private var borderColor: Color {
-        isError ? Color.hxDanger.opacity(0.25) : Color(.separator).opacity(0.25)
+        isError ? Color.hxDanger.opacity(0.25) : Color.hxSeparator.opacity(0.25)
     }
 }
 
@@ -553,7 +553,7 @@ struct MessageComposerView: View {
                         // the keyboard gap and the bottom safe area, so no strip
                         // of transcript shows around the row.
                         .background(
-                            Color(.systemBackground)
+                            Color.hxCanvas
                                 .padding(.top, -10)
                                 .padding(.bottom, -12)
                                 .ignoresSafeArea(edges: .bottom)
@@ -1281,7 +1281,7 @@ struct MessageComposerView: View {
     }
 
     private var metaControlColor: Color {
-        Color(.secondaryLabel)
+        Color.hxTextSecondary
     }
 
     private var workspaceTitle: String {

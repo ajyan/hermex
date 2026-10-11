@@ -183,10 +183,10 @@ private struct TranscriptMediaThumbnailView: View {
                 .scaledToFill()
                 .frame(width: thumbnailWidth, height: thumbnailHeight)
                 .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color(.separator).opacity(0.35), lineWidth: 0.5)
+                    RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
+                        .stroke(Color.hxSeparator.opacity(0.35), lineWidth: 0.5)
                 )
         } else if didAttemptLoad {
             if reference.isExtensionlessRemoteMediaCandidate {
@@ -195,7 +195,7 @@ private struct TranscriptMediaThumbnailView: View {
                 TranscriptMediaUnavailableChip(reference: reference)
             }
         } else {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                 .fill(Color(.systemFill))
                 .frame(width: thumbnailWidth, height: thumbnailHeight)
                 .overlay {
@@ -245,7 +245,7 @@ private struct TranscriptMediaResolvedRemoteView: View {
                 TranscriptMediaUnavailableChip(reference: reference)
 
             case nil:
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                     .fill(Color(.systemFill))
                     .frame(width: 210, height: 132)
                     .overlay {
@@ -273,10 +273,10 @@ private struct TranscriptMediaResolvedRemoteView: View {
             .scaledToFill()
             .frame(width: 210, height: 132)
             .clipped()
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color(.separator).opacity(0.35), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
+                    .stroke(Color.hxSeparator.opacity(0.35), lineWidth: 0.5)
             )
     }
 
@@ -333,7 +333,7 @@ private struct TranscriptMediaAudioExportView: View {
                 Task { await exportAudio() }
             } label: {
                 Image(systemName: "square.and.arrow.up")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(AppFont.subheadline(weight: .semibold))
             }
             .buttonStyle(.chatTactile(.icon))
             .disabled(isExporting)
@@ -424,13 +424,13 @@ private struct TranscriptMediaFileExportView: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "doc")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color(.secondaryLabel))
+                .font(AppFont.subheadline(weight: .semibold))
+                .foregroundStyle(Color.hxTextSecondary)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(reference.displayName)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color(.label))
+                    .foregroundStyle(Color.hxTextPrimary)
                     .lineLimit(1)
                     .truncationMode(.middle)
 
@@ -438,7 +438,7 @@ private struct TranscriptMediaFileExportView: View {
                      ? String(localized: "Loading…")
                      : String(localized: "Tap to download"))
                     .font(.caption2)
-                    .foregroundStyle(Color(.secondaryLabel))
+                    .foregroundStyle(Color.hxTextSecondary)
                     .lineLimit(1)
             }
 
@@ -448,7 +448,7 @@ private struct TranscriptMediaFileExportView: View {
                 Task { await exportFile() }
             } label: {
                 Image(systemName: "square.and.arrow.down")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(AppFont.subheadline(weight: .semibold))
             }
             .buttonStyle(.chatTactile(.icon))
             .disabled(isExporting)
@@ -457,11 +457,11 @@ private struct TranscriptMediaFileExportView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .frame(maxWidth: 240, alignment: .leading)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(Color.hxSurface)
+        .clipShape(RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color(.separator).opacity(0.35), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
+                .stroke(Color.hxSeparator.opacity(0.35), lineWidth: 0.5)
         )
         .accessibilityElement(children: .contain)
         .fileExporter(
@@ -528,12 +528,12 @@ private struct TranscriptMediaVideoTile: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color(.secondarySystemBackground))
+            RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
+                .fill(Color.hxSurface)
                 .frame(width: 210, height: 132)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color(.separator).opacity(0.35), lineWidth: 0.5)
+                    RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
+                        .stroke(Color.hxSeparator.opacity(0.35), lineWidth: 0.5)
                 )
 
             VStack(spacing: 8) {
@@ -543,14 +543,14 @@ private struct TranscriptMediaVideoTile: View {
 
                 Text(reference.displayName)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color(.label))
+                    .foregroundStyle(Color.hxTextPrimary)
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .frame(maxWidth: 172)
 
                 Text("Video")
                     .font(.caption2)
-                    .foregroundStyle(Color(.secondaryLabel))
+                    .foregroundStyle(Color.hxTextSecondary)
             }
             .padding(.horizontal, 14)
         }
@@ -563,30 +563,30 @@ private struct TranscriptMediaUnavailableChip: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: iconName)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color(.secondaryLabel))
+                .font(AppFont.subheadline(weight: .semibold))
+                .foregroundStyle(Color.hxTextSecondary)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(reference.displayName)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color(.label))
+                    .foregroundStyle(Color.hxTextPrimary)
                     .lineLimit(1)
                     .truncationMode(.middle)
 
                 Text("Media unavailable")
                     .font(.caption2)
-                    .foregroundStyle(Color(.secondaryLabel))
+                    .foregroundStyle(Color.hxTextSecondary)
                     .lineLimit(1)
             }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .frame(maxWidth: 240, alignment: .leading)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(Color.hxSurface)
+        .clipShape(RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color(.separator).opacity(0.35), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
+                .stroke(Color.hxSeparator.opacity(0.35), lineWidth: 0.5)
         )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(String(localized: "Media unavailable \(reference.displayName)"))
@@ -783,7 +783,7 @@ struct TranscriptMediaPreviewView: View {
             }
             .padding()
         }
-        .background(Color(.systemBackground))
+        .background(Color.hxCanvas)
     }
 
     private func audioContent(_ data: Data) -> some View {
@@ -797,7 +797,7 @@ struct TranscriptMediaPreviewView: View {
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(.systemBackground))
+        .background(Color.hxCanvas)
     }
 
     private func videoContent(_ url: URL) -> some View {
@@ -807,15 +807,15 @@ struct TranscriptMediaPreviewView: View {
             TranscriptVideoPreviewPlayerView(url: url)
                 .frame(maxWidth: .infinity)
                 .aspectRatio(16 / 9, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color(.separator).opacity(0.35), lineWidth: 0.5)
+                    RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
+                        .stroke(Color.hxSeparator.opacity(0.35), lineWidth: 0.5)
                 )
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(.systemBackground))
+        .background(Color.hxCanvas)
     }
 
     private func unavailableContent(_ message: String) -> some View {

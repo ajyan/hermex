@@ -35,7 +35,7 @@ private struct UsageMetricCell: View {
                 .foregroundStyle(.secondary)
 
             Text(cell.value)
-                .font(AppFont.title3(weight: .semibold))
+                .font(AppFont.display(style: .title3, weight: .semibold))
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)

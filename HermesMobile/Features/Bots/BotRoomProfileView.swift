@@ -21,7 +21,7 @@ import SwiftUI
                     BotRoomAvatars(room: reader.room, roster: roster, avatars: avatars, size: 84)
                     if reader.showsRename {
                         TextField("Group name", text: $name)
-                            .font(.title2.bold()).multilineTextAlignment(.center)
+                            .font(AppFont.display(style: .title2)).multilineTextAlignment(.center)
                             .focused($editingName).submitLabel(.done)
                             .disabled(!reader.mayRename)
                             .onSubmit { commitName() }
@@ -30,9 +30,9 @@ import SwiftUI
                                 .disabled(!reader.mayRename || !BotRoomRPC.validName(name))
                         }
                         if !BotRoomRPC.validName(name) {
-                            Text("Enter a name of up to 200 characters.").font(.caption)
+                            Text("Enter a name of up to 200 characters.").font(AppFont.caption())
                         }
-                    } else { Text(reader.room.name).font(.title2.bold()) }
+                    } else { Text(reader.room.name).font(AppFont.display(style: .title2)) }
                 }
                 .frame(maxWidth: .infinity).padding(.vertical, 24)
             }
@@ -59,6 +59,8 @@ import SwiftUI
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Color.hxCanvas.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if reader.showsDisband {

@@ -14,7 +14,7 @@ struct GoalsHomeView: View {
 
     var body: some View {
         content
-            .navigationTitle(Text(verbatim: "Goals"))
+            .hxNavigationTitle("Goals")
             .background(Color.hxCanvas.ignoresSafeArea())
             // Every appear refreshes, so check-ins made in a goal show on the way back.
             .task {

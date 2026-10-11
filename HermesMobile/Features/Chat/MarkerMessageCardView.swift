@@ -42,7 +42,7 @@ struct MarkerMessageCardView: View {
         .padding(.vertical, 9)
         .chatTimelineAccessorySurface(
             fallbackMaterial: .thinMaterial,
-            cornerRadius: 10
+            cornerRadius: HXRadius.sm
         )
         .frame(maxWidth: .infinity, alignment: .leading)
     }

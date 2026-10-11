@@ -4,32 +4,45 @@ import UIKit
 /// Each kind of Daily Deck card has its own paper (`HermexPaper`), symbol, and spoken name.
 struct DeckPalette: Equatable {
     let colors: HermexPaper
-    var paper: Color { colors.paper }
-    var ink: Color { colors.ink }
+    /// The opener summarizes the day rather than being one kind of thing, so it sits on the
+    /// neutral surface and keeps its color for the accents.
+    let isNeutralCard: Bool
+    /// The card's opaque fill: its glow card, or `hxSurface` for a neutral card.
+    var paper: Color { isNeutralCard ? .hxSurface : colors.card }
+    /// The card's hairline.
+    var edge: Color { isNeutralCard ? .hxSeparator : colors.edge }
+    /// Text and marks on the card: the paper's glow.
+    var ink: Color { colors.glow }
+    /// Text on an `ink`-filled button.
+    var onInk: Color { colors.onGlow }
     /// The kind's mark, drawn faintly in the card's corner.
     let symbol: String
     /// What VoiceOver calls this kind of card.
     let name: String
+    /// The kind in one word, for the opener's list of cards ahead.
+    let shortName: String
 
-    private init(_ colors: HermexPaper, symbol: String, name: String) {
+    private init(_ colors: HermexPaper, symbol: String, name: String, shortName: String, isNeutralCard: Bool = false) {
         self.colors = colors
+        self.isNeutralCard = isNeutralCard
         self.symbol = symbol
         self.name = name
+        self.shortName = shortName
     }
 
     // Bright paper in both appearances: index cards on a dark desk. Cards draw in light mode
     // (`DeckPageView`) so system text and controls stay legible on them.
-    static let opener = DeckPalette(.opener, symbol: "sun.horizon", name: "Today")
-    static let quote = DeckPalette(.quote, symbol: "quote.opening", name: "Quote")
-    static let book = DeckPalette(.book, symbol: "book.closed", name: "Book highlight")
-    static let wiki = DeckPalette(.wiki, symbol: "leaf", name: "From your wiki")
-    static let reading = DeckPalette(.reading, symbol: "newspaper", name: "From your reading")
-    static let notes = DeckPalette(.notes, symbol: "lightbulb", name: "From your notes")
-    static let video = DeckPalette(.video, symbol: "play.rectangle", name: "Video")
-    static let past = DeckPalette(.past, symbol: "clock.arrow.circlepath", name: "On this day")
-    static let advisor = DeckPalette(.advisor, symbol: "bubble.left", name: "Check-in")
-    static let plain = DeckPalette(.plain, symbol: "tray", name: "From your library")
-    static let followUps = DeckPalette(.plain, symbol: "checklist", name: "Follow-ups")
+    static let opener = DeckPalette(.opener, symbol: "sun.horizon", name: "Today", shortName: "Today", isNeutralCard: true)
+    static let quote = DeckPalette(.quote, symbol: "quote.opening", name: "Quote", shortName: "Quote")
+    static let book = DeckPalette(.book, symbol: "book.closed", name: "Book highlight", shortName: "Book")
+    static let wiki = DeckPalette(.wiki, symbol: "leaf", name: "From your wiki", shortName: "Wiki")
+    static let reading = DeckPalette(.reading, symbol: "newspaper", name: "From your reading", shortName: "Reading")
+    static let notes = DeckPalette(.notes, symbol: "lightbulb", name: "From your notes", shortName: "Notes")
+    static let video = DeckPalette(.video, symbol: "play.rectangle", name: "Video", shortName: "Video")
+    static let past = DeckPalette(.past, symbol: "clock.arrow.circlepath", name: "On this day", shortName: "On this day")
+    static let advisor = DeckPalette(.advisor, symbol: "bubble.left", name: "Check-in", shortName: "Check-in")
+    static let plain = DeckPalette(.plain, symbol: "tray", name: "From your library", shortName: "Library")
+    static let followUps = DeckPalette(.plain, symbol: "checklist", name: "Follow-ups", shortName: "Follow-ups")
 
     static func of(_ page: DeckPage) -> DeckPalette {
         switch page {

@@ -20,9 +20,13 @@ struct ToolCallLogRowView: View {
             copyText: { ToolCallSummaryFormatter.copyText(for: entry.toolCall) },
             toggleExpansion: { isExpanded.toggle() }
         ) {
+            // The call's kind in its glow, so the log matches the chip that opened it.
+            let paper = HermexPaper.forTool(row.kind)
             Image(systemName: row.icon)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(row.isFailure ? Color.hxDanger : Color.secondary)
+                .font(AppFont.caption2(weight: .semibold))
+                .foregroundStyle(row.isFailure ? Color.hxDanger : paper.glow)
+                .frame(width: 20, height: 20)
+                .background(paper.wash, in: RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous))
         } accessory: {
             if let counts = row.diffCounts {
                 DiffCountsLabel(additions: counts.additions, deletions: counts.deletions)
@@ -42,19 +46,19 @@ struct ToolCallLogRowView: View {
         switch row.status {
         case .success:
             Image(systemName: "checkmark")
-                .font(.system(size: 11, weight: .semibold))
+                .font(AppFont.caption2(weight: .semibold))
                 .foregroundStyle(.secondary)
         case .failure:
             Image(systemName: "xmark")
-                .font(.system(size: 11, weight: .semibold))
+                .font(AppFont.caption2(weight: .semibold))
                 .foregroundStyle(.hxDanger)
         case .running:
             Image(systemName: "ellipsis")
-                .font(.system(size: 11, weight: .semibold))
+                .font(AppFont.caption2(weight: .semibold))
                 .foregroundStyle(.secondary)
         case .interrupted:
             Image(systemName: "minus")
-                .font(.system(size: 11, weight: .semibold))
+                .font(AppFont.caption2(weight: .semibold))
                 .foregroundStyle(.secondary)
         }
     }
@@ -160,7 +164,7 @@ struct ToolCallDetailBodyView: View {
                 showAllDiffLinesButton(lineCount: diff.document.lines.count)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
         .chatTimelineAccessoryInsetSurface()
 
         if diff.isTruncated {

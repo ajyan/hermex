@@ -1091,6 +1091,10 @@ struct ChatView: View {
 
     var body: some View {
         chatContent
+            // The navy canvas behind every chat state (empty, loading, transcript), not the
+            // system's pure black.
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .preference(key: ChatBottomChromeHeightKey.self, value: bottomChromeHeight)
             .alert(
                 "Discard Later Messages?",
                 isPresented: $showEditDiscardConfirmation
@@ -1767,7 +1771,12 @@ struct ChatView: View {
     }
 
     private var scrollToBottomButtonBottomPadding: CGFloat {
-        composerHeight + 12 + composerAccessorySpacerHeight + clarificationFootprintHeight
+        bottomChromeHeight + 12
+    }
+
+    /// Everything docked at the bottom: composer, its accessory row, and a clarification.
+    private var bottomChromeHeight: CGFloat {
+        composerHeight + composerAccessorySpacerHeight + clarificationFootprintHeight
     }
 
     /// Bar height plus its gap above the composer while a clarification is
@@ -3413,41 +3422,14 @@ struct ChatView: View {
     }
 }
 
+/// The chat's header title: the shared `HXNavigationTitle`, centered like every screen's.
 struct ChatToolbarTitleLabel: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
     let title: String
     let subtitle: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-
-            if showsSubtitle, let subtitle {
-                Text(subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .multilineTextAlignment(.leading)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel)
-    }
-
-    private var showsSubtitle: Bool {
-        !dynamicTypeSize.isAccessibilitySize
-    }
-
-    private var accessibilityLabel: String {
-        guard let subtitle else { return title }
-        return "\(title), \(subtitle)"
+        HXNavigationTitle(title: title, subtitle: subtitle)
+            .frame(maxWidth: 220)
     }
 }
 
@@ -3495,7 +3477,7 @@ private struct LegacyToolbarClusterStyle: ViewModifier {
                 .clipShape(Capsule())
                 .overlay {
                     Capsule()
-                        .stroke(Color(.separator).opacity(colorScheme == .dark ? 0.38 : 0.24), lineWidth: 0.5)
+                        .stroke(Color.hxSeparator.opacity(colorScheme == .dark ? 0.38 : 0.24), lineWidth: 0.5)
                         .allowsHitTesting(false)
                 }
         }
@@ -3647,6 +3629,16 @@ struct ChatNavigationBackground: ViewModifier {
         if #available(iOS 26, *), !reduceTransparency {
             return AnyShapeStyle(.regularMaterial)
         }
-        return AnyShapeStyle(Color(uiColor: .systemBackground))
+        return AnyShapeStyle(Color.hxCanvas)
+    }
+}
+
+/// How tall a chat's bottom-docked chrome (composer, accessory row, clarification) is, so
+/// the shell's floating New Chat button can sit above it instead of on the send button.
+struct ChatBottomChromeHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }

@@ -33,18 +33,20 @@ struct ApprovalRequestOverlay: View {
         }
         .padding(16)
         .frame(maxWidth: 520, alignment: .leading)
-        .paperSurface(.request, cornerRadius: HXRadius.lg)
-        .shadow(color: .black.opacity(0.22), radius: 18, x: 0, y: 12)
+        .glowSurface(.request, cornerRadius: HXRadius.lg, opaque: true)
+        .hxShadow(.modal)
         .padding(.horizontal, 18)
     }
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Image(systemName: "hand.raised.fill")
+                .foregroundStyle(HermexPaper.request.glow)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Approval required")
                     .font(.headline)
+                    .foregroundStyle(HermexPaper.request.glow)
 
                 Text("Pending approvals: \(prompt.pendingCount)")
                     .font(.caption)

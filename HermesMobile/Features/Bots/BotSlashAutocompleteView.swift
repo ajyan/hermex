@@ -17,7 +17,7 @@ struct BotSlashAutocompleteView: View {
                     Button { onSelect(skill) } label: {
                         HStack(spacing: 12) {
                             Image(systemName: "bolt.fill")
-                                .font(.caption2.weight(.semibold))
+                                .font(AppFont.caption2(weight: .semibold))
                                 .foregroundStyle(Color.accentColor)
                                 .accessibilityHidden(true)
                             Text(verbatim: "/" + skill.name)
@@ -25,12 +25,12 @@ struct BotSlashAutocompleteView: View {
                                 .foregroundStyle(.primary).lineLimit(1).layoutPriority(2)
                             if let category = skill.category {
                                 Text(verbatim: category)
-                                    .font(.footnote).foregroundStyle(.secondary)
+                                    .font(AppFont.footnote()).foregroundStyle(.secondary)
                                     .lineLimit(1).layoutPriority(1)
                             }
                             Spacer(minLength: 8)
                             Text(verbatim: skill.description ?? String(localized: "Skill"))
-                                .font(.caption).foregroundStyle(.secondary)
+                                .font(AppFont.caption()).foregroundStyle(.secondary)
                                 .lineLimit(1).truncationMode(.tail)
                         }
                         .padding(.horizontal, 16).padding(.vertical, 12)

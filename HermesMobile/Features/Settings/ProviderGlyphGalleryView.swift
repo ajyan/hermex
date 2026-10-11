@@ -104,7 +104,7 @@ struct ProviderGlyphGalleryView: View {
                                 ProviderGlyph(providerID: provider.id)
                             } else {
                                 Image(systemName: "questionmark")
-                                    .font(.caption.weight(.semibold))
+                                    .font(AppFont.caption(weight: .semibold))
                                     .foregroundStyle(.tertiary)
                             }
                         }
@@ -112,17 +112,16 @@ struct ProviderGlyphGalleryView: View {
 
                         VStack(alignment: .leading, spacing: 1) {
                             Text(verbatim: provider.id)
-                                .font(.system(size: 14, weight: .semibold))
-                                .textCase(.uppercase)
+                                .font(AppFont.display(style: .subheadline, weight: .semibold))
                             Text(verbatim: provider.name)
-                                .font(.footnote)
+                                .font(AppFont.footnote())
                                 .foregroundStyle(.secondary)
                         }
 
                         Spacer(minLength: 0)
 
                         Text(verbatim: ProviderGlyphKind.resolve(providerID: provider.id)?.rawValue ?? "no glyph")
-                            .font(.caption.monospaced())
+                            .font(AppFont.mono(style: .caption))
                             .foregroundStyle(.tertiary)
                     }
                 }
@@ -130,8 +129,9 @@ struct ProviderGlyphGalleryView: View {
                 Text(verbatim: "Documented provider IDs")
             }
         }
-        .navigationTitle(Text(verbatim: "Provider Glyphs"))
-        .navigationBarTitleDisplayMode(.inline)
+        .scrollContentBackground(.hidden)
+        .background(Color.hxCanvas.ignoresSafeArea())
+        .hxNavigationTitle("Provider Glyphs")
         .sheet(isPresented: $showsPicker) {
             ModelPickerSheet(
                 configuration: .composer,

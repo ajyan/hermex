@@ -21,7 +21,8 @@ struct ArchivedSessionsView: View {
     var body: some View {
         content
             .adaptiveReadableScrollContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
-            .navigationTitle("Archived Sessions")
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .hxNavigationTitle(String(localized: "Archived Sessions"))
             .navigationDestination(item: $openedSession) { session in
                 // Opening an archived session reuses the normal read path —
                 // no special-casing on the chat side (issue #17).
@@ -64,14 +65,14 @@ struct ArchivedSessionsView: View {
                         ArchivedStatusRow(title: String(localized: "Could not load archived sessions"), systemImage: "exclamationmark.triangle")
 
                         Text(errorMessage)
-                            .font(.footnote)
+                            .font(AppFont.footnote())
                             .foregroundStyle(.secondary)
                             .lineLimit(3)
 
                         Button("Try Again") {
                             Task { await load() }
                         }
-                        .font(.subheadline.weight(.medium))
+                        .font(AppFont.subheadline(weight: .medium))
                         .foregroundStyle(.primary)
                     }
                     .padding(.horizontal, 24)
@@ -129,7 +130,7 @@ struct ArchivedSessionsView: View {
                         .controlSize(.small)
                 } else {
                     Image(systemName: "arrow.up.bin")
-                        .font(.body)
+                        .font(AppFont.body())
                         .foregroundStyle(.secondary)
                 }
             }
@@ -184,13 +185,13 @@ private struct ArchivedStatusRow: View {
     var body: some View {
         HStack(spacing: 14) {
             Image(systemName: systemImage)
-                .font(.body)
+                .font(AppFont.body())
                 .foregroundStyle(.secondary)
                 .frame(width: 24)
                 .accessibilityHidden(true)
 
             Text(title)
-                .font(.subheadline)
+                .font(AppFont.subheadline())
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
 

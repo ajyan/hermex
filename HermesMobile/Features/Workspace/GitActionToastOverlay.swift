@@ -128,17 +128,18 @@ struct GitActionToastOverlay: View {
 
             if isDismissable {
                 Button(action: state.dismissSuccess) {
-                    Image(systemName: "xmark").font(.caption.weight(.semibold))
+                    Image(systemName: "xmark").font(AppFont.caption(weight: .semibold))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Dismiss")
             }
         }
         .padding(14)
-        .adaptiveGlass(in: .rect(cornerRadius: 18))
+        .adaptiveGlass(in: .rect(cornerRadius: HXRadius.lg, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         }
+        .hxShadow(.float)
     }
 }

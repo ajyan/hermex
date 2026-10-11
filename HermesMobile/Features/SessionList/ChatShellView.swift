@@ -83,6 +83,8 @@ struct ChatShellView: View {
     @State private var brainRouteOpener = OpenBrainRouteAction()
     /// The drawer is built on first open and kept alive, so it keeps its scroll position.
     @State private var hasOpenedDrawer = false
+    /// The root chat's docked composer height, so the New Chat button clears it.
+    @State private var chatBottomChromeHeight: CGFloat = 0
     /// False while ChatView pushes its own screens (Files, forks), which the typed path cannot see.
     @State private var isRootVisible = true
     @State private var sessionPendingRename: SessionSummary?
@@ -494,11 +496,14 @@ struct ChatShellView: View {
         // The primary new-chat affordance; hidden on the empty new chat, where
         // another new chat would go nowhere (same rule as the top-bar button),
         // and while the drawer covers the screen (its New Chat row is there).
+        // On a chat it rides above the composer, clear of the send button.
         .overlay(alignment: .bottomTrailing) {
             if !navigation.isOnEmptyNewChat, !navigation.isDrawerOpen {
                 newChatFab
+                    .padding(.bottom, navigation.path.isEmpty ? chatBottomChromeHeight : 0)
             }
         }
+        .onPreferenceChange(ChatBottomChromeHeightKey.self) { chatBottomChromeHeight = $0 }
     }
 
     private var mainStack: some View {
