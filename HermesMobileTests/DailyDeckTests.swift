@@ -335,12 +335,14 @@ final class DailyDeckTests: XCTestCase {
         {"date":"d","kind":"weekly","cards":[
           {"id":"headline","type":"headline","title":"Your week","lines":["6 days you wrote"],"stats":[{"value":"6","label":"days you wrote"},{"value":7}]},
           {"id":"theme-1","type":"item","kind":"theme","title":"Taper and rest","context":"You slept more.","body":"You slept more.\nFri: quote","entries":[{"label":"Fri, Oct 9","text":"“Slept nine hours.”"}]},
-          {"id":"mood","type":"item","kind":"mood","title":"Energy and mood","body":"Tue: 4","points":[{"label":"Mon","energy":null,"mood":null,"note":""},{"label":"Tue","energy":4,"mood":3,"note":"short sleep"},{"label":"Wed","energy":"high"}]},
+          {"id":"mood","type":"item","kind":"mood","title":"Energy and mood","body":"Tue: 4","points":[{"label":"Mon","energy":null,"mood":null,"note":""},{"label":"Tue","energy":8,"mood":7,"sleep":7.4,"quote":"Felt strong.","note":"a strong run"},{"label":"Wed","energy":"high"}]},
           {"id":"goals","type":"item","kind":"goals","title":"Your goals","color":"wiki","body":"x","meters":[{"group":"Marathon","label":"Stretch","done":7,"target":6},{"label":"bad"}]}
         ]}
         """#)
         XCTAssertEqual(deck.cards[0].stats, [DeckStat(value: "6", label: "days you wrote")], "a malformed stat is dropped alone")
-        XCTAssertEqual(deck.cards[2].points.map(\.energy), [nil, 4], "a malformed point is dropped alone")
+        XCTAssertEqual(deck.cards[2].points.map(\.energy), [nil, 8], "a malformed point is dropped alone")
+        XCTAssertEqual(deck.cards[2].points[1].sleep, 7.4)
+        XCTAssertEqual(deck.cards[2].points[1].quote, "Felt strong.")
         XCTAssertEqual(deck.cards[3].meters.count, 1)
         XCTAssertEqual(deck.cards[3].meters[0].fraction, 1, "a meter never overfills")
 

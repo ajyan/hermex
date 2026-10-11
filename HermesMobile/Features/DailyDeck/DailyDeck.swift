@@ -130,11 +130,14 @@ struct DeckStat: Decodable, Equatable, Hashable {
     let label: String
 }
 
-/// One weekday on the mood card. Scores run 1–5; nil is a day with nothing to read.
+/// One weekday on the mood card. Energy (Garmin Body Battery) and mood (read from what you
+/// wrote, with the `quote` it rests on) run 1–10; sleep is hours. nil is a gap.
 struct DeckPoint: Decodable, Equatable, Hashable {
     let label: String
     let energy: Int?
     let mood: Int?
+    let sleep: Double?
+    let quote: String?
     let note: String?
 }
 

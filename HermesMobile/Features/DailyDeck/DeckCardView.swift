@@ -343,44 +343,53 @@ private struct StatGrid: View {
     }
 }
 
-/// Energy (solid) and mood (dashed) across the week on a 1–5 scale, then each day's reason.
-/// A day with nothing written has no point, so the line skips it.
+/// The week on one 0–10 scale: sleep hours as bars, energy (Garmin Body Battery) as a solid line,
+/// mood (read from your writing) dashed. A missing reading leaves a gap. Under the chart, each
+/// day's mood with the words it was read from.
 private struct MoodChart: View {
     let points: [DeckPoint]
     let palette: DeckPalette
 
-    private static let energy = "Energy"
-    private static let mood = "Mood"
+    private var hasSleep: Bool { points.contains { $0.sleep != nil } }
+    private var hasEnergy: Bool { points.contains { $0.energy != nil } }
+    private var hasMood: Bool { points.contains { $0.mood != nil } }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Chart {
                 ForEach(points, id: \.label) { point in
-                    if let value = point.energy {
-                        LineMark(x: .value("Day", point.label), y: .value("Score", value), series: .value("Kind", Self.energy))
-                            .foregroundStyle(palette.ink)
-                            .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                        PointMark(x: .value("Day", point.label), y: .value("Score", value))
-                            .foregroundStyle(palette.ink)
-                            .accessibilityLabel(Text(verbatim: "\(point.label), energy"))
-                            .accessibilityValue(Text(verbatim: "\(value) of 5"))
+                    if let hours = point.sleep {
+                        BarMark(x: .value("Day", point.label), y: .value("Value", min(hours, 10)), width: .ratio(0.5))
+                            .foregroundStyle(palette.ink.opacity(0.13))
+                            .cornerRadius(4)
+                            .accessibilityLabel(Text(verbatim: "\(point.label), sleep"))
+                            .accessibilityValue(Text(verbatim: "\(hours.formatted(.number.precision(.fractionLength(0...1)))) hours"))
                     }
-                    if let value = point.mood {
-                        LineMark(x: .value("Day", point.label), y: .value("Score", value), series: .value("Kind", Self.mood))
-                            .foregroundStyle(palette.ink.opacity(0.5))
-                            .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, dash: [4, 4]))
-                        PointMark(x: .value("Day", point.label), y: .value("Score", value))
-                            .foregroundStyle(palette.ink.opacity(0.5))
-                            .symbolSize(30)
-                            .accessibilityLabel(Text(verbatim: "\(point.label), mood"))
-                            .accessibilityValue(Text(verbatim: "\(value) of 5"))
-                    }
+                }
+                ForEach(points.filter { $0.energy != nil }, id: \.label) { point in
+                    LineMark(x: .value("Day", point.label), y: .value("Value", point.energy ?? 0), series: .value("Kind", "Energy"))
+                        .foregroundStyle(palette.ink)
+                        .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    PointMark(x: .value("Day", point.label), y: .value("Value", point.energy ?? 0))
+                        .foregroundStyle(palette.ink)
+                        .accessibilityLabel(Text(verbatim: "\(point.label), energy"))
+                        .accessibilityValue(Text(verbatim: "\(point.energy ?? 0) of 10"))
+                }
+                ForEach(points.filter { $0.mood != nil }, id: \.label) { point in
+                    LineMark(x: .value("Day", point.label), y: .value("Value", point.mood ?? 0), series: .value("Kind", "Mood"))
+                        .foregroundStyle(palette.ink.opacity(0.55))
+                        .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, dash: [4, 4]))
+                    PointMark(x: .value("Day", point.label), y: .value("Value", point.mood ?? 0))
+                        .foregroundStyle(palette.ink.opacity(0.55))
+                        .symbolSize(30)
+                        .accessibilityLabel(Text(verbatim: "\(point.label), mood"))
+                        .accessibilityValue(Text(verbatim: "\(point.mood ?? 0) of 10"))
                 }
             }
             .chartXScale(domain: points.map(\.label))
-            .chartYScale(domain: 1...5)
+            .chartYScale(domain: 0...10)
             .chartYAxis {
-                AxisMarks(values: [1, 3, 5]) { _ in
+                AxisMarks(values: [0, 5, 10]) { _ in
                     AxisGridLine().foregroundStyle(palette.ink.opacity(0.12))
                     AxisValueLabel().foregroundStyle(palette.ink.opacity(0.6))
                 }
@@ -388,24 +397,36 @@ private struct MoodChart: View {
             .chartXAxis {
                 AxisMarks { _ in AxisValueLabel().foregroundStyle(palette.ink.opacity(0.7)) }
             }
-            .frame(height: 170)
-            HStack(spacing: 16) {
-                legend(Self.energy, dash: [])
-                legend(Self.mood, dash: [4, 4])
+            .frame(height: 180)
+            HStack(spacing: 14) {
+                if hasEnergy { legend("Energy", line: []) }
+                if hasMood { legend("Mood", line: [4, 4]) }
+                if hasSleep {
+                    HStack(spacing: 6) {
+                        RoundedRectangle(cornerRadius: 2).fill(palette.ink.opacity(0.13)).frame(width: 10, height: 12)
+                        Text(verbatim: "Sleep (h)")
+                    }
+                }
             }
             .font(AppFont.footnote(weight: .medium))
             .foregroundStyle(palette.ink.opacity(0.7))
             .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(points.filter { !($0.note ?? "").isEmpty }, id: \.label) { point in
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(points.filter { $0.mood != nil && !($0.quote ?? "").isEmpty }, id: \.label) { point in
                     HStack(alignment: .firstTextBaseline, spacing: 10) {
                         Text(verbatim: point.label)
                             .font(AppFont.footnote(weight: .semibold))
                             .foregroundStyle(palette.ink.opacity(0.7))
                             .frame(width: 34, alignment: .leading)
-                        Text(verbatim: point.note ?? "")
-                            .font(AppFont.subheadline())
-                            .fixedSize(horizontal: false, vertical: true)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(verbatim: [point.mood.map { "Mood \($0)" }, point.note].compactMap { $0 }
+                                .filter { !$0.isEmpty }.joined(separator: " · "))
+                                .font(AppFont.subheadline(weight: .medium))
+                            Text(verbatim: "“\(point.quote ?? "")”")
+                                .font(AppFont.serif(style: .subheadline))
+                                .foregroundStyle(palette.ink.opacity(0.75))
+                        }
+                        .fixedSize(horizontal: false, vertical: true)
                     }
                     .accessibilityElement(children: .combine)
                 }
@@ -413,10 +434,10 @@ private struct MoodChart: View {
         }
     }
 
-    private func legend(_ name: String, dash: [CGFloat]) -> some View {
+    private func legend(_ name: String, line dash: [CGFloat]) -> some View {
         HStack(spacing: 6) {
             Path { $0.move(to: CGPoint(x: 0, y: 4)); $0.addLine(to: CGPoint(x: 18, y: 4)) }
-                .stroke(palette.ink.opacity(dash.isEmpty ? 1 : 0.5), style: StrokeStyle(lineWidth: 2, dash: dash))
+                .stroke(palette.ink.opacity(dash.isEmpty ? 1 : 0.55), style: StrokeStyle(lineWidth: 2, dash: dash))
                 .frame(width: 18, height: 8)
             Text(verbatim: name)
         }
