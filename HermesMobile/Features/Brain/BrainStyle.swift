@@ -117,16 +117,10 @@ enum BrainStyle {
         [HermexPaper.quote, .video, .wiki, .reading, .notes, .opener, .book, .plain].map { paper in
             let v = paper.values
             let canvas: UInt32 = 0x0D1117
-            return (light: (v.paper, mix(v.hue, over: 0xFFFFFF, 0.55), v.glowLight),
-                    dark: (mix(v.hue, over: canvas, 0.16), mix(v.hue, over: canvas, 0.38), v.glowDark))
+            return (light: (v.paper, HermexPaper.mix(v.hue, over: 0xFFFFFF, 0.55), v.glowLight),
+                    dark: (HermexPaper.mix(v.hue, over: canvas, 0.16), HermexPaper.mix(v.hue, over: canvas, 0.38), v.glowDark))
         }
 
-    private static func mix(_ top: UInt32, over bottom: UInt32, _ alpha: Double) -> UInt32 {
-        [16, 8, 0].reduce(UInt32(0)) { result, shift in
-            let t = Double((top >> UInt32(shift)) & 0xFF), b = Double((bottom >> UInt32(shift)) & 0xFF)
-            return result | UInt32((t * alpha + b * (1 - alpha)).rounded()) << UInt32(shift)
-        }
-    }
 
     /// Built once: a fresh dynamic `UIColor` never equals another, so rebuilding per
     /// view would defeat SwiftUI's diffing (same reasoning as `HermexPalette.colors`).

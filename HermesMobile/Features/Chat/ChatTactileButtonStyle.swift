@@ -338,9 +338,9 @@ struct ChatDecisionButtonStyle: ButtonStyle {
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
             .frame(maxWidth: .infinity, minHeight: 40)
-            .background(backgroundColor(isPressed: isPressed), in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
+            .background(backgroundColor(isPressed: isPressed), in: Capsule())
             .overlay(
-                RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
+                Capsule()
                     .strokeBorder(borderColor, lineWidth: 1)
             )
             .scaleEffect(reduceMotion ? 1 : (isPressed ? 0.975 : 1))

@@ -1547,6 +1547,7 @@ private struct SelectableMarkdownHeading: View {
             .relativeLineSpacing(.em(0.125))
             .markdownMargin(top: 24, bottom: 16)
             .markdownTextStyle {
+                FontFamily(.system(.rounded))
                 FontWeight(.semibold)
                 FontSize(.em(fontScale))
                 if level == 6 { ForegroundColor(tertiaryColor) }

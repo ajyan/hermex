@@ -33,7 +33,13 @@ enum AppFont {
         system(.title3, weight: weight)
     }
 
-    /// New York, for quoted words a person saved (book highlights, past journal entries).
+    /// SF Pro Rounded, the display voice (DESIGN.md § Type): screen titles, card headlines,
+    /// reply headings. Body text stays SF Pro.
+    static func display(style: Font.TextStyle = .title3, weight: Font.Weight = .semibold) -> Font {
+        system(style, design: .rounded, weight: weight)
+    }
+
+    /// New York, only for quoted words a person saved (book highlights, quotes, past journal entries).
     static func serif(style: Font.TextStyle = .body, weight: Font.Weight? = nil) -> Font {
         system(style, design: .serif, weight: weight)
     }

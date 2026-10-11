@@ -87,6 +87,8 @@ final class DesignSystemTests: XCTestCase {
                 let text = UIColor(paper.glow).resolvedColor(with: traits)
                 let wash = Self.composite(UIColor(paper.wash).resolvedColor(with: traits), over: canvas)
                 XCTAssertGreaterThanOrEqual(Self.contrast(text, wash), 4.5, "\(style.rawValue) glow on wash")
+                let card = UIColor(paper.card).resolvedColor(with: traits)
+                XCTAssertGreaterThanOrEqual(Self.contrast(text, card), 4.5, "\(style.rawValue) glow on a whole card")
             }
         }
     }

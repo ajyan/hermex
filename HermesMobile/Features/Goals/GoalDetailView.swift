@@ -15,7 +15,7 @@ struct GoalDetailView: View {
 
     var body: some View {
         content
-            .navigationTitle(Text(verbatim: navigationTitle))
+            .hxNavigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
             .background(Color.hxCanvas.ignoresSafeArea())
             .task { await viewModel.load() }

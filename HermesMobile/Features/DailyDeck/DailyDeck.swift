@@ -56,6 +56,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let reason: String?
     /// Other questions for the same material; Regenerate steps through them.
     let altQuestions: [String]
+    /// On the headline card: one sentence about yesterday, written by the brief.
+    let recap: String?
     /// A recap's items (a review's days, answers, or last week's plan), each under an optional label.
     let entries: [DeckEntry]
 
@@ -72,7 +74,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case id, type, title, body, source, lines, question, context, voice, why, draft, actions, fallback
-        case reason, altQuestions, entries
+        case reason, altQuestions, entries, recap
         case itemKind = "kind"
     }
 
@@ -93,6 +95,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         actions = (try? c.decodeIfPresent([DeckAction].self, forKey: .actions)) ?? []
         fallback = try? c.decodeIfPresent(String.self, forKey: .fallback)
         reason = try? c.decodeIfPresent(String.self, forKey: .reason)
+        recap = (try? c.decodeIfPresent(String.self, forKey: .recap))
+            .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
         altQuestions = (try? c.decodeIfPresent([String].self, forKey: .altQuestions)) ?? []
         entries = ((try? c.decodeIfPresent([LossyEntry].self, forKey: .entries)) ?? []).compactMap(\.value)
     }
