@@ -100,10 +100,11 @@ final class PrepRunViewModel {
     private(set) var hintsShown = 0
     private(set) var submitError: String?
     private(set) var isSubmitting = false
+    /// When the current rep appeared: the start of `elapsedMS` and of the approach clock.
+    private(set) var shownAt: Date
 
     @ObservationIgnored private let client: PrepDataClient
     @ObservationIgnored private let now: () -> Date
-    @ObservationIgnored private var shownAt: Date
     @ObservationIgnored private var mapBefore: PrepTrackMap?
     @ObservationIgnored private var lastStreak: PrepStreak?
     @ObservationIgnored private var generation = 0

@@ -234,7 +234,8 @@ struct PrepRunView: View {
                 hints: rep.item.hints,
                 hintsShown: viewModel.hintsShown,
                 isSubmitting: viewModel.isSubmitting,
-                showHint: { viewModel.showHint() }
+                showHint: { viewModel.showHint() },
+                shownAt: viewModel.shownAt
             )
         case .spotBug:
             let answer = draft(for: rep)

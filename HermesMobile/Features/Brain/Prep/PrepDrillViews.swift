@@ -213,8 +213,8 @@ struct PrepApproachView: View {
     let hintsShown: Int
     let isSubmitting: Bool
     let showHint: () -> Void
-    /// Reset per rep: the run view keys each rep with `.id(rep.index)`.
-    @State private var shownAt = Date()
+    /// When the rep appeared, from the view model, so the clock matches the timed answer.
+    let shownAt: Date
     @ScaledMetric(relativeTo: .body) private var editorHeight: CGFloat = 180
 
     var body: some View {
@@ -280,7 +280,7 @@ struct PrepHintLadder: View {
             Button(action: showHint) {
                 Text(verbatim: "Show a hint")
                     .font(BrainStyle.rowTitle)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Color.hxTextSecondary)
                     .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
                     .contentShape(Rectangle())
             }

@@ -586,7 +586,7 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertFalse(client.log.contains("attempt"))
     }
 
-    func testBugFixAnswerPosted() async {
+    func testBugFixAnswerPosted() async throws {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "spot_bug")]))]
         client.mapResults = [.success(map([]))]
@@ -594,10 +594,28 @@ final class PrepViewModelsTests: XCTestCase {
         let vm = makeVM(client)
         await vm.load()
         await vm.submitBugFix(line: 2, fix: "while lo <= hi:")
-        let sent = try! XCTUnwrap(client.attempts.first)
+        let sent = try XCTUnwrap(client.attempts.first)
         XCTAssertEqual(sent.drill, .spotBug)
         XCTAssertEqual(sent.answer, .bugFix(line: 2, fix: "while lo <= hi:"))
         if case .result = vm.phase {} else { XCTFail("phase \(vm.phase)") }
+    }
+
+    func testShownAtResetsForEachRepAndTimesTheAnswer() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(run(index: 0, reps: [rep(0), rep(1)]))]
+        client.mapResults = [.success(map([]))]
+        client.attemptResults = [.success(result(next: 1))]
+        var t = Date(timeIntervalSince1970: 1_000)
+        let vm = makeVM(client, clock: { t })
+        t = t.addingTimeInterval(5)
+        await vm.load()
+        XCTAssertEqual(vm.shownAt, Date(timeIntervalSince1970: 1_005), "the clock starts when the rep is shown")
+        t = t.addingTimeInterval(42)
+        await vm.submitApproach("Monotonic stack")
+        XCTAssertEqual(client.attempts.first?.elapsedMS, 42_000)
+        t = t.addingTimeInterval(3)
+        await vm.continue()
+        XCTAssertEqual(vm.shownAt, Date(timeIntervalSince1970: 1_050))
     }
 
     func testApproachClockCountsDownThenOver() {
@@ -679,8 +697,6 @@ final class PrepDrillViewsTests: XCTestCase {
         client.todayResults = [.success(try PrepDecoding.decode(PrepRun.self, from: Data(run.utf8)))]
         client.mapResults = [.failure(URLError(.badServerResponse))]
         let vm = PrepRunViewModel(client: client)
-        let restoreAutomation = enableAccessibilityAutomation()
-        defer { restoreAutomation() }
         let probe = "Prep hosted accessibility probe"
         let window = try show(VStack(spacing: 0) {
             Button(probe) {}
@@ -712,22 +728,6 @@ final class PrepDrillViewsTests: XCTestCase {
     }
 
     // MARK: Hosting
-
-    /// SwiftUI publishes its accessibility tree in-process only while an assistive
-    /// technology or UI automation is on. Turns automation on (test process only)
-    /// and returns how to put it back.
-    private func enableAccessibilityAutomation() -> () -> Void {
-        guard let handle = dlopen("/usr/lib/libAccessibility.dylib", RTLD_NOW),
-              let getter = dlsym(handle, "_AXSAutomationEnabled"),
-              let setter = dlsym(handle, "_AXSSetAutomationEnabled")
-        else { return {} }
-        typealias Get = @convention(c) () -> Bool
-        typealias Set = @convention(c) (Bool) -> Void
-        let wasEnabled = unsafeBitCast(getter, to: Get.self)()
-        let set = unsafeBitCast(setter, to: Set.self)
-        set(true)
-        return { set(wasEnabled) }
-    }
 
     private func show<V: View>(_ view: V) throws -> UIWindow {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
