@@ -16,7 +16,6 @@ struct GoalDetailView: View {
     var body: some View {
         content
             .hxNavigationTitle(navigationTitle)
-            .navigationBarTitleDisplayMode(.inline)
             .background(Color.hxCanvas.ignoresSafeArea())
             .task { await viewModel.load() }
             // Back from the background, the server's today may have moved on.
@@ -186,7 +185,9 @@ struct GoalDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, BrainStyle.s)
             } label: {
-                Text(verbatim: "Plan").brainText(.rowTitle)
+                Text(verbatim: "Plan")
+                    .font(AppFont.display(style: .body))
+                    .foregroundStyle(Color.hxTextPrimary)
             }
             .tint(Color.hxTextSecondary)
             .padding(.vertical, BrainStyle.xs)
@@ -259,14 +260,14 @@ private struct GoalCheckCircle: View {
             case .some(.done), .some(.min):
                 Circle().fill(status == .done ? tint.fill : tint.fill.opacity(0.55))
                 Image(systemName: GoalDetailCopy.symbol(status!))
-                    .font(.footnote.weight(.bold))
+                    .font(AppFont.footnote(weight: .bold))
                     .foregroundStyle(tint.on)
             case .some(.skip):
                 Circle().fill(Color.hxSeparator.opacity(0.7))
-                Image(systemName: GoalDetailCopy.symbol(.skip)).font(.footnote.weight(.semibold)).foregroundStyle(Color.hxTextSecondary)
+                Image(systemName: GoalDetailCopy.symbol(.skip)).font(AppFont.footnote(weight: .semibold)).foregroundStyle(Color.hxTextSecondary)
             case .some(.miss):
                 Circle().strokeBorder(Color.hxWarning, lineWidth: 2)
-                Image(systemName: GoalDetailCopy.symbol(.miss)).font(.footnote.weight(.bold)).foregroundStyle(Color.hxWarning)
+                Image(systemName: GoalDetailCopy.symbol(.miss)).font(AppFont.footnote(weight: .bold)).foregroundStyle(Color.hxWarning)
             default:
                 Circle().strokeBorder(tint.fill.opacity(0.7), lineWidth: 1.5)
             }
@@ -355,7 +356,7 @@ private struct GoalCalendarGrid: View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: 5), count: 7)
         LazyVGrid(columns: columns, spacing: 5) {
             ForEach(Array(["M", "T", "W", "T", "F", "S", "S"].enumerated()), id: \.offset) { _, letter in
-                Text(verbatim: letter).font(.caption2).foregroundStyle(Color.hxTextSecondary)
+                Text(verbatim: letter).font(AppFont.caption2()).foregroundStyle(Color.hxTextSecondary)
             }
             ForEach(Array(weeks.joined().enumerated()), id: \.offset) { _, day in
                 if let day {
@@ -375,7 +376,7 @@ private struct GoalCalendarCell: View {
     let tint: GoalTint
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous)
         let filled = !day.isFuture && (day.status != .none || day.isToday)
         ZStack {
             if day.isFuture {
@@ -385,10 +386,10 @@ private struct GoalCalendarCell: View {
             }
             if day.isToday { shape.strokeBorder(tint.fill, lineWidth: 2) }
             if day.isDeadline {
-                Image(systemName: "flag.checkered").font(.caption2.weight(.semibold)).foregroundStyle(tint.fill)
+                Image(systemName: "flag.checkered").font(AppFont.caption2(weight: .semibold)).foregroundStyle(tint.fill)
             } else {
                 Text(verbatim: "\(day.dayOfMonth)")
-                    .font(.caption2.monospacedDigit())
+                    .font(AppFont.caption2().monospacedDigit())
                     .foregroundStyle(filled && day.status.isShown ? tint.on : Color.hxTextSecondary)
             }
         }

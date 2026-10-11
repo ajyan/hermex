@@ -25,7 +25,7 @@ struct GitInlineCommitButton: View {
     private var isRunning: Bool { runningPhase != nil }
     private var title: String { runningPhase?.inlineTitle ?? String(localized: "Commit & Push") }
 
-    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: 12, style: .continuous) }
+    private var shape: Capsule { Capsule() }
 
     var body: some View {
         Button {

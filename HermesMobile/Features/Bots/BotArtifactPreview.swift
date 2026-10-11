@@ -85,8 +85,7 @@ struct BotArtifactPreview: View {
                     Text("Loading file...").foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle(reference.displayName)
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(reference.displayName)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
                 ToolbarItemGroup(placement: .topBarTrailing) {

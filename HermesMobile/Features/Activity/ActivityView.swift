@@ -13,8 +13,8 @@ struct ActivityView: View {
     var body: some View {
         content
             .scrollContentBackground(.hidden)
-            .background(Color.hxCanvas)
-            .navigationTitle("Activity")
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .hxNavigationTitle(String(localized: "Activity"))
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink {
@@ -75,7 +75,7 @@ struct ActivityView: View {
                 banner(String(localized: "Rules file has an error; using the previous version"), detail: rulesError)
             }
             ForEach(sections, id: \.day) { section in
-                Section(ActivityPresentation.dayHeader(for: section.day, now: .now, calendar: .current)) {
+                Section {
                     ForEach(section.events) { event in
                         ActivityRow(event: event)
                             .onAppear {
@@ -84,6 +84,9 @@ struct ActivityView: View {
                                 }
                             }
                     }
+                    .listRowBackground(Color.hxSurface)
+                } header: {
+                    dayHeader(section.day)
                 }
             }
         }
@@ -103,7 +106,7 @@ struct ActivityView: View {
                 banner(String(localized: "Rules file has an error; using the previous version"), detail: rulesError)
             }
             ForEach(episodeSections, id: \.day) { section in
-                Section(ActivityPresentation.dayHeader(for: section.day, now: .now, calendar: .current)) {
+                Section {
                     ForEach(section.episodes) { episode in
                         EpisodeRow(episode: episode)
                             .onAppear {
@@ -112,6 +115,9 @@ struct ActivityView: View {
                                 }
                             }
                     }
+                    .listRowBackground(Color.hxSurface)
+                } header: {
+                    dayHeader(section.day)
                 }
             }
         }
@@ -134,14 +140,21 @@ struct ActivityView: View {
         return grouped.keys.sorted(by: >).map { ($0, grouped[$0] ?? []) }
     }
 
+    /// A day's section title in sentence case (DESIGN.md § Section header).
+    private func dayHeader(_ day: Date) -> some View {
+        HXSectionHeader(title: ActivityPresentation.dayHeader(for: day, now: .now, calendar: .current))
+            .textCase(nil)
+    }
+
     private func banner(_ text: String, detail: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Label(text, systemImage: "exclamationmark.triangle").font(.footnote.weight(.semibold))
+            Label(text, systemImage: "exclamationmark.triangle").font(AppFont.footnote(weight: .semibold))
             if let detail {
-                Text(detail).font(.caption).foregroundStyle(.hxTextSecondary)
+                Text(detail).font(AppFont.caption()).foregroundStyle(.hxTextSecondary)
             }
         }
         .foregroundStyle(.hxWarning)
+        .listRowBackground(Color.hxSurface)
     }
 
     private var filterPicker: some View {
@@ -169,9 +182,10 @@ private struct ActivityRow: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text(ActivityPresentation.toolTitle(event.toolName))
-                    .font(.subheadline.weight(.semibold))
+                    .font(AppFont.subheadline(weight: .semibold))
+                    .foregroundStyle(Color.hxTextPrimary)
                 Text(event.summary)
-                    .font(.system(.caption, design: .monospaced))
+                    .font(AppFont.mono(style: .caption))
                     .foregroundStyle(.hxTextSecondary)
                     .lineLimit(2)
                 if let display = event.display {
@@ -183,18 +197,18 @@ private struct ActivityRow: View {
                         actionNeeded: display.actionNeeded
                     ) {
                         Text(display.rulePlain!)
-                            .font(.caption.weight(.medium))
+                            .font(AppFont.caption(weight: .medium))
                             .foregroundStyle(ActivityPresentation.outcomeStyle(event.outcome))
                     }
                     if !display.actionNeeded.isEmpty {
                         Text(display.actionNeeded)
-                            .font(.caption)
+                            .font(AppFont.caption())
                             .foregroundStyle(ActivityPresentation.outcomeStyle(event.outcome))
                     }
                 } else if let ruleID = event.ruleID, event.outcome == .blocked || event.outcome == .denied {
                     // Backward compat: older sidecars send no `display`.
                     Text("Rule: \(ruleID)")
-                        .font(.caption.weight(.medium))
+                        .font(AppFont.caption(weight: .medium))
                         .foregroundStyle(ActivityPresentation.outcomeStyle(event.outcome))
                 }
                 HStack(spacing: 8) {
@@ -206,7 +220,7 @@ private struct ActivityRow: View {
                     Spacer(minLength: 0)
                     Text(event.ts, style: .time)
                 }
-                .font(.caption)
+                .font(AppFont.caption())
                 .foregroundStyle(.hxTextSecondary)
             }
         }
@@ -229,17 +243,18 @@ private struct EpisodeRow: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text(ActivityPresentation.episodeTitle(rulePlain: episode.rulePlain))
-                    .font(.subheadline.weight(.semibold))
+                    .font(AppFont.subheadline(weight: .semibold))
+                    .foregroundStyle(Color.hxTextPrimary)
                 Text(ActivityPresentation.episodeSubtitle(count: episode.count, first: episode.firstTs, last: episode.lastTs))
-                    .font(.caption)
+                    .font(AppFont.caption())
                     .foregroundStyle(.hxTextSecondary)
                 Text(episode.sampleCommand)
-                    .font(.system(.caption, design: .monospaced))
+                    .font(AppFont.mono(style: .caption))
                     .foregroundStyle(.hxTextSecondary)
                     .lineLimit(2)
                 if !episode.actionNeeded.isEmpty {
                     Text(episode.actionNeeded)
-                        .font(.caption)
+                        .font(AppFont.caption())
                         .foregroundStyle(actionColor)
                 }
             }

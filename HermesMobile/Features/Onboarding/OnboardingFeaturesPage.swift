@@ -16,11 +16,11 @@ struct OnboardingFeaturesPage: View {
             VStack(spacing: dynamicTypeSize.isAccessibilitySize ? 28 : 36) {
                 VStack(spacing: 10) {
                     Text("What you get")
-                        .font(.system(size: dynamicTypeSize.isAccessibilitySize ? 26 : 28, weight: .bold))
+                        .font(AppFont.display(style: .title))
                         .foregroundStyle(.white)
 
                     Text("Atlas, reachable from iPhone over Tailscale.")
-                        .font(.subheadline)
+                        .font(AppFont.subheadline())
                         .foregroundStyle(.white.opacity(0.45))
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
@@ -58,18 +58,18 @@ struct OnboardingFeatureRow: View {
                 .foregroundStyle(color)
                 .frame(width: 40, height: 40)
                 .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                         .fill(color.opacity(0.12))
                 )
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(AppFont.subheadline(weight: .semibold))
                     .foregroundStyle(.white)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text(subtitle)
-                    .font(.caption)
+                    .font(AppFont.caption())
                     .foregroundStyle(.white.opacity(0.4))
                     .fixedSize(horizontal: false, vertical: true)
             }

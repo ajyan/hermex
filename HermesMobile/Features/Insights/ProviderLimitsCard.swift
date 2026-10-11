@@ -15,10 +15,7 @@ struct ProviderLimitsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Limits")
-                .textCase(.uppercase)
-                .font(AppFont.caption(weight: .semibold))
-                .foregroundStyle(.secondary)
+            HXSectionHeader(title: String(localized: "Limits"))
                 .padding(.horizontal, 4)
 
             if !cards.isEmpty {
@@ -44,7 +41,7 @@ private struct ProviderLimitsPlaceholderCard: View {
         SectionCard {
             VStack(alignment: .leading, spacing: 0) {
                 Text(verbatim: "Provider")
-                    .font(AppFont.headline())
+                    .font(AppFont.display(style: .headline, weight: .semibold))
                     .foregroundStyle(.primary)
                     .padding(.bottom, 14)
 
@@ -126,8 +123,8 @@ struct ProviderLimitsCard: View {
     @ViewBuilder
     private var header: some View {
         let title = Text(card.title)
-            .font(AppFont.headline())
-            .foregroundStyle(.primary)
+            .font(AppFont.display(style: .headline, weight: .semibold))
+            .foregroundStyle(Color.hxTextPrimary)
 
         Group {
             if dynamicTypeSize.isAccessibilitySize {

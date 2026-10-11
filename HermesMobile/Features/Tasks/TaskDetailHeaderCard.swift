@@ -36,11 +36,12 @@ struct TaskDetailHeaderCard: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(job.displayName)
-                    .font(.title3.bold())
+                    .font(AppFont.display(style: .title3, weight: .semibold))
+                    .foregroundStyle(Color.hxTextPrimary)
                     .lineLimit(3)
 
                 Text(scheduleSentence)
-                    .font(.subheadline)
+                    .font(AppFont.subheadline())
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
@@ -64,7 +65,7 @@ struct TaskDetailHeaderCard: View {
                     .font(.title2.weight(.semibold))
                     .foregroundStyle(Color.accentColor)
                 Text("Running now")
-                    .font(.footnote)
+                    .font(AppFont.footnote())
                     .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
@@ -73,17 +74,17 @@ struct TaskDetailHeaderCard: View {
                 Text(CronScheduleHumanizer.countdown(to: next))
                     .font(.title2.weight(.semibold))
                 Text("Next run · \(next.formatted(date: .abbreviated, time: .shortened))")
-                    .font(.footnote)
+                    .font(AppFont.footnote())
                     .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
         } else if let last = job.lastRunAt?.date {
             VStack(alignment: .leading, spacing: 1) {
                 Text("Not scheduled")
-                    .font(.title3.weight(.semibold))
+                    .font(AppFont.title3(weight: .semibold))
                     .foregroundStyle(.secondary)
                 Text("Last run · \(last.formatted(date: .abbreviated, time: .shortened))")
-                    .font(.footnote)
+                    .font(AppFont.footnote())
                     .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
@@ -95,7 +96,7 @@ struct TaskDetailHeaderCard: View {
         VStack(alignment: .leading, spacing: 6) {
             Label {
                 Text(failure)
-                    .font(.footnote)
+                    .font(AppFont.footnote())
                     .foregroundStyle(.primary)
                     .lineLimit(3)
             } icon: {
@@ -107,14 +108,14 @@ struct TaskDetailHeaderCard: View {
 
             if canSeeFullOutput {
                 Button("See full output", action: seeFullOutput)
-                    .font(.footnote.weight(.semibold))
+                    .font(AppFont.footnote(weight: .semibold))
                     .buttonStyle(.plain)
                     .foregroundStyle(.tint)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(Color.hxDanger.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color.hxDanger.opacity(0.10), in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
     }
 
     /// The card's two controls, as its bottom edge rather than as objects
@@ -164,10 +165,10 @@ struct TaskDetailHeaderCard: View {
         Button(action: action) {
             HStack(spacing: 7) {
                 Image(systemName: systemImage)
-                    .font(.footnote.weight(.semibold))
+                    .font(AppFont.footnote(weight: .semibold))
                     .foregroundStyle(.secondary)
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(AppFont.subheadline(weight: .semibold))
             }
             .frame(maxWidth: .infinity, minHeight: 46)
             .contentShape(Rectangle())

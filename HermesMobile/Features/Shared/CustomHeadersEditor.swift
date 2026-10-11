@@ -16,10 +16,10 @@ struct CustomHeadersEditor: View {
         var removeTint: Color
 
         static let standard = Style(
-            primaryText: .primary,
-            secondaryText: .secondary,
-            fieldBackground: Color(.secondarySystemBackground),
-            fieldStroke: Color(.separator),
+            primaryText: .hxTextPrimary,
+            secondaryText: .hxTextSecondary,
+            fieldBackground: .hxSurface,
+            fieldStroke: .hxSeparator,
             accent: .accentColor,
             removeTint: .hxDanger
         )
@@ -44,14 +44,14 @@ struct CustomHeadersEditor: View {
                 headers.append(CustomHeader())
             } label: {
                 Label("Add Header", systemImage: "plus.circle.fill")
-                    .font(.subheadline.weight(.semibold))
+                    .font(AppFont.subheadline(weight: .semibold))
                     .foregroundStyle(style.accent)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Add header")
 
             Text("Sent with every request to your server, including media and live streams. Use for a reverse proxy (e.g. Authentik) or token auth, such as an Authorization header.")
-                .font(.caption)
+                .font(AppFont.caption())
                 .foregroundStyle(style.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -72,7 +72,7 @@ struct CustomHeadersEditor: View {
                     remove(header.wrappedValue)
                 } label: {
                     Image(systemName: "minus.circle.fill")
-                        .font(.title3)
+                        .font(AppFont.title3())
                         .foregroundStyle(style.removeTint)
                 }
                 .buttonStyle(.plain)
@@ -89,12 +89,12 @@ struct CustomHeadersEditor: View {
 
     private func field<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         content()
-            .font(.subheadline)
+            .font(AppFont.subheadline())
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(style.fieldBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(style.fieldBackground, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                     .strokeBorder(style.fieldStroke, lineWidth: 1)
             )
     }

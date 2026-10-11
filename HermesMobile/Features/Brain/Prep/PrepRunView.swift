@@ -37,8 +37,7 @@ struct PrepRunView: View {
 
     var body: some View {
         content
-            .navigationTitle(Text(verbatim: title))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(title)
             .navigationBarBackButtonHidden(true)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

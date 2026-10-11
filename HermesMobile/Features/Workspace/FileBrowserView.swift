@@ -27,8 +27,8 @@ struct FileBrowserView: View {
             content
                 .adaptiveReadableScrollContent(maxWidth: AdaptiveReadableContentWidth.workspace)
         }
-        .navigationTitle("Files")
-        .navigationBarTitleDisplayMode(.inline)
+        .background(Color.hxCanvas)
+        .hxNavigationTitle(String(localized: "Files"), subtitle: session.workspace?.lastPathComponentFallback)
         .navigationDestination(item: $openedFile) { node in
             FilePreviewView(
                 session: session,
@@ -70,7 +70,7 @@ struct FileBrowserView: View {
             } description: {
                 if !searchText.isEmpty {
                     Text("Try a different file name or path.")
-                        .font(.footnote)
+                        .font(AppFont.footnote())
                         .foregroundStyle(.secondary)
                 }
             }
@@ -90,6 +90,7 @@ struct FileBrowserView: View {
                 .listRowSeparator(.hidden)
             }
             .listStyle(.plain)
+            .scrollContentBackground(.hidden)
             .refreshable {
                 await viewModel.refresh()
                 handleLastError()
@@ -100,15 +101,15 @@ struct FileBrowserView: View {
                         ProgressView()
                         Text("Loading files...")
                     }
-                    .font(.footnote)
+                    .font(AppFont.footnote())
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal)
                     .padding(.vertical, 10)
-                    .background(Color(.secondarySystemBackground))
+                    .background(Color.hxSurface)
                 } else if let errorMessage = viewModel.errorMessage {
                     HStack(spacing: 12) {
                         Label(errorMessage, systemImage: "exclamationmark.triangle")
-                            .font(.footnote)
+                            .font(AppFont.footnote())
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
 
@@ -120,11 +121,11 @@ struct FileBrowserView: View {
                                 handleLastError()
                             }
                         }
-                        .font(.footnote.weight(.semibold))
+                        .font(AppFont.footnote(weight: .semibold))
                     }
                     .padding(.horizontal)
                     .padding(.vertical, 10)
-                    .background(Color(.secondarySystemBackground))
+                    .background(Color.hxSurface)
                 }
             }
         }
@@ -133,11 +134,11 @@ struct FileBrowserView: View {
     private var searchBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .font(.caption)
+                .font(AppFont.caption())
                 .foregroundStyle(.secondary)
 
             TextField("Search files", text: $searchText)
-                .font(.subheadline)
+                .font(AppFont.subheadline())
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
 
@@ -146,7 +147,7 @@ struct FileBrowserView: View {
                     searchText = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.caption)
+                        .font(AppFont.caption())
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
@@ -155,12 +156,13 @@ struct FileBrowserView: View {
         }
         .padding(.horizontal, 12)
         .frame(height: 40)
-        .background(Color(.tertiarySystemFill).opacity(0.5), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color(.tertiarySystemFill).opacity(0.5), in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
         .padding(.horizontal)
         .padding(.vertical, 10)
-        .background(Color(.systemBackground))
+        .background(Color.hxCanvas)
         .overlay(alignment: .bottom) {
             Divider()
+                .overlay(Color.hxSeparator)
         }
     }
 
@@ -212,11 +214,10 @@ private struct FileTreeRowView: View {
                 }
 
                 icon
-                    .frame(width: 22)
 
                 Text(node.name)
-                    .font(.subheadline.weight(isSelected ? .semibold : .medium))
-                    .foregroundStyle(isSelected || node.isDirectory ? .primary : .secondary)
+                    .font(AppFont.subheadline(weight: isSelected ? .semibold : .medium))
+                    .foregroundStyle(isSelected || node.isDirectory ? Color.hxTextPrimary : Color.hxTextSecondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
 
@@ -248,31 +249,34 @@ private struct FileTreeRowView: View {
                     .controlSize(.mini)
             } else if hasLoadFailure {
                 Image(systemName: "exclamationmark.triangle")
-                    .font(.caption)
+                    .font(AppFont.caption())
                     .foregroundStyle(.hxWarning)
             } else if let childCount {
                 Text(childCount, format: .number)
-                    .font(.caption2.weight(.medium))
+                    .font(AppFont.caption2(weight: .medium))
                     .foregroundStyle(.tertiary)
                     .monospacedDigit()
             }
         }
     }
 
-    /// Folders and symlinks are quiet grey symbols; a file shows the glyph for its type.
-    /// Everything sits at 17 pt so the column lines up.
-    @ViewBuilder
+    /// Every entry is a `.file` object (DESIGN.md § The object key): its icon sits on a 24 pt
+    /// glow tile. Folders and symlinks take the file glow; a file keeps the glyph for its type.
     private var icon: some View {
-        if node.isDirectory || node.isSymlink {
-            Image(systemName: node.isSymlink ? "link" : "folder")
-                .font(.system(size: 17))
-                .foregroundStyle(Color(uiColor: .systemGray))
-        } else {
-            FileIcon.resolve(node.name).image
-                .resizable()
-                .scaledToFit()
-                .frame(width: 17, height: 17)
+        Group {
+            if node.isDirectory || node.isSymlink {
+                Image(systemName: node.isSymlink ? "link" : "folder")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(HermexPaper.file.glow)
+            } else {
+                FileIcon.resolve(node.name).image
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 15, height: 15)
+            }
         }
+        .frame(width: 24, height: 24)
+        .background(HermexPaper.file.wash, in: RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous))
     }
 
     private var accessibilityLabel: String {
@@ -300,7 +304,7 @@ private struct FileTreeRowButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                     .fill(background(isPressed: configuration.isPressed))
             )
             .onChange(of: configuration.isPressed) { _, isPressed in

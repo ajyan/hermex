@@ -90,17 +90,23 @@ private struct GitBranchPickerSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Local") {
+                Section {
                     ForEach(localBranches, id: \.name) { branch in
                         branchButton(branch, mode: .local)
                     }
+                } header: {
+                    HXSectionHeader(title: String(localized: "Local"))
+                        .textCase(nil)
                 }
 
                 if !remoteBranches.isEmpty {
-                    Section("Remote") {
+                    Section {
                         ForEach(remoteBranches, id: \.name) { branch in
                             branchButton(branch, mode: .remote)
                         }
+                    } header: {
+                        HXSectionHeader(title: String(localized: "Remote"))
+                            .textCase(nil)
                     }
                 }
 
@@ -123,8 +129,9 @@ private struct GitBranchPickerSheet: View {
                 }
             }
             .listStyle(.insetGrouped)
-            .navigationTitle("Branches")
-            .navigationBarTitleDisplayMode(.inline)
+            .scrollContentBackground(.hidden)
+            .background(Color.hxCanvas)
+            .hxNavigationTitle(String(localized: "Branches"))
             .searchable(text: $searchText, prompt: "Search branches")
             .overlay {
                 if isLoading, branches == nil { ProgressView() }

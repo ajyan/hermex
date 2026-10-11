@@ -61,7 +61,7 @@ struct BrainHighlightsView: View {
         }
         .brainListStyle()
         .refreshable { await viewModel.load() }
-        .navigationTitle(Text(verbatim: BrainModuleID.highlights.defaultTitle))
+        .hxNavigationTitle(BrainModuleID.highlights.defaultTitle)
         .background(Color.hxCanvas.ignoresSafeArea())
         .task {
             // Load once; a pop back from a book keeps the pages already scrolled.
@@ -158,8 +158,7 @@ struct BrainHighlightsBookView: View {
 
     var body: some View {
         content
-            .navigationTitle(Text(verbatim: viewModel.page?.item.title ?? ""))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(viewModel.page?.item.title ?? "")
             .background(Color.hxCanvas.ignoresSafeArea())
             .task {
                 // Re-run a first load that was cancelled before it finished, or it spins forever.

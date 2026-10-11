@@ -22,7 +22,7 @@ struct TasksView: View {
 
     var body: some View {
         content
-            .navigationTitle("Tasks")
+            .hxNavigationTitle(String(localized: "Tasks"))
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button {
@@ -132,10 +132,14 @@ struct TasksView: View {
                     }
 
                     ForEach(sections) { section in
-                        Section(section.group.title) {
+                        Section {
                             ForEach(section.jobs) { job in
                                 row(for: job, in: section.group)
+                                    .listRowBackground(Color.hxSurface)
                             }
+                        } header: {
+                            HXSectionHeader(title: section.group.title)
+                                .textCase(nil)
                         }
                     }
                 }
@@ -181,7 +185,7 @@ struct TasksView: View {
             let isTruncated = recentRuns.count > Self.compactRecentRunCount && !isShowingAllRecentRuns
             let visibleRuns = isTruncated ? Array(recentRuns.prefix(Self.compactRecentRunCount)) : recentRuns
 
-            Section("Ran Recently") {
+            Section {
                 ForEach(visibleRuns) { completion in
                     if let job = viewModel.job(for: completion) {
                         NavigationLink {
@@ -195,15 +199,20 @@ struct TasksView: View {
                         TaskRecentRunRowView(completion: completion)
                     }
                 }
+                .listRowBackground(Color.hxSurface)
 
                 if recentRuns.count > Self.compactRecentRunCount {
                     Button {
                         isShowingAllRecentRuns.toggle()
                     } label: {
                         Text(isTruncated ? "Show All (\(recentRuns.count))" : "Show Less")
-                            .font(.subheadline)
+                            .font(AppFont.subheadline())
                     }
+                    .listRowBackground(Color.hxSurface)
                 }
+            } header: {
+                HXSectionHeader(title: String(localized: "Ran Recently"))
+                    .textCase(nil)
             }
         }
     }
@@ -318,7 +327,7 @@ struct StatusBadge: View {
 
     var body: some View {
         Text(text)
-            .font(.caption2)
+            .font(AppFont.caption2())
             .fontWeight(.semibold)
             .foregroundStyle(color)
             .padding(.horizontal, 8)

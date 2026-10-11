@@ -38,8 +38,9 @@ struct GitCommitView: View {
     var body: some View {
         NavigationStack {
             content
-                .navigationTitle("Commit Changes")
-                .navigationBarTitleDisplayMode(.inline)
+                .buttonBorderShape(.capsule)
+                .background(Color.hxCanvas)
+                .hxNavigationTitle(String(localized: "Commit Changes"))
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Done") { dismiss() }
@@ -319,10 +320,12 @@ private struct GitCommitFileRow: View {
                 GitStatusChip(kind: file.changeKind)
             }
             .padding(12)
-            .background(Color(.secondarySystemBackground), in: .rect(cornerRadius: 12))
+            .hxCard(cornerRadius: HXRadius.md)
             .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(isSelected ? Color.accentColor.opacity(0.5) : Color(.separator).opacity(0.35), lineWidth: isSelected ? 1 : 0.5)
+                if isSelected {
+                    RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous)
+                        .strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 1)
+                }
             }
             .contentShape(.rect)
         }

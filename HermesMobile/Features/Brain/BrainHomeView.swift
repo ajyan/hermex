@@ -30,7 +30,7 @@ struct BrainHomeView: View {
 
     var body: some View {
         content
-            .navigationTitle(Text(verbatim: "Brain"))
+            .hxNavigationTitle("Brain")
             .background(Color.hxCanvas.ignoresSafeArea())
             .task {
                 // Every appear refreshes quietly: shown modules stay until the response lands.
@@ -105,32 +105,40 @@ struct BrainHomeView: View {
         return false
     }
 
+    /// The modules as one neutral card (DESIGN.md § Components), the same container every
+    /// screen's grouped rows sit in.
     private var moduleList: some View {
-        List {
-            Section {
-                ForEach(viewModel.modules, id: \.id) { module in
-                    NavigationLink(value: ShellPushDestination.brainRoute(.module(module.id))) {
-                        BrainRow(
-                            leading: { BrainModuleIcon(module: module.id) },
-                            title: module.title.isEmpty ? module.id.defaultTitle : module.title,
-                            subtitle: module.subtitle,
-                            trailing: "\(module.count)"
-                        )
+        ScrollView {
+            VStack(spacing: BrainStyle.s) {
+                VStack(spacing: 0) {
+                    ForEach(Array(viewModel.modules.enumerated()), id: \.element.id) { index, module in
+                        if index > 0 { moduleDivider }
+                        NavigationLink(value: ShellPushDestination.brainRoute(.module(module.id))) {
+                            BrainRow(
+                                leading: { BrainModuleIcon(module: module.id) },
+                                title: module.title.isEmpty ? module.id.defaultTitle : module.title,
+                                subtitle: module.subtitle,
+                                trailing: "\(module.count)"
+                            )
+                            .moduleRowPadding()
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .brainListRow()
-                }
-                if case .loaded(let home) = prepViewModel.state {
-                    NavigationLink(value: ShellPushDestination.brainRoute(.prep(.home))) {
-                        BrainRow(
-                            leading: { BrainModuleIcon(systemName: "target") },
-                            title: "Interview prep",
-                            subtitle: PrepCopy.homeRowSubtitle(
-                                streakDays: home.streak.days, remaining: home.run.remaining)
-                        )
+                    if case .loaded(let home) = prepViewModel.state {
+                        if !viewModel.modules.isEmpty { moduleDivider }
+                        NavigationLink(value: ShellPushDestination.brainRoute(.prep(.home))) {
+                            BrainRow(
+                                leading: { BrainModuleIcon(systemName: "target", paper: .knowledge) },
+                                title: "Interview prep",
+                                subtitle: PrepCopy.homeRowSubtitle(
+                                    streakDays: home.streak.days, remaining: home.run.remaining)
+                            )
+                            .moduleRowPadding()
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .brainListRow()
                 }
-            } footer: {
+                .hxCard()
                 if viewModel.isShowingCachedCopy {
                     Text(verbatim: "Offline, showing saved copy")
                         .brainText(.meta)
@@ -138,8 +146,9 @@ struct BrainHomeView: View {
                         .padding(.vertical, BrainStyle.s)
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, BrainStyle.m)
         }
-        .brainListStyle()
         .overlay {
             if viewModel.modules.isEmpty, !isShowingPrepRow {
                 ContentUnavailableView {
@@ -154,5 +163,27 @@ struct BrainHomeView: View {
             await viewModel.load()
             await prep
         }
+    }
+}
+
+private extension BrainHomeView {
+    var moduleDivider: some View {
+        Rectangle().fill(Color.hxSeparator).frame(height: 0.5).padding(.leading, 60)
+    }
+}
+
+private extension View {
+    /// A module row's padding inside the card, with a chevron like the list rows had.
+    func moduleRowPadding() -> some View {
+        HStack(spacing: 8) {
+            self
+            Image(systemName: "chevron.forward")
+                .font(AppFont.caption(weight: .semibold))
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
     }
 }

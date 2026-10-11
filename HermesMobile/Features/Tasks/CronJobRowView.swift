@@ -22,12 +22,12 @@ struct CronJobRowView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(job.displayName)
-                    .font(.subheadline.weight(.semibold))
+                    .font(AppFont.subheadline(weight: .semibold))
                     .foregroundStyle(isDimmed ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
                     .lineLimit(nameLineLimit)
 
                 Text(metaText)
-                    .font(.caption)
+                    .font(AppFont.caption())
                     .foregroundStyle(metaStyle)
                     .lineLimit(metaLineLimit)
             }

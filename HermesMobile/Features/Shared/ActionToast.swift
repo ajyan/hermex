@@ -144,7 +144,7 @@ struct ActionToastView: View {
                 actionButton(toast, horizontalPadding: 10)
                 if !state.dismissesAutomatically {
                     Rectangle()
-                        .fill(Color(.separator))
+                        .fill(Color.hxSeparator)
                         .frame(width: 1, height: 20)
                         .accessibilityHidden(true)
                     closeButton

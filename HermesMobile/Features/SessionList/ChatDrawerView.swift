@@ -218,7 +218,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
     @ViewBuilder
     private func pinnedSection(_ pinned: [SessionSummary]) -> some View {
         Text("Pinned")
-            .font(.headline)
+            .font(AppFont.display(style: .headline, weight: .semibold))
             .lineLimit(1)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .padding(.horizontal, 20)
@@ -257,7 +257,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
 
     private var recentsTitle: some View {
         Text("Recents")
-            .font(.headline)
+            .font(AppFont.display(style: .headline, weight: .semibold))
             .lineLimit(1)
             .fixedSize()
     }

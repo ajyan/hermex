@@ -34,7 +34,7 @@ import Observation
         Form {
             if let saved = setup.saved { statusSection(saved) }
             Section {
-                Text("Connect to your dashboard").font(.title3.bold())
+                Text("Connect to your dashboard").font(AppFont.display(style: .title3))
                 Text("Use your Hermes dashboard sign-in.").foregroundStyle(.secondary)
             }
             .listRowBackground(Color.clear)
@@ -100,9 +100,9 @@ import Observation
                     Text("Connecting to this host instead clears this connection’s drafts, cached chats and notification pairing on this iPhone.")
                 }
             }
-            Section("Need your connection details?") {
+            Section {
                 Text("Copy a prompt for your Hermes agent. It will check your setup and help you find the right address and sign-in details.")
-                    .font(.subheadline).foregroundStyle(.secondary)
+                    .font(AppFont.subheadline()).foregroundStyle(.secondary)
                 Button(copiedPrompt ? String(localized: "Copied") : String(localized: "Copy setup prompt"), systemImage: "doc.on.doc") {
                     UIPasteboard.general.string = BotConnectionSetup.prompt
                     copiedPrompt = true
@@ -113,6 +113,8 @@ import Observation
                     Text("Desktop and Atlas must use the same password-protected backend. Remote gateway connects Desktop to a backend; it does not expose Desktop’s private local backend to your phone.")
                     Text("Open each bot’s Bot Chat in Desktop first. Do not start a second backend using the same Profile storage.")
                 }
+            } header: {
+                HXSectionHeader(title: String(localized: "Need your connection details?")).textCase(nil)
             }
             Section {
                 DisclosureGroup("Connection name · optional") {
@@ -126,8 +128,9 @@ import Observation
                 }
             }
         }
-        .navigationTitle("Hermes connection")
-        .navigationBarTitleDisplayMode(.inline)
+        .scrollContentBackground(.hidden)
+        .background(Color.hxCanvas.ignoresSafeArea())
+        .hxNavigationTitle(String(localized: "Hermes connection"))
         .toolbar {
             if !isRoot { ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } } }
         }
@@ -159,8 +162,8 @@ import Observation
                         .padding(20)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .navigationTitle("Connection Headers")
-                .navigationBarTitleDisplayMode(.inline)
+                .background(Color.hxCanvas.ignoresSafeArea())
+                .hxNavigationTitle(String(localized: "Connection Headers"))
             } label: {
                 let count = setup.headers.sanitizedForStorage().count
                 LabeledContent("Connection Headers", value: count == 0 ? String(localized: "None") : count.formatted())
@@ -227,7 +230,7 @@ import Observation
             }
             .disabled(setup.hostStatus == .checking)
         } header: {
-            Text("Status")
+            HXSectionHeader(title: String(localized: "Status")).textCase(nil)
         } footer: {
             if live != nil {
                 Text("The messaging gateway runs scheduled Tasks and messaging platforms. Bot chat notifications still arrive while it is stopped.")
@@ -238,7 +241,7 @@ import Observation
     private func statusRow(_ label: LocalizedStringKey, value: String, note: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             LabeledContent(label, value: value)
-            if let note { Text(note).font(.footnote).foregroundStyle(.secondary) }
+            if let note { Text(note).font(AppFont.footnote()).foregroundStyle(.secondary) }
         }
         .accessibilityElement(children: .combine)
     }
@@ -539,15 +542,15 @@ struct BotConnectionWelcomeView: View {
             }
             .accessibilityHidden(true)
             VStack(spacing: 12) {
-                Text("Your bots, together.").font(.title2.bold())
+                Text("Your bots, together.").font(AppFont.display(style: .title2))
                 Text("Bots live in your Hermes dashboard. WebUI uses a separate connection, so sign in once here to bring them to Atlas.")
                     .foregroundStyle(.secondary)
             }
             .multilineTextAlignment(.center)
             Button("Connect", action: onConnect)
-                .font(.headline).frame(maxWidth: .infinity).padding(.vertical, 14)
-                .foregroundStyle(Color(uiColor: .systemBackground))
-                .background(Color(uiColor: .label), in: Capsule()).buttonStyle(.plain)
+                .font(AppFont.headline()).frame(maxWidth: .infinity).padding(.vertical, 14)
+                .foregroundStyle(Color.hxOnAccent)
+                .background(Color.accentColor, in: Capsule()).buttonStyle(.plain)
         }
         .frame(maxWidth: 360).padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
