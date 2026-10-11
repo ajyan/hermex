@@ -94,6 +94,52 @@ extension HermexPaper {
     }
 }
 
+/// The one header title (DESIGN.md § Header): centered, the rounded display voice, an optional
+/// subtitle under it. Sits in the toolbar's principal slot, between the leading glass circle
+/// and the trailing glass capsule.
+struct HXNavigationTitle: View {
+    let title: String
+    var subtitle: String?
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        VStack(spacing: 1) {
+            Text(verbatim: title)
+                .font(AppFont.display(style: .subheadline, weight: .semibold))
+                .foregroundStyle(Color.hxTextPrimary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            if let subtitle, !dynamicTypeSize.isAccessibilitySize {
+                Text(verbatim: subtitle)
+                    .font(AppFont.caption2())
+                    .foregroundStyle(Color.hxTextSecondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .contentTransition(.numericText())
+            }
+        }
+        .multilineTextAlignment(.center)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: [title, subtitle].compactMap { $0 }.joined(separator: ", ")))
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
+extension View {
+    /// The shared header: an inline navigation title (it still names the back button) drawn as
+    /// `HXNavigationTitle`.
+    func hxNavigationTitle(_ title: String, subtitle: String? = nil) -> some View {
+        navigationTitle(Text(verbatim: title))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    HXNavigationTitle(title: title, subtitle: subtitle)
+                }
+            }
+    }
+}
+
 /// A capsule naming one thing in its paper's glow: symbol, label, and an optional trailing
 /// mark. Tool calls, run counts, Brain citations, and source badges are all this chip.
 struct HXChip<Trailing: View>: View {

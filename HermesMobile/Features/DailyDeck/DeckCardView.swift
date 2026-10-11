@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// One card of the Daily Deck stack, on its own paper (`DeckPalette`). A card leads with its
-/// quote or takeaway in large serif type and scrolls into the rest: context, the question,
-/// and your reflection. Writing happens in `ReflectionSheet`, so a card never holds a text
+/// One card of the Daily Deck stack, a glow card in its kind's paper (`DeckPalette`). A card
+/// leads with its takeaway in large rounded type (serif when it quotes your saved words) and
+/// scrolls into the rest: context, the question, and your reflection. Writing happens in `ReflectionSheet`, so a card never holds a text
 /// field and long text never fights the swipe.
 struct DeckPageView: View {
     let page: DeckPage
@@ -24,8 +24,8 @@ struct DeckPageView: View {
             }
         }
         .opacity(contentOpacity)
-        .environment(\.colorScheme, .light)  // bright paper in every appearance
         .background(palette.paper, in: Self.shape)
+        .overlay(Self.shape.strokeBorder(palette.edge, lineWidth: 0.5))
         .clipShape(Self.shape)
         .hxShadow(.paper)
         .padding(.vertical, 12)
@@ -103,7 +103,7 @@ private struct DeckCardView: View {
         if let attribution = text.attribution {
             Text(verbatim: attribution)
                 .font(AppFont.subheadline(weight: .medium))
-                .foregroundStyle(palette.ink.opacity(0.7))
+                .foregroundStyle(palette.ink)
                 .padding(.top, 12)
         }
         if !card.entries.isEmpty {
@@ -113,14 +113,14 @@ private struct DeckCardView: View {
             Text(inlineMarkdown(detail))
                 .font(AppFont.body())
                 .lineSpacing(4)
-                .foregroundStyle(palette.ink.opacity(0.86))
+                .foregroundStyle(Color.hxTextPrimary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 22)
                 .textSelection(.enabled)
         }
         if !text.leadIsQuestion, let question = viewModel.question(for: card) {
             Text(verbatim: question)
-                .font(AppFont.title3(weight: .semibold))
+                .font(AppFont.display(style: .title3, weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 28)
                 .id(question)
@@ -130,15 +130,18 @@ private struct DeckCardView: View {
         if let reason = card.reason {
             Text(verbatim: reason)
                 .font(AppFont.footnote())
-                .foregroundStyle(palette.ink.opacity(0.62))
+                .foregroundStyle(palette.ink)
                 .padding(.top, 20)
         }
     }
 
+    /// Saved words (a quote, a book highlight, a past journal entry) keep the serif; every
+    /// other lead is the rounded display voice.
     private func leadFont(_ lead: String) -> Font {
         let style: Font.TextStyle = card.itemKind == "quote" ? .title
             : lead.count > 480 ? .body : lead.count > 220 ? .title3 : .title2
-        return AppFont.serif(style: style)
+        let quotesSavedWords = ["quote", "book", "on_this_day"].contains(card.itemKind ?? "")
+        return quotesSavedWords ? AppFont.serif(style: style) : AppFont.display(style: style, weight: .semibold)
     }
 
     /// Your words once written; until then, the way in.
@@ -153,11 +156,11 @@ private struct DeckCardView: View {
                         .fixedSize(horizontal: false, vertical: true)
                     Label { Text(verbatim: "Edit") } icon: { Image(systemName: "pencil") }
                         .font(AppFont.footnote(weight: .semibold))
-                        .foregroundStyle(palette.ink.opacity(0.7))
+                        .foregroundStyle(palette.ink)
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(palette.ink.opacity(0.07), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Text(verbatim: "Your reflection: \(text). Edit"))
@@ -165,7 +168,7 @@ private struct DeckCardView: View {
             Button { isWriting = true } label: {
                 Label { Text(verbatim: "Write a reflection") } icon: { Image(systemName: "square.and.pencil") }
                     .font(AppFont.body(weight: .semibold))
-                    .foregroundStyle(palette.paper)
+                    .foregroundStyle(palette.onInk)
                     .frame(maxWidth: .infinity, minHeight: 50)
                     .background(palette.ink, in: Capsule())
             }
@@ -193,41 +196,44 @@ private struct DeckCardView: View {
 
     // MARK: Opener and close
 
+    /// The day's title, a line about yesterday, and the cards ahead, so you know what you're
+    /// about to get.
     @ViewBuilder
     private var opener: some View {
-        Text(verbatim: card.title ?? "Today")
-            .font(AppFont.serif(style: .largeTitle))
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.trailing, 24)
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             ForEach(card.lines, id: \.self) { line in
-                Text(verbatim: line).font(AppFont.subheadline())
+                Text(verbatim: line).font(AppFont.footnote())
             }
         }
-        .foregroundStyle(palette.ink.opacity(0.75))
-        .padding(.top, 14)
+        .foregroundStyle(palette.ink)
+        .padding(.trailing, 24)
+        Text(verbatim: card.title ?? "Today")
+            .font(AppFont.display(style: .largeTitle, weight: .semibold))
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 10)
+        if let recap = card.recap {
+            (Text("Yesterday").font(AppFont.display(style: .subheadline, weight: .semibold))
+                + Text(verbatim: " · \(recap)").font(AppFont.subheadline()).foregroundStyle(Color.hxTextPrimary.opacity(0.85)))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 14)
+        }
         let ahead = viewModel.visiblePages.dropFirst().filter {
             if case .card(let c) = $0, c.type == .close { return false }
             return true
         }
-        FlowRow(spacing: 8) {
+        Text("Today · \(ahead.count) cards")
+            .font(AppFont.display(style: .subheadline, weight: .semibold))
+            .padding(.top, 26)
+            .padding(.bottom, 6)
+        VStack(spacing: 0) {
             ForEach(Array(ahead.enumerated()), id: \.element.id) { _, page in
-                let p = DeckPalette.of(page)
-                Text(verbatim: p.name)
-                    .font(AppFont.footnote(weight: .semibold))
-                    .foregroundStyle(p.ink)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(p.paper, in: Capsule())
-                    .overlay(Capsule().stroke(p.ink.opacity(0.15), lineWidth: 0.5))
+                DeckAheadRow(page: page)
             }
         }
-        .padding(.top, 28)
-        .accessibilityElement(children: .combine)
-        Text(verbatim: "\(ahead.count) cards · swipe to begin")
+        Text(verbatim: "Swipe to begin")
             .font(AppFont.footnote())
-            .foregroundStyle(palette.ink.opacity(0.6))
-            .padding(.top, 18)
+            .foregroundStyle(palette.ink)
+            .padding(.top, 16)
     }
 
     @ViewBuilder
@@ -235,7 +241,7 @@ private struct DeckCardView: View {
         let count = viewModel.answeredCount
         let filed = viewModel.isFiled && !viewModel.hasChanges
         Text(verbatim: filed ? "Filed" : count == 1 ? "1 reflection" : "\(count) reflections")
-            .font(AppFont.serif(style: .largeTitle))
+            .font(AppFont.display(style: .largeTitle, weight: .semibold))
         Text(verbatim: filed
              ? "In your journal. Edit any card and file again to update it."
              : viewModel.isFiled
@@ -244,7 +250,7 @@ private struct DeckCardView: View {
              ? "Nothing written yet. Swipe back to any card, or file the follow-ups you chose."
              : "Atlas writes them into today's journal and runs the follow-ups you chose.")
             .font(AppFont.body())
-            .foregroundStyle(palette.ink.opacity(0.8))
+            .foregroundStyle(Color.hxTextPrimary)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, 12)
         if case .failed(let message) = viewModel.filing {
@@ -252,11 +258,11 @@ private struct DeckCardView: View {
         }
         Button(action: file) {
             HStack {
-                if viewModel.filing == .filing { ProgressView().tint(palette.paper) }
+                if viewModel.filing == .filing { ProgressView().tint(palette.onInk) }
                 Text(verbatim: viewModel.isFiled ? "File Changes" : "File It")
             }
             .font(AppFont.body(weight: .semibold))
-            .foregroundStyle(palette.paper)
+            .foregroundStyle(palette.onInk)
             .frame(maxWidth: .infinity, minHeight: 50)
             .background(palette.ink.opacity(filed ? 0.35 : 1), in: Capsule())
         }
@@ -282,7 +288,7 @@ private struct RecapList: View {
                 if newGroup, let label = entry.label {
                     Text(verbatim: label)
                         .font(AppFont.subheadline(weight: .semibold))
-                        .foregroundStyle(palette.ink.opacity(0.7))
+                        .foregroundStyle(palette.ink)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.bottom, 4)
                 }
@@ -324,19 +330,19 @@ private struct ReflectionSheet: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
                 Text(verbatim: viewModel.question(for: card) ?? DeckCardText(card).lead ?? "Your thoughts")
-                    .font(AppFont.serif(style: .title3))
+                    .font(AppFont.display(style: .title3, weight: .semibold))
                     .foregroundStyle(palette.ink)
                     .fixedSize(horizontal: false, vertical: true)
                 TextEditor(text: $text)
                     .font(AppFont.body())
-                    .foregroundStyle(palette.ink)
+                    .foregroundStyle(Color.hxTextPrimary)
                     .scrollContentBackground(.hidden)
                     .focused($isFocused)
                     .overlay(alignment: .topLeading) {
                         if text.isEmpty {
                             Text(verbatim: "Write as much or as little as you like")
                                 .font(AppFont.body())
-                                .foregroundStyle(palette.ink.opacity(0.45))
+                                .foregroundStyle(Color.hxTextSecondary)
                                 .padding(.top, 8)
                                 .padding(.leading, 5)
                                 .allowsHitTesting(false)
@@ -354,7 +360,6 @@ private struct ReflectionSheet: View {
             .toolbarBackground(palette.paper, for: .navigationBar)
         }
         .tint(palette.ink)
-        .environment(\.colorScheme, .light)
         .onAppear {
             text = viewModel.answer(for: card)?.text ?? ""
             isFocused = true
@@ -374,7 +379,7 @@ private struct FollowUpsPage: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Text(verbatim: cards.count == 1 ? "1 follow-up" : "\(cards.count) follow-ups")
-                    .font(AppFont.serif(style: .title))
+                    .font(AppFont.display(style: .title, weight: .semibold))
                     .padding(.bottom, 20)
                 ForEach(Array(cards.enumerated()), id: \.element.id) { offset, card in
                     if offset > 0 { Divider().padding(.vertical, 16) }
@@ -491,3 +496,41 @@ private struct ChoiceButton: View {
     }
 }
 
+/// One card ahead on the opener: its kind's icon on a glow tile, its title, and its kind.
+private struct DeckAheadRow: View {
+    let page: DeckPage
+
+    var body: some View {
+        let palette = DeckPalette.of(page)
+        HStack(spacing: 10) {
+            Image(systemName: palette.symbol)
+                .font(AppFont.caption(weight: .semibold))
+                .foregroundStyle(palette.ink)
+                .frame(width: 26, height: 26)
+                .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.xs + 2, style: .continuous))
+                .accessibilityHidden(true)
+            Text(verbatim: Self.title(page))
+                .font(AppFont.subheadline())
+                .foregroundStyle(Color.hxTextPrimary)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            Text(verbatim: palette.shortName)
+                .font(AppFont.caption())
+                .foregroundStyle(Color.hxTextSecondary)
+                .lineLimit(1)
+        }
+        .padding(.vertical, 7)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// The card's own title, else its question, else what kind of card it is.
+    static func title(_ page: DeckPage) -> String {
+        switch page {
+        case .followUps(let cards):
+            return cards.count == 1 ? "1 follow-up" : "\(cards.count) follow-ups"
+        case .card(let card):
+            return [card.title, card.question].compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .first { !$0.isEmpty } ?? DeckPalette.of(card).name
+        }
+    }
+}

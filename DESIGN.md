@@ -1,14 +1,15 @@
 # Design
 
-Hermex's look: **calm chat, colorful objects.** The reading surface stays quiet and neutral so long agent output is easy on the eyes. Color lives on discrete *things*: a tool step, a goal, a Brain page, an approval. Each kind of thing always wears the same color, the same paper it wears in the Daily Brief, so the Brief, Goals, and chat read as one app.
+Hermex's look: **calm chat, colorful objects, one voice.** The reading surface stays quiet and neutral so long agent output is easy on the eyes. Color lives on discrete *things*: a tool step, a goal, a Brain page, an approval, a Brief card. Each kind of thing always wears the same color, rendered the same way everywhere (a glow), and every screen shares one type voice (SF Pro Rounded for display) and one header, so the Brief, Goals, and chat read as one app.
 
 ## Principles
 
 1. **Neutral ground, colored objects.** Canvases, bubbles, and body text use the `hx*` neutrals. Color appears only on an object you could tap, link, or act on.
 2. **A color means a kind.** Color is assigned by object type, never by sequence, position, or status. If two things share a color, they are the same kind of thing.
-3. **Whole cards are papers; small objects glow.** A card that fills the screen (a Brief card, the Goal hero) is a light paper in both appearances, like an index card on a dark desk. Everything smaller on the app's own canvas (chips, request cards, drawer icons, log icons) uses the paper's **glow**: its hue on a faint wash, deep in light mode and bright in dark mode. Pale pastel bits read as white specks on a dark screen; a glow keeps its color at any size.
-4. **Nous blue means interactive.** `Color.accentColor` (`#0053FD` / `#4A84FE`) is the tint for controls, the send button, links, and "Atlas is working". It is never an object color.
-5. **Status colors stay semantic.** `hxSuccess`, `hxWarning`, and `hxDanger` mark outcomes (done, needs care, failed). They are not object colors.
+3. **One material: glow.** Every colored thing is its hue on a wash of itself, deep in light mode and bright in dark mode, at two strengths: a faint `wash` for small objects (chips, request cards, drawer and log icons) and an opaque medium `card` fill for whole cards (Brief cards, the Goal hero). There are no fixed light papers anymore.
+4. **Glow text is full strength.** Text in a hue is never faded; hierarchy comes from size and weight. Fading is for decorative marks only (corner icons, dividers). Faded glow fails contrast.
+5. **Nous blue means interactive.** `Color.accentColor` (`#0053FD` / `#4A84FE`) is the tint for controls, the send button, links, and "Atlas is working". It is never an object color.
+6. **Status colors stay semantic.** `hxSuccess`, `hxWarning`, and `hxDanger` mark outcomes (done, needs care, failed). They are not object colors.
 
 ## Color
 
@@ -27,14 +28,19 @@ Prefer `hx*` over UIKit system colors (`systemBackground`, `secondarySystemBackg
 
 ### Papers (`HermexPaper`, `Config/HermexColors.swift`)
 
-Each paper has two renderings:
+Each paper is one hue rendered as a glow that adapts to the appearance:
 
-- **Paper** (`paper`, `ink`, `secondaryInk` = ink at 0.75): the bright card, identical in both appearances. Draw it in light appearance so system text stays legible on it. Used by `DeckPalette` (Brief cards) and `GoalPaper` (Goal hero).
-- **Glow** (`glow`, `wash`, `edge`, `onGlow`): for small objects on `hxCanvas`. `glow` is the text and symbol color, `wash` the hue at 16%, `edge` a 0.5 pt hairline in the hue (so a wash keeps its edge on the light canvas), `onGlow` the text on a solid `glow` fill. Glow text clears 4.5:1 on its wash in both appearances (`DesignSystemTests` checks every paper).
+- `glow`: text and symbols in the hue (the "Glow" column below).
+- `wash`: the hue at 16%, behind small objects.
+- `card`: a whole card's opaque fill, the hue at 20% over `hxCanvas`. **Warm hues** (`opener`, `reading`, `past`, `plain`) go 12% over `hxSurface` in dark mode instead, because warm mixed into navy reads as muddy brown.
+- `edge`: a 0.5 pt hairline in the hue, so a wash or card keeps its edge on the light canvas.
+- `onGlow`: text on a solid `glow` fill (a primary button).
+
+`glow` clears 4.5:1 on both `wash` and `card` in both appearances (`DesignSystemTests` checks every paper). `paper` and `ink` are the original light index-card values, kept as each hue's source.
 
 | Paper | Paper / ink | Glow light / dark | Brief card |
 |---|---|---|---|
-| `opener` | `#FFF1DC` / `#3A2410` | `#8A5200` / `#F6C77E` | Today |
+| `opener` | `#FFF1DC` / `#3A2410` | `#8A5200` / `#F6C77E` | Today (accents only; see the opener) |
 | `quote` | `#D9E8FF` / `#0E3264` | `#1D4FB8` / `#8DB4FF` | Quote |
 | `book` | `#FFDCE6` / `#6B1534` | `#A8335E` / `#F59AB8` | Book highlight |
 | `wiki` | `#D3F2E2` / `#0E4A33` | `#137049` / `#5FD3A0` | From your wiki |
@@ -72,7 +78,10 @@ Add a new kind of object here and in the code together. A failed tool step keeps
 - **Request cards.** Approvals and clarifications use `.glowSurface(.request, cornerRadius:, opaque: true)`: the wash over `hxSurface` (opaque because they float over transcript text), the edge, and the paper in `\.hxPaper`. Their title and symbol take the glow. Primary decision buttons fill with `glow` and `onGlow` text; secondary ones use the wash and edge.
 - **File attachments.** A tile on `.glowSurface(.file, …)`: glow icon and extension, neutral file name.
 - **Drawer.** Sections with their own paper show their icon on a 30 pt glow tile; the rest stay neutral so the colored ones stand out.
-- **Hero paper.** A Daily Brief card or Goal hero: light paper, radius `xl`, the `paper` shadow. The only lifted paper.
+- **Glow card.** A Daily Brief card or Goal hero: `card` fill, `edge` hairline, radius `xl`, the `paper` shadow; headline in `AppFont.display` semibold in the hue, body text in `hxTextPrimary`, everything else full-strength glow. Its buttons follow the button rules.
+- **Brief opener.** A neutral card (`hxSurface`, `hxSeparator` edge) with amber (`opener` glow) accents, since it summarizes the day rather than being one kind of thing: the date and advisor, the day's title, a **Yesterday** line (the brief's `recap`, one sentence from yesterday's journal and goal check-ins; hidden when absent), then **Today · N cards**, a list of the cards ahead, each with its kind's icon on a wash tile, its title (or question), and its one-word kind (`DeckPalette.shortName`). The list is for orientation only; it isn't tappable.
+- **Header** (`HXNavigationTitle`, `.hxNavigationTitle(_:subtitle:)`). Every screen: a glass circle on the left (menu or back), a centered title in `AppFont.display(.subheadline, .semibold)` with an optional `caption2` subtitle (the chat's project, the Brief's "3 of 10 · Filed"), and one glass capsule of actions on the right. Chat, Daily Brief, and Goals use it.
+- **Buttons.** Primary: a capsule filled with the object's `glow`, `onGlow` text (Allow, Answer, Write a reflection, File it). Secondary: a capsule in the object's `wash` and `edge`. On the app's own surfaces (no object), the primary is Nous blue. Icon actions are glass circles. `ChatDecisionButtonStyle` draws capsules.
 
 ## Shape
 
@@ -84,7 +93,7 @@ One radius scale, as `HXRadius`:
 | `sm` | 10 | Rows, attachment tiles, buttons, drawer icon tiles |
 | `md` | 14 | Inset blocks, choice buttons |
 | `lg` | 18 | Section cards, action cards (approval overlay, Bot request card) |
-| `xl` | 28 | Hero papers |
+| `xl` | 28 | Glow cards (Brief cards, Goal hero) |
 
 Use `.continuous` corners everywhere. Chips are capsules. The composer keeps its own geometry (`ChatComposerMetrics`: a pill, and 26 pt when expanded), and the clarification card that docks on it uses the same 26 so the two read as one surface.
 
@@ -92,7 +101,7 @@ Use `.continuous` corners everywhere. Chips are capsules. The composer keeps its
 
 Shadows, as `.hxShadow(_:)`:
 
-- **`paper`**: black at 0.08, radius 14, y 6, for hero papers. **`stacked`** (0.06, 10, y 4) for deck cards waiting behind the top one.
+- **`paper`**: black at 0.08, radius 14, y 6, for glow cards. **`stacked`** (0.06, 10, y 4) for deck cards waiting behind the top one.
 - **`float`**: black at 0.12 (light) or 0.28 (dark), radius 14, y 6, for the composer and floating glass controls.
 - **`modal`**: black at 0.22, radius 18, y 12, for a card over a dimmed screen (the approval overlay).
 
@@ -100,8 +109,13 @@ Everything inline in chat is flat.
 
 ## Type
 
-- SF Pro through `AppFont` and Dynamic Type styles. No `.system(size:)` on text. The one exception: an SF Symbol inside a fixed-size control (a round button, a media control) keeps a fixed point size, since a growing glyph would break the control.
-- Serif (New York) through `AppFont.serif` only, for Brief and Goal display text and quoted words a person saved. Chat content stays SF.
+One voice, three faces, all Dynamic Type through `AppFont`:
+
+- **Display: SF Pro Rounded** (`AppFont.display`): screen titles, card headlines, Brief questions, Goal titles, and headings in Atlas's replies (the Markdown theme's headings use `FontFamily(.system(.rounded))`). Semibold.
+- **Body: SF Pro**: everything you read at length, controls, metadata.
+- **Saved words: New York** (`AppFont.serif`), only for words a person saved: quotes, book highlights, past journal entries, and recap answers. Nothing else is serif.
+
+No `.system(size:)` on text. The one exception: an SF Symbol inside a fixed-size control (a round button, a media control) keeps a fixed point size, since a growing glyph would break the control.
 
 ## Motion
 
