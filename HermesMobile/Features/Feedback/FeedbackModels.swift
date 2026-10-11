@@ -101,11 +101,14 @@ struct FeedbackEntry: Decodable, Identifiable, Hashable, Sendable {
     let size: String?
     let planRepo: String?
     let attachments: [FeedbackAttachment]
+    /// Set on a `rejected` entry the nightly job folded into another entry's plan: that entry's id.
+    let mergedInto: String?
 
     private enum CodingKeys: String, CodingKey {
         case id, ts, feature, screen, item, build, text, status, updated, notes
         case branch, repo, tests, error, title, summary, size, attachments
         case planRepo = "plan_repo"
+        case mergedInto = "merged_into"
     }
 
     init(from decoder: Decoder) throws {
@@ -130,6 +133,7 @@ struct FeedbackEntry: Decodable, Identifiable, Hashable, Sendable {
         size = str(.size)
         planRepo = str(.planRepo)
         attachments = ((try? c.decodeIfPresent([FeedbackLossy<FeedbackAttachment>].self, forKey: .attachments)) ?? []).compactMap(\.value)
+        mergedInto = str(.mergedInto)
     }
 }
 

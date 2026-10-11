@@ -109,6 +109,13 @@ final class FeedbackModelsTests: XCTestCase {
         XCTAssertTrue(try decode(FeedbackEntry.self, "{}").attachments.isEmpty)
     }
 
+    func testEntryDecodesMergedInto() throws {
+        XCTAssertEqual(try decode(FeedbackEntry.self, #"{"id": "f1", "status": "rejected", "merged_into": "0123456789ab"}"#).mergedInto, "0123456789ab")
+        XCTAssertNil(try decode(FeedbackEntry.self, #"{"id": "f1", "merged_into": null}"#).mergedInto)
+        XCTAssertNil(try decode(FeedbackEntry.self, #"{"id": "f1", "merged_into": 7}"#).mergedInto)
+        XCTAssertNil(try decode(FeedbackEntry.self, "{}").mergedInto)
+    }
+
     // MARK: Per-screen state
 
     func testPrepRunStateOnAnsweredRep() throws {

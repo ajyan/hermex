@@ -45,7 +45,7 @@ struct FeedbackDetailView: View {
                         .font(AppFont.title3(weight: .semibold))
                         .foregroundStyle(Color.hxTextPrimary)
                         .accessibilityAddTraits(.isHeader)
-                    Text(verbatim: entry.metaLine)
+                    Text(verbatim: viewModel.metaLine(for: entry))
                         .font(AppFont.footnote())
                         .foregroundStyle(Color.hxTextSecondary)
                 }

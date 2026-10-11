@@ -41,6 +41,20 @@ final class FeedbackInboxViewModel {
         return groups.values.lazy.flatMap { $0 }.first { $0.id == id }
     }
 
+    /// The row's secondary text. An entry merged into another entry's plan names that entry
+    /// instead of "Rejected", e.g. "Daily Deck · Merged into Fix the question".
+    func metaLine(for entry: FeedbackEntry) -> String {
+        guard entry.status == .rejected, let mainID = entry.mergedInto else { return entry.metaLine }
+        return entry.metaLine(status: "Merged into " + (self.entry(id: mainID)?.headline ?? "another note"))
+    }
+
+    /// The entry a tap opens: for a merged entry, the entry whose plan covers it when that is
+    /// loaded; otherwise the entry itself.
+    func openedID(for entry: FeedbackEntry) -> String {
+        guard entry.status == .rejected, let mainID = entry.mergedInto, self.entry(id: mainID) != nil else { return entry.id }
+        return mainID
+    }
+
     func load() async {
         generation += 1
         let token = generation
@@ -158,8 +172,10 @@ extension FeedbackEntry {
     }
 
     /// The row's secondary text, e.g. "Prep · Plan ready · S".
-    var metaLine: String {
-        [feature, status.label, size ?? ""]
+    var metaLine: String { metaLine(status: status.label) }
+
+    func metaLine(status: String) -> String {
+        [feature, status, size ?? ""]
             .filter { !$0.isEmpty }
             .joined(separator: " · ")
     }
