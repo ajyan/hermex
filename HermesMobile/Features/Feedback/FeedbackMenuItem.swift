@@ -1,23 +1,26 @@
 import Observation
 import SwiftUI
 
-/// Whether the active server takes feedback. The server-keyed shell owns one and checks
-/// it once, so a server switch (which rebuilds the shell) checks again. Memory only.
+/// Whether the active server takes feedback. The server-keyed shell owns one, so a server
+/// switch (which rebuilds the shell) checks again. Memory only.
 @MainActor
 @Observable
 final class FeedbackAvailability {
     @ObservationIgnored let client: any FeedbackDataClient
     /// False until the server answers, so the item never flashes in on a server without it.
     private(set) var isAvailable = false
-    @ObservationIgnored private var hasChecked = false
+    @ObservationIgnored private var isChecking = false
 
     init(client: any FeedbackDataClient) {
         self.client = client
     }
 
+    /// Asks the server until it says yes. The shell calls this on launch and on each return
+    /// to the foreground, so a server that gains the inbox mid-session shows the item.
     func check() async {
-        guard !hasChecked else { return }
-        hasChecked = true
+        guard !isAvailable, !isChecking else { return }
+        isChecking = true
+        defer { isChecking = false }
         isAvailable = await client.isAvailable()
     }
 }

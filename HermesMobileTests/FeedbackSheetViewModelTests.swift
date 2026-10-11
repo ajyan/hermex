@@ -90,6 +90,21 @@ final class FeedbackSheetViewModelTests: XCTestCase {
         XCTAssertFalse(availability.isAvailable)
     }
 
+    func testUnavailableChecksAgainUntilTheServerSaysYes() async {
+        let client = StubFeedbackClient()
+        await client.setAvailable(false)
+        let availability = FeedbackAvailability(client: client)
+        await availability.check()
+        XCTAssertFalse(availability.isAvailable)
+
+        await client.setAvailable(true)
+        await availability.check()
+
+        XCTAssertTrue(availability.isAvailable, "a later check shows the item once the server has the inbox")
+        let checks = await client.availabilityChecks
+        XCTAssertEqual(checks, 2)
+    }
+
     func testAvailableShowsItemAndChecksOncePerServerSession() async {
         let client = StubFeedbackClient()
         let availability = FeedbackAvailability(client: client)

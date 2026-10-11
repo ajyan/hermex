@@ -81,7 +81,7 @@ struct ChatShellView: View {
     @State private var navigation = ShellNavigationState()
     /// Lets chat replies open Brain pages (`brain://` links) on this stack.
     @State private var brainRouteOpener = OpenBrainRouteAction()
-    /// Whether this server takes feedback; checked once, gone with the shell on a server switch.
+    /// Whether this server takes feedback; rechecked on return until yes, gone with the shell on a server switch.
     @State private var feedbackAvailability: FeedbackAvailability
     /// The drawer is built on first open and kept alive, so it keeps its scroll position.
     @State private var hasOpenedDrawer = false
@@ -184,6 +184,7 @@ struct ChatShellView: View {
                 if phase == .active, wasBackgrounded {
                     wasBackgrounded = false
                     viewModel.noteAppForegrounded()
+                    Task { await feedbackAvailability.check() }
                     if foregroundRefresh.appReturned(
                         didCompleteInitialLoad: didCompleteInitialLoad,
                         isLoading: viewModel.isLoading
