@@ -32,6 +32,14 @@ struct FeedbackDetailView: View {
     private func content(_ entry: FeedbackEntry) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                // Above everything: a 409 reload can move the entry past its action bar.
+                if let error = viewModel.error {
+                    Label { Text(verbatim: error) } icon: { Image(systemName: "exclamationmark.triangle.fill") }
+                        .font(AppFont.footnote(weight: .medium))
+                        .foregroundStyle(Color.hxDanger)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text(verbatim: entry.headline)
                         .font(AppFont.title3(weight: .semibold))
@@ -141,12 +149,16 @@ struct FeedbackDetailView: View {
 
     @ViewBuilder
     private func actionBar(_ entry: FeedbackEntry) -> some View {
-        if [.planned, .ready, .failed].contains(entry.status) {
+        if entry.status.hasDecisions {
             VStack(alignment: .leading, spacing: 8) {
-                if let error = viewModel.error {
-                    Text(verbatim: error)
-                        .font(AppFont.footnote())
-                        .foregroundStyle(Color.hxDanger)
+                if viewModel.pendingID == entry.id {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text(verbatim: "Saving…")
+                            .font(AppFont.footnote())
+                            .foregroundStyle(Color.hxTextSecondary)
+                    }
+                    .accessibilityElement(children: .combine)
                 }
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 8) { actions(entry) }

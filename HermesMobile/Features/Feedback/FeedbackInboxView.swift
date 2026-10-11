@@ -69,6 +69,7 @@ struct FeedbackInboxView: View {
                                 FeedbackInboxRow(
                                     entry: entry,
                                     isBusy: viewModel.pendingID != nil,
+                                    isPending: viewModel.pendingID == entry.id,
                                     open: { openedID = entry.id },
                                     approve: { Task { await viewModel.decide(entry, .approve) } },
                                     reply: { replyTarget = entry }
@@ -93,6 +94,7 @@ struct FeedbackInboxView: View {
 private struct FeedbackInboxRow: View {
     let entry: FeedbackEntry
     let isBusy: Bool
+    let isPending: Bool
     let open: () -> Void
     let approve: () -> Void
     let reply: () -> Void
@@ -135,6 +137,10 @@ private struct FeedbackInboxRow: View {
                     Button(action: reply) { Text(verbatim: "Reply") }
                         .buttonStyle(.bordered)
                         .tint(Color.hxTextPrimary)
+                    if isPending {
+                        ProgressView()
+                            .accessibilityLabel(Text(verbatim: "Saving"))
+                    }
                 }
                 .font(AppFont.subheadline(weight: .semibold))
                 .disabled(isBusy)
@@ -170,6 +176,7 @@ private struct FeedbackReplyPrompt: ViewModifier {
             } label: {
                 Text(verbatim: "Send")
             }
+            .disabled(note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             Button(role: .cancel) { note = "" } label: { Text(verbatim: "Cancel") }
         } message: { _ in
             Text(verbatim: "The plan goes back for another pass tonight.")

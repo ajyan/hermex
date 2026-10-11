@@ -104,6 +104,7 @@ final class FeedbackInboxViewModel {
 
     /// Groups by status, newest first within each group.
     static func grouped(_ entries: [FeedbackEntry]) -> [FeedbackGroup: [FeedbackEntry]] {
+        // `ts` is the server's uniform ISO-8601 UTC string, so string order is time order.
         let newestFirst = entries.sorted { ($0.ts ?? "") > ($1.ts ?? "") }
         return Dictionary(grouping: newestFirst, by: \.status.group)
     }
@@ -126,6 +127,14 @@ extension FeedbackGroup {
         case .inProgress: "In progress"
         case .done: "Done"
         }
+    }
+}
+
+extension FeedbackStatus {
+    /// Whether the user has a decision to make: planned (approve, reply, reject),
+    /// ready (mark merged, reject) or failed (retry).
+    var hasDecisions: Bool {
+        self == .planned || self == .ready || self == .failed
     }
 }
 

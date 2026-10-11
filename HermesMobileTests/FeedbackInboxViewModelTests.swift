@@ -98,6 +98,27 @@ final class FeedbackInboxViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.pendingID)
     }
 
+    func test409ErrorOutlivesTheEntryLeavingItsDecisions() async throws {
+        let client = InboxStubClient(entries: [entry("b", status: "planned", ts: "2026-10-02T10:00:00Z")])
+        await client.failDecisions(with: APIError.http(statusCode: 409, body: nil))
+        let viewModel = FeedbackInboxViewModel(client: client)
+        await viewModel.load()
+        XCTAssertTrue(try XCTUnwrap(viewModel.entry(id: "b")).status.hasDecisions)
+        await client.setEntries([entry("b", status: "building", ts: "2026-10-02T10:00:00Z")])
+
+        await viewModel.decide(try XCTUnwrap(viewModel.entry(id: "b")), .approve)
+
+        let reloaded = try XCTUnwrap(viewModel.entry(id: "b"))
+        XCTAssertFalse(reloaded.status.hasDecisions, "the detail's action bar goes away")
+        XCTAssertNotNil(viewModel.error, "so the error must show outside it")
+    }
+
+    func testOnlyPlannedReadyAndFailedHaveDecisions() {
+        let withDecisions = [FeedbackStatus.new, .planning, .planned, .approved, .building, .ready, .failed, .rejected, .merged, .unknown]
+            .filter(\.hasDecisions)
+        XCTAssertEqual(withDecisions, [.planned, .ready, .failed])
+    }
+
     func testOtherFailureKeepsEntryAndShowsError() async throws {
         let client = InboxStubClient(entries: [entry("b", status: "planned", ts: "2026-10-02T10:00:00Z")])
         await client.failDecisions(with: APIError.http(statusCode: 500, body: nil))
