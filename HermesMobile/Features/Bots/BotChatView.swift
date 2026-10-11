@@ -167,6 +167,7 @@ import SwiftUI
                     .chatDisclosureToggled { handleFollowEvent(.userScrollBegin) }
                     // One link router for the whole transcript.
                     .transcriptLinks()
+                    .interactiveAnswerAsk { model.fillDraftFromInteractiveAnswer($0) }
                     .background {
                         ChatScrollObserver(isStreaming: isStreaming, onFollowEvent: handleFollowEvent, onMetrics: updateScrollMetrics)
                             .accessibilityHidden(true)

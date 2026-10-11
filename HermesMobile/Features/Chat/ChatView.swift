@@ -1674,6 +1674,7 @@ struct ChatView: View {
         }
         .environment(\.composerChipCatalog, viewModel.composerChipCatalog)
         .transcriptLinks(perform: handleTranscriptLink)
+        .interactiveAnswerAsk(perform: fillDraftFromInteractiveAnswer)
         .environment(\.chatWorkspaceRoot, session.workspace)
         .task(id: transcriptSkillReferenceCount) {
             await loadSkillSuggestionsForTranscriptChipsIfNeeded()
@@ -2590,6 +2591,14 @@ struct ChatView: View {
         )
         draftMessage = resolvedContent.text
         draftQuotes = resolvedContent.quotes
+    }
+
+    /// An "Ask Atlas" tap in an interactive answer: it fills the draft, after
+    /// any draft already started, and never sends.
+    private func fillDraftFromInteractiveAnswer(_ text: String) {
+        draftMessage = InteractiveAnswerDraftMerge.merged(draft: draftMessage, ask: text)
+        persistDraftEdit(draftMessage)
+        requestComposerFocusIfPossible()
     }
 
     private func addSelectedPassageToDraft(_ passage: String) {
