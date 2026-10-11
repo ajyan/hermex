@@ -42,10 +42,6 @@ final class ResponseSelectionController: UIViewController {
 
     override func loadView() {
         view = input
-        // Content that changes size after its first layout (an interactive
-        // answer learning its page height) reports it, so the row re-measures
-        // instead of drawing over its neighbors.
-        host.sizingOptions = .preferredContentSize
         addChild(host)
         host.view.backgroundColor = .clear
         host.view.translatesAutoresizingMaskIntoConstraints = false
@@ -59,11 +55,6 @@ final class ResponseSelectionController: UIViewController {
             host.view.bottomAnchor.constraint(equalTo: input.bottomAnchor)
         ])
         host.didMove(toParent: self)
-    }
-
-    override func preferredContentSizeDidChange(forChildContentContainer container: UIContentContainer) {
-        super.preferredContentSizeDidChange(forChildContentContainer: container)
-        input.invalidateIntrinsicContentSize()
     }
 }
 

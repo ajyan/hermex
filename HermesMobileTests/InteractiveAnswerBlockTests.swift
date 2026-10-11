@@ -61,4 +61,28 @@ final class InteractiveAnswerBlockTests: XCTestCase {
         XCTAssertEqual(InteractiveAnswerBlock.title(in: "<title>\(long)</title>")?.count, 80)
         XCTAssertNil(InteractiveAnswerBlock.title(in: "<title>open"))
     }
+
+    func testDisabledSurfaceRendersCode() {
+        XCTAssertEqual(
+            InteractiveAnswerBlock.classify(language: "atlas-ui", content: "<p>x</p>", isStreaming: false, isEnabled: false),
+            .code
+        )
+    }
+
+    func testCutOffFenceRendersCode() {
+        XCTAssertEqual(
+            InteractiveAnswerBlock.classify(language: "atlas-ui", content: "<title>T</title><div>half", isStreaming: false, isFenceClosed: false),
+            .code
+        )
+    }
+
+    func testUnclosedFenceBodyFindsTrailingOpenFence() {
+        let cut = "Intro\n\n```atlas-ui\n<title>T</title>\n<div>half"
+        XCTAssertEqual(InteractiveAnswerBlock.unclosedFenceBody(in: cut), "<title>T</title>\n<div>half")
+        let closed = "Intro\n\n```atlas-ui\n<p>x</p>\n```\n"
+        XCTAssertNil(InteractiveAnswerBlock.unclosedFenceBody(in: closed))
+        let longer = "````atlas-ui\n```js\nx\n```\n"
+        XCTAssertEqual(InteractiveAnswerBlock.unclosedFenceBody(in: longer), "```js\nx\n```")
+        XCTAssertNil(InteractiveAnswerBlock.unclosedFenceBody(in: "plain text"))
+    }
 }

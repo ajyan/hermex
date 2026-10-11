@@ -34,6 +34,7 @@ struct MarkdownRenderer: View {
                 )
             } else {
                 markdownContent
+                    .environment(\.interactiveAnswerUnclosedBody, unclosedInteractiveAnswerBody)
             }
         }
         .onChange(of: isStreaming) { wasStreaming, nowStreaming in
@@ -47,6 +48,12 @@ struct MarkdownRenderer: View {
             guard !Task.isCancelled else { return }
             lingersAfterStreaming = false
         }
+    }
+
+    /// A reply cut off inside an `atlas-ui` block shows that block as code.
+    private var unclosedInteractiveAnswerBody: String? {
+        guard content.contains(InteractiveAnswerBlock.language) else { return nil }
+        return InteractiveAnswerBlock.unclosedFenceBody(in: content)
     }
 
     @ViewBuilder
@@ -458,9 +465,18 @@ private struct MathFenceOrCodeBlock: View {
     let content: String
     let isStreaming: Bool
 
+    @Environment(\.interactiveAnswersEnabled) private var interactiveAnswersEnabled
+    @Environment(\.interactiveAnswerUnclosedBody) private var unclosedInteractiveAnswerBody
+
     var body: some View {
         if InteractiveAnswerBlock.matches(language),
-           case let block = InteractiveAnswerBlock.classify(language: language, content: content, isStreaming: isStreaming),
+           case let block = InteractiveAnswerBlock.classify(
+               language: language,
+               content: content,
+               isStreaming: isStreaming,
+               isEnabled: interactiveAnswersEnabled,
+               isFenceClosed: unclosedInteractiveAnswerBody != content.trimmingCharacters(in: .whitespacesAndNewlines)
+           ),
            block != .code {
             InteractiveAnswerCard(block: block, source: content)
         } else if MathFenceLanguage.matches(language), MathLaTeX.isRenderable(content) {

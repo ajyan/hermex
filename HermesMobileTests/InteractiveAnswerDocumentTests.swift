@@ -61,4 +61,18 @@ final class InteractiveAnswerDocumentTests: XCTestCase {
         let fragment = try XCTUnwrap(html.range(of: "<p id=frag></p>"))
         XCTAssertLessThan(bridge.lowerBound, fragment.lowerBound)
     }
+
+    func testHeightComesFromBodySoCardsCanShrink() {
+        XCTAssertTrue(lightHTML.contains("document.body.getBoundingClientRect().height"))
+        XCTAssertFalse(lightHTML.contains("documentElement.scrollHeight"))
+    }
+
+    func testOnlyScriptFailuresAreLoadErrors() {
+        XCTAssertTrue(lightHTML.contains("t.tagName === 'SCRIPT'"))
+        XCTAssertFalse(lightHTML.contains("t.tagName === 'IMG'"))
+    }
+
+    func testAskAndOpenRequireAUserTap() {
+        XCTAssertTrue(lightHTML.contains("navigator.userActivation"))
+    }
 }

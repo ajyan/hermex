@@ -68,16 +68,37 @@ private struct InteractiveAnswerAskKey: EnvironmentKey {
     static let defaultValue = InteractiveAnswerAskAction()
 }
 
+private struct InteractiveAnswersEnabledKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+private struct InteractiveAnswerUnclosedBodyKey: EnvironmentKey {
+    static let defaultValue: String? = nil
+}
+
 extension EnvironmentValues {
     var interactiveAnswerAsk: InteractiveAnswerAskAction {
         get { self[InteractiveAnswerAskKey.self] }
         set { self[InteractiveAnswerAskKey.self] = newValue }
     }
+
+    /// Whether `atlas-ui` blocks render as cards. Only screens with a composer
+    /// (`interactiveAnswerAsk(perform:)`) turn it on; elsewhere they stay code.
+    var interactiveAnswersEnabled: Bool {
+        get { self[InteractiveAnswersEnabledKey.self] }
+        set { self[InteractiveAnswersEnabledKey.self] = newValue }
+    }
+
+    /// The body of an `atlas-ui` block the reply never closed, set by `MarkdownRenderer`.
+    var interactiveAnswerUnclosedBody: String? {
+        get { self[InteractiveAnswerUnclosedBodyKey.self] }
+        set { self[InteractiveAnswerUnclosedBodyKey.self] = newValue }
+    }
 }
 
 extension View {
-    /// Routes "Ask Atlas" taps from interactive answers below this view into
-    /// `handler`, which should fill the composer and never send.
+    /// Renders interactive answers below this view as cards and routes their
+    /// "Ask Atlas" taps into `handler`, which should fill the composer and never send.
     func interactiveAnswerAsk(perform handler: @escaping (String) -> Void) -> some View {
         modifier(InteractiveAnswerAskModifier(handler: handler))
     }
@@ -89,6 +110,8 @@ private struct InteractiveAnswerAskModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         action.handler = handler
-        return content.environment(\.interactiveAnswerAsk, action)
+        return content
+            .environment(\.interactiveAnswerAsk, action)
+            .environment(\.interactiveAnswersEnabled, true)
     }
 }

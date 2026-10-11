@@ -15,7 +15,12 @@ struct InteractiveAnswerCard: View {
         case .building(let title):
             InteractiveAnswerBuildingCard(title: title)
         case .card(let fragment, let title):
-            InteractiveAnswerLiveCard(fragment: fragment, title: title, source: source)
+            InteractiveAnswerLiveCard(
+                fragment: fragment,
+                title: title,
+                source: source,
+                cardID: InteractiveAnswerCardID.make(fragment: fragment)
+            )
         case .code:
             EmptyView()
         }
@@ -45,6 +50,7 @@ private struct InteractiveAnswerLiveCard: View {
     let fragment: String
     let title: String
     let source: String
+    let cardID: String
 
     private enum Failure: Equatable {
         case script
@@ -54,6 +60,10 @@ private struct InteractiveAnswerLiveCard: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.openURL) private var openURL
     @Environment(\.interactiveAnswerAsk) private var ask
+    /// Set when the card sits in a settled reply's selection host, which has its
+    /// own SwiftUI graph: scroll visibility and size changes cannot be seen from
+    /// inside it, so both go through the host.
+    @Environment(\.responseSelectionScope) private var selectionScope
     @State private var budget = InteractiveAnswerLiveBudget.shared
     @State private var reportedHeight: CGFloat?
     @State private var failure: Failure?
@@ -62,7 +72,6 @@ private struct InteractiveAnswerLiveCard: View {
     @State private var showsCode = false
 
     private static let restingHeight: CGFloat = 240
-    private var cardID: String { InteractiveAnswerCardID.make(fragment: fragment) }
     private var maxHeight: CGFloat { UIScreen.main.bounds.height * 0.7 }
     private var height: CGFloat {
         min(reportedHeight ?? budget.height(for: cardID) ?? Self.restingHeight, maxHeight)
@@ -77,8 +86,13 @@ private struct InteractiveAnswerLiveCard: View {
                 .clipped()
         }
         .interactiveAnswerSurface()
+        .onChange(of: selectionScope?.collectsGlyphs, initial: true) { _, replyVisible in
+            guard let replyVisible else { return }
+            setVisible(replyVisible)
+        }
         .onScrollVisibilityChange(threshold: 0.01) { visible in
-            if visible { budget.becameVisible(cardID) } else { budget.becameHidden(cardID) }
+            guard selectionScope == nil else { return }
+            setVisible(visible)
         }
         .contextMenu {
             Button {
@@ -142,8 +156,16 @@ private struct InteractiveAnswerLiveCard: View {
                         .font(.title3)
                         .foregroundStyle(.hxTextSecondary)
                 }
-                .accessibilityHidden(true)
+                .contentShape(Rectangle())
+                .onTapGesture { budget.becameVisible(cardID) }
+                .accessibilityElement()
+                .accessibilityLabel(String(localized: "Load \(title)"))
+                .accessibilityAddTraits(.isButton)
         }
+    }
+
+    private func setVisible(_ visible: Bool) {
+        if visible { budget.becameVisible(cardID) } else { budget.becameHidden(cardID) }
     }
 
     private func failureView(_ failure: Failure) -> some View {
@@ -180,6 +202,8 @@ private struct InteractiveAnswerLiveCard: View {
             guard reported != reportedHeight else { return }
             reportedHeight = reported
             budget.rememberHeight(reported, for: cardID)
+            // The reply's selection host measured this card at its old height.
+            selectionScope?.input?.invalidateIntrinsicContentSize()
         case .scriptError:
             failure = .script
         case .loadError:

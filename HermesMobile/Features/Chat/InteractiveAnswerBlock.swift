@@ -17,10 +17,21 @@ enum InteractiveAnswerBlock: Equatable {
         language?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == Self.language
     }
 
-    static func classify(language: String?, content: String, isStreaming: Bool) -> InteractiveAnswerBlock {
+    /// `isEnabled` is false on surfaces with no composer for "Ask Atlas" (Skills,
+    /// file previews, Brain), which show the block as code. `isFenceClosed` is
+    /// false when the reply ended inside this block (`unclosedFenceBody`).
+    static func classify(
+        language: String?,
+        content: String,
+        isStreaming: Bool,
+        isEnabled: Bool = true,
+        isFenceClosed: Bool = true
+    ) -> InteractiveAnswerBlock {
+        guard isEnabled else { return .code }
         if isStreaming { return .building(title: title(in: content)) }
         let fragment = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !fragment.isEmpty,
+        guard isFenceClosed,
+              !fragment.isEmpty,
               fragment.utf8.count <= maxFragmentBytes,
               isComplete(fragment)
         else { return .code }
@@ -36,6 +47,31 @@ enum InteractiveAnswerBlock: Equatable {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !decoded.isEmpty else { return nil }
         return String(decoded.prefix(maxTitleLength))
+    }
+
+    /// The body of a fenced block the markdown opens but never closes, trimmed,
+    /// or nil. A reply cancelled mid-block ends this way; CommonMark closes the
+    /// fence at the end, so the block alone cannot tell.
+    static func unclosedFenceBody(in markdown: String) -> String? {
+        var open: (marker: Character, length: Int, bodyStart: Int)?
+        var lines: [Substring] = []
+        markdown.split(separator: "\n", omittingEmptySubsequences: false).forEach { lines.append($0) }
+        for (index, line) in lines.enumerated() {
+            let trimmed = line.drop { $0 == " " }
+            guard let first = trimmed.first, first == "`" || first == "~" else { continue }
+            let run = trimmed.prefix { $0 == first }.count
+            guard run >= 3 else { continue }
+            if let current = open {
+                if first == current.marker, run >= current.length,
+                   trimmed.dropFirst(run).allSatisfy({ $0 == " " || $0 == "\t" }) {
+                    open = nil
+                }
+            } else {
+                open = (first, run, index + 1)
+            }
+        }
+        guard let open else { return nil }
+        return lines[open.bodyStart...].joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// A reply cut off mid-block leaves a `<script>` or `<style>` open; such a

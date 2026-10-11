@@ -69,9 +69,12 @@ enum InteractiveAnswerDocument {
           var post = function (message) {
             try { window.webkit.messageHandlers.\(messageHandlerName).postMessage(message); } catch (e) {}
           };
+          // Only a tap reaches the app, so a tool cannot fill the composer or
+          // open pages on load each time its card comes back to life.
+          var tapped = function () { return !navigator.userActivation || navigator.userActivation.isActive; };
           window.atlas = {
-            ask: function (text) { post({ type: 'ask', text: String(text) }); },
-            open: function (url) { post({ type: 'open', url: String(url) }); }
+            ask: function (text) { if (tapped()) post({ type: 'ask', text: String(text) }); },
+            open: function (url) { if (tapped()) post({ type: 'open', url: String(url) }); }
           };
           document.addEventListener('click', function (e) {
             var link = e.target.closest && e.target.closest('a[href]');
@@ -79,8 +82,10 @@ enum InteractiveAnswerDocument {
           }, true);
           window.addEventListener('error', function (e) {
             var t = e.target;
-            if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK' || t.tagName === 'IMG')) {
+            if (t && t.tagName === 'SCRIPT') {
               post({ type: 'loadError' });
+            } else if (t && t !== window && t.tagName) {
+              // A blocked image or stylesheet: the tool still runs without it.
             } else {
               post({ type: 'scriptError', message: String(e.message || 'Script error') });
             }
@@ -94,10 +99,15 @@ enum InteractiveAnswerDocument {
             pending = true;
             requestAnimationFrame(function () {
               pending = false;
-              post({ type: 'resize', height: Math.ceil(document.documentElement.scrollHeight) });
+              // The body, not the root: the root never measures less than the
+              // card's current frame, so a tool could never shrink.
+              post({ type: 'resize', height: Math.ceil(document.body.getBoundingClientRect().height) });
             });
           };
-          new ResizeObserver(report).observe(document.documentElement);
+          document.addEventListener('DOMContentLoaded', function () {
+            new ResizeObserver(report).observe(document.body);
+            report();
+          });
           window.addEventListener('load', report);
         })();
         </script>
