@@ -303,10 +303,12 @@
 		031031031031031031031005 /* MarkdownMathFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 031031031031031031031006 /* MarkdownMathFormatter.swift */; };
 		031031031031031031031007 /* MarkdownMathFormatter+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = 031031031031031031031008 /* MarkdownMathFormatter+Support.swift */; };
 		4E88D46E9F6DCA63079AAB90 /* InteractiveAnswerBlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 718FAAFAAA82C4FA4E88D46E /* InteractiveAnswerBlock.swift */; };
+		B3BAE18953EC85FE779D881D /* InteractiveAnswerDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BA30CC74499CEA5B3BAE189 /* InteractiveAnswerDocument.swift */; };
 		031031031031031031031009 /* DisplayMathView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03103103103103103103100A /* DisplayMathView.swift */; };
 		03103103103103103103100B /* MarkdownMathFormatter+Environments.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03103103103103103103100C /* MarkdownMathFormatter+Environments.swift */; };
 		031031031031031031031003 /* MarkdownMathRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 031031031031031031031004 /* MarkdownMathRendererTests.swift */; };
 		CDF992EC0B283F670CE51638 /* InteractiveAnswerBlockTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7A4AFC1D4E0C263CDF992EC /* InteractiveAnswerBlockTests.swift */; };
+		B2DA7C370BD284100D9AB2B9 /* InteractiveAnswerDocumentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D11A95718BD28AFB2DA7C37 /* InteractiveAnswerDocumentTests.swift */; };
 		D1FF76200000000000000004 /* MarkdownDiffFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1FF76200000000000000003 /* MarkdownDiffFormatterTests.swift */; };
 		D0M1C0000000000000000009 /* MarkdownMathLayoutCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0M1C000000000000000000A /* MarkdownMathLayoutCacheTests.swift */; };
 		C0DE34000000000000000003 /* TranscriptMediaParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE34000000000000000004 /* TranscriptMediaParserTests.swift */; };
@@ -1018,10 +1020,12 @@
 		031031031031031031031006 /* MarkdownMathFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownMathFormatter.swift; sourceTree = "<group>"; };
 		031031031031031031031008 /* MarkdownMathFormatter+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MarkdownMathFormatter+Support.swift"; sourceTree = "<group>"; };
 		718FAAFAAA82C4FA4E88D46E /* InteractiveAnswerBlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveAnswerBlock.swift; sourceTree = "<group>"; };
+		9BA30CC74499CEA5B3BAE189 /* InteractiveAnswerDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveAnswerDocument.swift; sourceTree = "<group>"; };
 		03103103103103103103100A /* DisplayMathView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayMathView.swift; sourceTree = "<group>"; };
 		03103103103103103103100C /* MarkdownMathFormatter+Environments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MarkdownMathFormatter+Environments.swift"; sourceTree = "<group>"; };
 		031031031031031031031004 /* MarkdownMathRendererTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownMathRendererTests.swift; sourceTree = "<group>"; };
 		E7A4AFC1D4E0C263CDF992EC /* InteractiveAnswerBlockTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveAnswerBlockTests.swift; sourceTree = "<group>"; };
+		3D11A95718BD28AFB2DA7C37 /* InteractiveAnswerDocumentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveAnswerDocumentTests.swift; sourceTree = "<group>"; };
 		D1FF76200000000000000003 /* MarkdownDiffFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownDiffFormatterTests.swift; sourceTree = "<group>"; };
 		D0M1C000000000000000000A /* MarkdownMathLayoutCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownMathLayoutCacheTests.swift; sourceTree = "<group>"; };
 		C0DE34000000000000000004 /* TranscriptMediaParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptMediaParserTests.swift; sourceTree = "<group>"; };
@@ -1790,6 +1794,7 @@
 				B5A100000000000000000061 /* AuthManagerStateTests.swift */,
 				B5A220000000000000000006 /* ChatMarkerMessageClassifierTests.swift */,
 				E7A4AFC1D4E0C263CDF992EC /* InteractiveAnswerBlockTests.swift */,
+				3D11A95718BD28AFB2DA7C37 /* InteractiveAnswerDocumentTests.swift */,
 				D1FF76200000000000000003 /* MarkdownDiffFormatterTests.swift */,
 				031031031031031031031004 /* MarkdownMathRendererTests.swift */,
 				D0M1C000000000000000000A /* MarkdownMathLayoutCacheTests.swift */,
@@ -2147,6 +2152,7 @@
 				C0DE12000000000000000008 /* TranscriptLinkPreviewCache.swift */,
 				C0DE12000000000000000006 /* TranscriptLinkPreviewView.swift */,
 				718FAAFAAA82C4FA4E88D46E /* InteractiveAnswerBlock.swift */,
+				9BA30CC74499CEA5B3BAE189 /* InteractiveAnswerDocument.swift */,
 				03103103103103103103100A /* DisplayMathView.swift */,
 				031031031031031031031002 /* MarkdownMathSegmenter.swift */,
 				031031031031031031031006 /* MarkdownMathFormatter.swift */,
@@ -3029,6 +3035,7 @@
 				C0DE22000000000000000001 /* ChatHaptics.swift in Sources */,
 				C08800000000000000000001 /* SessionHaptics.swift in Sources */,
 				4E88D46E9F6DCA63079AAB90 /* InteractiveAnswerBlock.swift in Sources */,
+				B3BAE18953EC85FE779D881D /* InteractiveAnswerDocument.swift in Sources */,
 				031031031031031031031009 /* DisplayMathView.swift in Sources */,
 				031031031031031031031001 /* MarkdownMathSegmenter.swift in Sources */,
 				031031031031031031031005 /* MarkdownMathFormatter.swift in Sources */,
@@ -3337,6 +3344,7 @@
 				B5A220000000000000000005 /* ChatMarkerMessageClassifierTests.swift in Sources */,
 				031031031031031031031003 /* MarkdownMathRendererTests.swift in Sources */,
 				CDF992EC0B283F670CE51638 /* InteractiveAnswerBlockTests.swift in Sources */,
+				B2DA7C370BD284100D9AB2B9 /* InteractiveAnswerDocumentTests.swift in Sources */,
 				D1FF76200000000000000004 /* MarkdownDiffFormatterTests.swift in Sources */,
 				D0M1C0000000000000000009 /* MarkdownMathLayoutCacheTests.swift in Sources */,
 				C0DE34000000000000000003 /* TranscriptMediaParserTests.swift in Sources */,
