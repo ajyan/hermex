@@ -81,36 +81,6 @@ final class PrepTrackViewModel {
     }
 }
 
-/// Tap-to-place Parsons answer. Lines are tracked by their index in the pool so
-/// duplicate strings stay distinct.
-struct ParsonsBoard: Equatable {
-    let pool: [String]
-    private(set) var placedIndices: [Int] = []
-
-    init(pool: [String]) {
-        self.pool = pool
-    }
-
-    var placed: [String] { placedIndices.map { pool[$0] } }
-
-    /// Pool indices not yet placed, in pool order.
-    var remaining: [Int] {
-        pool.indices.filter { !placedIndices.contains($0) }
-    }
-
-    mutating func place(poolIndex: Int) {
-        guard pool.indices.contains(poolIndex), !placedIndices.contains(poolIndex) else { return }
-        placedIndices.append(poolIndex)
-    }
-
-    mutating func unplace(at position: Int) {
-        guard placedIndices.indices.contains(position) else { return }
-        placedIndices.remove(at: position)
-    }
-
-    func isFull(target: Int) -> Bool { placedIndices.count >= target }
-}
-
 /// Today's run: one rep at a time, a result after each answer. Reps are always
 /// found by `rep.index`, never by array position.
 @MainActor
@@ -127,14 +97,14 @@ final class PrepRunViewModel {
 
     private(set) var phase: Phase = .loading
     private(set) var run: PrepRun?
-    private(set) var board: ParsonsBoard?
     private(set) var hintsShown = 0
     private(set) var submitError: String?
     private(set) var isSubmitting = false
+    /// When the current rep appeared: the start of `elapsedMS` and of the approach clock.
+    private(set) var shownAt: Date
 
     @ObservationIgnored private let client: PrepDataClient
     @ObservationIgnored private let now: () -> Date
-    @ObservationIgnored private var shownAt: Date
     @ObservationIgnored private var mapBefore: PrepTrackMap?
     @ObservationIgnored private var lastStreak: PrepStreak?
     @ObservationIgnored private var generation = 0
@@ -180,19 +150,27 @@ final class PrepRunViewModel {
         await submit(.choice("seen"))
     }
 
-    func checkParsons() async {
-        guard let board else { return }
-        await submit(.lines(board.placed))
+    /// An approach rep's written answer, capped to the server's limit; graded by the server before it returns.
+    func submitApproach(_ text: String) async {
+        await submit(.choice(PrepCopy.cappedApproach(text)))
     }
 
-    func place(poolIndex: Int) {
-        guard !isSubmitting else { return }
-        board?.place(poolIndex: poolIndex)
+    /// A spot-the-bug answer: `line` is a 0-based index into `item.code`.
+    func submitBugFix(line: Int, fix: String) async {
+        await submit(.bugFix(line: line, fix: fix))
     }
 
-    func unplace(at position: Int) {
-        guard !isSubmitting else { return }
-        board?.unplace(at: position)
+    /// Moves past a rep this build can't run (an unknown drill) without posting.
+    func skip() async {
+        guard !isSubmitting, !isAdvancing, case let .rep(rep, _) = phase, let run else { return }
+        isAdvancing = true
+        defer { isAdvancing = false }
+        await advance(in: run, to: rep.index + 1, after: rep.index, token: generation)
+    }
+
+    /// The user closed the run: any response still in flight is dropped.
+    func leave() {
+        generation += 1
     }
 
     func showHint() {
@@ -224,7 +202,6 @@ final class PrepRunViewModel {
     private func show(_ rep: PrepRep) {
         hintsShown = 0
         submitError = nil
-        board = rep.drill == .parsons ? ParsonsBoard(pool: rep.item.lines) : nil
         shownAt = now()
         phase = .rep(rep, index: rep.index)
     }
@@ -294,7 +271,6 @@ final class PrepRunViewModel {
         var moved: [PrepSkill] = []
         let after = mapBefore == nil ? nil : try? await client.map(track: "dsa")
         guard token == generation, !Task.isCancelled else { return }
-        board = nil
         if let before = mapBefore, let after {
             let old = Dictionary(
                 before.levels.flatMap(\.skills).map { ($0.id, $0.mastery) },
@@ -418,18 +394,50 @@ enum PrepCopy {
         return norm(optionID) == norm(correctID)
     }
 
-    /// Lines a Parsons answer needs: the pool holds the solution plus one decoy.
-    static func parsonsTarget(poolCount: Int) -> Int { max(1, poolCount - 1) }
-
-    static func parsonsLineLabel(_ code: String) -> String { "Line: \(code). Double-tap to place." }
-
-    static func parsonsPlacedLabel(position: Int, code: String) -> String {
-        "Position \(position): \(code). Double-tap to remove."
-    }
-
     /// A moved skill's subtitle on the run-complete screen.
     static func movedSubtitle(mastery: Double) -> String {
         "\(Int((mastery * 100).rounded()))% mastered"
+    }
+
+    /// The approach soft limit, in seconds; past it the server caps the rating.
+    static let approachLimit: TimeInterval = 90
+
+    /// The longest approach answer the server accepts. It counts Unicode scalars (Python `len`).
+    static let approachMaxLength = 4000
+
+    /// An approach draft cut to `approachMaxLength` scalars, so a submit is never rejected as too long.
+    static func cappedApproach(_ text: String) -> String {
+        guard text.unicodeScalars.count > approachMaxLength else { return text }
+        return String(String.UnicodeScalarView(text.unicodeScalars.prefix(approachMaxLength)))
+    }
+
+    /// Whether the draft has reached the cap, to show the "4000 characters max" note.
+    static func isAtApproachLimit(_ text: String) -> Bool {
+        text.unicodeScalars.count >= approachMaxLength
+    }
+
+    /// The approach clock: time left as "m:ss", then the overrun as "+m:ss".
+    static func approachClock(elapsed: TimeInterval) -> (text: String, isOver: Bool) {
+        let seconds = Int(elapsed.rounded(.down))
+        let limit = Int(approachLimit)
+        func clock(_ total: Int) -> String { String(format: "%d:%02d", total / 60, total % 60) }
+        return seconds > limit ? ("+" + clock(seconds - limit), true) : (clock(limit - seconds), false)
+    }
+
+    /// A code line's VoiceOver label; `index` is 0-based, the label counts from 1.
+    static func codeLineLabel(index: Int, code: String) -> String {
+        "Line \(index + 1): \(code)"
+    }
+
+    /// Whether a spot-the-bug answer is complete enough to submit.
+    static func canSubmitBugFix(line: Int?, fix: String?) -> Bool {
+        line != nil && !(fix ?? "").isEmpty
+    }
+
+    /// A grader rubric key as a title: "edge_cases" → "Edge cases".
+    static func rubricTitle(_ key: String) -> String {
+        let words = key.replacingOccurrences(of: "_", with: " ")
+        return words.prefix(1).uppercased() + words.dropFirst()
     }
 
     /// The cover id for a Prep track or skill, seeded apart from Brain pages.

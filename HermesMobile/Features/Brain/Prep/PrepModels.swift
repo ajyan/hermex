@@ -3,7 +3,8 @@ import Foundation
 // Models for the Prep (interview tutor) API on this user's `hermes-webui` fork
 // (`api/tutor.py`): `GET /api/tutor/{home,today,map}` and `POST /api/tutor/attempt`.
 // Every field decodes tolerantly: missing or mistyped values fall back to a default,
-// and reps with a drill this app doesn't know (or no stable index) are dropped.
+// and reps with a drill this app doesn't know stay as `.unknown` so the player can skip
+// them; reps with no stable index are dropped.
 //
 // These keys are snake_case on the wire and are matched literally, so decode with
 // `PrepDecoding`, not with `APIClient`'s `convertFromSnakeCase` decoder.
@@ -165,9 +166,10 @@ struct PrepHome: Decodable, Hashable, Sendable {
 // MARK: - Today's run
 
 enum PrepDrill: String, Encodable, Hashable, Sendable {
-    case patternID = "pattern_id"
+    case approach
     case complexity
-    case parsons
+    case spotBug = "spot_bug"
+    case trace
     case primer
     case unknown
 
@@ -179,8 +181,8 @@ enum PrepDrill: String, Encodable, Hashable, Sendable {
 
 extension PrepDrill: Decodable {}
 
-/// One answer choice. Pattern drills send `{id, title}`; complexity drills send the
-/// display string itself, which is both the id and the title and is POSTed as-is.
+/// One answer choice. Complexity and trace drills send the display string itself, which
+/// is both the id and the title and is POSTed as-is; `{id, title}` objects also decode.
 struct PrepOption: Decodable, Identifiable, Hashable, Sendable {
     let id: String
     let title: String
@@ -221,9 +223,9 @@ struct PrepPrimer: Decodable, Hashable, Sendable {
     }
 }
 
-/// The problem a rep is about. The server never includes answers: `options` is set for
-/// pattern and complexity drills, `lines` for parsons (solution lines plus a decoy,
-/// shuffled), and `primer` and `referenceMD` for primers.
+/// The problem a rep is about. The server never includes the answer key: `hints` is set
+/// for approach, `options` for complexity and trace, `code` (0-based lines) and `fixes`
+/// for spot-the-bug, `code` and `input` for trace, and `primer` and `referenceMD` for primers.
 struct PrepItemExcerpt: Decodable, Identifiable, Hashable, Sendable {
     let id: String
     let title: String
@@ -236,10 +238,12 @@ struct PrepItemExcerpt: Decodable, Identifiable, Hashable, Sendable {
     let primer: PrepPrimer?
     let referenceMD: String?
     let options: [PrepOption]
-    let lines: [String]
+    let code: [String]
+    let fixes: [String]
+    let input: String
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, summary, example, difficulty, hints, links, primer, options, lines
+        case id, title, summary, example, difficulty, hints, links, primer, options, code, fixes, input
         case skillTitle = "skill_title"
         case referenceMD = "reference_md"
     }
@@ -257,7 +261,9 @@ struct PrepItemExcerpt: Decodable, Identifiable, Hashable, Sendable {
         primer = c.optional(PrepPrimer.self, .primer)
         referenceMD = c.optional(String.self, .referenceMD)
         options = c.lossy(PrepOption.self, .options)
-        lines = c.strings(.lines)
+        code = c.strings(.code)
+        fixes = c.strings(.fixes)
+        input = c.string(.input)
     }
 }
 
@@ -295,31 +301,38 @@ struct PrepRun: Decodable, Hashable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         date = c.string(.date)
         index = c.int(.index)
-        reps = c.lossy(PrepRep.self, .reps).filter { $0.drill != .unknown && $0.index >= 0 }
+        reps = c.lossy(PrepRep.self, .reps).filter { $0.index >= 0 }
     }
 }
 
 // MARK: - Attempt
 
-/// A submitted or revealed answer: one choice id/display string, or ordered parsons lines.
+/// A submitted or revealed answer: one string (approach text, or the chosen complexity or
+/// trace option), or a spot-the-bug `{line, fix}` where `line` is a 0-based index into `code`.
 enum PrepAnswer: Codable, Hashable, Sendable {
     case choice(String)
-    case lines([String])
+    case bugFix(line: Int, fix: String)
+
+    private enum CodingKeys: String, CodingKey { case line, fix }
 
     init(from decoder: Decoder) throws {
-        let c = try decoder.singleValueContainer()
-        if let text = try? c.decode(String.self) {
+        if let text = try? decoder.singleValueContainer().decode(String.self) {
             self = .choice(text)
-        } else {
-            self = .lines(try c.decode([String].self))
+            return
         }
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self = .bugFix(line: try c.decode(Int.self, forKey: .line), fix: c.string(.fix))
     }
 
     func encode(to encoder: Encoder) throws {
-        var c = encoder.singleValueContainer()
         switch self {
-        case let .choice(text): try c.encode(text)
-        case let .lines(lines): try c.encode(lines)
+        case let .choice(text):
+            var c = encoder.singleValueContainer()
+            try c.encode(text)
+        case let .bugFix(line, fix):
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encode(line, forKey: .line)
+            try c.encode(fix, forKey: .fix)
         }
     }
 }
@@ -341,6 +354,64 @@ struct PrepAttemptRequest: Encodable, Hashable, Sendable {
     }
 }
 
+struct PrepQuote: Decodable, Hashable, Sendable {
+    let skill: String
+    let quote: String
+
+    private enum CodingKeys: String, CodingKey { case skill, quote }
+
+    init(skill: String, quote: String) {
+        self.skill = skill
+        self.quote = quote
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        skill = c.string(.skill)
+        quote = c.string(.quote)
+    }
+}
+
+struct PrepMiss: Decodable, Hashable, Sendable {
+    let skill: String
+    let why: String
+
+    private enum CodingKeys: String, CodingKey { case skill, why }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        skill = c.string(.skill)
+        why = c.string(.why)
+    }
+}
+
+/// The grader's read of an approach answer. An ungraded attempt can send just
+/// `{"verdict": "ungraded"}`, so every field falls back to empty.
+struct PrepOpenGrade: Decodable, Hashable, Sendable {
+    let patternOK: Bool
+    let scores: [String: Int]
+    let skillsHit: [PrepQuote]
+    let skillsMissed: [PrepMiss]
+    let strongAnswer: String
+
+    private enum CodingKeys: String, CodingKey {
+        case scores
+        case patternOK = "pattern_ok"
+        case skillsHit = "skills_hit"
+        case skillsMissed = "skills_missed"
+        case strongAnswer = "strong_answer"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        patternOK = c.bool(.patternOK)
+        scores = c.object([String: Int].self, .scores, default: [:])
+        skillsHit = c.lossy(PrepQuote.self, .skillsHit)
+        skillsMissed = c.lossy(PrepMiss.self, .skillsMissed)
+        strongAnswer = c.string(.strongAnswer)
+    }
+}
+
 struct PrepAttemptResult: Decodable, Hashable, Sendable {
     let verdict: String
     let correct: PrepAnswer?
@@ -350,9 +421,13 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
     let links: [String: String]
     let nextIndex: Int
     let streak: PrepStreak?
+    let grade: PrepOpenGrade?
+
+    /// The grader couldn't score the answer; there is no grade to show.
+    var isUngraded: Bool { verdict == "ungraded" }
 
     private enum CodingKeys: String, CodingKey {
-        case verdict, correct, feedback, credit, links, streak
+        case verdict, correct, feedback, credit, links, streak, grade
         case referenceMD = "reference_md"
         case nextIndex = "next_index"
     }
@@ -367,6 +442,7 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
         links = c.object([String: String].self, .links, default: [:])
         nextIndex = c.int(.nextIndex)
         streak = c.optional(PrepStreak.self, .streak)
+        grade = c.optional(PrepOpenGrade.self, .grade)
     }
 }
 
