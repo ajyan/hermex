@@ -186,6 +186,17 @@ import Vision
         model.suspend()
     }
 
+    func testInteractiveAnswerFillsDraftWithoutSending() async {
+        let wire = BotFixtureWire()
+        let model = make(wire); await model.recover()
+        model.fillDraftFromInteractiveAnswer("Plan next week's runs")
+        XCTAssertEqual(model.draft, "Plan next week's runs")
+        model.fillDraftFromInteractiveAnswer("And tonight's stretch?")
+        XCTAssertEqual(model.draft, "Plan next week's runs\n\nAnd tonight's stretch?", "A draft already started is kept")
+        XCTAssertFalse(wire.calls.contains { ["prompt.submit", "session.steer", "session.redirect", "command.dispatch"].contains($0.0) })
+        model.suspend()
+    }
+
     func testTransientDisconnectAutomaticallyRecoversWithoutResending() async {
         for failure in [BotFailure.transport, .rejected(503), .rejected(429)] {
             let wire = BotFixtureWire()
