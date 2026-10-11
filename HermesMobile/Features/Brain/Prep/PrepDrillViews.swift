@@ -117,30 +117,33 @@ struct PrepProblemCard: View {
     }
 }
 
-// MARK: - Choice (complexity)
+// MARK: - Choice (complexity, trace, spot-the-bug fixes)
 
-/// The options as card rows. Once graded, the chosen wrong option shows a red cross
-/// and the correct one a green check.
+/// The options as card rows. A tap answers straight away, or, with `selectedID`
+/// bound, only marks the option in the accent for a later submit. Once graded, the
+/// chosen wrong option shows a red cross and the correct one a green check.
 struct PrepChoiceView: View {
     struct Grading {
         let chosenID: String?
         let correctID: String?
     }
 
-    let rep: PrepRep
+    let title: String
+    let options: [PrepOption]
     let grading: Grading?
+    /// Options holding code (trace outputs, fixes) are set in the monospaced face.
+    var monospaced = false
+    var selectedID: String?
     var isSubmitting = false
     var submitError: String?
     let onChoose: (PrepOption) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
-            HStack(alignment: .firstTextBaseline) {
-                BrainSectionHeader(title: "Time complexity?")
-            }
+            BrainSectionHeader(title: title)
             SectionCard {
                 VStack(spacing: 0) {
-                    ForEach(Array(rep.item.options.enumerated()), id: \.offset) { offset, option in
+                    ForEach(Array(options.enumerated()), id: \.offset) { offset, option in
                         if offset > 0 { PrepRowDivider() }
                         row(option)
                     }
@@ -173,21 +176,230 @@ struct PrepChoiceView: View {
                 ? (PrepCopy.isSameChoice(option.id, grading.chosenID) ? "Your answer, correct" : "Correct answer")
                 : (isWrongPick ? "Your answer, wrong" : "")))
         } else {
+            let isSelected = selectedID == option.id
             Button { onChoose(option) } label: {
-                optionTitle(option)
-                    .frame(minHeight: BrainStyle.minTapTarget)
-                    .contentShape(Rectangle())
+                HStack(spacing: BrainStyle.m) {
+                    optionTitle(option)
+                    if isSelected {
+                        Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
+                    }
+                }
+                .frame(minHeight: BrainStyle.minTapTarget)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(isSubmitting)
+            .accessibilityLabel(Text(verbatim: option.title))
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
         }
     }
 
     private func optionTitle(_ option: PrepOption) -> some View {
         Text(verbatim: option.title)
-            .brainText(.rowTitle)
+            .font(monospaced ? AppFont.mono(style: .body) : BrainStyle.rowTitle)
+            .foregroundStyle(Color.hxTextPrimary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, BrainStyle.s)
+    }
+}
+
+// MARK: - Approach
+
+/// An approach rep: the answer in a plain editor, a 90-second clock in the toolbar,
+/// and the hint ladder. Submit lives in the run view's pinned bar.
+struct PrepApproachView: View {
+    @Binding var text: String
+    let hints: [String]
+    let hintsShown: Int
+    let isSubmitting: Bool
+    let showHint: () -> Void
+    /// Reset per rep: the run view keys each rep with `.id(rep.index)`.
+    @State private var shownAt = Date()
+    @ScaledMetric(relativeTo: .body) private var editorHeight: CGFloat = 180
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BrainStyle.s) {
+            BrainSectionHeader(title: "Your approach")
+            TextEditor(text: $text)
+                .font(.body)
+                .foregroundStyle(Color.hxTextPrimary)
+                .scrollContentBackground(.hidden)
+                .frame(minHeight: editorHeight)
+                .padding(.horizontal, BrainStyle.m)
+                .padding(.vertical, BrainStyle.s)
+                .overlay(alignment: .topLeading) {
+                    if text.isEmpty {
+                        Text(verbatim: "How would you solve this?")
+                            .font(.body)
+                            .foregroundStyle(Color.hxTextSecondary)
+                            .padding(.horizontal, BrainStyle.m + 5)
+                            .padding(.vertical, BrainStyle.s + 8)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .brainCardSurface()
+                .disabled(isSubmitting)
+                .accessibilityLabel(Text(verbatim: "Your approach"))
+                .accessibilityHint(Text(verbatim: "How would you solve this?"))
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                TimelineView(.periodic(from: shownAt, by: 1)) { context in
+                    let clock = PrepCopy.approachClock(elapsed: context.date.timeIntervalSince(shownAt))
+                    Text(verbatim: clock.text)
+                        .brainText(.meta)
+                        .foregroundStyle(clock.isOver ? Color.hxDanger.opacity(0.8) : Color.hxTextSecondary)
+                        .monospacedDigit()
+                        .accessibilityLabel(Text(verbatim: clock.isOver ? "Over time" : "Time left"))
+                        .accessibilityValue(Text(verbatim: clock.text))
+                }
+                .transaction { $0.animation = nil }
+            }
+        }
+
+        PrepHintLadder(hints: hints, shown: hintsShown, showHint: showHint)
+    }
+}
+
+/// Hints revealed one at a time, each numbered, then "Show a hint" while any remain.
+struct PrepHintLadder: View {
+    let hints: [String]
+    let shown: Int
+    let showHint: () -> Void
+
+    var body: some View {
+        if shown > 0 {
+            PrepNoteCard {
+                ForEach(0..<min(shown, hints.count), id: \.self) { index in
+                    PrepLeadText(lead: "Hint \(index + 1) of \(hints.count).", rest: hints[index])
+                }
+            }
+        }
+        if shown < hints.count {
+            Button(action: showHint) {
+                Text(verbatim: "Show a hint")
+                    .font(BrainStyle.rowTitle)
+                    .foregroundStyle(Color.accentColor)
+                    .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+}
+
+// MARK: - Spot the bug
+
+/// A spot-the-bug rep: tap the line with the bug, then pick its fix. The run view's
+/// pinned Submit enables once both are chosen.
+struct PrepSpotBugView: View {
+    let code: [String]
+    let fixes: [String]
+    let selectedLine: Int?
+    let selectedFix: String?
+    let isSubmitting: Bool
+    let selectLine: (Int) -> Void
+    let selectFix: (String) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BrainStyle.s) {
+            BrainSectionHeader(title: "Tap the line with the bug")
+            PrepNumberedCode(code: code, tint: { $0 == selectedLine ? Color.accentColor.opacity(0.18) : nil },
+                             selectedLine: selectedLine, isDisabled: isSubmitting, onTap: selectLine)
+        }
+        if selectedLine != nil {
+            PrepChoiceView(
+                title: "Fix",
+                options: fixes.map { PrepOption(id: $0, title: $0) },
+                grading: nil,
+                monospaced: true,
+                selectedID: selectedFix,
+                isSubmitting: isSubmitting
+            ) { selectFix($0.id) }
+        }
+    }
+}
+
+/// Code lines numbered from 1, each optionally tinted; tappable when `onTap` is set.
+struct PrepNumberedCode: View {
+    let code: [String]
+    let tint: (Int) -> Color?
+    var selectedLine: Int?
+    var isDisabled = false
+    var onTap: ((Int) -> Void)?
+    @ScaledMetric(relativeTo: .footnote) private var gutter: CGFloat = 20
+
+    var body: some View {
+        PrepCodeCard {
+            ForEach(Array(code.enumerated()), id: \.offset) { index, line in
+                if let onTap {
+                    Button { onTap(index) } label: { numbered(index, line) }
+                        .buttonStyle(.plain)
+                        .disabled(isDisabled)
+                        .accessibilityLabel(Text(verbatim: PrepCopy.codeLineLabel(index: index, code: line)))
+                        .accessibilityAddTraits(selectedLine == index ? .isSelected : [])
+                } else {
+                    numbered(index, line)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(Text(verbatim: PrepCopy.codeLineLabel(index: index, code: line)))
+                }
+            }
+        }
+    }
+
+    private func numbered(_ index: Int, _ line: String) -> some View {
+        HStack(spacing: BrainStyle.s) {
+            Text(verbatim: "\(index + 1)")
+                .font(AppFont.mono(style: .caption))
+                .foregroundStyle(Color.hxTextSecondary)
+                .frame(minWidth: gutter, alignment: .trailing)
+            PrepCodeLine(code: line)
+        }
+        .padding(.horizontal, BrainStyle.xs)
+        .background(tint(index) ?? .clear, in: RoundedRectangle(cornerRadius: BrainStyle.thumbnailCorner, style: .continuous))
+        .contentShape(Rectangle())
+    }
+}
+
+// MARK: - Trace
+
+/// A trace rep: the code, its input, then the possible outputs; a tap answers.
+struct PrepTraceView: View {
+    let item: PrepItemExcerpt
+    let isSubmitting: Bool
+    let submitError: String?
+    let onChoose: (PrepOption) -> Void
+
+    var body: some View {
+        PrepTraceCode(item: item)
+        PrepChoiceView(
+            title: "What does it return?",
+            options: item.options,
+            grading: nil,
+            monospaced: true,
+            isSubmitting: isSubmitting,
+            submitError: submitError,
+            onChoose: onChoose
+        )
+    }
+}
+
+/// The traced code and its input, shared by the rep and its result.
+struct PrepTraceCode: View {
+    let item: PrepItemExcerpt
+
+    var body: some View {
+        if !item.code.isEmpty {
+            PrepNumberedCode(code: item.code, tint: { _ in nil })
+        }
+        if !item.input.isEmpty {
+            Text(verbatim: "Input: \(item.input)")
+                .font(AppFont.mono(style: .footnote))
+                .foregroundStyle(Color.hxTextPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 
@@ -252,19 +464,38 @@ struct PrepPrimerView: View {
 
 // MARK: - Result
 
-/// A graded rep: the graded options or the submitted lines, the feedback with its
-/// first sentence in bold, the solution and video when the server sends them, and
-/// Continue.
+/// An answered rep: the graded options, the approach grade, or the bug revealed;
+/// then the feedback with its first sentence in bold, the solution and video when
+/// the server sends them. Continue is pinned by the run view.
 struct PrepResultView: View {
     let rep: PrepRep
     let result: PrepAttemptResult
     let chosenID: String?
+    /// The line tapped on a spot-the-bug rep, 0-based.
+    var chosenLine: Int?
 
     var body: some View {
         switch rep.drill {
         case .complexity:
-            PrepChoiceView(rep: rep, grading: .init(chosenID: chosenID, correctID: correctChoice)) { _ in }
-        default:
+            PrepChoiceView(title: "Time complexity?", options: rep.item.options,
+                           grading: .init(chosenID: chosenID, correctID: correctChoice)) { _ in }
+        case .trace:
+            PrepTraceCode(item: rep.item)
+            PrepChoiceView(title: "What does it return?", options: rep.item.options,
+                           grading: .init(chosenID: chosenID, correctID: correctChoice), monospaced: true) { _ in }
+        case .approach:
+            if result.isUngraded {
+                PrepNoteCard {
+                    Text(verbatim: "Saved — Atlas will grade this tonight.")
+                        .font(BrainStyle.rowTitle)
+                        .foregroundStyle(Color.hxTextPrimary)
+                }
+            } else if let grade = result.grade {
+                PrepApproachGradeView(grade: grade)
+            }
+        case .spotBug:
+            spotBugReveal
+        case .primer, .unknown:
             EmptyView()
         }
 
@@ -296,9 +527,90 @@ struct PrepResultView: View {
         }
     }
 
+    /// The code with the bug's line in green (and a wrong pick in red), then the fix.
+    @ViewBuilder
+    private var spotBugReveal: some View {
+        let bug = correctBugFix
+        VStack(alignment: .leading, spacing: BrainStyle.s) {
+            BrainSectionHeader(title: bug.map { "The bug is on line \($0.line + 1)" } ?? "The code")
+            PrepNumberedCode(code: rep.item.code, tint: { index in
+                if index == bug?.line { return Color.hxSuccess.opacity(0.18) }
+                if index == chosenLine { return Color.hxDanger.opacity(0.15) }
+                return nil
+            })
+        }
+        if let bug, !bug.fix.isEmpty {
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                BrainSectionHeader(title: "Fix")
+                PrepCodeCard {
+                    PrepCodeLine(code: bug.fix)
+                }
+            }
+        }
+    }
+
     private var correctChoice: String? {
         if case let .choice(id)? = result.correct { return id }
         return nil
+    }
+
+    private var correctBugFix: (line: Int, fix: String)? {
+        if case let .bugFix(line, fix)? = result.correct { return (line, fix) }
+        return nil
+    }
+}
+
+/// The grader's read of an approach: what landed, quoted in the serif; what was
+/// missing and why; then what a strong answer says.
+struct PrepApproachGradeView: View {
+    let grade: PrepOpenGrade
+
+    var body: some View {
+        if !grade.skillsHit.isEmpty {
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                BrainSectionHeader(title: "What landed")
+                SectionCard {
+                    VStack(spacing: 0) {
+                        ForEach(Array(grade.skillsHit.enumerated()), id: \.offset) { offset, hit in
+                            if offset > 0 { PrepRowDivider() }
+                            VStack(alignment: .leading, spacing: BrainStyle.xs) {
+                                Text(verbatim: PrepCopy.rubricTitle(hit.skill)).brainText(.meta)
+                                Text(verbatim: hit.quote)
+                                    .brainText(.quote)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, BrainStyle.s)
+                            .accessibilityElement(children: .combine)
+                        }
+                    }
+                }
+            }
+        }
+        if !grade.skillsMissed.isEmpty {
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                BrainSectionHeader(title: "What was missing")
+                SectionCard {
+                    VStack(spacing: 0) {
+                        ForEach(Array(grade.skillsMissed.enumerated()), id: \.offset) { offset, miss in
+                            if offset > 0 { PrepRowDivider() }
+                            BrainRow(title: PrepCopy.rubricTitle(miss.skill),
+                                     subtitle: miss.why.isEmpty ? nil : miss.why, subtitleLineLimit: 8)
+                        }
+                    }
+                }
+            }
+        }
+        if !grade.strongAnswer.isEmpty {
+            PrepNoteCard {
+                Text(verbatim: "What a strong answer says")
+                    .brainText(.sectionCaption)
+                    .accessibilityAddTraits(.isHeader)
+                Text(verbatim: grade.strongAnswer)
+                    .brainText(.rowTitle)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 }
 

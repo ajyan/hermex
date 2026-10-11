@@ -149,6 +149,29 @@ final class PrepRunViewModel {
         await submit(.choice("seen"))
     }
 
+    /// An approach rep's written answer; graded by the server before it returns.
+    func submitApproach(_ text: String) async {
+        await submit(.choice(text))
+    }
+
+    /// A spot-the-bug answer: `line` is a 0-based index into `item.code`.
+    func submitBugFix(line: Int, fix: String) async {
+        await submit(.bugFix(line: line, fix: fix))
+    }
+
+    /// Moves past a rep this build can't run (an unknown drill) without posting.
+    func skip() async {
+        guard !isSubmitting, !isAdvancing, case let .rep(rep, _) = phase, let run else { return }
+        isAdvancing = true
+        defer { isAdvancing = false }
+        await advance(in: run, to: rep.index + 1, after: rep.index, token: generation)
+    }
+
+    /// The user closed the run: any response still in flight is dropped.
+    func leave() {
+        generation += 1
+    }
+
     func showHint() {
         guard case let .rep(rep, _) = phase, hintsShown < rep.item.hints.count else { return }
         hintsShown += 1
@@ -373,6 +396,33 @@ enum PrepCopy {
     /// A moved skill's subtitle on the run-complete screen.
     static func movedSubtitle(mastery: Double) -> String {
         "\(Int((mastery * 100).rounded()))% mastered"
+    }
+
+    /// The approach soft limit, in seconds; past it the server caps the rating.
+    static let approachLimit: TimeInterval = 90
+
+    /// The approach clock: time left as "m:ss", then the overrun as "+m:ss".
+    static func approachClock(elapsed: TimeInterval) -> (text: String, isOver: Bool) {
+        let seconds = Int(elapsed.rounded(.down))
+        let limit = Int(approachLimit)
+        func clock(_ total: Int) -> String { String(format: "%d:%02d", total / 60, total % 60) }
+        return seconds > limit ? ("+" + clock(seconds - limit), true) : (clock(limit - seconds), false)
+    }
+
+    /// A code line's VoiceOver label; `index` is 0-based, the label counts from 1.
+    static func codeLineLabel(index: Int, code: String) -> String {
+        "Line \(index + 1): \(code)"
+    }
+
+    /// Whether a spot-the-bug answer is complete enough to submit.
+    static func canSubmitBugFix(line: Int?, fix: String?) -> Bool {
+        line != nil && !(fix ?? "").isEmpty
+    }
+
+    /// A grader rubric key as a title: "edge_cases" → "Edge cases".
+    static func rubricTitle(_ key: String) -> String {
+        let words = key.replacingOccurrences(of: "_", with: " ")
+        return words.prefix(1).uppercased() + words.dropFirst()
     }
 
     /// The cover id for a Prep track or skill, seeded apart from Brain pages.

@@ -1,5 +1,7 @@
 import XCTest
 import Foundation
+import SwiftUI
+import UIKit
 @testable import HermesMobile
 
 private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
@@ -497,6 +499,122 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(streak.days, 2)
     }
 
+    // MARK: New drills
+
+    func testApproachSubmitShowsGradingThenResult() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(run(index: 0, reps: [rep(0), rep(1)]))]
+        client.mapResults = [.success(map([]))]
+        client.attemptResults = [.success(result(next: 1))]
+        let (started, startedCont) = AsyncStream<Void>.makeStream()
+        let (release, releaseCont) = AsyncStream<Void>.makeStream()
+        client.gate = (startedCont, release)
+        let vm = makeVM(client)
+        await vm.load()
+        let submit = Task { await vm.submitApproach("Hash map of seen values") }
+        for await _ in started { break }
+        // Grading: the rep stays up and submitting is on.
+        XCTAssertTrue(vm.isSubmitting)
+        XCTAssertEqual(currentRep(vm)?.index, 0)
+        releaseCont.yield()
+        await submit.value
+        XCTAssertFalse(vm.isSubmitting)
+        guard case let .result(rep, _, _) = vm.phase else { return XCTFail("phase \(vm.phase)") }
+        XCTAssertEqual(rep.index, 0)
+        XCTAssertEqual(client.attempts.first?.answer, .choice("Hash map of seen values"))
+        XCTAssertEqual(client.attempts.first?.drill, .approach)
+    }
+
+    func testUngradedResultShown() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(run(index: 0, reps: [rep(0)]))]
+        client.mapResults = [.success(map([]))]
+        client.attemptResults = [.success(decode(PrepAttemptResult.self,
+            #"{"verdict": "ungraded", "next_index": 1, "grade": {"verdict": "ungraded"}}"#))]
+        let vm = makeVM(client)
+        await vm.load()
+        await vm.submitApproach("Two pointers")
+        guard case let .result(_, result, _) = vm.phase else { return XCTFail("phase \(vm.phase)") }
+        XCTAssertTrue(result.isUngraded)
+        XCTAssertNil(vm.submitError)
+    }
+
+    func testGradeFailureKeepsRepWithSubmitError() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(run(index: 0, reps: [rep(0)]))]
+        client.mapResults = [.success(map([]))]
+        client.attemptResults = [.failure(URLError(.timedOut))]
+        let vm = makeVM(client)
+        await vm.load()
+        await vm.submitApproach("Binary search on the answer")
+        XCTAssertEqual(currentRep(vm)?.index, 0)
+        XCTAssertEqual(vm.submitError, "Couldn't save. Try again.")
+        XCTAssertFalse(vm.isSubmitting)
+    }
+
+    func testLateGradeAfterLeaveIsIgnored() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(run(index: 0, reps: [rep(0), rep(1)]))]
+        client.mapResults = [.success(map([]))]
+        client.attemptResults = [.success(result(next: 1))]
+        let (started, startedCont) = AsyncStream<Void>.makeStream()
+        let (release, releaseCont) = AsyncStream<Void>.makeStream()
+        client.gate = (startedCont, release)
+        let vm = makeVM(client)
+        await vm.load()
+        let before = vm.phase
+        let submit = Task { await vm.submitApproach("Stack of indices") }
+        for await _ in started { break }
+        vm.leave()
+        releaseCont.yield()
+        await submit.value
+        XCTAssertEqual(vm.phase, before, "a grade landing after leaving must not move the run")
+        XCTAssertFalse(vm.isSubmitting)
+        XCTAssertNil(vm.submitError)
+    }
+
+    func testSkipUnknownAdvancesWithoutPost() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "mock"), rep(1)]))]
+        client.mapResults = [.success(map([]))]
+        let vm = makeVM(client)
+        await vm.load()
+        XCTAssertEqual(currentRep(vm)?.drill, .unknown)
+        await vm.skip()
+        XCTAssertEqual(currentRep(vm)?.index, 1)
+        XCTAssertTrue(client.attempts.isEmpty)
+        XCTAssertFalse(client.log.contains("attempt"))
+    }
+
+    func testBugFixAnswerPosted() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "spot_bug")]))]
+        client.mapResults = [.success(map([]))]
+        client.attemptResults = [.success(result(next: 1))]
+        let vm = makeVM(client)
+        await vm.load()
+        await vm.submitBugFix(line: 2, fix: "while lo <= hi:")
+        let sent = try! XCTUnwrap(client.attempts.first)
+        XCTAssertEqual(sent.drill, .spotBug)
+        XCTAssertEqual(sent.answer, .bugFix(line: 2, fix: "while lo <= hi:"))
+        if case .result = vm.phase {} else { XCTFail("phase \(vm.phase)") }
+    }
+
+    func testApproachClockCountsDownThenOver() {
+        XCTAssertEqual(PrepCopy.approachClock(elapsed: 0).text, "1:30")
+        XCTAssertEqual(PrepCopy.approachClock(elapsed: 31.4).text, "0:59")
+        XCTAssertFalse(PrepCopy.approachClock(elapsed: 90).isOver)
+        XCTAssertEqual(PrepCopy.approachClock(elapsed: 90).text, "0:00")
+        XCTAssertTrue(PrepCopy.approachClock(elapsed: 95).isOver)
+        XCTAssertEqual(PrepCopy.approachClock(elapsed: 95).text, "+0:05")
+        XCTAssertEqual(PrepCopy.approachClock(elapsed: 161).text, "+1:11")
+    }
+
+    func testRubricTitle() {
+        XCTAssertEqual(PrepCopy.rubricTitle("edge_cases"), "Edge cases")
+        XCTAssertEqual(PrepCopy.rubricTitle("pattern"), "Pattern")
+    }
+
     // MARK: - PrepCopy
 
     func testHomeRowSubtitleSaysWhetherTheRunIsDone() {
@@ -543,5 +661,110 @@ final class PrepViewModelsTests: XCTestCase {
     func testSkillLabel() {
         XCTAssertEqual(PrepCopy.skillLabel(title: "Sliding Window", state: .weak, detail: "Mixed up with two pointers"),
                        "Sliding Window, weak, Mixed up with two pointers")
+    }
+}
+
+/// The run player hosted for real: drives SwiftUI controls through their
+/// accessibility elements, as VoiceOver would.
+@MainActor
+final class PrepDrillViewsTests: XCTestCase {
+    func testSpotBugTapLineThenFixEnablesSubmit() async throws {
+        let client = FakePrepClient()
+        let run = #"""
+        {"date": "2026-10-10", "index": 0, "reps": [{"index": 0, "block": "main", "drill": "spot_bug",
+          "item": {"id": "dsa.bs", "title": "Binary Search",
+                   "code": ["def search(nums, t):", "    lo, hi = 0, len(nums)", "    while lo < hi:"],
+                   "fixes": ["    lo, hi = 0, len(nums) - 1", "    while lo <= hi:"]}}]}
+        """#
+        client.todayResults = [.success(try PrepDecoding.decode(PrepRun.self, from: Data(run.utf8)))]
+        client.mapResults = [.failure(URLError(.badServerResponse))]
+        let vm = PrepRunViewModel(client: client)
+        let restoreAutomation = enableAccessibilityAutomation()
+        defer { restoreAutomation() }
+        let probe = "Prep hosted accessibility probe"
+        let window = try show(VStack(spacing: 0) {
+            Button(probe) {}
+            NavigationStack { PrepRunView(viewModel: vm) }
+        })
+        defer { close(window) }
+
+        let line = "Line 2:     lo, hi = 0, len(nums)"
+        _ = await settle(window) { self.element(line, in: window) != nil }
+        try XCTSkipUnless(element(probe, in: window) != nil,
+                          "This toolchain does not expose the SwiftUI accessibility tree")
+        let submit = try XCTUnwrap(element("Submit", in: window), "spot-the-bug pins a Submit button")
+        XCTAssertTrue(submit.accessibilityTraits.contains(.notEnabled), "nothing chosen yet")
+        XCTAssertNil(element("    while lo <= hi:", in: window), "fixes wait for a line")
+
+        XCTAssertTrue(try XCTUnwrap(element(line, in: window)).accessibilityActivate())
+        let fix = "    lo, hi = 0, len(nums) - 1"
+        _ = await settle(window) { self.element(fix, in: window) != nil }
+        XCTAssertTrue(try XCTUnwrap(element(line, in: window)).accessibilityTraits.contains(.selected))
+        XCTAssertTrue(try XCTUnwrap(element("Submit", in: window)).accessibilityTraits.contains(.notEnabled),
+                      "a line alone is not an answer")
+
+        XCTAssertTrue(try XCTUnwrap(element(fix, in: window)).accessibilityActivate())
+        _ = await settle(window) {
+            self.element("Submit", in: window).map { !$0.accessibilityTraits.contains(.notEnabled) } ?? false
+        }
+        XCTAssertFalse(try XCTUnwrap(element("Submit", in: window)).accessibilityTraits.contains(.notEnabled))
+        XCTAssertTrue(client.attempts.isEmpty, "choosing never posts; Submit does")
+    }
+
+    // MARK: Hosting
+
+    /// SwiftUI publishes its accessibility tree in-process only while an assistive
+    /// technology or UI automation is on. Turns automation on (test process only)
+    /// and returns how to put it back.
+    private func enableAccessibilityAutomation() -> () -> Void {
+        guard let handle = dlopen("/usr/lib/libAccessibility.dylib", RTLD_NOW),
+              let getter = dlsym(handle, "_AXSAutomationEnabled"),
+              let setter = dlsym(handle, "_AXSSetAutomationEnabled")
+        else { return {} }
+        typealias Get = @convention(c) () -> Bool
+        typealias Set = @convention(c) (Bool) -> Void
+        let wasEnabled = unsafeBitCast(getter, to: Get.self)()
+        let set = unsafeBitCast(setter, to: Set.self)
+        set(true)
+        return { set(wasEnabled) }
+    }
+
+    private func show<V: View>(_ view: V) throws -> UIWindow {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        window.rootViewController = UIHostingController(rootView: view.transaction { $0.disablesAnimations = true })
+        window.makeKeyAndVisible()
+        return window
+    }
+
+    private func close(_ window: UIWindow) {
+        window.isHidden = true
+        window.rootViewController = nil
+    }
+
+    private func settle(_ window: UIWindow, until condition: () -> Bool) async -> Bool {
+        for _ in 0..<8 {
+            if condition() { return true }
+            await settle(window)
+        }
+        return condition()
+    }
+
+    /// The first accessibility element under `root` with exactly this label.
+    private func element(_ label: String, in root: UIView) -> NSObject? {
+        var pending: [NSObject] = [root]
+        var seen: Set<ObjectIdentifier> = []
+        while let node = pending.popLast() {
+            guard seen.insert(ObjectIdentifier(node)).inserted else { continue }
+            if node.accessibilityLabel == label { return node }
+            pending += (node as? UIView)?.subviews ?? []
+            pending += (node.accessibilityElements ?? []).compactMap { $0 as? NSObject }
+            let count = node.accessibilityElementCount()
+            if count != NSNotFound, count > 0 {
+                pending += (0..<count).compactMap { node.accessibilityElement(at: $0) as? NSObject }
+            }
+        }
+        return nil
     }
 }
