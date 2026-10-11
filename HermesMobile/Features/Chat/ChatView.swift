@@ -970,6 +970,8 @@ struct ChatView: View {
                                 if showsGitControls, gitAvailabilityViewModel.hasRepository {
                                     gitActionsMenu
                                 }
+
+                                FeedbackMenuItem()
                             } label: {
                                 Label("More", systemImage: "ellipsis")
                             }
@@ -1094,6 +1096,7 @@ struct ChatView: View {
             // The navy canvas behind every chat state (empty, loading, transcript), not the
             // system's pure black.
             .background(Color.hxCanvas.ignoresSafeArea())
+            .feedbackContext(FeedbackContext(feature: "Chat", screen: "Chat", item: displayTitle))
             .preference(key: ChatBottomChromeHeightKey.self, value: bottomChromeHeight)
             .alert(
                 "Discard Later Messages?",

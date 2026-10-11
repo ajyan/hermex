@@ -109,6 +109,9 @@ struct BrainReaderView: View {
         content
             .navigationTitle(Text(verbatim: viewModel.page?.item.title ?? ""))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { FeedbackMoreMenu() } }
+            .feedbackContext(FeedbackContext(
+                feature: "Brain", screen: viewModel.module.defaultTitle, item: viewModel.page?.item.title ?? viewModel.id))
             .background(Color.hxCanvas.ignoresSafeArea())
             .task {
                 guard didLoad else {

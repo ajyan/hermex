@@ -57,12 +57,14 @@ struct DailyDeckView: View {
                                 Label { Text(verbatim: "Change Workspace") } icon: { Image(systemName: "folder") }
                             }
                         }
+                        FeedbackMenuItem()
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
                     .accessibilityLabel(Text(verbatim: "More"))
                 }
             }
+            .feedbackContext(feedbackContext)
             .task {
                 if let review = DailyBriefLaunch.take() {
                     await viewModel.show(date: review.date, kind: review.kind)
@@ -86,6 +88,13 @@ struct DailyDeckView: View {
                     Task { await viewModel.show(date: day, kind: kind) }
                 }
             }
+    }
+
+    /// "Daily Deck · Daily Brief · <card title>" on a card; the deck alone elsewhere.
+    private var feedbackContext: FeedbackContext {
+        var card: String?
+        if case .card(let current) = viewModel.currentPage { card = current.title }
+        return FeedbackContext(feature: "Daily Deck", screen: viewModel.title, item: card)
     }
 
     @ViewBuilder
