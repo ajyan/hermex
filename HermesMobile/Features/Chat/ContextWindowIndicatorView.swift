@@ -93,7 +93,7 @@ struct ContextWindowIndicatorView: View {
 
 private struct ContextWindowPopover: View {
     let snapshot: ContextWindowSnapshot
-    private let popoverCornerRadius: CGFloat = 18
+    private let popoverCornerRadius: CGFloat = HXRadius.lg
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {

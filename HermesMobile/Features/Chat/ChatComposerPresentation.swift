@@ -49,7 +49,7 @@ struct ChatComposerActionAppearance {
     var foreground: Color {
         if isStop { return .hxDanger }
         if usesTheme { return HeaderLogoColor.prefersDarkForeground(for: themeHex) ? .black : .white }
-        if isDisabled { return Color(.secondaryLabel) }
+        if isDisabled { return Color.hxTextSecondary }
         return colorScheme == .dark ? .black : .white
     }
 }

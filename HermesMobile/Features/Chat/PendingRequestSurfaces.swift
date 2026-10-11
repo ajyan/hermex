@@ -26,9 +26,9 @@ extension View {
     @ViewBuilder
     func pendingRequestChoiceSurface(reduceTransparency: Bool) -> some View {
         if reduceTransparency {
-            background(Color(.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            background(Color(.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous)
                         .stroke(Color(.separator), lineWidth: 1)
                 )
         } else if #available(iOS 26.0, *) {
@@ -36,11 +36,11 @@ extension View {
             // button's height, so on tall multi-line options the curved ends bow
             // inward and clip the text. A fixed radius keeps the outline clear of
             // the label at any line count and matches the fallbacks below.
-            glassEffect(.regular.interactive(), in: .rect(cornerRadius: 14))
+            glassEffect(.regular.interactive(), in: .rect(cornerRadius: HXRadius.md))
         } else {
-            background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            background(.regularMaterial, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous)
                         .stroke(.primary.opacity(0.10), lineWidth: 1)
                 )
         }
@@ -103,9 +103,9 @@ private struct PendingRequestFieldSurface: ViewModifier {
         content
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(fill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(fill, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous)
                     .stroke(.primary.opacity(colorScheme == .dark ? 0.13 : 0.10), lineWidth: 1)
             )
     }
@@ -122,9 +122,9 @@ private struct PendingRequestBlockSurface: ViewModifier {
         content
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(fill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(fill, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                     .stroke(.primary.opacity(0.06), lineWidth: 1)
             )
     }

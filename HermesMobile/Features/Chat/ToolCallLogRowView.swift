@@ -164,7 +164,7 @@ struct ToolCallDetailBodyView: View {
                 showAllDiffLinesButton(lineCount: diff.document.lines.count)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
         .chatTimelineAccessoryInsetSurface()
 
         if diff.isTruncated {

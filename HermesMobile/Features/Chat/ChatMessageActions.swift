@@ -194,7 +194,7 @@ struct SelectableTextPresentationView: View {
         NavigationStack {
             SelectableTextView(text: selection.text)
                 .accessibilityIdentifier("selectable-response-text")
-                .background(Color(.systemBackground))
+                .background(Color.hxCanvas)
                 .navigationTitle("Select Text")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -249,7 +249,7 @@ struct EditMessageSheet: View {
                     .font(.body)
                     .padding()
                     .scrollContentBackground(.hidden)
-                    .background(Color(.systemGroupedBackground))
+                    .background(Color.hxCanvas)
             }
             .navigationTitle("Edit Message")
             .navigationBarTitleDisplayMode(.inline)

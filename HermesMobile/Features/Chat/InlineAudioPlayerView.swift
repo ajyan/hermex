@@ -33,12 +33,12 @@ struct InlineAudioPlayerView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(.secondarySystemBackground))
+            RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous)
+                .fill(Color.hxSurface)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color(.separator).opacity(0.25), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous)
+                .stroke(Color.hxSeparator.opacity(0.25), lineWidth: 0.5)
         )
         .task {
             await model.loadIfNeeded(using: load)

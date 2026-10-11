@@ -108,18 +108,25 @@ enum BrainStyle {
 
     // MARK: Cover palette
 
-    /// The 8 cover ramps, as `(background, mid, strong)` in `0xRRGGBB`, light then dark.
-    /// Indices 0–5 are pinned to tags in `BrainCoverSpec.tagRamps`.
-    static let coverPaletteValues: [(light: (UInt32, UInt32, UInt32), dark: (UInt32, UInt32, UInt32))] = [
-        (light: (0xE6EEFC, 0xA9C2F0, 0x3F6FD1), dark: (0x16233A, 0x2C4A7A, 0x7FA4EC)), // 0 Nous blue
-        (light: (0xE2F2F1, 0x9FD1CC, 0x2E8A83), dark: (0x12292A, 0x24504E, 0x6CC0B8)), // 1 teal
-        (light: (0xE7F3E8, 0xAED4B2, 0x3E8B4C), dark: (0x172A1B, 0x2D5234, 0x7DC08A)), // 2 green
-        (light: (0xFBEAE5, 0xEFB8A8, 0xC8604A), dark: (0x33201C, 0x5E3830, 0xE79A86)), // 3 coral
-        (light: (0xEEE9F8, 0xC6B7E6, 0x6E54B5), dark: (0x241E36, 0x43385F, 0xA994E0)), // 4 purple
-        (light: (0xFBF1DE, 0xEBCB8E, 0xA9761F), dark: (0x2E2414, 0x574321, 0xDDB062)), // 5 amber
-        (light: (0xFAE8F0, 0xE9B3CB, 0xB4507E), dark: (0x321C27, 0x5A3247, 0xE08DB3)), // 6 pink
-        (light: (0xEEF0F3, 0xC3C9D2, 0x5F6B7A), dark: (0x1E2228, 0x383F49, 0x9AA4B1))  // 7 gray
-    ]
+    /// The 8 cover ramps, as `(background, mid, strong)` in `0xRRGGBB`, light then dark, drawn
+    /// from the shared papers (DESIGN.md § Color) so a cover's hue is the same one the Brief
+    /// and chat use. Light: the paper, its hue, its light glow. Dark: the hue faint and stronger
+    /// over the navy canvas, then its dark glow. Indices 0–5 are pinned to tags in
+    /// `BrainCoverSpec.tagRamps`.
+    static let coverPaletteValues: [(light: (UInt32, UInt32, UInt32), dark: (UInt32, UInt32, UInt32))] =
+        [HermexPaper.quote, .video, .wiki, .reading, .notes, .opener, .book, .plain].map { paper in
+            let v = paper.values
+            let canvas: UInt32 = 0x0D1117
+            return (light: (v.paper, mix(v.hue, over: 0xFFFFFF, 0.55), v.glowLight),
+                    dark: (mix(v.hue, over: canvas, 0.16), mix(v.hue, over: canvas, 0.38), v.glowDark))
+        }
+
+    private static func mix(_ top: UInt32, over bottom: UInt32, _ alpha: Double) -> UInt32 {
+        [16, 8, 0].reduce(UInt32(0)) { result, shift in
+            let t = Double((top >> UInt32(shift)) & 0xFF), b = Double((bottom >> UInt32(shift)) & 0xFF)
+            return result | UInt32((t * alpha + b * (1 - alpha)).rounded()) << UInt32(shift)
+        }
+    }
 
     /// Built once: a fresh dynamic `UIColor` never equals another, so rebuilding per
     /// view would defeat SwiftUI's diffing (same reasoning as `HermexPalette.colors`).

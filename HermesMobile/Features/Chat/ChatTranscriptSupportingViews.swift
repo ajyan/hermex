@@ -996,7 +996,7 @@ struct StreamRecoveryStatusView: View {
         .background(.regularMaterial, in: Capsule(style: .continuous))
         .overlay(
             Capsule(style: .continuous)
-                .stroke(Color(.separator).opacity(0.35), lineWidth: 0.5)
+                .stroke(Color.hxSeparator.opacity(0.35), lineWidth: 0.5)
         )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
@@ -1077,7 +1077,7 @@ private struct ChatTranscriptLoadingSkeletonRow: View {
             .padding(.vertical, 10)
             .background(Color(.secondarySystemFill))
             .foregroundStyle(.primary)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
         }
         .redacted(reason: .placeholder)
         .accessibilityHidden(true)
@@ -1182,7 +1182,7 @@ struct PinnedLocalNoticeStack: View {
             ForEach(Array(notices.enumerated()), id: \.offset) { _, notice in
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(AppFont.body(weight: .semibold))
                         .foregroundStyle(Color.hxSuccess)
 
                     Text(notice)
@@ -1197,7 +1197,7 @@ struct PinnedLocalNoticeStack: View {
                 .clipShape(RoundedRectangle(cornerRadius: ChatComposerMetrics.cardCornerRadius, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: ChatComposerMetrics.cardCornerRadius, style: .continuous)
-                        .stroke(Color(.separator).opacity(0.45), lineWidth: 0.5)
+                        .stroke(Color.hxSeparator.opacity(0.45), lineWidth: 0.5)
                 )
             }
         }

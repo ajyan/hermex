@@ -350,7 +350,7 @@ struct ChatDecisionButtonStyle: ButtonStyle {
 
     private var foregroundColor: Color {
         guard isEnabled else {
-            return Color(.secondaryLabel)
+            return Color.hxTextSecondary
         }
 
         switch emphasis {
@@ -388,7 +388,7 @@ struct ChatDecisionButtonStyle: ButtonStyle {
             return .clear
         case .secondary:
             if let paper { return paper.edge }
-            return Color(.separator).opacity(colorScheme == .dark ? 0.36 : 0.24)
+            return Color.hxSeparator.opacity(colorScheme == .dark ? 0.36 : 0.24)
         case .destructive:
             return Color.hxDanger.opacity(colorScheme == .dark ? 0.36 : 0.26)
         }
