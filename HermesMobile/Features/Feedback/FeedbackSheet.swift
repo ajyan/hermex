@@ -49,6 +49,8 @@ struct FeedbackSheet: View {
         .safeAreaInset(edge: .top, spacing: 0) { header }
         .presentationDetents([.medium, .large])
         .presentationBackground(Color.hxCanvas)
+        // A send in flight finishes or fails in view, so its result is never lost.
+        .interactiveDismissDisabled(viewModel.isSending)
         .onAppear { isEditing = true }
         .onDisappear { viewModel.dismiss() }
     }
@@ -81,6 +83,7 @@ struct FeedbackSheet: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(viewModel.isSending)
         .accessibilityLabel(Text(verbatim: "Close"))
     }
 

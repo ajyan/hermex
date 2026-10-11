@@ -696,6 +696,10 @@
 		FEEDB0DE00000000000000A7 /* FeedbackSheetViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000A8 /* FeedbackSheetViewModelTests.swift */; };
 		FEEDB0DE00000000000000A9 /* FeedbackSheetViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000AA /* FeedbackSheetViewModel.swift */; };
 		FEEDB0DE00000000000000AB /* FeedbackSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000AC /* FeedbackSheet.swift */; };
+		FEEDB0DE00000000000000B1 /* FeedbackInboxViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000B2 /* FeedbackInboxViewModelTests.swift */; };
+		FEEDB0DE00000000000000B3 /* FeedbackInboxViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000B4 /* FeedbackInboxViewModel.swift */; };
+		FEEDB0DE00000000000000B5 /* FeedbackInboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000B6 /* FeedbackInboxView.swift */; };
+		FEEDB0DE00000000000000B7 /* FeedbackDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000B8 /* FeedbackDetailView.swift */; };
 		FEEDB0DE00000000000000AD /* FeedbackMenuItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000AE /* FeedbackMenuItem.swift */; };
 /* End PBXBuildFile section */
 
@@ -1431,6 +1435,10 @@
 		FEEDB0DE00000000000000A8 /* FeedbackSheetViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackSheetViewModelTests.swift; sourceTree = "<group>"; };
 		FEEDB0DE00000000000000AA /* FeedbackSheetViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackSheetViewModel.swift; sourceTree = "<group>"; };
 		FEEDB0DE00000000000000AC /* FeedbackSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackSheet.swift; sourceTree = "<group>"; };
+		FEEDB0DE00000000000000B2 /* FeedbackInboxViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackInboxViewModelTests.swift; sourceTree = "<group>"; };
+		FEEDB0DE00000000000000B4 /* FeedbackInboxViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackInboxViewModel.swift; sourceTree = "<group>"; };
+		FEEDB0DE00000000000000B6 /* FeedbackInboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackInboxView.swift; sourceTree = "<group>"; };
+		FEEDB0DE00000000000000B8 /* FeedbackDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackDetailView.swift; sourceTree = "<group>"; };
 		FEEDB0DE00000000000000AE /* FeedbackMenuItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackMenuItem.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -1599,6 +1607,7 @@
 				B1A1C0DE0000000000000E06 /* PrepModelsTests.swift */,
 				FEEDB0DE00000000000000A6 /* FeedbackModelsTests.swift */,
 				FEEDB0DE00000000000000A8 /* FeedbackSheetViewModelTests.swift */,
+				FEEDB0DE00000000000000B2 /* FeedbackInboxViewModelTests.swift */,
 				B1A1C0DE00000000000F0012 /* GoalsDesignTests.swift */,
 				B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */,
 				B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */,
@@ -2485,6 +2494,9 @@
 				FEEDB0DE00000000000000A2 /* FeedbackModels.swift */,
 				FEEDB0DE00000000000000A4 /* FeedbackDataClient.swift */,
 				FEEDB0DE00000000000000AE /* FeedbackMenuItem.swift */,
+				FEEDB0DE00000000000000B8 /* FeedbackDetailView.swift */,
+				FEEDB0DE00000000000000B6 /* FeedbackInboxView.swift */,
+				FEEDB0DE00000000000000B4 /* FeedbackInboxViewModel.swift */,
 				FEEDB0DE00000000000000AC /* FeedbackSheet.swift */,
 				FEEDB0DE00000000000000AA /* FeedbackSheetViewModel.swift */,
 			);
@@ -2726,6 +2738,9 @@
 				FEEDB0DE00000000000000A1 /* FeedbackModels.swift in Sources */,
 				FEEDB0DE00000000000000A3 /* FeedbackDataClient.swift in Sources */,
 				FEEDB0DE00000000000000AD /* FeedbackMenuItem.swift in Sources */,
+				FEEDB0DE00000000000000B7 /* FeedbackDetailView.swift in Sources */,
+				FEEDB0DE00000000000000B5 /* FeedbackInboxView.swift in Sources */,
+				FEEDB0DE00000000000000B3 /* FeedbackInboxViewModel.swift in Sources */,
 				FEEDB0DE00000000000000AB /* FeedbackSheet.swift in Sources */,
 				FEEDB0DE00000000000000A9 /* FeedbackSheetViewModel.swift in Sources */,
 				B1A1C0DE00000000000F0015 /* GoalHeroCard.swift in Sources */,
@@ -3164,6 +3179,7 @@
 				B1A1C0DE0000000000000E05 /* PrepModelsTests.swift in Sources */,
 				FEEDB0DE00000000000000A5 /* FeedbackModelsTests.swift in Sources */,
 				FEEDB0DE00000000000000A7 /* FeedbackSheetViewModelTests.swift in Sources */,
+				FEEDB0DE00000000000000B1 /* FeedbackInboxViewModelTests.swift in Sources */,
 				B1A1C0DE00000000000F0013 /* GoalsDesignTests.swift in Sources */,
 				B1A1C0DE00000000000F000B /* GoalsViewModelsTests.swift in Sources */,
 				B1A1C0DE00000000000F0007 /* GoalsModelsTests.swift in Sources */,
