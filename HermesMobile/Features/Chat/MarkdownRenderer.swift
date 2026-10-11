@@ -447,7 +447,8 @@ private struct ChatMarkdownView: View {
     }
 }
 
-/// Routes a fenced code block to display-math rendering when its language is a
+/// Routes a fenced code block to an interactive answer card when its language is
+/// `atlas-ui`, to display-math rendering when its language is a
 /// math language (`math`/`latex`/`tex`) and the body parses as math; otherwise
 /// renders it as a normal syntax-highlighted code block. A math fence whose
 /// body SwiftMath can't parse falls back to the code block too, so nothing is
@@ -458,7 +459,11 @@ private struct MathFenceOrCodeBlock: View {
     let isStreaming: Bool
 
     var body: some View {
-        if MathFenceLanguage.matches(language), MathLaTeX.isRenderable(content) {
+        if InteractiveAnswerBlock.matches(language),
+           case let block = InteractiveAnswerBlock.classify(language: language, content: content, isStreaming: isStreaming),
+           block != .code {
+            InteractiveAnswerCard(block: block, source: content)
+        } else if MathFenceLanguage.matches(language), MathLaTeX.isRenderable(content) {
             DisplayMathView(latex: content)
         } else {
             ChatCodeBlock(
@@ -470,7 +475,7 @@ private struct MathFenceOrCodeBlock: View {
     }
 }
 
-private struct ChatCodeBlock: View {
+struct ChatCodeBlock: View {
     let language: String?
     let content: String
     let isStreaming: Bool
