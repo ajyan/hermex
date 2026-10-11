@@ -59,6 +59,7 @@ final class FeedbackModelsTests: XCTestCase {
         XCTAssertEqual(try json(.reject), ["decision": "reject"])
         XCTAssertEqual(try json(.retry), ["decision": "retry"])
         XCTAssertEqual(try json(.merged), ["decision": "merged"])
+        XCTAssertEqual(try json(.unmerge), ["decision": "unmerge"])
     }
 
     func testAboutJoinsContext() {
@@ -107,6 +108,13 @@ final class FeedbackModelsTests: XCTestCase {
         XCTAssertEqual(e.attachments.first?.kind, "screenshot")
         XCTAssertNil(e.attachments.last?.kind)
         XCTAssertTrue(try decode(FeedbackEntry.self, "{}").attachments.isEmpty)
+    }
+
+    func testEntryDecodesMergedInto() throws {
+        XCTAssertEqual(try decode(FeedbackEntry.self, #"{"id": "f1", "status": "rejected", "merged_into": "0123456789ab"}"#).mergedInto, "0123456789ab")
+        XCTAssertNil(try decode(FeedbackEntry.self, #"{"id": "f1", "merged_into": null}"#).mergedInto)
+        XCTAssertNil(try decode(FeedbackEntry.self, #"{"id": "f1", "merged_into": 7}"#).mergedInto)
+        XCTAssertNil(try decode(FeedbackEntry.self, "{}").mergedInto)
     }
 
     // MARK: Per-screen state

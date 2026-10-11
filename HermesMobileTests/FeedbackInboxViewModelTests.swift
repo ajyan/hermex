@@ -212,9 +212,78 @@ final class FeedbackInboxViewModelTests: XCTestCase {
         XCTAssertEqual(untitled.metaLine, "Chat · Waiting for tonight")
     }
 
-    private func entry(_ id: String, status: String, ts: String, title: String? = nil) -> FeedbackEntry {
+    func testMergedEntryNamesAndOpensItsMainEntry() async throws {
+        let client = InboxStubClient(entries: [
+            entry("m", status: "planned", ts: "2026-10-02T10:00:00Z", title: "Shared fix"),
+            entry("d", status: "rejected", ts: "2026-10-01T10:00:00Z", mergedInto: "m"),
+        ])
+        let viewModel = FeedbackInboxViewModel(client: client)
+        await viewModel.load()
+
+        let merged = try XCTUnwrap(viewModel.entry(id: "d"))
+        XCTAssertEqual(viewModel.metaLine(for: merged), "Prep · Merged into Shared fix")
+        XCTAssertEqual(viewModel.openedID(for: merged), "m")
+        XCTAssertEqual(viewModel.sections.last?.group, .done)
+    }
+
+    func testMergedIntoAnEntryNotLoadedFallsBack() async throws {
+        let client = InboxStubClient(entries: [
+            entry("d", status: "rejected", ts: "2026-10-01T10:00:00Z", mergedInto: "0123456789ab"),
+            entry("r", status: "rejected", ts: "2026-10-01T09:00:00Z"),
+        ])
+        let viewModel = FeedbackInboxViewModel(client: client)
+        await viewModel.load()
+
+        let merged = try XCTUnwrap(viewModel.entry(id: "d"))
+        XCTAssertEqual(viewModel.metaLine(for: merged), "Prep · Merged into another note")
+        XCTAssertEqual(viewModel.openedID(for: merged), "d")
+        let rejected = try XCTUnwrap(viewModel.entry(id: "r"))
+        XCTAssertEqual(viewModel.metaLine(for: rejected), "Prep · Rejected")
+        XCTAssertEqual(viewModel.openedID(for: rejected), "r")
+    }
+
+    func testMainEntryListsItsMergedNotesOldestFirst() async {
+        let client = InboxStubClient(entries: [
+            entry("m", status: "new", ts: "2026-10-03T10:00:00Z"),
+            entry("d2", status: "rejected", ts: "2026-10-02T10:00:00Z", mergedInto: "m"),
+            entry("d1", status: "rejected", ts: "2026-10-01T10:00:00Z", mergedInto: "m"),
+            entry("x", status: "rejected", ts: "2026-10-01T09:00:00Z", mergedInto: "other"),
+            entry("r", status: "rejected", ts: "2026-10-01T08:00:00Z"),
+        ])
+        let viewModel = FeedbackInboxViewModel(client: client)
+        await viewModel.load()
+
+        XCTAssertEqual(viewModel.mergedNotes(into: "m").map(\.id), ["d1", "d2"])
+        XCTAssertTrue(viewModel.mergedNotes(into: "r").isEmpty)
+    }
+
+    func testUnmergeWaitsForTheServerAndMovesTheNoteBack() async throws {
+        let client = InboxStubClient(entries: [
+            entry("m", status: "planned", ts: "2026-10-02T10:00:00Z", title: "Shared fix"),
+            entry("d", status: "rejected", ts: "2026-10-01T10:00:00Z", mergedInto: "m"),
+        ])
+        await client.holdDecisions()
+        await client.setDecisionResult(entry("d", status: "new", ts: "2026-10-01T10:00:00Z"))
+        let viewModel = FeedbackInboxViewModel(client: client)
+        await viewModel.load()
+
+        let decision = Task { await viewModel.decide(try XCTUnwrap(viewModel.entry(id: "d")), .unmerge) }
+        await client.waitForDecision()
+        XCTAssertEqual(viewModel.mergedNotes(into: "m").map(\.id), ["d"], "not optimistic")
+        await client.releaseDecisions()
+        try await decision.value
+
+        let decisions = await client.decisions
+        XCTAssertEqual(decisions.map(\.decision), [.unmerge])
+        XCTAssertTrue(viewModel.mergedNotes(into: "m").isEmpty)
+        XCTAssertEqual(viewModel.entry(id: "d")?.status, .new)
+        XCTAssertNil(viewModel.entry(id: "d")?.mergedInto)
+    }
+
+    private func entry(_ id: String, status: String, ts: String, title: String? = nil, mergedInto: String? = nil) -> FeedbackEntry {
         var object: [String: Any] = ["id": id, "status": status, "ts": ts, "feature": "Prep", "text": "Note \(id)"]
         if let title { object["title"] = title }
+        if let mergedInto { object["merged_into"] = mergedInto }
         let data = try! JSONSerialization.data(withJSONObject: object)
         return try! FeedbackDecoding.decode(FeedbackEntry.self, from: data)
     }

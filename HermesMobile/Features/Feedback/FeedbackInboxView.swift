@@ -68,9 +68,10 @@ struct FeedbackInboxView: View {
                             ForEach(section.entries) { entry in
                                 FeedbackInboxRow(
                                     entry: entry,
+                                    metaLine: viewModel.metaLine(for: entry),
                                     isBusy: viewModel.pendingID != nil,
                                     isPending: viewModel.pendingID == entry.id,
-                                    open: { openedID = entry.id },
+                                    open: { openedID = viewModel.openedID(for: entry) },
                                     approve: { Task { await viewModel.decide(entry, .approve) } },
                                     reply: { replyTarget = entry }
                                 )
@@ -93,6 +94,7 @@ struct FeedbackInboxView: View {
 /// summary with Approve (the screen's only accent button) and Reply.
 private struct FeedbackInboxRow: View {
     let entry: FeedbackEntry
+    let metaLine: String
     let isBusy: Bool
     let isPending: Bool
     let open: () -> Void
@@ -109,7 +111,7 @@ private struct FeedbackInboxRow: View {
                             .font(AppFont.body(weight: .medium))
                             .foregroundStyle(Color.hxTextPrimary)
                             .lineLimit(3)
-                        Text(verbatim: entry.metaLine)
+                        Text(verbatim: metaLine)
                             .font(AppFont.footnote())
                             .foregroundStyle(Color.hxTextSecondary)
                         if entry.status == .planned, let summary = entry.summary, !summary.isEmpty {

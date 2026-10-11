@@ -45,7 +45,7 @@ struct FeedbackDetailView: View {
                         .font(AppFont.title3(weight: .semibold))
                         .foregroundStyle(Color.hxTextPrimary)
                         .accessibilityAddTraits(.isHeader)
-                    Text(verbatim: entry.metaLine)
+                    Text(verbatim: viewModel.metaLine(for: entry))
                         .font(AppFont.footnote())
                         .foregroundStyle(Color.hxTextSecondary)
                 }
@@ -87,6 +87,13 @@ struct FeedbackDetailView: View {
                             .font(AppFont.mono(style: .footnote))
                             .foregroundStyle(Color.hxDanger)
                             .textSelection(.enabled)
+                    }
+                }
+
+                let merged = viewModel.mergedNotes(into: entry.id)
+                if !merged.isEmpty {
+                    block("Merged into this plan") {
+                        ForEach(merged) { note in mergedNote(note) }
                     }
                 }
 
@@ -143,6 +150,25 @@ struct FeedbackDetailView: View {
                 .padding(10)
         }
         .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
+    }
+
+    /// A note the nightly job folded into this entry's plan, with Unmerge to plan it on its own again.
+    private func mergedNote(_ note: FeedbackEntry) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(verbatim: note.text)
+                .font(AppFont.body())
+                .foregroundStyle(Color.hxTextPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if viewModel.pendingID == note.id {
+                ProgressView().accessibilityLabel(Text(verbatim: "Saving"))
+            }
+            Button { decide(note, .unmerge) } label: { Text(verbatim: "Unmerge") }
+                .buttonStyle(.bordered)
+                .tint(Color.hxTextPrimary)
+                .font(AppFont.subheadline(weight: .semibold))
+                .disabled(viewModel.pendingID != nil)
+                .accessibilityHint(Text(verbatim: "Gets its own plan tonight."))
+        }
     }
 
     // MARK: - Decisions
