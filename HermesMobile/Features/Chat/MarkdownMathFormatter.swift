@@ -156,6 +156,13 @@ struct MarkdownMathFormatter {
                 return index
             }
 
+            // Another dollar that cannot close ("$5 when $x=2$") starts its own span;
+            // inline math never contains a bare dollar.
+            if delimiter == .dollar, characters[index] == "$", !protected[index],
+               !MarkdownMathProtection.isEscaped(characters, at: index) {
+                return nil
+            }
+
             index += 1
         }
         return nil
@@ -254,6 +261,9 @@ private enum InlineDelimiter: CaseIterable {
             guard matches("$", in: characters, at: index, protected: protected) else { return false }
             if index > 0, characters[index - 1] == "$" { return false }
             if index + 1 < characters.count, characters[index + 1] == "$" { return false }
+            // Pandoc's rule, so two prices in a sentence never pair up: an opening
+            // dollar is followed by a non-space.
+            guard index + 1 < characters.count, !characters[index + 1].isWhitespace else { return false }
             return !MarkdownMathProtection.isEscaped(characters, at: index)
         case .parens:
             return matches(#"\("#, in: characters, at: index, protected: protected)
@@ -267,6 +277,9 @@ private enum InlineDelimiter: CaseIterable {
             guard matches("$", in: characters, at: index, protected: protected) else { return false }
             if index > 0, characters[index - 1] == "$" { return false }
             if index + 1 < characters.count, characters[index + 1] == "$" { return false }
+            // A closing dollar follows a non-space and is not followed by a digit.
+            if index > 0, characters[index - 1].isWhitespace { return false }
+            if index + 1 < characters.count, characters[index + 1].isNumber { return false }
             return !MarkdownMathProtection.isEscaped(characters, at: index)
         case .parens:
             return matches(#"\)"#, in: characters, at: index, protected: protected)
