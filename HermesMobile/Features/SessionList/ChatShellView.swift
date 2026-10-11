@@ -85,8 +85,6 @@ struct ChatShellView: View {
     @State private var feedbackAvailability: FeedbackAvailability
     /// The drawer is built on first open and kept alive, so it keeps its scroll position.
     @State private var hasOpenedDrawer = false
-    /// The root chat's docked composer height, so the New Chat button clears it.
-    @State private var chatBottomChromeHeight: CGFloat = 0
     /// False while ChatView pushes its own screens (Files, forks), which the typed path cannot see.
     @State private var isRootVisible = true
     @State private var sessionPendingRename: SessionSummary?
@@ -131,8 +129,6 @@ struct ChatShellView: View {
     @AppStorage private var showsClaudeCodeSessions: Bool
     @AppStorage(AppHaptics.isEnabledKey) private var isHapticsEnabled = true
     @AppStorage(BotModeGate.isEnabledKey) private var isBotModeEnabled = false
-    @AppStorage(PrimaryActionTintSettings.isEnabledKey) private var tintsPrimaryActions = false
-    @AppStorage(HeaderLogoColor.storageKey) private var themeHex = HeaderLogoColor.defaultHex
 
     init(
         authManager: AuthManager,
@@ -500,17 +496,6 @@ struct ChatShellView: View {
                 sessionListSurface
             }
         }
-        // The primary new-chat affordance; hidden on the empty new chat, where
-        // another new chat would go nowhere (same rule as the top-bar button),
-        // and while the drawer covers the screen (its New Chat row is there).
-        // On a chat it rides above the composer, clear of the send button.
-        .overlay(alignment: .bottomTrailing) {
-            if !navigation.isOnEmptyNewChat, !navigation.isDrawerOpen {
-                newChatFab
-                    .padding(.bottom, navigation.path.isEmpty ? chatBottomChromeHeight : 0)
-            }
-        }
-        .onPreferenceChange(ChatBottomChromeHeightKey.self) { chatBottomChromeHeight = $0 }
     }
 
     private var mainStack: some View {
@@ -1365,42 +1350,6 @@ struct ChatShellView: View {
     /// in that project (#875); system entry points never inherit one.
     private func openNewChat() {
         selectDestination(PendingNewChatRoute())
-    }
-
-    /// A circular floating New Chat button, bottom-right of the shell: the
-    /// primary affordance, shown on the session list and every chat screen.
-    /// Kept off `shellContainer`'s return so the type-checker has a small
-    /// expression to chew (the type-checking-budget rule).
-    private var newChatFab: some View {
-        HapticButton {
-            openNewChat()
-        } label: {
-            Image(systemName: "plus")
-                .font(.title2.weight(.semibold))
-        }
-        .frame(width: 56, height: 56)
-        .background(newChatFabBackground, in: Circle())
-        .foregroundStyle(newChatFabForeground)
-        .shadow(color: .black.opacity(0.25), radius: 12, y: 6)
-        .padding(16)
-        .accessibilityLabel(String(localized: "New Chat"))
-        .accessibilityIdentifier("chatNewChatFab")
-    }
-
-    /// Themed like the other primary action: the Header Logo Color when the
-    /// user enables the tint, the accent otherwise.
-    private var newChatFabBackground: Color {
-        if tintsPrimaryActions {
-            return HeaderLogoColor.color(for: themeHex)
-        }
-        return .accentColor
-    }
-
-    private var newChatFabForeground: Color {
-        if tintsPrimaryActions {
-            return HeaderLogoColor.prefersDarkForeground(for: themeHex) ? .black : .white
-        }
-        return Color.hxOnAccent
     }
 
     /// A new chat that opens straight into a voice call with Atlas.
