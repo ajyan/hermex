@@ -1094,6 +1094,7 @@ struct ChatView: View {
             // The navy canvas behind every chat state (empty, loading, transcript), not the
             // system's pure black.
             .background(Color.hxCanvas.ignoresSafeArea())
+            .preference(key: ChatBottomChromeHeightKey.self, value: bottomChromeHeight)
             .alert(
                 "Discard Later Messages?",
                 isPresented: $showEditDiscardConfirmation
@@ -1770,7 +1771,12 @@ struct ChatView: View {
     }
 
     private var scrollToBottomButtonBottomPadding: CGFloat {
-        composerHeight + 12 + composerAccessorySpacerHeight + clarificationFootprintHeight
+        bottomChromeHeight + 12
+    }
+
+    /// Everything docked at the bottom: composer, its accessory row, and a clarification.
+    private var bottomChromeHeight: CGFloat {
+        composerHeight + composerAccessorySpacerHeight + clarificationFootprintHeight
     }
 
     /// Bar height plus its gap above the composer while a clarification is
@@ -3651,5 +3657,15 @@ struct ChatNavigationBackground: ViewModifier {
             return AnyShapeStyle(.regularMaterial)
         }
         return AnyShapeStyle(Color.hxCanvas)
+    }
+}
+
+/// How tall a chat's bottom-docked chrome (composer, accessory row, clarification) is, so
+/// the shell's floating New Chat button can sit above it instead of on the send button.
+struct ChatBottomChromeHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
