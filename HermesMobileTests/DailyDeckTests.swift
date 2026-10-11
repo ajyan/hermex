@@ -330,6 +330,29 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertNil(text.detail, "the list replaces the plain copy")
     }
 
+    func testWrappedCardsDecodeTheirStatsPointsAndMeters() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"d","kind":"weekly","cards":[
+          {"id":"headline","type":"headline","title":"Your week","lines":["6 days you wrote"],"stats":[{"value":"6","label":"days you wrote"},{"value":7}]},
+          {"id":"theme-1","type":"item","kind":"theme","title":"Taper and rest","context":"You slept more.","body":"You slept more.\nFri: quote","entries":[{"label":"Fri, Oct 9","text":"“Slept nine hours.”"}]},
+          {"id":"mood","type":"item","kind":"mood","title":"Energy and mood","body":"Tue: 4","points":[{"label":"Mon","energy":null,"mood":null,"note":""},{"label":"Tue","energy":4,"mood":3,"note":"short sleep"},{"label":"Wed","energy":"high"}]},
+          {"id":"goals","type":"item","kind":"goals","title":"Your goals","color":"wiki","body":"x","meters":[{"group":"Marathon","label":"Stretch","done":7,"target":6},{"label":"bad"}]}
+        ]}
+        """#)
+        XCTAssertEqual(deck.cards[0].stats, [DeckStat(value: "6", label: "days you wrote")], "a malformed stat is dropped alone")
+        XCTAssertEqual(deck.cards[2].points.map(\.energy), [nil, 4], "a malformed point is dropped alone")
+        XCTAssertEqual(deck.cards[3].meters.count, 1)
+        XCTAssertEqual(deck.cards[3].meters[0].fraction, 1, "a meter never overfills")
+
+        let theme = DeckCardText(deck.cards[1])
+        XCTAssertEqual(theme.lead, "Taper and rest")
+        XCTAssertEqual(theme.detail, "You slept more.", "a theme's summary, not its plain copy")
+        XCTAssertNil(DeckCardText(deck.cards[2]).detail, "the chart replaces the plain copy")
+        XCTAssertNil(DeckCardText(deck.cards[3]).detail, "the meters replace the plain copy")
+        XCTAssertEqual(deck.cards.map { DeckPalette.of($0).name }, ["Today", "Theme", "Energy and mood", "Goals"])
+        XCTAssertEqual(DeckPalette.of(deck.cards[3]).colors, HermexPaper.wiki, "the goals card wears its goal's paper")
+    }
+
     func testEveryCardKindHasItsOwnPaper() throws {
         let deck = try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"1","type":"reflect","kind":"book"},{"id":"2","type":"reflect","kind":"wiki"},{"id":"3","type":"reflect","kind":"quote"},{"id":"4","type":"headline"}]}"#)
         XCTAssertEqual(deck.cards.map { DeckPalette.of($0).name }, ["Book highlight", "From your wiki", "Quote", "Today"])
