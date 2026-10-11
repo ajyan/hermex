@@ -157,6 +157,7 @@ Canonical vocabulary: `CONTEXT.md`.
 - Comments describe how a thing is used, and move when the code moves. To be used mostly to describe functions, not to annotate every line of behavior.
 - Our users drive agents from a phone all day and notice a dropped frame, a lying spinner, and a stale label. The intended feel is dense, calm, and operator-grade. No continuously repainting animations; every animation respects Reduce Motion.
 - The look is compact and glass-forward: a Liquid-Glass composer with the runtime controls in its bottom row, dense native pickers rather than marketing pages, and no third-party UI packages to get there.
+- **Read `DESIGN.md` before any UI work.** It is the design system: calm chat, colorful objects. Chat stays on the neutral `hx*` tokens; color lives on objects, each kind wearing a fixed Daily Brief paper (`HermexPaper`, the object key in `Config/HermexStyle.swift`); Nous blue is the only interactive tint. New UI uses `HXRadius`, `.hxShadow`, `.paperSurface`, and `AppFont`, never raw hex, one-off radii, or `.system(size:)`. Add a new kind of object to the object key and `DESIGN.md` together.
 - The target builds in Swift 5 language mode with targeted concurrency. Fix what the build flags, not what strict Swift 6 would.
 - If a rule here fights the task in front of you, say so loudly and get a human sign-off before breaking it.
 
