@@ -1,12 +1,12 @@
 import SwiftUI
 
-/// Settings › Feedback: the active server's feedback, grouped for review. A planned row
-/// can be approved or answered in place; tapping a row opens its plan. English-only copy
-/// (personal fork).
+/// Settings › Feedback: the active server's feedback, grouped for review. Entries waiting on
+/// the user are request cards; tapping any entry opens it, where every decision lives.
+/// English-only copy (personal fork).
 struct FeedbackInboxView: View {
     @State private var viewModel: FeedbackInboxViewModel
     @State private var openedID: String?
-    @State private var replyTarget: FeedbackEntry?
+    @State private var showsDone = false
 
     init(client: any FeedbackDataClient) {
         _viewModel = State(initialValue: FeedbackInboxViewModel(client: client))
@@ -15,13 +15,11 @@ struct FeedbackInboxView: View {
     var body: some View {
         content
             .background(Color.hxCanvas.ignoresSafeArea())
-            .navigationTitle(Text(verbatim: "Feedback"))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle("Feedback")
             .task { await viewModel.load() }
             .navigationDestination(item: $openedID) { id in
                 FeedbackDetailView(entryID: id, viewModel: viewModel)
             }
-            .feedbackReplyPrompt(for: $replyTarget, viewModel: viewModel)
             // The detail screen shows its own errors inline while it is open.
             .alert(
                 Text(verbatim: "Feedback"),
@@ -62,98 +60,122 @@ struct FeedbackInboxView: View {
                     Text(verbatim: "Send feedback from a screen's More menu.")
                 }
             } else {
-                List {
-                    ForEach(sections, id: \.group) { section in
-                        Section {
-                            ForEach(section.entries) { entry in
-                                FeedbackInboxRow(
-                                    entry: entry,
-                                    metaLine: viewModel.metaLine(for: entry),
-                                    isBusy: viewModel.pendingID != nil,
-                                    isPending: viewModel.pendingID == entry.id,
-                                    open: { openedID = viewModel.openedID(for: entry) },
-                                    approve: { Task { await viewModel.decide(entry, .approve) } },
-                                    reply: { replyTarget = entry }
-                                )
-                                .listRowBackground(Color.hxSurface)
-                            }
-                        } header: {
-                            Text(verbatim: section.group.title)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 10) {
+                        ForEach(sections, id: \.group) { section in
+                            sectionView(section)
                         }
                     }
+                    .padding(16)
+                    .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
                 }
-                .listStyle(.insetGrouped)
-                .scrollContentBackground(.hidden)
                 .refreshable { await viewModel.load() }
             }
         }
     }
-}
 
-/// One entry: its headline and "Feature · status · size". A planned entry adds its
-/// summary with Approve (the screen's only accent button) and Reply.
-private struct FeedbackInboxRow: View {
-    let entry: FeedbackEntry
-    let metaLine: String
-    let isBusy: Bool
-    let isPending: Bool
-    let open: () -> Void
-    let approve: () -> Void
-    let reply: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Every button in the row has an explicit style, so each keeps its own hit area.
-            Button(action: open) {
-                HStack(spacing: 8) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(verbatim: entry.headline)
-                            .font(AppFont.body(weight: .medium))
-                            .foregroundStyle(Color.hxTextPrimary)
-                            .lineLimit(3)
-                        Text(verbatim: metaLine)
-                            .font(AppFont.footnote())
-                            .foregroundStyle(Color.hxTextSecondary)
-                        if entry.status == .planned, let summary = entry.summary, !summary.isEmpty {
-                            Text(verbatim: summary)
-                                .font(AppFont.subheadline())
-                                .foregroundStyle(Color.hxTextPrimary)
-                                .padding(.top, 3)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    Image(systemName: "chevron.forward")
-                        .font(AppFont.footnote(weight: .semibold))
-                        .foregroundStyle(Color(uiColor: .tertiaryLabel))
-                        .accessibilityHidden(true)
+    @ViewBuilder
+    private func sectionView(_ section: FeedbackInboxViewModel.InboxSection) -> some View {
+        switch section.group {
+        case .needsReview:
+            HXSectionHeader(title: section.group.title)
+                .padding(.top, 4)
+            ForEach(section.entries) { entry in
+                FeedbackRequestCard(entry: entry) { openedID = viewModel.openedID(for: entry) }
+            }
+        case .inProgress:
+            HXSectionHeader(title: section.group.title)
+                .padding(.top, 12)
+            rows(section.entries) { $0.progressWord }
+        case .done:
+            Button {
+                showsDone.toggle()
+            } label: {
+                HStack(alignment: .firstTextBaseline) {
+                    HXSectionHeader(title: section.group.title, trailing: "\(section.entries.count)")
+                    Image(systemName: showsDone ? "chevron.up" : "chevron.down")
+                        .font(AppFont.caption(weight: .semibold))
+                        .foregroundStyle(Color.hxTextSecondary)
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityHint(Text(verbatim: "Opens the plan."))
-
-            if entry.status == .planned {
-                HStack(spacing: 8) {
-                    Button(action: approve) { Text(verbatim: "Approve") }
-                        .buttonStyle(.borderedProminent)
-                    Button(action: reply) { Text(verbatim: "Reply") }
-                        .buttonStyle(.bordered)
-                        .tint(Color.hxTextPrimary)
-                    if isPending {
-                        ProgressView()
-                            .accessibilityLabel(Text(verbatim: "Saving"))
-                    }
-                }
-                .font(AppFont.subheadline(weight: .semibold))
-                .disabled(isBusy)
+            .padding(.top, 12)
+            .accessibilityValue(Text(verbatim: showsDone ? "Shown" : "Hidden"))
+            if showsDone {
+                rows(section.entries) { viewModel.metaLine(for: $0) }
             }
         }
-        .padding(.vertical, 4)
+    }
+
+    /// Neutral rows in one card, each opening its entry.
+    private func rows(_ entries: [FeedbackEntry], status: @escaping (FeedbackEntry) -> String) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                if index > 0 {
+                    Divider().overlay(Color.hxSeparator).padding(.leading, 14)
+                }
+                Button { openedID = viewModel.openedID(for: entry) } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(verbatim: entry.headline)
+                            .font(AppFont.body())
+                            .foregroundStyle(Color.hxTextPrimary)
+                            .lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(verbatim: status(entry))
+                            .font(AppFont.footnote())
+                            .foregroundStyle(Color.hxTextSecondary)
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 11)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .hxCard()
+    }
+}
+
+/// A Needs you entry: a request card with its title in the glow, the plan's one-line summary,
+/// and a chip naming what it needs.
+private struct FeedbackRequestCard: View {
+    let entry: FeedbackEntry
+    let open: () -> Void
+
+    var body: some View {
+        let chip = entry.needsYouChip
+        Button(action: open) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(verbatim: entry.headline)
+                    .font(AppFont.display(style: .headline))
+                    .foregroundStyle(HermexPaper.request.glow)
+                    .multilineTextAlignment(.leading)
+                if let summary = entry.summary, !summary.isEmpty {
+                    Text(verbatim: summary)
+                        .font(AppFont.subheadline())
+                        .foregroundStyle(Color.hxTextPrimary)
+                        .multilineTextAlignment(.leading)
+                }
+                HXChip(paper: .request, symbol: chip.symbol, label: chip.label)
+                    .padding(.top, 4)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .glowSurface(.request, cornerRadius: HXRadius.lg)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(Text(verbatim: "Opens the plan."))
     }
 }
 
 extension View {
-    /// The Reply prompt: a note for the planner, sent as a `reply` decision while `target` is set.
+    /// The free-text Reply prompt: a note for the planner, sent as a `reply` decision while
+    /// `target` is set.
     func feedbackReplyPrompt(for target: Binding<FeedbackEntry?>, viewModel: FeedbackInboxViewModel) -> some View {
         modifier(FeedbackReplyPrompt(target: target, viewModel: viewModel))
     }
@@ -166,7 +188,7 @@ private struct FeedbackReplyPrompt: ViewModifier {
 
     func body(content: Content) -> some View {
         content.alert(
-            Text(verbatim: "Reply to the plan"),
+            Text(verbatim: "Redo the plan"),
             isPresented: Binding(get: { target != nil }, set: { if !$0 { target = nil } }),
             presenting: target
         ) { entry in

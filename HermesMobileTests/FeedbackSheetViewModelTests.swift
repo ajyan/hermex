@@ -245,7 +245,7 @@ private actor StubFeedbackClient: FeedbackDataClient {
     }
 
     func list() async throws -> [FeedbackEntry] { [] }
-    func plan(id: String) async throws -> String { "" }
+    func plan(id: String) async throws -> FeedbackPlan { FeedbackPlan(markdown: "") }
 
     func create(_ body: FeedbackCreate) async throws -> FeedbackEntry {
         created.append(body)

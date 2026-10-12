@@ -189,6 +189,32 @@ final class FeedbackInboxViewModelTests: XCTestCase {
         XCTAssertEqual(listCalls, 2)
     }
 
+    func testApproveSendsAnswersAsNote() async throws {
+        let client = InboxStubClient(entries: [entry("b", status: "planned", ts: "2026-10-02T10:00:00Z")])
+        let viewModel = FeedbackInboxViewModel(client: client)
+        await viewModel.load()
+
+        await viewModel.decide(try XCTUnwrap(viewModel.entry(id: "b")), .approveAnswering("Q1 Keep? → No"))
+
+        let decisions = await client.decisions
+        XCTAssertEqual(decisions.map(\.decision), [.approveAnswering("Q1 Keep? → No")])
+    }
+
+    func testNeedsYouChipAndWords() throws {
+        func make(_ json: String) throws -> FeedbackEntry {
+            try FeedbackDecoding.decode(FeedbackEntry.self, from: Data(json.utf8))
+        }
+        XCTAssertEqual(try make(#"{"id":"a","status":"planned","question_count":2}"#).needsYouChip.label, "2 questions")
+        XCTAssertEqual(try make(#"{"id":"a","status":"planned","question_count":1}"#).needsYouChip.label, "1 question")
+        XCTAssertEqual(try make(#"{"id":"a","status":"planned"}"#).needsYouChip.label, "Ready to approve")
+        XCTAssertEqual(try make(#"{"id":"a","status":"ready"}"#).needsYouChip.label, "Branch ready")
+        XCTAssertEqual(try make(#"{"id":"a","status":"failed"}"#).needsYouChip.label, "Failed")
+        XCTAssertEqual(try make(#"{"id":"a","status":"new"}"#).progressWord, "Tonight")
+        XCTAssertEqual(try make(#"{"id":"a","feature":"Daily Deck","size":"S","plan_repo":"second-brain"}"#).detailMetaLine,
+                       "Daily Deck · small change · second-brain")
+        XCTAssertEqual(try make(#"{"id":"a","feature":"Prep","size":"huge"}"#).detailMetaLine, "Prep")
+    }
+
     func testPlanLoadsFromClient() async throws {
         let client = InboxStubClient(entries: [entry("b", status: "planned", ts: "2026-10-02T10:00:00Z")])
         await client.setPlan("# Plan\n\nDo the thing.")
@@ -197,7 +223,7 @@ final class FeedbackInboxViewModelTests: XCTestCase {
 
         let plan = await viewModel.plan(for: try XCTUnwrap(viewModel.entry(id: "b")))
 
-        XCTAssertEqual(plan, .loaded("# Plan\n\nDo the thing."))
+        XCTAssertEqual(plan, .loaded(FeedbackPlan(markdown: "# Plan\n\nDo the thing.")))
     }
 
     func testRowTextFallsBackToFirstLine() throws {
@@ -333,7 +359,7 @@ private actor InboxStubClient: FeedbackDataClient {
         return entries
     }
 
-    func plan(id: String) async throws -> String { planMarkdown }
+    func plan(id: String) async throws -> FeedbackPlan { FeedbackPlan(markdown: planMarkdown) }
 
     func create(_ body: FeedbackCreate) async throws -> FeedbackEntry {
         throw APIError.http(statusCode: 500, body: nil)

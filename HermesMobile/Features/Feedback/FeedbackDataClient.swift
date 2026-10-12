@@ -4,7 +4,7 @@ import Foundation
 /// the vault answer 404 on every endpoint, which `isAvailable()` reads as "no feedback here".
 protocol FeedbackDataClient: Sendable {
     func list() async throws -> [FeedbackEntry]
-    func plan(id: String) async throws -> String
+    func plan(id: String) async throws -> FeedbackPlan
     func create(_ body: FeedbackCreate) async throws -> FeedbackEntry
     func decide(id: String, _ decision: FeedbackDecision) async throws -> FeedbackEntry
     func isAvailable() async -> Bool
@@ -19,9 +19,9 @@ struct APIClientFeedbackAdapter: FeedbackDataClient {
         return try decodeList(data)
     }
 
-    func plan(id: String) async throws -> String {
+    func plan(id: String) async throws -> FeedbackPlan {
         let data = try await apiClient.sendData(endpoint: .feedbackPlan(id: id), method: "GET")
-        return try decode(FeedbackPlan.self, data).markdown
+        return try decode(FeedbackPlan.self, data)
     }
 
     func create(_ body: FeedbackCreate) async throws -> FeedbackEntry {
