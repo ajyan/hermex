@@ -108,8 +108,8 @@ final class FeedbackInboxViewModel {
         error = nil
     }
 
-    /// The entry's plan Markdown. A 404 means no plan has been written yet.
-    func plan(for entry: FeedbackEntry) async -> BrainLoadState<String> {
+    /// The entry's plan. A 404 means no plan has been written yet.
+    func plan(for entry: FeedbackEntry) async -> BrainLoadState<FeedbackPlan> {
         do {
             return .loaded(try await client.plan(id: entry.id))
         } catch {
@@ -146,7 +146,7 @@ extension FeedbackGroup {
     /// The inbox section header.
     var title: String {
         switch self {
-        case .needsReview: "Needs review"
+        case .needsReview: "Needs you"
         case .inProgress: "In progress"
         case .done: "Done"
         }
@@ -177,6 +177,44 @@ extension FeedbackEntry {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .first { !$0.isEmpty }
         return firstLine ?? "Untitled"
+    }
+
+    /// What a Needs you card asks of the user, as its chip: questions to answer, a plan to
+    /// approve, a branch to merge, or a failure to retry.
+    var needsYouChip: (symbol: String, label: String) {
+        switch status {
+        case .ready: ("arrow.triangle.branch", "Branch ready")
+        case .failed: ("exclamationmark.triangle", "Failed")
+        default:
+            questionCount > 0
+                ? ("questionmark.circle", questionCount == 1 ? "1 question" : "\(questionCount) questions")
+                : ("checkmark", "Ready to approve")
+        }
+    }
+
+    /// An In progress row's status in one word.
+    var progressWord: String {
+        switch status {
+        case .new: "Tonight"
+        case .planning: "Planning"
+        case .approved: "Approved"
+        case .building: "Building"
+        default: status.label
+        }
+    }
+
+    /// The detail's line under the title, e.g. "Daily Deck · small change · second-brain".
+    var detailMetaLine: String {
+        let size: String? = switch self.size {
+        case "S": "small change"
+        case "M": "medium change"
+        case "L": "large change"
+        default: nil
+        }
+        return [feature, size, planRepo]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
     }
 
     /// The row's secondary text, e.g. "Prep · Plan ready · S".

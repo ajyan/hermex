@@ -103,6 +103,8 @@ struct FeedbackEntry: Decodable, Identifiable, Hashable, Sendable {
     let attachments: [FeedbackAttachment]
     /// Set on a `rejected` entry the nightly job folded into another entry's plan: that entry's id.
     let mergedInto: String?
+    /// How many questions the entry's plan asks; 0 without a plan or for an old-format plan.
+    let questionCount: Int
 
     /// Whether the nightly job folded this entry into another entry's plan.
     var isMerged: Bool { status == .rejected && mergedInto != nil }
@@ -112,6 +114,7 @@ struct FeedbackEntry: Decodable, Identifiable, Hashable, Sendable {
         case branch, repo, tests, error, title, summary, size, attachments
         case planRepo = "plan_repo"
         case mergedInto = "merged_into"
+        case questionCount = "question_count"
     }
 
     init(from decoder: Decoder) throws {
@@ -137,6 +140,7 @@ struct FeedbackEntry: Decodable, Identifiable, Hashable, Sendable {
         planRepo = str(.planRepo)
         attachments = ((try? c.decodeIfPresent([FeedbackLossy<FeedbackAttachment>].self, forKey: .attachments)) ?? []).compactMap(\.value)
         mergedInto = str(.mergedInto)
+        questionCount = max(0, (try? c.decodeIfPresent(Int.self, forKey: .questionCount)) ?? 0)
     }
 }
 
@@ -197,6 +201,8 @@ struct FeedbackCreate: Encodable, Sendable {
 /// The body of `POST /api/feedback/<id>/decision`.
 enum FeedbackDecision: Encodable, Hashable, Sendable {
     case approve
+    /// Approve, with the plan's answers as a note the build follows.
+    case approveAnswering(String)
     case reject
     case reply(String)
     case retry
@@ -210,6 +216,9 @@ enum FeedbackDecision: Encodable, Hashable, Sendable {
         var c = encoder.container(keyedBy: CodingKeys.self)
         switch self {
         case .approve: try c.encode("approve", forKey: .decision)
+        case let .approveAnswering(note):
+            try c.encode("approve", forKey: .decision)
+            try c.encode(note, forKey: .note)
         case .reject: try c.encode("reject", forKey: .decision)
         case let .reply(note):
             try c.encode("reply", forKey: .decision)
@@ -221,14 +230,128 @@ enum FeedbackDecision: Encodable, Hashable, Sendable {
     }
 }
 
-struct FeedbackPlan: Decodable, Sendable {
-    let markdown: String
+/// One answer the planner offers to a question.
+struct FeedbackOption: Decodable, Hashable, Sendable {
+    let text: String
+    let recommended: Bool
 
-    private enum CodingKeys: String, CodingKey { case markdown }
+    private enum CodingKeys: String, CodingKey { case text, recommended }
+
+    init(text: String, recommended: Bool = false) {
+        self.text = text
+        self.recommended = recommended
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        text = try c.decode(String.self, forKey: .text)
+        recommended = (try? c.decodeIfPresent(Bool.self, forKey: .recommended)) ?? false
+    }
+}
+
+/// A question from the plan's Questions section, with the answers to choose from.
+struct FeedbackQuestion: Decodable, Hashable, Sendable {
+    let text: String
+    let options: [FeedbackOption]
+
+    private enum CodingKeys: String, CodingKey { case text, options }
+
+    init(text: String, options: [FeedbackOption]) {
+        self.text = text
+        self.options = options
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        text = try c.decode(String.self, forKey: .text)
+        options = ((try? c.decodeIfPresent([FeedbackLossy<FeedbackOption>].self, forKey: .options)) ?? []).compactMap(\.value)
+    }
+}
+
+/// `GET /api/feedback/<id>/plan`: the Markdown, plus the parts the server finds in a plan
+/// written in the steering format (Questions, What changes, Details). An older plan has no
+/// `changes`, and the app shows its Markdown whole.
+struct FeedbackPlan: Decodable, Hashable, Sendable {
+    let markdown: String
+    let questions: [FeedbackQuestion]
+    let changes: String?
+    let details: String?
+
+    /// Whether the plan has the steering parts; otherwise show `body` whole.
+    var isSteerable: Bool { changes != nil }
+
+    /// The Markdown without its `---` frontmatter, whose fields the entry already carries.
+    /// Rendered raw, the fences turn the frontmatter into one giant heading.
+    var body: String {
+        let lines = markdown.split(separator: "\n", omittingEmptySubsequences: false)
+        guard lines.first?.trimmingCharacters(in: .whitespaces) == "---",
+              let close = lines.dropFirst().firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "---" })
+        else { return markdown }
+        return lines[(close + 1)...].joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private enum CodingKeys: String, CodingKey { case markdown, questions, changes, details }
+
+    init(markdown: String, questions: [FeedbackQuestion] = [], changes: String? = nil, details: String? = nil) {
+        self.markdown = markdown
+        self.questions = questions
+        self.changes = changes
+        self.details = details
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         markdown = (try? c.decodeIfPresent(String.self, forKey: .markdown)) ?? ""
+        questions = ((try? c.decodeIfPresent([FeedbackLossy<FeedbackQuestion>].self, forKey: .questions)) ?? [])
+            .compactMap(\.value)
+            .filter { $0.options.count >= 2 }
+        func text(_ key: CodingKeys) -> String? {
+            let value = (try? c.decodeIfPresent(String.self, forKey: key))?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return value?.isEmpty == false ? value : nil
+        }
+        changes = text(.changes)
+        details = text(.details)
+    }
+}
+
+/// The user's answers to a plan's questions, by question index. They travel as one note, a
+/// line per answered question (`Q1 <question> → <answer>`), which the planner and build read.
+struct FeedbackAnswers: Equatable, Sendable {
+    enum Pick: Equatable, Sendable {
+        case option(Int)
+        case other(String)
+    }
+
+    private(set) var picks: [Int: Pick] = [:]
+
+    func pick(for question: Int) -> Pick? { picks[question] }
+
+    /// Picks `option` for `question`, or clears it when it is already picked.
+    mutating func toggle(_ option: Int, for question: Int) {
+        picks[question] = picks[question] == .option(option) ? nil : .option(option)
+    }
+
+    /// Sets a typed answer; blank text clears the question.
+    mutating func setOther(_ text: String, for question: Int) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        picks[question] = trimmed.isEmpty ? nil : .other(trimmed)
+    }
+
+    /// The note for `questions`, or nil when nothing is answered.
+    func note(for questions: [FeedbackQuestion]) -> String? {
+        let lines = questions.indices.compactMap { index -> String? in
+            let answer: String
+            switch picks[index] {
+            case .option(let option)? where questions[index].options.indices.contains(option):
+                answer = questions[index].options[option].text
+            case .other(let text)?:
+                answer = text
+            default:
+                return nil
+            }
+            return "Q\(index + 1) \(questions[index].text) → \(answer)"
+        }
+        return lines.isEmpty ? nil : lines.joined(separator: "\n")
     }
 }
 

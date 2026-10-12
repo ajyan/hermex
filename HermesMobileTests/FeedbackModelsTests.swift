@@ -56,6 +56,7 @@ final class FeedbackModelsTests: XCTestCase {
         }
         XCTAssertEqual(try json(.reply("narrower please")), ["decision": "reply", "note": "narrower please"])
         XCTAssertEqual(try json(.approve), ["decision": "approve"])
+        XCTAssertEqual(try json(.approveAnswering("Q1 Keep? → Yes")), ["decision": "approve", "note": "Q1 Keep? → Yes"])
         XCTAssertEqual(try json(.reject), ["decision": "reject"])
         XCTAssertEqual(try json(.retry), ["decision": "retry"])
         XCTAssertEqual(try json(.merged), ["decision": "merged"])
@@ -149,5 +150,70 @@ final class FeedbackModelsTests: XCTestCase {
         XCTAssertEqual(context.state, ["slot": "2026-10-11.morning", "card": "c3"])
         XCTAssertEqual(FeedbackContext.dailyDeck(title: "Weekly Review", date: "2026-10-11", kind: "weekly", page: nil).state,
                        ["slot": "2026-10-11.weekly"])
+    }
+
+    // MARK: - Steering
+
+    func testPlanDecodesSteeringParts() throws {
+        let plan = try decode(FeedbackPlan.self, #"""
+        {"markdown": "md", "changes": " Short. ", "details": "Long.",
+         "questions": [
+           {"text": "Keep it?", "options": [{"text": "Yes", "recommended": true}, {"text": "No"}]},
+           {"text": "One answer only", "options": [{"text": "Only"}]},
+           {"options": [{"text": "a"}, {"text": "b"}]},
+           {"text": "Bad option", "options": [{"text": "a"}, {"nope": 1}, {"text": "b"}]}
+         ]}
+        """#)
+        XCTAssertTrue(plan.isSteerable)
+        XCTAssertEqual(plan.changes, "Short.")
+        XCTAssertEqual(plan.details, "Long.")
+        XCTAssertEqual(plan.questions, [
+            FeedbackQuestion(text: "Keep it?", options: [FeedbackOption(text: "Yes", recommended: true), FeedbackOption(text: "No")]),
+            FeedbackQuestion(text: "Bad option", options: [FeedbackOption(text: "a"), FeedbackOption(text: "b")]),
+        ])
+    }
+
+    func testOldFormatPlanIsNotSteerable() throws {
+        let plan = try decode(FeedbackPlan.self, ###"{"markdown": "## What changes\nx", "changes": null, "questions": []}"###)
+        XCTAssertFalse(plan.isSteerable)
+        XCTAssertEqual(plan.markdown, "## What changes\nx")
+        XCTAssertFalse(try decode(FeedbackPlan.self, #"{"markdown": "x"}"#).isSteerable)
+    }
+
+    func testEntryDecodesQuestionCount() throws {
+        XCTAssertEqual(try decode(FeedbackEntry.self, #"{"id":"a","question_count":2}"#).questionCount, 2)
+        XCTAssertEqual(try decode(FeedbackEntry.self, #"{"id":"a"}"#).questionCount, 0)
+        XCTAssertEqual(try decode(FeedbackEntry.self, #"{"id":"a","question_count":"2"}"#).questionCount, 0)
+    }
+
+    func testAnswersNote() {
+        let questions = [
+            FeedbackQuestion(text: "Keep the page?", options: [FeedbackOption(text: "Keep it", recommended: true), FeedbackOption(text: "Opt it out")]),
+            FeedbackQuestion(text: "Plan the menu fix?", options: [FeedbackOption(text: "Yes"), FeedbackOption(text: "No")]),
+            FeedbackQuestion(text: "Unanswered?", options: [FeedbackOption(text: "a"), FeedbackOption(text: "b")]),
+        ]
+        var answers = FeedbackAnswers()
+        XCTAssertNil(answers.note(for: questions))
+
+        answers.toggle(1, for: 0)
+        answers.setOther("  Only for wiki cards ", for: 1)
+        XCTAssertEqual(answers.note(for: questions),
+                       "Q1 Keep the page? → Opt it out\nQ2 Plan the menu fix? → Only for wiki cards")
+
+        answers.toggle(1, for: 0)
+        answers.setOther("   ", for: 1)
+        XCTAssertNil(answers.note(for: questions), "toggling a pick again and blank text both clear")
+    }
+
+    func testAnswersSkipAnOptionThatNoLongerExists() {
+        var answers = FeedbackAnswers()
+        answers.toggle(5, for: 0)
+        XCTAssertNil(answers.note(for: [FeedbackQuestion(text: "Q", options: [FeedbackOption(text: "a"), FeedbackOption(text: "b")])]))
+    }
+
+    func testPlanBodyDropsFrontmatter() {
+        XCTAssertEqual(FeedbackPlan(markdown: "---\ntitle: T\nsize: S\n---\n\n## What changes\nx\n").body, "## What changes\nx")
+        XCTAssertEqual(FeedbackPlan(markdown: "## No frontmatter\n---\nx").body, "## No frontmatter\n---\nx")
+        XCTAssertEqual(FeedbackPlan(markdown: "---\ntitle: never closed\n").body, "---\ntitle: never closed\n")
     }
 }
