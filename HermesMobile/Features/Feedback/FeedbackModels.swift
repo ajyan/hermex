@@ -277,8 +277,18 @@ struct FeedbackPlan: Decodable, Hashable, Sendable {
     let changes: String?
     let details: String?
 
-    /// Whether the plan has the steering parts; otherwise show `markdown` whole.
+    /// Whether the plan has the steering parts; otherwise show `body` whole.
     var isSteerable: Bool { changes != nil }
+
+    /// The Markdown without its `---` frontmatter, whose fields the entry already carries.
+    /// Rendered raw, the fences turn the frontmatter into one giant heading.
+    var body: String {
+        let lines = markdown.split(separator: "\n", omittingEmptySubsequences: false)
+        guard lines.first?.trimmingCharacters(in: .whitespaces) == "---",
+              let close = lines.dropFirst().firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "---" })
+        else { return markdown }
+        return lines[(close + 1)...].joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     private enum CodingKeys: String, CodingKey { case markdown, questions, changes, details }
 

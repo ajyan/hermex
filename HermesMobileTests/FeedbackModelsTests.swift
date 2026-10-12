@@ -210,4 +210,10 @@ final class FeedbackModelsTests: XCTestCase {
         answers.toggle(5, for: 0)
         XCTAssertNil(answers.note(for: [FeedbackQuestion(text: "Q", options: [FeedbackOption(text: "a"), FeedbackOption(text: "b")])]))
     }
+
+    func testPlanBodyDropsFrontmatter() {
+        XCTAssertEqual(FeedbackPlan(markdown: "---\ntitle: T\nsize: S\n---\n\n## What changes\nx\n").body, "## What changes\nx")
+        XCTAssertEqual(FeedbackPlan(markdown: "## No frontmatter\n---\nx").body, "## No frontmatter\n---\nx")
+        XCTAssertEqual(FeedbackPlan(markdown: "---\ntitle: never closed\n").body, "---\ntitle: never closed\n")
+    }
 }

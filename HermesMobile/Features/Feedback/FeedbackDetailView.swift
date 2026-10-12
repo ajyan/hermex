@@ -166,7 +166,7 @@ struct FeedbackDetailView: View {
                 }
             }
         case .loaded(let plan):
-            MarkdownRenderer(content: plan.markdown)
+            MarkdownRenderer(content: plan.body)
         }
     }
 
