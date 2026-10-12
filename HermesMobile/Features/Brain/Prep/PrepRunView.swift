@@ -105,7 +105,7 @@ struct PrepRunView: View {
         case .spotBug:
             let draft = draft(for: rep)
             return draft.line.map { .bugFix(line: $0, fix: draft.fix ?? "") }
-        case .primer, .unknown:
+        case .primer, .unknown, .fact, .judgment:
             return nil
         }
     }
@@ -117,6 +117,8 @@ struct PrepRunView: View {
         case .spotBug: "Spot the bug"
         case .trace: "Trace"
         case .primer: "Primer"
+        case .fact: "Fact"
+        case .judgment: "Judgment"
         case .unknown: "Run"
         }
     }
@@ -207,7 +209,7 @@ struct PrepRunView: View {
 
     private func hasAction(_ rep: PrepRep) -> Bool {
         switch rep.drill {
-        case .primer, .approach, .spotBug, .unknown: true
+        case .primer, .approach, .spotBug, .unknown, .fact, .judgment: true
         case .complexity, .trace: false
         }
     }
@@ -235,7 +237,7 @@ struct PrepRunView: View {
                 guard let line = answer.line, let fix = answer.fix else { return }
                 Task { await viewModel.submitBugFix(line: line, fix: fix) }
             }
-        case .unknown:
+        case .unknown, .fact, .judgment:
             PrepPrimaryButton(title: "Skip") { Task { await viewModel.skip() } }
         case .complexity, .trace:
             EmptyView()
@@ -283,7 +285,7 @@ struct PrepRunView: View {
             )
         case .primer:
             PrepPrimerView(item: rep.item)
-        case .unknown:
+        case .unknown, .fact, .judgment:
             PrepNoteCard {
                 Text(verbatim: "Update Atlas to do this rep")
                     .font(BrainStyle.rowTitle)

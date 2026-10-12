@@ -188,4 +188,104 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertEqual(map.levels.first?.skills.first?.state, .unknown)
         XCTAssertEqual(map.levels.first?.locked, false)
     }
+
+    // MARK: - Anthropic track
+
+    func testDecodesFactAndJudgmentDrills() throws {
+        let json = #"""
+        {"date": "d", "index": 0, "reps": [
+          {"index": 0, "block": "warmup", "drill": "fact", "item": {"id": "anth.f.0001", "title": "RSP facts",
+            "summary": "Which ASL?", "stage": "1", "format": "choice", "origin": "ingest", "options": ["ASL-2", "ASL-3"]}},
+          {"index": 1, "block": "warmup", "drill": "fact", "item": {"id": "anth.f.0002", "summary": "Term?", "format": "cloze"}},
+          {"index": 2, "block": "warmup", "drill": "judgment", "item": {"id": "anth.j.0001", "title": "Safety and the RSP",
+            "summary": "Ship it?", "stage": "5", "origin": "coach"}}
+        ]}
+        """#
+        let run = try decode(PrepRun.self, json)
+        XCTAssertEqual(run.reps.map(\.drill), [.fact, .fact, .judgment])
+        XCTAssertEqual(run.reps[0].item.stage, "1")
+        XCTAssertEqual(run.reps[0].item.format, "choice")
+        XCTAssertEqual(run.reps[0].item.options.map(\.id), ["ASL-2", "ASL-3"])
+        XCTAssertEqual(run.reps[1].item.format, "cloze")
+        XCTAssertEqual(run.reps[1].item.origin, "", "a missing origin decodes empty")
+        XCTAssertEqual(run.reps[2].item.origin, "coach")
+        XCTAssertTrue(run.reps[2].item.isCoachWritten)
+        XCTAssertFalse(run.reps[0].item.isCoachWritten)
+    }
+
+    func testJudgmentResultDecodesPointsAndGapMatch() throws {
+        let json = #"""
+        {"verdict": "partial", "correct": null, "feedback": "", "credit": 0.5, "next_index": 3,
+         "grade": {"verdict": "partial", "points_hit": [{"point_id": "p.tail", "quote": "depends on the tail"}],
+                   "points_missed": [{"point_id": "p.harm", "why": "Never named who."}], "strong_answer": "Name who."},
+         "gap_match": [{"id": "gap.harm", "label": "Who bears the harm", "misses": 3}], "logged": false}
+        """#
+        let r = try decode(PrepAttemptResult.self, json)
+        let j = try XCTUnwrap(r.judgment)
+        XCTAssertEqual(j.pointsHit.map(\.pointID), ["p.tail"])
+        XCTAssertEqual(j.pointsHit.first?.quote, "depends on the tail")
+        XCTAssertEqual(j.pointsMissed.first?.why, "Never named who.")
+        XCTAssertEqual(j.strongAnswer, "Name who.")
+        XCTAssertEqual(r.gapMatch, [PrepGapMatch(id: "gap.harm", label: "Who bears the harm", misses: 3)])
+        XCTAssertFalse(r.logged)
+    }
+
+    func testApproachResultStillDecodesOpenGrade() throws {
+        let json = #"""
+        {"verdict": "pass", "credit": 1, "next_index": 1,
+         "grade": {"pattern_ok": true, "scores": {"insight": 2}, "skills_hit": [], "skills_missed": [], "strong_answer": "s"}}
+        """#
+        let r = try decode(PrepAttemptResult.self, json)
+        XCTAssertEqual(r.grade?.patternOK, true)
+        XCTAssertNil(r.judgment, "an approach grade has no points")
+        XCTAssertEqual(r.gapMatch, [])
+        XCTAssertFalse(r.logged)
+    }
+
+    func testGapSummaryUnknownStatusIsTolerated() throws {
+        let json = #"""
+        {"gaps": [{"id": "gap.a", "label": "A", "stage": "5", "status": "open", "misses": 3, "hits_toward_close": 0,
+                   "last_seen": "2026-10-12", "card_count": 2},
+                  {"id": "gap.b", "label": "B", "status": "snoozed"},
+                  {"label": "no id"}]}
+        """#
+        let gaps = try decode(PrepGaps.self, json).gaps
+        XCTAssertEqual(gaps.map(\.id), ["gap.a", "gap.b"], "a gap without an id is dropped")
+        XCTAssertEqual(gaps[0].status, .open)
+        XCTAssertEqual(gaps[0].misses, 3)
+        XCTAssertEqual(gaps[0].lastSeen, "2026-10-12")
+        XCTAssertEqual(gaps[1].status, .unknown)
+        XCTAssertEqual(gaps[1].hitsTowardClose, 0)
+    }
+
+    func testGapDetailMissingFieldsDefault() throws {
+        let json = #"""
+        {"id": "gap.a", "label": "A", "status": "improving", "hits_toward_close": 1, "summary": "Skips who.",
+         "evidence": [{"date": "2026-10-12", "item": "anth.j.0001", "item_title": "Ship it?", "quote": "ship the 98%"}, {"date": 3}],
+         "cards": [{"id": "anth.j.c001", "title": "Who is the 2%?", "origin": "coach", "due": "2026-10-14"},
+                   {"id": "anth.j.0001", "title": "Ship it?", "origin": "ingest", "due": null}]}
+        """#
+        let d = try decode(PrepGapDetail.self, json)
+        XCTAssertEqual(d.status, .improving)
+        XCTAssertEqual(d.summary, "Skips who.")
+        XCTAssertEqual(d.evidence.count, 2)
+        XCTAssertEqual(d.evidence[0].quote, "ship the 98%")
+        XCTAssertEqual(d.evidence[0].itemTitle, "Ship it?")
+        XCTAssertEqual(d.evidence[1].date, "", "a mistyped date decodes empty")
+        XCTAssertEqual(d.cards.map(\.isCoachWritten), [true, false])
+        XCTAssertNil(d.cards[1].due)
+        XCTAssertEqual(d.stage, "")
+    }
+
+    func testFlagRequestEncodesItem() throws {
+        let data = try JSONEncoder().encode(PrepFlagRequest(item: "anth.j.c001"))
+        XCTAssertEqual(try JSONSerialization.jsonObject(with: data) as? [String: String], ["item": "anth.j.c001"])
+    }
+
+    func testTutorGapEndpoints() {
+        XCTAssertEqual(Endpoint.tutorGaps.path, "/api/tutor/gaps")
+        XCTAssertEqual(Endpoint.tutorGap(id: "gap.a").path, "/api/tutor/gap")
+        XCTAssertEqual(Endpoint.tutorGap(id: "gap.a").queryItems, [URLQueryItem(name: "id", value: "gap.a")])
+        XCTAssertEqual(Endpoint.tutorFlag.path, "/api/tutor/flag")
+    }
 }

@@ -159,12 +159,16 @@ enum Endpoint {
     case brainPage(module: String, id: String)
     case brainSearch(query: String, module: String?)
     case brainGraph(module: String, id: String)
-    /// The Prep interview tutor (`api/tutor.py`): today's run, home, a track map, one item, and answer submission.
+    /// The Prep interview tutor (`api/tutor.py`): today's run, home, a track map, one item, answer submission,
+    /// the gap ledger (all gaps and one gap) and flagging a coach-written card.
     case tutorHome
     case tutorToday
     case tutorMap(track: String)
     case tutorItem(id: String)
     case tutorAttempt
+    case tutorGaps
+    case tutorGap(id: String)
+    case tutorFlag
     /// The feedback loop (`api/feedback.py`): list or create entries, read a plan, decide on an entry.
     case feedbackList
     case feedbackPlan(id: String)
@@ -458,6 +462,12 @@ enum Endpoint {
             return "/api/tutor/item"
         case .tutorAttempt:
             return "/api/tutor/attempt"
+        case .tutorGaps:
+            return "/api/tutor/gaps"
+        case .tutorGap:
+            return "/api/tutor/gap"
+        case .tutorFlag:
+            return "/api/tutor/flag"
         case .feedbackList:
             return "/api/feedback"
         case let .feedbackPlan(id):
@@ -680,7 +690,7 @@ enum Endpoint {
             return items
         case let .tutorMap(track):
             return [URLQueryItem(name: "track", value: track)]
-        case let .tutorItem(id):
+        case let .tutorItem(id), let .tutorGap(id):
             return [URLQueryItem(name: "id", value: id)]
         case let .goalDetail(slug):
             return [URLQueryItem(name: "slug", value: slug)]

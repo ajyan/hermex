@@ -500,7 +500,7 @@ struct PrepResultView: View {
             }
         case .spotBug:
             spotBugReveal
-        case .primer, .unknown:
+        case .primer, .unknown, .fact, .judgment:
             EmptyView()
         }
 
