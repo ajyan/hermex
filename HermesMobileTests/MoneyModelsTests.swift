@@ -86,4 +86,25 @@ final class MoneyModelsTests: XCTestCase {
         XCTAssertFalse(old.matches(snapshot.week))
         XCTAssertFalse(old.matches(nil))
     }
+
+    func testDebtShowsOwedAndTheDebtsDirection() throws {
+        func account(_ kind: String, _ balance: Double, _ change: Double) throws -> MoneyAccount {
+            try MoneyDates.decoder.decode(MoneyAccount.self, from: Data(#"{"id": "x", "kind": "\#(kind)", "balance": \#(balance), "change_1w": \#(change)}"#.utf8))
+        }
+        let paidDown = try account("credit", -2180, 20)
+        XCTAssertEqual(MoneyFormat.balance(paidDown, hidden: false), "$2,180 owed")
+        XCTAssertEqual(MoneyFormat.balance(paidDown, hidden: true), "$•••••• owed")
+        XCTAssertEqual(MoneyFormat.weekChange(paidDown, hidden: false), "↓ $20")
+        XCTAssertEqual(MoneyFormat.weekChange(paidDown, hidden: true), "↓ 0.91%")
+        XCTAssertEqual(MoneyFormat.weekChangeLabel(paidDown, hidden: false), "Owe $20 less this week")
+
+        let charged = try account("loan", -10980, -480)
+        XCTAssertEqual(MoneyFormat.weekChange(charged, hidden: false), "↑ $480")
+        XCTAssertEqual(MoneyFormat.weekChangeLabel(charged, hidden: true), "Owe more this week")
+
+        let brokerage = try account("investment", 74500, 1240)
+        XCTAssertEqual(MoneyFormat.balance(brokerage, hidden: false), "$74,500")
+        XCTAssertEqual(MoneyFormat.weekChange(brokerage, hidden: false), "+$1,240")
+        XCTAssertEqual(MoneyFormat.weekChange(try account("credit", -5, 0), hidden: false), "—")
+    }
 }
