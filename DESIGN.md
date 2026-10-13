@@ -45,7 +45,7 @@ Each paper is one hue rendered as a glow that adapts to the appearance:
 | `book` | `#FFDCE6` / `#6B1534` | `#A8335E` / `#F59AB8` | Book highlight |
 | `wiki` | `#D3F2E2` / `#0E4A33` | `#137049` / `#5FD3A0` | From your wiki |
 | `reading` | `#FFE4D1` / `#5A2A0C` | `#9A4410` / `#F5A37A` | From your reading |
-| `notes` | `#E6DCFF` / `#33197A` | `#5B3FC4` / `#B39DFF` | From your notes |
+| `notes` | `#E6DCFF` / `#33197A` | `#5B3FC4` / `#B39DFF` | From your notes, Sleep |
 | `video` | `#D2F0F4` / `#0B4650` | `#0E6D7A` / `#5CCFE0` | Video |
 | `past` | `#FFEFC2` / `#4E3A00` | `#7A5C00` / `#E8C55A` | On this day |
 | `advisor` | `#E4EEF6` / `#14324A` | `#2E5878` / `#9DBEDD` | Check-in |

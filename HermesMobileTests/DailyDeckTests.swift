@@ -335,6 +335,66 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(deck.cards.map { DeckPalette.of($0).name }, ["Book highlight", "From your wiki", "Quote", "Today"])
     }
 
+    // MARK: - Sleep
+
+    private static let sleepDeckJSON = """
+    {"date": "2026-10-04", "kind": "morning", "cards": [
+      {"id": "sleep", "type": "sleep", "question": "How did you sleep?", "scale": ["Very poor", "Poor", "Fair", "Good", "Very good"],
+       "sleep": {"headline": "8.5 h of 9 h needed", "lines": ["Asleep 10:31 pm · up 7:19 am"],
+                 "nights": [{"day": "Sun", "hours": 7.6, "need": 9}, {"day": "Mon", "hours": null}, {"day": 3, "hours": "x"}]},
+       "fallback": "How did you sleep? Last night: 8.5 h of 9 h needed.", "reason": "From your Garmin"},
+      {"id": "close", "type": "close"}
+    ]}
+    """
+
+    func testSleepCardDecodesItsScaleAndNumbersTolerantly() throws {
+        let card = try DailyDeck.decode(Self.sleepDeckJSON).cards[0]
+        XCTAssertEqual(card.type, .sleep)
+        XCTAssertEqual(card.scale.count, 5)
+        let sleep = try XCTUnwrap(card.sleep)
+        XCTAssertEqual(sleep.headline, "8.5 h of 9 h needed")
+        XCTAssertEqual(sleep.nights.map(\.day), ["Sun", "Mon", ""], "a malformed night keeps its place")
+        XCTAssertEqual(sleep.nights.map(\.hours), [7.6, nil, nil])
+        XCTAssertEqual(sleep.nights[0].need, 9)
+        XCTAssertTrue(card.takesText)
+        XCTAssertFalse(card.takesFeedback, "the deck's own check-in, not material it picked")
+        XCTAssertEqual(DeckPalette.of(card).name, "Sleep")
+        let text = DeckCardText(card)
+        XCTAssertEqual(text.lead, "How did you sleep?")
+        XCTAssertTrue(text.leadIsQuestion)
+        let unsynced = try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"sleep","type":"sleep","sleep":{"lines":["Garmin hasn't synced last night yet."]}}]}"#).cards[0]
+        XCTAssertNil(unsynced.sleep?.headline)
+        XCTAssertEqual(unsynced.sleep?.nights, [])
+    }
+
+    func testARatingAloneAnswersTheSleepCardAndIsFiledAsSnakeCaseJSON() throws {
+        let deck = try DailyDeck.decode(Self.sleepDeckJSON)
+        let rated = DeckAnswer(card: "sleep", rating: 4)
+        XCTAssertFalse(rated.isEmpty)
+        XCTAssertTrue(rated.isAnswer(for: deck.cards[0]))
+        let payload = DeckAnswersPayload(deck: deck, answers: ["sleep": rated], completedAt: morning)
+        XCTAssertEqual(payload.answers, [rated])
+        let json = try XCTUnwrap(try payload.message().components(separatedBy: "```json\n").last?.components(separatedBy: "\n```").first)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+        XCTAssertEqual((object["answers"] as? [[String: Any]])?.first?["rating"] as? Int, 4)
+    }
+
+    @MainActor
+    func testRatingTheSleepCardTogglesAndCountsAsAnAnswer() async throws {
+        store.setWorkspace("/vault", for: server)
+        let model = makeViewModel(ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.sleepDeckJSON))
+        await model.load()
+        let card = try XCTUnwrap(model.cards.first)
+        model.rate(2, for: card)
+        XCTAssertEqual(model.answer(for: card)?.rating, 2)
+        XCTAssertEqual(model.answeredCount, 1)
+        model.rate(4, for: card)
+        XCTAssertEqual(model.answer(for: card)?.rating, 4, "another rating replaces it")
+        model.rate(4, for: card)
+        XCTAssertNil(model.answer(for: card), "tapping the chosen rating clears it")
+        XCTAssertEqual(model.answeredCount, 0)
+    }
+
     // MARK: - Not for Me and questions
 
     func testDecodesReasonAndAlternativeQuestions() throws {
