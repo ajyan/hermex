@@ -438,6 +438,7 @@
 		C03190000000000000B003 /* AttachmentAudioDetectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03190000000000000F003 /* AttachmentAudioDetectionTests.swift */; };
 		C03250000000000000B101 /* TranscribeResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03250000000000000F101 /* TranscribeResponse.swift */; };
 		C03250000000000000B102 /* APIClient+Transcribe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03250000000000000F102 /* APIClient+Transcribe.swift */; };
+		D1A7B0000000000000B001 /* APIClient+Brief.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A7B0000000000000F001 /* APIClient+Brief.swift */; };
 		C03250000000000000B103 /* MultipartFormData.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03250000000000000F103 /* MultipartFormData.swift */; };
 		C03250000000000000B104 /* ComposerVoiceNoteRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03250000000000000F104 /* ComposerVoiceNoteRecorder.swift */; };
 		C03250000000000000B105 /* APIClientTranscribeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03250000000000000F105 /* APIClientTranscribeTests.swift */; };
@@ -1189,6 +1190,7 @@
 		C03190000000000000F003 /* AttachmentAudioDetectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentAudioDetectionTests.swift; sourceTree = "<group>"; };
 		C03250000000000000F101 /* TranscribeResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscribeResponse.swift; sourceTree = "<group>"; };
 		C03250000000000000F102 /* APIClient+Transcribe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "APIClient+Transcribe.swift"; sourceTree = "<group>"; };
+		D1A7B0000000000000F001 /* APIClient+Brief.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "APIClient+Brief.swift"; sourceTree = "<group>"; };
 		C03250000000000000F103 /* MultipartFormData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultipartFormData.swift; sourceTree = "<group>"; };
 		C03250000000000000F104 /* ComposerVoiceNoteRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerVoiceNoteRecorder.swift; sourceTree = "<group>"; };
 		C03250000000000000F105 /* APIClientTranscribeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientTranscribeTests.swift; sourceTree = "<group>"; };
@@ -1958,6 +1960,7 @@
 				C15100000000000000000002 /* KanbanEventStreamClient.swift */,
 				1A2B3C4D5E6F7000000000B8 /* Endpoints.swift */,
 				C03250000000000000F102 /* APIClient+Transcribe.swift */,
+				D1A7B0000000000000F001 /* APIClient+Brief.swift */,
 				C03260000000000000F101 /* APIClient+TTS.swift */,
 				C03270000000000000F101 /* APIClient+SessionExport.swift */,
 				C03250000000000000F103 /* MultipartFormData.swift */,
@@ -3027,6 +3030,7 @@
 				1A2B3C4D5E6F7000000000A8 /* Endpoints.swift in Sources */,
 				C03250000000000000B101 /* TranscribeResponse.swift in Sources */,
 				C03250000000000000B102 /* APIClient+Transcribe.swift in Sources */,
+				D1A7B0000000000000B001 /* APIClient+Brief.swift in Sources */,
 				C03260000000000000B101 /* APIClient+TTS.swift in Sources */,
 				C03270000000000000B101 /* APIClient+SessionExport.swift in Sources */,
 				C03250000000000000B103 /* MultipartFormData.swift in Sources */,

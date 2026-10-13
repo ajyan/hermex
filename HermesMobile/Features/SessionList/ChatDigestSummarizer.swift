@@ -21,7 +21,25 @@ enum ChatDigestError: LocalizedError, Equatable {
 /// same mapping the Live Activity reconciler uses. A run that is still going
 /// at `timeout` is cancelled so it never lingers behind an unarchived chat.
 struct ChatDigestSummarizer {
-    static let prompt = "Before this chat is archived: write a concise digest of this conversation (what it was about, decisions made, open follow-ups, people mentioned) and save it to my second brain as notes/chat-digests/YYYY-MM-DD-<short-slug>.md (today's date). If a person from crm/contacts was discussed, add a dated one-line note to their file too. Reply with just the file path."
+    /// The digest request for a chat archived on `date` (the user's day). The date and the
+    /// vault path are spelled out because the turn may run in another workspace, and working
+    /// out "today" costs the agent a tool call.
+    static func prompt(on date: Date, calendar: Calendar = .current) -> String {
+        let day = DailyDeckPaths.day(date, calendar: calendar)
+        return """
+        Before this chat is archived, write a short digest of it to \
+        ~/Code/second-brain/notes/chat-digests/\(day)-<short-slug>.md (today is \(day)), using these sections \
+        with a few brief bullets each, or "None":
+
+        ## About
+        ## Decisions
+        ## Follow-ups
+        ## People
+
+        Then, only for people named in this chat who already have a file in \
+        ~/Code/second-brain/crm/contacts, add a dated one-line note to that file. Reply with just the digest's path.
+        """
+    }
 
     /// Chats shorter than this are archived without a digest.
     static let minimumMessagesForDigest = 2
@@ -34,6 +52,7 @@ struct ChatDigestSummarizer {
     var pollInterval: Duration = .seconds(3)
     var timeout: Duration = .seconds(300)
     var sleep: @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+    var now: @Sendable () -> Date = { Date() }
 
     func summarize(_ session: SessionSummary) async throws {
         guard let sessionID = session.sessionId, !sessionID.isEmpty else {
@@ -41,7 +60,7 @@ struct ChatDigestSummarizer {
         }
         let response = try await client.startChat(
             sessionID: sessionID,
-            message: Self.prompt,
+            message: Self.prompt(on: now()),
             workspace: session.workspace,
             model: nil,
             profile: session.profile

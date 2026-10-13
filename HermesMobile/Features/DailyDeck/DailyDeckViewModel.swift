@@ -2,8 +2,8 @@ import Foundation
 import Observation
 
 /// The network surface the Daily Deck needs. File reads are session-scoped on the
-/// server, so the deck owns one session per day in the brief's workspace; filing
-/// sends one message to that same session.
+/// server, so the deck owns one session per day in the brief's workspace. Filing goes
+/// through the server's filer when it has one, else one message in a fresh session.
 protocol DailyDeckDataClient: Sendable {
     func workspacePaths() async throws -> [String]
     func createSession(workspace: String) async throws -> String
@@ -11,6 +11,8 @@ protocol DailyDeckDataClient: Sendable {
     func entryNames(sessionID: String, path: String) async throws -> [String]
     func fileContent(sessionID: String, path: String) async throws -> String
     func startChat(sessionID: String, message: String, workspace: String) async throws
+    /// Files the answers on the server without the model; nil when the server has no filer.
+    func fileBrief(_ request: BriefFileRequest) async throws -> BriefFileResponse?
 }
 
 enum DailyDeckState: Equatable {
@@ -31,6 +33,21 @@ enum DailyDeckFilingState: Equatable {
     case failed(String)
 }
 
+/// Where a successful filing leaves the user.
+enum DailyDeckFilingResult: Equatable {
+    /// The server filed everything; the deck shows it as filed.
+    case filed
+    /// A session is working on the filing (the whole of it, or the follow-ups): open it.
+    case openSession(String)
+}
+
+/// What the server's filer reported, shown quietly on the close card.
+struct DailyDeckFiledNote: Equatable {
+    var summary: String?
+    /// Steps that failed, as "step: error".
+    var failures: [String] = []
+}
+
 @MainActor
 @Observable
 final class DailyDeckViewModel {
@@ -44,6 +61,8 @@ final class DailyDeckViewModel {
     private(set) var workspace: String?
     /// What was last filed for the deck on screen; nil until it is filed.
     private(set) var filedAnswers: [String: DeckAnswer]?
+    /// The server filer's report from this screen's last filing; nil after a chat filing.
+    private(set) var filedNote: DailyDeckFiledNote?
     /// Days with a deck in `briefs/`, newest first.
     private(set) var availableDates: [String] = []
     /// Days whose deck has been filed.
@@ -165,6 +184,7 @@ final class DailyDeckViewModel {
         deck = nil
         pages = []
         filedAnswers = nil
+        filedNote = nil
         guard names.contains(fileName(DailyDeckPaths.deck(date: date, kind: kind))) else {
             state = .noDeck
             return
@@ -359,28 +379,74 @@ final class DailyDeckViewModel {
 
     // MARK: Filing
 
-    /// Sends the answers in a fresh session, so the chat it opens holds only this filing
-    /// (never an earlier, stopped attempt). Filing again sends every answer; the server
-    /// updates only what changed. Returns the session id on success so the caller can
-    /// open it and watch the agent file them.
-    func file() async -> String? {
+    /// Files the answers. The server's filer does it without the model; when it leaves
+    /// follow-ups for the agent, they go to a fresh session the caller opens. A server without
+    /// the filer gets the whole filing as one message in a fresh session, as before. Filing
+    /// again sends every answer; the server updates only what changed. Returns nil on failure.
+    func file() async -> DailyDeckFilingResult? {
         guard let deck, let workspace, filing != .filing else { return nil }
         filing = .filing
+        let payload = DeckAnswersPayload(deck: deck, answers: answers, completedAt: now())
+        let refiling = isFiled
+        let filed: BriefFileResponse?
         do {
-            let message = try DeckAnswersPayload(deck: deck, answers: answers, completedAt: now()).message(refiling: isFiled)
-            let sessionID = try await client.createSession(workspace: workspace)
-            try? await client.renameSession(id: sessionID, title: Self.sessionTitle(for: date, kind: kind))
-            store.setSession(sessionID, for: server, date: today)
-            self.sessionID = sessionID
-            try await client.startChat(sessionID: sessionID, message: message, workspace: workspace)
-            store.setAnswers([:], for: server, date: date, kind: kind)
-            filedAnswers = answers
-            filing = .idle
-            return sessionID
+            filed = try await client.fileBrief(BriefFileRequest(date: deck.date, kind: deck.kind, answers: payload))
         } catch {
             filing = .failed(error.localizedDescription)
             return nil
         }
+        guard let filed else {
+            // No filer on this server: the agent files it from the message.
+            do {
+                let sessionID = try await startSession(message: try payload.message(refiling: refiling), workspace: workspace)
+                markFiled(note: nil)
+                return .openSession(sessionID)
+            } catch {
+                filing = .failed(error.localizedDescription)
+                return nil
+            }
+        }
+        if filed.ok == false {
+            filing = .failed(filed.error ?? filed.summary ?? "The server couldn't file the brief.")
+            return nil
+        }
+        // The answers are filed now; a failure below only loses the follow-ups.
+        markFiled(note: DailyDeckFiledNote(
+            summary: Self.trimmed(filed.summary),
+            failures: (filed.ran ?? []).filter { $0.ok == false }.map { step in
+                [step.step, step.error].compactMap { $0 }.joined(separator: ": ")
+            }))
+        let steps = (filed.agentSteps ?? []).compactMap(Self.trimmed)
+        guard !steps.isEmpty else { return .filed }
+        do {
+            return .openSession(try await startSession(message: payload.followUpMessage(steps: steps), workspace: workspace))
+        } catch {
+            filing = .failed("Filed, but the follow-ups didn't start: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    private nonisolated static func trimmed(_ text: String?) -> String? {
+        guard let text = text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
+        return text
+    }
+
+    private func markFiled(note: DailyDeckFiledNote?) {
+        store.setAnswers([:], for: server, date: date, kind: kind)
+        filedAnswers = answers
+        filedNote = note
+        filing = .idle
+    }
+
+    /// A fresh session (so the chat holds only this filing, never an earlier stopped attempt)
+    /// with `message` sent; it becomes today's session.
+    private func startSession(message: String, workspace: String) async throws -> String {
+        let sessionID = try await client.createSession(workspace: workspace)
+        try? await client.renameSession(id: sessionID, title: Self.sessionTitle(for: date, kind: kind))
+        store.setSession(sessionID, for: server, date: today)
+        self.sessionID = sessionID
+        try await client.startChat(sessionID: sessionID, message: message, workspace: workspace)
+        return sessionID
     }
 }
 
@@ -420,6 +486,10 @@ struct APIClientDailyDeckAdapter: DailyDeckDataClient {
         guard response.streamId?.isEmpty == false else {
             throw DailyDeckSendError(message: response.error ?? "The server did not return a stream ID.")
         }
+    }
+
+    func fileBrief(_ request: BriefFileRequest) async throws -> BriefFileResponse? {
+        try await apiClient.fileBrief(request)
     }
 }
 

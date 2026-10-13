@@ -72,6 +72,14 @@ final class SpeechTextShaperTests: XCTestCase {
         XCTAssertEqual(spoken("[voice]\nIt's Friday."), ["It's Friday."])
     }
 
+    func testEchoedTimedVoiceTagIsNotSpoken() {
+        XCTAssertEqual(spoken("[voice 2:41 PM] It's 2:41."), ["It's 2:41."])
+        XCTAssertEqual(spoken("[Voice 14:41]: It's 2:41."), ["It's 2:41."])
+        var shaper = SpeechTextShaper()
+        XCTAssertEqual(shaper.append("[voice 2:4"), [], "a tag still arriving is held")
+        XCTAssertEqual(shaper.append("[voice 2:41 PM] Hi. The"), ["Hi."])
+    }
+
     func testBareVoiceIsHeldWhileStreamingThenDropped() {
         var shaper = SpeechTextShaper()
         XCTAssertEqual(shaper.append("voice"), [])

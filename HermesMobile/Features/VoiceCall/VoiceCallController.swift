@@ -15,7 +15,6 @@ enum VoiceCallState: Equatable {
 
 /// Spoken lines. English only: recognition and the approve phrases are English.
 enum VoiceCallPhrases {
-    static let voicePrefix = "[voice] "
     static let reconnecting = "Lost connection, reconnecting."
     static let connectionLost = "Call ended, connection lost"
     static let sendFailed = "I couldn't reach Atlas."
@@ -24,11 +23,45 @@ enum VoiceCallPhrases {
     static let didntCatch = "I didn't catch that."
     static let hangingUpNoSpeech = "I haven't heard anything, so I'm hanging up"
 
-    /// `text` without a call's leading `[voice] ` tag, for display.
+    /// The tag before each spoken turn, carrying the phone's local time (`[voice 2:41 PM] `)
+    /// so Atlas can answer "what time is it?" without a tool call.
+    static func voicePrefix(at date: Date, locale: Locale = .current, timeZone: TimeZone = .current) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.timeZone = timeZone
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        // Plain spaces: the short style can use a narrow no-break space before AM/PM.
+        let time = formatter.string(from: date).replacingOccurrences(of: "\u{202F}", with: " ")
+        return "[voice \(time)] "
+    }
+
+    /// A call's leading tag: `[voice 2:41 PM] `, or the legacy `[voice] ` in older history.
+    nonisolated(unsafe) private static let voiceTag = #/^\[voice(?: [^\]]{1,20})?\] ?/#
+    private static let voiceTagOpening = "[voice"
+    /// The longest time a tag holds, matching `voiceTag`.
+    private static let voiceTagTimeLimit = 20
+
+    /// How many characters of `text` its leading call tag takes (with one trailing space),
+    /// or nil when it has none. Display matches the app's own lowercase tag; speech also
+    /// catches Atlas echoing it in another case.
+    static func voiceTagLength(in text: Substring, ignoringCase: Bool = false) -> Int? {
+        guard let match = text.prefixMatch(of: voiceTag.ignoresCase(ignoringCase)) else { return nil }
+        return text.distance(from: match.range.lowerBound, to: match.range.upperBound)
+    }
+
+    /// Whether streaming `text` could still grow into a call tag (`[voi`, `[voice 2:4`).
+    static func isPartialVoiceTag(_ text: Substring) -> Bool {
+        let lowered = text.lowercased()
+        guard lowered.hasPrefix("["), !lowered.contains("]") else { return false }
+        if voiceTagOpening.hasPrefix(lowered) { return true }
+        return lowered.hasPrefix(voiceTagOpening + " ") && lowered.count <= voiceTagOpening.count + 1 + voiceTagTimeLimit
+    }
+
+    /// `text` without a call's leading tag, for display.
     static func withoutVoiceTag(_ text: String) -> String {
-        if text == voicePrefix.trimmingCharacters(in: .whitespaces) { return "" }
-        guard text.hasPrefix(voicePrefix) else { return text }
-        return String(text.dropFirst(voicePrefix.count))
+        guard let length = voiceTagLength(in: text[...]) else { return text }
+        return String(text.dropFirst(length))
     }
 
     static func approvalReadBack(_ action: String) -> String {
@@ -63,6 +96,8 @@ final class VoiceCallController {
     @ObservationIgnored private let chat: VoiceCallChatDriving
     @ObservationIgnored private let bridge: CallSystemBridging
     @ObservationIgnored private let now: () -> TimeInterval
+    /// Wall-clock time for the turn tag (`now` is uptime).
+    @ObservationIgnored private let clock: () -> Date
     @ObservationIgnored private let suppressThinkingCue: @MainActor () -> Bool
     @ObservationIgnored private let tickInterval: Duration?
     /// Diagnostics sink (Debug builds write it to a file on the device).
@@ -125,6 +160,7 @@ final class VoiceCallController {
         chat: VoiceCallChatDriving,
         bridge: CallSystemBridging,
         now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+        clock: @escaping () -> Date = Date.init,
         suppressThinkingCue: @escaping @MainActor () -> Bool = { UIAccessibility.isReduceMotionEnabled },
         tickInterval: Duration? = .milliseconds(250),
         log: @escaping (String) -> Void = { _ in }
@@ -135,6 +171,7 @@ final class VoiceCallController {
         self.chat = chat
         self.bridge = bridge
         self.now = now
+        self.clock = clock
         self.suppressThinkingCue = suppressThinkingCue
         self.tickInterval = tickInterval
 
@@ -469,7 +506,7 @@ final class VoiceCallController {
         sentAt = now()
         log("send: \"\(text)\"\(spokenFor)")
         lastChatTask = Task { [weak self, chat] in
-            let sent = await chat.sendVoiceMessage(VoiceCallPhrases.voicePrefix + text)
+            let sent = await chat.sendVoiceMessage(VoiceCallPhrases.voicePrefix(at: clock()) + text)
             self?.log("send \(sent ? "accepted" : "FAILED") \(self?.since(self?.sentAt) ?? "")")
             guard !sent, let self, self.replyActive, self.state == .thinking else { return }
             self.replyActive = false

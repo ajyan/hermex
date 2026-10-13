@@ -180,6 +180,9 @@ enum Endpoint {
     case goalsHome
     case goalDetail(slug: String)
     case goalCheckIn
+    /// Files a Daily Deck's answers without the model (this user's webui fork):
+    /// POST `{date, kind, answers}`. Servers without it answer 404.
+    case briefFile
 
     var path: String {
         switch self {
@@ -485,6 +488,8 @@ enum Endpoint {
             return "/api/goals/detail"
         case .goalCheckIn:
             return "/api/goals/checkin"
+        case .briefFile:
+            return "/api/brief/file"
         }
     }
 
