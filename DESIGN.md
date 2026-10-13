@@ -9,7 +9,7 @@ Hermex's look: **calm chat, colorful objects, one voice.** The reading surface s
 3. **One material: glow.** Every colored thing is its hue on a wash of itself, deep in light mode and bright in dark mode, at two strengths: a faint `wash` for small objects (chips, request cards, drawer and log icons) and an opaque medium `card` fill for whole cards (Brief cards, the Goal hero). There are no fixed light papers anymore.
 4. **Glow text is full strength.** Text in a hue is never faded; hierarchy comes from size and weight. Fading is for decorative marks only (corner icons, dividers). Faded glow fails contrast.
 5. **Nous blue means interactive.** `Color.accentColor` (`#0053FD` / `#4A84FE`) is the tint for controls, the send button, links, and "Atlas is working". It is never an object color.
-6. **Status colors stay semantic.** `hxSuccess`, `hxWarning`, and `hxDanger` mark outcomes (done, needs care, failed). They are not object colors.
+6. **Status colors stay semantic.** `hxSuccess`, `hxWarning`, and `hxDanger` mark outcomes (done, needs care, failed), and on Money a gain or a loss. They are not object colors.
 
 ## Color
 
@@ -50,6 +50,7 @@ Each paper is one hue rendered as a glow that adapts to the appearance:
 | `past` | `#FFEFC2` / `#4E3A00` | `#7A5C00` / `#E8C55A` | On this day |
 | `advisor` | `#E4EEF6` / `#14324A` | `#2E5878` / `#9DBEDD` | Check-in |
 | `plain` | `#F4F0E8` / `#2A2A28` | `#5E5646` / `#D6CDBB` | Library, follow-ups |
+| `ledger` | `#EEF3D6` / `#2F3A0A` | `#4F6300` / `#C2DA6E` | (Money, not a Brief card) |
 
 ### The object key
 
@@ -64,7 +65,8 @@ Named in `Config/HermexStyle.swift`; `HermexPaper.forTool(_:)` maps tool kinds.
 | Memory or skill | `.recall` | `advisor` |
 | Shell, code, delegation, everything else; chat source badges | `.tool` | `plain` |
 | Goal | the goal's own paper (`GoalPaper`) | any |
-| Drawer sections: Daily Brief, Brain, Goals | `opener`, `.knowledge`, `book` | |
+| Money: net worth, accounts, the market card | `.money` | `ledger` |
+| Drawer sections: Daily Brief, Brain, Goals, Money | `opener`, `.knowledge`, `book`, `.money` | |
 
 Add a new kind of object here and in the code together. A failed tool step keeps its color and adds an `hxDanger` mark; the color never turns red.
 
