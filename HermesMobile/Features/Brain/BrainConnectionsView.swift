@@ -118,7 +118,8 @@ struct BrainLinkCardsRow: View {
 struct BrainLinkCard: View {
     let ref: BrainRef
     @ScaledMetric(relativeTo: .subheadline) private var width: CGFloat = 156
-    @ScaledMetric(relativeTo: .subheadline) private var minHeight: CGFloat = 92
+    /// One height for every card in the row: a two-line title and a two-line snippet.
+    @ScaledMetric(relativeTo: .subheadline) private var height: CGFloat = 118
 
     var body: some View {
         let paper = ref.module.paper
@@ -141,8 +142,7 @@ struct BrainLinkCard: View {
         }
         .padding(.horizontal, 11)
         .padding(.vertical, 10)
-        .frame(width: width, alignment: .topLeading)
-        .frame(minHeight: minHeight, alignment: .topLeading)
+        .frame(width: width, height: height, alignment: .topLeading)
         .glowSurface(paper, cornerRadius: HXRadius.md)
         .contentShape(RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
         .accessibilityElement(children: .ignore)
@@ -265,7 +265,8 @@ struct BrainHubPager: View {
             stepButton(1, ref: hub.next, symbol: "chevron.forward", label: "Next")
         }
         .padding(.horizontal, BrainStyle.xs)
-        .adaptiveGlass(isInteractive: true, in: Capsule())
+        // Surface-tinted so the labels stay legible over body text scrolling beneath.
+        .adaptiveGlass(isInteractive: true, tint: Color.hxSurface.opacity(0.75), in: Capsule())
         .hxShadow(.float)
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }

@@ -115,6 +115,16 @@ final class BrainModelsTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(BrainPage.self, from: JSONEncoder().encode(page)), page)
     }
 
+    /// `APIClient` decodes with `.convertFromSnakeCase`; snake_case fields must survive it.
+    func testSnakeCaseFieldsDecodeThroughTheAPIClientDecoder() throws {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let page = #"{"item": {"module": "wiki", "id": "w"}, "unlinked": [{"module": "wiki", "id": "u"}], "unlinked_count": 23}"#
+        XCTAssertEqual(try decoder.decode(BrainPage.self, from: Data(page.utf8)).unlinkedCount, 23)
+        let list = #"{"items": [], "next_cursor": 40}"#
+        XCTAssertEqual(try decoder.decode(BrainList.self, from: Data(list.utf8)).nextCursor, 40)
+    }
+
     func testOlderPageWithoutConnectionsStillDecodes() throws {
         let json = #"{"item": {"module": "wiki", "id": "w"}, "hub": {"ref": {"module": "goals", "id": "x"}}}"#
         let page = try JSONDecoder().decode(BrainPage.self, from: Data(json.utf8))

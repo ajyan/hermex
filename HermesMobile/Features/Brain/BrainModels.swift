@@ -12,6 +12,23 @@ enum BrainModuleID: String, CaseIterable, Codable, Hashable, Sendable {
     case people, wiki, articles, journal, highlights
 }
 
+/// A snake_case field read as written. `APIClient` decodes with `.convertFromSnakeCase`, so
+/// models key these in camelCase; this covers a plain decoder (tests) reading the server's
+/// raw JSON. The cache round-trips the camelCase key.
+private func brainSnakeInt(_ decoder: Decoder, _ key: String) -> Int? {
+    guard let key = BrainRawKey(stringValue: key),
+          let raw = try? decoder.container(keyedBy: BrainRawKey.self)
+    else { return nil }
+    return try? raw.decodeIfPresent(Int.self, forKey: key)
+}
+
+private struct BrainRawKey: CodingKey {
+    let stringValue: String
+    var intValue: Int? { nil }
+    init?(stringValue: String) { self.stringValue = stringValue }
+    init?(intValue: Int) { nil }
+}
+
 /// Decodes an element or yields nil, so one bad element never fails its array.
 private struct BrainLossy<Value: Decodable>: Decodable {
     let value: Value?
@@ -251,8 +268,7 @@ struct BrainPage: Codable, Hashable, Sendable {
     let hub: BrainHubContext?
 
     private enum CodingKeys: String, CodingKey {
-        case item, content, links, backlinks, further, prev, next, highlights, facts, unlinked, hub
-        case unlinkedCount = "unlinked_count"
+        case item, content, links, backlinks, further, prev, next, highlights, facts, unlinked, hub, unlinkedCount
     }
 
     init(item: BrainItem, content: String = "", links: [BrainRef] = [], backlinks: [BrainRef] = [],
@@ -285,7 +301,8 @@ struct BrainPage: Codable, Hashable, Sendable {
         highlights = c.lossy(BrainHighlight.self, .highlights)
         facts = c.lossy(BrainFact.self, .facts)
         unlinked = c.lossy(BrainRef.self, .unlinked)
-        unlinkedCount = max(c.optional(Int.self, .unlinkedCount) ?? 0, unlinked.count)
+        unlinkedCount = max(c.optional(Int.self, .unlinkedCount) ?? brainSnakeInt(decoder, "unlinked_count") ?? 0,
+                            unlinked.count)
         hub = c.optional(BrainHubContext.self, .hub)
     }
 }
@@ -334,8 +351,7 @@ struct BrainList: Codable, Hashable, Sendable {
     let nextCursor: Int?
 
     private enum CodingKeys: String, CodingKey {
-        case items, tags, groups
-        case nextCursor = "next_cursor"
+        case items, tags, groups, nextCursor
     }
 
     init(items: [BrainItem] = [], tags: [BrainTagCount] = [], groups: [BrainGroup] = [], nextCursor: Int? = nil) {
@@ -350,7 +366,7 @@ struct BrainList: Codable, Hashable, Sendable {
         items = c.lossy(BrainItem.self, .items)
         tags = c.lossy(BrainTagCount.self, .tags)
         groups = c.lossy(BrainGroup.self, .groups)
-        nextCursor = c.optional(Int.self, .nextCursor)
+        nextCursor = c.optional(Int.self, .nextCursor) ?? brainSnakeInt(decoder, "next_cursor")
     }
 }
 
