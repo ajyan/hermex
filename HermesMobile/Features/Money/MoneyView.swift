@@ -271,17 +271,16 @@ struct MoneyView: View {
             Spacer(minLength: 4)
             MoneySparkline(values: account.spark, color: color)
             VStack(alignment: .trailing, spacing: 3) {
-                Text(verbatim: MoneyFormat.amount(account.balance, hidden: viewModel.isHidden))
+                Text(verbatim: MoneyFormat.balance(account, hidden: viewModel.isHidden))
                     .font(AppFont.subheadline())
                     .foregroundStyle(Color.hxTextPrimary)
-                Text(verbatim: account.change1w == 0 ? "—"
-                     : viewModel.isHidden ? MoneyFormat.percent(account.percentChange1w)
-                     : MoneyFormat.signed(account.change1w, hidden: false))
+                Text(verbatim: MoneyFormat.weekChange(account, hidden: viewModel.isHidden))
                     .font(AppFont.caption(weight: .semibold))
                     .foregroundStyle(account.change1w == 0 ? Color.hxTextSecondary : Color.white)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(account.change1w == 0 ? Color.clear : color, in: RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous))
+                    .accessibilityLabel(Text(verbatim: MoneyFormat.weekChangeLabel(account, hidden: viewModel.isHidden)))
             }
             .monospacedDigit()
             .frame(minWidth: 84, alignment: .trailing)

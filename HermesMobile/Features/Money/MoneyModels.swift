@@ -105,6 +105,9 @@ struct MoneyAccount: Decodable, Equatable, Identifiable {
         return before == 0 ? 0 : change1w / abs(before) * 100
     }
 
+    /// A card or loan: shown as what's owed, its change as the debt's direction.
+    var isDebt: Bool { kind == "credit" || kind == "loan" }
+
     /// "Investment · S&P 500", "Credit".
     var subtitle: String {
         [kind.prefix(1).uppercased() + kind.dropFirst(), tracks].compactMap { $0 }.joined(separator: " · ")
@@ -276,6 +279,29 @@ enum MoneyFormat {
 
     static func percent(_ value: Double) -> String {
         (value < 0 ? "−" : "+") + String(format: "%.2f%%", abs(value))
+    }
+
+    /// "$184,320", or "$2,180 owed" for a card or loan.
+    static func balance(_ account: MoneyAccount, hidden: Bool) -> String {
+        account.isDebt ? amount(abs(account.balance), hidden: hidden) + " owed" : amount(account.balance, hidden: hidden)
+    }
+
+    /// An account's week, for its pill: "+$560" or "−$60"; for a card or loan the debt's
+    /// direction, "↓ $20" (owe less) or "↑ $480" (owe more). Hidden amounts show percents.
+    static func weekChange(_ account: MoneyAccount, hidden: Bool) -> String {
+        let change = account.change1w
+        guard change != 0 else { return "—" }
+        guard account.isDebt else { return hidden ? percent(account.percentChange1w) : signed(change, hidden: false) }
+        let size = hidden ? String(format: "%.2f%%", abs(account.percentChange1w)) : amount(abs(change), hidden: false)
+        return (change > 0 ? "↓ " : "↑ ") + size
+    }
+
+    /// What VoiceOver reads for the pill: the arrows spelled out for a card or loan.
+    static func weekChangeLabel(_ account: MoneyAccount, hidden: Bool) -> String {
+        let change = account.change1w
+        guard account.isDebt, change != 0 else { return change == 0 ? "No change this week" : weekChange(account, hidden: hidden) + " this week" }
+        let size = hidden ? "" : " " + amount(abs(change), hidden: false)
+        return "Owe\(size) \(change > 0 ? "less" : "more") this week"
     }
 
     /// "+$1.8k" for thousands, "+$340" below.
