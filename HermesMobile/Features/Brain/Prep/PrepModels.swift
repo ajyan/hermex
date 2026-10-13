@@ -171,6 +171,8 @@ enum PrepDrill: String, Encodable, Hashable, Sendable {
     case spotBug = "spot_bug"
     case trace
     case primer
+    case fact
+    case judgment
     case unknown
 
     init(from decoder: Decoder) throws {
@@ -241,9 +243,18 @@ struct PrepItemExcerpt: Decodable, Identifiable, Hashable, Sendable {
     let code: [String]
     let fixes: [String]
     let input: String
+    /// Anthropic-track reps: the interview loop stage ("1", "2a", ... "5"), the fact
+    /// format ("choice" or "cloze") and who wrote the card ("ingest" or "coach").
+    let stage: String
+    let format: String
+    let origin: String
+
+    /// A card the nightly coach wrote for a gap; only these can be flagged.
+    var isCoachWritten: Bool { origin == "coach" }
 
     private enum CodingKeys: String, CodingKey {
         case id, title, summary, example, difficulty, hints, links, primer, options, code, fixes, input
+        case stage, format, origin
         case skillTitle = "skill_title"
         case referenceMD = "reference_md"
     }
@@ -264,6 +275,9 @@ struct PrepItemExcerpt: Decodable, Identifiable, Hashable, Sendable {
         code = c.strings(.code)
         fixes = c.strings(.fixes)
         input = c.string(.input)
+        stage = c.string(.stage)
+        format = c.string(.format)
+        origin = c.string(.origin)
     }
 }
 
@@ -422,14 +436,22 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
     let nextIndex: Int
     let streak: PrepStreak?
     let grade: PrepOpenGrade?
+    /// A judgment card's grade: the reference points hit and missed. Nil for other drills.
+    let judgment: PrepJudgmentGrade?
+    /// The gaps this answer's misses belong to, and whether a miss belongs to none yet.
+    let gapMatch: [PrepGapMatch]
+    let logged: Bool
+    /// A judgment card's reference point sentences by point id, sent once the answer is graded.
+    let pointTexts: [String: String]
 
     /// The grader couldn't score the answer; there is no grade to show.
     var isUngraded: Bool { verdict == "ungraded" }
 
     private enum CodingKeys: String, CodingKey {
-        case verdict, correct, feedback, credit, links, streak, grade
+        case verdict, correct, feedback, credit, links, streak, grade, logged, points
         case referenceMD = "reference_md"
         case nextIndex = "next_index"
+        case gapMatch = "gap_match"
     }
 
     init(from decoder: Decoder) throws {
@@ -442,7 +464,233 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
         links = c.object([String: String].self, .links, default: [:])
         nextIndex = c.int(.nextIndex)
         streak = c.optional(PrepStreak.self, .streak)
-        grade = c.optional(PrepOpenGrade.self, .grade)
+        let judgment = c.optional(PrepJudgmentGrade.self, .grade)
+        self.judgment = judgment?.hasPoints == true ? judgment : nil
+        grade = self.judgment == nil ? c.optional(PrepOpenGrade.self, .grade) : nil
+        gapMatch = c.lossy(PrepGapMatch.self, .gapMatch)
+        logged = c.bool(.logged)
+        pointTexts = Dictionary(c.lossy(PrepPointText.self, .points).map { ($0.id, $0.text) },
+                                uniquingKeysWith: { first, _ in first })
+    }
+}
+
+struct PrepPointHit: Decodable, Hashable, Sendable {
+    let pointID: String
+    let quote: String
+
+    private enum CodingKeys: String, CodingKey {
+        case quote
+        case pointID = "point_id"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        pointID = c.string(.pointID)
+        quote = c.string(.quote)
+    }
+}
+
+struct PrepPointMiss: Decodable, Hashable, Sendable {
+    let pointID: String
+    let why: String
+
+    private enum CodingKeys: String, CodingKey {
+        case why
+        case pointID = "point_id"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        pointID = c.string(.pointID)
+        why = c.string(.why)
+    }
+}
+
+/// A judgment card's grade (`grade` on its attempt result): which reference points the answer made.
+struct PrepJudgmentGrade: Decodable, Hashable, Sendable {
+    let pointsHit: [PrepPointHit]
+    let pointsMissed: [PrepPointMiss]
+    let strongAnswer: String
+
+    var hasPoints: Bool { !pointsHit.isEmpty || !pointsMissed.isEmpty }
+
+    private enum CodingKeys: String, CodingKey {
+        case pointsHit = "points_hit"
+        case pointsMissed = "points_missed"
+        case strongAnswer = "strong_answer"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        pointsHit = c.lossy(PrepPointHit.self, .pointsHit)
+        pointsMissed = c.lossy(PrepPointMiss.self, .pointsMissed)
+        strongAnswer = c.string(.strongAnswer)
+    }
+}
+
+struct PrepGapMatch: Decodable, Hashable, Sendable {
+    let id: String
+    let label: String
+    let misses: Int
+
+    init(id: String, label: String, misses: Int) {
+        self.id = id
+        self.label = label
+        self.misses = misses
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, label, misses }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.string(.id)
+        label = c.string(.label)
+        misses = c.int(.misses)
+    }
+}
+
+private struct PrepPointText: Decodable {
+    let id: String
+    let text: String
+
+    private enum CodingKeys: String, CodingKey { case id, text }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.string(.id)
+        text = c.string(.text)
+        guard !id.isEmpty, !text.isEmpty else { throw PrepMissingID() }
+    }
+}
+
+struct PrepFlagRequest: Encodable, Hashable, Sendable {
+    let item: String
+}
+
+// MARK: - Gaps
+
+enum PrepGapStatus: String, Decodable, Hashable, Sendable {
+    case open
+    case improving
+    case closed
+    case unknown
+
+    init(from decoder: Decoder) throws {
+        let raw = try? decoder.singleValueContainer().decode(String.self)
+        self = raw.flatMap(PrepGapStatus.init(rawValue:)) ?? .unknown
+    }
+}
+
+private struct PrepMissingID: Error {}
+
+/// One row of `GET /api/tutor/gaps`: a recurring blind spot the coach named, with its status
+/// derived from attempts. A gap with no id fails to decode and is dropped from the list.
+struct PrepGapSummary: Decodable, Identifiable, Hashable, Sendable {
+    let id: String
+    let label: String
+    let stage: String
+    let status: PrepGapStatus
+    let misses: Int
+    let hitsTowardClose: Int
+    let lastSeen: String
+
+    private enum CodingKeys: String, CodingKey {
+        case id, label, stage, status, misses
+        case hitsTowardClose = "hits_toward_close"
+        case lastSeen = "last_seen"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.string(.id)
+        guard !id.isEmpty else { throw PrepMissingID() }
+        label = c.string(.label)
+        stage = c.string(.stage)
+        status = c.optional(PrepGapStatus.self, .status) ?? .unknown
+        misses = c.int(.misses)
+        hitsTowardClose = c.int(.hitsTowardClose)
+        lastSeen = c.string(.lastSeen)
+    }
+}
+
+struct PrepGaps: Decodable, Hashable, Sendable {
+    let gaps: [PrepGapSummary]
+
+    private enum CodingKeys: String, CodingKey { case gaps }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        gaps = c.lossy(PrepGapSummary.self, .gaps)
+    }
+}
+
+struct PrepGapEvidence: Decodable, Hashable, Sendable {
+    let date: String
+    let item: String
+    let itemTitle: String
+    let quote: String
+
+    private enum CodingKeys: String, CodingKey {
+        case date, item, quote
+        case itemTitle = "item_title"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        date = c.string(.date)
+        item = c.string(.item)
+        itemTitle = c.string(.itemTitle)
+        quote = c.string(.quote)
+    }
+}
+
+struct PrepGapCard: Decodable, Identifiable, Hashable, Sendable {
+    let id: String
+    let title: String
+    let origin: String
+    let due: String?
+
+    var isCoachWritten: Bool { origin == "coach" }
+
+    private enum CodingKeys: String, CodingKey { case id, title, origin, due }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.string(.id)
+        title = c.string(.title)
+        origin = c.string(.origin)
+        due = c.optional(String.self, .due)
+    }
+}
+
+/// `GET /api/tutor/gap?id=`: one gap with the answers that showed it and the cards that target it.
+struct PrepGapDetail: Decodable, Hashable, Sendable {
+    let id: String
+    let label: String
+    let stage: String
+    let status: PrepGapStatus
+    let summary: String
+    let misses: Int
+    let hitsTowardClose: Int
+    let evidence: [PrepGapEvidence]
+    let cards: [PrepGapCard]
+
+    private enum CodingKeys: String, CodingKey {
+        case id, label, stage, status, summary, misses, evidence, cards
+        case hitsTowardClose = "hits_toward_close"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.string(.id)
+        label = c.string(.label)
+        stage = c.string(.stage)
+        status = c.optional(PrepGapStatus.self, .status) ?? .unknown
+        summary = c.string(.summary)
+        misses = c.int(.misses)
+        hitsTowardClose = c.int(.hitsTowardClose)
+        evidence = c.lossy(PrepGapEvidence.self, .evidence)
+        cards = c.lossy(PrepGapCard.self, .cards)
     }
 }
 

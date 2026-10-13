@@ -682,6 +682,9 @@ struct ChatShellView: View {
                 .adaptiveSecondaryNavigationTitle()
         case .prep(.run):
             PrepRunView(server: server, onAPIError: authManager.handleAPIError)
+        case .prep(.gap(let id)):
+            PrepGapView(id: id, server: server, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
         }
     }
 

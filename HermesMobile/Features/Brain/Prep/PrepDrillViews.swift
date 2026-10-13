@@ -26,7 +26,13 @@ struct PrepProblemCard: View {
     init(rep: PrepRep, maxHeight: CGFloat = .infinity) {
         self.maxHeight = maxHeight
         let item = rep.item
-        if rep.drill == .primer {
+        if rep.drill == .fact || rep.drill == .judgment {
+            meta = [PrepCopy.stageChip(item.stage) ?? "", item.skillTitle ?? item.title]
+                .filter { !$0.isEmpty }.joined(separator: " · ")
+            title = item.summary
+            summary = ""
+            example = ""
+        } else if rep.drill == .primer {
             meta = "Primer"
             title = item.skillTitle.flatMap { $0.isEmpty ? nil : $0 } ?? item.title
             summary = "Worked example: \(item.title)"
@@ -215,11 +221,13 @@ struct PrepApproachView: View {
     let showHint: () -> Void
     /// When the rep appeared, from the view model, so the clock matches the timed answer.
     let shownAt: Date
+    /// The section title: "Your approach" on DSA reps, "Your answer" on judgment cards.
+    var prompt = "Your approach"
     @ScaledMetric(relativeTo: .body) private var editorHeight: CGFloat = 180
 
     var body: some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
-            BrainSectionHeader(title: "Your approach")
+            BrainSectionHeader(title: prompt)
             TextEditor(text: $text)
                 .font(AppFont.body())
                 .foregroundStyle(Color.hxTextPrimary)
@@ -240,7 +248,7 @@ struct PrepApproachView: View {
                 }
                 .brainCardSurface()
                 .disabled(isSubmitting)
-                .accessibilityLabel(Text(verbatim: "Your approach"))
+                .accessibilityLabel(Text(verbatim: prompt))
                 .accessibilityHint(Text(verbatim: "How would you solve this?"))
             if PrepCopy.isAtApproachLimit(text) {
                 Text(verbatim: "\(PrepCopy.approachMaxLength) characters max")
@@ -478,6 +486,8 @@ struct PrepResultView: View {
     let chosenID: String?
     /// The line tapped on a spot-the-bug rep, 0-based.
     var chosenLine: Int?
+    /// The text typed on a cloze fact, shown beside the answer.
+    var typedAnswer = ""
 
     var body: some View {
         switch rep.drill {
@@ -500,6 +510,32 @@ struct PrepResultView: View {
             }
         case .spotBug:
             spotBugReveal
+        case .fact:
+            if rep.item.format == "cloze" {
+                PrepNoteCard {
+                    PrepLeadText(lead: result.verdict == "pass" ? "Right." : "Not quite.",
+                                 rest: "You wrote \u{201C}\(typedAnswer.trimmingCharacters(in: .whitespacesAndNewlines))\u{201D}. "
+                                     + "The answer is \(correctChoice ?? "").")
+                }
+            } else {
+                PrepChoiceView(title: "Your answer", options: rep.item.options,
+                               grading: .init(chosenID: chosenID, correctID: correctChoice)) { _ in }
+            }
+        case .judgment:
+            if result.isUngraded {
+                PrepNoteCard {
+                    Text(verbatim: "Saved — Atlas will grade this tonight.")
+                        .font(BrainStyle.rowTitle)
+                        .foregroundStyle(Color.hxTextPrimary)
+                }
+            } else {
+                if let callout = PrepCopy.gapCallout(match: result.gapMatch, logged: result.logged) {
+                    PrepGapCallout(text: callout, isKnownGap: !result.gapMatch.isEmpty)
+                }
+                if let grade = result.judgment {
+                    PrepJudgmentGradeView(grade: grade, pointTexts: result.pointTexts)
+                }
+            }
         case .primer, .unknown:
             EmptyView()
         }
@@ -613,6 +649,158 @@ struct PrepApproachGradeView: View {
                 Text(verbatim: grade.strongAnswer)
                     .brainText(.rowTitle)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+/// A judgment card's grade: the points made, quoted in the serif; the points missed and why;
+/// then what a strong answer says.
+struct PrepJudgmentGradeView: View {
+    let grade: PrepJudgmentGrade
+    /// Each reference point's sentence by id; a point without one shows its id as a title.
+    var pointTexts: [String: String] = [:]
+
+    private func point(_ id: String) -> String { pointTexts[id] ?? PrepCopy.pointTitle(id) }
+
+    var body: some View {
+        if !grade.pointsHit.isEmpty {
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                BrainSectionHeader(title: "What landed")
+                SectionCard {
+                    VStack(spacing: 0) {
+                        ForEach(Array(grade.pointsHit.enumerated()), id: \.offset) { offset, hit in
+                            if offset > 0 { PrepRowDivider() }
+                            Label {
+                                VStack(alignment: .leading, spacing: BrainStyle.xs) {
+                                    Text(verbatim: point(hit.pointID)).brainText(.meta)
+                                    if !hit.quote.isEmpty {
+                                        Text(verbatim: hit.quote)
+                                            .brainText(.quote)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                }
+                            } icon: {
+                                Image(systemName: "checkmark").foregroundStyle(Color.hxSuccess)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, BrainStyle.s)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(Text(verbatim: "Hit: \(point(hit.pointID)). \(hit.quote)"))
+                        }
+                    }
+                }
+            }
+        }
+        if !grade.pointsMissed.isEmpty {
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                BrainSectionHeader(title: "What was missing")
+                SectionCard {
+                    VStack(spacing: 0) {
+                        ForEach(Array(grade.pointsMissed.enumerated()), id: \.offset) { offset, miss in
+                            if offset > 0 { PrepRowDivider() }
+                            BrainRow(title: point(miss.pointID),
+                                     subtitle: miss.why.isEmpty ? nil : miss.why, subtitleLineLimit: 8)
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel(Text(verbatim: "Missed: \(point(miss.pointID)). \(miss.why)"))
+                        }
+                    }
+                }
+            }
+        }
+        if !grade.strongAnswer.isEmpty {
+            PrepNoteCard {
+                HXSectionHeader(title: "What a strong answer says")
+                Text(verbatim: grade.strongAnswer)
+                    .brainText(.rowTitle)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+/// The line under a graded judgment naming the gap its miss belongs to, or that it was logged.
+struct PrepGapCallout: View {
+    let text: String
+    /// A miss on a gap already in the ledger, rather than one logged for the coach.
+    let isKnownGap: Bool
+
+    var body: some View {
+        Label {
+            Text(verbatim: text)
+                .font(BrainStyle.rowTitle)
+                .foregroundStyle(isKnownGap ? HermexPaper.request.glow : Color.hxTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: isKnownGap ? "arrow.triangle.branch" : "tray.and.arrow.down")
+                .foregroundStyle(isKnownGap ? HermexPaper.request.glow : Color.hxTextSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, BrainStyle.cardHorizontalPadding)
+        .padding(.vertical, BrainStyle.cardVerticalPadding)
+        .glowSurface(HermexPaper.request, cornerRadius: HXRadius.md)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// A cloze fact: one short typed answer, submitted from the keyboard or the pinned button.
+struct PrepClozeView: View {
+    @Binding var text: String
+    let isSubmitting: Bool
+    let onSubmit: () -> Void
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BrainStyle.s) {
+            BrainSectionHeader(title: "Your answer")
+            TextField(text: $text) { Text(verbatim: "Type the term") }
+                .font(AppFont.body())
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.done)
+                .focused($focused)
+                .onSubmit(onSubmit)
+                .disabled(isSubmitting)
+                .padding(.horizontal, BrainStyle.m)
+                .frame(minHeight: BrainStyle.minTapTarget)
+                .brainCardSurface()
+                .accessibilityLabel(Text(verbatim: "Your answer"))
+        }
+        .onAppear { focused = true }
+    }
+}
+
+/// Retires a coach-written card after a confirmation; the coach writes a replacement for its gap.
+struct PrepFlagCardButton: View {
+    let isFlagged: Bool
+    let error: String?
+    let flag: () -> Void
+    @State private var confirming = false
+
+    var body: some View {
+        VStack(spacing: BrainStyle.xs) {
+            Button {
+                confirming = true
+            } label: {
+                Label {
+                    Text(verbatim: isFlagged ? "Card flagged" : "Flag this card")
+                } icon: {
+                    Image(systemName: isFlagged ? "flag.fill" : "flag")
+                }
+                .font(BrainStyle.rowTitle)
+                .foregroundStyle(Color.hxTextSecondary)
+                .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(isFlagged)
+            .confirmationDialog(Text(verbatim: "Flag this card?"), isPresented: $confirming, titleVisibility: .visible) {
+                Button(role: .destructive, action: flag) { Text(verbatim: "Flag and retire") }
+            } message: {
+                Text(verbatim: "Atlas wrote this card. Flagging retires it for good, and Atlas writes another for the same gap tonight.")
+            }
+            if let error {
+                PrepSubmitError(message: error)
             }
         }
     }
