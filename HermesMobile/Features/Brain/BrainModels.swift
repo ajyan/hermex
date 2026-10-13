@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-// Models for the Brain module API (`/api/brain/{modules,list,page,search,graph}`).
+// Models for the Brain module API (`/api/brain/{modules,list,page,search,home}`).
 // Every model is `Codable` so the module screens can cache them as JSON, and every
 // field decodes tolerantly: missing or mistyped values fall back to a default and
 // elements from an unknown module are dropped at the array level.
@@ -10,6 +10,23 @@ import SwiftUI
 /// content skip such elements via `BrainLossy`.
 enum BrainModuleID: String, CaseIterable, Codable, Hashable, Sendable {
     case people, wiki, articles, journal, highlights
+}
+
+/// A snake_case field read as written. `APIClient` decodes with `.convertFromSnakeCase`, so
+/// models key these in camelCase; this covers a plain decoder (tests) reading the server's
+/// raw JSON. The cache round-trips the camelCase key.
+private func brainSnakeInt(_ decoder: Decoder, _ key: String) -> Int? {
+    guard let key = BrainRawKey(stringValue: key),
+          let raw = try? decoder.container(keyedBy: BrainRawKey.self)
+    else { return nil }
+    return try? raw.decodeIfPresent(Int.self, forKey: key)
+}
+
+private struct BrainRawKey: CodingKey {
+    let stringValue: String
+    var intValue: Int? { nil }
+    init?(stringValue: String) { self.stringValue = stringValue }
+    init?(intValue: Int) { nil }
 }
 
 /// Decodes an element or yields nil, so one bad element never fails its array.
@@ -121,9 +138,11 @@ struct BrainItem: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
-/// One reference to a Brain item: a link, backlink, further-reading entry, search
-/// hit, or prev/next neighbor. Links arrive with `label` instead of `title`.
+/// One reference to a Brain item: a link, backlink, unlinked mention, further-reading
+/// entry, search hit, or prev/next neighbor. Links arrive with `label` instead of `title`.
 /// `tags` is the target item's tags, so a ref's cover takes the same hue as the page.
+/// `snippet` is a link's target preview, or the text around a mention; `mention` is the
+/// words in `snippet` that name the page, for highlighting.
 struct BrainRef: Codable, Hashable, Sendable {
     let module: BrainModuleID
     let id: String
@@ -131,18 +150,20 @@ struct BrainRef: Codable, Hashable, Sendable {
     let snippet: String
     let reason: String
     let tags: [String]
+    let mention: String
 
-    private enum CodingKeys: String, CodingKey { case module, id, title, snippet, reason, tags }
+    private enum CodingKeys: String, CodingKey { case module, id, title, snippet, reason, tags, mention }
     private enum LabelKey: String, CodingKey { case label }
 
     init(module: BrainModuleID, id: String, title: String = "", snippet: String = "", reason: String = "",
-         tags: [String] = []) {
+         tags: [String] = [], mention: String = "") {
         self.module = module
         self.id = id
         self.title = title
         self.snippet = snippet
         self.reason = reason
         self.tags = tags
+        self.mention = mention
     }
 
     init(from decoder: Decoder) throws {
@@ -158,6 +179,37 @@ struct BrainRef: Codable, Hashable, Sendable {
         snippet = c.string(.snippet)
         reason = c.string(.reason)
         tags = c.strings(.tags)
+        mention = c.string(.mention)
+    }
+}
+
+/// Where a page sits in its hub: the hub, the page's place among the hub's pages, and its
+/// neighbours there. `index` is nil when the page isn't one of the hub's pages (a hub set
+/// by front matter it doesn't link with), and then `prev` and `next` are nil too.
+struct BrainHubContext: Codable, Hashable, Sendable {
+    let ref: BrainRef
+    let index: Int?
+    let count: Int
+    let prev: BrainRef?
+    let next: BrainRef?
+
+    private enum CodingKeys: String, CodingKey { case ref, index, count, prev, next }
+
+    init(ref: BrainRef, index: Int? = nil, count: Int = 0, prev: BrainRef? = nil, next: BrainRef? = nil) {
+        self.ref = ref
+        self.index = index
+        self.count = count
+        self.prev = prev
+        self.next = next
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        ref = try c.decode(BrainRef.self, forKey: .ref)
+        index = c.optional(Int.self, .index)
+        count = c.int(.count)
+        prev = c.optional(BrainRef.self, .prev)
+        next = c.optional(BrainRef.self, .next)
     }
 }
 
@@ -209,14 +261,20 @@ struct BrainPage: Codable, Hashable, Sendable {
     let highlights: [BrainHighlight]
     /// Person pages only: present frontmatter facts, in server order.
     let facts: [BrainFact]
+    /// Items that name this page without linking to it (the first few), and how many there are.
+    let unlinked: [BrainRef]
+    let unlinkedCount: Int
+    /// The page's place in its parent hub, for the trail and the pager.
+    let hub: BrainHubContext?
 
     private enum CodingKeys: String, CodingKey {
-        case item, content, links, backlinks, further, prev, next, highlights, facts
+        case item, content, links, backlinks, further, prev, next, highlights, facts, unlinked, hub, unlinkedCount
     }
 
     init(item: BrainItem, content: String = "", links: [BrainRef] = [], backlinks: [BrainRef] = [],
          further: [BrainRef] = [], prev: BrainRef? = nil, next: BrainRef? = nil,
-         highlights: [BrainHighlight] = [], facts: [BrainFact] = []) {
+         highlights: [BrainHighlight] = [], facts: [BrainFact] = [], unlinked: [BrainRef] = [],
+         unlinkedCount: Int? = nil, hub: BrainHubContext? = nil) {
         self.item = item
         self.content = content
         self.links = links
@@ -226,6 +284,9 @@ struct BrainPage: Codable, Hashable, Sendable {
         self.next = next
         self.highlights = highlights
         self.facts = facts
+        self.unlinked = unlinked
+        self.unlinkedCount = unlinkedCount ?? unlinked.count
+        self.hub = hub
     }
 
     init(from decoder: Decoder) throws {
@@ -239,6 +300,10 @@ struct BrainPage: Codable, Hashable, Sendable {
         next = c.optional(BrainRef.self, .next)
         highlights = c.lossy(BrainHighlight.self, .highlights)
         facts = c.lossy(BrainFact.self, .facts)
+        unlinked = c.lossy(BrainRef.self, .unlinked)
+        unlinkedCount = max(c.optional(Int.self, .unlinkedCount) ?? brainSnakeInt(decoder, "unlinked_count") ?? 0,
+                            unlinked.count)
+        hub = c.optional(BrainHubContext.self, .hub)
     }
 }
 
@@ -286,8 +351,7 @@ struct BrainList: Codable, Hashable, Sendable {
     let nextCursor: Int?
 
     private enum CodingKeys: String, CodingKey {
-        case items, tags, groups
-        case nextCursor = "next_cursor"
+        case items, tags, groups, nextCursor
     }
 
     init(items: [BrainItem] = [], tags: [BrainTagCount] = [], groups: [BrainGroup] = [], nextCursor: Int? = nil) {
@@ -302,7 +366,7 @@ struct BrainList: Codable, Hashable, Sendable {
         items = c.lossy(BrainItem.self, .items)
         tags = c.lossy(BrainTagCount.self, .tags)
         groups = c.lossy(BrainGroup.self, .groups)
-        nextCursor = c.optional(Int.self, .nextCursor)
+        nextCursor = c.optional(Int.self, .nextCursor) ?? brainSnakeInt(decoder, "next_cursor")
     }
 }
 
@@ -340,67 +404,50 @@ struct BrainSearchResult: Codable, Hashable, Sendable {
     }
 }
 
-struct BrainGraphNode: Codable, Hashable, Sendable {
-    let module: BrainModuleID
-    let id: String
-    let title: String
-    let weight: Int
-    let tags: [String]
+/// One hub on the Brain home: the hub page, how many pages meet there, and a few of their titles.
+struct BrainHub: Codable, Hashable, Sendable {
+    let ref: BrainRef
+    let count: Int
+    let inside: [String]
 
-    private enum CodingKeys: String, CodingKey { case module, id, title, weight, tags }
+    private enum CodingKeys: String, CodingKey { case ref, count, inside }
 
-    init(module: BrainModuleID, id: String, title: String = "", weight: Int = 0, tags: [String] = []) {
-        self.module = module
-        self.id = id
-        self.title = title
-        self.weight = weight
-        self.tags = tags
+    init(ref: BrainRef, count: Int = 0, inside: [String] = []) {
+        self.ref = ref
+        self.count = count
+        self.inside = inside
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        module = try c.decode(BrainModuleID.self, forKey: .module)
-        id = c.string(.id)
-        title = c.string(.title)
-        weight = c.int(.weight)
-        tags = c.strings(.tags)
+        ref = try c.decode(BrainRef.self, forKey: .ref)
+        count = c.int(.count)
+        inside = c.strings(.inside)
     }
 }
 
-struct BrainGraphEdge: Codable, Hashable, Sendable {
-    let a: String
-    let b: String
+/// `GET /api/brain/home`: the hubs, recently changed wiki pages, and today's rediscover picks.
+struct BrainHome: Codable, Hashable, Sendable {
+    let hubs: [BrainHub]
+    let recent: [BrainItem]
+    let rediscover: [BrainItem]
 
-    private enum CodingKeys: String, CodingKey { case a, b }
+    private enum CodingKeys: String, CodingKey { case hubs, recent, rediscover }
 
-    init(a: String, b: String) {
-        self.a = a
-        self.b = b
+    init(hubs: [BrainHub] = [], recent: [BrainItem] = [], rediscover: [BrainItem] = []) {
+        self.hubs = hubs
+        self.recent = recent
+        self.rediscover = rediscover
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        a = c.string(.a)
-        b = c.string(.b)
-    }
-}
-
-struct BrainGraph: Codable, Hashable, Sendable {
-    let nodes: [BrainGraphNode]
-    let edges: [BrainGraphEdge]
-
-    private enum CodingKeys: String, CodingKey { case nodes, edges }
-
-    init(nodes: [BrainGraphNode] = [], edges: [BrainGraphEdge] = []) {
-        self.nodes = nodes
-        self.edges = edges
+        hubs = c.lossy(BrainHub.self, .hubs)
+        recent = c.lossy(BrainItem.self, .recent)
+        rediscover = c.lossy(BrainItem.self, .rediscover)
     }
 
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        nodes = c.lossy(BrainGraphNode.self, .nodes)
-        edges = c.lossy(BrainGraphEdge.self, .edges)
-    }
+    var isEmpty: Bool { hubs.isEmpty && recent.isEmpty && rediscover.isEmpty }
 }
 
 /// In-app links inside Brain Markdown: `brain://<module>/<percent-encoded id>`.

@@ -59,6 +59,7 @@ Named in `Config/HermexStyle.swift`; `HermexPaper.forTool(_:)` maps tool kinds.
 |---|---|---|
 | Approval, clarification, anything waiting on the user | `.request` | `opener` |
 | Brain or wiki page (`brain://` citation) | `.knowledge` | `wiki` |
+| Inside the Brain, a page of each kind: wiki, person, journal day, article, highlight | `BrainModuleID.paper` | `wiki`, `advisor`, `past`, `reading`, `book` (each source's Brief card paper) |
 | File read, written, listed, or searched (grep, find); file attachments | `.file` | `notes` |
 | Web search or fetch | `.web` | `video` |
 | Memory or skill | `.recall` | `advisor` |
@@ -74,6 +75,8 @@ Add a new kind of object here and in the code together. A failed tool step keeps
 - **Live run.** While Atlas works, each call is a `ToolCallChip`: its target (cut at 24 characters), an ellipsis while running, a red `xmark` after failing. The newest four show; older calls sit behind `+N`.
 - **Finished run.** One chip per kind of tool with its count, in the order each kind first ran ("3 commands", "2 searches"), plus a red `xmark` on a kind with failures. Tapping the row opens the full log; "Expand Tools by Default" starts it open. The row is at least 44 pt tall.
 - **Tool log rows.** Each row's icon sits on a 20 pt tile in its kind's wash and glow, so the log matches the chip that opened it.
+- **Brain connections** (`BrainConnectionsView.swift`). A page with links shows them as a sideways row of linked-page cards (`wash` glow in each kind's paper, `md` corners) under the title instead of a cover. Its parent hub is a Nous-blue trail above the title. Linked and unlinked mentions are rows on a neutral card: a kind dot, the source title, and the words around the mention with the mention marked in the page's wash and glow. A page in a hub gets a glass pager capsule at the foot (previous, the hub and "4 of 14", next); a sideways swipe on the body does the same, and the next page slides in only once it has loaded.
+- **Rediscover** (`BrainRediscoverCard`): the Brain home's one glow card, a page brought back from a while ago, with Open (primary) and Another (secondary).
 - **Brain citations** (`BrainCitationChips`). Each Brain page a reply links (up to three) gets a knowledge chip under the reply, opening through the same router as the inline link. Hit areas extend 7 pt past the chip.
 - **Request cards.** Approvals and clarifications use `.glowSurface(.request, cornerRadius:, opaque: true)`: the wash over `hxSurface` (opaque because they float over transcript text), the edge, and the paper in `\.hxPaper`. Their title and symbol take the glow. Primary decision buttons fill with `glow` and `onGlow` text; secondary ones use the wash and edge.
 - **File attachments.** A tile on `.glowSurface(.file, …)`: glow icon and extension, neutral file name.

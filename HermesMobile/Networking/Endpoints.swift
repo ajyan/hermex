@@ -153,12 +153,13 @@ enum Endpoint {
     case upload
     case transcribe
     case tts
-    /// The Brain module library (`api/brain.py`): module counts, item lists, one page, search, and the link graph.
+    /// The Brain module library (`api/brain_catalog.py`): module counts, item lists, one page (optionally
+    /// placed in a given hub), search, and the home's hubs, recent and rediscover picks.
     case brainModules
     case brainList(module: String, tag: String?, cursor: Int?)
-    case brainPage(module: String, id: String)
+    case brainPage(module: String, id: String, hub: String?)
     case brainSearch(query: String, module: String?)
-    case brainGraph(module: String, id: String)
+    case brainHome
     /// The Prep interview tutor (`api/tutor.py`): today's run, home, a track map, one item, answer submission,
     /// the gap ledger (all gaps and one gap) and flagging a coach-written card.
     case tutorHome
@@ -450,8 +451,8 @@ enum Endpoint {
             return "/api/brain/page"
         case .brainSearch:
             return "/api/brain/search"
-        case .brainGraph:
-            return "/api/brain/graph"
+        case .brainHome:
+            return "/api/brain/home"
         case .tutorHome:
             return "/api/tutor/home"
         case .tutorToday:
@@ -682,8 +683,10 @@ enum Endpoint {
             if let tag { items.append(URLQueryItem(name: "tag", value: tag)) }
             if let cursor { items.append(URLQueryItem(name: "cursor", value: String(cursor))) }
             return items
-        case let .brainPage(module, id), let .brainGraph(module, id):
-            return [URLQueryItem(name: "module", value: module), URLQueryItem(name: "id", value: id)]
+        case let .brainPage(module, id, hub):
+            var items = [URLQueryItem(name: "module", value: module), URLQueryItem(name: "id", value: id)]
+            if let hub { items.append(URLQueryItem(name: "hub", value: hub)) }
+            return items
         case let .brainSearch(query, module):
             var items = [URLQueryItem(name: "q", value: query)]
             if let module { items.append(URLQueryItem(name: "module", value: module)) }

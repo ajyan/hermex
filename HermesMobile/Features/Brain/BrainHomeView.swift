@@ -1,7 +1,8 @@
 import SwiftData
 import SwiftUI
 
-/// The Brain's front door: a search field over a directory of the five modules.
+/// The Brain's front door: a search field, then doors into the vault (a page brought back
+/// from a while ago, the hubs where pages meet, what changed recently), then the modules.
 /// Pushed onto the shell's navigation stack, so it must not own a `NavigationStack`;
 /// every Brain screen is pushed as `ShellPushDestination.brainRoute(_:)`.
 /// Copy is English-only (personal fork).
@@ -105,11 +106,30 @@ struct BrainHomeView: View {
         return false
     }
 
-    /// The modules as one neutral card (DESIGN.md § Components), the same container every
-    /// screen's grouped rows sit in.
+    /// Rediscover, Hubs and Recently changed (when the server sends them), then the modules
+    /// as one neutral card (DESIGN.md § Components).
     private var moduleList: some View {
         ScrollView {
-            VStack(spacing: BrainStyle.s) {
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                if let pick = viewModel.rediscoverPick {
+                    BrainRediscoverCard(
+                        item: pick,
+                        canShowAnother: viewModel.home.rediscover.count > 1,
+                        onAnother: viewModel.showAnotherPick
+                    )
+                    .padding(.bottom, BrainStyle.m)
+                }
+                if !viewModel.home.hubs.isEmpty {
+                    HXSectionHeader(title: "Hubs", trailing: "Where your pages meet")
+                    hubList.padding(.bottom, BrainStyle.m)
+                }
+                if !viewModel.home.recent.isEmpty {
+                    HXSectionHeader(title: "Recently changed")
+                    recentList.padding(.bottom, BrainStyle.m)
+                }
+                if !viewModel.home.isEmpty {
+                    HXSectionHeader(title: "Library")
+                }
                 VStack(spacing: 0) {
                     ForEach(Array(viewModel.modules.enumerated()), id: \.element.id) { index, module in
                         if index > 0 { moduleDivider }
@@ -169,6 +189,92 @@ struct BrainHomeView: View {
 private extension BrainHomeView {
     var moduleDivider: some View {
         Rectangle().fill(Color.hxSeparator).frame(height: 0.5).padding(.leading, 60)
+    }
+
+    var hubList: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(viewModel.home.hubs.enumerated()), id: \.element.ref.id) { index, hub in
+                if index > 0 { moduleDivider }
+                NavigationLink(value: ShellPushDestination.brainRoute(.page(hub.ref.module, hub.ref.id))) {
+                    BrainRow(
+                        leading: { BrainModuleIcon(systemName: "point.3.connected.trianglepath.dotted", paper: .knowledge) },
+                        title: hub.ref.title,
+                        subtitle: hub.inside.joined(separator: ", "),
+                        trailing: "\(hub.count)",
+                        subtitleLineLimit: 1
+                    )
+                    .moduleRowPadding()
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .hxCard()
+    }
+
+    var recentList: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(viewModel.home.recent.enumerated()), id: \.element.id) { index, item in
+                if index > 0 { moduleDivider }
+                NavigationLink(value: ShellPushDestination.brainRoute(.page(item.module, item.id))) {
+                    BrainRow(
+                        leading: { BrainModuleIcon(module: item.module) },
+                        title: item.title,
+                        subtitle: BrainStyle.displayDate(item.date),
+                        subtitleLineLimit: 1
+                    )
+                    .moduleRowPadding()
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .hxCard()
+    }
+}
+
+/// A page brought back from a while ago: the screen's one glow card, in the page's paper,
+/// with Open and Another (today's other picks).
+struct BrainRediscoverCard: View {
+    let item: BrainItem
+    let canShowAnother: Bool
+    let onAnother: () -> Void
+
+    var body: some View {
+        let paper = item.module.paper
+        let shape = RoundedRectangle(cornerRadius: HXRadius.xl, style: .continuous)
+        VStack(alignment: .leading, spacing: BrainStyle.s) {
+            Text(verbatim: item.date.isEmpty ? "Rediscover" : "Rediscover · last touched \(BrainStyle.displayDate(item.date))")
+                .font(AppFont.caption(weight: .semibold))
+                .foregroundStyle(paper.glow)
+            Text(verbatim: item.title)
+                .font(AppFont.display(style: .title3, weight: .semibold))
+                .foregroundStyle(paper.glow)
+                .accessibilityAddTraits(.isHeader)
+            if !item.preview.isEmpty {
+                Text(verbatim: item.preview)
+                    .font(BrainStyle.rowSubtitle)
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .lineLimit(3)
+            }
+            HStack(spacing: BrainStyle.s) {
+                NavigationLink(value: ShellPushDestination.brainRoute(.page(item.module, item.id))) {
+                    Text(verbatim: "Open")
+                }
+                .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
+                if canShowAnother {
+                    Button(action: onAnother) { Text(verbatim: "Another") }
+                        .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
+                        .accessibilityHint(Text(verbatim: "Shows another page from today's picks"))
+                }
+            }
+            .padding(.top, BrainStyle.xs)
+        }
+        .padding(BrainStyle.l)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(paper.card, in: shape)
+        .overlay(shape.strokeBorder(paper.edge, lineWidth: 0.5))
+        .hxShadow(.paper)
+        .environment(\.hxPaper, paper)
+        .tint(paper.glow)
     }
 }
 

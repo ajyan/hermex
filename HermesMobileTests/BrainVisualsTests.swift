@@ -73,96 +73,6 @@ final class BrainVisualsTests: XCTestCase {
         XCTAssertEqual(motifs, [.circles, .waves, .bars])
     }
 
-    func testGraphLayoutCentresAndIsStable() throws {
-        let size = CGSize(width: 340, height: 180)
-        let ids = ["wiki/c.md", "wiki/center.md", "wiki/a.md", "wiki/b.md", "wiki/d.md"]
-        let positions = BrainGraphLayout.positions(nodeIDs: ids, centerID: "wiki/center.md", size: size)
-
-        XCTAssertEqual(positions.count, ids.count)
-        XCTAssertEqual(positions["wiki/center.md"], CGPoint(x: 170, y: 90))
-        let bounds = CGRect(origin: .zero, size: size)
-        let rx = size.width * 0.20
-        let ry = size.height * 0.30
-        for id in ids where id != "wiki/center.md" {
-            let point = try XCTUnwrap(positions[id])
-            XCTAssertTrue(bounds.contains(point), "\(id) at \(point) is outside \(bounds)")
-            let dx = (point.x - 170) / rx
-            let dy = (point.y - 90) / ry
-            XCTAssertEqual(dx * dx + dy * dy, 1, accuracy: 0.0001, "\(id) is off the ellipse")
-        }
-
-        let again = BrainGraphLayout.positions(nodeIDs: ids.reversed(), centerID: "wiki/center.md", size: size)
-        XCTAssertEqual(positions, again)
-    }
-
-    func testGraphLayoutWithoutNeighbours() {
-        let positions = BrainGraphLayout.positions(nodeIDs: ["x"], centerID: "x", size: CGSize(width: 100, height: 50))
-        XCTAssertEqual(positions, ["x": CGPoint(x: 50, y: 25)])
-    }
-
-    func testVisibleNodesCapsOrdersDedupesAndExcludesCentre() {
-        let nodes = [
-            BrainGraphNode(module: .wiki, id: "center", title: "Centre", weight: 99),
-            BrainGraphNode(module: .wiki, id: "b", weight: 5),
-            BrainGraphNode(module: .wiki, id: "a", weight: 5),
-            BrainGraphNode(module: .wiki, id: "low", weight: 0),
-            BrainGraphNode(module: .wiki, id: "top", weight: 9),
-            BrainGraphNode(module: .journal, id: "a", weight: 1),
-            BrainGraphNode(module: .wiki, id: "c", weight: 3),
-            BrainGraphNode(module: .wiki, id: "d", weight: 2),
-            BrainGraphNode(module: .wiki, id: "e", weight: 2),
-            BrainGraphNode(module: .wiki, id: "f", weight: 1)
-        ]
-        let visible = BrainGraphLayout.visibleNodes(of: BrainGraph(nodes: nodes), centerID: "center")
-        XCTAssertEqual(BrainGraphLayout.maxNeighbours, 6)
-        XCTAssertEqual(visible.map(\.id), ["top", "a", "b", "c", "d", "e"])
-        XCTAssertEqual(visible.first { $0.id == "a" }?.module, .wiki, "keeps the first of a duplicate id")
-    }
-
-    func testGraphLabelFramesDoNotCollide() throws {
-        let centerIDs = ["wiki/virtues.md", "wiki/networking.md", "journal/2026-09-01.md", "a", "b", "c", "d", "e"]
-        let allNeighbours = (1...6).map { "wiki/a-very-long-title-that-would-never-fit-\($0).md" }
-        for count in 1...6 {
-            let neighbours = Array(allNeighbours.prefix(count))
-            for width in [375.0, 320.0] {
-                let size = CGSize(width: width, height: 180)
-                let inner = CGRect(origin: .zero, size: size).insetBy(dx: 4, dy: 4)
-                for centerID in centerIDs {
-                    for labelHeight in [16.0, 22.0] {
-                        let ids = [centerID] + neighbours
-                        let frames = BrainGraphLayout.labelFrames(
-                            nodeIDs: ids, centerID: centerID, size: size, labelHeight: labelHeight
-                        )
-                        XCTAssertEqual(Set(frames.keys), Set(neighbours))
-                        XCTAssertNil(frames[centerID])
-                        let dots = BrainGraphLayout.positions(nodeIDs: ids, centerID: centerID, size: size)
-                        let center = try XCTUnwrap(dots[centerID])
-                        let side = BrainGraphLayout.centerDot
-                        let centerDot = CGRect(x: center.x - side / 2, y: center.y - side / 2, width: side, height: side)
-                        let rects = neighbours.compactMap { frames[$0] }
-                        for (index, rect) in rects.enumerated() {
-                            let context = "\(count) neighbours, \(centerID) at \(width), label \(index): \(rect)"
-                            XCTAssertGreaterThanOrEqual(rect.height, 44, context)
-                            XCTAssertLessThanOrEqual(rect.width, width * 0.25 + 0.001, context)
-                            XCTAssertTrue(inner.contains(rect), "outside bounds: \(context)")
-                            XCTAssertFalse(rect.intersects(centerDot), "covers the centre: \(context)")
-                            for (dotID, dot) in dots {
-                                XCTAssertFalse(rect.contains(dot), "covers the dot of \(dotID): \(context)")
-                            }
-                            for other in rects[(index + 1)...] {
-                                XCTAssertFalse(rect.intersects(other), "overlaps \(other): \(context)")
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: Routing
-
-    /// Every Brain push rides the shell's typed path, so each route must hash to a
-    /// distinct destination (and equal routes must collapse).
     func testBrainRouteDestinationsAreDistinct() {
         let destinations: [ShellPushDestination] = [
             .brain,
@@ -304,25 +214,12 @@ final class BrainVisualsTests: XCTestCase {
         XCTAssertEqual(BrainReaderLayout.showAllTitle(refs.count), "Show all 7")
     }
 
-    func testReaderBacklinkSubtitleIsTheJournalSnippetOnly() {
-        let day = BrainRef(module: .journal, id: "j", title: "Oct 6", snippet: "met Ada")
-        let wiki = BrainRef(module: .wiki, id: "w", title: "W", snippet: "mentions")
-        XCTAssertEqual(BrainReaderLayout.backlinkSubtitle(day), "met Ada")
-        XCTAssertNil(BrainReaderLayout.backlinkSubtitle(wiki))
-    }
-
-    func testReaderSectionTitlesAndGraphThreshold() {
+    func testReaderSectionTitles() {
         XCTAssertEqual(BrainReaderLayout.linkedFromTitle(.people), "Mentioned in")
-        XCTAssertEqual(BrainReaderLayout.linkedFromTitle(.wiki), "Linked from")
-        let center = BrainGraphNode(module: .wiki, id: "a")
-        let other = BrainGraphNode(module: .wiki, id: "b")
-        XCTAssertFalse(BrainReaderLayout.showsGraph(nil, centerID: "a"))
-        XCTAssertFalse(BrainReaderLayout.showsGraph(BrainGraph(nodes: [center]), centerID: "a"))
-        XCTAssertFalse(BrainReaderLayout.showsGraph(BrainGraph(nodes: [center, center]), centerID: "a"))
-        XCTAssertTrue(BrainReaderLayout.showsGraph(BrainGraph(nodes: [center, other]), centerID: "a"))
+        XCTAssertEqual(BrainReaderLayout.linkedFromTitle(.wiki), "Linked mentions")
     }
 
-    func testReaderGraphRampMatchesTheCover() {
+    func testReaderCoverUsesTheFirstTag() {
         let item = BrainItem(module: .wiki, id: "wiki/virtues.md", tags: ["habits"])
         XCTAssertEqual(BrainReaderLayout.cover(for: item), BrainCoverSpec.make(id: item.id, tag: "habits"))
         XCTAssertEqual(BrainReaderLayout.cover(for: item).ramp, 2)
@@ -387,5 +284,72 @@ final class BrainVisualsTests: XCTestCase {
         XCTAssertEqual(BrainReaderLayout.linkAction(for: web), .system)
         let mail = try XCTUnwrap(URL(string: "mailto:a@example.com"))
         XCTAssertEqual(BrainReaderLayout.linkAction(for: mail), .system)
+    }
+}
+
+final class BrainConnectionsTests: XCTestCase {
+    private func ref(_ id: String, _ module: BrainModuleID = .wiki) -> BrainRef {
+        BrainRef(module: module, id: id, title: id.uppercased())
+    }
+
+    func testLinkCardsDropRepeatsAndThePageItself() {
+        let page = BrainPage(item: BrainItem(module: .wiki, id: "self"),
+                             links: [ref("a"), ref("self"), ref("b", .people), ref("a")])
+        XCTAssertEqual(BrainConnectionsLayout.linkCards(page).map(\.id), ["a", "b"])
+        XCTAssertFalse(BrainConnectionsLayout.showsCover(page))
+        XCTAssertTrue(BrainConnectionsLayout.showsCover(BrainPage(item: BrainItem(module: .wiki, id: "self"),
+                                                                 links: [ref("self")])))
+    }
+
+    func testPagerShowsOnlyForAPageInItsHubWithANeighbour() {
+        XCTAssertFalse(BrainConnectionsLayout.showsPager(nil))
+        XCTAssertFalse(BrainConnectionsLayout.showsPager(BrainHubContext(ref: ref("hub"), index: nil, count: 4, next: ref("b"))),
+                       "a hub from front matter the page isn't listed in shows the trail only")
+        XCTAssertFalse(BrainConnectionsLayout.showsPager(BrainHubContext(ref: ref("hub"), index: 0, count: 1)))
+        XCTAssertTrue(BrainConnectionsLayout.showsPager(BrainHubContext(ref: ref("hub"), index: 3, count: 4, prev: ref("c"))))
+    }
+
+    func testPositionReadsAsOneBased() {
+        XCTAssertEqual(BrainConnectionsLayout.position(BrainHubContext(ref: ref("hub"), index: 3, count: 14)), "4 of 14")
+        XCTAssertNil(BrainConnectionsLayout.position(BrainHubContext(ref: ref("hub"), index: nil, count: 14)))
+    }
+
+    func testSwipeNeedsALongMostlySidewaysDrag() {
+        XCTAssertEqual(BrainConnectionsLayout.swipeStep(CGSize(width: -100, height: 10)), 1, "swipe left is next")
+        XCTAssertEqual(BrainConnectionsLayout.swipeStep(CGSize(width: 100, height: -10)), -1, "swipe right is previous")
+        XCTAssertNil(BrainConnectionsLayout.swipeStep(CGSize(width: -60, height: 0)), "too short")
+        XCTAssertNil(BrainConnectionsLayout.swipeStep(CGSize(width: -100, height: 60)), "too diagonal: a scroll")
+    }
+
+    func testMentionRangeIsTheFirstCaseInsensitiveMatch() throws {
+        let snippet = "Both anthropic and Anthropic's labs"
+        let range = try XCTUnwrap(BrainConnectionsLayout.mentionRange(in: snippet, mention: "Anthropic"))
+        XCTAssertEqual(snippet[range], "anthropic")
+        XCTAssertNil(BrainConnectionsLayout.mentionRange(in: snippet, mention: "  "))
+        XCTAssertNil(BrainConnectionsLayout.mentionRange(in: snippet, mention: "OpenAI"))
+    }
+
+    func testHighlightedMarksOnlyTheMention() throws {
+        let text = BrainConnectionsLayout.highlighted("see Virtues here", mention: "virtues", paper: .wiki)
+        XCTAssertEqual(String(text.characters), "see Virtues here")
+        let marked = text.runs.filter { $0.inlinePresentationIntent == .stronglyEmphasized }
+        XCTAssertEqual(marked.count, 1)
+        XCTAssertEqual(String(text[try XCTUnwrap(marked.first).range].characters), "Virtues")
+        let plain = BrainConnectionsLayout.highlighted("no match", mention: "virtues", paper: .wiki)
+        XCTAssertTrue(plain.runs.allSatisfy { $0.inlinePresentationIntent == nil })
+    }
+
+    func testCappedFooterOnlyWhenSomeAreHidden() {
+        XCTAssertEqual(BrainConnectionsLayout.cappedFooter(shown: 8, total: 13), "Showing 8 of 13")
+        XCTAssertNil(BrainConnectionsLayout.cappedFooter(shown: 8, total: 8))
+    }
+
+    func testEachKindWearsItsBriefPaper() {
+        XCTAssertEqual(BrainModuleID.wiki.paper, .wiki)
+        XCTAssertEqual(BrainModuleID.people.paper, .advisor)
+        XCTAssertEqual(BrainModuleID.journal.paper, .past)
+        XCTAssertEqual(BrainModuleID.articles.paper, .reading)
+        XCTAssertEqual(BrainModuleID.highlights.paper, .book)
+        XCTAssertEqual(BrainModuleID.people.kindName, "Person")
     }
 }
