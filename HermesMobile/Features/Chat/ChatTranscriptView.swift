@@ -548,7 +548,7 @@ struct ChatTranscriptView: View {
     }
 
     private var hasLiveReasoningText: Bool {
-        !liveReasoningText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        liveReasoningText.contains(where: { !$0.isWhitespace })
     }
 
     private func hasDisplayedTranscriptMessage(anchorID: String?) -> Bool {
@@ -807,7 +807,7 @@ private struct ChatTranscriptMessageBlock: View, Equatable {
         hasActiveStream &&
             showsThinkingAndToolCards &&
             reasoningAnchorMessageID == transcriptMessage.anchorID &&
-            !liveReasoningText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            liveReasoningText.contains(where: { !$0.isWhitespace })
     }
 
     private var shouldRenderLiveToolActivityGroup: Bool {

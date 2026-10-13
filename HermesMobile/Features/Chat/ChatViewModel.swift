@@ -6710,7 +6710,7 @@ extension ChatViewModel {
     }
 
     nonisolated private static func hasTranscriptMessageRowContent(_ message: ChatMessage) -> Bool {
-        if message.content?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+        if message.content?.contains(where: { !$0.isWhitespace }) == true {
             return true
         }
 
