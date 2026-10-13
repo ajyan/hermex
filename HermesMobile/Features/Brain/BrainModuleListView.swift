@@ -98,6 +98,35 @@ enum BrainListLayout {
     }
 }
 
+/// Name lookup for the People list: each typed word must start some word of the name,
+/// ignoring case and accents. People whose first name matches come first; otherwise the
+/// list keeps its order.
+enum BrainPeopleSearch {
+    static func matches(_ people: [BrainItem], query: String) -> [BrainItem] {
+        let typed = words(query)
+        guard !typed.isEmpty else { return people }
+        var firstNameHits: [BrainItem] = []
+        var otherHits: [BrainItem] = []
+        for person in people {
+            let name = words(person.title)
+            guard typed.allSatisfy({ word in name.contains { $0.hasPrefix(word) } }) else { continue }
+            if name.first?.hasPrefix(typed[0]) == true {
+                firstNameHits.append(person)
+            } else {
+                otherHits.append(person)
+            }
+        }
+        return firstNameHits + otherHits
+    }
+
+    private static func words(_ text: String) -> [String] {
+        text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+            .lowercased()
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+            .map(String.init)
+    }
+}
+
 /// One module's browsable list (people, wiki, articles, journal), shaped per spec §2.
 /// Every module screen is one `List` in the shared Brain style; grids are chunked
 /// rows of cards. Pushed as `.brainRoute(.module(_:))`; owns no `NavigationStack`.
@@ -110,6 +139,10 @@ struct BrainModuleListView: View {
     @State private var didLoad = false
     /// The chip bar, frozen from the unfiltered list so filtering never reshuffles it.
     @State private var chipTags: [String] = []
+    /// People only: the name being looked up, and whether the field has taken focus once.
+    @State private var peopleQuery = ""
+    @State private var didFocusPeopleSearch = false
+    @FocusState private var isPeopleSearchFocused: Bool
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     init(
@@ -131,6 +164,17 @@ struct BrainModuleListView: View {
 
     var body: some View {
         content
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if module == .people { peopleSearchField }
+            }
+            .task {
+                // Keyboard up on first open only, not on the way back from a person. Focus set
+                // during the push is dropped, so it waits for the push to finish.
+                guard module == .people, !didFocusPeopleSearch else { return }
+                do { try await Task.sleep(for: .milliseconds(400)) } catch { return }
+                didFocusPeopleSearch = true
+                isPeopleSearchFocused = true
+            }
             .hxNavigationTitle(module.defaultTitle)
             .background(Color.hxCanvas.ignoresSafeArea())
             .task {
@@ -195,10 +239,10 @@ struct BrainModuleListView: View {
         // keep the switch exhaustive.
         case .articles, .highlights: articleSection(list)
         }
+        // A clear row, not a section footer: a plain list paints footers in the system background.
         Section {
-            EmptyView()
-        } footer: {
             BrainListFooter(viewModel: viewModel)
+                .brainListClearRow()
         }
     }
 
@@ -209,8 +253,9 @@ struct BrainModuleListView: View {
     // MARK: People
 
     private func peopleSection(_ list: BrainList) -> some View {
-        let items = BrainListLayout.uniqueItems(list.items)
+        let items = peopleMatches(list)
         let lastID = items.last?.id
+        let query = peopleQuery.trimmingCharacters(in: .whitespaces)
         return Section {
             ForEach(items, id: \.id) { item in
                 NavigationLink(value: link(item.id)) {
@@ -219,7 +264,61 @@ struct BrainModuleListView: View {
                 .brainListRow()
                 .onAppear { if item.id == lastID { loadMore() } }
             }
+            if items.isEmpty, !query.isEmpty {
+                Text("No one named \u{201C}\(query)\u{201D}")
+                    .font(AppFont.subheadline())
+                    .foregroundStyle(Color.hxTextSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .brainListRow()
+            }
         }
+        // A search covers everyone, so pages past the first load while there's a query.
+        .task(id: query.isEmpty ? nil : list.nextCursor) {
+            if !query.isEmpty, list.nextCursor != nil { await viewModel.loadMore() }
+        }
+    }
+
+    private func peopleMatches(_ list: BrainList) -> [BrainItem] {
+        BrainPeopleSearch.matches(BrainListLayout.uniqueItems(list.items), query: peopleQuery)
+    }
+
+    /// Pinned above the People list. Return opens the top match.
+    private var peopleSearchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+
+            TextField("Search people", text: $peopleQuery)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .focused($isPeopleSearchFocused)
+                .submitLabel(.go)
+                .onSubmit {
+                    guard let list = viewModel.list,
+                          !peopleQuery.trimmingCharacters(in: .whitespaces).isEmpty,
+                          let top = peopleMatches(list).first
+                    else { return }
+                    push(.page(.people, top.id))
+                }
+
+            if !peopleQuery.isEmpty {
+                Button {
+                    peopleQuery = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(minHeight: 40)
+        .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Color.hxCanvas)
     }
 
     // MARK: Wiki
