@@ -615,6 +615,8 @@ struct ChatShellView: View {
         case .goal(let slug):
             GoalDetailView(slug: slug, server: server, onAPIError: authManager.handleAPIError)
                 .id(slug)
+        case .money:
+            MoneyView(server: server)
         case .brainRoute(let route):
             // Keyed by route so a destination's view models can never carry over to another page.
             brainDestination(route).id(route)

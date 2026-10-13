@@ -143,6 +143,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
             drawerRow("Brain", systemImage: "brain", paper: .knowledge) { onOpen(.brain) }
         }
         drawerRow("Goals", systemImage: "flag.checkered", paper: .book) { onOpen(.goals) }
+        drawerRow("Money", systemImage: "chart.line.uptrend.xyaxis", paper: .money) { onOpen(.money) }
     }
 
     /// Floating bottom-right New Chat, where messaging apps put compose.
