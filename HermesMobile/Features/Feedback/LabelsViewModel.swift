@@ -12,8 +12,8 @@ final class LabelsViewModel {
     /// The verdict being saved for each key in flight.
     private(set) var pending: [LabelKey: LabelVerdict] = [:]
     private(set) var errors: [LabelKey: String] = [:]
-    /// Whether a load has landed, so screens can tell "unlabeled" from "not read yet".
-    private(set) var hasLoaded = false
+    /// Scopes read successfully: `feature` alone for a feature-wide read, `feature|item` for one item.
+    private var loadedScopes: Set<String> = []
 
     @ObservationIgnored let client: any LabelsDataClient
 
@@ -25,6 +25,13 @@ final class LabelsViewModel {
     func isPending(_ key: LabelKey) -> Bool { pending[key] != nil }
     func error(for key: LabelKey) -> String? { errors[key] }
 
+    /// Whether `item`'s labels have been read, by a feature-wide read or its own. Rate rows
+    /// stay hidden until then, so "unlabeled" never stands in for "couldn't read".
+    /// Without `item`, whether the whole feature has been read.
+    func isLoaded(feature: String, item: String? = nil) -> Bool {
+        loadedScopes.contains(feature) || item.map { loadedScopes.contains("\(feature)|\($0)") } == true
+    }
+
     /// Reads `feature`'s labels (one `item`'s when given), replacing what was held for them.
     func load(feature: String, item: String? = nil) async throws {
         let records = try await client.labels(feature: feature, item: item)
@@ -34,7 +41,7 @@ final class LabelsViewModel {
         for record in records where pending[record.key] == nil {
             verdicts[record.key] = record.currentVerdict
         }
-        hasLoaded = true
+        loadedScopes.insert(item.map { "\(feature)|\($0)" } ?? feature)
     }
 
     /// A tap on ✓ (`.good`) or ✗ (`.bad`): sets it, or clears it when it is already the label.

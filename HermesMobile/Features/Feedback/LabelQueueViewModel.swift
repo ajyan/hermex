@@ -16,17 +16,19 @@ struct LabelQueueItem: Identifiable, Equatable {
     }
 }
 
-/// Settings › Feedback › Label recent cards: reflect cards from the last 14 days of Daily
-/// Decks, newest first, without the ones already labeled. Decks are read the way the Daily
-/// Deck reads them (its workspace and session, `DailyDeckPaths`). Built once; every tap saves
-/// at once, so leaving at any point loses nothing.
+/// Settings › Feedback › Label recent cards: reflect cards from the last 14 days of morning
+/// Daily Decks, newest first, without the ones already labeled. Read-only: it reads `briefs/`
+/// through the session the Daily Deck already opened, and never creates or renames a session,
+/// stores a workspace, or reads answers. Built once, by one task the row and the screen share;
+/// every tap saves at once, so leaving at any point loses nothing.
 @MainActor
 @Observable
 final class LabelQueueViewModel {
     enum State: Equatable {
         case idle, loading, ready
-        /// The Daily Deck hasn't been told which workspace holds `briefs/` yet.
-        case needsWorkspace
+        /// No Daily Deck session to read through: the brief hasn't been opened in the window
+        /// (or its session is gone). Opening the Daily Brief once sets one up.
+        case needsBrief
         case failed(String)
     }
 
@@ -42,6 +44,9 @@ final class LabelQueueViewModel {
     private let deckClient: any DailyDeckDataClient
     private let store: DailyDeckStore
     private let now: () -> Date
+    /// The one build in flight. Unstructured, so leaving the screen that started it doesn't
+    /// cancel it; `nil` once it ends.
+    @ObservationIgnored private var buildTask: Task<Void, Never>?
 
     init(server: URL, deckClient: any DailyDeckDataClient, labels: LabelsViewModel,
          store: DailyDeckStore = DailyDeckStore(), now: @escaping () -> Date = Date.init) {
@@ -72,40 +77,84 @@ final class LabelQueueViewModel {
         if index < items.count { index += 1 }
     }
 
-    /// Builds the queue once; a failed or unfinished build can run again.
-    func build() async {
-        guard state != .loading, state != .ready else { return }
+    /// Starts the build unless one is running or it is built. A failed build starts over.
+    func start() {
+        guard buildTask == nil, state != .ready else { return }
         state = .loading
+        buildTask = Task { [weak self] in
+            await self?.run()
+            self?.buildTask = nil
+        }
+    }
+
+    /// Starts the build if needed and waits for it.
+    func build() async {
+        start()
+        await buildTask?.value
+    }
+
+    /// Stops the build in flight; it ends as a failure to retry, never as an empty queue.
+    func cancelBuild() {
+        buildTask?.cancel()
+    }
+
+    private func run() async {
         do {
-            try await labels.load(feature: LabelKey.dailyDeckFeature)
-            let deck = DailyDeckViewModel(server: server, client: deckClient, store: store, now: now)
-            await deck.load()
-            if case .needsWorkspace = deck.state { state = .needsWorkspace; return }
-            if case .failed(let message) = deck.state { state = .failed(message); return }
-            guard let sessionID = deck.sessionID else { state = .failed("Couldn't open the briefs folder."); return }
-            let dates = Self.windowDates(deck.availableDates, now: now())
-            let decks = await read(dates: dates, sessionID: sessionID)
-            items = Self.items(decks: decks) { labels.verdict(for: $0) != nil }
+            let built = try await readItems()
+            try Task.checkCancellation()
+            guard let built else {
+                state = .needsBrief
+                return
+            }
+            items = built
             index = 0
             state = .ready
         } catch is CancellationError {
-            state = .idle
+            state = .failed("Stopped before the cards loaded.")
         } catch {
             state = .failed(error.localizedDescription)
         }
     }
 
-    /// The morning decks for `dates`, in that order; one that can't be read or decoded is left out.
-    private func read(dates: [String], sessionID: String) async -> [(date: String, kind: String, deck: DailyDeck)] {
+    /// The queue's items, or nil when there's no Daily Deck session to read through.
+    private func readItems() async throws -> [LabelQueueItem]? {
+        try await labels.load(feature: LabelKey.dailyDeckFeature)
+        guard store.workspace(for: server) != nil, let sessionID = storedSession() else { return nil }
+        let names: [String]
+        do {
+            names = try await deckClient.entryNames(sessionID: sessionID, path: DailyDeckPaths.directory)
+        } catch let error as APIError where error.isVanishedSession {
+            return nil
+        } catch let error as APIError where error.isNotFound {
+            return [] // No `briefs/` yet: nothing to label.
+        }
+        let dates = Self.windowDates(DailyDeckViewModel.deckDates(in: names, kind: "morning"), now: now())
+        let decks = try await read(dates: dates, sessionID: sessionID)
+        return Self.items(decks: decks) { labels.verdict(for: $0) != nil }
+    }
+
+    /// Today's Daily Deck session, else the newest stored one inside the window.
+    private func storedSession() -> String? {
+        let today = DailyDeckPaths.day(now())
+        if let session = store.session(for: server, date: today) { return session }
+        guard let latest = store.latestSession(for: server),
+              Self.windowDates([latest.date], now: now()).isEmpty == false
+        else { return nil }
+        return latest.id
+    }
+
+    /// The morning decks for `dates`, in that order. A deck that doesn't decode is skipped; a
+    /// read that fails fails the build.
+    private func read(dates: [String], sessionID: String) async throws -> [(date: String, kind: String, deck: DailyDeck)] {
         let client = deckClient
-        let contents = await withTaskGroup(of: (String, String?).self) { group in
+        let contents = try await withThrowingTaskGroup(of: (String, String).self) { group in
             for date in dates {
                 group.addTask {
-                    (date, try? await client.fileContent(sessionID: sessionID, path: DailyDeckPaths.deck(date: date, kind: "morning")))
+                    (date, try await client.fileContent(sessionID: sessionID, path: DailyDeckPaths.deck(date: date, kind: "morning")))
                 }
             }
             var byDate: [String: String] = [:]
-            for await (date, content) in group { byDate[date] = content }
+            for try await (date, content) in group { byDate[date] = content }
             return byDate
         }
         return dates.compactMap { date in

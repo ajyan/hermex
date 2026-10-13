@@ -126,8 +126,9 @@ struct BrainReaderView: View {
                 }
             }
             .task(id: "\(viewModel.module.rawValue)/\(viewModel.id)|\(labelsAvailable)") {
-                guard labelsAvailable else { return }
+                // Runs on each appear, so a failed read retries; the row hides until one lands.
                 let key = ratingKey
+                guard labelsAvailable, !labels.isLoaded(feature: key.feature, item: key.item) else { return }
                 try? await labels.load(feature: key.feature, item: key.item)
             }
             .onDisappear { stepTask?.cancel() }
@@ -180,7 +181,8 @@ struct BrainReaderView: View {
                 isMissing: viewModel.isMissing,
                 push: push,
                 onStep: BrainConnectionsLayout.showsPager(page.hub) ? step : nil,
-                rating: labelsAvailable ? BrainPageRating(labels: labels, key: ratingKey) : nil
+                rating: labelsAvailable && labels.isLoaded(feature: ratingKey.feature, item: ratingKey.item)
+                    ? BrainPageRating(labels: labels, key: ratingKey) : nil
             )
             .refreshable { await viewModel.load() }
         }

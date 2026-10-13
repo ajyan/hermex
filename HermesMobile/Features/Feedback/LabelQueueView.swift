@@ -47,7 +47,7 @@ struct LabelQueueView: View {
         content
             .background(Color.hxCanvas.ignoresSafeArea())
             .hxNavigationTitle("Label Cards", subtitle: subtitle)
-            .task { await viewModel.build() }
+            .onAppear { viewModel.start() }
     }
 
     private var subtitle: String? {
@@ -60,11 +60,11 @@ struct LabelQueueView: View {
         switch viewModel.state {
         case .idle, .loading:
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-        case .needsWorkspace:
+        case .needsBrief:
             ContentUnavailableView {
-                Label { Text(verbatim: "Open the Daily Brief first") } icon: { Image(systemName: "sun.horizon") }
+                Label { Text(verbatim: "Open the Daily Brief once first") } icon: { Image(systemName: "sun.horizon") }
             } description: {
-                Text(verbatim: "Choose the workspace that holds briefs/ there, then come back.")
+                Text(verbatim: "Recent cards are read through the Daily Brief's session. Open it, then come back.")
             }
         case .failed(let message):
             ContentUnavailableView {
@@ -72,7 +72,7 @@ struct LabelQueueView: View {
             } description: {
                 Text(verbatim: message)
             } actions: {
-                Button { Task { await viewModel.build() } } label: { Text(verbatim: "Try again") }
+                Button { viewModel.start() } label: { Text(verbatim: "Try again") }
             }
         case .ready:
             if let item = viewModel.current {
@@ -120,8 +120,7 @@ private struct LabelQueueCard: View {
                 .padding(.bottom, 12)
             if let lead = text.lead {
                 Text(verbatim: lead)
-                    .font(["quote", "book", "on_this_day"].contains(item.card.itemKind ?? "")
-                          ? AppFont.serif(style: .title3) : AppFont.display(style: .title3, weight: .semibold))
+                    .font(DeckCardText.leadFont(for: item.card, lead: lead))
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let attribution = text.attribution {

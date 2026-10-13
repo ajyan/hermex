@@ -20,7 +20,8 @@ struct FeedbackInboxView: View {
             .background(Color.hxCanvas.ignoresSafeArea())
             .hxNavigationTitle("Feedback")
             .task { await viewModel.load() }
-            .task { await labelQueue?.build() }
+            // Not a `.task`: opening the queue would cancel it mid-build. The queue owns its build.
+            .onAppear { labelQueue?.start() }
             .navigationDestination(item: $openedID) { id in
                 FeedbackDetailView(entryID: id, viewModel: viewModel)
             }

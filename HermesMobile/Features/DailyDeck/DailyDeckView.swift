@@ -21,13 +21,17 @@ struct DailyDeckView: View {
     }
 
     private var labelsAvailable: Bool { availability?.labelsAvailable == true }
+    /// Rate rows show once the server has labels and this screen has read them.
+    private var showsLabels: Bool {
+        labelsAvailable && labels.isLoaded(feature: LabelKey.dailyDeckFeature)
+    }
 
     var body: some View {
         content
-            .environment(labelsAvailable ? labels : nil)
+            .environment(showsLabels ? labels : nil)
             .task(id: labelsAvailable) {
-                // Every deck's labels in one read, once per screen.
-                if labelsAvailable, !labels.hasLoaded { try? await labels.load(feature: LabelKey.dailyDeckFeature) }
+                // Every deck's labels in one read, once per screen; a failed read retries on the next appear.
+                if labelsAvailable, !showsLabels { try? await labels.load(feature: LabelKey.dailyDeckFeature) }
             }
             .hxNavigationTitle(viewModel.title, subtitle: viewModel.state == .ready ? progressSubtitle : nil)
             .background(Color.hxCanvas.ignoresSafeArea())

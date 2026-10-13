@@ -232,7 +232,22 @@ final class LabelsViewModelTests: XCTestCase {
         XCTAssertEqual(labels.verdict(for: key), .good)
         XCTAssertNil(labels.verdict(for: .deckQuestion(date: "2026-10-12", kind: "morning", cardID: "quote-3")))
         XCTAssertNil(labels.verdict(for: other), "another feature's labels stay out")
-        XCTAssertTrue(labels.hasLoaded)
+        XCTAssertTrue(labels.isLoaded(feature: "daily_deck", item: "anything"), "a feature-wide read covers every item")
+        XCTAssertFalse(labels.isLoaded(feature: "brain", item: "wiki/a"))
+    }
+
+    func testAFailedLoadLeavesTheScopeUnloadedSoRowsStayHidden() async throws {
+        let client = StubLabelsClient()
+        await client.failLists()
+        let labels = LabelsViewModel(client: client)
+
+        try? await labels.load(feature: "brain", item: "wiki/a")
+        XCTAssertFalse(labels.isLoaded(feature: "brain", item: "wiki/a"))
+
+        await client.failLists(false)
+        try await labels.load(feature: "brain", item: "wiki/a")
+        XCTAssertTrue(labels.isLoaded(feature: "brain", item: "wiki/a"))
+        XCTAssertFalse(labels.isLoaded(feature: "brain", item: "wiki/b"), "one page's read covers only that page")
     }
 
     func testUnavailableLabelsHideTheControls() async {
@@ -288,6 +303,19 @@ final class LabelQueueViewModelTests: XCTestCase {
         Calendar.current.date(from: DateComponents(year: 2026, month: 10, day: 13, hour: 9))!
     }
 
+    private var store: DailyDeckStore { DailyDeckStore(defaults: defaults) }
+
+    /// A store the Daily Deck has used: its workspace and a day's session.
+    private func openedBrief(session: String = "s-today", on date: String = "2026-10-13") {
+        store.setWorkspace("/brain", for: server)
+        store.setSession(session, for: server, date: date)
+    }
+
+    private func makeQueue(_ client: any DailyDeckDataClient, labels: StubLabelsClient = StubLabelsClient()) -> LabelQueueViewModel {
+        LabelQueueViewModel(server: server, deckClient: client, labels: LabelsViewModel(client: labels),
+                            store: store, now: { self.now })
+    }
+
     func testWindowIsTheLastFourteenDaysNewestFirst() {
         let dates = ["2026-09-28", "2026-09-29", "2026-10-13", "2026-10-01", "2026-10-14", "2026-09-30"]
         XCTAssertEqual(LabelQueueViewModel.windowDates(dates, now: now),
@@ -319,36 +347,22 @@ final class LabelQueueViewModelTests: XCTestCase {
 
         XCTAssertEqual(items.map(\.id), ["2026-10-13|morning|b1", "2026-10-12|morning|q1"],
                        "b1 still needs its question; w1 has no question so its card label is enough")
-        XCTAssertNil(items.first?.questionKey.flatMap { labeled.contains($0) ? $0 : nil })
     }
 
     func testBuildReadsTheWindowsDecksAndCountsDownAsCardsAreLabeled() async throws {
-        let names = ["2026-10-13.morning.json", "2026-10-10.morning.json", "2026-09-20.morning.json",
-                     "2026-10-12.weekly.json"]
-        let client = ScriptedDailyDeckClient(workspaces: ["/brain"], names: names, deck: "{}")
-        client.files = [
-            DailyDeckPaths.deck(date: "2026-10-13", kind: "morning"): Self.deck(date: "2026-10-13", cards: [
-                #"{"id":"q1","type":"reflect","kind":"quote","body":"A","question":"Why?"}"#
-            ]),
-            DailyDeckPaths.deck(date: "2026-10-10", kind: "morning"): Self.deck(date: "2026-10-10", cards: [
-                #"{"id":"w1","type":"reflect","kind":"wiki","body":"C"}"#,
-                #"{"id":"w2","type":"reflect","kind":"wiki","body":"E","question":"So?"}"#
-            ]),
-            DailyDeckPaths.deck(date: "2026-09-20", kind: "morning"): Self.deck(date: "2026-09-20", cards: [
-                #"{"id":"old","type":"reflect","kind":"wiki","body":"F"}"#
-            ])
-        ]
+        openedBrief()
+        let client = ScriptedDailyDeckClient(workspaces: ["/brain"], names: Self.names, deck: "{}")
+        client.files = Self.files
         let labelsClient = StubLabelsClient()
         let labeledJSON = #"{"feature":"daily_deck","item":"2026-10-10|morning|w2","part":"card","verdict":"good"}"#
         await labelsClient.setRecords([try FeedbackDecoding.decode(LabelRecord.self, from: Data(labeledJSON.utf8))])
-        let queue = LabelQueueViewModel(
-            server: server, deckClient: client, labels: LabelsViewModel(client: labelsClient),
-            store: DailyDeckStore(defaults: defaults), now: { self.now })
+        let queue = makeQueue(client, labels: labelsClient)
 
         await queue.build()
 
         XCTAssertEqual(queue.state, .ready)
         XCTAssertEqual(queue.items.map(\.id), ["2026-10-13|morning|q1", "2026-10-10|morning|w1", "2026-10-10|morning|w2"])
+        XCTAssertEqual(client.listedSessions, ["s-today"], "reads through the Daily Deck's stored session")
         XCTAssertFalse(client.readPaths.contains(DailyDeckPaths.deck(date: "2026-09-20", kind: "morning")),
                        "decks outside the window are never read")
         XCTAssertEqual(queue.unlabeledCount, 3)
@@ -364,33 +378,210 @@ final class LabelQueueViewModelTests: XCTestCase {
         XCTAssertNil(queue.current, "past the last card the queue is done")
     }
 
-    func testNoWorkspaceYetAsksToOpenTheBriefFirst() async {
-        let client = ScriptedDailyDeckClient(workspaces: ["/a", "/b"], names: [], deck: "{}")
-        let queue = LabelQueueViewModel(
-            server: server, deckClient: client, labels: LabelsViewModel(client: StubLabelsClient()),
-            store: DailyDeckStore(defaults: defaults), now: { self.now })
+    func testBuildIsReadOnly() async {
+        openedBrief()
+        let client = ScriptedDailyDeckClient(workspaces: ["/brain"], names: Self.names, deck: "{}")
+        client.files = Self.files
+
+        await makeQueue(client).build()
+
+        XCTAssertEqual(client.createdWorkspaces, [], "never creates a session")
+        XCTAssertTrue(client.renamed.isEmpty, "never renames one")
+        XCTAssertTrue(client.sent.isEmpty)
+        XCTAssertFalse(client.readPaths.contains { $0.hasSuffix(".answers.json") }, "never reads answers")
+        XCTAssertEqual(store.workspace(for: server), "/brain")
+        XCTAssertEqual(store.session(for: server, date: "2026-10-13"), "s-today")
+    }
+
+    func testWithAnEmptyStoreItAsksToOpenTheBriefAndTouchesNothing() async {
+        let client = ScriptedDailyDeckClient(workspaces: ["/brain"], names: Self.names, deck: "{}")
+        let queue = makeQueue(client)
 
         await queue.build()
 
-        XCTAssertEqual(queue.state, .needsWorkspace)
+        XCTAssertEqual(queue.state, .needsBrief)
+        XCTAssertEqual(queue.items, [])
+        XCTAssertEqual(client.createdWorkspaces, [])
+        XCTAssertTrue(client.renamed.isEmpty)
+        XCTAssertTrue(client.listedSessions.isEmpty)
+        XCTAssertNil(store.workspace(for: server), "never persists a workspace, even when the server has only one")
+    }
+
+    func testFallsBackToTheNewestStoredSessionInTheWindow() async {
+        openedBrief(session: "s-oct10", on: "2026-10-10")
+        let client = ScriptedDailyDeckClient(workspaces: ["/brain"], names: Self.names, deck: "{}")
+        client.files = Self.files
+        let queue = makeQueue(client)
+
+        await queue.build()
+
+        XCTAssertEqual(queue.state, .ready)
+        XCTAssertEqual(client.listedSessions, ["s-oct10"])
+    }
+
+    func testASessionOlderThanTheWindowOrVanishedAsksToOpenTheBrief() async {
+        openedBrief(session: "s-old", on: "2026-09-01")
+        let old = ScriptedDailyDeckClient(workspaces: ["/brain"], names: Self.names, deck: "{}")
+        let oldQueue = makeQueue(old)
+        await oldQueue.build()
+        XCTAssertEqual(oldQueue.state, .needsBrief)
+        XCTAssertTrue(old.listedSessions.isEmpty)
+
+        openedBrief(session: "s-gone")
+        let vanished = ScriptedDailyDeckClient(workspaces: ["/brain"], names: Self.names, deck: "{}")
+        vanished.vanished = ["s-gone"]
+        let vanishedQueue = makeQueue(vanished)
+        await vanishedQueue.build()
+        XCTAssertEqual(vanishedQueue.state, .needsBrief)
+        XCTAssertEqual(vanished.createdWorkspaces, [], "a vanished session is never replaced from here")
+    }
+
+    func testAMissingBriefsFolderIsAnEmptyQueue() async {
+        openedBrief()
+        let client = ScriptedDailyDeckClient(workspaces: ["/brain"], names: nil, deck: "{}")
+        let queue = makeQueue(client)
+
+        await queue.build()
+
+        XCTAssertEqual(queue.state, .ready)
         XCTAssertEqual(queue.items, [])
     }
 
+    func testAnUndecodableDeckIsSkippedButATransportFailureFailsTheBuild() async {
+        openedBrief()
+        let client = QueueDeckClient(names: ["2026-10-13.morning.json", "2026-10-12.morning.json"])
+        client.files = [
+            DailyDeckPaths.deck(date: "2026-10-13", kind: "morning"): .success("not json"),
+            DailyDeckPaths.deck(date: "2026-10-12", kind: "morning"): .success(Self.deck(date: "2026-10-12", cards: [
+                #"{"id":"q1","type":"reflect","kind":"quote","body":"A"}"#
+            ]))
+        ]
+        let skipping = makeQueue(client)
+        await skipping.build()
+        XCTAssertEqual(skipping.state, .ready)
+        XCTAssertEqual(skipping.items.map(\.id), ["2026-10-12|morning|q1"])
+
+        client.files[DailyDeckPaths.deck(date: "2026-10-13", kind: "morning")] = .failure(URLError(.timedOut))
+        let failing = makeQueue(client)
+        await failing.build()
+        guard case .failed = failing.state else { return XCTFail("expected failed, got \(failing.state)") }
+        XCTAssertEqual(failing.items, [])
+
+        client.files[DailyDeckPaths.deck(date: "2026-10-13", kind: "morning")] = .success("not json")
+        await failing.build()
+        XCTAssertEqual(failing.state, .ready, "a failed build can run again")
+    }
+
+    func testCancellingMidBuildIsARetryableFailureNotAnEmptyQueue() async {
+        openedBrief()
+        let client = QueueDeckClient(names: ["2026-10-13.morning.json"])
+        client.files = [DailyDeckPaths.deck(date: "2026-10-13", kind: "morning"): .success(Self.deck(date: "2026-10-13", cards: [
+            #"{"id":"q1","type":"reflect","kind":"quote","body":"A"}"#
+        ]))]
+        let reading = expectation(description: "deck read started")
+        client.onRead = { reading.fulfill() }
+        client.holdsReads = true
+        let queue = makeQueue(client)
+
+        queue.start()
+        await fulfillment(of: [reading], timeout: 5)
+        queue.cancelBuild()
+        client.releaseReads()
+        await queue.build()
+
+        guard case .failed = queue.state else { return XCTFail("expected failed, got \(queue.state)") }
+        XCTAssertEqual(queue.items, [])
+    }
+
+    func testStartingTwiceRunsOneBuild() async {
+        openedBrief()
+        let client = ScriptedDailyDeckClient(workspaces: ["/brain"], names: Self.names, deck: "{}")
+        client.files = Self.files
+        let queue = makeQueue(client)
+
+        queue.start()
+        queue.start()
+        await queue.build()
+
+        XCTAssertEqual(client.listedSessions.count, 1, "the row and the screen share one build")
+        XCTAssertEqual(queue.state, .ready)
+    }
+
     func testFailedLabelsLoadFailsTheQueueRatherThanShowingLabeledCards() async {
+        openedBrief()
         let client = ScriptedDailyDeckClient(workspaces: ["/brain"], names: [], deck: "{}")
         let labelsClient = StubLabelsClient()
         await labelsClient.failLists()
-        let queue = LabelQueueViewModel(
-            server: server, deckClient: client, labels: LabelsViewModel(client: labelsClient),
-            store: DailyDeckStore(defaults: defaults), now: { self.now })
+        let queue = makeQueue(client, labels: labelsClient)
 
         await queue.build()
 
         guard case .failed = queue.state else { return XCTFail("expected failed, got \(queue.state)") }
     }
 
+    private static let names = ["2026-10-13.morning.json", "2026-10-13.morning.answers.json", "2026-10-10.morning.json",
+                                "2026-09-20.morning.json", "2026-10-12.weekly.json"]
+
+    private static var files: [String: String] {
+        [
+            DailyDeckPaths.deck(date: "2026-10-13", kind: "morning"): deck(date: "2026-10-13", cards: [
+                #"{"id":"q1","type":"reflect","kind":"quote","body":"A","question":"Why?"}"#
+            ]),
+            DailyDeckPaths.deck(date: "2026-10-10", kind: "morning"): deck(date: "2026-10-10", cards: [
+                #"{"id":"w1","type":"reflect","kind":"wiki","body":"C"}"#,
+                #"{"id":"w2","type":"reflect","kind":"wiki","body":"E","question":"So?"}"#
+            ]),
+            DailyDeckPaths.deck(date: "2026-09-20", kind: "morning"): deck(date: "2026-09-20", cards: [
+                #"{"id":"old","type":"reflect","kind":"wiki","body":"F"}"#
+            ])
+        ]
+    }
+
     private static func deck(date: String, cards: [String]) -> String {
         #"{"date":"\#(date)","kind":"morning","cards":[\#(cards.joined(separator: ","))]}"#
+    }
+}
+
+/// Deck reads that can fail or wait. Never creates or renames a session.
+private final class QueueDeckClient: DailyDeckDataClient, @unchecked Sendable {
+    let names: [String]
+    var files: [String: Result<String, Error>] = [:]
+    var holdsReads = false
+    var onRead: (() -> Void)?
+    private var held: [CheckedContinuation<Void, Never>] = []
+    private let lock = NSLock()
+
+    init(names: [String]) { self.names = names }
+
+    func releaseReads() {
+        lock.lock()
+        holdsReads = false
+        let waiting = held
+        held = []
+        lock.unlock()
+        waiting.forEach { $0.resume() }
+    }
+
+    func workspacePaths() async throws -> [String] { ["/brain"] }
+    func createSession(workspace: String) async throws -> String { XCTFail("createSession"); return "x" }
+    func renameSession(id: String, title: String) async throws { XCTFail("renameSession") }
+    func entryNames(sessionID: String, path: String) async throws -> [String] { names }
+    func startChat(sessionID: String, message: String, workspace: String) async throws { XCTFail("startChat") }
+
+    func fileContent(sessionID: String, path: String) async throws -> String {
+        onRead?()
+        // Checked and parked under one lock, so a release can't slip between them.
+        await withCheckedContinuation { continuation in
+            lock.lock()
+            if holdsReads {
+                held.append(continuation)
+                lock.unlock()
+            } else {
+                lock.unlock()
+                continuation.resume()
+            }
+        }
+        return try (files[path] ?? .failure(URLError(.fileDoesNotExist))).get()
     }
 }
 
@@ -408,7 +599,7 @@ actor StubLabelsClient: LabelsDataClient {
     func setRecords(_ records: [LabelRecord]) { self.records = records }
     func setAvailable(_ value: Bool) { available = value }
     func fail(with error: Error?) { saveError = error }
-    func failLists() { listFails = true }
+    func failLists(_ fails: Bool = true) { listFails = fails }
     func holdSaves() { holdsSaves = true }
 
     func releaseSaves() {
