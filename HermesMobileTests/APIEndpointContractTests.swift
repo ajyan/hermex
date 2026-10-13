@@ -313,7 +313,8 @@ final class ContractReadinessTests: XCTestCase {
                 path: "/api/goals/detail",
                 query: ["slug": "nyc-marathon-2026"]
             ),
-            .init(name: "goal check-in", method: "POST", endpoint: .goalCheckIn, path: "/api/goals/checkin")
+            .init(name: "goal check-in", method: "POST", endpoint: .goalCheckIn, path: "/api/goals/checkin"),
+            .init(name: "brief file", method: "POST", endpoint: .briefFile, path: "/api/brief/file")
         ]
 
         let baseURL = URL(string: "https://example.test")!

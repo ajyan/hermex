@@ -567,6 +567,7 @@ private final class QueueDeckClient: DailyDeckDataClient, @unchecked Sendable {
     func renameSession(id: String, title: String) async throws { XCTFail("renameSession") }
     func entryNames(sessionID: String, path: String) async throws -> [String] { names }
     func startChat(sessionID: String, message: String, workspace: String) async throws { XCTFail("startChat") }
+    func fileBrief(_ request: BriefFileRequest) async throws -> BriefFileResponse? { XCTFail("fileBrief"); return nil }
 
     func fileContent(sessionID: String, path: String) async throws -> String {
         onRead?()
