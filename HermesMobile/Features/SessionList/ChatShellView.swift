@@ -158,7 +158,8 @@ struct ChatShellView: View {
         _pendingWebuiPush = pendingWebuiPush
         _viewModel = State(initialValue: SessionListViewModel(server: server))
         _feedbackAvailability = State(initialValue: FeedbackAvailability(
-            client: APIClientFeedbackAdapter(apiClient: APIClient(baseURL: server))))
+            client: APIClientFeedbackAdapter(apiClient: APIClient(baseURL: server)),
+            labels: APIClientLabelsAdapter(apiClient: APIClient(baseURL: server))))
         _showsCliSessions = AppStorage(
             wrappedValue: SessionRowDisplaySettings.showsCliSessions(for: server),
             SessionRowDisplaySettings.showCliSessionsKey(for: server)

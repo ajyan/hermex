@@ -385,7 +385,7 @@ final class DailyDeckViewModel {
 }
 
 /// Wraps the `APIClient` actor in a `Sendable` value for the protocol.
-private struct APIClientDailyDeckAdapter: DailyDeckDataClient {
+struct APIClientDailyDeckAdapter: DailyDeckDataClient {
     let apiClient: APIClient
 
     func workspacePaths() async throws -> [String] {

@@ -40,6 +40,8 @@ private struct DeckCardView: View {
     let file: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Set by the Daily Deck when the server takes labels.
+    @Environment(LabelsViewModel.self) private var labels: LabelsViewModel?
     @State private var isWriting = false
     @State private var overflows = false
     /// The sleep card's numbers, shown before rating when asked for.
@@ -135,6 +137,12 @@ private struct DeckCardView: View {
                 .font(AppFont.footnote())
                 .foregroundStyle(palette.ink)
                 .padding(.top, 20)
+        }
+        if card.type == .reflect, let labels {
+            DeckRateRows(card: card, date: viewModel.date, kind: viewModel.kind,
+                         showsQuestion: viewModel.question(for: card) == card.question,
+                         labels: labels, palette: palette)
+                .padding(.top, 24)
         }
     }
 

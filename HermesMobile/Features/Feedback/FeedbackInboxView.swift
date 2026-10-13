@@ -7,9 +7,12 @@ struct FeedbackInboxView: View {
     @State private var viewModel: FeedbackInboxViewModel
     @State private var openedID: String?
     @State private var showsDone = false
+    /// Label recent cards; nil when the server has no labels.
+    @State private var labelQueue: LabelQueueViewModel?
 
-    init(client: any FeedbackDataClient) {
+    init(client: any FeedbackDataClient, labelQueue: LabelQueueViewModel? = nil) {
         _viewModel = State(initialValue: FeedbackInboxViewModel(client: client))
+        _labelQueue = State(initialValue: labelQueue)
     }
 
     var body: some View {
@@ -17,6 +20,7 @@ struct FeedbackInboxView: View {
             .background(Color.hxCanvas.ignoresSafeArea())
             .hxNavigationTitle("Feedback")
             .task { await viewModel.load() }
+            .task { await labelQueue?.build() }
             .navigationDestination(item: $openedID) { id in
                 FeedbackDetailView(entryID: id, viewModel: viewModel)
             }
@@ -53,7 +57,7 @@ struct FeedbackInboxView: View {
             }
         case .loaded:
             let sections = viewModel.sections
-            if sections.isEmpty {
+            if sections.isEmpty, labelQueue == nil {
                 ContentUnavailableView {
                     Label { Text(verbatim: "No feedback yet") } icon: { Image(systemName: "message") }
                 } description: {
@@ -62,6 +66,15 @@ struct FeedbackInboxView: View {
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 10) {
+                        if let labelQueue {
+                            LabelQueueRow(queue: labelQueue)
+                        }
+                        if sections.isEmpty {
+                            Text(verbatim: "No feedback yet. Send feedback from a screen's More menu.")
+                                .font(AppFont.footnote())
+                                .foregroundStyle(Color.hxTextSecondary)
+                                .padding(.top, 12)
+                        }
                         ForEach(sections, id: \.group) { section in
                             sectionView(section)
                         }
