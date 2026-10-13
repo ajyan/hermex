@@ -1016,7 +1016,11 @@ struct SettingsView: View {
             if let feedbackAvailability {
                 // English-only like the other fork features: a plain String is not localized.
                 agentLink("Feedback", systemImage: "message") {
-                    FeedbackInboxView(client: feedbackAvailability.client)
+                    FeedbackInboxView(
+                        client: feedbackAvailability.client,
+                        labelQueue: feedbackAvailability.labelsAvailable
+                            ? feedbackAvailability.labels.map { LabelQueueViewModel(server: server, labelsClient: $0) }
+                            : nil)
                 }
             }
         }

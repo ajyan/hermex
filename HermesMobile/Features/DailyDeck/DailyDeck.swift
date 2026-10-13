@@ -359,6 +359,12 @@ struct DailyDeckStore {
         return stored?[date]
     }
 
+    /// The newest stored day session, if any.
+    func latestSession(for server: URL) -> (date: String, id: String)? {
+        let stored = defaults.dictionary(forKey: key("session", server)) as? [String: String]
+        return stored?.max { $0.key < $1.key }.map { ($0.key, $0.value) }
+    }
+
     func setSession(_ sessionID: String, for server: URL, date: String) {
         defaults.set([date: sessionID], forKey: key("session", server))
     }

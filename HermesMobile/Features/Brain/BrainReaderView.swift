@@ -86,6 +86,9 @@ struct BrainReaderView: View {
     @State private var stepTask: Task<Void, Never>?
     @State private var stepEdge: Edge = .trailing
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Good/not-good on the page; shown only where the server has labels.
+    @State private var labels: LabelsViewModel
+    @Environment(FeedbackAvailability.self) private var availability: FeedbackAvailability?
     private let push: (BrainRoute) -> Void
 
     init(module: BrainModuleID, id: String, server: URL, modelContext: ModelContext,
@@ -94,6 +97,7 @@ struct BrainReaderView: View {
         let cache = BrainCacheHandle(server: server, context: modelContext)
         _viewModel = State(initialValue: BrainPageViewModel(
             module: module, id: id, client: client, cache: cache, onAPIError: onAPIError))
+        _labels = State(initialValue: LabelsViewModel(client: APIClientLabelsAdapter(apiClient: APIClient(baseURL: server))))
         self.push = push
     }
 
@@ -121,8 +125,17 @@ struct BrainReaderView: View {
                     await viewModel.load()
                 }
             }
+            .task(id: "\(viewModel.module.rawValue)/\(viewModel.id)|\(labelsAvailable)") {
+                // Runs on each appear, so a failed read retries; the row hides until one lands.
+                let key = ratingKey
+                guard labelsAvailable, !labels.isLoaded(feature: key.feature, item: key.item) else { return }
+                try? await labels.load(feature: key.feature, item: key.item)
+            }
             .onDisappear { stepTask?.cancel() }
     }
+
+    private var labelsAvailable: Bool { availability?.labelsAvailable == true }
+    private var ratingKey: LabelKey { .brainPage(module: viewModel.module, id: viewModel.id) }
 
     /// Moves to the previous (-1) or next (+1) page in the hub. The next page loads behind
     /// the current one and slides in once it lands, so there is no spinner between pages.
@@ -167,7 +180,9 @@ struct BrainReaderView: View {
                 isShowingCachedCopy: viewModel.isShowingCachedCopy,
                 isMissing: viewModel.isMissing,
                 push: push,
-                onStep: BrainConnectionsLayout.showsPager(page.hub) ? step : nil
+                onStep: BrainConnectionsLayout.showsPager(page.hub) ? step : nil,
+                rating: labelsAvailable && labels.isLoaded(feature: ratingKey.feature, item: ratingKey.item)
+                    ? BrainPageRating(labels: labels, key: ratingKey) : nil
             )
             .refreshable { await viewModel.load() }
         }
@@ -184,6 +199,8 @@ struct BrainReaderContent: View {
     let push: (BrainRoute) -> Void
     /// Pages through the hub (-1 previous, +1 next) on a sideways swipe; nil without a pager.
     var onStep: ((Int) -> Void)?
+    /// The page's Rate control; nil where the server has no labels.
+    var rating: BrainPageRating?
     /// Built once per page, never in `body`.
     private let cover: BrainCoverSpec
     /// Articles and video notes in the summary outline read as a digest.
@@ -193,12 +210,13 @@ struct BrainReaderContent: View {
     @State private var showsAllBacklinks = false
 
     init(page: BrainPage, isShowingCachedCopy: Bool, isMissing: Bool = false,
-         push: @escaping (BrainRoute) -> Void, onStep: ((Int) -> Void)? = nil) {
+         push: @escaping (BrainRoute) -> Void, onStep: ((Int) -> Void)? = nil, rating: BrainPageRating? = nil) {
         self.page = page
         self.isShowingCachedCopy = isShowingCachedCopy
         self.isMissing = isMissing
         self.push = push
         self.onStep = onStep
+        self.rating = rating
         self.cover = BrainReaderLayout.cover(for: page.item)
         self.digest = BrainReaderLayout.digest(for: page)
         self.linkCards = BrainConnectionsLayout.linkCards(page)
@@ -236,6 +254,11 @@ struct BrainReaderContent: View {
                 .simultaneousGesture(swipe, including: onStep == nil ? .subviews : .all)
                 furtherReading
                 journalPaging
+                if let rating {
+                    RateControl(label: "Rate this page", key: rating.key, title: page.item.title, labels: rating.labels)
+                        .padding(.horizontal, BrainStyle.cardHorizontalPadding)
+                        .brainCardSurface()
+                }
                 if isShowingCachedCopy {
                     Text(verbatim: BrainReaderLayout.cachedCopyFooter(isMissing: isMissing))
                         .brainText(.meta)
@@ -442,4 +465,10 @@ struct BrainReaderRefSection: View {
             .padding(.leading, separatorInset)
             .accessibilityHidden(true)
     }
+}
+
+/// The Brain reader's Rate control: whose labels, and which page.
+struct BrainPageRating {
+    let labels: LabelsViewModel
+    let key: LabelKey
 }

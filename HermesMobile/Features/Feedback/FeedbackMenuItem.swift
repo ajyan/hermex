@@ -1,27 +1,40 @@
 import Observation
 import SwiftUI
 
-/// Whether the active server takes feedback. The server-keyed shell owns one, so a server
-/// switch (which rebuilds the shell) checks again. Memory only.
+/// Whether the active server takes feedback, and labels on generated content (the Rate
+/// controls and Label recent cards). The server-keyed shell owns one, so a server switch
+/// (which rebuilds the shell) checks again. Memory only.
 @MainActor
 @Observable
 final class FeedbackAvailability {
     @ObservationIgnored let client: any FeedbackDataClient
+    /// Nil where labels aren't wired up; `labelsAvailable` then stays false.
+    @ObservationIgnored let labels: (any LabelsDataClient)?
     /// False until the server answers, so the item never flashes in on a server without it.
     private(set) var isAvailable = false
+    /// False until the server answers; a 404 on `/api/labels` keeps every Rate control hidden.
+    private(set) var labelsAvailable = false
     @ObservationIgnored private var isChecking = false
 
-    init(client: any FeedbackDataClient) {
+    init(client: any FeedbackDataClient, labels: (any LabelsDataClient)? = nil) {
         self.client = client
+        self.labels = labels
     }
 
-    /// Asks the server until it says yes. The shell calls this on launch and on each return
-    /// to the foreground, so a server that gains the inbox mid-session shows the item.
+    /// Asks the server until it says yes to each. The shell calls this on launch and on each
+    /// return to the foreground, so a server that gains a feature mid-session shows it.
     func check() async {
-        guard !isAvailable, !isChecking else { return }
+        let needsLabels = labels != nil && !labelsAvailable
+        guard !isChecking, !isAvailable || needsLabels else { return }
         isChecking = true
         defer { isChecking = false }
-        isAvailable = await client.isAvailable()
+        let client = client, labels = needsLabels ? labels : nil
+        let hasFeedback = isAvailable, hasLabels = labelsAvailable
+        async let feedback = hasFeedback ? true : client.isAvailable()
+        async let labeled = labels == nil ? hasLabels : (await labels?.isAvailable() ?? false)
+        let (feedbackResult, labelsResult) = await (feedback, labeled)
+        isAvailable = feedbackResult
+        labelsAvailable = labelsResult
     }
 }
 
