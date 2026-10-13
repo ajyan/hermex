@@ -690,6 +690,7 @@
 		B1A1C0DE0000000000000C03 /* BrainPersonCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000C04 /* BrainPersonCardView.swift */; };
 		B1A1C0DE0000000000000903 /* BrainCoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000904 /* BrainCoverView.swift */; };
 		B1A1C0DE0000000000000905 /* BrainConnectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000906 /* BrainConnectionsView.swift */; };
+		B1A1C0DE0000000000000F01 /* BrainJournalCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000F02 /* BrainJournalCalendarView.swift */; };
 		B1A1C0DE0000000000000907 /* BrainVisualsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000908 /* BrainVisualsTests.swift */; };
 		B1A1C0DE0000000000000D03 /* BrainArticleDigestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000D04 /* BrainArticleDigestTests.swift */; };
 		B1A1C0DE0000000000000801 /* BrainLibraryViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000802 /* BrainLibraryViewModels.swift */; };
@@ -1439,6 +1440,7 @@
 		B1A1C0DE0000000000000C04 /* BrainPersonCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainPersonCardView.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000904 /* BrainCoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainCoverView.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000906 /* BrainConnectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainConnectionsView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000F02 /* BrainJournalCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainJournalCalendarView.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000908 /* BrainVisualsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainVisualsTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000D04 /* BrainArticleDigestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainArticleDigestTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000802 /* BrainLibraryViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainLibraryViewModels.swift; sourceTree = "<group>"; };
@@ -2506,6 +2508,7 @@
 				B1A1C0DE0000000000000103 /* BrainModels.swift */,
 				B1A1C0DE0000000000000802 /* BrainLibraryViewModels.swift */,
 				B1A1C0DE0000000000000906 /* BrainConnectionsView.swift */,
+				B1A1C0DE0000000000000F02 /* BrainJournalCalendarView.swift */,
 				B1A1C0DE0000000000000904 /* BrainCoverView.swift */,
 				B1A1C0DE0000000000000902 /* BrainStyle.swift */,
 				B1A1C0DE0000000000000A02 /* BrainHomeView.swift */,
@@ -2793,6 +2796,7 @@
 				B1A1C0DE0000000000000E27 /* PrepDrillViews.swift in Sources */,
 				B1A1C0DE0000000000000801 /* BrainLibraryViewModels.swift in Sources */,
 				B1A1C0DE0000000000000905 /* BrainConnectionsView.swift in Sources */,
+				B1A1C0DE0000000000000F01 /* BrainJournalCalendarView.swift in Sources */,
 				B1A1C0DE0000000000000903 /* BrainCoverView.swift in Sources */,
 				B1A1C0DE0000000000000901 /* BrainStyle.swift in Sources */,
 				B1A1C0DE0000000000000A01 /* BrainHomeView.swift in Sources */,

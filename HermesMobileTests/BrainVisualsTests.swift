@@ -353,3 +353,66 @@ final class BrainConnectionsTests: XCTestCase {
         XCTAssertEqual(BrainModuleID.people.kindName, "Person")
     }
 }
+
+final class BrainJournalCalendarTests: XCTestCase {
+    private typealias Layout = BrainJournalCalendarLayout
+
+    private func day(_ key: String, id: String? = nil) -> BrainItem {
+        BrainItem(module: .journal, id: id ?? "journal/2026/10-October/\(key).md", title: key, date: key)
+    }
+
+    private func utc(_ key: String) throws -> Date {
+        try XCTUnwrap(Layout.date(fromKey: key))
+    }
+
+    func testDayKeyComesFromTheDateOrTheFileName() {
+        XCTAssertEqual(Layout.dayKey(of: day("2026-10-06")), "2026-10-06")
+        XCTAssertEqual(Layout.dayKey(of: BrainItem(module: .journal, id: "journal/2026/10-October/2026-10-07.md", date: "")), "2026-10-07")
+        XCTAssertNil(Layout.dayKey(of: BrainItem(module: .journal, id: "journal/notes.md", date: "Oct 7")))
+        XCTAssertNil(Layout.date(fromKey: "2026-02-30"), "impossible days are not days")
+    }
+
+    func testEntriesKeepTheFirstItemForADay() {
+        let entries = Layout.entries([day("2026-10-06", id: "a"), day("2026-10-06", id: "b"), day("2026-10-07")])
+        XCTAssertEqual(entries.count, 2)
+        XCTAssertEqual(entries["2026-10-06"]?.id, "a")
+    }
+
+    func testMonthsRunFromThisMonthBackToTheOldestEntryWithGaps() throws {
+        let months = Layout.months(for: ["2026-08-03", "2026-10-06"], today: try utc("2026-12-01"))
+        XCTAssertEqual(months.map(\.id), ["2026-12", "2026-11", "2026-10", "2026-09", "2026-08"])
+        let acrossYear = Layout.months(for: ["2025-12-31", "2026-01-02"], today: try utc("2026-01-15"))
+        XCTAssertEqual(acrossYear.map(\.id), ["2026-01", "2025-12"])
+        XCTAssertEqual(Layout.months(for: [String](), today: .now), [])
+    }
+
+    func testCellsStartOnTheLocalesFirstWeekday() {
+        // October 2026 starts on a Thursday.
+        let october = Layout.Month(year: 2026, month: 10)
+        let sundayStart = Layout.cells(for: october, calendar: Layout.calendar(firstWeekday: 1))
+        XCTAssertEqual(Array(sundayStart.prefix(5)), [nil, nil, nil, nil, 1])
+        XCTAssertEqual(sundayStart.compactMap { $0 }.count, 31)
+        let mondayStart = Layout.cells(for: october, calendar: Layout.calendar(firstWeekday: 2))
+        XCTAssertEqual(Array(mondayStart.prefix(4)), [nil, nil, nil, 1])
+        XCTAssertEqual(Layout.cells(for: Layout.Month(year: 2028, month: 2)).compactMap { $0 }.count, 29, "leap February")
+    }
+
+    func testWeekdaySymbolsRotateToTheFirstWeekday() {
+        let english = Locale(identifier: "en_US")
+        XCTAssertEqual(Layout.weekdaySymbols(calendar: Layout.calendar(firstWeekday: 1), locale: english),
+                       ["S", "M", "T", "W", "T", "F", "S"])
+        XCTAssertEqual(Layout.weekdaySymbols(calendar: Layout.calendar(firstWeekday: 2), locale: english),
+                       ["M", "T", "W", "T", "F", "S", "S"])
+    }
+
+    func testTitleCountAndSpokenDate() {
+        let english = Locale(identifier: "en_US")
+        let october = Layout.Month(year: 2026, month: 10)
+        XCTAssertEqual(Layout.title(of: october, locale: english), "October 2026")
+        let entries = Layout.entries([day("2026-10-06"), day("2026-10-07"), day("2026-09-07")])
+        XCTAssertEqual(Layout.entryCount(in: october, entries: entries), "2 days")
+        XCTAssertEqual(Layout.entryCount(in: Layout.Month(year: 2026, month: 9), entries: entries), "1 day")
+        XCTAssertNil(Layout.entryCount(in: Layout.Month(year: 2026, month: 11), entries: entries))
+        XCTAssertEqual(Layout.spokenDate("2026-10-06", locale: english), "Tuesday, October 6, 2026")
+    }
+}
