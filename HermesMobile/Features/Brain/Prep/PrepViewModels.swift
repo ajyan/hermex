@@ -24,6 +24,9 @@ private func prepFailureState<Value>(_ error: Error) -> BrainLoadState<Value> {
 @Observable
 final class PrepHomeViewModel {
     private(set) var state: BrainLoadState<PrepHome> = .loading
+    /// The gap ledger; nil when the server has no gaps route (an older fork) or it failed,
+    /// in which case the home shows the older "Needs work" section instead.
+    private(set) var gaps: [PrepGapSummary]?
     @ObservationIgnored private let client: PrepDataClient
     @ObservationIgnored private var generation = 0
 
@@ -37,10 +40,44 @@ final class PrepHomeViewModel {
     func load() async {
         generation += 1
         let token = generation
+        async let gapsLoad = try? await client.gaps()
         do {
             let home = try await client.home()
+            let gaps = await gapsLoad
             guard token == generation, !Task.isCancelled else { return }
+            self.gaps = gaps
             state = .loaded(home)
+        } catch {
+            guard token == generation, !prepIsCancellation(error) else { return }
+            onAPIError(error)
+            state = prepFailureState(error)
+        }
+    }
+}
+
+/// One gap: the answers that showed it and the cards that target it.
+@MainActor
+@Observable
+final class PrepGapViewModel {
+    let id: String
+    private(set) var state: BrainLoadState<PrepGapDetail> = .loading
+    @ObservationIgnored private let client: PrepDataClient
+    @ObservationIgnored private var generation = 0
+    @ObservationIgnored private let onAPIError: (Error) -> Void
+
+    init(id: String, client: PrepDataClient, onAPIError: @escaping (Error) -> Void = { _ in }) {
+        self.id = id
+        self.client = client
+        self.onAPIError = onAPIError
+    }
+
+    func load() async {
+        generation += 1
+        let token = generation
+        do {
+            let detail = try await client.gap(id: id)
+            guard token == generation, !Task.isCancelled else { return }
+            state = .loaded(detail)
         } catch {
             guard token == generation, !prepIsCancellation(error) else { return }
             onAPIError(error)
@@ -340,6 +377,23 @@ enum PrepCopy {
     enum RunAction: Equatable { case start, resume, done }
 
     static func streak(days: Int) -> String { "\(days)-day streak" }
+
+    /// A gap row's trailing detail: how often it was missed, or progress toward closing it.
+    static func gapRowDetail(_ gap: PrepGapSummary) -> String {
+        switch gap.status {
+        case .improving: "\(gap.hitsTowardClose) of 3 hits"
+        case .closed: "Closed"
+        case .open, .unknown: "Seen \(gap.misses)×"
+        }
+    }
+
+    static func gapsHeader(open: Int, improving: Int) -> String {
+        switch (open, improving) {
+        case (0, 0): "None open"
+        case (_, 0): "\(open) open"
+        default: "\(open) open · \(improving) improving"
+        }
+    }
 
     /// A reference point's id as a readable title: `p.harm-bearer` → "Harm bearer".
     static func pointTitle(_ id: String) -> String {

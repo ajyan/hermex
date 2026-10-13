@@ -37,7 +37,11 @@ struct PrepHomeView: View {
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
                     todaySection(home)
                     if !home.tracks.isEmpty { tracksSection(home.tracks) }
-                    if !home.needsWork.isEmpty { needsWorkSection(home.needsWork) }
+                    if let gaps = viewModel.gaps {
+                        PrepGapsSection(gaps: gaps)
+                    } else if !home.needsWork.isEmpty {
+                        needsWorkSection(home.needsWork)
+                    }
                 }
                 .padding(BrainStyle.l)
                 .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
@@ -276,6 +280,182 @@ struct PrepFailedView: View {
             Text(verbatim: message)
         } actions: {
             Button(action: retry) { Text(verbatim: "Try again") }
+        }
+    }
+}
+
+// MARK: - Gaps
+
+/// The gap ledger on Prep home: open gaps (red dot) and improving ones (amber dot), each
+/// pushing its detail, then a "Closed this week" count. Replaces "Needs work" when the server
+/// has the gaps route.
+struct PrepGapsSection: View {
+    let gaps: [PrepGapSummary]
+
+    private var active: [PrepGapSummary] { gaps.filter { $0.status == .open || $0.status == .improving } }
+    private var closed: Int { gaps.filter { $0.status == .closed }.count }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BrainStyle.s) {
+            BrainSectionHeader(
+                title: "Gaps",
+                trailing: PrepCopy.gapsHeader(open: gaps.filter { $0.status == .open }.count,
+                                              improving: gaps.filter { $0.status == .improving }.count))
+            SectionCard {
+                VStack(spacing: 0) {
+                    if active.isEmpty {
+                        BrainRow(title: "No open gaps",
+                                 subtitle: "Atlas names a gap when the same point is missed across answers.")
+                    }
+                    ForEach(Array(active.enumerated()), id: \.element.id) { offset, gap in
+                        if offset > 0 { PrepRowDivider() }
+                        NavigationLink(value: ShellPushDestination.brainRoute(.prep(.gap(gap.id)))) {
+                            BrainRow(
+                                leading: { PrepGapStatusDot(status: gap.status) },
+                                title: gap.label,
+                                subtitle: PrepCopy.stageChip(gap.stage),
+                                trailing: PrepCopy.gapRowDetail(gap)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    if closed > 0 {
+                        PrepRowDivider()
+                        BrainRow(title: "Closed this week", trailing: "\(closed)")
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// A gap's status as a small dot: open in the danger tint, improving in the warning tint.
+struct PrepGapStatusDot: View {
+    let status: PrepGapStatus
+
+    var body: some View {
+        Circle()
+            .fill(status == .open ? Color.hxDanger : status == .improving ? Color.hxWarning : Color.hxTextSecondary)
+            .frame(width: 8, height: 8)
+            .accessibilityLabel(Text(verbatim: status == .open ? "Open" : status == .improving ? "Improving" : "Closed"))
+    }
+}
+
+/// One gap: what it is, the answers that showed it (quoted in the serif), and the cards that
+/// target it. Pushed as `.brainRoute(.prep(.gap(id)))`; owns no `NavigationStack`.
+struct PrepGapView: View {
+    @State private var viewModel: PrepGapViewModel
+
+    init(id: String, server: URL, onAPIError: @escaping (Error) -> Void) {
+        _viewModel = State(initialValue: PrepGapViewModel(
+            id: id, client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
+    }
+
+    var body: some View {
+        content
+            .hxNavigationTitle(title)
+            .feedbackContext(FeedbackContext(feature: "Prep", screen: "Gap"))
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .task { await viewModel.load() }
+    }
+
+    private var title: String {
+        if case .loaded(let gap) = viewModel.state, !gap.label.isEmpty { return gap.label }
+        return "Gap"
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch viewModel.state {
+        case .loading:
+            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .unavailable:
+            PrepUnavailableView()
+        case .failed(let message):
+            PrepFailedView(title: "Couldn't load this gap", message: message) {
+                Task { await viewModel.load() }
+            }
+        case .loaded(let gap):
+            ScrollView {
+                VStack(alignment: .leading, spacing: BrainStyle.xl) {
+                    header(gap)
+                    if !gap.evidence.isEmpty { evidence(gap.evidence) }
+                    if !gap.cards.isEmpty { cards(gap.cards) }
+                    Text(verbatim: "A gap closes after you make its point on 3 different cards across 2 or more days.")
+                        .brainText(.meta)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(BrainStyle.l)
+                .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
+            }
+            .refreshable { await viewModel.load() }
+        }
+    }
+
+    private func header(_ gap: PrepGapDetail) -> some View {
+        VStack(alignment: .leading, spacing: BrainStyle.s) {
+            HStack(spacing: BrainStyle.s) {
+                HXChip(paper: .request, label: statusWord(gap)) { EmptyView() }
+                if let stage = PrepCopy.stageChip(gap.stage) {
+                    HXChip(paper: .plain, label: stage) { EmptyView() }
+                }
+            }
+            if !gap.summary.isEmpty {
+                Text(verbatim: gap.summary)
+                    .brainText(.rowTitle)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func statusWord(_ gap: PrepGapDetail) -> String {
+        switch gap.status {
+        case .open: "Open · seen \(gap.misses)×"
+        case .improving: "Improving · \(gap.hitsTowardClose) of 3 hits"
+        case .closed: "Closed"
+        case .unknown: "Gap"
+        }
+    }
+
+    private func evidence(_ rows: [PrepGapEvidence]) -> some View {
+        VStack(alignment: .leading, spacing: BrainStyle.s) {
+            BrainSectionHeader(title: "Your answers", count: rows.count)
+            SectionCard {
+                VStack(spacing: 0) {
+                    ForEach(Array(rows.enumerated()), id: \.offset) { offset, row in
+                        if offset > 0 { PrepRowDivider() }
+                        VStack(alignment: .leading, spacing: BrainStyle.xs) {
+                            Text(verbatim: [row.date, row.itemTitle].filter { !$0.isEmpty }.joined(separator: " · "))
+                                .brainText(.meta)
+                                .lineLimit(2)
+                            Text(verbatim: "\u{201C}\(row.quote)\u{201D}")
+                                .brainText(.quote)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, BrainStyle.s)
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+            }
+        }
+    }
+
+    private func cards(_ rows: [PrepGapCard]) -> some View {
+        VStack(alignment: .leading, spacing: BrainStyle.s) {
+            BrainSectionHeader(title: "Cards that target it", count: rows.count)
+            SectionCard {
+                VStack(spacing: 0) {
+                    ForEach(Array(rows.enumerated()), id: \.element.id) { offset, card in
+                        if offset > 0 { PrepRowDivider() }
+                        BrainRow(
+                            title: card.title,
+                            subtitle: card.due.map { "Due \($0)" },
+                            badge: card.isCoachWritten ? "Atlas" : nil
+                        )
+                    }
+                }
+            }
         }
     }
 }

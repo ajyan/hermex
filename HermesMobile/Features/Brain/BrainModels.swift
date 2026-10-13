@@ -443,11 +443,12 @@ enum BrainRoute: Hashable, Sendable {
     case prep(PrepRoute)
 }
 
-/// A screen in the Prep module: its home, one track's skill map, or today's run.
+/// A screen in the Prep module: its home, one track's skill map, today's run, or one gap.
 enum PrepRoute: Hashable, Sendable {
     case home
     case track(String)
     case run
+    case gap(String)
 }
 
 /// Opens a Brain page on the shell's stack from outside Brain (a `brain://` link in a

@@ -736,6 +736,71 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(client.log, ["today", "map:anth"])
     }
 
+    // MARK: Gaps
+
+    private func gapSummary(_ id: String, status: String, misses: Int = 3, hits: Int = 0) -> PrepGapSummary {
+        decode(PrepGapSummary.self, #"{"id": "\#(id)", "label": "Label \#(id)", "stage": "5", "status": "\#(status)", "misses": \#(misses), "hits_toward_close": \#(hits)}"#)
+    }
+
+    private var homeValue: PrepHome {
+        decode(PrepHome.self, #"{"streak": {"days": 1, "freezes": 0}, "run": {"minutes": 30, "reps": 9, "remaining": 9}, "tracks": [], "needs_work": [{"skill": "s", "title": "T", "detail": "d"}]}"#)
+    }
+
+    func testHomeFallsBackToNeedsWorkOn404() async {
+        let client = FakePrepClient()
+        client.homeResults = [.success(homeValue)]
+        client.gapsResults = [.failure(http(404))]
+        let vm = PrepHomeViewModel(client: client)
+        await vm.load()
+        XCTAssertNil(vm.gaps)
+        if case let .loaded(home) = vm.state { XCTAssertEqual(home.needsWork.count, 1) } else { XCTFail("\(vm.state)") }
+    }
+
+    func testGapsLoadedAlongsideHome() async {
+        let client = FakePrepClient()
+        client.homeResults = [.success(homeValue)]
+        client.gapsResults = [.success([gapSummary("gap.a", status: "open"), gapSummary("gap.b", status: "improving", hits: 1)])]
+        let vm = PrepHomeViewModel(client: client)
+        await vm.load()
+        XCTAssertEqual(vm.gaps?.map(\.id), ["gap.a", "gap.b"])
+        XCTAssertEqual(Set(client.log), ["home", "gaps"])
+    }
+
+    func testGapsFailureDoesNotFailHome() async {
+        let client = FakePrepClient()
+        client.homeResults = [.success(homeValue)]
+        client.gapsResults = [.failure(http(500))]
+        let vm = PrepHomeViewModel(client: client)
+        await vm.load()
+        XCTAssertNil(vm.gaps)
+        if case .loaded = vm.state {} else { XCTFail("\(vm.state)") }
+    }
+
+    func testGapRowDetailCopy() {
+        XCTAssertEqual(PrepCopy.gapRowDetail(gapSummary("g", status: "open", misses: 3)), "Seen 3×")
+        XCTAssertEqual(PrepCopy.gapRowDetail(gapSummary("g", status: "improving", hits: 1)), "1 of 3 hits")
+        XCTAssertEqual(PrepCopy.gapRowDetail(gapSummary("g", status: "closed")), "Closed")
+    }
+
+    func testGapsHeaderCopy() {
+        XCTAssertEqual(PrepCopy.gapsHeader(open: 4, improving: 2), "4 open · 2 improving")
+        XCTAssertEqual(PrepCopy.gapsHeader(open: 1, improving: 0), "1 open")
+        XCTAssertEqual(PrepCopy.gapsHeader(open: 0, improving: 0), "None open")
+    }
+
+    func testGapDetailLoadStates() async {
+        let client = FakePrepClient()
+        let detail = decode(PrepGapDetail.self, #"{"id": "gap.a", "label": "A", "status": "open", "evidence": [], "cards": []}"#)
+        client.gapResults = [.success(detail)]
+        let vm = PrepGapViewModel(id: "gap.a", client: client)
+        await vm.load()
+        XCTAssertEqual(vm.state, .loaded(detail))
+        XCTAssertEqual(client.log, ["gap:gap.a"])
+        client.gapResults = [.failure(http(404))]
+        await vm.load()
+        XCTAssertEqual(vm.state, .unavailable)
+    }
+
     func testPointTitleFallback() {
         XCTAssertEqual(PrepCopy.pointTitle("p.harm-bearer"), "Harm bearer")
         XCTAssertEqual(PrepCopy.pointTitle("odd"), "Odd")
