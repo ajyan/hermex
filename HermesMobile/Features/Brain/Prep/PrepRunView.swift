@@ -100,12 +100,15 @@ struct PrepRunView: View {
         switch rep.drill {
         case .complexity, .trace:
             return chosen?.rep == rep.index ? chosen.map { .choice($0.id) } : nil
-        case .approach:
+        case .approach, .judgment:
             return .choice(draft(for: rep).text)
+        case .fact:
+            if rep.item.format == "cloze" { return .choice(draft(for: rep).text) }
+            return chosen?.rep == rep.index ? chosen.map { .choice($0.id) } : nil
         case .spotBug:
             let draft = draft(for: rep)
             return draft.line.map { .bugFix(line: $0, fix: draft.fix ?? "") }
-        case .primer, .unknown, .fact, .judgment:
+        case .primer, .unknown:
             return nil
         }
     }
@@ -154,8 +157,15 @@ struct PrepRunView: View {
                     rep: rep,
                     result: result,
                     chosenID: chosen?.rep == rep.index ? chosen?.id : nil,
-                    chosenLine: draft(for: rep).line
+                    chosenLine: draft(for: rep).line,
+                    typedAnswer: draft(for: rep).text
                 )
+                if rep.item.isCoachWritten {
+                    PrepFlagCardButton(
+                        isFlagged: viewModel.isFlagged(rep.item.id),
+                        error: viewModel.flagError
+                    ) { Task { await viewModel.flagCurrent() } }
+                }
             } bottom: {
                 PrepPrimaryButton(title: "Continue") { Task { await viewModel.continue() } }
             }
@@ -209,7 +219,8 @@ struct PrepRunView: View {
 
     private func hasAction(_ rep: PrepRep) -> Bool {
         switch rep.drill {
-        case .primer, .approach, .spotBug, .unknown, .fact, .judgment: true
+        case .primer, .approach, .spotBug, .unknown, .judgment: true
+        case .fact: rep.item.format == "cloze"
         case .complexity, .trace: false
         }
     }
@@ -237,7 +248,19 @@ struct PrepRunView: View {
                 guard let line = answer.line, let fix = answer.fix else { return }
                 Task { await viewModel.submitBugFix(line: line, fix: fix) }
             }
-        case .unknown, .fact, .judgment:
+        case .judgment:
+            let text = draft(for: rep).text
+            PrepPrimaryButton(
+                title: viewModel.isSubmitting ? "Grading…" : "Submit",
+                enabled: PrepCopy.canSubmitJudgment(text) && !viewModel.isSubmitting
+            ) { Task { await viewModel.submitJudgment(text) } }
+        case .fact:
+            let text = draft(for: rep).text
+            PrepPrimaryButton(
+                title: "Submit",
+                enabled: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !viewModel.isSubmitting
+            ) { Task { await viewModel.submitCloze(text) } }
+        case .unknown:
             PrepPrimaryButton(title: "Skip") { Task { await viewModel.skip() } }
         case .complexity, .trace:
             EmptyView()
@@ -285,7 +308,34 @@ struct PrepRunView: View {
             )
         case .primer:
             PrepPrimerView(item: rep.item)
-        case .unknown, .fact, .judgment:
+        case .fact:
+            if rep.item.format == "cloze" {
+                PrepClozeView(
+                    text: Binding(get: { draft(for: rep).text }, set: { text in updateDraft(rep) { $0.text = text } }),
+                    isSubmitting: viewModel.isSubmitting
+                ) { Task { await viewModel.submitCloze(draft(for: rep).text) } }
+            } else {
+                PrepChoiceView(
+                    title: "Your answer",
+                    options: rep.item.options,
+                    grading: nil,
+                    isSubmitting: viewModel.isSubmitting,
+                    submitError: viewModel.submitError
+                ) { option in choose(option, in: rep) }
+            }
+        case .judgment:
+            PrepApproachView(
+                text: Binding(
+                    get: { draft(for: rep).text },
+                    set: { text in updateDraft(rep) { $0.text = PrepCopy.cappedApproach(text) } }),
+                hints: [],
+                hintsShown: 0,
+                isSubmitting: viewModel.isSubmitting,
+                showHint: {},
+                shownAt: viewModel.shownAt,
+                prompt: "Your answer"
+            )
+        case .unknown:
             PrepNoteCard {
                 Text(verbatim: "Update Atlas to do this rep")
                     .font(BrainStyle.rowTitle)

@@ -441,12 +441,14 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
     /// The gaps this answer's misses belong to, and whether a miss belongs to none yet.
     let gapMatch: [PrepGapMatch]
     let logged: Bool
+    /// A judgment card's reference point sentences by point id, sent once the answer is graded.
+    let pointTexts: [String: String]
 
     /// The grader couldn't score the answer; there is no grade to show.
     var isUngraded: Bool { verdict == "ungraded" }
 
     private enum CodingKeys: String, CodingKey {
-        case verdict, correct, feedback, credit, links, streak, grade, logged
+        case verdict, correct, feedback, credit, links, streak, grade, logged, points
         case referenceMD = "reference_md"
         case nextIndex = "next_index"
         case gapMatch = "gap_match"
@@ -467,6 +469,8 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
         grade = self.judgment == nil ? c.optional(PrepOpenGrade.self, .grade) : nil
         gapMatch = c.lossy(PrepGapMatch.self, .gapMatch)
         logged = c.bool(.logged)
+        pointTexts = Dictionary(c.lossy(PrepPointText.self, .points).map { ($0.id, $0.text) },
+                                uniquingKeysWith: { first, _ in first })
     }
 }
 
@@ -542,6 +546,20 @@ struct PrepGapMatch: Decodable, Hashable, Sendable {
         id = c.string(.id)
         label = c.string(.label)
         misses = c.int(.misses)
+    }
+}
+
+private struct PrepPointText: Decodable {
+    let id: String
+    let text: String
+
+    private enum CodingKeys: String, CodingKey { case id, text }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.string(.id)
+        text = c.string(.text)
+        guard !id.isEmpty, !text.isEmpty else { throw PrepMissingID() }
     }
 }
 

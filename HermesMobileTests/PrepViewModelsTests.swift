@@ -699,6 +699,115 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(PrepCopy.skillLabel(title: "Sliding Window", state: .weak, detail: "Mixed up with two pointers"),
                        "Sliding Window, weak, Mixed up with two pointers")
     }
+
+    // MARK: Anthropic drills
+
+    private func judgmentResult(next: Int, gap: Bool = true, logged: Bool = false) -> PrepAttemptResult {
+        let match = gap ? #"[{"id": "gap.harm", "label": "Who bears the harm", "misses": 3}]"# : "[]"
+        return decode(PrepAttemptResult.self, #"""
+        {"verdict": "partial", "credit": 0.5, "next_index": \#(next),
+         "grade": {"points_hit": [{"point_id": "p.a", "quote": "q"}], "points_missed": [{"point_id": "p.b", "why": "w"}]},
+         "gap_match": \#(match), "logged": \#(logged)}
+        """#)
+    }
+
+    func testJudgmentBlankCannotSubmit() {
+        XCTAssertFalse(PrepCopy.canSubmitJudgment(""))
+        XCTAssertFalse(PrepCopy.canSubmitJudgment("  \n\t "))
+        XCTAssertTrue(PrepCopy.canSubmitJudgment("a"))
+    }
+
+    func testGapCalloutCopy() {
+        let match = [PrepGapMatch(id: "gap.harm", label: "Who bears the harm", misses: 3)]
+        XCTAssertEqual(PrepCopy.gapCallout(match: match, logged: false), "Seen before: Who bears the harm · 3 misses")
+        XCTAssertEqual(PrepCopy.gapCallout(match: [PrepGapMatch(id: "g", label: "L", misses: 1)], logged: true),
+                       "Seen before: L · 1 miss")
+        XCTAssertEqual(PrepCopy.gapCallout(match: [], logged: true), "Logged · Atlas will review tonight")
+        XCTAssertNil(PrepCopy.gapCallout(match: [], logged: false))
+    }
+
+    func testAnthRunLoadsAnthMap() async {
+        let client = FakePrepClient()
+        let anthRep = #"{"index": 0, "block": "warmup", "drill": "judgment", "item": {"id": "anth.j.0001"}}"#
+        client.todayResults = [.success(run(index: 0, reps: [anthRep]))]
+        client.mapResults = [.success(map([]))]
+        let vm = makeVM(client)
+        await vm.load()
+        XCTAssertEqual(client.log, ["today", "map:anth"])
+    }
+
+    func testPointTitleFallback() {
+        XCTAssertEqual(PrepCopy.pointTitle("p.harm-bearer"), "Harm bearer")
+        XCTAssertEqual(PrepCopy.pointTitle("odd"), "Odd")
+    }
+
+    func testStageChip() {
+        XCTAssertEqual(PrepCopy.stageChip("5"), "Stage 5")
+        XCTAssertEqual(PrepCopy.stageChip("2a"), "Stage 2a")
+        XCTAssertNil(PrepCopy.stageChip(""))
+    }
+
+    func testJudgmentSubmitsJudgmentDrill() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "judgment")]))]
+        client.mapResults = [.success(map([]))]
+        client.attemptResults = [.success(judgmentResult(next: 1))]
+        let vm = makeVM(client)
+        await vm.load()
+        await vm.submitJudgment("  Find the tail first.  ")
+        let sent = try! XCTUnwrap(client.attempts.first)
+        XCTAssertEqual(sent.drill, .judgment)
+        XCTAssertEqual(sent.answer, .choice("Find the tail first."))
+        guard case let .result(_, result, _) = vm.phase else { return XCTFail("phase \(vm.phase)") }
+        XCTAssertEqual(result.judgment?.pointsMissed.first?.pointID, "p.b")
+    }
+
+    func testClozeSubmitsTrimmedText() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "fact", extra: #", "format": "cloze""#)]))]
+        client.mapResults = [.success(map([]))]
+        client.attemptResults = [.success(result(next: 1))]
+        let vm = makeVM(client)
+        await vm.load()
+        await vm.submitCloze(" ASL-3 ")
+        XCTAssertEqual(client.attempts.first?.answer, .choice("ASL-3"))
+        XCTAssertEqual(client.attempts.first?.drill, .fact)
+    }
+
+    func testFlagOnlyForCoachItems() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(run(index: 0, reps: [
+            rep(0, drill: "judgment"), rep(1, drill: "judgment", extra: #", "origin": "coach""#)]))]
+        client.mapResults = [.success(map([]))]
+        client.attemptResults = [.success(judgmentResult(next: 1)), .success(judgmentResult(next: 2))]
+        let vm = makeVM(client)
+        await vm.load()
+        await vm.submitJudgment("answer")
+        XCTAssertFalse(vm.canFlag, "an ingest card can't be flagged")
+        await vm.flagCurrent()
+        XCTAssertFalse(client.log.contains { $0.hasPrefix("flag:") })
+        await vm.continue()
+        await vm.submitJudgment("answer")
+        XCTAssertTrue(vm.canFlag)
+        await vm.flagCurrent()
+        XCTAssertEqual(client.log.filter { $0.hasPrefix("flag:") }, ["flag:dsa.1"])
+        XCTAssertFalse(vm.canFlag, "flagged once")
+        XCTAssertTrue(vm.isFlagged("dsa.1"))
+    }
+
+    func testFlagFailureLeavesItFlaggable() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "judgment", extra: #", "origin": "coach""#)]))]
+        client.mapResults = [.success(map([]))]
+        client.attemptResults = [.success(judgmentResult(next: 1))]
+        client.flagResults = [.failure(http(500))]
+        let vm = makeVM(client)
+        await vm.load()
+        await vm.submitJudgment("answer")
+        await vm.flagCurrent()
+        XCTAssertTrue(vm.canFlag)
+        XCTAssertEqual(vm.flagError, "Couldn't flag this card. Try again.")
+    }
 }
 
 /// The run player hosted for real: drives SwiftUI controls through their
@@ -786,4 +895,5 @@ final class PrepDrillViewsTests: XCTestCase {
         }
         return nil
     }
+
 }

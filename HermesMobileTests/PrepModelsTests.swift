@@ -218,9 +218,11 @@ final class PrepModelsTests: XCTestCase {
         {"verdict": "partial", "correct": null, "feedback": "", "credit": 0.5, "next_index": 3,
          "grade": {"verdict": "partial", "points_hit": [{"point_id": "p.tail", "quote": "depends on the tail"}],
                    "points_missed": [{"point_id": "p.harm", "why": "Never named who."}], "strong_answer": "Name who."},
-         "gap_match": [{"id": "gap.harm", "label": "Who bears the harm", "misses": 3}], "logged": false}
+         "gap_match": [{"id": "gap.harm", "label": "Who bears the harm", "misses": 3}], "logged": false,
+         "points": [{"id": "p.tail", "text": "Averages hide the tail."}, {"id": "p.harm", "text": "Name who bears it."}, {"x": 1}]}
         """#
         let r = try decode(PrepAttemptResult.self, json)
+        XCTAssertEqual(r.pointTexts, ["p.tail": "Averages hide the tail.", "p.harm": "Name who bears it."])
         let j = try XCTUnwrap(r.judgment)
         XCTAssertEqual(j.pointsHit.map(\.pointID), ["p.tail"])
         XCTAssertEqual(j.pointsHit.first?.quote, "depends on the tail")

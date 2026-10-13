@@ -100,6 +100,9 @@ final class PrepRunViewModel {
     private(set) var hintsShown = 0
     private(set) var submitError: String?
     private(set) var isSubmitting = false
+    /// Coach-written cards flagged this run, so the flag button reads as done.
+    private(set) var flaggedItems: Set<String> = []
+    private(set) var flagError: String?
     /// When the current rep appeared: the start of `elapsedMS` and of the approach clock.
     private(set) var shownAt: Date
 
@@ -130,7 +133,7 @@ final class PrepRunViewModel {
         do {
             let loaded = try await client.today()
             // Non-fatal: only used to show which skills moved at the end.
-            let map = try? await client.map(track: "dsa")
+            let map = try? await client.map(track: Self.track(of: loaded))
             guard token == generation, !Task.isCancelled else { return }
             mapBefore = map
             run = loaded
@@ -155,6 +158,44 @@ final class PrepRunViewModel {
         await submit(.choice(PrepCopy.cappedApproach(text)))
     }
 
+    /// A judgment card's spoken or typed answer, trimmed and capped like an approach.
+    func submitJudgment(_ text: String) async {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard PrepCopy.canSubmitJudgment(trimmed) else { return }
+        await submit(.choice(PrepCopy.cappedApproach(trimmed)))
+    }
+
+    /// A cloze fact's typed answer; the server compares it ignoring case, spaces and punctuation.
+    func submitCloze(_ text: String) async {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        await submit(.choice(trimmed))
+    }
+
+    /// The answered card was written by the coach and isn't flagged yet.
+    var canFlag: Bool {
+        guard case let .result(rep, _, _) = phase else { return false }
+        return rep.item.isCoachWritten && !flaggedItems.contains(rep.item.id)
+    }
+
+    func isFlagged(_ itemID: String) -> Bool { flaggedItems.contains(itemID) }
+
+    /// Retires the answered coach-written card for good; the coach writes a replacement for its gap.
+    func flagCurrent() async {
+        guard canFlag, case let .result(rep, _, _) = phase else { return }
+        let token = generation
+        flagError = nil
+        do {
+            try await client.flag(item: rep.item.id)
+            guard token == generation else { return }
+            flaggedItems.insert(rep.item.id)
+        } catch {
+            guard token == generation, !prepIsCancellation(error) else { return }
+            onAPIError(error)
+            flagError = "Couldn't flag this card. Try again."
+        }
+    }
+
     /// A spot-the-bug answer: `line` is a 0-based index into `item.code`.
     func submitBugFix(line: Int, fix: String) async {
         await submit(.bugFix(line: line, fix: fix))
@@ -166,6 +207,12 @@ final class PrepRunViewModel {
         isAdvancing = true
         defer { isAdvancing = false }
         await advance(in: run, to: rep.index + 1, after: rep.index, token: generation)
+    }
+
+    /// The track today's run drills, for the before/after skill map: `anth` once the run holds
+    /// Anthropic-track reps (ids `anth.…`), otherwise `dsa`.
+    static func track(of run: PrepRun) -> String {
+        run.reps.contains { $0.item.id.hasPrefix("anth.") } ? "anth" : "dsa"
     }
 
     /// The user closed the run: any response still in flight is dropped.
@@ -202,6 +249,7 @@ final class PrepRunViewModel {
     private func show(_ rep: PrepRep) {
         hintsShown = 0
         submitError = nil
+        flagError = nil
         shownAt = now()
         phase = .rep(rep, index: rep.index)
     }
@@ -253,7 +301,7 @@ final class PrepRunViewModel {
         lastStreak = nil
         do {
             let fresh = try await client.today()
-            let map = try? await client.map(track: "dsa")
+            let map = try? await client.map(track: Self.track(of: fresh))
             guard token == generation, !Task.isCancelled else { return }
             mapBefore = map
             run = fresh
@@ -269,7 +317,7 @@ final class PrepRunViewModel {
         var streak = lastStreak
         if streak == nil { streak = try? await client.home().streak }
         var moved: [PrepSkill] = []
-        let after = mapBefore == nil ? nil : try? await client.map(track: "dsa")
+        let after = mapBefore == nil ? nil : try? await client.map(track: run.map(Self.track(of:)) ?? "dsa")
         guard token == generation, !Task.isCancelled else { return }
         if let before = mapBefore, let after {
             let old = Dictionary(
@@ -292,6 +340,32 @@ enum PrepCopy {
     enum RunAction: Equatable { case start, resume, done }
 
     static func streak(days: Int) -> String { "\(days)-day streak" }
+
+    /// A reference point's id as a readable title: `p.harm-bearer` → "Harm bearer".
+    static func pointTitle(_ id: String) -> String {
+        let slug = id.hasPrefix("p.") ? String(id.dropFirst(2)) : id
+        let words = slug.split(separator: "-").joined(separator: " ")
+        return words.prefix(1).uppercased() + words.dropFirst()
+    }
+
+    /// A judgment answer needs something besides whitespace.
+    static func canSubmitJudgment(_ text: String) -> Bool {
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// The interview-loop stage chip on an Anthropic-track rep; nil when the rep has no stage.
+    static func stageChip(_ stage: String) -> String? {
+        stage.isEmpty ? nil : "Stage \(stage)"
+    }
+
+    /// The line under a graded judgment: the gap this miss belongs to, or that it was logged
+    /// for the nightly coach. Nil when nothing was missed.
+    static func gapCallout(match: [PrepGapMatch], logged: Bool) -> String? {
+        if let gap = match.first {
+            return "Seen before: \(gap.label) · \(gap.misses) \(gap.misses == 1 ? "miss" : "misses")"
+        }
+        return logged ? "Logged · Atlas will review tonight" : nil
+    }
 
     static func freezes(_ count: Int) -> String {
         count == 1 ? "1 freeze saved" : "\(count) freezes saved"
