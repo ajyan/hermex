@@ -263,7 +263,9 @@ private struct TranscriptMediaResolvedRemoteView: View {
             }
 
             guard !Task.isCancelled else { return }
-            resolvedMedia = Self.resolve(data)
+            let resolved = await Task.detached(priority: .userInitiated) { Self.resolve(data) }.value
+            guard !Task.isCancelled else { return }
+            resolvedMedia = resolved
         }
     }
 
@@ -280,8 +282,10 @@ private struct TranscriptMediaResolvedRemoteView: View {
             )
     }
 
-    private static func resolve(_ data: Data) -> ResolvedMedia {
-        if let image = UIImage(data: data) {
+    /// Sniffs what the bytes are. An image keeps only its 512 px thumbnail, not the
+    /// full-size decode, since the row shows a thumbnail. Synchronous: call it off the main thread.
+    private nonisolated static func resolve(_ data: Data) -> ResolvedMedia {
+        if let image = TranscriptImageCache.thumbnail(from: data) {
             return .image(image)
         }
 
@@ -292,7 +296,7 @@ private struct TranscriptMediaResolvedRemoteView: View {
         return .video
     }
 
-    private enum ResolvedMedia {
+    private enum ResolvedMedia: Sendable {
         case image(UIImage)
         case audio(Data)
         case video
