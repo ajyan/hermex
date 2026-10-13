@@ -22,6 +22,7 @@ enum VoiceCallPhrases {
     static let approved = "Approved."
     static let denied = "Denied."
     static let didntCatch = "I didn't catch that."
+    static let hangingUpNoSpeech = "I haven't heard anything, so I'm hanging up"
 
     /// `text` without a call's leading `[voice] ` tag, for display.
     static func withoutVoiceTag(_ text: String) -> String {
@@ -90,6 +91,8 @@ final class VoiceCallController {
     @ObservationIgnored private var transcriptChangedAt: TimeInterval?
     /// When `listening` began, for the no-speech prompt.
     @ObservationIgnored private var listeningSince: TimeInterval?
+    /// "I didn't catch that" prompts since the user last spoke; a forgotten call hangs up after a few.
+    @ObservationIgnored private var unansweredNoSpeechPrompts = 0
 
     // Reply
     @ObservationIgnored private var shaper = SpeechTextShaper()
@@ -382,6 +385,7 @@ final class VoiceCallController {
     private func publishTranscript() {
         let text = (finals + [partial]).filter { !$0.isEmpty }.joined(separator: " ")
         if partialTranscript != text { partialTranscript = text }
+        if !text.isEmpty { unansweredNoSpeechPrompts = 0 }
     }
 
     private func clearTranscript() {
@@ -476,8 +480,15 @@ final class VoiceCallController {
         }
     }
 
-    /// Nothing was heard for a while: say so instead of sitting silent.
+    /// Nothing was heard for a while: say so instead of sitting silent. A call left
+    /// running with nobody there hangs up rather than keeping the mic and recognizer on.
     private func announceNoSpeech() {
+        guard unansweredNoSpeechPrompts < VoiceCallTiming.noSpeechPromptsBeforeHangUp else {
+            log("no speech after \(unansweredNoSpeechPrompts) prompts; hanging up")
+            tearDown(endSystemCall: true, message: VoiceCallPhrases.hangingUpNoSpeech)
+            return
+        }
+        unansweredNoSpeechPrompts += 1
         log("no speech heard; prompting")
         listeningSince = nil
         spokenWords = []
