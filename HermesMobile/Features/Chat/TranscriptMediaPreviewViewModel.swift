@@ -9,6 +9,8 @@ final class TranscriptMediaPreviewViewModel {
     private let apiClient: APIClient
     private var didLoad = false
     private var loadGeneration = 0
+    /// The downloaded bytes, kept only until a video is on disk; after that the
+    /// temporary file is the copy, so a large video isn't also held in memory.
     private var originalData: Data?
     private var temporaryVideoURL: URL?
 
@@ -36,7 +38,7 @@ final class TranscriptMediaPreviewViewModel {
     }
 
     var canSaveVideoToPhotos: Bool {
-        videoFileURL != nil && originalData != nil
+        videoFileURL != nil
     }
 
     var canSaveMediaToPhotos: Bool {
@@ -44,6 +46,10 @@ final class TranscriptMediaPreviewViewModel {
     }
 
     var canExportMedia: Bool {
+        originalData != nil || temporaryVideoURL != nil
+    }
+
+    var holdsOriginalDataInMemory: Bool {
         originalData != nil
     }
 
@@ -87,6 +93,7 @@ final class TranscriptMediaPreviewViewModel {
                 }
                 temporaryVideoURL = fileURL
                 videoFileURL = fileURL
+                originalData = nil
             } else if reference.isExtensionlessRemoteMediaCandidate, Self.isAudioData(data) {
                 // Sniffed before the image decode: a WAV header is a RIFF
                 // container, which sends ImageIO looking for a WebP codec.
@@ -104,6 +111,7 @@ final class TranscriptMediaPreviewViewModel {
                         let fileURL = try writeTemporaryVideoFile(data)
                         temporaryVideoURL = fileURL
                         videoFileURL = fileURL
+                        originalData = nil
                     } else {
                         errorMessage = String(localized: "Could not decode this image.")
                     }
@@ -123,6 +131,10 @@ final class TranscriptMediaPreviewViewModel {
     func originalMediaData() async throws -> Data {
         if let originalData {
             return originalData
+        }
+        if let temporaryVideoURL {
+            // Mapped, so exporting a large video doesn't read it all into memory.
+            return try Data(contentsOf: temporaryVideoURL, options: .alwaysMapped)
         }
 
         let data = try await transcriptMediaData()
