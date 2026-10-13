@@ -7,6 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C0FFEE500000000000000003 /* MoneyModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE500000000000000002 /* MoneyModels.swift */; };
+		C0FFEE500000000000000005 /* MoneyViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE500000000000000004 /* MoneyViewModel.swift */; };
+		C0FFEE500000000000000007 /* MoneyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE500000000000000006 /* MoneyView.swift */; };
+		C0FFEE500000000000000009 /* MoneyChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE500000000000000008 /* MoneyChart.swift */; };
+		C0FFEE50000000000000000B /* MoneyMarketView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE50000000000000000A /* MoneyMarketView.swift */; };
+		C0FFEE50000000000000000D /* MoneySparkline.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE50000000000000000C /* MoneySparkline.swift */; };
+		C0FFEE50000000000000000F /* MoneyModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE50000000000000000E /* MoneyModelsTests.swift */; };
+		C0FFEE500000000000000011 /* MoneyViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE500000000000000010 /* MoneyViewModelTests.swift */; };
 		B1A1C0DE00000000000F0015 /* GoalHeroCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0014 /* GoalHeroCard.swift */; };
 		B1A1C0DE00000000000F0013 /* GoalsDesignTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0012 /* GoalsDesignTests.swift */; };
 		B1A1C0DE00000000000F0011 /* GoalPaper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0010 /* GoalPaper.swift */; };
@@ -763,6 +771,14 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		C0FFEE500000000000000002 /* MoneyModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyModels.swift; sourceTree = "<group>"; };
+		C0FFEE500000000000000004 /* MoneyViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyViewModel.swift; sourceTree = "<group>"; };
+		C0FFEE500000000000000006 /* MoneyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyView.swift; sourceTree = "<group>"; };
+		C0FFEE500000000000000008 /* MoneyChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyChart.swift; sourceTree = "<group>"; };
+		C0FFEE50000000000000000A /* MoneyMarketView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyMarketView.swift; sourceTree = "<group>"; };
+		C0FFEE50000000000000000C /* MoneySparkline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneySparkline.swift; sourceTree = "<group>"; };
+		C0FFEE50000000000000000E /* MoneyModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyModelsTests.swift; sourceTree = "<group>"; };
+		C0FFEE500000000000000010 /* MoneyViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyViewModelTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0014 /* GoalHeroCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalHeroCard.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0012 /* GoalsDesignTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsDesignTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0010 /* GoalPaper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalPaper.swift; sourceTree = "<group>"; };
@@ -1512,6 +1528,19 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		C0FFEE500000000000000001 /* Money */ = {
+			isa = PBXGroup;
+			children = (
+				C0FFEE500000000000000002 /* MoneyModels.swift */,
+				C0FFEE500000000000000004 /* MoneyViewModel.swift */,
+				C0FFEE500000000000000006 /* MoneyView.swift */,
+				C0FFEE500000000000000008 /* MoneyChart.swift */,
+				C0FFEE50000000000000000A /* MoneyMarketView.swift */,
+				C0FFEE50000000000000000C /* MoneySparkline.swift */,
+			);
+			path = Money;
+			sourceTree = "<group>";
+		};
 		B1A1C0DE00000000000F0001 /* Goals */ = {
 			isa = PBXGroup;
 			children = (
@@ -1625,6 +1654,8 @@
 		1A2B3C4D5E6F700000000034 /* HermesMobileTests */ = {
 			isa = PBXGroup;
 			children = (
+				C0FFEE50000000000000000E /* MoneyModelsTests.swift */,
+				C0FFEE500000000000000010 /* MoneyViewModelTests.swift */,
 				3A997D807C262D12E5491E89 /* DailyDeckTests.swift */,
 				B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */,
 				B1A1C0DE0000000000000204 /* BrainModelsTests.swift */,
@@ -1964,6 +1995,7 @@
 				B1A1C0DE0000000000000003 /* Brain */,
 				FEEDB0DE00000000000000A0 /* Feedback */,
 				B1A1C0DE00000000000F0001 /* Goals */,
+				C0FFEE500000000000000001 /* Money */,
 				12A06408B1B8DA1A340CBD38 /* DailyDeck */,
 				9BAF7D8BBF390913B4F060B0 /* VoiceCall */,
 				AA0200000000000000000006 /* Activity */,
@@ -2762,6 +2794,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C0FFEE500000000000000003 /* MoneyModels.swift in Sources */,
+				C0FFEE500000000000000005 /* MoneyViewModel.swift in Sources */,
+				C0FFEE500000000000000007 /* MoneyView.swift in Sources */,
+				C0FFEE500000000000000009 /* MoneyChart.swift in Sources */,
+				C0FFEE50000000000000000B /* MoneyMarketView.swift in Sources */,
+				C0FFEE50000000000000000D /* MoneySparkline.swift in Sources */,
 				456FFBA86135A0D6C5707B5E /* DeckCalendarView.swift in Sources */,
 				BBEB574715121587294478C7 /* DailyBriefReminder.swift in Sources */,
 				3F522DC0F0540A319E63AB5A /* DeckFeedbackSheet.swift in Sources */,
@@ -3217,6 +3255,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C0FFEE50000000000000000F /* MoneyModelsTests.swift in Sources */,
+				C0FFEE500000000000000011 /* MoneyViewModelTests.swift in Sources */,
 				2A8CB7ACCDBA9BBE34E57FDC /* DailyDeckTests.swift in Sources */,
 				B1A1C0DE0000000000000201 /* BrainViewModelTests.swift in Sources */,
 				B1A1C0DE0000000000000203 /* BrainModelsTests.swift in Sources */,

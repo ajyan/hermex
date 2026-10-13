@@ -83,6 +83,8 @@ extension HermexPaper {
     static let recall = HermexPaper.advisor
     /// Shell, code, and everything without a kind of its own.
     static let tool = HermexPaper.plain
+    /// Money: net worth, accounts, and the market card.
+    static let money = HermexPaper.ledger
 
     static func forTool(_ kind: ToolCallSummaryFormatter.Kind) -> HermexPaper {
         switch kind {

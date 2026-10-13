@@ -1,0 +1,26 @@
+{
+ "version": 1,
+ "written_at": "2026-10-12T16:33:00-04:00",
+ "window": {
+  "start": "2026-10-05",
+  "end": "2026-10-12"
+ },
+ "story": "Stocks rose after a softer inflation report lifted rate-cut odds.",
+ "drivers": [
+  {
+   "text": "September consumer prices rose less than forecast.",
+   "source": "Example News",
+   "url": "https://example.com/cpi"
+  },
+  {
+   "text": "Large tech shares led after upbeat cloud guidance.",
+   "source": "Example Wire",
+   "url": "https://example.com/tech"
+  },
+  {
+   "text": "A stronger dollar weighed on international stocks.",
+   "source": "Example Daily",
+   "url": "https://example.com/dollar"
+  }
+ ]
+}
