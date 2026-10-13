@@ -2210,6 +2210,62 @@ final class ChatViewModelSendTests: XCTestCase {
     }
 
     @MainActor
+    func testApprovalFallbackRetriesTheStreamWhenTheNextRunStarts() async throws {
+        let streamClient = SpySSEStreamingClient()
+        let approvalStreamClient = SpySSEStreamingClient()
+        let pollingIntervals = ChatPollingIntervals(
+            approvalNanoseconds: 60_000_000_000,
+            clarificationNanoseconds: 60_000_000_000,
+            backgroundNanoseconds: 60_000_000_000
+        )
+        let viewModel = try makeViewModel(
+            streamClient: streamClient,
+            approvalStreamClient: approvalStreamClient,
+            pollingIntervals: pollingIntervals
+        ) { request in
+            switch request.url?.path {
+            case "/api/chat/start":
+                return apiTestJSONResponse(#"{"session_id":"session-abc","stream_id":"stream-123"}"#, for: request)
+            case "/api/approval/pending":
+                return apiTestJSONResponse(#"{"pending":null,"pending_count":0}"#, for: request)
+            default:
+                XCTFail("Unexpected request path: \(request.url?.path ?? "nil")")
+                throw URLError(.badURL)
+            }
+        }
+
+        let didStart = await viewModel.sendMessage("Run setup")
+        XCTAssertTrue(didStart)
+        XCTAssertEqual(approvalStreamClient.startedURLs.count, 1)
+        approvalStreamClient.emit(.transportError("approval stream failed"))
+        streamClient.emit(.streamEnd)
+
+        let didStartAgain = await viewModel.sendMessage("And again")
+        XCTAssertTrue(didStartAgain)
+
+        XCTAssertEqual(approvalStreamClient.startedURLs.count, 2, "A new run should leave fallback polling for the stream.")
+        viewModel.cleanupPollingTasks()
+    }
+
+    @MainActor
+    func testIdleApprovalFallbackPollingBacksOffToTheCap() {
+        let base: UInt64 = 1_500_000_000
+        let cap = ChatPendingActionCoordinator.maxIdleApprovalPollingNanoseconds
+        var interval = base
+        var intervals: [UInt64] = []
+        for _ in 0..<6 {
+            interval = ChatPendingActionCoordinator.nextApprovalPollingInterval(after: interval, base: base, isRunLive: false)
+            intervals.append(interval)
+        }
+        XCTAssertEqual(intervals, [3_000_000_000, 6_000_000_000, 12_000_000_000, 24_000_000_000, cap, cap])
+        XCTAssertEqual(
+            ChatPendingActionCoordinator.nextApprovalPollingInterval(after: cap, base: base, isRunLive: true),
+            base,
+            "A live run polls at the base rate again."
+        )
+    }
+
+    @MainActor
     func testCleanupPollingTasksCancelsStoredPollingTasks() async throws {
         let streamClient = SpySSEStreamingClient()
         let approvalStreamClient = SpySSEStreamingClient()
