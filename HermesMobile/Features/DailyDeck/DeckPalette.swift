@@ -40,6 +40,7 @@ struct DeckPalette: Equatable {
     static let notes = DeckPalette(.notes, symbol: "lightbulb", name: "From your notes", shortName: "Notes")
     static let video = DeckPalette(.video, symbol: "play.rectangle", name: "Video", shortName: "Video")
     static let past = DeckPalette(.past, symbol: "clock.arrow.circlepath", name: "On this day", shortName: "On this day")
+    static let sleep = DeckPalette(.notes, symbol: "moon.zzz", name: "Sleep", shortName: "Sleep")
     static let advisor = DeckPalette(.advisor, symbol: "bubble.left", name: "Check-in", shortName: "Check-in")
     static let plain = DeckPalette(.plain, symbol: "tray", name: "From your library", shortName: "Library")
     static let followUps = DeckPalette(.plain, symbol: "checklist", name: "Follow-ups", shortName: "Follow-ups")
@@ -56,6 +57,7 @@ struct DeckPalette: Equatable {
         case .headline: return .opener
         case .close: return .quote
         case .prompt: return .advisor
+        case .sleep: return .sleep
         case .decision: return .followUps
         case .item, .unknown: return .plain
         case .reflect:

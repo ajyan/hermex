@@ -42,6 +42,8 @@ private struct DeckCardView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isWriting = false
     @State private var overflows = false
+    /// The sleep card's numbers, shown before rating when asked for.
+    @State private var showsNumbers = false
 
     var body: some View {
         ScrollView {
@@ -49,6 +51,7 @@ private struct DeckCardView: View {
                 switch card.type {
                 case .headline: opener
                 case .close: close
+                case .sleep: sleep
                 default: reading
                 }
             }
@@ -126,7 +129,7 @@ private struct DeckCardView: View {
                 .id(question)
                 .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
         }
-        if card.takesText { reflection.padding(.top, 16) }
+        if card.takesText { reflection().padding(.top, 16) }
         if let reason = card.reason {
             Text(verbatim: reason)
                 .font(AppFont.footnote())
@@ -146,7 +149,7 @@ private struct DeckCardView: View {
 
     /// Your words once written; until then, the way in.
     @ViewBuilder
-    private var reflection: some View {
+    private func reflection(_ invitation: String = "Write a reflection") -> some View {
         if let text = viewModel.answer(for: card)?.text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             Button { isWriting = true } label: {
                 VStack(alignment: .leading, spacing: 8) {
@@ -166,13 +169,58 @@ private struct DeckCardView: View {
             .accessibilityLabel(Text(verbatim: "Your reflection: \(text). Edit"))
         } else {
             Button { isWriting = true } label: {
-                Label { Text(verbatim: "Write a reflection") } icon: { Image(systemName: "square.and.pencil") }
+                Label { Text(verbatim: invitation) } icon: { Image(systemName: "square.and.pencil") }
                     .font(AppFont.body(weight: .semibold))
                     .foregroundStyle(palette.onInk)
                     .frame(maxWidth: .infinity, minHeight: 50)
                     .background(palette.ink, in: Capsule())
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    // MARK: Sleep
+
+    /// Rate the night first, then last night's numbers: shown once rated (or when asked for) so
+    /// they don't decide the rating. A note is optional.
+    @ViewBuilder
+    private var sleep: some View {
+        let rating = viewModel.answer(for: card)?.rating
+        Text(verbatim: card.question ?? "How did you sleep?")
+            .font(AppFont.display(style: .title2, weight: .semibold))
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.trailing, 30)
+        FlowRow(spacing: 8) {
+            ForEach(Array(card.scale.enumerated()), id: \.offset) { index, label in
+                ChoiceButton(title: label, isSelected: rating == index + 1) {
+                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { viewModel.rate(index + 1, for: card) }
+                }
+            }
+        }
+        .padding(.top, 18)
+        if let numbers = card.sleep {
+            if rating != nil || showsNumbers {
+                SleepNumbers(sleep: numbers, palette: palette)
+                    .padding(.top, 26)
+                    .transition(.opacity)
+            } else {
+                Button {
+                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { showsNumbers = true }
+                } label: {
+                    Label { Text(verbatim: "Show last night") } icon: { Image(systemName: "chart.bar") }
+                        .font(AppFont.subheadline(weight: .semibold))
+                        .foregroundStyle(palette.ink)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 22)
+            }
+        }
+        reflection("Add a note").padding(.top, 24)
+        if let reason = card.reason {
+            Text(verbatim: reason)
+                .font(AppFont.footnote())
+                .foregroundStyle(palette.ink)
+                .padding(.top, 20)
         }
     }
 
@@ -269,6 +317,76 @@ private struct DeckCardView: View {
         .buttonStyle(.plain)
         .disabled(viewModel.filing == .filing || !viewModel.hasChanges)
         .padding(.top, 28)
+    }
+}
+
+/// Last night in words (hours against need, then timing and recovery) over the week's strip.
+private struct SleepNumbers: View {
+    let sleep: DeckSleep
+    let palette: DeckPalette
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let headline = sleep.headline {
+                Text(verbatim: headline)
+                    .font(AppFont.display(style: .title3, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            ForEach(Array(sleep.lines.enumerated()), id: \.offset) { _, line in
+                Text(verbatim: line)
+                    .font(AppFont.body())
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 6)
+            }
+            if sleep.nights.contains(where: { $0.hours != nil }) {
+                SleepStrip(nights: sleep.nights, palette: palette).padding(.top, 20)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// The last seven nights as bars, last night full strength, each with a tick at that night's need.
+private struct SleepStrip: View {
+    let nights: [DeckNight]
+    let palette: DeckPalette
+
+    private static let height: CGFloat = 64
+
+    var body: some View {
+        let top = max(nights.compactMap { max($0.hours ?? 0, $0.need ?? 0) }.max() ?? 0, 1)
+        HStack(alignment: .bottom, spacing: 8) {
+            ForEach(Array(nights.enumerated()), id: \.offset) { index, night in
+                let last = index == nights.count - 1
+                VStack(spacing: 6) {
+                    ZStack(alignment: .bottom) {
+                        Color.clear
+                        RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous)
+                            .fill(palette.ink.opacity(night.hours == nil ? 0.12 : last ? 1 : 0.35))
+                            .frame(height: night.hours.map { max(Self.height * $0 / top, 3) } ?? 3)
+                        if let need = night.need {
+                            Rectangle()
+                                .fill(palette.ink.opacity(0.7))
+                                .frame(height: 1.5)
+                                .padding(.bottom, Self.height * need / top)
+                        }
+                    }
+                    .frame(height: Self.height)
+                    Text(verbatim: night.day)
+                        .font(AppFont.caption(weight: last ? .semibold : .regular))
+                        .foregroundStyle(palette.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "Last \(nights.count) nights"))
+        .accessibilityValue(Text(verbatim: nights.map { night in
+            "\(night.day): " + (night.hours.map { "\($0.formatted()) hours" } ?? "no data")
+        }.joined(separator: ", ")))
     }
 }
 
