@@ -11506,3 +11506,62 @@ private actor ManualAsyncDelay {
         }
     }
 }
+
+final class ActiveChatStreamSnapshotStoreTests: XCTestCase {
+    private let server = URL(string: "https://hermes.example")!
+
+    func testSavingAStreamDropsThatSessionsOlderStreams() {
+        let store = ActiveChatStreamSnapshotStore()
+        store.save(Self.snapshot("first"), server: server, sessionID: "s1", streamID: "stream-1")
+        store.save(Self.snapshot("other"), server: server, sessionID: "s2", streamID: "stream-9")
+        store.save(Self.snapshot("second"), server: server, sessionID: "s1", streamID: "stream-2")
+
+        XCTAssertNil(store.snapshot(server: server, sessionID: "s1", streamID: "stream-1"))
+        XCTAssertEqual(store.snapshot(server: server, sessionID: "s1", streamID: "stream-2")?.displayTitle, "second")
+        XCTAssertEqual(store.snapshot(server: server, sessionID: "s2", streamID: "stream-9")?.displayTitle, "other")
+        XCTAssertEqual(store.count, 2)
+    }
+
+    func testTheSameSessionOnAnotherServerIsKept() {
+        let store = ActiveChatStreamSnapshotStore()
+        let otherServer = URL(string: "https://other.example")!
+        store.save(Self.snapshot("a"), server: server, sessionID: "s1", streamID: "stream-1")
+        store.save(Self.snapshot("b"), server: otherServer, sessionID: "s1", streamID: "stream-2")
+
+        XCTAssertNotNil(store.snapshot(server: server, sessionID: "s1", streamID: "stream-1"))
+        XCTAssertNotNil(store.snapshot(server: otherServer, sessionID: "s1", streamID: "stream-2"))
+    }
+
+    func testOldestSnapshotIsEvictedPastTheLimit() {
+        let store = ActiveChatStreamSnapshotStore(limit: 2)
+        store.save(Self.snapshot("1"), server: server, sessionID: "s1", streamID: "a")
+        store.save(Self.snapshot("2"), server: server, sessionID: "s2", streamID: "b")
+        // Saving again refreshes s1, so s2 is now the oldest.
+        store.save(Self.snapshot("1b"), server: server, sessionID: "s1", streamID: "a")
+        store.save(Self.snapshot("3"), server: server, sessionID: "s3", streamID: "c")
+
+        XCTAssertNil(store.snapshot(server: server, sessionID: "s2", streamID: "b"))
+        XCTAssertEqual(store.snapshot(server: server, sessionID: "s1", streamID: "a")?.displayTitle, "1b")
+        XCTAssertNotNil(store.snapshot(server: server, sessionID: "s3", streamID: "c"))
+        XCTAssertEqual(store.count, 2)
+    }
+
+    private static func snapshot(_ title: String) -> ActiveChatStreamSnapshot {
+        ActiveChatStreamSnapshot(
+            messages: [],
+            messagesOffset: 0,
+            displayTitle: title,
+            completedToolCallGroups: [],
+            completedReasoningGroups: [],
+            liveToolCalls: [],
+            liveReasoningText: "",
+            activeStreamLastEventID: nil,
+            streamingAssistantMessageID: nil,
+            toolCallAnchorMessageID: nil,
+            reasoningAnchorMessageID: nil,
+            contextWindowSnapshot: nil,
+            localAttachmentPreviews: [:],
+            pinnedLocalNotices: []
+        )
+    }
+}
