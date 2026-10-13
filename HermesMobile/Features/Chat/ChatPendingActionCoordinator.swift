@@ -301,7 +301,8 @@ final class ChatPendingActionCoordinator {
     private func startApprovalMonitoring() {
         guard let sessionID = delegate?.pendingActionSessionID,
               delegate?.pendingActionHasActiveStream == true || approvalPendingBySession[sessionID] != nil,
-              approvalMonitoringSessionID != sessionID
+              // A session stuck on fallback polling retries its SSE stream when a new run starts.
+              approvalMonitoringSessionID != sessionID || approvalPollingTask != nil
         else { return }
 
         stopApprovalMonitoring(clearPrompt: false)
@@ -349,8 +350,9 @@ final class ChatPendingActionCoordinator {
 
         approvalStreamClient.stop()
         approvalPollingTask?.cancel()
-        let pollingInterval = pollingIntervals.approvalNanoseconds
+        let baseInterval = pollingIntervals.approvalNanoseconds
         approvalPollingTask = Task { @MainActor [weak self] in
+            var pollingInterval = baseInterval
             pollingLoop: while !Task.isCancelled {
                 do {
                     guard let self,
@@ -358,15 +360,34 @@ final class ChatPendingActionCoordinator {
                           self.delegate?.pendingActionIsStreamConnectionSuspended != true
                     else { break pollingLoop }
 
-                    await self.refreshApprovalPending(sessionID: sessionID)
+                    // Offline, a request can only fail; keep the cadence and skip it.
+                    if NetworkPathMonitor.shared.isSatisfied {
+                        await self.refreshApprovalPending(sessionID: sessionID)
+                    }
                     // An empty snapshot cannot rule out a later approval. Keep
-                    // polling while this chat is open if its SSE connection failed.
+                    // polling while this chat is open if its SSE connection failed,
+                    // but back off between runs so an idle chat stops waking the radio.
+                    pollingInterval = Self.nextApprovalPollingInterval(
+                        after: pollingInterval,
+                        base: baseInterval,
+                        isRunLive: self.delegate?.pendingActionHasActiveStream == true
+                            || self.approvalPendingBySession[sessionID] != nil
+                    )
                 }
 
                 guard !Task.isCancelled else { break }
                 try? await Task.sleep(nanoseconds: pollingInterval)
             }
         }
+    }
+
+    /// Longest wait between fallback approval polls while no run is live.
+    static let maxIdleApprovalPollingNanoseconds: UInt64 = 30_000_000_000
+
+    /// The base interval while a run can raise an approval; otherwise doubles up to the idle cap.
+    static func nextApprovalPollingInterval(after current: UInt64, base: UInt64, isRunLive: Bool) -> UInt64 {
+        guard !isRunLive else { return base }
+        return min(max(current * 2, base), max(base, maxIdleApprovalPollingNanoseconds))
     }
 
     private func refreshApprovalPending(sessionID: String) async {

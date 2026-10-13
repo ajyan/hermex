@@ -85,7 +85,8 @@ struct VoiceCallOrb: View {
     @State private var motion = OrbMotion()
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60, paused: reduceMotion)) { timeline in
+        // 30 fps: the motion is time-based and soft, and a call can run for a long time.
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { timeline in
             Canvas { context, size in
                 guard !focus.isEmpty else { return }
                 let frame = motion.advance(
