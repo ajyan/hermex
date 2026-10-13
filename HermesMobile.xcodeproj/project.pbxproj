@@ -711,6 +711,13 @@
 		39D0697E4167AB61D9640383 /* DeckPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = B87C4558BE2BEAAD59ECCE39 /* DeckPalette.swift */; };
 		FEEDB0DE00000000000000A1 /* FeedbackModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000A2 /* FeedbackModels.swift */; };
 		FEEDB0DE00000000000000A3 /* FeedbackDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000A4 /* FeedbackDataClient.swift */; };
+		1ABE15000000000000000001 /* LabelsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ABE15000000000000000002 /* LabelsModels.swift */; };
+		1ABE15000000000000000003 /* LabelsDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ABE15000000000000000004 /* LabelsDataClient.swift */; };
+		1ABE15000000000000000005 /* LabelsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ABE15000000000000000006 /* LabelsViewModel.swift */; };
+		1ABE15000000000000000007 /* RateControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ABE15000000000000000008 /* RateControl.swift */; };
+		1ABE15000000000000000009 /* LabelQueueViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ABE1500000000000000000A /* LabelQueueViewModel.swift */; };
+		1ABE1500000000000000000B /* LabelQueueView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ABE1500000000000000000C /* LabelQueueView.swift */; };
+		1ABE1500000000000000000D /* LabelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ABE1500000000000000000E /* LabelsTests.swift */; };
 		FEEDB0DE00000000000000A5 /* FeedbackModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000A6 /* FeedbackModelsTests.swift */; };
 		FEEDB0DE00000000000000A7 /* FeedbackSheetViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000A8 /* FeedbackSheetViewModelTests.swift */; };
 		FEEDB0DE00000000000000A9 /* FeedbackSheetViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000AA /* FeedbackSheetViewModel.swift */; };
@@ -1470,6 +1477,13 @@
 		B87C4558BE2BEAAD59ECCE39 /* DeckPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckPalette.swift; sourceTree = "<group>"; };
 		FEEDB0DE00000000000000A2 /* FeedbackModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackModels.swift; sourceTree = "<group>"; };
 		FEEDB0DE00000000000000A4 /* FeedbackDataClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackDataClient.swift; sourceTree = "<group>"; };
+		1ABE15000000000000000002 /* LabelsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelsModels.swift; sourceTree = "<group>"; };
+		1ABE15000000000000000004 /* LabelsDataClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelsDataClient.swift; sourceTree = "<group>"; };
+		1ABE15000000000000000006 /* LabelsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelsViewModel.swift; sourceTree = "<group>"; };
+		1ABE15000000000000000008 /* RateControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RateControl.swift; sourceTree = "<group>"; };
+		1ABE1500000000000000000A /* LabelQueueViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelQueueViewModel.swift; sourceTree = "<group>"; };
+		1ABE1500000000000000000C /* LabelQueueView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelQueueView.swift; sourceTree = "<group>"; };
+		1ABE1500000000000000000E /* LabelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelsTests.swift; sourceTree = "<group>"; };
 		FEEDB0DE00000000000000A6 /* FeedbackModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackModelsTests.swift; sourceTree = "<group>"; };
 		FEEDB0DE00000000000000A8 /* FeedbackSheetViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackSheetViewModelTests.swift; sourceTree = "<group>"; };
 		FEEDB0DE00000000000000AA /* FeedbackSheetViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackSheetViewModel.swift; sourceTree = "<group>"; };
@@ -1661,6 +1675,7 @@
 				B1A1C0DE0000000000000204 /* BrainModelsTests.swift */,
 				B1A1C0DE0000000000000E06 /* PrepModelsTests.swift */,
 				FEEDB0DE00000000000000A6 /* FeedbackModelsTests.swift */,
+				1ABE1500000000000000000E /* LabelsTests.swift */,
 				FEEDB0DE00000000000000A8 /* FeedbackSheetViewModelTests.swift */,
 				FEEDB0DE00000000000000B2 /* FeedbackInboxViewModelTests.swift */,
 				B1A1C0DE00000000000F0012 /* GoalsDesignTests.swift */,
@@ -2560,6 +2575,12 @@
 			children = (
 				FEEDB0DE00000000000000A2 /* FeedbackModels.swift */,
 				FEEDB0DE00000000000000A4 /* FeedbackDataClient.swift */,
+				1ABE15000000000000000002 /* LabelsModels.swift */,
+				1ABE15000000000000000004 /* LabelsDataClient.swift */,
+				1ABE15000000000000000006 /* LabelsViewModel.swift */,
+				1ABE15000000000000000008 /* RateControl.swift */,
+				1ABE1500000000000000000A /* LabelQueueViewModel.swift */,
+				1ABE1500000000000000000C /* LabelQueueView.swift */,
 				FEEDB0DE00000000000000AE /* FeedbackMenuItem.swift */,
 				FEEDB0DE00000000000000B8 /* FeedbackDetailView.swift */,
 				FEEDB0DE00000000000000B6 /* FeedbackInboxView.swift */,
@@ -2811,6 +2832,12 @@
 				B1A1C0DE0000000000000E01 /* PrepModels.swift in Sources */,
 				FEEDB0DE00000000000000A1 /* FeedbackModels.swift in Sources */,
 				FEEDB0DE00000000000000A3 /* FeedbackDataClient.swift in Sources */,
+				1ABE15000000000000000001 /* LabelsModels.swift in Sources */,
+				1ABE15000000000000000003 /* LabelsDataClient.swift in Sources */,
+				1ABE15000000000000000005 /* LabelsViewModel.swift in Sources */,
+				1ABE15000000000000000007 /* RateControl.swift in Sources */,
+				1ABE15000000000000000009 /* LabelQueueViewModel.swift in Sources */,
+				1ABE1500000000000000000B /* LabelQueueView.swift in Sources */,
 				FEEDB0DE00000000000000AD /* FeedbackMenuItem.swift in Sources */,
 				FEEDB0DE00000000000000B7 /* FeedbackDetailView.swift in Sources */,
 				FEEDB0DE00000000000000B5 /* FeedbackInboxView.swift in Sources */,
@@ -3262,6 +3289,7 @@
 				B1A1C0DE0000000000000203 /* BrainModelsTests.swift in Sources */,
 				B1A1C0DE0000000000000E05 /* PrepModelsTests.swift in Sources */,
 				FEEDB0DE00000000000000A5 /* FeedbackModelsTests.swift in Sources */,
+				1ABE1500000000000000000D /* LabelsTests.swift in Sources */,
 				FEEDB0DE00000000000000A7 /* FeedbackSheetViewModelTests.swift in Sources */,
 				FEEDB0DE00000000000000B1 /* FeedbackInboxViewModelTests.swift in Sources */,
 				B1A1C0DE00000000000F0013 /* GoalsDesignTests.swift in Sources */,

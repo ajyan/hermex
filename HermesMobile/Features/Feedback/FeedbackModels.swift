@@ -61,7 +61,7 @@ struct FeedbackNote: Decodable, Hashable, Sendable {
 }
 
 /// An element that yields nil instead of failing its array.
-private struct FeedbackLossy<Value: Decodable>: Decodable {
+struct FeedbackLossy<Value: Decodable>: Decodable {
     let value: Value?
     init(from decoder: Decoder) throws { value = try? Value(from: decoder) }
 }

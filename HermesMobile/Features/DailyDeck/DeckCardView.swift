@@ -40,6 +40,8 @@ private struct DeckCardView: View {
     let file: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Set by the Daily Deck when the server takes labels.
+    @Environment(LabelsViewModel.self) private var labels: LabelsViewModel?
     @State private var isWriting = false
     @State private var overflows = false
     /// The sleep card's numbers, shown before rating when asked for.
@@ -97,7 +99,7 @@ private struct DeckCardView: View {
         }
         if let lead = text.lead {
             Text(inlineMarkdown(lead))
-                .font(leadFont(lead))
+                .font(DeckCardText.leadFont(for: card, lead: lead))
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.trailing, 30)
@@ -136,15 +138,12 @@ private struct DeckCardView: View {
                 .foregroundStyle(palette.ink)
                 .padding(.top, 20)
         }
-    }
-
-    /// Saved words (a quote, a book highlight, a past journal entry) keep the serif; every
-    /// other lead is the rounded display voice.
-    private func leadFont(_ lead: String) -> Font {
-        let style: Font.TextStyle = card.itemKind == "quote" ? .title
-            : lead.count > 480 ? .body : lead.count > 220 ? .title3 : .title2
-        let quotesSavedWords = ["quote", "book", "on_this_day"].contains(card.itemKind ?? "")
-        return quotesSavedWords ? AppFont.serif(style: style) : AppFont.display(style: style, weight: .semibold)
+        if card.type == .reflect, let labels {
+            DeckRateRows(card: card, date: viewModel.date, kind: viewModel.kind,
+                         showsQuestion: viewModel.question(for: card) == card.question,
+                         labels: labels, palette: palette)
+                .padding(.top, 24)
+        }
     }
 
     /// Your words once written; until then, the way in.
@@ -650,5 +649,17 @@ private struct DeckAheadRow: View {
             return [card.title, card.question].compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .first { !$0.isEmpty } ?? DeckPalette.of(card).name
         }
+    }
+}
+
+extension DeckCardText {
+    /// A card's lead font, wherever the card is drawn. Saved words (a quote, a book highlight,
+    /// a past journal entry) keep the serif; every other lead is the rounded display voice,
+    /// smaller as the lead grows.
+    static func leadFont(for card: DeckCard, lead: String) -> Font {
+        let style: Font.TextStyle = card.itemKind == "quote" ? .title
+            : lead.count > 480 ? .body : lead.count > 220 ? .title3 : .title2
+        let quotesSavedWords = ["quote", "book", "on_this_day"].contains(card.itemKind ?? "")
+        return quotesSavedWords ? AppFont.serif(style: style) : AppFont.display(style: style, weight: .semibold)
     }
 }

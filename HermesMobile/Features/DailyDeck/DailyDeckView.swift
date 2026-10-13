@@ -9,15 +9,30 @@ struct DailyDeckView: View {
     @State private var isShowingCalendar = false
     @State private var feedbackCard: DeckCard?
     @AppStorage(DailyBriefReminder.enabledKey) private var notifies = false
+    /// Good/not-good labels on reflect cards; shown only where the server has labels.
+    @State private var labels: LabelsViewModel
+    @Environment(FeedbackAvailability.self) private var availability: FeedbackAvailability?
     private let openSession: (String) -> Void
 
     init(server: URL, openSession: @escaping (String) -> Void) {
         _viewModel = State(initialValue: DailyDeckViewModel(server: server))
+        _labels = State(initialValue: LabelsViewModel(client: APIClientLabelsAdapter(apiClient: APIClient(baseURL: server))))
         self.openSession = openSession
+    }
+
+    private var labelsAvailable: Bool { availability?.labelsAvailable == true }
+    /// Rate rows show once the server has labels and this screen has read them.
+    private var showsLabels: Bool {
+        labelsAvailable && labels.isLoaded(feature: LabelKey.dailyDeckFeature)
     }
 
     var body: some View {
         content
+            .environment(showsLabels ? labels : nil)
+            .task(id: labelsAvailable) {
+                // Every deck's labels in one read, once per screen; a failed read retries on the next appear.
+                if labelsAvailable, !showsLabels { try? await labels.load(feature: LabelKey.dailyDeckFeature) }
+            }
             .hxNavigationTitle(viewModel.title, subtitle: viewModel.state == .ready ? progressSubtitle : nil)
             .background(Color.hxCanvas.ignoresSafeArea())
             .toolbar {

@@ -174,6 +174,8 @@ enum Endpoint {
     case feedbackList
     case feedbackPlan(id: String)
     case feedbackDecision(id: String)
+    /// Good/not-good labels on generated content (`api/labels.py`): read with a feature (and item), or POST one.
+    case labels(feature: String?, item: String?)
     /// Personal goals from the vault (`api/vault_goals.py`): home, one goal, and a check-in.
     case goalsHome
     case goalDetail(slug: String)
@@ -475,6 +477,8 @@ enum Endpoint {
             return "/api/feedback/\(id)/plan"
         case let .feedbackDecision(id):
             return "/api/feedback/\(id)/decision"
+        case .labels:
+            return "/api/labels"
         case .goalsHome:
             return "/api/goals"
         case .goalDetail:
@@ -697,6 +701,11 @@ enum Endpoint {
             return [URLQueryItem(name: "id", value: id)]
         case let .goalDetail(slug):
             return [URLQueryItem(name: "slug", value: slug)]
+        case let .labels(feature, item):
+            var items: [URLQueryItem] = []
+            if let feature { items.append(URLQueryItem(name: "feature", value: feature)) }
+            if let item { items.append(URLQueryItem(name: "item", value: item)) }
+            return items
         default:
             return []
         }

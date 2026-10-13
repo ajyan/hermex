@@ -158,7 +158,8 @@ struct ChatShellView: View {
         _pendingWebuiPush = pendingWebuiPush
         _viewModel = State(initialValue: SessionListViewModel(server: server))
         _feedbackAvailability = State(initialValue: FeedbackAvailability(
-            client: APIClientFeedbackAdapter(apiClient: APIClient(baseURL: server))))
+            client: APIClientFeedbackAdapter(apiClient: APIClient(baseURL: server)),
+            labels: APIClientLabelsAdapter(apiClient: APIClient(baseURL: server))))
         _showsCliSessions = AppStorage(
             wrappedValue: SessionRowDisplaySettings.showsCliSessions(for: server),
             SessionRowDisplaySettings.showCliSessionsKey(for: server)
@@ -618,7 +619,11 @@ struct ChatShellView: View {
         case .money:
             MoneyView(server: server)
         case .feedback:
-            FeedbackInboxView(client: feedbackAvailability.client)
+            FeedbackInboxView(
+                client: feedbackAvailability.client,
+                labelQueue: feedbackAvailability.labelsAvailable
+                    ? feedbackAvailability.labels.map { LabelQueueViewModel(server: server, labelsClient: $0) }
+                    : nil)
         case .brainRoute(let route):
             // Keyed by route so a destination's view models can never carry over to another page.
             brainDestination(route).id(route)
