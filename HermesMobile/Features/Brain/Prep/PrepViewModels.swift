@@ -24,6 +24,9 @@ private func prepFailureState<Value>(_ error: Error) -> BrainLoadState<Value> {
 @Observable
 final class PrepHomeViewModel {
     private(set) var state: BrainLoadState<PrepHome> = .loading
+    /// The gap ledger; nil when the server has no gaps route (an older fork) or it failed,
+    /// in which case the home shows the older "Needs work" section instead.
+    private(set) var gaps: [PrepGapSummary]?
     @ObservationIgnored private let client: PrepDataClient
     @ObservationIgnored private var generation = 0
 
@@ -37,10 +40,44 @@ final class PrepHomeViewModel {
     func load() async {
         generation += 1
         let token = generation
+        async let gapsLoad = try? await client.gaps()
         do {
             let home = try await client.home()
+            let gaps = await gapsLoad
             guard token == generation, !Task.isCancelled else { return }
+            self.gaps = gaps
             state = .loaded(home)
+        } catch {
+            guard token == generation, !prepIsCancellation(error) else { return }
+            onAPIError(error)
+            state = prepFailureState(error)
+        }
+    }
+}
+
+/// One gap: the answers that showed it and the cards that target it.
+@MainActor
+@Observable
+final class PrepGapViewModel {
+    let id: String
+    private(set) var state: BrainLoadState<PrepGapDetail> = .loading
+    @ObservationIgnored private let client: PrepDataClient
+    @ObservationIgnored private var generation = 0
+    @ObservationIgnored private let onAPIError: (Error) -> Void
+
+    init(id: String, client: PrepDataClient, onAPIError: @escaping (Error) -> Void = { _ in }) {
+        self.id = id
+        self.client = client
+        self.onAPIError = onAPIError
+    }
+
+    func load() async {
+        generation += 1
+        let token = generation
+        do {
+            let detail = try await client.gap(id: id)
+            guard token == generation, !Task.isCancelled else { return }
+            state = .loaded(detail)
         } catch {
             guard token == generation, !prepIsCancellation(error) else { return }
             onAPIError(error)
@@ -81,36 +118,6 @@ final class PrepTrackViewModel {
     }
 }
 
-/// Tap-to-place Parsons answer. Lines are tracked by their index in the pool so
-/// duplicate strings stay distinct.
-struct ParsonsBoard: Equatable {
-    let pool: [String]
-    private(set) var placedIndices: [Int] = []
-
-    init(pool: [String]) {
-        self.pool = pool
-    }
-
-    var placed: [String] { placedIndices.map { pool[$0] } }
-
-    /// Pool indices not yet placed, in pool order.
-    var remaining: [Int] {
-        pool.indices.filter { !placedIndices.contains($0) }
-    }
-
-    mutating func place(poolIndex: Int) {
-        guard pool.indices.contains(poolIndex), !placedIndices.contains(poolIndex) else { return }
-        placedIndices.append(poolIndex)
-    }
-
-    mutating func unplace(at position: Int) {
-        guard placedIndices.indices.contains(position) else { return }
-        placedIndices.remove(at: position)
-    }
-
-    func isFull(target: Int) -> Bool { placedIndices.count >= target }
-}
-
 /// Today's run: one rep at a time, a result after each answer. Reps are always
 /// found by `rep.index`, never by array position.
 @MainActor
@@ -127,14 +134,17 @@ final class PrepRunViewModel {
 
     private(set) var phase: Phase = .loading
     private(set) var run: PrepRun?
-    private(set) var board: ParsonsBoard?
     private(set) var hintsShown = 0
     private(set) var submitError: String?
     private(set) var isSubmitting = false
+    /// Coach-written cards flagged this run, so the flag button reads as done.
+    private(set) var flaggedItems: Set<String> = []
+    private(set) var flagError: String?
+    /// When the current rep appeared: the start of `elapsedMS` and of the approach clock.
+    private(set) var shownAt: Date
 
     @ObservationIgnored private let client: PrepDataClient
     @ObservationIgnored private let now: () -> Date
-    @ObservationIgnored private var shownAt: Date
     @ObservationIgnored private var mapBefore: PrepTrackMap?
     @ObservationIgnored private var lastStreak: PrepStreak?
     @ObservationIgnored private var generation = 0
@@ -160,7 +170,7 @@ final class PrepRunViewModel {
         do {
             let loaded = try await client.today()
             // Non-fatal: only used to show which skills moved at the end.
-            let map = try? await client.map(track: "dsa")
+            let map = try? await client.map(track: Self.track(of: loaded))
             guard token == generation, !Task.isCancelled else { return }
             mapBefore = map
             run = loaded
@@ -180,19 +190,71 @@ final class PrepRunViewModel {
         await submit(.choice("seen"))
     }
 
-    func checkParsons() async {
-        guard let board else { return }
-        await submit(.lines(board.placed))
+    /// An approach rep's written answer, capped to the server's limit; graded by the server before it returns.
+    func submitApproach(_ text: String) async {
+        await submit(.choice(PrepCopy.cappedApproach(text)))
     }
 
-    func place(poolIndex: Int) {
-        guard !isSubmitting else { return }
-        board?.place(poolIndex: poolIndex)
+    /// A judgment card's spoken or typed answer, trimmed and capped like an approach.
+    func submitJudgment(_ text: String) async {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard PrepCopy.canSubmitJudgment(trimmed) else { return }
+        await submit(.choice(PrepCopy.cappedApproach(trimmed)))
     }
 
-    func unplace(at position: Int) {
-        guard !isSubmitting else { return }
-        board?.unplace(at: position)
+    /// A cloze fact's typed answer; the server compares it ignoring case, spaces and punctuation.
+    func submitCloze(_ text: String) async {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        await submit(.choice(trimmed))
+    }
+
+    /// The answered card was written by the coach and isn't flagged yet.
+    var canFlag: Bool {
+        guard case let .result(rep, _, _) = phase else { return false }
+        return rep.item.isCoachWritten && !flaggedItems.contains(rep.item.id)
+    }
+
+    func isFlagged(_ itemID: String) -> Bool { flaggedItems.contains(itemID) }
+
+    /// Retires the answered coach-written card for good; the coach writes a replacement for its gap.
+    func flagCurrent() async {
+        guard canFlag, case let .result(rep, _, _) = phase else { return }
+        let token = generation
+        flagError = nil
+        do {
+            try await client.flag(item: rep.item.id)
+            guard token == generation else { return }
+            flaggedItems.insert(rep.item.id)
+        } catch {
+            guard token == generation, !prepIsCancellation(error) else { return }
+            onAPIError(error)
+            flagError = "Couldn't flag this card. Try again."
+        }
+    }
+
+    /// A spot-the-bug answer: `line` is a 0-based index into `item.code`.
+    func submitBugFix(line: Int, fix: String) async {
+        await submit(.bugFix(line: line, fix: fix))
+    }
+
+    /// Moves past a rep this build can't run (an unknown drill) without posting.
+    func skip() async {
+        guard !isSubmitting, !isAdvancing, case let .rep(rep, _) = phase, let run else { return }
+        isAdvancing = true
+        defer { isAdvancing = false }
+        await advance(in: run, to: rep.index + 1, after: rep.index, token: generation)
+    }
+
+    /// The track today's run drills, for the before/after skill map: `anth` once the run holds
+    /// Anthropic-track reps (ids `anth.…`), otherwise `dsa`.
+    static func track(of run: PrepRun) -> String {
+        run.reps.contains { $0.item.id.hasPrefix("anth.") } ? "anth" : "dsa"
+    }
+
+    /// The user closed the run: any response still in flight is dropped.
+    func leave() {
+        generation += 1
     }
 
     func showHint() {
@@ -224,7 +286,7 @@ final class PrepRunViewModel {
     private func show(_ rep: PrepRep) {
         hintsShown = 0
         submitError = nil
-        board = rep.drill == .parsons ? ParsonsBoard(pool: rep.item.lines) : nil
+        flagError = nil
         shownAt = now()
         phase = .rep(rep, index: rep.index)
     }
@@ -276,7 +338,7 @@ final class PrepRunViewModel {
         lastStreak = nil
         do {
             let fresh = try await client.today()
-            let map = try? await client.map(track: "dsa")
+            let map = try? await client.map(track: Self.track(of: fresh))
             guard token == generation, !Task.isCancelled else { return }
             mapBefore = map
             run = fresh
@@ -292,9 +354,8 @@ final class PrepRunViewModel {
         var streak = lastStreak
         if streak == nil { streak = try? await client.home().streak }
         var moved: [PrepSkill] = []
-        let after = mapBefore == nil ? nil : try? await client.map(track: "dsa")
+        let after = mapBefore == nil ? nil : try? await client.map(track: run.map(Self.track(of:)) ?? "dsa")
         guard token == generation, !Task.isCancelled else { return }
-        board = nil
         if let before = mapBefore, let after {
             let old = Dictionary(
                 before.levels.flatMap(\.skills).map { ($0.id, $0.mastery) },
@@ -316,6 +377,49 @@ enum PrepCopy {
     enum RunAction: Equatable { case start, resume, done }
 
     static func streak(days: Int) -> String { "\(days)-day streak" }
+
+    /// A gap row's trailing detail: how often it was missed, or progress toward closing it.
+    static func gapRowDetail(_ gap: PrepGapSummary) -> String {
+        switch gap.status {
+        case .improving: "\(gap.hitsTowardClose) of 3 hits"
+        case .closed: "Closed"
+        case .open, .unknown: "Seen \(gap.misses)×"
+        }
+    }
+
+    static func gapsHeader(open: Int, improving: Int) -> String {
+        switch (open, improving) {
+        case (0, 0): "None open"
+        case (_, 0): "\(open) open"
+        default: "\(open) open · \(improving) improving"
+        }
+    }
+
+    /// A reference point's id as a readable title: `p.harm-bearer` → "Harm bearer".
+    static func pointTitle(_ id: String) -> String {
+        let slug = id.hasPrefix("p.") ? String(id.dropFirst(2)) : id
+        let words = slug.split(separator: "-").joined(separator: " ")
+        return words.prefix(1).uppercased() + words.dropFirst()
+    }
+
+    /// A judgment answer needs something besides whitespace.
+    static func canSubmitJudgment(_ text: String) -> Bool {
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// The interview-loop stage chip on an Anthropic-track rep; nil when the rep has no stage.
+    static func stageChip(_ stage: String) -> String? {
+        stage.isEmpty ? nil : "Stage \(stage)"
+    }
+
+    /// The line under a graded judgment: the gap this miss belongs to, or that it was logged
+    /// for the nightly coach. Nil when nothing was missed.
+    static func gapCallout(match: [PrepGapMatch], logged: Bool) -> String? {
+        if let gap = match.first {
+            return "Seen before: \(gap.label) · \(gap.misses) \(gap.misses == 1 ? "miss" : "misses")"
+        }
+        return logged ? "Logged · Atlas will review tonight" : nil
+    }
 
     static func freezes(_ count: Int) -> String {
         count == 1 ? "1 freeze saved" : "\(count) freezes saved"
@@ -418,18 +522,50 @@ enum PrepCopy {
         return norm(optionID) == norm(correctID)
     }
 
-    /// Lines a Parsons answer needs: the pool holds the solution plus one decoy.
-    static func parsonsTarget(poolCount: Int) -> Int { max(1, poolCount - 1) }
-
-    static func parsonsLineLabel(_ code: String) -> String { "Line: \(code). Double-tap to place." }
-
-    static func parsonsPlacedLabel(position: Int, code: String) -> String {
-        "Position \(position): \(code). Double-tap to remove."
-    }
-
     /// A moved skill's subtitle on the run-complete screen.
     static func movedSubtitle(mastery: Double) -> String {
         "\(Int((mastery * 100).rounded()))% mastered"
+    }
+
+    /// The approach soft limit, in seconds; past it the server caps the rating.
+    static let approachLimit: TimeInterval = 90
+
+    /// The longest approach answer the server accepts. It counts Unicode scalars (Python `len`).
+    static let approachMaxLength = 4000
+
+    /// An approach draft cut to `approachMaxLength` scalars, so a submit is never rejected as too long.
+    static func cappedApproach(_ text: String) -> String {
+        guard text.unicodeScalars.count > approachMaxLength else { return text }
+        return String(String.UnicodeScalarView(text.unicodeScalars.prefix(approachMaxLength)))
+    }
+
+    /// Whether the draft has reached the cap, to show the "4000 characters max" note.
+    static func isAtApproachLimit(_ text: String) -> Bool {
+        text.unicodeScalars.count >= approachMaxLength
+    }
+
+    /// The approach clock: time left as "m:ss", then the overrun as "+m:ss".
+    static func approachClock(elapsed: TimeInterval) -> (text: String, isOver: Bool) {
+        let seconds = Int(elapsed.rounded(.down))
+        let limit = Int(approachLimit)
+        func clock(_ total: Int) -> String { String(format: "%d:%02d", total / 60, total % 60) }
+        return seconds > limit ? ("+" + clock(seconds - limit), true) : (clock(limit - seconds), false)
+    }
+
+    /// A code line's VoiceOver label; `index` is 0-based, the label counts from 1.
+    static func codeLineLabel(index: Int, code: String) -> String {
+        "Line \(index + 1): \(code)"
+    }
+
+    /// Whether a spot-the-bug answer is complete enough to submit.
+    static func canSubmitBugFix(line: Int?, fix: String?) -> Bool {
+        line != nil && !(fix ?? "").isEmpty
+    }
+
+    /// A grader rubric key as a title: "edge_cases" → "Edge cases".
+    static func rubricTitle(_ key: String) -> String {
+        let words = key.replacingOccurrences(of: "_", with: " ")
+        return words.prefix(1).uppercased() + words.dropFirst()
     }
 
     /// The cover id for a Prep track or skill, seeded apart from Brain pages.

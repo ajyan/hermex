@@ -246,7 +246,7 @@ struct TranscriptTurnFoldRowView: View {
                     .lineLimit(1)
 
                 Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(AppFont.subheadline(weight: .semibold))
                     .foregroundStyle(.tertiary)
 
                 Spacer(minLength: 0)
@@ -256,7 +256,7 @@ struct TranscriptTurnFoldRowView: View {
             .contentShape(Rectangle())
             .overlay(alignment: .bottom) {
                 Rectangle()
-                    .fill(Color(.separator).opacity(0.5))
+                    .fill(Color.hxSeparator.opacity(0.5))
                     .frame(height: 0.5)
             }
         }

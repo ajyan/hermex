@@ -132,13 +132,14 @@ struct CronJobEditorSheet: View {
                 if let formMessage {
                     Section {
                         Text(formMessage)
-                            .font(.footnote)
+                            .font(AppFont.footnote())
                             .foregroundStyle(messageColor)
                     }
                 }
             }
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
+            .scrollContentBackground(.hidden)
+            .background(Color.hxCanvas)
+            .hxNavigationTitle(title)
             .task {
                 await configuration.load()
             }

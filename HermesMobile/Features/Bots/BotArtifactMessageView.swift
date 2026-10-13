@@ -293,15 +293,15 @@ private struct BotArtifactRow: View {
                 if let image {
                     Image(uiImage: image).resizable().scaledToFit()
                         .frame(maxWidth: 210, maxHeight: 150)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .clipShape(RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous))
                 }
                 Label(reference.displayName, systemImage: reference.isAudioCandidate ? "waveform" : (reference.isRasterImageCandidate ? "photo" : "doc"))
-                    .font(.subheadline)
+                    .font(AppFont.subheadline())
                     .lineLimit(2)
                     .truncationMode(.middle)
             }
             .padding(12)
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+            .glowSurface(.file, cornerRadius: HXRadius.sm)
             .foregroundStyle(.primary)
         }
         .buttonStyle(.chatTactile(.thumbnail))

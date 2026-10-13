@@ -21,26 +21,25 @@ struct GoalHeroCard: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(verbatim: GoalHeroCopy.countdown(goal))
                     .font(BrainStyle.meta)
-                    .opacity(0.75)
+
                 Spacer(minLength: 0)
                 Image(systemName: GoalPaper.symbol(goal.icon))
                     .font(BrainStyle.rowSubtitle)
-                    .opacity(0.7)
+
                     .accessibilityHidden(true)
             }
             Text(verbatim: goal.title)
-                .font(AppFont.serif(style: isCompact ? .title3 : .title))
+                .font(AppFont.display(style: isCompact ? .title3 : .title, weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
             if !goal.identity.isEmpty {
                 Text(verbatim: GoalHeroCopy.sentenceCase(goal.identity))
-                    .font(AppFont.serif(style: .subheadline))
-                    .italic()
-                    .opacity(0.85)
+                    .font(AppFont.display(style: .subheadline, weight: .medium))
+
             }
             if !isCompact, !why.isEmpty {
                 Text(verbatim: why)
                     .font(BrainStyle.rowSubtitle)
-                    .opacity(0.8)
+
                     .fixedSize(horizontal: false, vertical: true)
             }
             if !goal.week.days.isEmpty {
@@ -55,9 +54,9 @@ struct GoalHeroCard: View {
         .foregroundStyle(palette.ink)
         .padding(BrainStyle.l)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(palette.paper, in: Self.shape)
+        .background(palette.colors.card, in: Self.shape)
+        .overlay(Self.shape.strokeBorder(palette.colors.edge, lineWidth: 0.5))
         .hxShadow(.paper)
-        .environment(\.colorScheme, .light)  // bright paper in every appearance, like the Brief
     }
 }
 
@@ -103,7 +102,7 @@ private struct GoalWeekStrip: View {
                 .frame(height: cellHeight)
             Text(verbatim: GoalHeroCopy.weekdayLetter(day.date))
                 .font(.caption2.weight(isSelected ? .semibold : .regular))
-                .opacity(0.75)
+
         }
         .frame(maxWidth: .infinity)
 

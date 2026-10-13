@@ -195,9 +195,7 @@ struct BrainArticleDigestView: View {
 
     private var gistCard: some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
-            Text(verbatim: "In short")
-                .brainText(.sectionCaption)
-                .fontWeight(.semibold)
+            HXSectionHeader(title: "In short")
             if showsFullGist || !BrainArticleDigest.isLong(digest.gist) {
                 MarkdownRenderer(content: digest.gist)
             } else {
@@ -254,14 +252,14 @@ struct BrainArticleDigestView: View {
                     Text(verbatim: "\(idea.number)")
                         .brainText(.meta)
                         .fontWeight(.semibold)
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(HermexPaper.knowledge.glow)
                         .monospacedDigit()
                         .frame(minWidth: 22, minHeight: 22)
-                        .background(Color.accentColor.opacity(0.14), in: Circle())
+                        .background(HermexPaper.knowledge.wash, in: Circle())
                     VStack(alignment: .leading, spacing: BrainStyle.xs) {
                         Text(Self.inlineMarkdown(idea.headline))
-                            .brainText(.rowTitle)
-                            .fontWeight(.semibold)
+                            .font(AppFont.display(style: .body))
+                            .foregroundStyle(Color.hxTextPrimary)
                             .multilineTextAlignment(.leading)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         if canExpand, !isExpanded {
@@ -303,18 +301,14 @@ struct BrainArticleDigestView: View {
             } icon: {
                 Image(systemName: "lightbulb")
             }
-            .font(BrainStyle.sectionCaption)
-            .foregroundStyle(Color.accentColor)
+            .font(AppFont.display(style: .subheadline))
+            .foregroundStyle(HermexPaper.knowledge.glow)
             MarkdownRenderer(content: takeaway)
         }
         .padding(.horizontal, BrainStyle.cardHorizontalPadding)
         .padding(.vertical, BrainStyle.cardVerticalPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.accentColor.opacity(0.08), in: BrainStyle.cardShape())
-        .overlay {
-            BrainStyle.cardShape().stroke(Color.accentColor.opacity(0.25), lineWidth: 0.7)
-                .allowsHitTesting(false)
-        }
+        .glowSurface(.knowledge, cornerRadius: BrainStyle.cardCorner)
     }
 
     private var allExpanded: Bool {

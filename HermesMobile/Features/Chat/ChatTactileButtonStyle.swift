@@ -326,7 +326,7 @@ struct ChatDecisionButtonStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.isEnabled) private var isEnabled
-    /// On a paper, primary fills with its ink and secondary washes in it.
+    /// On a glow surface, primary fills with the paper's hue and secondary washes in it.
     @Environment(\.hxPaper) private var paper
 
     func makeBody(configuration: Configuration) -> some View {
@@ -338,9 +338,9 @@ struct ChatDecisionButtonStyle: ButtonStyle {
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
             .frame(maxWidth: .infinity, minHeight: 40)
-            .background(backgroundColor(isPressed: isPressed), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(backgroundColor(isPressed: isPressed), in: Capsule())
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                Capsule()
                     .strokeBorder(borderColor, lineWidth: 1)
             )
             .scaleEffect(reduceMotion ? 1 : (isPressed ? 0.975 : 1))
@@ -350,15 +350,15 @@ struct ChatDecisionButtonStyle: ButtonStyle {
 
     private var foregroundColor: Color {
         guard isEnabled else {
-            return Color(.secondaryLabel)
+            return Color.hxTextSecondary
         }
 
         switch emphasis {
         case .primary:
-            if let paper { return paper.paper }
+            if let paper { return paper.onGlow }
             return colorScheme == .dark ? .black : .white
         case .secondary:
-            if let paper { return paper.ink }
+            if let paper { return paper.glow }
             return .primary
         case .destructive:
             return .hxDanger
@@ -372,10 +372,10 @@ struct ChatDecisionButtonStyle: ButtonStyle {
 
         switch emphasis {
         case .primary:
-            if let paper { return paper.ink }
+            if let paper { return paper.glow }
             return colorScheme == .dark ? .white : .black
         case .secondary:
-            if let paper { return paper.ink.opacity(isPressed ? 0.12 : 0.08) }
+            if let paper { return paper.wash.opacity(isPressed ? 1 : 0.8) }
             return colorScheme == .dark ? Color.white.opacity(isPressed ? 0.12 : 0.08) : Color.black.opacity(isPressed ? 0.07 : 0.045)
         case .destructive:
             return Color.hxDanger.opacity(isPressed ? 0.16 : 0.10)
@@ -387,7 +387,8 @@ struct ChatDecisionButtonStyle: ButtonStyle {
         case .primary:
             return .clear
         case .secondary:
-            return Color(.separator).opacity(colorScheme == .dark ? 0.36 : 0.24)
+            if let paper { return paper.edge }
+            return Color.hxSeparator.opacity(colorScheme == .dark ? 0.36 : 0.24)
         case .destructive:
             return Color.hxDanger.opacity(colorScheme == .dark ? 0.36 : 0.26)
         }

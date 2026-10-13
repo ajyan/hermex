@@ -27,20 +27,20 @@ struct OnboardingConnectPage: View {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Connect")
-                        .font(.title3.weight(.bold))
+                        .font(AppFont.display(style: .title3))
                         .foregroundStyle(.white)
 
                     ConnectionModePicker(selection: $viewModel.connectionMode, style: .onboarding)
                         .padding(.horizontal, 13)
-                        .background(Color.black.opacity(0.24), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .background(Color.black.opacity(0.24), in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
                         )
                         .disabled(viewModel.isConnectionLocked)
 
                     Text(viewModel.connectionMode.help)
-                        .font(.footnote)
+                        .font(AppFont.footnote())
                         .foregroundStyle(.white.opacity(0.5))
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -74,7 +74,7 @@ struct OnboardingConnectPage: View {
                     // IPv6 literal's "]", in one left-to-right run inside right-to-left text.
                     if let preview = viewModel.addressPreview {
                         Text("Will connect to \(preview.absoluteString + "\u{200E}")")
-                            .font(.caption)
+                            .font(AppFont.caption())
                             .foregroundStyle(.white.opacity(0.5))
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -122,7 +122,7 @@ struct OnboardingConnectPage: View {
                     VStack(alignment: .leading, spacing: 10) {
                         if viewModel.connectionMode == .cloudflareTunnel {
                             Text("Cloudflare Access: paste your service token’s Client ID and Client Secret as the values. Leave both empty if Access is off.")
-                                .font(.caption)
+                                .font(AppFont.caption())
                                 .foregroundStyle(.white.opacity(0.5))
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -132,7 +132,7 @@ struct OnboardingConnectPage: View {
                     .padding(.top, 10)
                 } label: {
                     Label("Advanced", systemImage: "slider.horizontal.3")
-                        .font(.subheadline.weight(.semibold))
+                        .font(AppFont.subheadline(weight: .semibold))
                         .foregroundStyle(.white.opacity(0.85))
                 }
                 .tint(.white.opacity(0.6))
@@ -170,10 +170,10 @@ struct OnboardingConnectPage: View {
             VStack(alignment: .leading, spacing: 10) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Hermes dashboard found")
-                        .font(.subheadline.weight(.semibold))
+                        .font(AppFont.subheadline(weight: .semibold))
                         .foregroundStyle(.white)
                     Text("Adding one needs Bot Mode (beta), which is off. Bot Mode is unfinished, and you can turn it off again in Settings.")
-                        .font(.footnote)
+                        .font(AppFont.footnote())
                         .foregroundStyle(.white.opacity(0.7))
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -190,9 +190,9 @@ struct OnboardingConnectPage: View {
                 .disabled(viewModel.isConnectionLocked)
             }
             .padding(12)
-            .background(accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(accent.opacity(0.1), in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                     .stroke(accent.opacity(0.2), lineWidth: 1)
             )
         }
@@ -216,7 +216,7 @@ struct OnboardingConnectPage: View {
     private var savedSignInRows: some View {
         if let reused = viewModel.reusedSignIn {
             Label("Filled in from \(reused.serverName)’s Hermes connection.", systemImage: "checkmark.circle")
-                .font(.footnote)
+                .font(AppFont.footnote())
                 .foregroundStyle(.white.opacity(0.7))
         } else {
             ForEach(viewModel.savedSignIns, id: \.connection.id) { saved in
@@ -225,15 +225,15 @@ struct OnboardingConnectPage: View {
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "person.badge.key.fill")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(AppFont.subheadline(weight: .semibold))
                             .foregroundStyle(accent)
                             .frame(width: 24)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Use the sign-in saved on \(saved.serverName)")
-                                .font(.subheadline.weight(.semibold))
+                                .font(AppFont.subheadline(weight: .semibold))
                                 .foregroundStyle(accent)
                             Text("Fills in the username, password and headers.")
-                                .font(.caption)
+                                .font(AppFont.caption())
                                 .foregroundStyle(.white.opacity(0.5))
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -241,9 +241,9 @@ struct OnboardingConnectPage: View {
                     }
                     .padding(.horizontal, 13)
                     .padding(.vertical, 11)
-                    .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                             .stroke(accent.opacity(0.3), lineWidth: 1)
                     )
                 }

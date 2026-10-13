@@ -17,7 +17,9 @@ struct SkillsView: View {
     var body: some View {
         content
             .adaptiveReadableScrollContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
-            .navigationTitle("Skills")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .hxNavigationTitle(String(localized: "Skills"))
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -92,7 +94,6 @@ struct SkillsView: View {
             .refreshable {
                 await loadSkills()
             }
-            .background(Color.hxCanvas)
         }
     }
 
@@ -121,10 +122,7 @@ private struct SkillCategorySection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(category)
-                .textCase(.uppercase)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+            HXSectionHeader(title: category)
                 .padding(.horizontal, 4)
 
             VStack(spacing: 0) {
@@ -160,9 +158,12 @@ private struct SkillCategorySection: View {
 
                     if index < skills.count - 1 {
                         Divider()
+                            .overlay(Color.hxSeparator)
                     }
                 }
             }
+            .padding(.horizontal, 14)
+            .hxCard()
         }
     }
 
@@ -185,16 +186,25 @@ private struct SkillRow: View {
 
     var body: some View {
         HStack(alignment: .top) {
+            // Skills are a `.recall` object (DESIGN.md § The object key).
+            Image(systemName: "hammer")
+                .font(AppFont.footnote(weight: .semibold))
+                .foregroundStyle(HermexPaper.recall.glow)
+                .frame(width: 28, height: 28)
+                .background(HermexPaper.recall.wash, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
+                .padding(.top, 1)
+                .accessibilityHidden(true)
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(displayName)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.primary)
+                    .font(AppFont.body(weight: .semibold))
+                    .foregroundStyle(Color.hxTextPrimary)
                     .lineLimit(2)
 
                 if let description {
                     Text(description)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .font(AppFont.subheadline())
+                        .foregroundStyle(Color.hxTextSecondary)
                         .lineLimit(3)
                 }
 
@@ -202,7 +212,7 @@ private struct SkillRow: View {
                     HStack(spacing: 6) {
                         if skill.disabled == true {
                             Text("Disabled")
-                                .font(.caption2.weight(.semibold))
+                                .font(AppFont.caption2(weight: .semibold))
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 3)
                                 .foregroundStyle(.secondary)
@@ -211,7 +221,7 @@ private struct SkillRow: View {
 
                         ForEach(tags, id: \.self) { tag in
                             Text(tag)
-                                .font(.caption2.weight(.medium))
+                                .font(AppFont.caption2(weight: .medium))
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 3)
                                 .foregroundStyle(.secondary)
@@ -236,7 +246,7 @@ private struct SkillRow: View {
             }
 
             Image(systemName: "chevron.forward")
-                .font(.caption.weight(.semibold))
+                .font(AppFont.caption(weight: .semibold))
                 .foregroundStyle(.tertiary)
                 .padding(.top, 12)
         }
@@ -287,7 +297,9 @@ struct SkillDetailView: View {
 
     var body: some View {
         content
-            .navigationTitle(skill.name ?? String(localized: "Skill"))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .hxNavigationTitle(skill.name ?? String(localized: "Skill"))
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -396,10 +408,8 @@ private struct SkillLinkedFilesSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Linked Files")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 20)
+            HXSectionHeader(title: String(localized: "Linked Files"))
+                .padding(.horizontal, 24)
 
             VStack(spacing: 0) {
                 ForEach(Array(fileNames.enumerated()), id: \.element) { index, fileName in
@@ -408,20 +418,20 @@ private struct SkillLinkedFilesSection: View {
                     } label: {
                         HStack(spacing: 12) {
                             Image(systemName: "doc.text")
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(.primary)
-                                .frame(width: 34, height: 34)
-                                .background(Color(.tertiarySystemFill).opacity(0.7), in: Circle())
+                                .font(AppFont.subheadline(weight: .medium))
+                                .foregroundStyle(HermexPaper.file.glow)
+                                .frame(width: 30, height: 30)
+                                .background(HermexPaper.file.wash, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
 
                             Text(fileName)
-                                .font(.subheadline)
-                                .foregroundStyle(.primary)
+                                .font(AppFont.subheadline())
+                                .foregroundStyle(Color.hxTextPrimary)
                                 .lineLimit(1)
 
                             Spacer(minLength: 8)
 
                             Image(systemName: "chevron.forward")
-                                .font(.caption.weight(.semibold))
+                                .font(AppFont.caption(weight: .semibold))
                                 .foregroundStyle(.tertiary)
                         }
                         .padding(.vertical, 9)
@@ -431,10 +441,13 @@ private struct SkillLinkedFilesSection: View {
 
                     if index < fileNames.count - 1 {
                         Divider()
-                            .padding(.leading, 54)
+                            .overlay(Color.hxSeparator)
+                            .padding(.leading, 42)
                     }
                 }
             }
+            .padding(.horizontal, 14)
+            .hxCard()
             .padding(.horizontal, 20)
         }
     }
@@ -464,8 +477,9 @@ struct SkillLinkedFileView: View {
                 }
             }
         }
-        .navigationTitle(fileName)
-        .navigationBarTitleDisplayMode(.inline)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.hxCanvas.ignoresSafeArea())
+        .hxNavigationTitle(fileName)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Close") {

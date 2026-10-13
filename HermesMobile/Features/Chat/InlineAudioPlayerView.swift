@@ -2,10 +2,11 @@ import AVFoundation
 import SwiftUI
 
 /// A compact, Telegram-style inline audio player used both in the chat bubble
-/// and in the full-screen attachment preview. Bytes are fetched lazily via the
-/// injected `load` closure — the same authenticated raw-file route the image
-/// loader uses — then played with `AVAudioPlayer`. Starting one player pauses
-/// any other that's currently playing (see `AudioAttachmentPlaybackCenter`).
+/// and in the full-screen attachment preview. Bytes are fetched on the first
+/// tap of play via the injected `load` closure — the same authenticated
+/// raw-file route the image loader uses — then played with `AVAudioPlayer`, so
+/// opening a chat downloads no audio. Starting one player pauses any other
+/// that's currently playing (see `AudioAttachmentPlaybackCenter`).
 struct InlineAudioPlayerView: View {
     /// Accessibility / labelling name for the clip (typically the file name).
     let title: String
@@ -33,16 +34,13 @@ struct InlineAudioPlayerView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(.secondarySystemBackground))
+            RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous)
+                .fill(Color.hxSurface)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color(.separator).opacity(0.25), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous)
+                .stroke(Color.hxSeparator.opacity(0.25), lineWidth: 0.5)
         )
-        .task {
-            await model.loadIfNeeded(using: load)
-        }
         .onDisappear {
             model.teardown()
         }
@@ -51,7 +49,22 @@ struct InlineAudioPlayerView: View {
     @ViewBuilder
     private var controlButton: some View {
         switch model.phase {
-        case .idle, .loading:
+        case .idle:
+            Button {
+                Task { await model.loadAndPlay(using: load) }
+            } label: {
+                ZStack {
+                    Circle().fill(Color.accentColor)
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 40, height: 40)
+            }
+            .buttonStyle(.chatTactile(.icon))
+            .accessibilityLabel(String(localized: "Play \(title)"))
+
+        case .loading:
             ZStack {
                 Circle().fill(Color.accentColor.opacity(0.15))
                 ProgressView().tint(Color.accentColor)
@@ -110,7 +123,12 @@ struct InlineAudioPlayerView: View {
         HStack(spacing: 8) {
             Text(AudioDurationFormatter.string(from: model.displayTime))
             Spacer(minLength: 8)
-            Text(AudioDurationFormatter.string(from: model.duration))
+            if model.phase == .ready {
+                Text(AudioDurationFormatter.string(from: model.duration))
+            } else {
+                // The length is unknown until the clip is loaded on first play.
+                Text(verbatim: "–:––")
+            }
         }
         .font(AppFont.caption2().monospacedDigit())
         .foregroundStyle(.secondary)
@@ -153,8 +171,8 @@ final class ComposerAudioCaptureState {
     }
 }
 
-/// Drives a single `AVAudioPlayer`: lazy load, play/pause, a 0.2s progress
-/// ticker, and scrubbing. Owned by `InlineAudioPlayerView` via `@State`.
+/// Drives a single `AVAudioPlayer`: load on first play, play/pause, a 0.2s
+/// progress ticker, and scrubbing. Owned by `InlineAudioPlayerView` via `@State`.
 @MainActor
 @Observable
 final class InlineAudioPlayerModel {
@@ -179,6 +197,18 @@ final class InlineAudioPlayerModel {
     @ObservationIgnored private let delegateProxy = AudioPlayerDelegateProxy()
     @ObservationIgnored private var ticker: Timer?
     @ObservationIgnored private var didLoad = false
+    /// Set by a tap on an unloaded clip; cleared by `teardown` so a load that
+    /// finishes after the row is gone doesn't start playing.
+    @ObservationIgnored private var playsWhenLoaded = false
+
+    /// Loads the clip, then starts it unless the view went away meanwhile.
+    func loadAndPlay(using load: () async -> Data?) async {
+        playsWhenLoaded = true
+        await loadIfNeeded(using: load)
+        guard playsWhenLoaded, phase == .ready, !isPlaying else { return }
+        playsWhenLoaded = false
+        togglePlayPause()
+    }
 
     func loadIfNeeded(using load: () async -> Data?) async {
         guard !didLoad else { return }
@@ -267,11 +297,18 @@ final class InlineAudioPlayerModel {
         }
     }
 
-    /// Stops playback and releases the run-loop ticker. Called on disappear.
+    /// Stops playback, releases the run-loop ticker and the decoded clip, and
+    /// leaves the player ready to load again. Called on disappear.
     func teardown() {
+        playsWhenLoaded = false
         pause()
-        player?.currentTime = 0
+        player = nil
         currentTime = 0
+        scrubTime = nil
+        if phase == .ready {
+            didLoad = false
+            phase = .idle
+        }
         deactivateSession()
     }
 

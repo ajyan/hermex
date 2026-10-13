@@ -138,11 +138,18 @@ struct ChatDrawerView<ServerMenu: View>: View {
         if sectionVisibility.kanban {
             drawerRow(String(localized: "Kanban"), systemImage: "rectangle.split.3x1") { onOpen(.kanban) }
         }
-        drawerRow("Daily Brief", systemImage: "sun.horizon") { onOpen(.dailyDeck) }
+        drawerRow("Daily Brief", systemImage: "sun.horizon", paper: .opener) { onOpen(.dailyDeck) }
         if sectionVisibility.brain {
-            drawerRow("Brain", systemImage: "brain") { onOpen(.brain) }
+            drawerRow("Brain", systemImage: "brain", paper: .knowledge) { onOpen(.brain) }
+            drawerRow("People", systemImage: BrainModuleID.people.symbolName, paper: BrainModuleID.people.paper) {
+                onOpen(.brainRoute(.module(.people)))
+            }
         }
-        drawerRow("Goals", systemImage: "flag.checkered") { onOpen(.goals) }
+        drawerRow("Goals", systemImage: "flag.checkered", paper: .book) { onOpen(.goals) }
+        drawerRow("Money", systemImage: "chart.line.uptrend.xyaxis", paper: .money) { onOpen(.money) }
+        if sectionVisibility.feedback {
+            drawerRow("Feedback", systemImage: "message", paper: .feedback) { onOpen(.feedback) }
+        }
     }
 
     /// Floating bottom-right New Chat, where messaging apps put compose.
@@ -162,12 +169,27 @@ struct ChatDrawerView<ServerMenu: View>: View {
         .padding(.bottom, 16)
     }
 
-    private func drawerRow(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+    /// A section row. A section with its own paper (Brief, Brain, People, Goals, Money, Feedback) shows its icon in that
+    /// paper's glow; the rest stay neutral so the colored ones stand out.
+    private func drawerRow(
+        _ title: String,
+        systemImage: String,
+        paper: HermexPaper? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .font(.body)
-                .foregroundStyle(.primary)
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            HStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(AppFont.body())
+                    .foregroundStyle(paper?.glow ?? Color.hxTextPrimary)
+                    .frame(width: 30, height: 30)
+                    .background(paper?.wash ?? .clear, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
+                    .accessibilityHidden(true)
+                Text(title)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -203,7 +225,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
     @ViewBuilder
     private func pinnedSection(_ pinned: [SessionSummary]) -> some View {
         Text("Pinned")
-            .font(.headline)
+            .font(AppFont.display(style: .headline, weight: .semibold))
             .lineLimit(1)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .padding(.horizontal, 20)
@@ -242,7 +264,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
 
     private var recentsTitle: some View {
         Text("Recents")
-            .font(.headline)
+            .font(AppFont.display(style: .headline, weight: .semibold))
             .lineLimit(1)
             .fixedSize()
     }

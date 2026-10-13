@@ -71,8 +71,7 @@ struct FilePreviewView: View {
             }
         }
         .adaptiveReadableScrollContent(maxWidth: AdaptiveReadableContentWidth.workspace)
-        .navigationTitle(displayName)
-        .navigationBarTitleDisplayMode(.inline)
+        .hxNavigationTitle(displayName)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if case let .text(file) = viewModel.preview, !isMarkdownFile {
@@ -205,7 +204,7 @@ struct FilePreviewView: View {
             VStack(spacing: 8) {
                 Text(message)
                 Text(displayPath)
-                    .font(.footnote)
+                    .font(AppFont.footnote())
                     .fontDesign(.monospaced)
                     .foregroundStyle(.secondary)
             }
@@ -310,14 +309,14 @@ struct FilePreviewView: View {
     private var fileHeader: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(displayPath)
-                .font(.caption)
+                .font(AppFont.caption())
                 .fontDesign(.monospaced)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
 
             if let metadataText {
                 Text(metadataText)
-                    .font(.footnote)
+                    .font(AppFont.footnote())
                     .foregroundStyle(.secondary)
             }
         }

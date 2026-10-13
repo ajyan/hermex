@@ -91,6 +91,8 @@ struct SidebarSectionVisibility: Equatable {
     var projects: Bool
     /// The second brain's read-only CRM tab (personal fork).
     var brain: Bool
+    /// The in-app feedback inbox, shown only while the server has the feedback routes (personal fork).
+    var feedback: Bool
 
     /// Show every row, primarily for previews and tests.
     static let showAll = SidebarSectionVisibility(
@@ -102,7 +104,8 @@ struct SidebarSectionVisibility: Equatable {
         insights: true,
         activeProfile: true,
         projects: true,
-        brain: true
+        brain: true,
+        feedback: true
     )
 
     /// The plain links share one List row, so that row is dropped entirely

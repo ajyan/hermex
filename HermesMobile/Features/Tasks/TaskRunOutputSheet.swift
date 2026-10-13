@@ -21,7 +21,7 @@ struct TaskRunOutputSheet: View {
                 if let text = matchingText, !text.isEmpty {
                     ScrollView {
                         Text(text)
-                            .font(.system(.footnote, design: .monospaced))
+                            .font(AppFont.mono(style: .footnote))
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(16)
@@ -45,8 +45,9 @@ struct TaskRunOutputSheet: View {
                     }
                 }
             }
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.hxCanvas)
+            .hxNavigationTitle(title)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Done") { dismiss() }

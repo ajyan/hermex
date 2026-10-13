@@ -18,9 +18,9 @@ struct BotCachedHistoryView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
                     Text("Messages saved on this iPhone")
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(AppFont.footnote()).foregroundStyle(.secondary)
                     Text(hit.snapshot.savedAt, format: .dateTime.month().day().hour().minute())
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(AppFont.footnote()).foregroundStyle(.secondary)
                     ForEach(hit.snapshot.messages) { message in
                         let chatMessage = ChatMessage(
                             role: message.role,
@@ -41,13 +41,13 @@ struct BotCachedHistoryView: View {
                         } else {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(message.role == "user" ? String(localized: "You") : profile.name)
-                                    .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                                    .font(AppFont.subheadline(weight: .semibold)).foregroundStyle(.secondary)
                                 Text(message.text).textSelection(.enabled)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(12)
                             .background(message.id == hit.message.id ? Color.accentColor.opacity(0.12) : Color.clear,
-                                        in: RoundedRectangle(cornerRadius: 12))
+                                        in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
                             .id(message.id)
                         }
                     }
@@ -63,8 +63,8 @@ struct BotCachedHistoryView: View {
                 positioned = true
                 scrollID = hit.message.id
             }
-            .navigationTitle(profile.name)
-            .navigationBarTitleDisplayMode(.inline)
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .hxNavigationTitle(profile.name)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
     }

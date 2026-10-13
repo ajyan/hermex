@@ -117,4 +117,48 @@ final class AttachmentAudioDetectionTests: XCTestCase {
         await model.loadIfNeeded(using: { nil })
         XCTAssertEqual(model.phase, .failed)
     }
+
+    /// Leaving the row drops the decoded clip; the next play loads it again.
+    @MainActor
+    func testTeardownReleasesALoadedClipForReload() async {
+        let model = InlineAudioPlayerModel()
+        var loads = 0
+        let load: () async -> Data? = {
+            loads += 1
+            return Self.silentWAV()
+        }
+        await model.loadIfNeeded(using: load)
+        XCTAssertEqual(model.phase, .ready)
+        XCTAssertGreaterThan(model.duration, 0)
+
+        model.teardown()
+        XCTAssertEqual(model.phase, .idle)
+
+        await model.loadIfNeeded(using: load)
+        XCTAssertEqual(model.phase, .ready)
+        XCTAssertEqual(loads, 2)
+    }
+
+    /// A tap that is still loading when the row goes away must not start playback.
+    @MainActor
+    func testPlayTapDoesNotStartAfterTheRowIsTornDown() async {
+        let model = InlineAudioPlayerModel()
+        await model.loadAndPlay(using: {
+            model.teardown()
+            return Self.silentWAV()
+        })
+        XCTAssertEqual(model.phase, .ready)
+        XCTAssertFalse(model.isPlaying)
+    }
+
+    /// 0.1 s of 8 kHz mono 16-bit silence.
+    private static func silentWAV() -> Data {
+        let sampleBytes = 1_600
+        func le32(_ value: UInt32) -> [UInt8] { withUnsafeBytes(of: value.littleEndian, Array.init) }
+        func le16(_ value: UInt16) -> [UInt8] { withUnsafeBytes(of: value.littleEndian, Array.init) }
+        var bytes: [UInt8] = Array("RIFF".utf8) + le32(UInt32(36 + sampleBytes)) + Array("WAVE".utf8)
+        bytes += Array("fmt ".utf8) + le32(16) + le16(1) + le16(1) + le32(8_000) + le32(16_000) + le16(2) + le16(16)
+        bytes += Array("data".utf8) + le32(UInt32(sampleBytes)) + [UInt8](repeating: 0, count: sampleBytes)
+        return Data(bytes)
+    }
 }

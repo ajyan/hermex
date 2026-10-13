@@ -84,9 +84,7 @@ import SwiftUI
                     }
                 }
                 if scope != .bots {
-                    Text("Messages saved on this iPhone")
-                        .font(.footnote).foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    HXSectionHeader(title: String(localized: "Messages saved on this iPhone"))
                         .padding(.horizontal, 20).padding(.top, 16)
                     if !request.query.isEmpty {
                         ForEach(visibleHits) { hit in
@@ -117,7 +115,7 @@ import SwiftUI
         }
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .top, spacing: 0) { searchBar }
-        .background(Color(uiColor: .systemBackground))
+        .background(Color.hxCanvas)
         .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
         .presentationCornerRadius(36)
@@ -140,7 +138,7 @@ import SwiftUI
         HStack(spacing: 8) {
             Button("Close search", systemImage: "xmark") { dismiss() }
                 .labelStyle(.iconOnly)
-                .font(.title3)
+                .font(AppFont.title3())
                 .frame(width: 44, height: 44)
                 .adaptiveGlass(isInteractive: true, in: Circle())
                 .keyboardShortcut(.cancelAction)
@@ -174,7 +172,7 @@ import SwiftUI
                 }
             } label: {
                 Image(systemName: "line.3.horizontal.decrease")
-                    .font(.title3).frame(width: 44, height: 44)
+                    .font(AppFont.title3()).frame(width: 44, height: 44)
             }
             .accessibilityLabel("Search filter")
             .accessibilityValue(Text(scope.title))
@@ -204,12 +202,12 @@ import SwiftUI
                 HStack(alignment: .firstTextBaseline) {
                     Text(hit.message.role == "user"
                          ? String(localized: "You to \(profile.name)") : String(localized: "\(profile.name) to you"))
-                        .font(.body).lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                        .font(AppFont.body()).lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                     Spacer(minLength: 8)
-                    Text("Message").font(.subheadline).foregroundStyle(.tertiary)
+                    Text("Message").font(AppFont.subheadline()).foregroundStyle(.tertiary)
                 }
                 Text(SessionSearchExcerpt(text: hit.excerpt, query: request.query).highlighted)
-                    .font(.body).foregroundStyle(.secondary)
+                    .font(AppFont.body()).foregroundStyle(.secondary)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
             }
         }
@@ -224,12 +222,12 @@ import SwiftUI
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(verbatim: [room.name, hit.message.sender].compactMap { $0 }.joined(separator: " · "))
-                        .font(.body).lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                        .font(AppFont.body()).lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                     Spacer(minLength: 8)
-                    Text("Message").font(.subheadline).foregroundStyle(.tertiary)
+                    Text("Message").font(AppFont.subheadline()).foregroundStyle(.tertiary)
                 }
                 Text(SessionSearchExcerpt(text: hit.excerpt, query: request.query).highlighted)
-                    .font(.body).foregroundStyle(.secondary)
+                    .font(AppFont.body()).foregroundStyle(.secondary)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
             }
         }
@@ -260,13 +258,13 @@ import SwiftUI
             BotAvatarView(profile: profile, avatar: inbox.avatars[profile.id], size: 44)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(profile.name).font(.body)
+                    Text(profile.name).font(AppFont.body())
                         .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                     Spacer(minLength: 8)
-                    Text("Bot").font(.subheadline).foregroundStyle(.tertiary)
+                    Text("Bot").font(AppFont.subheadline()).foregroundStyle(.tertiary)
                 }
                 if let description = profile.description {
-                    Text(description).font(.body).foregroundStyle(.secondary)
+                    Text(description).font(AppFont.body()).foregroundStyle(.secondary)
                         .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
                 }
             }

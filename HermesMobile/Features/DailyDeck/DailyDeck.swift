@@ -21,7 +21,7 @@ struct DailyDeck: Decodable, Equatable {
 /// fails to decode; an unknown `type` renders its `fallback` text as a plain card.
 struct DeckCard: Decodable, Equatable, Identifiable {
     enum CardType: Equatable {
-        case headline, prompt, decision, reflect, item, close
+        case headline, prompt, decision, reflect, item, sleep, close
         case unknown(String)
 
         init(_ raw: String) {
@@ -31,6 +31,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case "decision": self = .decision
             case "reflect": self = .reflect
             case "item": self = .item
+            case "sleep": self = .sleep
             case "close": self = .close
             default: self = .unknown(raw)
             }
@@ -56,6 +57,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let reason: String?
     /// Other questions for the same material; Regenerate steps through them.
     let altQuestions: [String]
+    /// On the headline card: one sentence about yesterday, written by the brief.
+    let recap: String?
     /// A recap's items (a review's days, answers, or last week's plan), each under an optional label.
     let entries: [DeckEntry]
     /// A weekly review's headline numbers ("7 days you wrote").
@@ -66,21 +69,25 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let meters: [DeckMeter]
     /// A goals card's paper name ("wiki"), as its goal sets it.
     let color: String?
+    /// A sleep card's rating labels, worst to best; the answer's `rating` is a 1-based index.
+    let scale: [String]
+    /// A sleep card's numbers from the user's watch.
+    let sleep: DeckSleep?
 
-    /// Whether answering this card means typing (prompt and reflect cards).
-    var takesText: Bool { type == .prompt || type == .reflect }
+    /// Whether answering this card means typing (prompt and reflect cards, and a sleep card's note).
+    var takesText: Bool { type == .prompt || type == .reflect || type == .sleep }
 
     /// Whether "Not for Me" applies: material the brief chose, not the deck's own pages.
     var takesFeedback: Bool {
         switch type {
         case .prompt, .reflect, .item, .unknown: true
-        case .headline, .decision, .close: false
+        case .headline, .decision, .sleep, .close: false
         }
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, type, title, body, source, lines, question, context, voice, why, draft, actions, fallback
-        case reason, altQuestions, entries, stats, points, meters, color
+        case reason, altQuestions, entries, recap, scale, sleep, stats, points, meters, color
         case itemKind = "kind"
     }
 
@@ -101,13 +108,51 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         actions = (try? c.decodeIfPresent([DeckAction].self, forKey: .actions)) ?? []
         fallback = try? c.decodeIfPresent(String.self, forKey: .fallback)
         reason = try? c.decodeIfPresent(String.self, forKey: .reason)
+        recap = (try? c.decodeIfPresent(String.self, forKey: .recap))
+            .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
         altQuestions = (try? c.decodeIfPresent([String].self, forKey: .altQuestions)) ?? []
         entries = ((try? c.decodeIfPresent([Lossy<DeckEntry>].self, forKey: .entries)) ?? []).compactMap(\.value)
         stats = ((try? c.decodeIfPresent([Lossy<DeckStat>].self, forKey: .stats)) ?? []).compactMap(\.value)
         points = ((try? c.decodeIfPresent([Lossy<DeckPoint>].self, forKey: .points)) ?? []).compactMap(\.value)
         meters = ((try? c.decodeIfPresent([Lossy<DeckMeter>].self, forKey: .meters)) ?? []).compactMap(\.value)
         color = try? c.decodeIfPresent(String.self, forKey: .color)
+        scale = (try? c.decodeIfPresent([String].self, forKey: .scale)) ?? []
+        sleep = try? c.decodeIfPresent(DeckSleep.self, forKey: .sleep)
     }
+}
+
+/// Last night from the user's watch, already written as lines by the brief: `headline` is hours
+/// against need ("8.5 h of 9 h needed", nil before the watch syncs), `lines` the timing and
+/// recovery, `nights` the last seven, oldest first, for the strip chart.
+struct DeckSleep: Decodable, Equatable {
+    let headline: String?
+    let lines: [String]
+    let nights: [DeckNight]
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        headline = try? c.decodeIfPresent(String.self, forKey: .headline)
+        lines = (try? c.decodeIfPresent([String].self, forKey: .lines)) ?? []
+        nights = (try? c.decodeIfPresent([DeckNight].self, forKey: .nights)) ?? []
+    }
+
+    private enum CodingKeys: String, CodingKey { case headline, lines, nights }
+}
+
+/// One night on the strip: its weekday and hours slept against hours needed (nil when unknown).
+struct DeckNight: Decodable, Equatable {
+    let day: String
+    let hours: Double?
+    let need: Double?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        day = (try? c.decode(String.self, forKey: .day)) ?? ""
+        hours = try? c.decodeIfPresent(Double.self, forKey: .hours)
+        need = try? c.decodeIfPresent(Double.self, forKey: .need)
+    }
+
+    private enum CodingKeys: String, CodingKey { case day, hours, need }
 }
 
 /// One item in a recap card. An entry that fails to decode is dropped, never the card.
@@ -179,13 +224,15 @@ struct DeckAnswer: Codable, Equatable {
     var card: String
     var text: String?
     var action: String?
+    /// A sleep card's rating: a 1-based index into the card's `scale`.
+    var rating: Int?
     /// The question answered, when it isn't the card's own (regenerated, or the user's).
     var question: String?
     /// "Not for Me" on this card; a card with feedback leaves the deck.
     var feedback: DeckFeedback?
 
     var isEmpty: Bool {
-        !hasText && action == nil && question == nil && feedback == nil
+        !hasText && action == nil && rating == nil && question == nil && feedback == nil
     }
 
     private var hasText: Bool {
@@ -196,7 +243,7 @@ struct DeckAnswer: Codable, Equatable {
     /// (Answer, Edit) answers nothing until the text is there.
     func isAnswer(for card: DeckCard) -> Bool {
         if let action, card.actions.first(where: { $0.id == action })?.takesText == true { return hasText }
-        return hasText || action != nil
+        return hasText || action != nil || rating != nil
     }
 
     /// Whether this says something worth filing: an answer, or feedback on the card.
@@ -352,6 +399,12 @@ struct DailyDeckStore {
         return stored?[date]
     }
 
+    /// The newest stored day session, if any.
+    func latestSession(for server: URL) -> (date: String, id: String)? {
+        let stored = defaults.dictionary(forKey: key("session", server)) as? [String: String]
+        return stored?.max { $0.key < $1.key }.map { ($0.key, $0.value) }
+    }
+
     func setSession(_ sessionID: String, for server: URL, date: String) {
         defaults.set([date: sessionID], forKey: key("session", server))
     }
@@ -432,6 +485,10 @@ struct DeckCardText: Equatable {
             // for older builds. A theme's summary is its `context`.
             let drawn = !card.entries.isEmpty || !card.points.isEmpty || !card.meters.isEmpty
             detail = card.context ?? (drawn ? nil : (card.body ?? (card.title == nil ? nil : card.fallback)))
+        case .sleep:
+            // The question leads; the numbers show after the rating so they don't decide it.
+            lead = card.question
+            leadIsQuestion = true
         case .headline, .decision, .close:
             lead = card.title
             detail = card.body

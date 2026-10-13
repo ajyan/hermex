@@ -8,6 +8,8 @@ struct PrepRunView: View {
     @State private var didLoad = false
     /// The option tapped on a choice rep, kept to mark it once graded.
     @State private var chosen: ChosenOption?
+    /// The unsent answer on an approach or spot-the-bug rep.
+    @State private var draft = Draft(rep: -1)
     @Environment(\.dismiss) private var dismiss
     @State private var screenHeight: CGFloat = 800
 
@@ -16,19 +18,33 @@ struct PrepRunView: View {
         let id: String
     }
 
+    /// Belongs to one rep; any other rep reads a fresh one.
+    private struct Draft: Equatable {
+        let rep: Int
+        var text = ""
+        var line: Int?
+        var fix: String?
+    }
+
     init(server: URL, onAPIError: @escaping (Error) -> Void) {
-        _viewModel = State(initialValue: PrepRunViewModel(
+        self.init(viewModel: PrepRunViewModel(
             client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
+    }
+
+    init(viewModel: PrepRunViewModel) {
+        _viewModel = State(initialValue: viewModel)
     }
 
     var body: some View {
         content
-            .navigationTitle(Text(verbatim: title))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(title)
             .navigationBarBackButtonHidden(true)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { dismiss() } label: {
+                    Button {
+                        viewModel.leave()
+                        dismiss()
+                    } label: {
                         Image(systemName: "xmark")
                     }
                     .accessibilityLabel(Text(verbatim: "Save and quit"))
@@ -41,7 +57,9 @@ struct PrepRunView: View {
                             .accessibilityLabel(Text(verbatim: "Rep \(progress.position + 1) of \(progress.count)"))
                     }
                 }
+                ToolbarItem(placement: .topBarTrailing) { FeedbackMoreMenu() }
             }
+            .feedbackContext(feedbackContext)
             .background(Color.hxCanvas.ignoresSafeArea())
             .background {
                 GeometryReader { proxy in
@@ -69,6 +87,43 @@ struct PrepRunView: View {
     private var title: String {
         if case .finished = viewModel.phase { return "Run complete" }
         return currentRep.map { PrepCopy.blockTitle($0.block) } ?? ""
+    }
+
+    private var feedbackContext: FeedbackContext {
+        var result: PrepAttemptResult?
+        if case .result(_, let graded, _) = viewModel.phase { result = graded }
+        return .prepRun(rep: currentRep, answer: currentRep.flatMap(answer(for:)), result: result)
+    }
+
+    /// The answer on screen for a rep: the option tapped, the approach draft, or the bug pick.
+    private func answer(for rep: PrepRep) -> PrepAnswer? {
+        switch rep.drill {
+        case .complexity, .trace:
+            return chosen?.rep == rep.index ? chosen.map { .choice($0.id) } : nil
+        case .approach, .judgment:
+            return .choice(draft(for: rep).text)
+        case .fact:
+            if rep.item.format == "cloze" { return .choice(draft(for: rep).text) }
+            return chosen?.rep == rep.index ? chosen.map { .choice($0.id) } : nil
+        case .spotBug:
+            let draft = draft(for: rep)
+            return draft.line.map { .bugFix(line: $0, fix: draft.fix ?? "") }
+        case .primer, .unknown:
+            return nil
+        }
+    }
+
+    fileprivate static func drillTitle(_ drill: PrepDrill) -> String {
+        switch drill {
+        case .approach: "Approach"
+        case .complexity: "Complexity"
+        case .spotBug: "Spot the bug"
+        case .trace: "Trace"
+        case .primer: "Primer"
+        case .fact: "Fact"
+        case .judgment: "Judgment"
+        case .unknown: "Run"
+        }
     }
 
     /// The rep's position among today's reps (not its stable index, which can skip).
@@ -102,8 +157,15 @@ struct PrepRunView: View {
                     rep: rep,
                     result: result,
                     chosenID: chosen?.rep == rep.index ? chosen?.id : nil,
-                    placedLines: viewModel.board?.placed ?? []
+                    chosenLine: draft(for: rep).line,
+                    typedAnswer: draft(for: rep).text
                 )
+                if rep.item.isCoachWritten {
+                    PrepFlagCardButton(
+                        isFlagged: viewModel.isFlagged(rep.item.id),
+                        error: viewModel.flagError
+                    ) { Task { await viewModel.flagCurrent() } }
+                }
             } bottom: {
                 PrepPrimaryButton(title: "Continue") { Task { await viewModel.continue() } }
             }
@@ -157,8 +219,9 @@ struct PrepRunView: View {
 
     private func hasAction(_ rep: PrepRep) -> Bool {
         switch rep.drill {
-        case .parsons, .primer: true
-        default: false
+        case .primer, .approach, .spotBug, .unknown, .judgment: true
+        case .fact: rep.item.format == "cloze"
+        case .complexity, .trace: false
         }
     }
 
@@ -166,19 +229,40 @@ struct PrepRunView: View {
     @ViewBuilder
     private func repAction(_ rep: PrepRep) -> some View {
         switch rep.drill {
-        case .parsons:
-            if let board = viewModel.board {
-                PrepPrimaryButton(
-                    title: "Check order",
-                    enabled: board.isFull(target: PrepCopy.parsonsTarget(poolCount: board.pool.count))
-                        && !viewModel.isSubmitting
-                ) { Task { await viewModel.checkParsons() } }
-            }
         case .primer:
             PrepPrimaryButton(title: "Got it", enabled: !viewModel.isSubmitting) {
                 Task { await viewModel.acknowledgePrimer() }
             }
-        default:
+        case .approach:
+            let text = draft(for: rep).text.trimmingCharacters(in: .whitespacesAndNewlines)
+            PrepPrimaryButton(
+                title: viewModel.isSubmitting ? "Grading…" : "Submit",
+                enabled: !text.isEmpty && !viewModel.isSubmitting
+            ) { Task { await viewModel.submitApproach(text) } }
+        case .spotBug:
+            let answer = draft(for: rep)
+            PrepPrimaryButton(
+                title: "Submit",
+                enabled: PrepCopy.canSubmitBugFix(line: answer.line, fix: answer.fix) && !viewModel.isSubmitting
+            ) {
+                guard let line = answer.line, let fix = answer.fix else { return }
+                Task { await viewModel.submitBugFix(line: line, fix: fix) }
+            }
+        case .judgment:
+            let text = draft(for: rep).text
+            PrepPrimaryButton(
+                title: viewModel.isSubmitting ? "Grading…" : "Submit",
+                enabled: PrepCopy.canSubmitJudgment(text) && !viewModel.isSubmitting
+            ) { Task { await viewModel.submitJudgment(text) } }
+        case .fact:
+            let text = draft(for: rep).text
+            PrepPrimaryButton(
+                title: "Submit",
+                enabled: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !viewModel.isSubmitting
+            ) { Task { await viewModel.submitCloze(text) } }
+        case .unknown:
+            PrepPrimaryButton(title: "Skip") { Task { await viewModel.skip() } }
+        case .complexity, .trace:
             EmptyView()
         }
     }
@@ -186,33 +270,93 @@ struct PrepRunView: View {
     @ViewBuilder
     private func repContent(_ rep: PrepRep) -> some View {
         switch rep.drill {
-        case .patternID, .complexity:
+        case .complexity:
             PrepChoiceView(
-                rep: rep,
+                title: "Time complexity?",
+                options: rep.item.options,
                 grading: nil,
                 isSubmitting: viewModel.isSubmitting,
                 submitError: viewModel.submitError
-            ) { option in
-                chosen = ChosenOption(rep: rep.index, id: option.id)
-                Task { await viewModel.choose(.choice(option.id)) }
-            }
-        case .parsons:
-            if let board = viewModel.board {
-                PrepParsonsView(
-                    hints: rep.item.hints,
-                    board: board,
-                    hintsShown: viewModel.hintsShown,
-                    isSubmitting: viewModel.isSubmitting,
-                    place: { viewModel.place(poolIndex: $0) },
-                    unplace: { viewModel.unplace(at: $0) },
-                    showHint: { viewModel.showHint() }
-                )
-            }
+            ) { option in choose(option, in: rep) }
+        case .trace:
+            PrepTraceView(
+                item: rep.item,
+                isSubmitting: viewModel.isSubmitting,
+                submitError: viewModel.submitError
+            ) { option in choose(option, in: rep) }
+        case .approach:
+            PrepApproachView(
+                text: Binding(
+                    get: { draft(for: rep).text },
+                    set: { text in updateDraft(rep) { $0.text = PrepCopy.cappedApproach(text) } }),
+                hints: rep.item.hints,
+                hintsShown: viewModel.hintsShown,
+                isSubmitting: viewModel.isSubmitting,
+                showHint: { viewModel.showHint() },
+                shownAt: viewModel.shownAt
+            )
+        case .spotBug:
+            let answer = draft(for: rep)
+            PrepSpotBugView(
+                code: rep.item.code,
+                fixes: rep.item.fixes,
+                selectedLine: answer.line,
+                selectedFix: answer.fix,
+                isSubmitting: viewModel.isSubmitting,
+                selectLine: { line in updateDraft(rep) { $0.line = line } },
+                selectFix: { fix in updateDraft(rep) { $0.fix = fix } }
+            )
         case .primer:
             PrepPrimerView(item: rep.item)
+        case .fact:
+            if rep.item.format == "cloze" {
+                PrepClozeView(
+                    text: Binding(get: { draft(for: rep).text }, set: { text in updateDraft(rep) { $0.text = text } }),
+                    isSubmitting: viewModel.isSubmitting
+                ) { Task { await viewModel.submitCloze(draft(for: rep).text) } }
+            } else {
+                PrepChoiceView(
+                    title: "Your answer",
+                    options: rep.item.options,
+                    grading: nil,
+                    isSubmitting: viewModel.isSubmitting,
+                    submitError: viewModel.submitError
+                ) { option in choose(option, in: rep) }
+            }
+        case .judgment:
+            PrepApproachView(
+                text: Binding(
+                    get: { draft(for: rep).text },
+                    set: { text in updateDraft(rep) { $0.text = PrepCopy.cappedApproach(text) } }),
+                hints: [],
+                hintsShown: 0,
+                isSubmitting: viewModel.isSubmitting,
+                showHint: {},
+                shownAt: viewModel.shownAt,
+                prompt: "Your answer"
+            )
         case .unknown:
-            EmptyView()
+            PrepNoteCard {
+                Text(verbatim: "Update Atlas to do this rep")
+                    .font(BrainStyle.rowTitle)
+                    .foregroundStyle(Color.hxTextPrimary)
+            }
         }
+    }
+
+    private func choose(_ option: PrepOption, in rep: PrepRep) {
+        chosen = ChosenOption(rep: rep.index, id: option.id)
+        Task { await viewModel.choose(.choice(option.id)) }
+    }
+
+    private func draft(for rep: PrepRep) -> Draft {
+        draft.rep == rep.index ? draft : Draft(rep: rep.index)
+    }
+
+    private func updateDraft(_ rep: PrepRep, _ change: (inout Draft) -> Void) {
+        var next = draft(for: rep)
+        change(&next)
+        draft = next
     }
 }
 
@@ -277,5 +421,28 @@ struct PrepRunCompleteView: View {
             .padding(BrainStyle.l)
             .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
         }
+    }
+}
+
+extension FeedbackContext {
+    /// "Prep · Spot the bug · Longest Substring" on a rep; just the run around it. State
+    /// carries the rep, the answer on screen and, once graded, the verdict and feedback.
+    static func prepRun(rep: PrepRep?, answer: PrepAnswer?, result: PrepAttemptResult?) -> FeedbackContext {
+        guard let rep else { return FeedbackContext(feature: "Prep", screen: "Run") }
+        let answerText: String? = switch answer {
+        case .choice(let text): text
+        case .bugFix(let line, let fix): "line \(line + 1): \(fix)"
+        case nil: nil
+        }
+        return FeedbackContext(
+            feature: "Prep", screen: PrepRunView.drillTitle(rep.drill), item: rep.item.title,
+            state: [
+                "item_id": rep.item.id,
+                "drill": rep.drill.rawValue,
+                "rep_index": String(rep.index),
+                "answer": answerText,
+                "verdict": result?.verdict,
+                "feedback": result?.feedback,
+            ])
     }
 }

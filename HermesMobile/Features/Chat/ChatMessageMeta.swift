@@ -337,7 +337,7 @@ struct TranscriptTimeSeparator: View {
 
     private var hairline: some View {
         Rectangle()
-            .fill(Color(.separator))
+            .fill(Color.hxSeparator)
             .frame(height: 0.5)
             .frame(maxWidth: .infinity)
             .accessibilityHidden(true)

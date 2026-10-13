@@ -21,6 +21,10 @@ enum ShellPushDestination: Hashable {
     case goals
     /// One personal goal, by slug.
     case goal(String)
+    /// Money: net worth and the market card, from the drawer.
+    case money
+    /// The in-app feedback inbox, from the drawer.
+    case feedback
     case settings(SettingsScrollAnchor?)
 }
 

@@ -405,11 +405,16 @@ final class ChatViewModelSendTests: XCTestCase {
         XCTAssertEqual(viewModel.listenPlaybackElapsedTime, 0)
         let nowPlayingUpdatesAfterStart = remoteControlCenter.snapshots.count
 
+        XCTAssertTrue(viewModel.isListenPlaybackProgressTicking)
+        viewModel.pauseListenPlaybackProgressForBackground()
+        XCTAssertFalse(viewModel.isListenPlaybackProgressTicking, "Background audio needs no progress ticker.")
+
         // Simulates background audio advancing while the foreground UI timer is not
         // firing. Returning to the scene must pull the latest player time into the bar.
         player.currentTime = 42
         viewModel.refreshListenPlaybackProgressAfterSceneActivation()
 
+        XCTAssertTrue(viewModel.isListenPlaybackProgressTicking)
         XCTAssertEqual(viewModel.listenPlaybackElapsedTime, 42)
         XCTAssertEqual(viewModel.listenPlaybackDisplayTime, 42)
         XCTAssertEqual(remoteControlCenter.snapshots.count, nowPlayingUpdatesAfterStart)
@@ -2207,6 +2212,62 @@ final class ChatViewModelSendTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(approvalPendingRequests.count, 2)
         XCTAssertEqual(viewModel.approvalPrompt?.pending.approvalId, "approval-1")
         viewModel.cleanupPollingTasks()
+    }
+
+    @MainActor
+    func testApprovalFallbackRetriesTheStreamWhenTheNextRunStarts() async throws {
+        let streamClient = SpySSEStreamingClient()
+        let approvalStreamClient = SpySSEStreamingClient()
+        let pollingIntervals = ChatPollingIntervals(
+            approvalNanoseconds: 60_000_000_000,
+            clarificationNanoseconds: 60_000_000_000,
+            backgroundNanoseconds: 60_000_000_000
+        )
+        let viewModel = try makeViewModel(
+            streamClient: streamClient,
+            approvalStreamClient: approvalStreamClient,
+            pollingIntervals: pollingIntervals
+        ) { request in
+            switch request.url?.path {
+            case "/api/chat/start":
+                return apiTestJSONResponse(#"{"session_id":"session-abc","stream_id":"stream-123"}"#, for: request)
+            case "/api/approval/pending":
+                return apiTestJSONResponse(#"{"pending":null,"pending_count":0}"#, for: request)
+            default:
+                XCTFail("Unexpected request path: \(request.url?.path ?? "nil")")
+                throw URLError(.badURL)
+            }
+        }
+
+        let didStart = await viewModel.sendMessage("Run setup")
+        XCTAssertTrue(didStart)
+        XCTAssertEqual(approvalStreamClient.startedURLs.count, 1)
+        approvalStreamClient.emit(.transportError("approval stream failed"))
+        streamClient.emit(.streamEnd)
+
+        let didStartAgain = await viewModel.sendMessage("And again")
+        XCTAssertTrue(didStartAgain)
+
+        XCTAssertEqual(approvalStreamClient.startedURLs.count, 2, "A new run should leave fallback polling for the stream.")
+        viewModel.cleanupPollingTasks()
+    }
+
+    @MainActor
+    func testIdleApprovalFallbackPollingBacksOffToTheCap() {
+        let base: UInt64 = 1_500_000_000
+        let cap = ChatPendingActionCoordinator.maxIdleApprovalPollingNanoseconds
+        var interval = base
+        var intervals: [UInt64] = []
+        for _ in 0..<6 {
+            interval = ChatPendingActionCoordinator.nextApprovalPollingInterval(after: interval, base: base, isRunLive: false)
+            intervals.append(interval)
+        }
+        XCTAssertEqual(intervals, [3_000_000_000, 6_000_000_000, 12_000_000_000, 24_000_000_000, cap, cap])
+        XCTAssertEqual(
+            ChatPendingActionCoordinator.nextApprovalPollingInterval(after: cap, base: base, isRunLive: true),
+            base,
+            "A live run polls at the base rate again."
+        )
     }
 
     @MainActor
@@ -11443,5 +11504,64 @@ private actor ManualAsyncDelay {
         for observer in satisfied {
             observer.continuation.resume()
         }
+    }
+}
+
+final class ActiveChatStreamSnapshotStoreTests: XCTestCase {
+    private let server = URL(string: "https://hermes.example")!
+
+    func testSavingAStreamDropsThatSessionsOlderStreams() {
+        let store = ActiveChatStreamSnapshotStore()
+        store.save(Self.snapshot("first"), server: server, sessionID: "s1", streamID: "stream-1")
+        store.save(Self.snapshot("other"), server: server, sessionID: "s2", streamID: "stream-9")
+        store.save(Self.snapshot("second"), server: server, sessionID: "s1", streamID: "stream-2")
+
+        XCTAssertNil(store.snapshot(server: server, sessionID: "s1", streamID: "stream-1"))
+        XCTAssertEqual(store.snapshot(server: server, sessionID: "s1", streamID: "stream-2")?.displayTitle, "second")
+        XCTAssertEqual(store.snapshot(server: server, sessionID: "s2", streamID: "stream-9")?.displayTitle, "other")
+        XCTAssertEqual(store.count, 2)
+    }
+
+    func testTheSameSessionOnAnotherServerIsKept() {
+        let store = ActiveChatStreamSnapshotStore()
+        let otherServer = URL(string: "https://other.example")!
+        store.save(Self.snapshot("a"), server: server, sessionID: "s1", streamID: "stream-1")
+        store.save(Self.snapshot("b"), server: otherServer, sessionID: "s1", streamID: "stream-2")
+
+        XCTAssertNotNil(store.snapshot(server: server, sessionID: "s1", streamID: "stream-1"))
+        XCTAssertNotNil(store.snapshot(server: otherServer, sessionID: "s1", streamID: "stream-2"))
+    }
+
+    func testOldestSnapshotIsEvictedPastTheLimit() {
+        let store = ActiveChatStreamSnapshotStore(limit: 2)
+        store.save(Self.snapshot("1"), server: server, sessionID: "s1", streamID: "a")
+        store.save(Self.snapshot("2"), server: server, sessionID: "s2", streamID: "b")
+        // Saving again refreshes s1, so s2 is now the oldest.
+        store.save(Self.snapshot("1b"), server: server, sessionID: "s1", streamID: "a")
+        store.save(Self.snapshot("3"), server: server, sessionID: "s3", streamID: "c")
+
+        XCTAssertNil(store.snapshot(server: server, sessionID: "s2", streamID: "b"))
+        XCTAssertEqual(store.snapshot(server: server, sessionID: "s1", streamID: "a")?.displayTitle, "1b")
+        XCTAssertNotNil(store.snapshot(server: server, sessionID: "s3", streamID: "c"))
+        XCTAssertEqual(store.count, 2)
+    }
+
+    private static func snapshot(_ title: String) -> ActiveChatStreamSnapshot {
+        ActiveChatStreamSnapshot(
+            messages: [],
+            messagesOffset: 0,
+            displayTitle: title,
+            completedToolCallGroups: [],
+            completedReasoningGroups: [],
+            liveToolCalls: [],
+            liveReasoningText: "",
+            activeStreamLastEventID: nil,
+            streamingAssistantMessageID: nil,
+            toolCallAnchorMessageID: nil,
+            reasoningAnchorMessageID: nil,
+            contextWindowSnapshot: nil,
+            localAttachmentPreviews: [:],
+            pinnedLocalNotices: []
+        )
     }
 }

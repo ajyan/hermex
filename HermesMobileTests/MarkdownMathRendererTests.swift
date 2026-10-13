@@ -88,6 +88,29 @@ final class MarkdownMathRendererTests: XCTestCase {
         }
     }
 
+    /// Two prices in one sentence are not a formula, even when the prose between
+    /// them has a hyphen or a percent (Pandoc's rule: no space inside the dollars,
+    /// and a closing dollar is never followed by a digit).
+    func testPricesInProseStayLiteral() {
+        let inputs = [
+            "$46.60 each, pre-tip. At a 20% tip that's $57.12 a person.",
+            "Split $186.40 four ways: $46.60 each.",
+            "From $5 to $10-ish, a 2x jump.",
+            "It was $20 - $30 per head."
+        ]
+
+        for input in inputs {
+            XCTAssertEqual(MarkdownMathFormatter.replacingInlineMath(in: input), input)
+        }
+        XCTAssertEqual(MarkdownMathLayoutCache.uncachedLayout(for: inputs[0]), .plain(inputs[0]))
+    }
+
+    func testMathNextToPricesStillRenders() {
+        let rendered = MarkdownMathFormatter.replacingInlineMath(in: "Pay $5 when $x=2$ holds.")
+        XCTAssertTrue(rendered.hasPrefix("Pay $5 when "))
+        XCTAssertFalse(rendered.contains("$x=2$"))
+    }
+
     func testProductionLayoutsRecognizeAssignmentsForStreamingAndFinalizedMarkdown() {
         let input = #"Result: **$E=[4,-2]$** and `$O=[6,-2]$` stays code."#
 

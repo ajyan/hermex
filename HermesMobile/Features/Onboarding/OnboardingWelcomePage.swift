@@ -13,7 +13,7 @@ struct OnboardingWelcomePage: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Color.hxCanvas.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 Spacer(minLength: 24)
@@ -68,14 +68,14 @@ struct OnboardingWelcomePage: View {
 
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Control Atlas from iPhone or iPad.")
-                        .font(.system(size: dynamicTypeSize.isAccessibilitySize ? 27 : 31, weight: .bold))
+                        .font(AppFont.display(style: .largeTitle))
                         .foregroundStyle(.white)
                         .lineLimit(3)
                         .minimumScaleFactor(0.86)
                         .fixedSize(horizontal: false, vertical: true)
 
                     Text("Connect to your self-hosted server over a private network, such as Tailscale or NetBird.")
-                        .font(.subheadline)
+                        .font(AppFont.subheadline())
                         .foregroundStyle(.white.opacity(0.58))
                         .fixedSize(horizontal: false, vertical: true)
 

@@ -819,3 +819,89 @@ final class ChatMotionTests: XCTestCase {
         XCTAssertEqual(ChatMotion.clarificationToggle(reduceMotion: false), .easeOut(duration: 0.22))
     }
 }
+
+/// The chat transcript reads streaming state inside `ChatObservationScope`, so a
+/// streamed word must redraw only that scope, never the screen that built it.
+@MainActor
+final class ChatObservationScopeTests: XCTestCase {
+    @Observable
+    final class StreamModel {
+        var words = 0
+    }
+
+    private final class BodyCounts {
+        var screen = 0
+        var scope = 0
+        var onScopeRender: ((Int) -> Void)?
+    }
+
+    private struct Screen: View {
+        let model: StreamModel
+        let counts: BodyCounts
+
+        var body: some View {
+            let _ = (counts.screen += 1)
+            VStack {
+                Text(verbatim: "composer")
+                ChatObservationScope {
+                    let _ = (counts.scope += 1)
+                    let _ = counts.onScopeRender?(model.words)
+                    Text(verbatim: "\(model.words)")
+                }
+            }
+        }
+    }
+
+    /// The same screen reading the state directly, which redraws on every word.
+    private struct UnscopedScreen: View {
+        let model: StreamModel
+        let counts: BodyCounts
+
+        var body: some View {
+            let _ = (counts.screen += 1)
+            let _ = counts.onScopeRender?(model.words)
+            VStack {
+                Text(verbatim: "composer")
+                Text(verbatim: "\(model.words)")
+            }
+        }
+    }
+
+    func testStreamingStateRedrawsOnlyTheScope() async throws {
+        let counts = BodyCounts()
+        let screenBodies = try await streamThreeWords(counts: counts) { Screen(model: $0, counts: counts) }
+        XCTAssertEqual(counts.screen, screenBodies, "A streamed word must not redraw the screen around the transcript.")
+    }
+
+    /// Shows the body count actually sees a redraw, so the test above can't pass vacuously.
+    func testReadingStreamingStateInTheScreenRedrawsIt() async throws {
+        let counts = BodyCounts()
+        let screenBodies = try await streamThreeWords(counts: counts) { UnscopedScreen(model: $0, counts: counts) }
+        XCTAssertGreaterThanOrEqual(counts.screen, screenBodies + 3)
+    }
+
+    /// Hosts the screen, streams three words into it, and returns the screen's body count before the first word.
+    private func streamThreeWords<V: View>(counts: BodyCounts, makeScreen: (StreamModel) -> V) async throws -> Int {
+        let model = StreamModel()
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = UIHostingController(rootView: makeScreen(model))
+        window.makeKeyAndVisible()
+        defer {
+            window.isHidden = true
+            window.rootViewController = nil
+        }
+        window.layoutIfNeeded()
+        let screenBodies = counts.screen
+        XCTAssertGreaterThan(screenBodies, 0)
+
+        for word in 1...3 {
+            let rendered = expectation(description: "scope rendered word \(word)")
+            rendered.assertForOverFulfill = false
+            counts.onScopeRender = { if $0 == word { rendered.fulfill() } }
+            model.words = word
+            await fulfillment(of: [rendered], timeout: 2)
+        }
+        return screenBodies
+    }
+}

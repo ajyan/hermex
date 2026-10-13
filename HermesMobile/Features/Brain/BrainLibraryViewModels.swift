@@ -34,6 +34,11 @@ private func brainIsNotFound(_ error: Error) -> Bool {
 final class BrainHomeViewModel {
     private(set) var state: BrainLoadState<[BrainModule]> = .loading
     private(set) var modules: [BrainModule] = []
+    /// Hubs, recent and rediscover picks. Best effort: empty on a server without the home
+    /// route, and a failed refresh keeps what was shown.
+    private(set) var home = BrainHome()
+    /// Which rediscover pick is showing; "Another" steps through today's picks.
+    private(set) var rediscoverIndex = 0
     private(set) var isShowingCachedCopy = false
 
     private let client: any BrainDataClient
@@ -53,6 +58,8 @@ final class BrainHomeViewModel {
         generation += 1
         let token = generation
         if modules.isEmpty { state = .loading }
+        if home.isEmpty, let cached = cache.load(BrainHome.self, kind: "home", id: "") { home = cached }
+        async let fetchedHome: BrainHome? = try? client.home()
         do {
             let fetched = try await client.modules()
             guard !Task.isCancelled, token == generation else { return }
@@ -60,6 +67,11 @@ final class BrainHomeViewModel {
             state = .loaded(fetched)
             isShowingCachedCopy = false
             cache.store(fetched, kind: "modules", id: "")
+            if let loadedHome = await fetchedHome, !Task.isCancelled, token == generation {
+                if loadedHome.rediscover != home.rediscover { rediscoverIndex = 0 }
+                home = loadedHome
+                cache.store(loadedHome, kind: "home", id: "")
+            }
         } catch is CancellationError {
             // The screen went away; nothing to update.
         } catch {
@@ -75,6 +87,16 @@ final class BrainHomeViewModel {
             }
             onAPIError(error)
         }
+    }
+
+    /// The rediscover pick showing now, if the server sent any.
+    var rediscoverPick: BrainItem? {
+        home.rediscover.isEmpty ? nil : home.rediscover[rediscoverIndex % home.rediscover.count]
+    }
+
+    func showAnotherPick() {
+        guard home.rediscover.count > 1 else { return }
+        rediscoverIndex = (rediscoverIndex + 1) % home.rediscover.count
     }
 }
 
@@ -279,15 +301,16 @@ final class BrainSearchViewModel {
     }
 }
 
-/// One Brain page, plus its link graph (best effort).
+/// One Brain page, optionally placed in a hub the reader is paging through.
 @MainActor
 @Observable
 final class BrainPageViewModel {
     let module: BrainModuleID
     let id: String
+    /// The hub the reader was paging through, so the server keeps the page in it.
+    let hub: String?
     private(set) var state: BrainLoadState<BrainPage> = .loading
     private(set) var page: BrainPage?
-    private(set) var graph: BrainGraph?
     private(set) var isShowingCachedCopy = false
     private(set) var isMissing = false
 
@@ -295,13 +318,19 @@ final class BrainPageViewModel {
     private let cache: BrainCacheHandle
     private let onAPIError: (Error) -> Void
 
-    init(module: BrainModuleID, id: String, client: any BrainDataClient, cache: BrainCacheHandle,
-         onAPIError: @escaping (Error) -> Void = { _ in }) {
+    init(module: BrainModuleID, id: String, hub: String? = nil, client: any BrainDataClient,
+         cache: BrainCacheHandle, onAPIError: @escaping (Error) -> Void = { _ in }) {
         self.module = module
         self.id = id
+        self.hub = hub
         self.client = client
         self.cache = cache
         self.onAPIError = onAPIError
+    }
+
+    /// The same client and cache for another page in the hub (the pager's next or previous).
+    func sibling(module: BrainModuleID, id: String, hub: String) -> BrainPageViewModel {
+        BrainPageViewModel(module: module, id: id, hub: hub, client: client, cache: cache, onAPIError: onAPIError)
     }
 
     /// Bumped by every `load()`, so an older failure never overwrites a newer success.
@@ -311,20 +340,14 @@ final class BrainPageViewModel {
         generation += 1
         let token = generation
         if page == nil { state = .loading }
-        async let fetchedGraph: BrainGraph? = try? client.graph(module: module, id: id)
         do {
-            let fetched = try await client.page(module: module, id: id)
+            let fetched = try await client.page(module: module, id: id, hub: hub)
             guard !Task.isCancelled, token == generation else { return }
             page = fetched
             state = .loaded(fetched)
             isShowingCachedCopy = false
             isMissing = false
             cache.store(fetched, kind: "page", id: id)
-            // The graph is best effort and never holds the page back; a failed
-            // refresh keeps whatever graph was already shown.
-            if let loadedGraph = await fetchedGraph, !Task.isCancelled, token == generation {
-                graph = loadedGraph
-            }
         } catch is CancellationError {
             // The screen went away; nothing to update.
         } catch {
@@ -342,17 +365,5 @@ final class BrainPageViewModel {
             }
             onAPIError(error)
         }
-    }
-
-    /// Fetches only the graph when a page is showing without one, e.g. after the
-    /// reader's first task was cancelled before the graph landed. Best effort: a
-    /// failure leaves the cover in place, and a newer `load()` wins over this fetch.
-    func loadGraphIfNeeded() async {
-        guard page != nil, graph == nil else { return }
-        let token = generation
-        guard let fetched = try? await client.graph(module: module, id: id),
-              !Task.isCancelled, token == generation, graph == nil
-        else { return }
-        graph = fetched
     }
 }

@@ -289,6 +289,11 @@ final class DailyDeckViewModel {
         update(card) { $0.text = text }
     }
 
+    /// Rates a sleep card (1-based into its scale); tapping the chosen rating again clears it.
+    func rate(_ rating: Int, for card: DeckCard) {
+        update(card) { $0.rating = $0.rating == rating ? nil : rating }
+    }
+
     /// Chooses a decision action; choosing the chosen one again clears it.
     func choose(_ action: DeckAction, for card: DeckCard) {
         update(card) { answer in
@@ -380,7 +385,7 @@ final class DailyDeckViewModel {
 }
 
 /// Wraps the `APIClient` actor in a `Sendable` value for the protocol.
-private struct APIClientDailyDeckAdapter: DailyDeckDataClient {
+struct APIClientDailyDeckAdapter: DailyDeckDataClient {
     let apiClient: APIClient
 
     func workspacePaths() async throws -> [String] {

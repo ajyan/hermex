@@ -420,7 +420,7 @@ struct ClarificationRequestCard: View {
     }
 
     private var progressFill: Color {
-        HermexPaper.request.ink.opacity(0.58)
+        HermexPaper.request.glow
     }
 
     private func submitDraft() {

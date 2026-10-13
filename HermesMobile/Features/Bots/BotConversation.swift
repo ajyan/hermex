@@ -476,6 +476,12 @@ import OSLog
         editDraft(reply.text)
     }
 
+    /// An "Ask Atlas" tap in an interactive answer: it fills the draft, after
+    /// any draft already started, and never sends.
+    func fillDraftFromInteractiveAnswer(_ text: String) {
+        editDraft(InteractiveAnswerDraftMerge.merged(draft: draft, ask: text))
+    }
+
     /// Reads this connection's skills once it is connected.
     ///
     /// The composer drives this, because its `/` panel is the only thing that

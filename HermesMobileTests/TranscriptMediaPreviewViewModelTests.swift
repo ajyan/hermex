@@ -231,6 +231,7 @@ final class TranscriptMediaPreviewViewModelTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: videoFileURL.path))
         XCTAssertEqual(try Data(contentsOf: videoFileURL), videoData)
         XCTAssertEqual(viewModel.originalByteCount, videoData.count)
+        XCTAssertFalse(viewModel.holdsOriginalDataInMemory, "The temporary file is the only copy of a video.")
         XCTAssertFalse(viewModel.canSaveImageToPhotos)
         XCTAssertTrue(viewModel.canSaveVideoToPhotos)
         XCTAssertTrue(viewModel.canSaveMediaToPhotos)

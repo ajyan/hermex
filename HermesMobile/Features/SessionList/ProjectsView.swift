@@ -55,7 +55,7 @@ struct ProjectsView: View {
                 }
             }
         }
-        .navigationTitle("Projects")
+        .hxNavigationTitle(String(localized: "Projects"))
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(action: createProject) {
@@ -80,16 +80,17 @@ struct ProjectsView: View {
                     .foregroundStyle(project.displayColor)
                     .accessibilityHidden(true)
                 Text(project.displayName)
-                    .foregroundStyle(.primary)
+                    .font(AppFont.body())
+                    .foregroundStyle(Color.hxTextPrimary)
                     .lineLimit(1)
                 Spacer(minLength: 0)
                 if count > 0 {
                     Text("\(count)")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .font(AppFont.caption(weight: .semibold))
+                        .foregroundStyle(Color.hxTextSecondary)
                 }
                 Image(systemName: "chevron.forward")
-                    .font(.caption.weight(.semibold))
+                    .font(AppFont.caption(weight: .semibold))
                     .foregroundStyle(.tertiary)
                     .accessibilityHidden(true)
             }
@@ -161,7 +162,6 @@ struct ProjectDetailView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Color.hxCanvas)
-        .navigationTitle(viewModel.projects.first { $0.projectId == projectID }?.displayName ?? String(localized: "Project"))
-        .navigationBarTitleDisplayMode(.inline)
+        .hxNavigationTitle(viewModel.projects.first { $0.projectId == projectID }?.displayName ?? String(localized: "Project"))
     }
 }

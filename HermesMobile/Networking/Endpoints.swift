@@ -153,18 +153,29 @@ enum Endpoint {
     case upload
     case transcribe
     case tts
-    /// The Brain module library (`api/brain.py`): module counts, item lists, one page, search, and the link graph.
+    /// The Brain module library (`api/brain_catalog.py`): module counts, item lists, one page (optionally
+    /// placed in a given hub), search, and the home's hubs, recent and rediscover picks.
     case brainModules
     case brainList(module: String, tag: String?, cursor: Int?)
-    case brainPage(module: String, id: String)
+    case brainPage(module: String, id: String, hub: String?)
     case brainSearch(query: String, module: String?)
-    case brainGraph(module: String, id: String)
-    /// The Prep interview tutor (`api/tutor.py`): today's run, home, a track map, one item, and answer submission.
+    case brainHome
+    /// The Prep interview tutor (`api/tutor.py`): today's run, home, a track map, one item, answer submission,
+    /// the gap ledger (all gaps and one gap) and flagging a coach-written card.
     case tutorHome
     case tutorToday
     case tutorMap(track: String)
     case tutorItem(id: String)
     case tutorAttempt
+    case tutorGaps
+    case tutorGap(id: String)
+    case tutorFlag
+    /// The feedback loop (`api/feedback.py`): list or create entries, read a plan, decide on an entry.
+    case feedbackList
+    case feedbackPlan(id: String)
+    case feedbackDecision(id: String)
+    /// Good/not-good labels on generated content (`api/labels.py`): read with a feature (and item), or POST one.
+    case labels(feature: String?, item: String?)
     /// Personal goals from the vault (`api/vault_goals.py`): home, one goal, and a check-in.
     case goalsHome
     case goalDetail(slug: String)
@@ -442,8 +453,8 @@ enum Endpoint {
             return "/api/brain/page"
         case .brainSearch:
             return "/api/brain/search"
-        case .brainGraph:
-            return "/api/brain/graph"
+        case .brainHome:
+            return "/api/brain/home"
         case .tutorHome:
             return "/api/tutor/home"
         case .tutorToday:
@@ -454,6 +465,20 @@ enum Endpoint {
             return "/api/tutor/item"
         case .tutorAttempt:
             return "/api/tutor/attempt"
+        case .tutorGaps:
+            return "/api/tutor/gaps"
+        case .tutorGap:
+            return "/api/tutor/gap"
+        case .tutorFlag:
+            return "/api/tutor/flag"
+        case .feedbackList:
+            return "/api/feedback"
+        case let .feedbackPlan(id):
+            return "/api/feedback/\(id)/plan"
+        case let .feedbackDecision(id):
+            return "/api/feedback/\(id)/decision"
+        case .labels:
+            return "/api/labels"
         case .goalsHome:
             return "/api/goals"
         case .goalDetail:
@@ -662,18 +687,25 @@ enum Endpoint {
             if let tag { items.append(URLQueryItem(name: "tag", value: tag)) }
             if let cursor { items.append(URLQueryItem(name: "cursor", value: String(cursor))) }
             return items
-        case let .brainPage(module, id), let .brainGraph(module, id):
-            return [URLQueryItem(name: "module", value: module), URLQueryItem(name: "id", value: id)]
+        case let .brainPage(module, id, hub):
+            var items = [URLQueryItem(name: "module", value: module), URLQueryItem(name: "id", value: id)]
+            if let hub { items.append(URLQueryItem(name: "hub", value: hub)) }
+            return items
         case let .brainSearch(query, module):
             var items = [URLQueryItem(name: "q", value: query)]
             if let module { items.append(URLQueryItem(name: "module", value: module)) }
             return items
         case let .tutorMap(track):
             return [URLQueryItem(name: "track", value: track)]
-        case let .tutorItem(id):
+        case let .tutorItem(id), let .tutorGap(id):
             return [URLQueryItem(name: "id", value: id)]
         case let .goalDetail(slug):
             return [URLQueryItem(name: "slug", value: slug)]
+        case let .labels(feature, item):
+            var items: [URLQueryItem] = []
+            if let feature { items.append(URLQueryItem(name: "feature", value: feature)) }
+            if let item { items.append(URLQueryItem(name: "item", value: item)) }
+            return items
         default:
             return []
         }

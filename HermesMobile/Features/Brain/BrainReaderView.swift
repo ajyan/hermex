@@ -5,8 +5,8 @@ import SwiftUI
 enum BrainReaderLayout {
     /// Backlinks shown before "Show all N".
     static let backlinkPreviewCount = 5
-    /// The header's height: the graph's, and the cover that stands in for it.
-    static let headerHeight: CGFloat = BrainGraphView.height
+    /// The cover's height, on a page with no links to show instead.
+    static let headerHeight: CGFloat = 180
 
     /// "<Kind> · <date>", the kind's first letter capitalised and the date in the one
     /// Brain format; either part may be absent.
@@ -54,16 +54,9 @@ enum BrainReaderLayout {
         return url.scheme?.lowercased() == "brain" ? .discard : .system
     }
 
-    /// The page's one cover recipe. The graph header takes its ramp, so a page keeps
-    /// one hue whether it shows the graph or the cover.
+    /// The page's one cover recipe.
     static func cover(for item: BrainItem) -> BrainCoverSpec {
         BrainCoverSpec.make(id: item.id, tag: item.tags.first)
-    }
-
-    /// The graph replaces the cover only when it has a neighbour besides the page.
-    static func showsGraph(_ graph: BrainGraph?, centerID: String) -> Bool {
-        guard let graph, graph.nodes.count >= 2 else { return false }
-        return !BrainGraphLayout.visibleNodes(of: graph, centerID: centerID).isEmpty
     }
 
     static func visibleBacklinks(_ backlinks: [BrainRef], expanded: Bool) -> [BrainRef] {
@@ -78,22 +71,24 @@ enum BrainReaderLayout {
         "Show all \(count)"
     }
 
-    /// Journal backlinks show the sentence that mentions the page; others show nothing.
-    static func backlinkSubtitle(_ ref: BrainRef) -> String? {
-        ref.module == .journal && !ref.snippet.isEmpty ? ref.snippet : nil
-    }
-
     static func linkedFromTitle(_ module: BrainModuleID) -> String {
-        module == .people ? "Mentioned in" : "Linked from"
+        module == .people ? "Mentioned in" : "Linked mentions"
     }
 }
 
 /// One page of the Brain (wiki, article, journal day, video note or person), pushed
 /// as `.brainRoute(.page(module, id))` for every id that isn't a book. Owns no
 /// `NavigationStack`: `push` and the rows' `NavigationLink`s go onto the shell's.
+/// The hub pager swaps the page in place, so Back returns to where the reader came from.
 struct BrainReaderView: View {
     @State private var viewModel: BrainPageViewModel
-    @State private var didLoad = false
+    /// The page the pager is loading; it replaces `viewModel` once it lands.
+    @State private var stepTask: Task<Void, Never>?
+    @State private var stepEdge: Edge = .trailing
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Good/not-good on the page; shown only where the server has labels.
+    @State private var labels: LabelsViewModel
+    @Environment(FeedbackAvailability.self) private var availability: FeedbackAvailability?
     private let push: (BrainRoute) -> Void
 
     init(module: BrainModuleID, id: String, server: URL, modelContext: ModelContext,
@@ -102,27 +97,60 @@ struct BrainReaderView: View {
         let cache = BrainCacheHandle(server: server, context: modelContext)
         _viewModel = State(initialValue: BrainPageViewModel(
             module: module, id: id, client: client, cache: cache, onAPIError: onAPIError))
+        _labels = State(initialValue: LabelsViewModel(client: APIClientLabelsAdapter(apiClient: APIClient(baseURL: server))))
         self.push = push
     }
 
     var body: some View {
         content
-            .navigationTitle(Text(verbatim: viewModel.page?.item.title ?? ""))
-            .navigationBarTitleDisplayMode(.inline)
+            .id(viewModel.id)
+            .transition(reduceMotion ? .opacity : .asymmetric(
+                insertion: .move(edge: stepEdge).combined(with: .opacity), removal: .opacity))
+            .hxNavigationTitle(viewModel.page?.item.title ?? "")
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { FeedbackMoreMenu() } }
+            .feedbackContext(FeedbackContext(
+                feature: "Brain", screen: viewModel.module.defaultTitle, item: viewModel.page?.item.title ?? viewModel.id,
+                state: ["module": viewModel.module.rawValue, "item_id": viewModel.id]))
             .background(Color.hxCanvas.ignoresSafeArea())
-            .task {
-                guard didLoad else {
-                    didLoad = true
-                    await viewModel.load()
-                    return
-                }
-                // Back on screen after an earlier task was cancelled: finish what it dropped.
-                if viewModel.state == .loading {
-                    await viewModel.load()
-                } else {
-                    await viewModel.loadGraphIfNeeded()
+            .safeAreaInset(edge: .bottom) {
+                if let hub = viewModel.page?.hub, BrainConnectionsLayout.showsPager(hub) {
+                    BrainHubPager(hub: hub, onStep: step)
+                        .padding(.horizontal, BrainStyle.l)
+                        .padding(.bottom, BrainStyle.s)
                 }
             }
+            .task(id: viewModel.id) {
+                // First appear, or back on screen after an earlier load was cancelled.
+                if viewModel.state == .loading {
+                    await viewModel.load()
+                }
+            }
+            .task(id: "\(viewModel.module.rawValue)/\(viewModel.id)|\(labelsAvailable)") {
+                // Runs on each appear, so a failed read retries; the row hides until one lands.
+                let key = ratingKey
+                guard labelsAvailable, !labels.isLoaded(feature: key.feature, item: key.item) else { return }
+                try? await labels.load(feature: key.feature, item: key.item)
+            }
+            .onDisappear { stepTask?.cancel() }
+    }
+
+    private var labelsAvailable: Bool { availability?.labelsAvailable == true }
+    private var ratingKey: LabelKey { .brainPage(module: viewModel.module, id: viewModel.id) }
+
+    /// Moves to the previous (-1) or next (+1) page in the hub. The next page loads behind
+    /// the current one and slides in once it lands, so there is no spinner between pages.
+    private func step(_ direction: Int) {
+        guard let hub = viewModel.page?.hub,
+              let target = direction < 0 ? hub.prev : hub.next
+        else { return }
+        let next = viewModel.sibling(module: target.module, id: target.id, hub: hub.ref.id)
+        stepTask?.cancel()
+        stepTask = Task {
+            await next.load()
+            guard !Task.isCancelled else { return }
+            stepEdge = direction < 0 ? .leading : .trailing
+            withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) { viewModel = next }
+        }
     }
 
     @ViewBuilder
@@ -149,46 +177,64 @@ struct BrainReaderView: View {
         case .loaded(let page):
             BrainReaderContent(
                 page: page,
-                graph: viewModel.graph,
                 isShowingCachedCopy: viewModel.isShowingCachedCopy,
                 isMissing: viewModel.isMissing,
-                push: push
+                push: push,
+                onStep: BrainConnectionsLayout.showsPager(page.hub) ? step : nil,
+                rating: labelsAvailable && labels.isLoaded(feature: ratingKey.feature, item: ratingKey.item)
+                    ? BrainPageRating(labels: labels, key: ratingKey) : nil
             )
             .refreshable { await viewModel.load() }
         }
     }
 }
 
-/// A loaded page, top to bottom (spec §3): header, title block (or person card),
-/// tags, body, Linked from, Further reading, and journal paging.
+/// A loaded page, top to bottom: the cover (only without links), the trail, title block
+/// (or person card), tags, the linked-page cards, body, linked and unlinked mentions,
+/// Further reading, and journal paging.
 struct BrainReaderContent: View {
     let page: BrainPage
-    let graph: BrainGraph?
     let isShowingCachedCopy: Bool
     let isMissing: Bool
     let push: (BrainRoute) -> Void
+    /// Pages through the hub (-1 previous, +1 next) on a sideways swipe; nil without a pager.
+    var onStep: ((Int) -> Void)?
+    /// The page's Rate control; nil where the server has no labels.
+    var rating: BrainPageRating?
     /// Built once per page, never in `body`.
     private let cover: BrainCoverSpec
     /// Articles and video notes in the summary outline read as a digest.
     private let digest: BrainArticleDigest?
+    /// Built once per page: the linked-page cards.
+    private let linkCards: [BrainRef]
     @State private var showsAllBacklinks = false
 
-    init(page: BrainPage, graph: BrainGraph?, isShowingCachedCopy: Bool, isMissing: Bool = false,
-         push: @escaping (BrainRoute) -> Void) {
+    init(page: BrainPage, isShowingCachedCopy: Bool, isMissing: Bool = false,
+         push: @escaping (BrainRoute) -> Void, onStep: ((Int) -> Void)? = nil, rating: BrainPageRating? = nil) {
         self.page = page
-        self.graph = graph
         self.isShowingCachedCopy = isShowingCachedCopy
         self.isMissing = isMissing
         self.push = push
+        self.onStep = onStep
+        self.rating = rating
         self.cover = BrainReaderLayout.cover(for: page.item)
         self.digest = BrainReaderLayout.digest(for: page)
+        self.linkCards = BrainConnectionsLayout.linkCards(page)
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: BrainStyle.xl) {
                 VStack(alignment: .leading, spacing: BrainStyle.l) {
-                    header
+                    if linkCards.isEmpty {
+                        BrainCoverView(spec: cover)
+                            .frame(height: BrainReaderLayout.headerHeight)
+                            .frame(maxWidth: .infinity)
+                            .clipShape(BrainStyle.cardShape())
+                    }
+                    if let hub = page.hub {
+                        BrainTrail(hub: hub.ref)
+                    }
                     if page.item.module == .people {
                         BrainPersonCardView(item: page.item, facts: page.facts)
                     } else {
@@ -198,29 +244,21 @@ struct BrainReaderContent: View {
                         tagRow
                     }
                 }
-                if !page.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Group {
-                        if let digest {
-                            BrainArticleDigestView(digest: digest)
-                        } else {
-                            MarkdownRenderer(content: page.content)
-                        }
-                    }
-                    .environment(\.openURL, OpenURLAction { url in
-                        switch BrainReaderLayout.linkAction(for: url) {
-                        case .push(let route):
-                            push(route)
-                            return .handled
-                        case .discard:
-                            return .discarded
-                        case .system:
-                            return .systemAction
-                        }
-                    })
+                if !linkCards.isEmpty {
+                    BrainLinkCardsRow(refs: linkCards)
                 }
-                linkedFrom
+                VStack(alignment: .leading, spacing: BrainStyle.xl) {
+                    bodyAndMentions
+                }
+                .contentShape(Rectangle())
+                .simultaneousGesture(swipe, including: onStep == nil ? .subviews : .all)
                 furtherReading
                 journalPaging
+                if let rating {
+                    RateControl(label: "Rate this page", key: rating.key, title: page.item.title, labels: rating.labels)
+                        .padding(.horizontal, BrainStyle.cardHorizontalPadding)
+                        .brainCardSurface()
+                }
                 if isShowingCachedCopy {
                     Text(verbatim: BrainReaderLayout.cachedCopyFooter(isMissing: isMissing))
                         .brainText(.meta)
@@ -232,19 +270,41 @@ struct BrainReaderContent: View {
         }
     }
 
-    @ViewBuilder
-    private var header: some View {
-        if let graph, BrainReaderLayout.showsGraph(graph, centerID: page.item.id) {
-            BrainGraphView(graph: graph, centerID: page.item.id, ramp: cover.ramp) { module, id in
-                push(.page(module, id))
+    /// A sideways swipe over the body pages through the hub. Kept off the card row, which
+    /// scrolls sideways itself.
+    private var swipe: some Gesture {
+        DragGesture(minimumDistance: 24)
+            .onEnded { value in
+                if let onStep, let direction = BrainConnectionsLayout.swipeStep(value.translation) {
+                    onStep(direction)
+                }
             }
-            .clipShape(BrainStyle.cardShape())
-        } else {
-            BrainCoverView(spec: cover)
-                .frame(height: BrainReaderLayout.headerHeight)
-                .frame(maxWidth: .infinity)
-                .clipShape(BrainStyle.cardShape())
+    }
+
+    @ViewBuilder
+    private var bodyAndMentions: some View {
+        if !page.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            Group {
+                if let digest {
+                    BrainArticleDigestView(digest: digest)
+                } else {
+                    MarkdownRenderer(content: page.content)
+                }
+            }
+            .environment(\.openURL, OpenURLAction { url in
+                switch BrainReaderLayout.linkAction(for: url) {
+                case .push(let route):
+                    push(route)
+                    return .handled
+                case .discard:
+                    return .discarded
+                case .system:
+                    return .systemAction
+                }
+            })
         }
+        linkedFrom
+        unlinked
     }
 
     private var titleBlock: some View {
@@ -271,19 +331,33 @@ struct BrainReaderContent: View {
         .scrollClipDisabled()
     }
 
+    /// Pages that link here, each with the words around its link.
     @ViewBuilder
     private var linkedFrom: some View {
         let backlinks = page.backlinks
         if !backlinks.isEmpty {
-            BrainReaderRefSection(
+            BrainMentionSection(
                 title: BrainReaderLayout.linkedFromTitle(page.item.module),
                 count: backlinks.count,
-                rows: BrainReaderLayout.visibleBacklinks(backlinks, expanded: showsAllBacklinks).map {
-                    BrainReaderRefSection.Row(ref: $0, subtitle: BrainReaderLayout.backlinkSubtitle($0) ?? "")
-                },
+                refs: BrainReaderLayout.visibleBacklinks(backlinks, expanded: showsAllBacklinks),
+                paper: page.item.module.paper,
                 showAllTitle: BrainReaderLayout.hasMoreBacklinks(backlinks, expanded: showsAllBacklinks)
                     ? BrainReaderLayout.showAllTitle(backlinks.count) : nil,
                 onShowAll: { showsAllBacklinks = true }
+            )
+        }
+    }
+
+    /// Pages that name this one without linking to it (the server sends the first few).
+    @ViewBuilder
+    private var unlinked: some View {
+        if !page.unlinked.isEmpty {
+            BrainMentionSection(
+                title: "Unlinked mentions",
+                count: page.unlinkedCount,
+                refs: page.unlinked,
+                paper: page.item.module.paper,
+                footer: BrainConnectionsLayout.cappedFooter(shown: page.unlinked.count, total: page.unlinkedCount)
             )
         }
     }
@@ -391,4 +465,10 @@ struct BrainReaderRefSection: View {
             .padding(.leading, separatorInset)
             .accessibilityHidden(true)
     }
+}
+
+/// The Brain reader's Rate control: whose labels, and which page.
+struct BrainPageRating {
+    let labels: LabelsViewModel
+    let key: LabelKey
 }

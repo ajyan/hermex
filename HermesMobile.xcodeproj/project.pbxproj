@@ -7,6 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C0FFEE500000000000000003 /* MoneyModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE500000000000000002 /* MoneyModels.swift */; };
+		C0FFEE500000000000000005 /* MoneyViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE500000000000000004 /* MoneyViewModel.swift */; };
+		C0FFEE500000000000000007 /* MoneyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE500000000000000006 /* MoneyView.swift */; };
+		C0FFEE500000000000000009 /* MoneyChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE500000000000000008 /* MoneyChart.swift */; };
+		C0FFEE50000000000000000B /* MoneyMarketView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE50000000000000000A /* MoneyMarketView.swift */; };
+		C0FFEE50000000000000000D /* MoneySparkline.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE50000000000000000C /* MoneySparkline.swift */; };
+		C0FFEE50000000000000000F /* MoneyModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE50000000000000000E /* MoneyModelsTests.swift */; };
+		C0FFEE500000000000000011 /* MoneyViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE500000000000000010 /* MoneyViewModelTests.swift */; };
 		B1A1C0DE00000000000F0015 /* GoalHeroCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0014 /* GoalHeroCard.swift */; };
 		B1A1C0DE00000000000F0013 /* GoalsDesignTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0012 /* GoalsDesignTests.swift */; };
 		B1A1C0DE00000000000F0011 /* GoalPaper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0010 /* GoalPaper.swift */; };
@@ -302,9 +310,19 @@
 		031031031031031031031001 /* MarkdownMathSegmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 031031031031031031031002 /* MarkdownMathSegmenter.swift */; };
 		031031031031031031031005 /* MarkdownMathFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 031031031031031031031006 /* MarkdownMathFormatter.swift */; };
 		031031031031031031031007 /* MarkdownMathFormatter+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = 031031031031031031031008 /* MarkdownMathFormatter+Support.swift */; };
+		4E88D46E9F6DCA63079AAB90 /* InteractiveAnswerBlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 718FAAFAAA82C4FA4E88D46E /* InteractiveAnswerBlock.swift */; };
+		B3BAE18953EC85FE779D881D /* InteractiveAnswerDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BA30CC74499CEA5B3BAE189 /* InteractiveAnswerDocument.swift */; };
+		9DA31CD9AF1D7B8666C9744C /* InteractiveAnswerBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F94298A7225A3AD9DA31CD9 /* InteractiveAnswerBridge.swift */; };
+		056A0A4EADA3C8630817E584 /* InteractiveAnswerLiveBudget.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB8F391C40D0A722056A0A4E /* InteractiveAnswerLiveBudget.swift */; };
+		F7CFE27CD4FC1F24E9FB083B /* InteractiveAnswerWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70FCA39F5423B2FCF7CFE27C /* InteractiveAnswerWebView.swift */; };
+		7AE99AEF1EC44A2ABA8A8E5A /* InteractiveAnswerCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58F4F827A8B52CDA7AE99AEF /* InteractiveAnswerCard.swift */; };
 		031031031031031031031009 /* DisplayMathView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03103103103103103103100A /* DisplayMathView.swift */; };
 		03103103103103103103100B /* MarkdownMathFormatter+Environments.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03103103103103103103100C /* MarkdownMathFormatter+Environments.swift */; };
 		031031031031031031031003 /* MarkdownMathRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 031031031031031031031004 /* MarkdownMathRendererTests.swift */; };
+		CDF992EC0B283F670CE51638 /* InteractiveAnswerBlockTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7A4AFC1D4E0C263CDF992EC /* InteractiveAnswerBlockTests.swift */; };
+		B2DA7C370BD284100D9AB2B9 /* InteractiveAnswerDocumentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D11A95718BD28AFB2DA7C37 /* InteractiveAnswerDocumentTests.swift */; };
+		3CEEB3BEDA979C20A4C3523B /* InteractiveAnswerBridgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E87591F0FFF36E8A3CEEB3BE /* InteractiveAnswerBridgeTests.swift */; };
+		42F1FE45EEF156BDAFE03A56 /* InteractiveAnswerLiveBudgetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FF8A0E837CD5D2A42F1FE45 /* InteractiveAnswerLiveBudgetTests.swift */; };
 		D1FF76200000000000000004 /* MarkdownDiffFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1FF76200000000000000003 /* MarkdownDiffFormatterTests.swift */; };
 		D0M1C0000000000000000009 /* MarkdownMathLayoutCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0M1C000000000000000000A /* MarkdownMathLayoutCacheTests.swift */; };
 		C0DE34000000000000000003 /* TranscriptMediaParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE34000000000000000004 /* TranscriptMediaParserTests.swift */; };
@@ -679,7 +697,8 @@
 		B1A1C0DE0000000000000D01 /* BrainArticleDigest.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000D02 /* BrainArticleDigest.swift */; };
 		B1A1C0DE0000000000000C03 /* BrainPersonCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000C04 /* BrainPersonCardView.swift */; };
 		B1A1C0DE0000000000000903 /* BrainCoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000904 /* BrainCoverView.swift */; };
-		B1A1C0DE0000000000000905 /* BrainGraphView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000906 /* BrainGraphView.swift */; };
+		B1A1C0DE0000000000000905 /* BrainConnectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000906 /* BrainConnectionsView.swift */; };
+		B1A1C0DE0000000000000F01 /* BrainJournalCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000F02 /* BrainJournalCalendarView.swift */; };
 		B1A1C0DE0000000000000907 /* BrainVisualsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000908 /* BrainVisualsTests.swift */; };
 		B1A1C0DE0000000000000D03 /* BrainArticleDigestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000D04 /* BrainArticleDigestTests.swift */; };
 		B1A1C0DE0000000000000801 /* BrainLibraryViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000802 /* BrainLibraryViewModels.swift */; };
@@ -690,6 +709,25 @@
 		3F522DC0F0540A319E63AB5A /* DeckFeedbackSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85E374D76D0C399DE79819AE /* DeckFeedbackSheet.swift */; };
 		1FE8B00FD19A1F67ACF1CA6C /* DeckStackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4449578C9E4BFBE64D09B3C2 /* DeckStackView.swift */; };
 		39D0697E4167AB61D9640383 /* DeckPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = B87C4558BE2BEAAD59ECCE39 /* DeckPalette.swift */; };
+		FEEDB0DE00000000000000A1 /* FeedbackModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000A2 /* FeedbackModels.swift */; };
+		FEEDB0DE00000000000000A3 /* FeedbackDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000A4 /* FeedbackDataClient.swift */; };
+		1ABE15000000000000000001 /* LabelsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ABE15000000000000000002 /* LabelsModels.swift */; };
+		1ABE15000000000000000003 /* LabelsDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ABE15000000000000000004 /* LabelsDataClient.swift */; };
+		1ABE15000000000000000005 /* LabelsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ABE15000000000000000006 /* LabelsViewModel.swift */; };
+		1ABE15000000000000000007 /* RateControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ABE15000000000000000008 /* RateControl.swift */; };
+		1ABE15000000000000000009 /* LabelQueueViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ABE1500000000000000000A /* LabelQueueViewModel.swift */; };
+		1ABE1500000000000000000B /* LabelQueueView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ABE1500000000000000000C /* LabelQueueView.swift */; };
+		1ABE1500000000000000000D /* LabelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ABE1500000000000000000E /* LabelsTests.swift */; };
+		FEEDB0DE00000000000000A5 /* FeedbackModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000A6 /* FeedbackModelsTests.swift */; };
+		FEEDB0DE00000000000000A7 /* FeedbackSheetViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000A8 /* FeedbackSheetViewModelTests.swift */; };
+		FEEDB0DE00000000000000A9 /* FeedbackSheetViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000AA /* FeedbackSheetViewModel.swift */; };
+		FEEDB0DE00000000000000B9 /* FeedbackScreenshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000BA /* FeedbackScreenshot.swift */; };
+		FEEDB0DE00000000000000AB /* FeedbackSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000AC /* FeedbackSheet.swift */; };
+		FEEDB0DE00000000000000B1 /* FeedbackInboxViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000B2 /* FeedbackInboxViewModelTests.swift */; };
+		FEEDB0DE00000000000000B3 /* FeedbackInboxViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000B4 /* FeedbackInboxViewModel.swift */; };
+		FEEDB0DE00000000000000B5 /* FeedbackInboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000B6 /* FeedbackInboxView.swift */; };
+		FEEDB0DE00000000000000B7 /* FeedbackDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000B8 /* FeedbackDetailView.swift */; };
+		FEEDB0DE00000000000000AD /* FeedbackMenuItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000AE /* FeedbackMenuItem.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -740,6 +778,14 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		C0FFEE500000000000000002 /* MoneyModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyModels.swift; sourceTree = "<group>"; };
+		C0FFEE500000000000000004 /* MoneyViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyViewModel.swift; sourceTree = "<group>"; };
+		C0FFEE500000000000000006 /* MoneyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyView.swift; sourceTree = "<group>"; };
+		C0FFEE500000000000000008 /* MoneyChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyChart.swift; sourceTree = "<group>"; };
+		C0FFEE50000000000000000A /* MoneyMarketView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyMarketView.swift; sourceTree = "<group>"; };
+		C0FFEE50000000000000000C /* MoneySparkline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneySparkline.swift; sourceTree = "<group>"; };
+		C0FFEE50000000000000000E /* MoneyModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyModelsTests.swift; sourceTree = "<group>"; };
+		C0FFEE500000000000000010 /* MoneyViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyViewModelTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0014 /* GoalHeroCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalHeroCard.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0012 /* GoalsDesignTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsDesignTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0010 /* GoalPaper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalPaper.swift; sourceTree = "<group>"; };
@@ -1015,9 +1061,19 @@
 		031031031031031031031002 /* MarkdownMathSegmenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownMathSegmenter.swift; sourceTree = "<group>"; };
 		031031031031031031031006 /* MarkdownMathFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownMathFormatter.swift; sourceTree = "<group>"; };
 		031031031031031031031008 /* MarkdownMathFormatter+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MarkdownMathFormatter+Support.swift"; sourceTree = "<group>"; };
+		718FAAFAAA82C4FA4E88D46E /* InteractiveAnswerBlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveAnswerBlock.swift; sourceTree = "<group>"; };
+		9BA30CC74499CEA5B3BAE189 /* InteractiveAnswerDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveAnswerDocument.swift; sourceTree = "<group>"; };
+		0F94298A7225A3AD9DA31CD9 /* InteractiveAnswerBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveAnswerBridge.swift; sourceTree = "<group>"; };
+		FB8F391C40D0A722056A0A4E /* InteractiveAnswerLiveBudget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveAnswerLiveBudget.swift; sourceTree = "<group>"; };
+		70FCA39F5423B2FCF7CFE27C /* InteractiveAnswerWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveAnswerWebView.swift; sourceTree = "<group>"; };
+		58F4F827A8B52CDA7AE99AEF /* InteractiveAnswerCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveAnswerCard.swift; sourceTree = "<group>"; };
 		03103103103103103103100A /* DisplayMathView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayMathView.swift; sourceTree = "<group>"; };
 		03103103103103103103100C /* MarkdownMathFormatter+Environments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MarkdownMathFormatter+Environments.swift"; sourceTree = "<group>"; };
 		031031031031031031031004 /* MarkdownMathRendererTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownMathRendererTests.swift; sourceTree = "<group>"; };
+		E7A4AFC1D4E0C263CDF992EC /* InteractiveAnswerBlockTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveAnswerBlockTests.swift; sourceTree = "<group>"; };
+		3D11A95718BD28AFB2DA7C37 /* InteractiveAnswerDocumentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveAnswerDocumentTests.swift; sourceTree = "<group>"; };
+		E87591F0FFF36E8A3CEEB3BE /* InteractiveAnswerBridgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveAnswerBridgeTests.swift; sourceTree = "<group>"; };
+		8FF8A0E837CD5D2A42F1FE45 /* InteractiveAnswerLiveBudgetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveAnswerLiveBudgetTests.swift; sourceTree = "<group>"; };
 		D1FF76200000000000000003 /* MarkdownDiffFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownDiffFormatterTests.swift; sourceTree = "<group>"; };
 		D0M1C000000000000000000A /* MarkdownMathLayoutCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownMathLayoutCacheTests.swift; sourceTree = "<group>"; };
 		C0DE34000000000000000004 /* TranscriptMediaParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptMediaParserTests.swift; sourceTree = "<group>"; };
@@ -1406,7 +1462,8 @@
 		B1A1C0DE0000000000000D02 /* BrainArticleDigest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainArticleDigest.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000C04 /* BrainPersonCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainPersonCardView.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000904 /* BrainCoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainCoverView.swift; sourceTree = "<group>"; };
-		B1A1C0DE0000000000000906 /* BrainGraphView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainGraphView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000906 /* BrainConnectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainConnectionsView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000000F02 /* BrainJournalCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainJournalCalendarView.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000908 /* BrainVisualsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainVisualsTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000D04 /* BrainArticleDigestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainArticleDigestTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000802 /* BrainLibraryViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainLibraryViewModels.swift; sourceTree = "<group>"; };
@@ -1418,6 +1475,25 @@
 		85E374D76D0C399DE79819AE /* DeckFeedbackSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckFeedbackSheet.swift; sourceTree = "<group>"; };
 		4449578C9E4BFBE64D09B3C2 /* DeckStackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckStackView.swift; sourceTree = "<group>"; };
 		B87C4558BE2BEAAD59ECCE39 /* DeckPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckPalette.swift; sourceTree = "<group>"; };
+		FEEDB0DE00000000000000A2 /* FeedbackModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackModels.swift; sourceTree = "<group>"; };
+		FEEDB0DE00000000000000A4 /* FeedbackDataClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackDataClient.swift; sourceTree = "<group>"; };
+		1ABE15000000000000000002 /* LabelsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelsModels.swift; sourceTree = "<group>"; };
+		1ABE15000000000000000004 /* LabelsDataClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelsDataClient.swift; sourceTree = "<group>"; };
+		1ABE15000000000000000006 /* LabelsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelsViewModel.swift; sourceTree = "<group>"; };
+		1ABE15000000000000000008 /* RateControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RateControl.swift; sourceTree = "<group>"; };
+		1ABE1500000000000000000A /* LabelQueueViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelQueueViewModel.swift; sourceTree = "<group>"; };
+		1ABE1500000000000000000C /* LabelQueueView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelQueueView.swift; sourceTree = "<group>"; };
+		1ABE1500000000000000000E /* LabelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelsTests.swift; sourceTree = "<group>"; };
+		FEEDB0DE00000000000000A6 /* FeedbackModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackModelsTests.swift; sourceTree = "<group>"; };
+		FEEDB0DE00000000000000A8 /* FeedbackSheetViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackSheetViewModelTests.swift; sourceTree = "<group>"; };
+		FEEDB0DE00000000000000AA /* FeedbackSheetViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackSheetViewModel.swift; sourceTree = "<group>"; };
+		FEEDB0DE00000000000000BA /* FeedbackScreenshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackScreenshot.swift; sourceTree = "<group>"; };
+		FEEDB0DE00000000000000AC /* FeedbackSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackSheet.swift; sourceTree = "<group>"; };
+		FEEDB0DE00000000000000B2 /* FeedbackInboxViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackInboxViewModelTests.swift; sourceTree = "<group>"; };
+		FEEDB0DE00000000000000B4 /* FeedbackInboxViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackInboxViewModel.swift; sourceTree = "<group>"; };
+		FEEDB0DE00000000000000B6 /* FeedbackInboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackInboxView.swift; sourceTree = "<group>"; };
+		FEEDB0DE00000000000000B8 /* FeedbackDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackDetailView.swift; sourceTree = "<group>"; };
+		FEEDB0DE00000000000000AE /* FeedbackMenuItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackMenuItem.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1466,6 +1542,19 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		C0FFEE500000000000000001 /* Money */ = {
+			isa = PBXGroup;
+			children = (
+				C0FFEE500000000000000002 /* MoneyModels.swift */,
+				C0FFEE500000000000000004 /* MoneyViewModel.swift */,
+				C0FFEE500000000000000006 /* MoneyView.swift */,
+				C0FFEE500000000000000008 /* MoneyChart.swift */,
+				C0FFEE50000000000000000A /* MoneyMarketView.swift */,
+				C0FFEE50000000000000000C /* MoneySparkline.swift */,
+			);
+			path = Money;
+			sourceTree = "<group>";
+		};
 		B1A1C0DE00000000000F0001 /* Goals */ = {
 			isa = PBXGroup;
 			children = (
@@ -1579,10 +1668,16 @@
 		1A2B3C4D5E6F700000000034 /* HermesMobileTests */ = {
 			isa = PBXGroup;
 			children = (
+				C0FFEE50000000000000000E /* MoneyModelsTests.swift */,
+				C0FFEE500000000000000010 /* MoneyViewModelTests.swift */,
 				3A997D807C262D12E5491E89 /* DailyDeckTests.swift */,
 				B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */,
 				B1A1C0DE0000000000000204 /* BrainModelsTests.swift */,
 				B1A1C0DE0000000000000E06 /* PrepModelsTests.swift */,
+				FEEDB0DE00000000000000A6 /* FeedbackModelsTests.swift */,
+				1ABE1500000000000000000E /* LabelsTests.swift */,
+				FEEDB0DE00000000000000A8 /* FeedbackSheetViewModelTests.swift */,
+				FEEDB0DE00000000000000B2 /* FeedbackInboxViewModelTests.swift */,
 				B1A1C0DE00000000000F0012 /* GoalsDesignTests.swift */,
 				B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */,
 				B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */,
@@ -1785,6 +1880,10 @@
 				B5A100000000000000000019 /* ShareInputReaderTests.swift */,
 				B5A100000000000000000061 /* AuthManagerStateTests.swift */,
 				B5A220000000000000000006 /* ChatMarkerMessageClassifierTests.swift */,
+				E7A4AFC1D4E0C263CDF992EC /* InteractiveAnswerBlockTests.swift */,
+				3D11A95718BD28AFB2DA7C37 /* InteractiveAnswerDocumentTests.swift */,
+				E87591F0FFF36E8A3CEEB3BE /* InteractiveAnswerBridgeTests.swift */,
+				8FF8A0E837CD5D2A42F1FE45 /* InteractiveAnswerLiveBudgetTests.swift */,
 				D1FF76200000000000000003 /* MarkdownDiffFormatterTests.swift */,
 				031031031031031031031004 /* MarkdownMathRendererTests.swift */,
 				D0M1C000000000000000000A /* MarkdownMathLayoutCacheTests.swift */,
@@ -1909,7 +2008,9 @@
 			isa = PBXGroup;
 			children = (
 				B1A1C0DE0000000000000003 /* Brain */,
+				FEEDB0DE00000000000000A0 /* Feedback */,
 				B1A1C0DE00000000000F0001 /* Goals */,
+				C0FFEE500000000000000001 /* Money */,
 				12A06408B1B8DA1A340CBD38 /* DailyDeck */,
 				9BAF7D8BBF390913B4F060B0 /* VoiceCall */,
 				AA0200000000000000000006 /* Activity */,
@@ -2141,6 +2242,12 @@
 				C0DE12000000000000000002 /* TranscriptLinkPreview.swift */,
 				C0DE12000000000000000008 /* TranscriptLinkPreviewCache.swift */,
 				C0DE12000000000000000006 /* TranscriptLinkPreviewView.swift */,
+				718FAAFAAA82C4FA4E88D46E /* InteractiveAnswerBlock.swift */,
+				9BA30CC74499CEA5B3BAE189 /* InteractiveAnswerDocument.swift */,
+				0F94298A7225A3AD9DA31CD9 /* InteractiveAnswerBridge.swift */,
+				FB8F391C40D0A722056A0A4E /* InteractiveAnswerLiveBudget.swift */,
+				70FCA39F5423B2FCF7CFE27C /* InteractiveAnswerWebView.swift */,
+				58F4F827A8B52CDA7AE99AEF /* InteractiveAnswerCard.swift */,
 				03103103103103103103100A /* DisplayMathView.swift */,
 				031031031031031031031002 /* MarkdownMathSegmenter.swift */,
 				031031031031031031031006 /* MarkdownMathFormatter.swift */,
@@ -2447,7 +2554,8 @@
 				B1A1C0DE0000000000000102 /* BrainViewModel.swift */,
 				B1A1C0DE0000000000000103 /* BrainModels.swift */,
 				B1A1C0DE0000000000000802 /* BrainLibraryViewModels.swift */,
-				B1A1C0DE0000000000000906 /* BrainGraphView.swift */,
+				B1A1C0DE0000000000000906 /* BrainConnectionsView.swift */,
+				B1A1C0DE0000000000000F02 /* BrainJournalCalendarView.swift */,
 				B1A1C0DE0000000000000904 /* BrainCoverView.swift */,
 				B1A1C0DE0000000000000902 /* BrainStyle.swift */,
 				B1A1C0DE0000000000000A02 /* BrainHomeView.swift */,
@@ -2460,6 +2568,28 @@
 				B1A1C0DE0000000000000E10 /* Prep */,
 			);
 			path = Brain;
+			sourceTree = "<group>";
+		};
+		FEEDB0DE00000000000000A0 /* Feedback */ = {
+			isa = PBXGroup;
+			children = (
+				FEEDB0DE00000000000000A2 /* FeedbackModels.swift */,
+				FEEDB0DE00000000000000A4 /* FeedbackDataClient.swift */,
+				1ABE15000000000000000002 /* LabelsModels.swift */,
+				1ABE15000000000000000004 /* LabelsDataClient.swift */,
+				1ABE15000000000000000006 /* LabelsViewModel.swift */,
+				1ABE15000000000000000008 /* RateControl.swift */,
+				1ABE1500000000000000000A /* LabelQueueViewModel.swift */,
+				1ABE1500000000000000000C /* LabelQueueView.swift */,
+				FEEDB0DE00000000000000AE /* FeedbackMenuItem.swift */,
+				FEEDB0DE00000000000000B8 /* FeedbackDetailView.swift */,
+				FEEDB0DE00000000000000B6 /* FeedbackInboxView.swift */,
+				FEEDB0DE00000000000000B4 /* FeedbackInboxViewModel.swift */,
+				FEEDB0DE00000000000000AC /* FeedbackSheet.swift */,
+				FEEDB0DE00000000000000AA /* FeedbackSheetViewModel.swift */,
+				FEEDB0DE00000000000000BA /* FeedbackScreenshot.swift */,
+			);
+			path = Feedback;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -2685,6 +2815,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C0FFEE500000000000000003 /* MoneyModels.swift in Sources */,
+				C0FFEE500000000000000005 /* MoneyViewModel.swift in Sources */,
+				C0FFEE500000000000000007 /* MoneyView.swift in Sources */,
+				C0FFEE500000000000000009 /* MoneyChart.swift in Sources */,
+				C0FFEE50000000000000000B /* MoneyMarketView.swift in Sources */,
+				C0FFEE50000000000000000D /* MoneySparkline.swift in Sources */,
 				456FFBA86135A0D6C5707B5E /* DeckCalendarView.swift in Sources */,
 				BBEB574715121587294478C7 /* DailyBriefReminder.swift in Sources */,
 				3F522DC0F0540A319E63AB5A /* DeckFeedbackSheet.swift in Sources */,
@@ -2694,6 +2830,21 @@
 				B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */,
 				B1A1C0DE00000000000000A3 /* BrainModels.swift in Sources */,
 				B1A1C0DE0000000000000E01 /* PrepModels.swift in Sources */,
+				FEEDB0DE00000000000000A1 /* FeedbackModels.swift in Sources */,
+				FEEDB0DE00000000000000A3 /* FeedbackDataClient.swift in Sources */,
+				1ABE15000000000000000001 /* LabelsModels.swift in Sources */,
+				1ABE15000000000000000003 /* LabelsDataClient.swift in Sources */,
+				1ABE15000000000000000005 /* LabelsViewModel.swift in Sources */,
+				1ABE15000000000000000007 /* RateControl.swift in Sources */,
+				1ABE15000000000000000009 /* LabelQueueViewModel.swift in Sources */,
+				1ABE1500000000000000000B /* LabelQueueView.swift in Sources */,
+				FEEDB0DE00000000000000AD /* FeedbackMenuItem.swift in Sources */,
+				FEEDB0DE00000000000000B7 /* FeedbackDetailView.swift in Sources */,
+				FEEDB0DE00000000000000B5 /* FeedbackInboxView.swift in Sources */,
+				FEEDB0DE00000000000000B3 /* FeedbackInboxViewModel.swift in Sources */,
+				FEEDB0DE00000000000000AB /* FeedbackSheet.swift in Sources */,
+				FEEDB0DE00000000000000A9 /* FeedbackSheetViewModel.swift in Sources */,
+				FEEDB0DE00000000000000B9 /* FeedbackScreenshot.swift in Sources */,
 				B1A1C0DE00000000000F0015 /* GoalHeroCard.swift in Sources */,
 				B1A1C0DE00000000000F0011 /* GoalPaper.swift in Sources */,
 				B1A1C0DE00000000000F000F /* GoalDetailView.swift in Sources */,
@@ -2709,7 +2860,8 @@
 				B1A1C0DE0000000000000E25 /* PrepRunView.swift in Sources */,
 				B1A1C0DE0000000000000E27 /* PrepDrillViews.swift in Sources */,
 				B1A1C0DE0000000000000801 /* BrainLibraryViewModels.swift in Sources */,
-				B1A1C0DE0000000000000905 /* BrainGraphView.swift in Sources */,
+				B1A1C0DE0000000000000905 /* BrainConnectionsView.swift in Sources */,
+				B1A1C0DE0000000000000F01 /* BrainJournalCalendarView.swift in Sources */,
 				B1A1C0DE0000000000000903 /* BrainCoverView.swift in Sources */,
 				B1A1C0DE0000000000000901 /* BrainStyle.swift in Sources */,
 				B1A1C0DE0000000000000A01 /* BrainHomeView.swift in Sources */,
@@ -3022,6 +3174,12 @@
 				C27800000000000000000001 /* ChatGitControlsVisibilityPolicy.swift in Sources */,
 				C0DE22000000000000000001 /* ChatHaptics.swift in Sources */,
 				C08800000000000000000001 /* SessionHaptics.swift in Sources */,
+				4E88D46E9F6DCA63079AAB90 /* InteractiveAnswerBlock.swift in Sources */,
+				B3BAE18953EC85FE779D881D /* InteractiveAnswerDocument.swift in Sources */,
+				9DA31CD9AF1D7B8666C9744C /* InteractiveAnswerBridge.swift in Sources */,
+				056A0A4EADA3C8630817E584 /* InteractiveAnswerLiveBudget.swift in Sources */,
+				F7CFE27CD4FC1F24E9FB083B /* InteractiveAnswerWebView.swift in Sources */,
+				7AE99AEF1EC44A2ABA8A8E5A /* InteractiveAnswerCard.swift in Sources */,
 				031031031031031031031009 /* DisplayMathView.swift in Sources */,
 				031031031031031031031001 /* MarkdownMathSegmenter.swift in Sources */,
 				031031031031031031031005 /* MarkdownMathFormatter.swift in Sources */,
@@ -3124,10 +3282,16 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C0FFEE50000000000000000F /* MoneyModelsTests.swift in Sources */,
+				C0FFEE500000000000000011 /* MoneyViewModelTests.swift in Sources */,
 				2A8CB7ACCDBA9BBE34E57FDC /* DailyDeckTests.swift in Sources */,
 				B1A1C0DE0000000000000201 /* BrainViewModelTests.swift in Sources */,
 				B1A1C0DE0000000000000203 /* BrainModelsTests.swift in Sources */,
 				B1A1C0DE0000000000000E05 /* PrepModelsTests.swift in Sources */,
+				FEEDB0DE00000000000000A5 /* FeedbackModelsTests.swift in Sources */,
+				1ABE1500000000000000000D /* LabelsTests.swift in Sources */,
+				FEEDB0DE00000000000000A7 /* FeedbackSheetViewModelTests.swift in Sources */,
+				FEEDB0DE00000000000000B1 /* FeedbackInboxViewModelTests.swift in Sources */,
 				B1A1C0DE00000000000F0013 /* GoalsDesignTests.swift in Sources */,
 				B1A1C0DE00000000000F000B /* GoalsViewModelsTests.swift in Sources */,
 				B1A1C0DE00000000000F0007 /* GoalsModelsTests.swift in Sources */,
@@ -3329,6 +3493,10 @@
 				B5A100000000000000000060 /* AuthManagerStateTests.swift in Sources */,
 				B5A220000000000000000005 /* ChatMarkerMessageClassifierTests.swift in Sources */,
 				031031031031031031031003 /* MarkdownMathRendererTests.swift in Sources */,
+				CDF992EC0B283F670CE51638 /* InteractiveAnswerBlockTests.swift in Sources */,
+				B2DA7C370BD284100D9AB2B9 /* InteractiveAnswerDocumentTests.swift in Sources */,
+				3CEEB3BEDA979C20A4C3523B /* InteractiveAnswerBridgeTests.swift in Sources */,
+				42F1FE45EEF156BDAFE03A56 /* InteractiveAnswerLiveBudgetTests.swift in Sources */,
 				D1FF76200000000000000004 /* MarkdownDiffFormatterTests.swift in Sources */,
 				D0M1C0000000000000000009 /* MarkdownMathLayoutCacheTests.swift in Sources */,
 				C0DE34000000000000000003 /* TranscriptMediaParserTests.swift in Sources */,

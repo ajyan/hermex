@@ -418,6 +418,7 @@ final class SidebarSectionVisibilityTests: XCTestCase {
         XCTAssertTrue(visibility.insights)
         XCTAssertTrue(visibility.activeProfile)
         XCTAssertTrue(visibility.projects)
+        XCTAssertTrue(visibility.feedback)
         XCTAssertTrue(visibility.showsAnyUtilityLink)
     }
 

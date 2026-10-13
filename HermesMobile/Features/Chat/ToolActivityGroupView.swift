@@ -12,12 +12,25 @@ enum ToolActivityEntrance {
 }
 
 /// How a collapsed tool group reads (DESIGN.md § Components): live, its newest calls as
-/// paper chips; settled, one summary line. Pure so the rules are unit-testable.
+/// glow chips; settled, one chip per kind of tool with its count. Pure so the rules are
+/// unit-testable.
 enum ToolActivityPresentation {
     /// Chips a live group shows before the rest fold into a `+N` chip.
     static let chipLimit = 4
     /// Longest chip label before it's cut with an ellipsis.
     static let chipLabelLimit = 24
+
+    /// One settled chip: how many calls of a kind ran, and how many of them failed.
+    struct KindCount: Equatable, Identifiable {
+        let kind: ToolCallSummaryFormatter.Kind
+        let symbol: String
+        var count: Int
+        var failures: Int
+
+        var id: String { symbol + "\(kind)" }
+        var paper: HermexPaper { .forTool(kind) }
+        var label: String { ToolActivityPresentation.countLabel(kind, count) }
+    }
 
     /// The newest `chipLimit` entries, oldest first, and how many earlier ones `+N` stands for.
     static func chips(_ entries: [ToolCallLogEntry]) -> (shown: [ToolCallLogEntry], hiddenCount: Int) {
@@ -32,28 +45,40 @@ enum ToolActivityPresentation {
         return String(label.prefix(chipLabelLimit - 1)) + "…"
     }
 
-    /// The settled line: the call itself when there's one, else how many steps ran.
-    static func summaryTitle(_ entries: [ToolCallLogEntry]) -> String {
-        if entries.count == 1, let row = entries.first?.row {
-            return [row.summary, row.detail].compactMap { $0 }.joined(separator: " ")
+    /// A settled group's chips: one per kind, in the order each kind first ran.
+    static func kindCounts(_ entries: [ToolCallLogEntry]) -> [KindCount] {
+        var counts: [KindCount] = []
+        for entry in entries {
+            let failed = entry.row.isFailure ? 1 : 0
+            if let index = counts.firstIndex(where: { $0.kind == entry.row.kind }) {
+                counts[index].count += 1
+                counts[index].failures += failed
+            } else {
+                counts.append(KindCount(kind: entry.row.kind, symbol: entry.row.icon, count: 1, failures: failed))
+            }
         }
-        return String(localized: "\(entries.count) steps")
+        return counts
     }
 
-    /// Up to three distinct papers, in the order their kinds first ran.
-    static func summaryPapers(_ entries: [ToolCallLogEntry]) -> [HermexPaper] {
-        var papers: [HermexPaper] = []
-        for entry in entries {
-            let paper = HermexPaper.forTool(entry.row.kind)
-            if !papers.contains(paper) { papers.append(paper) }
-            if papers.count == 3 { break }
+    static func countLabel(_ kind: ToolCallSummaryFormatter.Kind, _ count: Int) -> String {
+        let one = count == 1
+        switch kind {
+        case .shell: return one ? String(localized: "1 command") : String(localized: "\(count) commands")
+        case .read: return one ? String(localized: "1 read") : String(localized: "\(count) reads")
+        case .write: return one ? String(localized: "1 edit") : String(localized: "\(count) edits")
+        case .search: return one ? String(localized: "1 search") : String(localized: "\(count) searches")
+        case .web: return one ? String(localized: "1 web lookup") : String(localized: "\(count) web lookups")
+        case .list: return one ? String(localized: "1 listing") : String(localized: "\(count) listings")
+        case .skill: return one ? String(localized: "1 skill") : String(localized: "\(count) skills")
+        case .memory: return one ? String(localized: "1 memory") : String(localized: "\(count) memories")
+        case .delegate: return one ? String(localized: "1 delegation") : String(localized: "\(count) delegations")
+        case .unknown: return one ? String(localized: "1 tool call") : String(localized: "\(count) tool calls")
         }
-        return papers
     }
 }
 
-/// A turn's tool calls. Collapsed, a live group shows its newest calls as paper chips and
-/// a settled one folds to a summary line; either opens to the full log, one row per call.
+/// A turn's tool calls. Collapsed, a live group shows its newest calls as glow chips and a
+/// settled one shows a chip per kind of tool; tapping either opens the full log.
 struct ToolActivityGroupView: View {
     let group: ToolCallGroup
     var isLive = false
@@ -89,7 +114,7 @@ struct ToolActivityGroupView: View {
                 } else if isLive {
                     chipRow(entries)
                 } else {
-                    summaryLine(entries)
+                    kindCountRow(entries)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -118,70 +143,53 @@ struct ToolActivityGroupView: View {
 
     private func chipRow(_ entries: [ToolCallLogEntry]) -> some View {
         let chips = ToolActivityPresentation.chips(entries)
-        return Button(action: toggleExpansion) {
-            FlowRow(spacing: 5) {
-                if chips.hiddenCount > 0 {
-                    Text(verbatim: "+\(chips.hiddenCount)")
-                        .font(AppFont.caption(weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 5)
-                        .background(Color.hxSurface, in: Capsule())
-                        .overlay(Capsule().strokeBorder(Color.hxSeparator, lineWidth: 0.5))
-                }
-                ForEach(chips.shown) { entry in
-                    ToolCallChip(row: entry.row)
-                        .transition(newestChipTransition)
+        return disclosureButton(
+            label: entries.map(\.row.accessibilityLabel).joined(separator: "; ")
+        ) {
+            if chips.hiddenCount > 0 {
+                HXChip(paper: .tool, label: "+\(chips.hiddenCount)")
+            }
+            ForEach(chips.shown) { entry in
+                ToolCallChip(row: entry.row)
+                    .transition(newestChipTransition)
+            }
+        }
+    }
+
+    private func kindCountRow(_ entries: [ToolCallLogEntry]) -> some View {
+        let counts = ToolActivityPresentation.kindCounts(entries)
+        let spoken = counts.map { count in
+            count.failures > 0 ? String(localized: "\(count.label), \(count.failures) failed") : count.label
+        }
+        return disclosureButton(label: spoken.joined(separator: ", ")) {
+            ForEach(counts) { count in
+                HXChip(paper: count.paper, symbol: count.symbol, label: count.label) {
+                    if count.failures > 0 {
+                        Image(systemName: "xmark")
+                            .font(AppFont.caption2(weight: .bold))
+                            .foregroundStyle(Color.hxDanger)
+                    }
                 }
             }
-            .padding(.vertical, 4)
-            .contentShape(Rectangle())
+        }
+    }
+
+    /// A row of chips that opens the full log, at least a 44 pt target.
+    private func disclosureButton<Chips: View>(
+        label: String,
+        @ViewBuilder chips: () -> Chips
+    ) -> some View {
+        Button(action: toggleExpansion) {
+            FlowRow(spacing: 5) { chips() }
+                .padding(.vertical, 4)
+                .frame(minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .forcedLeftToRight()
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(entries.map(\.row.accessibilityLabel).joined(separator: "; "))
-        .accessibilityHint(Text("Shows every tool call"))
-    }
-
-    private func summaryLine(_ entries: [ToolCallLogEntry]) -> some View {
-        let failures = entries.filter(\.row.isFailure).count
-        return Button(action: toggleExpansion) {
-            HStack(spacing: 6) {
-                HStack(spacing: -3) {
-                    ForEach(Array(ToolActivityPresentation.summaryPapers(entries).enumerated()), id: \.offset) { _, paper in
-                        Circle()
-                            .fill(paper.paper)
-                            .overlay(Circle().strokeBorder(paper.ink.opacity(0.35), lineWidth: 0.5))
-                            .frame(width: 9, height: 9)
-                    }
-                }
-                .frame(width: 20)
-
-                Text(verbatim: ToolActivityPresentation.summaryTitle(entries))
-                    .font(AppFont.caption(weight: .medium))
-                    .foregroundStyle(Color.hxTextSecondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
-                if failures > 0 {
-                    Text("\(failures) failed")
-                        .font(AppFont.caption(weight: .medium))
-                        .foregroundStyle(Color.hxDanger)
-                }
-
-                Image(systemName: "chevron.right")
-                    .font(AppFont.caption2(weight: .semibold))
-                    .foregroundStyle(.tertiary)
-
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 2)
-            .frame(minHeight: TranscriptLogRowMetrics.minimumHeight)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
+        .accessibilityLabel(label)
+        .accessibilityValue(Text("Collapsed"))
         .accessibilityHint(Text("Shows every tool call"))
     }
 
@@ -208,24 +216,17 @@ struct ToolActivityGroupView: View {
     }
 }
 
-/// One tool call as a capsule in its kind's paper: icon, target, and a mark while it runs or
-/// after it fails.
+/// One live tool call as a glow chip in its kind's paper: icon, target, and a mark while it
+/// runs or after it fails.
 struct ToolCallChip: View {
     let row: ToolCallLogRow
 
     var body: some View {
-        let paper = HermexPaper.forTool(row.kind)
-        HStack(spacing: 5) {
-            Image(systemName: row.icon)
-                .font(AppFont.caption2(weight: .semibold))
-            Text(verbatim: ToolActivityPresentation.chipLabel(row))
-                .font(AppFont.caption(weight: .medium))
-                .lineLimit(1)
+        HXChip(paper: .forTool(row.kind), symbol: row.icon, label: ToolActivityPresentation.chipLabel(row)) {
             switch row.status {
             case .running:
                 Image(systemName: "ellipsis")
                     .font(AppFont.caption2(weight: .bold))
-                    .foregroundStyle(paper.secondaryInk)
             case .failure:
                 Image(systemName: "xmark")
                     .font(AppFont.caption2(weight: .bold))
@@ -234,10 +235,5 @@ struct ToolCallChip: View {
                 EmptyView()
             }
         }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 5)
-        .foregroundStyle(paper.ink)
-        .background(paper.paper, in: Capsule())
-        .environment(\.colorScheme, .light)
     }
 }

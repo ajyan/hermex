@@ -60,7 +60,7 @@ struct UsageChartCard: View {
                     .foregroundStyle(.secondary)
 
                 Text(hero.value)
-                    .font(AppFont.title(weight: .bold))
+                    .font(AppFont.display(style: .title, weight: .bold))
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)

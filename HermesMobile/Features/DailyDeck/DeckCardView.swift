@@ -1,9 +1,9 @@
 import Charts
 import SwiftUI
 
-/// One card of the Daily Deck stack, on its own paper (`DeckPalette`). A card leads with its
-/// quote or takeaway in large serif type and scrolls into the rest: context, the question,
-/// and your reflection. Writing happens in `ReflectionSheet`, so a card never holds a text
+/// One card of the Daily Deck stack, a glow card in its kind's paper (`DeckPalette`). A card
+/// leads with its takeaway in large rounded type (serif when it quotes your saved words) and
+/// scrolls into the rest: context, the question, and your reflection. Writing happens in `ReflectionSheet`, so a card never holds a text
 /// field and long text never fights the swipe.
 struct DeckPageView: View {
     let page: DeckPage
@@ -25,8 +25,8 @@ struct DeckPageView: View {
             }
         }
         .opacity(contentOpacity)
-        .environment(\.colorScheme, .light)  // bright paper in every appearance
         .background(palette.paper, in: Self.shape)
+        .overlay(Self.shape.strokeBorder(palette.edge, lineWidth: 0.5))
         .clipShape(Self.shape)
         .hxShadow(.paper)
         .padding(.vertical, 12)
@@ -41,8 +41,12 @@ private struct DeckCardView: View {
     let file: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Set by the Daily Deck when the server takes labels.
+    @Environment(LabelsViewModel.self) private var labels: LabelsViewModel?
     @State private var isWriting = false
     @State private var overflows = false
+    /// The sleep card's numbers, shown before rating when asked for.
+    @State private var showsNumbers = false
 
     var body: some View {
         ScrollView {
@@ -50,6 +54,7 @@ private struct DeckCardView: View {
                 switch card.type {
                 case .headline: opener
                 case .close: close
+                case .sleep: sleep
                 default: reading
                 }
             }
@@ -95,7 +100,7 @@ private struct DeckCardView: View {
         }
         if let lead = text.lead {
             Text(inlineMarkdown(lead))
-                .font(leadFont(lead))
+                .font(DeckCardText.leadFont(for: card, lead: lead))
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.trailing, 30)
@@ -104,14 +109,14 @@ private struct DeckCardView: View {
         if let attribution = text.attribution {
             Text(verbatim: attribution)
                 .font(AppFont.subheadline(weight: .medium))
-                .foregroundStyle(palette.ink.opacity(0.7))
+                .foregroundStyle(palette.ink)
                 .padding(.top, 12)
         }
         if let detail = text.detail {
             Text(inlineMarkdown(detail))
                 .font(AppFont.body())
                 .lineSpacing(4)
-                .foregroundStyle(palette.ink.opacity(0.86))
+                .foregroundStyle(Color.hxTextPrimary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 22)
                 .textSelection(.enabled)
@@ -127,30 +132,30 @@ private struct DeckCardView: View {
         }
         if !text.leadIsQuestion, let question = viewModel.question(for: card) {
             Text(verbatim: question)
-                .font(AppFont.title3(weight: .semibold))
+                .font(AppFont.display(style: .title3, weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 28)
                 .id(question)
                 .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
         }
-        if card.takesText { reflection.padding(.top, 16) }
+        if card.takesText { reflection().padding(.top, 16) }
         if let reason = card.reason {
             Text(verbatim: reason)
                 .font(AppFont.footnote())
-                .foregroundStyle(palette.ink.opacity(0.62))
+                .foregroundStyle(palette.ink)
                 .padding(.top, 20)
         }
-    }
-
-    private func leadFont(_ lead: String) -> Font {
-        let style: Font.TextStyle = card.itemKind == "quote" ? .title
-            : lead.count > 480 ? .body : lead.count > 220 ? .title3 : .title2
-        return AppFont.serif(style: style)
+        if card.type == .reflect, let labels {
+            DeckRateRows(card: card, date: viewModel.date, kind: viewModel.kind,
+                         showsQuestion: viewModel.question(for: card) == card.question,
+                         labels: labels, palette: palette)
+                .padding(.top, 24)
+        }
     }
 
     /// Your words once written; until then, the way in.
     @ViewBuilder
-    private var reflection: some View {
+    private func reflection(_ invitation: String = "Write a reflection") -> some View {
         if let text = viewModel.answer(for: card)?.text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             Button { isWriting = true } label: {
                 VStack(alignment: .leading, spacing: 8) {
@@ -160,23 +165,68 @@ private struct DeckCardView: View {
                         .fixedSize(horizontal: false, vertical: true)
                     Label { Text(verbatim: "Edit") } icon: { Image(systemName: "pencil") }
                         .font(AppFont.footnote(weight: .semibold))
-                        .foregroundStyle(palette.ink.opacity(0.7))
+                        .foregroundStyle(palette.ink)
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(palette.ink.opacity(0.07), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Text(verbatim: "Your reflection: \(text). Edit"))
         } else {
             Button { isWriting = true } label: {
-                Label { Text(verbatim: "Write a reflection") } icon: { Image(systemName: "square.and.pencil") }
+                Label { Text(verbatim: invitation) } icon: { Image(systemName: "square.and.pencil") }
                     .font(AppFont.body(weight: .semibold))
-                    .foregroundStyle(palette.paper)
+                    .foregroundStyle(palette.onInk)
                     .frame(maxWidth: .infinity, minHeight: 50)
                     .background(palette.ink, in: Capsule())
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    // MARK: Sleep
+
+    /// Rate the night first, then last night's numbers: shown once rated (or when asked for) so
+    /// they don't decide the rating. A note is optional.
+    @ViewBuilder
+    private var sleep: some View {
+        let rating = viewModel.answer(for: card)?.rating
+        Text(verbatim: card.question ?? "How did you sleep?")
+            .font(AppFont.display(style: .title2, weight: .semibold))
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.trailing, 30)
+        FlowRow(spacing: 8) {
+            ForEach(Array(card.scale.enumerated()), id: \.offset) { index, label in
+                ChoiceButton(title: label, isSelected: rating == index + 1) {
+                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { viewModel.rate(index + 1, for: card) }
+                }
+            }
+        }
+        .padding(.top, 18)
+        if let numbers = card.sleep {
+            if rating != nil || showsNumbers {
+                SleepNumbers(sleep: numbers, palette: palette)
+                    .padding(.top, 26)
+                    .transition(.opacity)
+            } else {
+                Button {
+                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { showsNumbers = true }
+                } label: {
+                    Label { Text(verbatim: "Show last night") } icon: { Image(systemName: "chart.bar") }
+                        .font(AppFont.subheadline(weight: .semibold))
+                        .foregroundStyle(palette.ink)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 22)
+            }
+        }
+        reflection("Add a note").padding(.top, 24)
+        if let reason = card.reason {
+            Text(verbatim: reason)
+                .font(AppFont.footnote())
+                .foregroundStyle(palette.ink)
+                .padding(.top, 20)
         }
     }
 
@@ -200,45 +250,50 @@ private struct DeckCardView: View {
 
     // MARK: Opener and close
 
+    /// The day's title, a line about yesterday, and the cards ahead, so you know what you're
+    /// about to get.
     @ViewBuilder
     private var opener: some View {
-        Text(verbatim: card.title ?? "Today")
-            .font(AppFont.serif(style: .largeTitle))
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.trailing, 24)
         if card.stats.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 ForEach(card.lines, id: \.self) { line in
-                    Text(verbatim: line).font(AppFont.subheadline())
+                    Text(verbatim: line).font(AppFont.footnote())
                 }
             }
-            .foregroundStyle(palette.ink.opacity(0.75))
-            .padding(.top, 14)
-        } else {
+            .foregroundStyle(palette.ink)
+            .padding(.trailing, 24)
+        }
+        Text(verbatim: card.title ?? "Today")
+            .font(AppFont.display(style: .largeTitle, weight: .semibold))
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, card.stats.isEmpty ? 10 : 0)
+            .padding(.trailing, card.stats.isEmpty ? 0 : 24)
+        if let recap = card.recap {
+            (Text("Yesterday").font(AppFont.display(style: .subheadline, weight: .semibold))
+                + Text(verbatim: " · \(recap)").font(AppFont.subheadline()).foregroundStyle(Color.hxTextPrimary.opacity(0.85)))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 14)
+        }
+        if !card.stats.isEmpty {
             StatGrid(stats: card.stats, palette: palette).padding(.top, 22)
         }
         let ahead = viewModel.visiblePages.dropFirst().filter {
             if case .card(let c) = $0, c.type == .close { return false }
             return true
         }
-        FlowRow(spacing: 8) {
+        Text("Today · \(ahead.count) cards")
+            .font(AppFont.display(style: .subheadline, weight: .semibold))
+            .padding(.top, 26)
+            .padding(.bottom, 6)
+        VStack(spacing: 0) {
             ForEach(Array(ahead.enumerated()), id: \.element.id) { _, page in
-                let p = DeckPalette.of(page)
-                Text(verbatim: p.name)
-                    .font(AppFont.footnote(weight: .semibold))
-                    .foregroundStyle(p.ink)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(p.paper, in: Capsule())
-                    .overlay(Capsule().stroke(p.ink.opacity(0.15), lineWidth: 0.5))
+                DeckAheadRow(page: page)
             }
         }
-        .padding(.top, 28)
-        .accessibilityElement(children: .combine)
-        Text(verbatim: "\(ahead.count) cards · swipe to begin")
+        Text(verbatim: "Swipe to begin")
             .font(AppFont.footnote())
-            .foregroundStyle(palette.ink.opacity(0.6))
-            .padding(.top, 18)
+            .foregroundStyle(palette.ink)
+            .padding(.top, 16)
     }
 
     @ViewBuilder
@@ -246,7 +301,7 @@ private struct DeckCardView: View {
         let count = viewModel.answeredCount
         let filed = viewModel.isFiled && !viewModel.hasChanges
         Text(verbatim: filed ? "Filed" : count == 1 ? "1 reflection" : "\(count) reflections")
-            .font(AppFont.serif(style: .largeTitle))
+            .font(AppFont.display(style: .largeTitle, weight: .semibold))
         Text(verbatim: filed
              ? "In your journal. Edit any card and file again to update it."
              : viewModel.isFiled
@@ -255,7 +310,7 @@ private struct DeckCardView: View {
              ? "Nothing written yet. Swipe back to any card, or file the follow-ups you chose."
              : "Atlas writes them into today's journal and runs the follow-ups you chose.")
             .font(AppFont.body())
-            .foregroundStyle(palette.ink.opacity(0.8))
+            .foregroundStyle(Color.hxTextPrimary)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, 12)
         if case .failed(let message) = viewModel.filing {
@@ -263,17 +318,87 @@ private struct DeckCardView: View {
         }
         Button(action: file) {
             HStack {
-                if viewModel.filing == .filing { ProgressView().tint(palette.paper) }
+                if viewModel.filing == .filing { ProgressView().tint(palette.onInk) }
                 Text(verbatim: viewModel.isFiled ? "File Changes" : "File It")
             }
             .font(AppFont.body(weight: .semibold))
-            .foregroundStyle(palette.paper)
+            .foregroundStyle(palette.onInk)
             .frame(maxWidth: .infinity, minHeight: 50)
             .background(palette.ink.opacity(filed ? 0.35 : 1), in: Capsule())
         }
         .buttonStyle(.plain)
         .disabled(viewModel.filing == .filing || !viewModel.hasChanges)
         .padding(.top, 28)
+    }
+}
+
+/// Last night in words (hours against need, then timing and recovery) over the week's strip.
+private struct SleepNumbers: View {
+    let sleep: DeckSleep
+    let palette: DeckPalette
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let headline = sleep.headline {
+                Text(verbatim: headline)
+                    .font(AppFont.display(style: .title3, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            ForEach(Array(sleep.lines.enumerated()), id: \.offset) { _, line in
+                Text(verbatim: line)
+                    .font(AppFont.body())
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 6)
+            }
+            if sleep.nights.contains(where: { $0.hours != nil }) {
+                SleepStrip(nights: sleep.nights, palette: palette).padding(.top, 20)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// The last seven nights as bars, last night full strength, each with a tick at that night's need.
+private struct SleepStrip: View {
+    let nights: [DeckNight]
+    let palette: DeckPalette
+
+    private static let height: CGFloat = 64
+
+    var body: some View {
+        let top = max(nights.compactMap { max($0.hours ?? 0, $0.need ?? 0) }.max() ?? 0, 1)
+        HStack(alignment: .bottom, spacing: 8) {
+            ForEach(Array(nights.enumerated()), id: \.offset) { index, night in
+                let last = index == nights.count - 1
+                VStack(spacing: 6) {
+                    ZStack(alignment: .bottom) {
+                        Color.clear
+                        RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous)
+                            .fill(palette.ink.opacity(night.hours == nil ? 0.12 : last ? 1 : 0.35))
+                            .frame(height: night.hours.map { max(Self.height * $0 / top, 3) } ?? 3)
+                        if let need = night.need {
+                            Rectangle()
+                                .fill(palette.ink.opacity(0.7))
+                                .frame(height: 1.5)
+                                .padding(.bottom, Self.height * need / top)
+                        }
+                    }
+                    .frame(height: Self.height)
+                    Text(verbatim: night.day)
+                        .font(AppFont.caption(weight: last ? .semibold : .regular))
+                        .foregroundStyle(palette.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "Last \(nights.count) nights"))
+        .accessibilityValue(Text(verbatim: nights.map { night in
+            "\(night.day): " + (night.hours.map { "\($0.formatted()) hours" } ?? "no data")
+        }.joined(separator: ", ")))
     }
 }
 
@@ -293,7 +418,7 @@ private struct RecapList: View {
                 if newGroup, let label = entry.label {
                     Text(verbatim: label)
                         .font(AppFont.subheadline(weight: .semibold))
-                        .foregroundStyle(palette.ink.opacity(0.7))
+                        .foregroundStyle(palette.ink)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.bottom, 4)
                 }
@@ -497,19 +622,19 @@ private struct ReflectionSheet: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
                 Text(verbatim: viewModel.question(for: card) ?? DeckCardText(card).lead ?? "Your thoughts")
-                    .font(AppFont.serif(style: .title3))
+                    .font(AppFont.display(style: .title3, weight: .semibold))
                     .foregroundStyle(palette.ink)
                     .fixedSize(horizontal: false, vertical: true)
                 TextEditor(text: $text)
                     .font(AppFont.body())
-                    .foregroundStyle(palette.ink)
+                    .foregroundStyle(Color.hxTextPrimary)
                     .scrollContentBackground(.hidden)
                     .focused($isFocused)
                     .overlay(alignment: .topLeading) {
                         if text.isEmpty {
                             Text(verbatim: "Write as much or as little as you like")
                                 .font(AppFont.body())
-                                .foregroundStyle(palette.ink.opacity(0.45))
+                                .foregroundStyle(Color.hxTextSecondary)
                                 .padding(.top, 8)
                                 .padding(.leading, 5)
                                 .allowsHitTesting(false)
@@ -527,7 +652,6 @@ private struct ReflectionSheet: View {
             .toolbarBackground(palette.paper, for: .navigationBar)
         }
         .tint(palette.ink)
-        .environment(\.colorScheme, .light)
         .onAppear {
             text = viewModel.answer(for: card)?.text ?? ""
             isFocused = true
@@ -547,7 +671,7 @@ private struct FollowUpsPage: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Text(verbatim: cards.count == 1 ? "1 follow-up" : "\(cards.count) follow-ups")
-                    .font(AppFont.serif(style: .title))
+                    .font(AppFont.display(style: .title, weight: .semibold))
                     .padding(.bottom, 20)
                 ForEach(Array(cards.enumerated()), id: \.element.id) { offset, card in
                     if offset > 0 { Divider().padding(.vertical, 16) }
@@ -664,3 +788,53 @@ private struct ChoiceButton: View {
     }
 }
 
+/// One card ahead on the opener: its kind's icon on a glow tile, its title, and its kind.
+private struct DeckAheadRow: View {
+    let page: DeckPage
+
+    var body: some View {
+        let palette = DeckPalette.of(page)
+        HStack(spacing: 10) {
+            Image(systemName: palette.symbol)
+                .font(AppFont.caption(weight: .semibold))
+                .foregroundStyle(palette.ink)
+                .frame(width: 26, height: 26)
+                .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.xs + 2, style: .continuous))
+                .accessibilityHidden(true)
+            Text(verbatim: Self.title(page))
+                .font(AppFont.subheadline())
+                .foregroundStyle(Color.hxTextPrimary)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            Text(verbatim: palette.shortName)
+                .font(AppFont.caption())
+                .foregroundStyle(Color.hxTextSecondary)
+                .lineLimit(1)
+        }
+        .padding(.vertical, 7)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// The card's own title, else its question, else what kind of card it is.
+    static func title(_ page: DeckPage) -> String {
+        switch page {
+        case .followUps(let cards):
+            return cards.count == 1 ? "1 follow-up" : "\(cards.count) follow-ups"
+        case .card(let card):
+            return [card.title, card.question].compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .first { !$0.isEmpty } ?? DeckPalette.of(card).name
+        }
+    }
+}
+
+extension DeckCardText {
+    /// A card's lead font, wherever the card is drawn. Saved words (a quote, a book highlight,
+    /// a past journal entry) keep the serif; every other lead is the rounded display voice,
+    /// smaller as the lead grows.
+    static func leadFont(for card: DeckCard, lead: String) -> Font {
+        let style: Font.TextStyle = card.itemKind == "quote" ? .title
+            : lead.count > 480 ? .body : lead.count > 220 ? .title3 : .title2
+        let quotesSavedWords = ["quote", "book", "on_this_day"].contains(card.itemKind ?? "")
+        return quotesSavedWords ? AppFont.serif(style: style) : AppFont.display(style: style, weight: .semibold)
+    }
+}

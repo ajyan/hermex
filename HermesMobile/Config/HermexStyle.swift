@@ -14,17 +14,19 @@ enum HXRadius {
     static let xl: CGFloat = 28
 }
 
-/// The app's two shadows (DESIGN.md § Elevation). Everything inline in chat is flat.
+/// The app's shadows (DESIGN.md § Elevation). Everything inline in chat is flat.
 enum HXShadow {
     /// A lifted hero paper; `stacked` is a card waiting behind the top one.
     case paper, stacked
     /// The composer and floating glass controls.
     case float
+    /// A card floating over a dimmed screen (the approval overlay).
+    case modal
 }
 
 extension EnvironmentValues {
-    /// The paper a view is drawn on, so controls inside it (decision buttons, submit) take
-    /// its ink instead of black or the accent. `nil` on the app's own surfaces.
+    /// The paper a glow surface is drawn in, so controls inside it (decision buttons, submit)
+    /// take its hue instead of black or the accent. `nil` on the app's own surfaces.
     @Entry var hxPaper: HermexPaper?
 }
 
@@ -33,15 +35,17 @@ extension View {
         modifier(HXShadowModifier(shadow: shadow))
     }
 
-    /// Draws the content on `paper`: the paper fill in a `radius` rounded rect, ink as the
-    /// foreground, and light appearance so system text and controls stay legible on it in
-    /// either app appearance.
-    func paperSurface(_ paper: HermexPaper, cornerRadius radius: CGFloat) -> some View {
-        foregroundStyle(paper.ink)
-            .tint(paper.ink)
-            .background(paper.paper, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+    /// Draws the content as a glow object (DESIGN.md § Components): the paper's wash and edge in
+    /// a `radius` rounded rect, its hue as the tint, and the paper in `\.hxPaper` for the
+    /// controls inside. Text keeps the canvas colors; titles opt into `paper.glow`.
+    /// `opaque` lays the wash over `hxSurface`, for cards that float over transcript text.
+    func glowSurface(_ paper: HermexPaper, cornerRadius radius: CGFloat, opaque: Bool = false) -> some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        return tint(paper.glow)
+            .background(paper.wash, in: shape)
+            .background(opaque ? Color.hxSurface : Color.clear, in: shape)
+            .overlay(shape.strokeBorder(paper.edge, lineWidth: 0.5))
             .environment(\.hxPaper, paper)
-            .environment(\.colorScheme, .light)
     }
 }
 
@@ -57,6 +61,8 @@ private struct HXShadowModifier: ViewModifier {
             content.shadow(color: .black.opacity(0.06), radius: 10, y: 4)
         case .float:
             content.shadow(color: .black.opacity(colorScheme == .dark ? 0.28 : 0.12), radius: 14, y: 6)
+        case .modal:
+            content.shadow(color: .black.opacity(0.22), radius: 18, y: 12)
         }
     }
 }
@@ -67,9 +73,9 @@ private struct HXShadowModifier: ViewModifier {
 extension HermexPaper {
     /// An approval, clarification, or anything else waiting on the user.
     static let request = HermexPaper.opener
-    /// A Brain or wiki page, and a search through the user's own knowledge.
+    /// A Brain or wiki page.
     static let knowledge = HermexPaper.wiki
-    /// A file read, written, or listed.
+    /// A file read, written, listed, or searched (grep, find).
     static let file = HermexPaper.notes
     /// A web search or fetch.
     static let web = HermexPaper.video
@@ -77,11 +83,14 @@ extension HermexPaper {
     static let recall = HermexPaper.advisor
     /// Shell, code, and everything without a kind of its own.
     static let tool = HermexPaper.plain
+    /// Money: net worth, accounts, and the market card.
+    static let money = HermexPaper.ledger
+    /// The in-app feedback inbox and its drawer row.
+    static let feedback = HermexPaper.notes
 
     static func forTool(_ kind: ToolCallSummaryFormatter.Kind) -> HermexPaper {
         switch kind {
-        case .read, .write, .list: .file
-        case .search: .knowledge
+        case .read, .write, .list, .search: .file
         case .web: .web
         case .skill, .memory: .recall
         case .shell, .delegate, .unknown: .tool
@@ -89,7 +98,121 @@ extension HermexPaper {
     }
 }
 
-/// Chips left to right, wrapping onto new rows.
+/// A section's title above its rows or card (DESIGN.md § Components): the rounded display
+/// voice in sentence case, like the Brief opener's "Today · 8 cards". Never uppercase.
+struct HXSectionHeader: View {
+    let title: String
+    var trailing: String?
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(verbatim: title)
+                .font(AppFont.display(style: .subheadline, weight: .semibold))
+                .foregroundStyle(Color.hxTextPrimary)
+            Spacer(minLength: 8)
+            if let trailing {
+                Text(verbatim: trailing)
+                    .font(AppFont.caption())
+                    .foregroundStyle(Color.hxTextSecondary)
+            }
+        }
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
+extension View {
+    /// The neutral card (DESIGN.md § Components): `hxSurface` with an `hxSeparator` hairline,
+    /// `lg` corners by default. Settings sections, list groups, and the Brief opener use it.
+    func hxCard(cornerRadius radius: CGFloat = HXRadius.lg) -> some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        return background(Color.hxSurface, in: shape)
+            .overlay(shape.strokeBorder(Color.hxSeparator, lineWidth: 0.5))
+    }
+}
+
+/// The one header title (DESIGN.md § Header): centered, the rounded display voice, an optional
+/// subtitle under it. Sits in the toolbar's principal slot, between the leading glass circle
+/// and the trailing glass capsule.
+struct HXNavigationTitle: View {
+    let title: String
+    var subtitle: String?
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        VStack(spacing: 1) {
+            Text(verbatim: title)
+                .font(AppFont.display(style: .subheadline, weight: .semibold))
+                .foregroundStyle(Color.hxTextPrimary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            if let subtitle, !dynamicTypeSize.isAccessibilitySize {
+                Text(verbatim: subtitle)
+                    .font(AppFont.caption2())
+                    .foregroundStyle(Color.hxTextSecondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .contentTransition(.numericText())
+            }
+        }
+        .multilineTextAlignment(.center)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: [title, subtitle].compactMap { $0 }.joined(separator: ", ")))
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
+extension View {
+    /// The shared header: an inline navigation title (it still names the back button) drawn as
+    /// `HXNavigationTitle`.
+    func hxNavigationTitle(_ title: String, subtitle: String? = nil) -> some View {
+        navigationTitle(Text(verbatim: title))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    HXNavigationTitle(title: title, subtitle: subtitle)
+                }
+            }
+    }
+}
+
+/// A capsule naming one thing in its paper's glow: symbol, label, and an optional trailing
+/// mark. Tool calls, run counts, Brain citations, and source badges are all this chip.
+struct HXChip<Trailing: View>: View {
+    let paper: HermexPaper
+    var symbol: String?
+    let label: String
+    @ViewBuilder var trailing: () -> Trailing
+
+    var body: some View {
+        HStack(spacing: 5) {
+            if let symbol {
+                Image(systemName: symbol)
+                    .font(AppFont.caption2(weight: .semibold))
+                    .accessibilityHidden(true)
+            }
+            Text(verbatim: label)
+                .font(AppFont.caption(weight: .medium))
+                .lineLimit(1)
+                .truncationMode(.middle)
+            trailing()
+        }
+        .foregroundStyle(paper.glow)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(paper.wash, in: Capsule())
+        .overlay(Capsule().strokeBorder(paper.edge, lineWidth: 0.5))
+    }
+}
+
+extension HXChip where Trailing == EmptyView {
+    init(paper: HermexPaper, symbol: String? = nil, label: String) {
+        self.init(paper: paper, symbol: symbol, label: label) { EmptyView() }
+    }
+}
+
+/// Chips left to right, wrapping onto new rows. A chip wider than the row (large text) is
+/// offered the row's width so it truncates instead of running off the edge.
 struct FlowRow: Layout {
     var spacing: CGFloat
 
@@ -97,7 +220,7 @@ struct FlowRow: Layout {
         let width = proposal.width ?? .infinity
         var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0, widest: CGFloat = 0
         for view in subviews {
-            let size = view.sizeThatFits(.unspecified)
+            let size = Self.size(of: view, maxWidth: width)
             if x > 0, x + size.width > width { x = 0; y += rowHeight + spacing; rowHeight = 0 }
             x += size.width + spacing
             widest = max(widest, x - spacing)
@@ -109,11 +232,17 @@ struct FlowRow: Layout {
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         var x = bounds.minX, y = bounds.minY, rowHeight: CGFloat = 0
         for view in subviews {
-            let size = view.sizeThatFits(.unspecified)
+            let size = Self.size(of: view, maxWidth: bounds.width)
             if x > bounds.minX, x + size.width > bounds.maxX { x = bounds.minX; y += rowHeight + spacing; rowHeight = 0 }
             view.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
             x += size.width + spacing
             rowHeight = max(rowHeight, size.height)
         }
+    }
+
+    private static func size(of view: LayoutSubview, maxWidth: CGFloat) -> CGSize {
+        let ideal = view.sizeThatFits(.unspecified)
+        guard ideal.width > maxWidth else { return ideal }
+        return view.sizeThatFits(ProposedViewSize(width: maxWidth, height: nil))
     }
 }

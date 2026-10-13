@@ -166,7 +166,7 @@ struct MessageBubbleView: View {
                     .font(.caption.weight(.semibold))
             } icon: {
                 Image(systemName: "wand.and.stars")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(AppFont.caption2(weight: .semibold))
             }
             .foregroundStyle(.secondary)
 
@@ -178,10 +178,10 @@ struct MessageBubbleView: View {
                     .padding(.vertical, 8)
                     .background(
                         Color.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.12),
-                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous)
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous)
                             .stroke(
                                 Color.accentColor.opacity(colorScheme == .dark ? 0.45 : 0.3),
                                 lineWidth: 0.5
@@ -222,7 +222,8 @@ struct MessageBubbleView: View {
             if !isStreaming {
                 let citations = BrainCitation.citations(in: messageText)
                 if !citations.isEmpty {
-                    BrainCitationCards(citations: citations)
+                    BrainCitationChips(citations: citations)
+                        .padding(.top, 4)
                 }
             }
 
@@ -339,10 +340,10 @@ struct MessageBubbleView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color(.separator).opacity(colorScheme == .dark ? 0.42 : 0.28), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous)
+                .stroke(Color.hxSeparator.opacity(colorScheme == .dark ? 0.42 : 0.28), lineWidth: 0.5)
         )
         .padding(.vertical, 4)
     }
@@ -391,10 +392,10 @@ struct MessageBubbleView: View {
         }
         .padding(.horizontal, Self.userBubbleHorizontalPadding)
         .padding(.vertical, 8)
-        .background(userBubbleBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(userBubbleBackground, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
         .foregroundStyle(userBubbleForeground)
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous)
                 .stroke(userBubbleBorder, lineWidth: 0.5)
         )
     }
@@ -601,7 +602,7 @@ struct MessageBubbleView: View {
     private var userBubbleBackground: Color { Self.userBubbleFill }
 
     private var userBubbleForeground: Color {
-        Color(.label)
+        Color.hxTextPrimary
     }
 
     private var userBubbleBorder: Color {
@@ -735,46 +736,42 @@ private struct GridAttachmentCell: View {
             }
         }
         .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color(.separator).opacity(0.25), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous)
+                .stroke(Color.hxSeparator.opacity(0.25), lineWidth: 0.5)
         )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Image attachment \(attachmentAccessibilityName)")
     }
 
     private var fileCell: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(HermexPaper.file.paper)
+        VStack(spacing: 5) {
+            Image(systemName: fileIconName)
+                .font(AppFont.title(weight: .semibold))
+                .foregroundStyle(HermexPaper.file.glow)
 
-            VStack(spacing: 5) {
-                Image(systemName: fileIconName)
-                    .font(.system(size: 28, weight: .semibold))
+            Text(fileDisplayName)
+                .font(AppFont.caption2(weight: .medium))
+                .foregroundStyle(Color.hxTextPrimary)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .truncationMode(.middle)
+                .frame(maxWidth: size - 18)
 
-                Text(fileDisplayName)
-                    .font(.caption2.weight(.medium))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-                    .truncationMode(.middle)
-                    .frame(maxWidth: size - 18)
-
-                Text(fileExtensionLabel)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(HermexPaper.file.secondaryInk)
-                    .lineLimit(1)
-            }
-            .foregroundStyle(HermexPaper.file.ink)
+            Text(fileExtensionLabel)
+                .font(AppFont.caption2(weight: .bold))
+                .foregroundStyle(HermexPaper.file.glow)
+                .lineLimit(1)
         }
         .frame(width: size, height: size)
-        .environment(\.colorScheme, .light)
+        .glowSurface(.file, cornerRadius: HXRadius.sm)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("File attachment \(fileDisplayName), \(fileExtensionLabel)")
     }
 
     private var fallbackImage: some View {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
+        RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
             .fill(Color(.systemFill))
             .overlay(
                 Image(systemName: "photo")
@@ -784,7 +781,7 @@ private struct GridAttachmentCell: View {
     }
 
     private var placeholderImage: some View {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
+        RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
             .fill(Color(.systemFill))
             .overlay(
                 ProgressView()
@@ -878,7 +875,7 @@ private struct RemoteAttachmentImage: View {
     }
 
     private var fallbackImage: some View {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
+        RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
             .fill(Color(.systemFill))
             .overlay(
                 Image(systemName: "photo")
@@ -888,7 +885,7 @@ private struct RemoteAttachmentImage: View {
     }
 
     private var placeholderImage: some View {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
+        RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
             .fill(Color(.systemFill))
             .overlay(
                 ProgressView()

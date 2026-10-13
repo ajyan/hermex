@@ -213,7 +213,7 @@ struct ChatTranscriptView: View {
                     }
                 }
                 .animation(ChatMotion.quickState(reduceMotion: reduceMotion), value: showsScrollToBottomButton)
-                .background(Color(.systemBackground))
+                .background(Color.hxCanvas)
                 .background {
                     StreamingFollowTrigger(trigger: streamingScrollTrigger) {
                         if isFollowingLatestContent {
@@ -548,7 +548,7 @@ struct ChatTranscriptView: View {
     }
 
     private var hasLiveReasoningText: Bool {
-        !liveReasoningText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        liveReasoningText.contains(where: { !$0.isWhitespace })
     }
 
     private func hasDisplayedTranscriptMessage(anchorID: String?) -> Bool {
@@ -807,7 +807,7 @@ private struct ChatTranscriptMessageBlock: View, Equatable {
         hasActiveStream &&
             showsThinkingAndToolCards &&
             reasoningAnchorMessageID == transcriptMessage.anchorID &&
-            !liveReasoningText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            liveReasoningText.contains(where: { !$0.isWhitespace })
     }
 
     private var shouldRenderLiveToolActivityGroup: Bool {
@@ -994,7 +994,7 @@ struct LoadOlderMessagesButton: View {
             .background(.regularMaterial, in: Capsule(style: .continuous))
             .overlay(
                 Capsule(style: .continuous)
-                    .stroke(Color(.separator).opacity(0.32), lineWidth: 0.5)
+                    .stroke(Color.hxSeparator.opacity(0.32), lineWidth: 0.5)
             )
         }
         .buttonStyle(.chatTactile(.capsule))

@@ -46,7 +46,7 @@ struct ForkOriginRowView: View {
         Button(action: onOpen) {
             HStack(spacing: 8) {
                 Image(systemName: "arrow.triangle.branch")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(AppFont.subheadline(weight: .semibold))
                     .foregroundStyle(.tertiary)
                     .accessibilityHidden(true)
 
@@ -58,7 +58,7 @@ struct ForkOriginRowView: View {
                 Spacer(minLength: 0)
 
                 Image(systemName: "chevron.forward")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(AppFont.subheadline(weight: .semibold))
                     .foregroundStyle(.tertiary)
                     .accessibilityHidden(true)
             }
@@ -67,7 +67,7 @@ struct ForkOriginRowView: View {
             .contentShape(Rectangle())
             .overlay(alignment: .bottom) {
                 Rectangle()
-                    .fill(Color(.separator).opacity(0.5))
+                    .fill(Color.hxSeparator.opacity(0.5))
                     .frame(height: 0.5)
             }
         }

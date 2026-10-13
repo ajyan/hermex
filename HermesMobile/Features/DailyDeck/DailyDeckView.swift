@@ -9,17 +9,31 @@ struct DailyDeckView: View {
     @State private var isShowingCalendar = false
     @State private var feedbackCard: DeckCard?
     @AppStorage(DailyBriefReminder.enabledKey) private var notifies = false
+    /// Good/not-good labels on reflect cards; shown only where the server has labels.
+    @State private var labels: LabelsViewModel
+    @Environment(FeedbackAvailability.self) private var availability: FeedbackAvailability?
     private let openSession: (String) -> Void
 
     init(server: URL, openSession: @escaping (String) -> Void) {
         _viewModel = State(initialValue: DailyDeckViewModel(server: server))
+        _labels = State(initialValue: LabelsViewModel(client: APIClientLabelsAdapter(apiClient: APIClient(baseURL: server))))
         self.openSession = openSession
+    }
+
+    private var labelsAvailable: Bool { availability?.labelsAvailable == true }
+    /// Rate rows show once the server has labels and this screen has read them.
+    private var showsLabels: Bool {
+        labelsAvailable && labels.isLoaded(feature: LabelKey.dailyDeckFeature)
     }
 
     var body: some View {
         content
-            .navigationTitle(Text(verbatim: viewModel.title))
-            .navigationBarTitleDisplayMode(.inline)
+            .environment(showsLabels ? labels : nil)
+            .task(id: labelsAvailable) {
+                // Every deck's labels in one read, once per screen; a failed read retries on the next appear.
+                if labelsAvailable, !showsLabels { try? await labels.load(feature: LabelKey.dailyDeckFeature) }
+            }
+            .hxNavigationTitle(viewModel.title, subtitle: viewModel.state == .ready ? progressSubtitle : nil)
             .background(Color.hxCanvas.ignoresSafeArea())
             .toolbar {
                 if viewModel.workspace != nil {
@@ -57,12 +71,14 @@ struct DailyDeckView: View {
                                 Label { Text(verbatim: "Change Workspace") } icon: { Image(systemName: "folder") }
                             }
                         }
+                        FeedbackMenuItem()
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
                     .accessibilityLabel(Text(verbatim: "More"))
                 }
             }
+            .feedbackContext(feedbackContext)
             .task {
                 if let review = DailyBriefLaunch.take() {
                     await viewModel.show(date: review.date, kind: review.kind)
@@ -86,6 +102,10 @@ struct DailyDeckView: View {
                     Task { await viewModel.show(date: day, kind: kind) }
                 }
             }
+    }
+
+    private var feedbackContext: FeedbackContext {
+        .dailyDeck(title: viewModel.title, date: viewModel.date, kind: viewModel.kind, page: viewModel.currentPage)
     }
 
     @ViewBuilder
@@ -142,32 +162,26 @@ struct DailyDeckView: View {
         }
     }
 
+    /// "Oct 9 · 3 of 10 · Filed": which day (when it isn't today), where you are, and whether
+    /// it's filed. The header's subtitle.
+    private var progressSubtitle: String {
+        var parts: [String] = []
+        if viewModel.isReview {
+            parts.append(viewModel.reviews.first { $0.date == viewModel.date && $0.kind == viewModel.kind }?.label
+                         ?? DailyDeckPaths.label(viewModel.date))
+        } else if viewModel.date != viewModel.today {
+            parts.append(DailyDeckPaths.label(viewModel.date))
+        }
+        parts.append("\(viewModel.index + 1) of \(viewModel.visiblePages.count)")
+        if viewModel.isFiled { parts.append(viewModel.hasChanges ? "Edited" : "Filed") }
+        return parts.joined(separator: " · ")
+    }
+
     private func progress(count: Int) -> some View {
         VStack(spacing: 6) {
             ProgressView(value: Double(viewModel.index + 1), total: Double(max(count, 1)))
-                .tint(.secondary)
-            HStack(spacing: 6) {
-                if viewModel.isReview {
-                    Text(verbatim: viewModel.reviews.first { $0.date == viewModel.date && $0.kind == viewModel.kind }?.label
-                         ?? DailyDeckPaths.label(viewModel.date))
-                    Text(verbatim: "·")
-                } else if viewModel.date != viewModel.today {
-                    Text(verbatim: DailyDeckPaths.label(viewModel.date))
-                    Text(verbatim: "·")
-                }
-                Text(verbatim: "\(viewModel.index + 1) of \(count)")
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-                if viewModel.isFiled {
-                    Text(verbatim: "·")
-                    Label { Text(verbatim: viewModel.hasChanges ? "Edited" : "Filed") } icon: {
-                        Image(systemName: viewModel.hasChanges ? "pencil" : "checkmark")
-                    }
-                    .labelStyle(.titleAndIcon)
-                }
-            }
-            .font(AppFont.caption())
-            .foregroundStyle(.secondary)
+                .tint(viewModel.currentPage.map { DeckPalette.of($0).ink } ?? .secondary)
+                .accessibilityValue(Text(verbatim: progressSubtitle))
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
@@ -219,5 +233,17 @@ final class DailyBriefLaunch {
     static func take() -> Request? {
         defer { shared.pending = nil }
         return shared.pending
+    }
+}
+
+extension FeedbackContext {
+    /// "Daily Deck · Daily Brief · <card title>" on a card; the deck alone elsewhere. State
+    /// names the deck file (`slot`, "<date>.<kind>") and the page on display (`card`).
+    static func dailyDeck(title: String, date: String, kind: String, page: DeckPage?) -> FeedbackContext {
+        var cardTitle: String?
+        if case .card(let card) = page { cardTitle = card.title }
+        return FeedbackContext(
+            feature: "Daily Deck", screen: title, item: cardTitle,
+            state: ["slot": "\(date).\(kind)", "card": page?.id])
     }
 }

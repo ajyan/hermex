@@ -159,7 +159,7 @@ struct BotChatComposerView: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 14)
                     .background(
-                        Color(.systemBackground)
+                        Color.hxCanvas
                             .padding(.top, -10).padding(.bottom, -12)
                             .ignoresSafeArea(edges: .bottom)
                     )
@@ -363,14 +363,14 @@ struct BotChatComposerView: View {
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: plusIconSize, weight: .medium))
-                .foregroundStyle(Color(.secondaryLabel))
+                .foregroundStyle(Color.hxTextSecondary)
                 .frame(width: ChatComposerMetrics.actionSize, height: ChatComposerMetrics.actionSize)
                 .adaptiveGlass(.regular, isInteractive: true, fallbackMaterial: .ultraThinMaterial,
                                inheritsClipping: true, in: Circle())
                 .clipShape(Circle())
         }
         .buttonStyle(.plain)
-        .tint(Color(.secondaryLabel))
+        .tint(Color.hxTextSecondary)
         .disabled(
             !model.mayImportAttachments
                 || model.attachments.isImporting
@@ -391,7 +391,7 @@ struct BotChatComposerView: View {
         ComposerVoiceControlButton(
             isListening: voiceInput.isListening,
             isDisabled: isVoiceInputDisabled,
-            color: Color(.secondaryLabel),
+            color: Color.hxTextSecondary,
             isRecordingVoiceNote: false,
             supportsVoiceNotes: false,
             onTap: toggleVoiceInput,

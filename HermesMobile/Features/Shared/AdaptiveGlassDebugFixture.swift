@@ -28,7 +28,7 @@ private struct AdaptiveGlassDebugFixture: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text(verbatim: "Adaptive surfaces")
-                .font(.headline)
+                .font(AppFont.headline())
 
             HStack(spacing: 14) {
                 AdaptiveGlassContainer(spacing: 14) {
@@ -85,9 +85,9 @@ private struct AdaptiveGlassDebugFixture: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(AppFont.subheadline(weight: .semibold))
                 Text(subtitle)
-                    .font(.caption)
+                    .font(AppFont.caption())
                     .foregroundStyle(.secondary)
             }
         }

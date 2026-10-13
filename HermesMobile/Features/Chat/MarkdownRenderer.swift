@@ -34,6 +34,7 @@ struct MarkdownRenderer: View {
                 )
             } else {
                 markdownContent
+                    .environment(\.interactiveAnswerUnclosedBody, unclosedInteractiveAnswerBody)
             }
         }
         .onChange(of: isStreaming) { wasStreaming, nowStreaming in
@@ -47,6 +48,12 @@ struct MarkdownRenderer: View {
             guard !Task.isCancelled else { return }
             lingersAfterStreaming = false
         }
+    }
+
+    /// A reply cut off inside an `atlas-ui` block shows that block as code.
+    private var unclosedInteractiveAnswerBody: String? {
+        guard content.contains(InteractiveAnswerBlock.language) else { return nil }
+        return InteractiveAnswerBlock.unclosedFenceBody(in: content)
     }
 
     @ViewBuilder
@@ -447,7 +454,8 @@ private struct ChatMarkdownView: View {
     }
 }
 
-/// Routes a fenced code block to display-math rendering when its language is a
+/// Routes a fenced code block to an interactive answer card when its language is
+/// `atlas-ui`, to display-math rendering when its language is a
 /// math language (`math`/`latex`/`tex`) and the body parses as math; otherwise
 /// renders it as a normal syntax-highlighted code block. A math fence whose
 /// body SwiftMath can't parse falls back to the code block too, so nothing is
@@ -457,8 +465,21 @@ private struct MathFenceOrCodeBlock: View {
     let content: String
     let isStreaming: Bool
 
+    @Environment(\.interactiveAnswersEnabled) private var interactiveAnswersEnabled
+    @Environment(\.interactiveAnswerUnclosedBody) private var unclosedInteractiveAnswerBody
+
     var body: some View {
-        if MathFenceLanguage.matches(language), MathLaTeX.isRenderable(content) {
+        if InteractiveAnswerBlock.matches(language),
+           case let block = InteractiveAnswerBlock.classify(
+               language: language,
+               content: content,
+               isStreaming: isStreaming,
+               isEnabled: interactiveAnswersEnabled,
+               isFenceClosed: unclosedInteractiveAnswerBody != content.trimmingCharacters(in: .whitespacesAndNewlines)
+           ),
+           block != .code {
+            InteractiveAnswerCard(block: block, source: content)
+        } else if MathFenceLanguage.matches(language), MathLaTeX.isRenderable(content) {
             DisplayMathView(latex: content)
         } else {
             ChatCodeBlock(
@@ -470,7 +491,7 @@ private struct MathFenceOrCodeBlock: View {
     }
 }
 
-private struct ChatCodeBlock: View {
+struct ChatCodeBlock: View {
     let language: String?
     let content: String
     let isStreaming: Bool
@@ -734,7 +755,7 @@ private struct PlainCodeBlockText: View {
                 }
             }
         }
-        .font(.system(size: 13, weight: .regular, design: .monospaced))
+        .font(AppFont.mono(style: .footnote))
         .foregroundStyle(.primary)
     }
 
@@ -1547,6 +1568,7 @@ private struct SelectableMarkdownHeading: View {
             .relativeLineSpacing(.em(0.125))
             .markdownMargin(top: 24, bottom: 16)
             .markdownTextStyle {
+                FontFamily(.system(.rounded))
                 FontWeight(.semibold)
                 FontSize(.em(fontScale))
                 if level == 6 { ForegroundColor(tertiaryColor) }

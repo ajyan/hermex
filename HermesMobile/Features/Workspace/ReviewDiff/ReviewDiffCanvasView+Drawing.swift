@@ -386,7 +386,7 @@ extension ReviewDiffCanvasView {
 
     private func drawFileIcon(rect: CGRect, changeKind: GitFile.ChangeKind, context: CGContext) {
         let color = theme.tint(for: changeKind)
-        let outline = UIBezierPath(roundedRect: rect, cornerRadius: 6)
+        let outline = UIBezierPath(roundedRect: rect, cornerRadius: HXRadius.xs)
         color.setStroke()
         outline.lineWidth = 2
         outline.stroke()
@@ -419,7 +419,7 @@ extension ReviewDiffCanvasView {
     }
 
     private func drawViewedCheckbox(rect: CGRect, checked: Bool, context: CGContext) {
-        let path = UIBezierPath(roundedRect: rect, cornerRadius: 6)
+        let path = UIBezierPath(roundedRect: rect, cornerRadius: HXRadius.xs)
         if checked {
             theme.accent.setFill()
             path.fill()

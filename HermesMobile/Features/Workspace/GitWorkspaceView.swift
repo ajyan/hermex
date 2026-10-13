@@ -28,8 +28,8 @@ struct GitWorkspaceView: View {
         NavigationStack {
             content
                 .adaptiveReadableScrollContent(maxWidth: AdaptiveReadableContentWidth.workspace)
-                .navigationTitle("Git")
-                .navigationBarTitleDisplayMode(.inline)
+                .background(Color.hxCanvas)
+                .hxNavigationTitle(String(localized: "Git"), subtitle: viewModel.status?.branch)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Done") { dismiss() }
@@ -226,11 +226,7 @@ struct GitFileCard: View {
             GitStatusChip(kind: file.changeKind)
         }
         .padding(12)
-        .background(Color(.secondarySystemBackground), in: .rect(cornerRadius: 12))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color(.separator).opacity(0.35), lineWidth: 0.5)
-        }
+        .hxCard(cornerRadius: HXRadius.md)
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
     }

@@ -11,6 +11,8 @@ enum VoiceCallTiming {
     static let transcriptStallEnd: TimeInterval = 1.5
     /// Listening this long with nothing heard prompts "I didn't catch that".
     static let noSpeechTimeout: TimeInterval = 15
+    /// No-speech prompts in a row before the call hangs up instead of prompting again.
+    static let noSpeechPromptsBeforeHangUp = 2
     /// After a run ends with no reply text yet, how long to wait for it before going back to listening.
     static let noReplyTextGrace: TimeInterval = 3
     /// A turn is forced to end this long after it started, so a stuck mic can't hang the call.

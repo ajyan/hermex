@@ -13,7 +13,7 @@ import UIKit
 /// Hermes Desktop holds. Everything else — approvals, questions, sudo, secret
 /// and password-vault prompts, connection operations — is answered from here.
 struct BotPendingRequestCard: View {
-    static let cornerRadius: CGFloat = 14
+    static let cornerRadius: CGFloat = HXRadius.lg
 
     let request: BotPendingRequest
     /// Which bot on which connection is asking, so two hosts with equal Profile

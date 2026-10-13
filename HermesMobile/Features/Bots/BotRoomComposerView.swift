@@ -63,7 +63,7 @@ struct BotRoomComposerView: View {
         } label: {
             Group {
                 if reader.awaitingStop || reader.status.stopping > 0 {
-                    Text("Stopping…").font(.caption).padding(.horizontal, 8)
+                    Text("Stopping…").font(AppFont.caption()).padding(.horizontal, 8)
                 } else {
                     Image(systemName: stop ? "stop.fill" : "arrow.up")
                         .font(.system(size: iconSize, weight: .semibold))
@@ -114,7 +114,7 @@ struct BotRoomActionCard: View {
                 onStop: { Task { await reader.stop() } }, onConnection: { _ in })
         } else {
             VStack(alignment: .leading, spacing: 12) {
-                Text(identity).font(.caption).foregroundStyle(.secondary)
+                Text(identity).font(AppFont.caption()).foregroundStyle(.secondary)
                 if action.isRetry {
                     Button("Retry") { Task { await reader.act(action) } }.disabled(!reader.mayAct(action))
                 } else {

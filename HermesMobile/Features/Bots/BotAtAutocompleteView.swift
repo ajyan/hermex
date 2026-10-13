@@ -83,7 +83,7 @@ struct BotAtAutocompleteView: View {
 
     private func header(_ title: LocalizedStringKey) -> some View {
         Text(title)
-            .font(.caption2.weight(.semibold))
+            .font(AppFont.caption2(weight: .semibold))
             .textCase(.uppercase)
             .foregroundStyle(.secondary)
             .padding(.horizontal, 16)
@@ -106,7 +106,7 @@ struct BotAtAutocompleteView: View {
         header("Files")
         if matches.isEmpty {
             Text("Searching files…")
-                .font(.subheadline)
+                .font(AppFont.subheadline())
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 16)
                 .frame(maxWidth: .infinity, alignment: .leading)

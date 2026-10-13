@@ -20,14 +20,14 @@ struct OnboardingTailscalePage: View {
 
                     Button(action: openTailscaleInAppStore) {
                         Label("Get Tailscale on the App Store", systemImage: "arrow.up.forward.square")
-                            .font(.subheadline.weight(.semibold))
+                            .font(AppFont.subheadline(weight: .semibold))
                             .foregroundStyle(Color.accentColor)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 13)
-                            .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                                     .stroke(Color.white.opacity(0.1), lineWidth: 1)
                             )
                     }
@@ -52,13 +52,13 @@ struct OnboardingTailscalePage: View {
     private func tailscaleStep(number: String, text: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Text(number)
-                .font(.caption.weight(.bold))
+                .font(AppFont.caption(weight: .bold))
                 .foregroundStyle(.white)
                 .frame(width: 23, height: 23)
                 .background(Color.accentColor, in: Circle())
 
             Text(text)
-                .font(.subheadline)
+                .font(AppFont.subheadline())
                 .foregroundStyle(.white.opacity(0.72))
                 .fixedSize(horizontal: false, vertical: true)
         }

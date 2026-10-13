@@ -1,20 +1,21 @@
+import SwiftUI
 import UIKit
 
-/// Semantic colours for the surface. Every colour is dynamic, so a draw pass resolves
-/// light or dark from the current trait collection with no theme plumbing.
+/// Semantic colours for the surface, from the `hx` tokens. Every colour is dynamic, so a
+/// draw pass resolves light or dark from the current trait collection with no theme plumbing.
 struct ReviewDiffTheme {
-    let background = UIColor.systemBackground
-    let text = UIColor.label
-    let mutedText = UIColor.secondaryLabel
-    let headerBackground = UIColor.secondarySystemBackground
-    let border = UIColor.separator
-    let accent = UIColor.systemBlue
-    let hunkBackground = UIColor.systemBlue.withAlphaComponent(0.10)
-    let addBackground = UIColor.systemGreen.withAlphaComponent(0.14)
-    let deleteBackground = UIColor.systemRed.withAlphaComponent(0.14)
-    let addTint = UIColor.systemGreen
-    let deleteTint = UIColor.systemRed
-    let conflictTint = UIColor.systemOrange
+    let background = UIColor(Color.hxCanvas)
+    let text = UIColor(Color.hxTextPrimary)
+    let mutedText = UIColor(Color.hxTextSecondary)
+    let headerBackground = UIColor(Color.hxSurface)
+    let border = UIColor(Color.hxSeparator)
+    let accent = UIColor(named: "AccentColor") ?? .systemBlue
+    let hunkBackground = (UIColor(named: "AccentColor") ?? .systemBlue).withAlphaComponent(0.10)
+    let addBackground = UIColor(Color.hxSuccess).withAlphaComponent(0.14)
+    let deleteBackground = UIColor(Color.hxDanger).withAlphaComponent(0.14)
+    let addTint = UIColor(Color.hxSuccess)
+    let deleteTint = UIColor(Color.hxDanger)
+    let conflictTint = UIColor(Color.hxWarning)
 
     func tint(for changeKind: GitFile.ChangeKind) -> UIColor {
         switch changeKind {

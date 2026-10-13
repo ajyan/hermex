@@ -21,7 +21,7 @@ private struct ChatTimelineAccessorySurfaceModifier<SurfaceShape: Shape>: ViewMo
             .clipShape(shape)
             .overlay {
                 shape
-                    .stroke(Color(.separator).opacity(colorScheme == .dark ? 0.42 : 0.28), lineWidth: 0.5)
+                    .stroke(Color.hxSeparator.opacity(colorScheme == .dark ? 0.42 : 0.28), lineWidth: 0.5)
                     .allowsHitTesting(false)
             }
     }
@@ -43,11 +43,11 @@ private struct ChatTimelineAccessoryInsetSurfaceModifier: ViewModifier {
         content
             .background(
                 backgroundColor,
-                in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .stroke(Color(.separator).opacity(colorScheme == .dark ? 0.36 : 0.22), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
+                    .stroke(Color.hxSeparator.opacity(colorScheme == .dark ? 0.36 : 0.22), lineWidth: 0.5)
                     .allowsHitTesting(false)
             }
     }

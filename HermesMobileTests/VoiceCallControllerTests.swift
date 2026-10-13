@@ -280,6 +280,48 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(speaker.spoken.count, 2)
     }
 
+    /// Lets one no-speech timeout pass and plays out whatever the call said.
+    private func sitSilentThroughNoSpeechTimeout() {
+        clock += VoiceCallTiming.noSpeechTimeout
+        controller.tick()
+        speaker.drain()
+    }
+
+    func testForgottenCallHangsUpAfterUnansweredNoSpeechPrompts() async {
+        await controller.start()
+        for _ in 0..<VoiceCallTiming.noSpeechPromptsBeforeHangUp {
+            sitSilentThroughNoSpeechTimeout()
+        }
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertEqual(bridge.endCount, 0)
+
+        clock += VoiceCallTiming.noSpeechTimeout
+        controller.tick()
+        XCTAssertEqual(controller.state, .ended(VoiceCallPhrases.hangingUpNoSpeech))
+        XCTAssertEqual(speaker.spoken.last, VoiceCallPhrases.hangingUpNoSpeech + ".")
+        XCTAssertEqual(listener.stopCount, 1)
+        speaker.drain()
+        XCTAssertEqual(bridge.endCount, 1)
+        XCTAssertTrue(controller.isFinished)
+    }
+
+    func testSpeakingResetsTheNoSpeechHangUpCount() async {
+        await controller.start()
+        for _ in 0..<VoiceCallTiming.noSpeechPromptsBeforeHangUp {
+            sitSilentThroughNoSpeechTimeout()
+        }
+        // A mumble too short to send still counts as someone being there.
+        voice(true, for: 0.6)
+        listener.onPartial?("um")
+        listener.onFinal?("")
+        voice(false, for: 0.9)
+        XCTAssertTrue(chat.sent.isEmpty)
+        // The user spoke, so the next silence prompts again instead of hanging up.
+        sitSilentThroughNoSpeechTimeout()
+        XCTAssertEqual(speaker.spoken.last, VoiceCallPhrases.didntCatch)
+        XCTAssertEqual(bridge.endCount, 0)
+    }
+
     func testReplyCutMidSentenceAtRunEndIsCompletedWhenTheFullTextLands() async {
         await startSpeaking()
         let cut = "An octopus has three hearts, and its blood is blue because it uses copper to carry oxygen instead of"

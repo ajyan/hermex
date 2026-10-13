@@ -128,14 +128,14 @@ enum GoalCalendar {
     }
 }
 
-/// A goal's accent on the app's own surfaces (rows, calendar, choices): its ink in light
-/// appearance and its paper in dark, so it stays legible on dark glass; `on` is the text on it.
+/// A goal's accent on the app's own surfaces (rows, calendar, choices): its glow, which
+/// already adapts to the appearance; `on` is the text on it.
 struct GoalTint {
     let fill: Color
     let on: Color
 
     init(_ palette: DeckPalette, scheme: ColorScheme) {
-        fill = scheme == .dark ? palette.paper : palette.ink
-        on = scheme == .dark ? palette.ink : .white
+        fill = palette.ink
+        on = palette.onInk
     }
 }

@@ -4696,6 +4696,14 @@ final class ChatViewModel {
         }
     }
 
+    /// Background audio keeps playing, but nobody can see the progress bar; stop
+    /// its 5 Hz ticker until `refreshListenPlaybackProgressAfterSceneActivation`.
+    func pauseListenPlaybackProgressForBackground() {
+        stopListenPlaybackTicker()
+    }
+
+    var isListenPlaybackProgressTicking: Bool { listenPlaybackTicker != nil }
+
     func refreshListenPlaybackProgressAfterSceneActivation() {
         guard listenPlaybackPhase == .playing || listenPlaybackPhase == .paused else { return }
 
@@ -6386,13 +6394,28 @@ private struct ActiveChatStreamSnapshotKey: Hashable {
     let streamID: String
 }
 
-private final class ActiveChatStreamSnapshotStore {
+/// The in-memory transcripts of streams the user navigated away from, so
+/// returning mid-run restores them. A session runs one stream at a time, so
+/// saving a stream drops that session's older ones, and the store keeps only
+/// the most recently saved few: an evicted chat reloads from the server.
+final class ActiveChatStreamSnapshotStore {
     static let shared = ActiveChatStreamSnapshotStore()
 
     private let lock = NSLock()
+    private let limit: Int
     private var snapshots: [ActiveChatStreamSnapshotKey: ActiveChatStreamSnapshot] = [:]
+    /// Keys from least to most recently saved.
+    private var saveOrder: [ActiveChatStreamSnapshotKey] = []
 
-    private init() {}
+    init(limit: Int = 8) {
+        self.limit = limit
+    }
+
+    var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return snapshots.count
+    }
 
     func save(
         _ snapshot: ActiveChatStreamSnapshot,
@@ -6402,7 +6425,17 @@ private final class ActiveChatStreamSnapshotStore {
     ) {
         lock.lock()
         defer { lock.unlock() }
-        snapshots[key(server: server, sessionID: sessionID, streamID: streamID)] = snapshot
+        let newKey = key(server: server, sessionID: sessionID, streamID: streamID)
+        let replaced = saveOrder.filter { $0 == newKey || ($0.server == newKey.server && $0.sessionID == newKey.sessionID) }
+        for oldKey in replaced {
+            snapshots.removeValue(forKey: oldKey)
+        }
+        saveOrder.removeAll { replaced.contains($0) }
+        snapshots[newKey] = snapshot
+        saveOrder.append(newKey)
+        while saveOrder.count > limit {
+            snapshots.removeValue(forKey: saveOrder.removeFirst())
+        }
     }
 
     func snapshot(server: URL, sessionID: String, streamID: String) -> ActiveChatStreamSnapshot? {
@@ -6414,13 +6447,16 @@ private final class ActiveChatStreamSnapshotStore {
     func remove(server: URL, sessionID: String, streamID: String) {
         lock.lock()
         defer { lock.unlock() }
-        snapshots.removeValue(forKey: key(server: server, sessionID: sessionID, streamID: streamID))
+        let oldKey = key(server: server, sessionID: sessionID, streamID: streamID)
+        snapshots.removeValue(forKey: oldKey)
+        saveOrder.removeAll { $0 == oldKey }
     }
 
     func removeAll() {
         lock.lock()
         defer { lock.unlock() }
         snapshots.removeAll()
+        saveOrder.removeAll()
     }
 
     private func key(server: URL, sessionID: String, streamID: String) -> ActiveChatStreamSnapshotKey {
@@ -6674,7 +6710,7 @@ extension ChatViewModel {
     }
 
     nonisolated private static func hasTranscriptMessageRowContent(_ message: ChatMessage) -> Bool {
-        if message.content?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+        if message.content?.contains(where: { !$0.isWhitespace }) == true {
             return true
         }
 

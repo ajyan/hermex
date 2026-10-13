@@ -806,7 +806,11 @@ struct ChatView: View {
 
                     listenPlaybackBar
 
-                    messageContent
+                    // The transcript reads the streaming state (messages, live
+                    // tool calls, tokens per second) in its own scope, so a
+                    // streamed word redraws the transcript, not the composer,
+                    // toolbar, and the rest of this screen.
+                    ChatObservationScope { messageContent }
                         // Scope RTL to the chat transcript only (#259): the offline
                         // banner above stays in the app's default direction.
                         .environment(\.layoutDirection, chatLayoutDirection)
@@ -920,7 +924,6 @@ struct ChatView: View {
                 guard viewModel.runEndTrigger > 0 else { return }
                 handleRunEnd()
             }
-            .onChange(of: viewModel.streamingHapticPulseTrigger, handleStreamingHapticPulse)
     }
 
     /// Toolbar, navigation, and presentations over `chatLifecycle`.
@@ -970,6 +973,8 @@ struct ChatView: View {
                                 if showsGitControls, gitAvailabilityViewModel.hasRepository {
                                     gitActionsMenu
                                 }
+
+                                FeedbackMenuItem()
                             } label: {
                                 Label("More", systemImage: "ellipsis")
                             }
@@ -1091,6 +1096,11 @@ struct ChatView: View {
 
     var body: some View {
         chatContent
+            // The navy canvas behind every chat state (empty, loading, transcript), not the
+            // system's pure black.
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .feedbackContext(FeedbackContext(
+                feature: "Chat", screen: "Chat", item: displayTitle, state: ["session_id": transcriptMediaSessionID]))
             .alert(
                 "Discard Later Messages?",
                 isPresented: $showEditDiscardConfirmation
@@ -1666,8 +1676,12 @@ struct ChatView: View {
         .onChange(of: viewModel.messages.isEmpty, initial: true) { _, isEmpty in
             if !isEmpty { endSessionOpenSignpost() }
         }
+        // Bumps several times a second while streaming, so it lives with the
+        // transcript's scope rather than invalidating the whole screen.
+        .onChange(of: viewModel.streamingHapticPulseTrigger, handleStreamingHapticPulse)
         .environment(\.composerChipCatalog, viewModel.composerChipCatalog)
         .transcriptLinks(perform: handleTranscriptLink)
+        .interactiveAnswerAsk(perform: fillDraftFromInteractiveAnswer)
         .environment(\.chatWorkspaceRoot, session.workspace)
         .task(id: transcriptSkillReferenceCount) {
             await loadSkillSuggestionsForTranscriptChipsIfNeeded()
@@ -1767,7 +1781,12 @@ struct ChatView: View {
     }
 
     private var scrollToBottomButtonBottomPadding: CGFloat {
-        composerHeight + 12 + composerAccessorySpacerHeight + clarificationFootprintHeight
+        bottomChromeHeight + 12
+    }
+
+    /// Everything docked at the bottom: composer, its accessory row, and a clarification.
+    private var bottomChromeHeight: CGFloat {
+        composerHeight + composerAccessorySpacerHeight + clarificationFootprintHeight
     }
 
     /// Bar height plus its gap above the composer while a clarification is
@@ -1851,7 +1870,8 @@ struct ChatView: View {
     }
 
     private func shouldRenderMessageRow(_ message: ChatMessage) -> Bool {
-        if message.content?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+        // Stops at the first visible character instead of copying the whole reply.
+        if message.content?.contains(where: { !$0.isWhitespace }) == true {
             return true
         }
 
@@ -2581,6 +2601,14 @@ struct ChatView: View {
         draftQuotes = resolvedContent.quotes
     }
 
+    /// An "Ask Atlas" tap in an interactive answer: it fills the draft, after
+    /// any draft already started, and never sends.
+    private func fillDraftFromInteractiveAnswer(_ text: String) {
+        draftMessage = InteractiveAnswerDraftMerge.merged(draft: draftMessage, ask: text)
+        persistDraftEdit(draftMessage)
+        requestComposerFocusIfPossible()
+    }
+
     private func addSelectedPassageToDraft(_ passage: String) {
         guard !passage.isEmpty else { return }
         persistedQuotesBinding.wrappedValue = draftQuotes + [ComposerQuote(text: passage)]
@@ -2945,6 +2973,7 @@ struct ChatView: View {
 
         switch phase {
         case .background:
+            viewModel.pauseListenPlaybackProgressForBackground()
             if viewModel.activeStreamID != nil {
                 beginResponseCompletionBackgroundTask()
             }
@@ -3273,15 +3302,25 @@ struct ChatView: View {
         }
     }
 
+    /// Runs for every scroll frame, including each follow scroll while a reply
+    /// streams, so it writes state only when a value actually changes.
     private func handleFollowEvent(_ event: ChatScrollPolicy.FollowEvent) {
-        completionScrollPolicy.observe(event)
+        var policy = completionScrollPolicy
+        policy.observe(event)
+        if policy != completionScrollPolicy {
+            completionScrollPolicy = policy
+        }
+        let clearsCompletedResponse: Bool
         switch event {
         case .userScrollBegin, .reset:
-            completedResponseRenderID = nil
+            clearsCompletedResponse = true
         case .contentScrolled(_, let isUserScrolling, let movedAway, _):
-            if isUserScrolling || movedAway { completedResponseRenderID = nil }
+            clearsCompletedResponse = isUserScrolling || movedAway
         default:
-            break
+            clearsCompletedResponse = false
+        }
+        if clearsCompletedResponse, completedResponseRenderID != nil {
+            completedResponseRenderID = nil
         }
         let resolved = ChatScrollPolicy.resolveFollow(current: followLatch, event: event)
         if resolved != followLatch {
@@ -3324,7 +3363,9 @@ struct ChatView: View {
             isStreaming: isStreaming
         )
         let wasNearBottom = isScrolledNearBottom
-        isScrolledNearBottom = isNearBottom
+        if isNearBottom != wasNearBottom {
+            isScrolledNearBottom = isNearBottom
+        }
         handleFollowEvent(.contentScrolled(
             isAtBottom: ChatScrollPolicy.isAtBottom(distanceFromBottom: metrics.distanceFromBottom),
             isUserScrolling: metrics.isUserInteracting,
@@ -3413,41 +3454,14 @@ struct ChatView: View {
     }
 }
 
+/// The chat's header title: the shared `HXNavigationTitle`, centered like every screen's.
 struct ChatToolbarTitleLabel: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
     let title: String
     let subtitle: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-
-            if showsSubtitle, let subtitle {
-                Text(subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .multilineTextAlignment(.leading)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel)
-    }
-
-    private var showsSubtitle: Bool {
-        !dynamicTypeSize.isAccessibilitySize
-    }
-
-    private var accessibilityLabel: String {
-        guard let subtitle else { return title }
-        return "\(title), \(subtitle)"
+        HXNavigationTitle(title: title, subtitle: subtitle)
+            .frame(maxWidth: 220)
     }
 }
 
@@ -3495,7 +3509,7 @@ private struct LegacyToolbarClusterStyle: ViewModifier {
                 .clipShape(Capsule())
                 .overlay {
                     Capsule()
-                        .stroke(Color(.separator).opacity(colorScheme == .dark ? 0.38 : 0.24), lineWidth: 0.5)
+                        .stroke(Color.hxSeparator.opacity(colorScheme == .dark ? 0.38 : 0.24), lineWidth: 0.5)
                         .allowsHitTesting(false)
                 }
         }
@@ -3647,6 +3661,17 @@ struct ChatNavigationBackground: ViewModifier {
         if #available(iOS 26, *), !reduceTransparency {
             return AnyShapeStyle(.regularMaterial)
         }
-        return AnyShapeStyle(Color(uiColor: .systemBackground))
+        return AnyShapeStyle(Color.hxCanvas)
+    }
+}
+
+/// Builds `content` inside its own `body`, so the observable state that content
+/// reads invalidates only this subtree. The screen that creates the scope never
+/// reads that state itself and is not redrawn when it changes.
+struct ChatObservationScope<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
     }
 }

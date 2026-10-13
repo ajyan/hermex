@@ -131,7 +131,7 @@ struct BrainModuleListView: View {
 
     var body: some View {
         content
-            .navigationTitle(Text(verbatim: module.defaultTitle))
+            .hxNavigationTitle(module.defaultTitle)
             .background(Color.hxCanvas.ignoresSafeArea())
             .task {
                 // Load once; a pop back from a page keeps the pages already scrolled.
@@ -148,7 +148,21 @@ struct BrainModuleListView: View {
 
     @ViewBuilder
     private var content: some View {
-        if hasChipBar, !chipTags.isEmpty {
+        if module == .journal {
+            BrainListStateView(viewModel: viewModel) { list in
+                BrainJournalCalendarView(
+                    list: list,
+                    isLoadingOlder: list.nextCursor != nil && !viewModel.loadMoreFailed,
+                    loadOlderFailed: viewModel.loadMoreFailed,
+                    onRetry: { loadMore() }
+                )
+                .refreshable { await viewModel.load() }
+                // Older pages load one after another so earlier months fill in.
+                .task(id: list.nextCursor) {
+                    if list.nextCursor != nil { await viewModel.loadMore() }
+                }
+            }
+        } else if hasChipBar, !chipTags.isEmpty {
             // The chip bar stays put while a tag reloads; the state shows beneath it.
             List {
                 Section {
@@ -174,7 +188,8 @@ struct BrainModuleListView: View {
     private func loadedSections(_ list: BrainList) -> some View {
         switch module {
         case .people: peopleSection(list)
-        case .journal: journalSections(list)
+        // The journal is a calendar (`BrainJournalCalendarView`), never these sections.
+        case .journal: EmptyView()
         case .wiki: wikiSections(list)
         // Highlights routes to `BrainHighlightsView`; it shares the article grid only to
         // keep the switch exhaustive.
@@ -203,29 +218,6 @@ struct BrainModuleListView: View {
                 }
                 .brainListRow()
                 .onAppear { if item.id == lastID { loadMore() } }
-            }
-        }
-    }
-
-    // MARK: Journal
-
-    private func journalSections(_ list: BrainList) -> some View {
-        let sections = BrainListLayout.sections(list)
-        let lastID = sections.last?.items.last?.id
-        return ForEach(sections, id: \.title) { section in
-            Section {
-                if !section.title.isEmpty {
-                    BrainMonthBanner(title: section.title, count: section.items.count)
-                        .brainListClearRow()
-                }
-                ForEach(section.items, id: \.id) { item in
-                    NavigationLink(value: link(item.id)) {
-                        BrainRow(title: item.title.isEmpty ? item.date : item.title,
-                                 subtitle: item.preview, subtitleLineLimit: 1)
-                    }
-                    .brainListRow()
-                    .onAppear { if item.id == lastID { loadMore() } }
-                }
             }
         }
     }
@@ -477,30 +469,3 @@ struct BrainCoverRow: View {
     }
 }
 
-/// A journal month's header: the month title and count over a 64pt cover banner
-/// seeded by the title.
-struct BrainMonthBanner: View {
-    static let height: CGFloat = 64
-
-    let title: String
-    let count: Int
-    private let cover: BrainCoverSpec
-
-    init(title: String, count: Int) {
-        self.title = title
-        self.count = count
-        self.cover = BrainCoverSpec.make(id: title, tag: nil)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: BrainStyle.s) {
-            BrainSectionHeader(title: title, count: count)
-            BrainCoverView(spec: cover)
-                .frame(height: Self.height)
-                .frame(maxWidth: .infinity)
-                .clipShape(BrainStyle.cardShape())
-                .drawingGroup()
-        }
-        .padding(.top, BrainStyle.s)
-    }
-}
