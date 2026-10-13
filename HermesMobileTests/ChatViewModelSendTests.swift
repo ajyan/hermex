@@ -405,11 +405,16 @@ final class ChatViewModelSendTests: XCTestCase {
         XCTAssertEqual(viewModel.listenPlaybackElapsedTime, 0)
         let nowPlayingUpdatesAfterStart = remoteControlCenter.snapshots.count
 
+        XCTAssertTrue(viewModel.isListenPlaybackProgressTicking)
+        viewModel.pauseListenPlaybackProgressForBackground()
+        XCTAssertFalse(viewModel.isListenPlaybackProgressTicking, "Background audio needs no progress ticker.")
+
         // Simulates background audio advancing while the foreground UI timer is not
         // firing. Returning to the scene must pull the latest player time into the bar.
         player.currentTime = 42
         viewModel.refreshListenPlaybackProgressAfterSceneActivation()
 
+        XCTAssertTrue(viewModel.isListenPlaybackProgressTicking)
         XCTAssertEqual(viewModel.listenPlaybackElapsedTime, 42)
         XCTAssertEqual(viewModel.listenPlaybackDisplayTime, 42)
         XCTAssertEqual(remoteControlCenter.snapshots.count, nowPlayingUpdatesAfterStart)

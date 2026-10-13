@@ -4696,6 +4696,14 @@ final class ChatViewModel {
         }
     }
 
+    /// Background audio keeps playing, but nobody can see the progress bar; stop
+    /// its 5 Hz ticker until `refreshListenPlaybackProgressAfterSceneActivation`.
+    func pauseListenPlaybackProgressForBackground() {
+        stopListenPlaybackTicker()
+    }
+
+    var isListenPlaybackProgressTicking: Bool { listenPlaybackTicker != nil }
+
     func refreshListenPlaybackProgressAfterSceneActivation() {
         guard listenPlaybackPhase == .playing || listenPlaybackPhase == .paused else { return }
 

@@ -2966,6 +2966,7 @@ struct ChatView: View {
 
         switch phase {
         case .background:
+            viewModel.pauseListenPlaybackProgressForBackground()
             if viewModel.activeStreamID != nil {
                 beginResponseCompletionBackgroundTask()
             }
