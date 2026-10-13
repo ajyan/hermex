@@ -148,6 +148,10 @@ final class GoalsViewModelsTests: XCTestCase {
         await vm.checkIn(commitment: "stretch-pm", status: .done)
         XCTAssertEqual(client.log, ["detail:nyc-marathon-2026", "checkIn", "detail:nyc-marathon-2026"])
         XCTAssertEqual(vm.error, "The day changed. Check in again.")
+        // The reload replaces the optimistic tap with the server's state.
+        XCTAssertNil(stretch(vm)?.today)
+        XCTAssertEqual(stretch(vm)?.done, 0)
+        XCTAssertTrue(vm.pending.isEmpty)
     }
 
     func testSuccessReloadsDetailSoHistoryIsFresh() async throws {
