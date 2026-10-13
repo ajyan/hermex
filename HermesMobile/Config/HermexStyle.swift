@@ -85,6 +85,8 @@ extension HermexPaper {
     static let tool = HermexPaper.plain
     /// Money: net worth, accounts, and the market card.
     static let money = HermexPaper.ledger
+    /// The in-app feedback inbox and its drawer row.
+    static let feedback = HermexPaper.notes
 
     static func forTool(_ kind: ToolCallSummaryFormatter.Kind) -> HermexPaper {
         switch kind {

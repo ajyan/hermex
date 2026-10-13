@@ -67,7 +67,8 @@ Named in `Config/HermexStyle.swift`; `HermexPaper.forTool(_:)` maps tool kinds.
 | Shell, code, delegation, everything else; chat source badges | `.tool` | `plain` |
 | Goal | the goal's own paper (`GoalPaper`) | any |
 | Money: net worth, accounts, the market card | `.money` | `ledger` |
-| Drawer sections: Daily Brief, Brain, Goals, Money | `opener`, `.knowledge`, `book`, `.money` | |
+| Feedback inbox | `.feedback` | `notes` |
+| Drawer sections: Daily Brief, Brain, People, Goals, Money, Feedback | `opener`, `.knowledge`, `BrainModuleID.people.paper`, `book`, `.money`, `.feedback` | |
 
 Add a new kind of object here and in the code together. A failed tool step keeps its color and adds an `hxDanger` mark; the color never turns red.
 

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Settings › Feedback: the active server's feedback, grouped for review. Entries waiting on
+/// Drawer › Feedback: the active server's feedback, grouped for review. Entries waiting on
 /// the user are request cards; tapping any entry opens it, where every decision lives.
 /// English-only copy (personal fork).
 struct FeedbackInboxView: View {
