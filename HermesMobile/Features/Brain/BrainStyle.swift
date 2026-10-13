@@ -197,6 +197,29 @@ extension View {
 }
 
 extension BrainModuleID {
+    /// The paper a page of this kind wears inside the Brain (DESIGN.md § The object key):
+    /// its source's Daily Brief paper. Chat citations stay `.knowledge`.
+    var paper: HermexPaper {
+        switch self {
+        case .wiki: .wiki
+        case .people: .advisor
+        case .journal: .past
+        case .articles: .reading
+        case .highlights: .book
+        }
+    }
+
+    /// One page of this kind, for card and row labels ("Wiki", "Person").
+    var kindName: String {
+        switch self {
+        case .wiki: "Wiki"
+        case .people: "Person"
+        case .journal: "Journal"
+        case .articles: "Article"
+        case .highlights: "Highlight"
+        }
+    }
+
     /// The SF Symbol for the module's icon tile.
     var symbolName: String {
         switch self {
@@ -211,9 +234,9 @@ extension BrainModuleID {
 
 // MARK: - Shared views
 
-/// A module's SF Symbol on a glow tile in its paper (the Brain's `.knowledge` for a
-/// module), or a neutral tile without one, for a row's leading slot. Decorative: the
-/// row's title names the module.
+/// A module's SF Symbol on a glow tile in its paper (each kind's `BrainModuleID.paper`),
+/// or a neutral tile without one, for a row's leading slot. Decorative: the row's title
+/// names the module.
 struct BrainModuleIcon: View {
     let symbolName: String
     let paper: HermexPaper?
@@ -221,7 +244,7 @@ struct BrainModuleIcon: View {
 
     init(module: BrainModuleID) {
         self.symbolName = module.symbolName
-        self.paper = .knowledge
+        self.paper = module.paper
     }
 
     init(systemName: String, paper: HermexPaper? = nil) {

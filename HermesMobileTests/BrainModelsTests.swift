@@ -79,7 +79,7 @@ final class BrainModelsTests: XCTestCase {
         XCTAssertEqual(list.nextCursor, 40)
     }
 
-    func testSearchAndGraphDecode() throws {
+    func testSearchDecode() throws {
         let search = #"{"groups": [{"module": "wiki", "total": 3, "items": [{"module": "wiki", "id": "w", "title": "T", "snippet": "S", "tags": ["stoicism"]}, {"module": "wiki", "id": "u", "title": "U"}]}, {"module": "goals", "total": 1, "items": []}]}"#
         let result = try JSONDecoder().decode(BrainSearchResult.self, from: Data(search.utf8))
         XCTAssertEqual(result.groups.count, 1)
@@ -88,13 +88,56 @@ final class BrainModelsTests: XCTestCase {
         XCTAssertEqual(result.groups[0].items[0].tags, ["stoicism"])
         XCTAssertEqual(result.groups[0].items[1].tags, [])
 
-        let graph = #"{"nodes": [{"module": "wiki", "id": "a", "title": "A", "weight": 2, "tags": ["llm"]}, {"module": "wiki", "id": "b"}], "edges": [{"a": "a", "b": "b"}]}"#
-        let decoded = try JSONDecoder().decode(BrainGraph.self, from: Data(graph.utf8))
-        XCTAssertEqual(decoded.nodes[0].weight, 2)
-        XCTAssertEqual(decoded.nodes[0].tags, ["llm"])
-        XCTAssertEqual(decoded.nodes[1].tags, [])
-        XCTAssertEqual(try JSONDecoder().decode(BrainGraph.self, from: JSONEncoder().encode(decoded)), decoded)
-        XCTAssertEqual(decoded.edges, [BrainGraphEdge(a: "a", b: "b")])
+    }
+
+    func testPageDecodesMentionsUnlinkedAndHub() throws {
+        let json = #"""
+        {"item": {"module": "wiki", "id": "wiki/anthropic.md", "title": "Anthropic"},
+         "links": [{"module": "wiki", "id": "wiki/openai.md", "label": "OpenAI", "snippet": "The lab behind GPT."}],
+         "backlinks": [{"module": "wiki", "id": "wiki/openai.md", "title": "OpenAI", "snippet": "and Anthropic define", "mention": "Anthropic"}],
+         "unlinked": [{"module": "journal", "id": "j.md", "title": "Oct 6", "snippet": "read about anthropic", "mention": "anthropic"},
+                      {"module": "goals", "id": "x"}],
+         "unlinked_count": 13,
+         "hub": {"ref": {"module": "wiki", "id": "wiki/career.md", "title": "Career"}, "index": 3, "count": 14,
+                 "prev": {"module": "wiki", "id": "wiki/a.md", "title": "A"}, "next": null}}
+        """#
+        let page = try JSONDecoder().decode(BrainPage.self, from: Data(json.utf8))
+        XCTAssertEqual(page.links[0].title, "OpenAI")
+        XCTAssertEqual(page.links[0].snippet, "The lab behind GPT.")
+        XCTAssertEqual(page.backlinks[0].mention, "Anthropic")
+        XCTAssertEqual(page.unlinked.map(\.id), ["j.md"], "an unknown module drops just that mention")
+        XCTAssertEqual(page.unlinkedCount, 13)
+        XCTAssertEqual(page.hub?.ref.id, "wiki/career.md")
+        XCTAssertEqual(page.hub?.index, 3)
+        XCTAssertEqual(page.hub?.count, 14)
+        XCTAssertEqual(page.hub?.prev?.id, "wiki/a.md")
+        XCTAssertNil(page.hub?.next)
+        XCTAssertEqual(try JSONDecoder().decode(BrainPage.self, from: JSONEncoder().encode(page)), page)
+    }
+
+    func testOlderPageWithoutConnectionsStillDecodes() throws {
+        let json = #"{"item": {"module": "wiki", "id": "w"}, "hub": {"ref": {"module": "goals", "id": "x"}}}"#
+        let page = try JSONDecoder().decode(BrainPage.self, from: Data(json.utf8))
+        XCTAssertEqual(page.unlinked, [])
+        XCTAssertEqual(page.unlinkedCount, 0)
+        XCTAssertNil(page.hub, "a hub that can't decode is dropped, not the page")
+        XCTAssertEqual(BrainRef(module: .wiki, id: "w").mention, "")
+    }
+
+    func testHomeDecodes() throws {
+        let json = #"""
+        {"hubs": [{"ref": {"module": "wiki", "id": "wiki/career.md", "title": "Career"}, "count": 14, "inside": ["Anthropic", "OpenAI"]},
+                  {"ref": {"module": "goals", "id": "x"}}],
+         "recent": [{"module": "wiki", "id": "wiki/a.md", "title": "A", "date": "2026-10-12"}],
+         "rediscover": [{"module": "wiki", "id": "wiki/old.md", "title": "Old"}]}
+        """#
+        let home = try JSONDecoder().decode(BrainHome.self, from: Data(json.utf8))
+        XCTAssertEqual(home.hubs.map(\.count), [14])
+        XCTAssertEqual(home.hubs[0].inside, ["Anthropic", "OpenAI"])
+        XCTAssertEqual(home.recent.map(\.id), ["wiki/a.md"])
+        XCTAssertEqual(home.rediscover.map(\.id), ["wiki/old.md"])
+        XCTAssertFalse(home.isEmpty)
+        XCTAssertTrue(try JSONDecoder().decode(BrainHome.self, from: Data("{}".utf8)).isEmpty)
     }
 
     func testBrainLinkParsesPercentEncodedID() throws {
@@ -113,10 +156,14 @@ final class BrainModelsTests: XCTestCase {
                        [URLQueryItem(name: "module", value: "wiki"), URLQueryItem(name: "tag", value: "a"), URLQueryItem(name: "cursor", value: "5")])
         XCTAssertEqual(Endpoint.brainSearch(query: "ada l", module: nil).queryItems,
                        [URLQueryItem(name: "q", value: "ada l")])
-        XCTAssertEqual(Endpoint.brainPage(module: "wiki", id: "x.md").queryItems,
+        XCTAssertEqual(Endpoint.brainPage(module: "wiki", id: "x.md", hub: nil).queryItems,
                        [URLQueryItem(name: "module", value: "wiki"), URLQueryItem(name: "id", value: "x.md")])
+        XCTAssertEqual(Endpoint.brainPage(module: "wiki", id: "x.md", hub: "wiki/hub.md").queryItems,
+                       [URLQueryItem(name: "module", value: "wiki"), URLQueryItem(name: "id", value: "x.md"),
+                        URLQueryItem(name: "hub", value: "wiki/hub.md")])
         XCTAssertEqual(Endpoint.brainModules.queryItems, [])
-        XCTAssertEqual(Endpoint.brainGraph(module: "wiki", id: "x").path, "/api/brain/graph")
+        XCTAssertEqual(Endpoint.brainHome.path, "/api/brain/home")
+        XCTAssertEqual(Endpoint.brainHome.queryItems, [])
     }
 
     func testSearchURLEncodesPlusAndSpace() throws {

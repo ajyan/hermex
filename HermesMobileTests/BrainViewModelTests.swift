@@ -139,16 +139,6 @@ final class BrainViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.isSearching)
     }
 
-    func testGraphFailureDoesNotFailPage() async {
-        let client = FakeBrainClient()
-        client.pageResult = .success(samplePage)
-        client.graphResult = .failure(URLError(.timedOut))
-        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
-        await viewModel.load()
-        XCTAssertEqual(viewModel.state, .loaded(samplePage))
-        XCTAssertNil(viewModel.graph)
-    }
-
     func testTagSelectionReloadsWithTag() async {
         let client = FakeBrainClient()
         let viewModel = BrainListViewModel(module: .wiki, client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
@@ -312,87 +302,78 @@ final class BrainViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.didFail)
     }
 
-    func testPagePublishesBeforeGraphArrives() async {
+    func testPagePassesItsHubToTheServer() async {
         let client = FakeBrainClient()
         client.pageResult = .success(samplePage)
-        let graph = BrainGraph(nodes: [BrainGraphNode(module: .wiki, id: "p1")])
-        client.graphResult = .success(graph)
-        let gate = Gate()
-        client.graphGate = gate
+        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", hub: "wiki/hub.md", client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
+        await viewModel.load()
+        XCTAssertEqual(client.pageCalls.map(\.hub), ["wiki/hub.md"])
+    }
+
+    func testSiblingLoadsTheNextPageInTheSameHub() async {
+        let client = FakeBrainClient()
+        client.pageResult = .success(samplePage)
         let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
-        let published = expectation(description: "page published")
-        withObservationTracking {
-            _ = viewModel.page
-        } onChange: {
-            // onChange fires before the write lands; hop so the assertions see it.
-            Task { @MainActor in published.fulfill() }
-        }
-        let task = Task { await viewModel.load() }
-        await fulfillment(of: [published], timeout: 10)
-        XCTAssertEqual(viewModel.state, .loaded(samplePage))
-        XCTAssertNil(viewModel.graph, "graph is still suspended")
-        gate.open()
-        await task.value
-        XCTAssertEqual(viewModel.graph, graph)
+        await viewModel.load()
+        let next = viewModel.sibling(module: .people, id: "p2", hub: "wiki/hub.md")
+        XCTAssertEqual(next.state, .loading)
+        await next.load()
+        XCTAssertEqual(client.pageCalls.map(\.id), ["p1", "p2"])
+        XCTAssertEqual(client.pageCalls.map(\.hub), [nil, "wiki/hub.md"])
+        XCTAssertEqual(next.module, .people)
+        XCTAssertEqual(next.state, .loaded(samplePage))
     }
 }
 
 extension BrainViewModelTests {
-    func testLoadGraphIfNeededRefetchesALostGraph() async {
-        let client = FakeBrainClient()
-        client.pageResult = .success(samplePage)
-        client.graphResult = .failure(CancellationError())
-        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
-        await viewModel.load()
-        XCTAssertNotNil(viewModel.page)
-        XCTAssertNil(viewModel.graph, "the graph was lost")
-        let graph = BrainGraph(nodes: [BrainGraphNode(module: .wiki, id: "p1"), BrainGraphNode(module: .wiki, id: "p2")])
-        client.graphResult = .success(graph)
-        await viewModel.loadGraphIfNeeded()
-        XCTAssertEqual(viewModel.graph, graph)
-        XCTAssertEqual(client.graphCalls, 2)
-        await viewModel.loadGraphIfNeeded()
-        XCTAssertEqual(client.graphCalls, 2, "a graph already shown is not fetched again")
+    private var sampleHome: BrainHome {
+        BrainHome(
+            hubs: [BrainHub(ref: BrainRef(module: .wiki, id: "wiki/hub.md", title: "Hub"), count: 3, inside: ["A", "B"])],
+            recent: [BrainItem(module: .wiki, id: "wiki/a.md", title: "A", date: "2026-10-12")],
+            rediscover: [BrainItem(module: .wiki, id: "wiki/old.md", title: "Old"),
+                         BrainItem(module: .wiki, id: "wiki/older.md", title: "Older")]
+        )
     }
 
-    func testLoadGraphIfNeededDoesNothingWithoutAPage() async {
+    func testHomeLoadsHubsRecentAndRediscoverWithTheModules() async {
         let client = FakeBrainClient()
-        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
-        await viewModel.loadGraphIfNeeded()
-        XCTAssertEqual(client.graphCalls, 0)
-        XCTAssertNil(viewModel.graph)
+        client.modulesResult = .success([BrainModule(id: .wiki, title: "Wiki", count: 2)])
+        client.homeResult = .success(sampleHome)
+        let viewModel = BrainHomeViewModel(client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
+        await viewModel.load()
+        XCTAssertEqual(viewModel.home, sampleHome)
+        XCTAssertEqual(viewModel.rediscoverPick?.id, "wiki/old.md")
+        viewModel.showAnotherPick()
+        XCTAssertEqual(viewModel.rediscoverPick?.id, "wiki/older.md")
+        viewModel.showAnotherPick()
+        XCTAssertEqual(viewModel.rediscoverPick?.id, "wiki/old.md", "Another wraps around today's picks")
     }
 
-    func testLoadGraphIfNeededFailureLeavesThePageAlone() async {
+    func testHomeWithoutTheHomeRouteStillShowsTheModules() async {
         let client = FakeBrainClient()
-        client.pageResult = .success(samplePage)
-        client.graphResult = .failure(URLError(.timedOut))
-        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
+        let modules = [BrainModule(id: .wiki, title: "Wiki", count: 2)]
+        client.modulesResult = .success(modules)
+        client.homeResult = .failure(URLError(.badServerResponse))
+        var reported = 0
+        let viewModel = BrainHomeViewModel(client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in reported += 1 })
         await viewModel.load()
-        await viewModel.loadGraphIfNeeded()
-        XCTAssertNil(viewModel.graph)
-        XCTAssertEqual(viewModel.state, .loaded(samplePage))
+        XCTAssertEqual(viewModel.state, .loaded(modules))
+        XCTAssertTrue(viewModel.home.isEmpty)
+        XCTAssertNil(viewModel.rediscoverPick)
+        XCTAssertEqual(reported, 0, "the home route is best effort and never reports an error")
     }
 
-    func testStaleGraphRefetchIsDroppedWhenALoadStarts() async {
+    func testFailedHomeRefreshKeepsWhatWasShown() async {
         let client = FakeBrainClient()
-        client.pageResult = .success(samplePage)
-        client.graphResult = .failure(URLError(.timedOut))
-        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
+        client.modulesResult = .success([BrainModule(id: .wiki, title: "Wiki", count: 2)])
+        client.homeResult = .success(sampleHome)
+        let viewModel = BrainHomeViewModel(client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
         await viewModel.load()
-        let stale = BrainGraph(nodes: [BrainGraphNode(module: .wiki, id: "stale")])
-        client.graphResult = .success(stale)
-        let gate = Gate()
-        client.graphGate = gate
-        let refetch = Task { await viewModel.loadGraphIfNeeded() }
-        await gate.waitEntered()
-        // A newer load starts (and its own graph fetch fails) while the refetch is suspended.
-        client.graphGate = nil
-        client.graphResult = .failure(URLError(.timedOut))
+        viewModel.showAnotherPick()
+        client.homeResult = .failure(URLError(.timedOut))
         await viewModel.load()
-        gate.open()
-        await refetch.value
-        XCTAssertNil(viewModel.graph, "the older refetch must not land after a newer load")
+        XCTAssertEqual(viewModel.home, sampleHome)
+        XCTAssertEqual(viewModel.rediscoverPick?.id, "wiki/older.md", "a failed refresh keeps the pick showing")
     }
 }
 
@@ -442,12 +423,11 @@ final class FakeBrainClient: BrainDataClient, @unchecked Sendable {
     private var _listCalls: [(tag: String?, cursor: Int?)] = []
     var modulesResult: Result<[BrainModule], Error> = .success([])
     var pageResult: Result<BrainPage, Error> = .failure(URLError(.badServerResponse))
-    var graphResult: Result<BrainGraph, Error> = .success(BrainGraph())
+    var homeResult: Result<BrainHome, Error> = .success(BrainHome())
+    private var _pageCalls: [(id: String, hub: String?)] = []
+    var pageCalls: [(id: String, hub: String?)] { lock.withLock { _pageCalls } }
     var listResults: [Result<BrainList, Error>] = []
     var failingSearches: Set<String> = []
-    var graphGate: Gate?
-    private var _graphCalls = 0
-    var graphCalls: Int { lock.withLock { _graphCalls } }
     var pagedListGate: Gate?
     var modulesGate: Gate?
     var firstListGate: Gate?
@@ -469,15 +449,14 @@ final class FakeBrainClient: BrainDataClient, @unchecked Sendable {
         if cursor == nil, let gate = firstListGate { await gate.pass() }
         return try (next ?? .success(BrainList())).get()
     }
-    func page(module: BrainModuleID, id: String) async throws -> BrainPage { try pageResult.get() }
+    func page(module: BrainModuleID, id: String, hub: String?) async throws -> BrainPage {
+        lock.withLock { _pageCalls.append((id, hub)) }
+        return try pageResult.get()
+    }
     func search(query: String, module: BrainModuleID?) async throws -> BrainSearchResult {
         lock.withLock { _searchQueries.append(query) }
         if failingSearches.contains(query) { throw URLError(.timedOut) }
         return BrainSearchResult()
     }
-    func graph(module: BrainModuleID, id: String) async throws -> BrainGraph {
-        lock.withLock { _graphCalls += 1 }
-        if let gate = graphGate { await gate.pass() }
-        return try graphResult.get()
-    }
+    func home() async throws -> BrainHome { try homeResult.get() }
 }
