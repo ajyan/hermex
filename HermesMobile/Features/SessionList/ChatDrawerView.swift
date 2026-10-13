@@ -141,9 +141,15 @@ struct ChatDrawerView<ServerMenu: View>: View {
         drawerRow("Daily Brief", systemImage: "sun.horizon", paper: .opener) { onOpen(.dailyDeck) }
         if sectionVisibility.brain {
             drawerRow("Brain", systemImage: "brain", paper: .knowledge) { onOpen(.brain) }
+            drawerRow("People", systemImage: BrainModuleID.people.symbolName, paper: BrainModuleID.people.paper) {
+                onOpen(.brainRoute(.module(.people)))
+            }
         }
         drawerRow("Goals", systemImage: "flag.checkered", paper: .book) { onOpen(.goals) }
         drawerRow("Money", systemImage: "chart.line.uptrend.xyaxis", paper: .money) { onOpen(.money) }
+        if sectionVisibility.feedback {
+            drawerRow("Feedback", systemImage: "message", paper: .feedback) { onOpen(.feedback) }
+        }
     }
 
     /// Floating bottom-right New Chat, where messaging apps put compose.
@@ -163,7 +169,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
         .padding(.bottom, 16)
     }
 
-    /// A section row. A section with its own paper (Brief, Brain, Goals) shows its icon in that
+    /// A section row. A section with its own paper (Brief, Brain, People, Goals, Money, Feedback) shows its icon in that
     /// paper's glow; the rest stay neutral so the colored ones stand out.
     private func drawerRow(
         _ title: String,

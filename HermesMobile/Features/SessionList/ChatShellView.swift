@@ -618,6 +618,12 @@ struct ChatShellView: View {
                 .id(slug)
         case .money:
             MoneyView(server: server)
+        case .feedback:
+            FeedbackInboxView(
+                client: feedbackAvailability.client,
+                labelQueue: feedbackAvailability.labelsAvailable
+                    ? feedbackAvailability.labels.map { LabelQueueViewModel(server: server, labelsClient: $0) }
+                    : nil)
         case .brainRoute(let route):
             // Keyed by route so a destination's view models can never carry over to another page.
             brainDestination(route).id(route)
@@ -793,7 +799,8 @@ struct ChatShellView: View {
             insights: showsInsightsSection,
             activeProfile: showsActiveProfileSection,
             projects: showsProjectsSection,
-            brain: true
+            brain: true,
+            feedback: feedbackAvailability.isAvailable
         )
     }
 

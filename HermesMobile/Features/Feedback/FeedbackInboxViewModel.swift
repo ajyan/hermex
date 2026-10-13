@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// Settings › Feedback: every entry on the active server, grouped for review. Live only,
+/// Drawer › Feedback: every entry on the active server, grouped for review. Live only,
 /// no cache. Decisions wait for the server and swap in the entry it returns.
 @MainActor
 @Observable
