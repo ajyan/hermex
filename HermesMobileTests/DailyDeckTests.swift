@@ -347,8 +347,9 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(deck.cards[3].meters[0].fraction, 1, "a meter never overfills")
 
         let theme = DeckCardText(deck.cards[1])
-        XCTAssertEqual(theme.lead, "Taper and rest")
-        XCTAssertEqual(theme.detail, "You slept more.", "a theme's summary, not its plain copy")
+        XCTAssertEqual(theme.lead, "You slept more.", "a theme leads with its takeaway")
+        XCTAssertEqual(theme.attribution, "Taper and rest", "named underneath")
+        XCTAssertNil(theme.detail, "the quotes replace the plain copy")
         XCTAssertNil(DeckCardText(deck.cards[2]).detail, "the chart replaces the plain copy")
         XCTAssertNil(DeckCardText(deck.cards[3]).detail, "the meters replace the plain copy")
         XCTAssertEqual(deck.cards.map { DeckPalette.of($0).name }, ["Today", "Theme", "Energy and mood", "Goals"])
