@@ -323,7 +323,7 @@ enum ChatInitialAppearancePolicy {
 
 /// A run keeps reader ownership even after an explicit latest/send re-arms follow.
 /// Only an owned successful completion can consume this one-shot permission.
-struct ChatCompletionScrollPolicy {
+struct ChatCompletionScrollPolicy: Equatable {
     /// Use the final visible row of the current turn, never an older reply or
     /// an interim bubble. Render identity remains stable through hydration.
     static func finalResponseRenderID(

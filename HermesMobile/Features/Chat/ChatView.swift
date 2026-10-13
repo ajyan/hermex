@@ -806,7 +806,11 @@ struct ChatView: View {
 
                     listenPlaybackBar
 
-                    messageContent
+                    // The transcript reads the streaming state (messages, live
+                    // tool calls, tokens per second) in its own scope, so a
+                    // streamed word redraws the transcript, not the composer,
+                    // toolbar, and the rest of this screen.
+                    ChatObservationScope { messageContent }
                         // Scope RTL to the chat transcript only (#259): the offline
                         // banner above stays in the app's default direction.
                         .environment(\.layoutDirection, chatLayoutDirection)
@@ -920,7 +924,6 @@ struct ChatView: View {
                 guard viewModel.runEndTrigger > 0 else { return }
                 handleRunEnd()
             }
-            .onChange(of: viewModel.streamingHapticPulseTrigger, handleStreamingHapticPulse)
     }
 
     /// Toolbar, navigation, and presentations over `chatLifecycle`.
@@ -1673,6 +1676,9 @@ struct ChatView: View {
         .onChange(of: viewModel.messages.isEmpty, initial: true) { _, isEmpty in
             if !isEmpty { endSessionOpenSignpost() }
         }
+        // Bumps several times a second while streaming, so it lives with the
+        // transcript's scope rather than invalidating the whole screen.
+        .onChange(of: viewModel.streamingHapticPulseTrigger, handleStreamingHapticPulse)
         .environment(\.composerChipCatalog, viewModel.composerChipCatalog)
         .transcriptLinks(perform: handleTranscriptLink)
         .interactiveAnswerAsk(perform: fillDraftFromInteractiveAnswer)
@@ -1864,7 +1870,8 @@ struct ChatView: View {
     }
 
     private func shouldRenderMessageRow(_ message: ChatMessage) -> Bool {
-        if message.content?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+        // Stops at the first visible character instead of copying the whole reply.
+        if message.content?.contains(where: { !$0.isWhitespace }) == true {
             return true
         }
 
@@ -3295,15 +3302,25 @@ struct ChatView: View {
         }
     }
 
+    /// Runs for every scroll frame, including each follow scroll while a reply
+    /// streams, so it writes state only when a value actually changes.
     private func handleFollowEvent(_ event: ChatScrollPolicy.FollowEvent) {
-        completionScrollPolicy.observe(event)
+        var policy = completionScrollPolicy
+        policy.observe(event)
+        if policy != completionScrollPolicy {
+            completionScrollPolicy = policy
+        }
+        let clearsCompletedResponse: Bool
         switch event {
         case .userScrollBegin, .reset:
-            completedResponseRenderID = nil
+            clearsCompletedResponse = true
         case .contentScrolled(_, let isUserScrolling, let movedAway, _):
-            if isUserScrolling || movedAway { completedResponseRenderID = nil }
+            clearsCompletedResponse = isUserScrolling || movedAway
         default:
-            break
+            clearsCompletedResponse = false
+        }
+        if clearsCompletedResponse, completedResponseRenderID != nil {
+            completedResponseRenderID = nil
         }
         let resolved = ChatScrollPolicy.resolveFollow(current: followLatch, event: event)
         if resolved != followLatch {
@@ -3346,7 +3363,9 @@ struct ChatView: View {
             isStreaming: isStreaming
         )
         let wasNearBottom = isScrolledNearBottom
-        isScrolledNearBottom = isNearBottom
+        if isNearBottom != wasNearBottom {
+            isScrolledNearBottom = isNearBottom
+        }
         handleFollowEvent(.contentScrolled(
             isAtBottom: ChatScrollPolicy.isAtBottom(distanceFromBottom: metrics.distanceFromBottom),
             isUserScrolling: metrics.isUserInteracting,
@@ -3643,5 +3662,16 @@ struct ChatNavigationBackground: ViewModifier {
             return AnyShapeStyle(.regularMaterial)
         }
         return AnyShapeStyle(Color.hxCanvas)
+    }
+}
+
+/// Builds `content` inside its own `body`, so the observable state that content
+/// reads invalidates only this subtree. The screen that creates the scope never
+/// reads that state itself and is not redrawn when it changes.
+struct ChatObservationScope<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
     }
 }
