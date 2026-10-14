@@ -367,6 +367,115 @@ extension BrainViewModelTests {
         await viewModel.load()
         XCTAssertEqual(viewModel.home, sampleHome)
     }
+
+    // MARK: Review position
+
+    private var reviewServer: URL { URL(string: "https://a.example")! }
+
+    private func makeReviewStore() -> BrainReviewStore {
+        BrainReviewStore(defaults: UserDefaults(suiteName: UUID().uuidString)!)
+    }
+
+    private func bites(_ count: Int) -> [BrainBite] {
+        (0..<count).map { BrainBite(id: "b\($0)", kind: .idea, text: "Idea \($0)", ref: BrainRef(module: .wiki, id: "wiki/\($0).md", title: "T\($0)")) }
+    }
+
+    private func makeReviewModel(client: FakeBrainClient, store: BrainReviewStore, today: String = "2026-10-14") -> BrainHomeViewModel {
+        BrainHomeViewModel(client: client, cache: BrainCacheHandle(server: reviewServer, context: nil), onAPIError: { _ in },
+                           reviewStore: store, today: { today })
+    }
+
+    func testReviewRestoresTodaysPosition() async {
+        let store = makeReviewStore()
+        store.save(BrainReviewPosition(day: "2026-10-14", batch: 1, index: 4), for: reviewServer)
+        let client = FakeBrainClient()
+        client.homeResult = .success(BrainHome(bites: bites(10), batch: 1, hasMore: true))
+        let viewModel = makeReviewModel(client: client, store: store)
+        await viewModel.load()
+        XCTAssertEqual(client.requestedBatches, [1])
+        XCTAssertEqual(viewModel.reviewIndex, 4)
+    }
+
+    func testReviewResetsOnANewDay() async {
+        let store = makeReviewStore()
+        store.save(BrainReviewPosition(day: "2026-10-13", batch: 1, index: 4), for: reviewServer)
+        let client = FakeBrainClient()
+        client.homeResult = .success(BrainHome(bites: bites(10), batch: 0, hasMore: true))
+        let viewModel = makeReviewModel(client: client, store: store)
+        await viewModel.load()
+        XCTAssertEqual(client.requestedBatches, [0])
+        XCTAssertEqual(viewModel.reviewIndex, 0)
+    }
+
+    func testReviewIndexClampsToAShorterBatch() async {
+        let store = makeReviewStore()
+        store.save(BrainReviewPosition(day: "2026-10-14", batch: 0, index: 9), for: reviewServer)
+        let client = FakeBrainClient()
+        client.homeResult = .success(BrainHome(bites: bites(3), batch: 0, hasMore: false))
+        let viewModel = makeReviewModel(client: client, store: store)
+        await viewModel.load()
+        XCTAssertEqual(viewModel.reviewPages.count, 4)
+        XCTAssertEqual(viewModel.reviewPages.last, .summary)
+        XCTAssertEqual(viewModel.reviewIndex, 3)
+    }
+
+    func testReviewPagesAreEmptyWithoutBites() async {
+        let viewModel = makeReviewModel(client: FakeBrainClient(), store: makeReviewStore())
+        await viewModel.load()
+        XCTAssertTrue(viewModel.reviewPages.isEmpty)
+        XCTAssertEqual(viewModel.reviewIndex, 0)
+    }
+
+    func testReviewIndexPersistsWhenSet() async {
+        let store = makeReviewStore()
+        let client = FakeBrainClient()
+        client.homeResult = .success(BrainHome(bites: bites(10), batch: 0, hasMore: true))
+        let viewModel = makeReviewModel(client: client, store: store)
+        await viewModel.load()
+        viewModel.reviewIndex = 6
+        XCTAssertEqual(store.position(for: reviewServer), BrainReviewPosition(day: "2026-10-14", batch: 0, index: 6))
+    }
+
+    func testDealMoreLoadsTheNextBatch() async {
+        let store = makeReviewStore()
+        let client = FakeBrainClient()
+        client.homeResult = .success(BrainHome(bites: bites(10), batch: 0, hasMore: true))
+        let viewModel = makeReviewModel(client: client, store: store)
+        await viewModel.load()
+        viewModel.reviewIndex = 10
+        await viewModel.dealMore()
+        XCTAssertEqual(client.requestedBatches.last, 1)
+        XCTAssertEqual(viewModel.reviewIndex, 0)
+        XCTAssertEqual(store.position(for: reviewServer), BrainReviewPosition(day: "2026-10-14", batch: 1, index: 0))
+    }
+
+    func testFailedDealMoreKeepsTheCurrentBatch() async {
+        let store = makeReviewStore()
+        let client = FakeBrainClient()
+        client.homeResult = .success(BrainHome(bites: bites(10), batch: 0, hasMore: true))
+        let viewModel = makeReviewModel(client: client, store: store)
+        await viewModel.load()
+        viewModel.reviewIndex = 10
+        client.homeResult = .failure(URLError(.timedOut))
+        await viewModel.dealMore()
+        XCTAssertEqual(viewModel.reviewIndex, 10)
+        XCTAssertEqual(viewModel.home.batch, 0)
+        XCTAssertEqual(store.position(for: reviewServer), BrainReviewPosition(day: "2026-10-14", batch: 0, index: 10))
+    }
+
+    func testReviewStoreIsPerServer() {
+        let store = makeReviewStore()
+        let a = URL(string: "https://a.example")!
+        let b = URL(string: "https://b.example")!
+        let position = BrainReviewPosition(day: "2026-10-14", batch: 1, index: 2)
+        store.save(position, for: a)
+        XCTAssertEqual(store.position(for: a), position)
+        XCTAssertNil(store.position(for: b))
+        store.save(position, for: b)
+        store.remove(for: a)
+        XCTAssertNil(store.position(for: a))
+        XCTAssertEqual(store.position(for: b), position)
+    }
 }
 
 final class Gate: @unchecked Sendable {
@@ -450,5 +559,10 @@ final class FakeBrainClient: BrainDataClient, @unchecked Sendable {
         if failingSearches.contains(query) { throw URLError(.timedOut) }
         return BrainSearchResult()
     }
-    func home(batch: Int) async throws -> BrainHome { try homeResult.get() }
+    private var _requestedBatches: [Int] = []
+    var requestedBatches: [Int] { lock.withLock { _requestedBatches } }
+    func home(batch: Int) async throws -> BrainHome {
+        lock.withLock { _requestedBatches.append(batch) }
+        return try homeResult.get()
+    }
 }

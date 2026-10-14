@@ -39,25 +39,65 @@ final class BrainHomeViewModel {
     private(set) var home = BrainHome()
     private(set) var isShowingCachedCopy = false
 
+    /// The deck's pages: the bites, then a summary once there are any.
+    var reviewPages: [BrainReviewPage] {
+        home.bites.isEmpty ? [] : home.bites.map(BrainReviewPage.bite) + [.summary]
+    }
+
+    /// The page the review pager shows. Setting it saves the position for this server and day.
+    var reviewIndex = 0 {
+        didSet {
+            guard reviewIndex != oldValue else { return }
+            persistPosition()
+        }
+    }
+
     private let client: any BrainDataClient
     private let cache: BrainCacheHandle
     private let onAPIError: (Error) -> Void
+    private let reviewStore: BrainReviewStore
+    private let today: () -> String
+    /// The batch `home` holds, which is what the saved position refers to.
+    private var currentBatch = 0
 
-    init(client: any BrainDataClient, cache: BrainCacheHandle, onAPIError: @escaping (Error) -> Void = { _ in }) {
+    init(client: any BrainDataClient, cache: BrainCacheHandle, onAPIError: @escaping (Error) -> Void = { _ in },
+         reviewStore: BrainReviewStore = BrainReviewStore(), today: @escaping () -> String = BrainReviewStore.today) {
         self.client = client
         self.cache = cache
         self.onAPIError = onAPIError
+        self.reviewStore = reviewStore
+        self.today = today
     }
 
-    /// Bumped by every `load()`, so an older failure never overwrites a newer success.
+    /// Bumped by every `load()` and `dealMore()`, so an older result never overwrites a newer one.
     private var generation = 0
+
+    /// Today's saved position, if the user already started today's deck.
+    private func savedToday() -> BrainReviewPosition? {
+        guard let saved = reviewStore.position(for: cache.server), saved.day == today() else { return nil }
+        return saved
+    }
+
+    private func persistPosition() {
+        reviewStore.save(BrainReviewPosition(day: today(), batch: currentBatch, index: reviewIndex), for: cache.server)
+    }
+
+    /// Shows `deck` as `batch`, landing on `index` or the nearest page that exists.
+    private func show(_ deck: BrainHome, batch: Int, index: Int) {
+        home = deck
+        currentBatch = batch
+        reviewIndex = min(max(index, 0), max(reviewPages.count - 1, 0))
+    }
 
     func load() async {
         generation += 1
         let token = generation
         if modules.isEmpty { state = .loading }
-        if home.isEmpty, let cached = cache.load(BrainHome.self, kind: "home", id: "") { home = cached }
-        async let fetchedHome: BrainHome? = try? client.home(batch: 0)
+        let batch = savedToday()?.batch ?? 0
+        if home.isEmpty, let cached = cache.load(BrainHome.self, kind: "home", id: String(batch)) {
+            show(cached, batch: batch, index: savedToday()?.index ?? 0)
+        }
+        async let fetchedHome: BrainHome? = try? client.home(batch: batch)
         do {
             let fetched = try await client.modules()
             guard !Task.isCancelled, token == generation else { return }
@@ -66,8 +106,9 @@ final class BrainHomeViewModel {
             isShowingCachedCopy = false
             cache.store(fetched, kind: "modules", id: "")
             if let loadedHome = await fetchedHome, !Task.isCancelled, token == generation {
-                home = loadedHome
-                cache.store(loadedHome, kind: "home", id: "")
+                // Read the position now, not before the fetch, so a swipe made while it ran wins.
+                show(loadedHome, batch: batch, index: savedToday()?.index ?? 0)
+                cache.store(loadedHome, kind: "home", id: String(batch))
             }
         } catch is CancellationError {
             // The screen went away; nothing to update.
@@ -84,6 +125,18 @@ final class BrainHomeViewModel {
             }
             onAPIError(error)
         }
+    }
+
+    /// "Deal me more": the next batch of ten, from the first page. A failed fetch keeps the
+    /// current batch and position.
+    func dealMore() async {
+        generation += 1
+        let token = generation
+        let batch = currentBatch + 1
+        guard let more = try? await client.home(batch: batch), !Task.isCancelled, token == generation else { return }
+        show(more, batch: batch, index: 0)
+        persistPosition()
+        cache.store(more, kind: "home", id: String(batch))
     }
 }
 
