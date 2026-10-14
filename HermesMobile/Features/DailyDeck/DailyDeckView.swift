@@ -7,6 +7,7 @@ import SwiftUI
 struct DailyDeckView: View {
     @State private var viewModel: DailyDeckViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
     @State private var isShowingCalendar = false
     @State private var feedbackCard: DeckCard?
     @AppStorage(DailyBriefReminder.enabledKey) private var notifies = false
@@ -91,6 +92,10 @@ struct DailyDeckView: View {
             .onChange(of: DailyBriefLaunch.shared.pending) { _, request in
                 guard request != nil, viewModel.workspace != nil, let review = DailyBriefLaunch.take() else { return }
                 Task { await viewModel.show(date: review.date, kind: review.kind) }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                // Left open overnight, the brief moves on to the new day's deck.
+                if phase == .active { Task { await viewModel.refreshDay() } }
             }
             .onChange(of: viewModel.state) {
                 // Opening today's brief is the answer the 09:00 reminder waits for.

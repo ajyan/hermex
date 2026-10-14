@@ -8,7 +8,19 @@ struct DailyDeck: Decodable, Equatable {
     let date: String
     let kind: String
     let advisor: String?
+    /// A card that fails to decode (no `id`, say) is dropped, never the deck.
     let cards: [DeckCard]
+
+    private enum CodingKeys: String, CodingKey { case version, date, kind, advisor, cards }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        version = try? c.decodeIfPresent(Int.self, forKey: .version)
+        date = try c.decode(String.self, forKey: .date)
+        kind = try c.decode(String.self, forKey: .kind)
+        advisor = try? c.decodeIfPresent(String.self, forKey: .advisor)
+        cards = try c.decode([Lossy<DeckCard>].self, forKey: .cards).compactMap(\.value)
+    }
 
     static func decode(_ content: String) throws -> DailyDeck {
         let decoder = JSONDecoder()
@@ -97,13 +109,13 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         voice = try? c.decodeIfPresent(String.self, forKey: .voice)
         why = try? c.decodeIfPresent(String.self, forKey: .why)
         draft = try? c.decodeIfPresent(DeckDraft.self, forKey: .draft)
-        actions = (try? c.decodeIfPresent([DeckAction].self, forKey: .actions)) ?? []
+        actions = ((try? c.decodeIfPresent([Lossy<DeckAction>].self, forKey: .actions)) ?? []).compactMap(\.value)
         fallback = try? c.decodeIfPresent(String.self, forKey: .fallback)
         reason = try? c.decodeIfPresent(String.self, forKey: .reason)
         recap = (try? c.decodeIfPresent(String.self, forKey: .recap))
             .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
         altQuestions = (try? c.decodeIfPresent([String].self, forKey: .altQuestions)) ?? []
-        entries = ((try? c.decodeIfPresent([LossyEntry].self, forKey: .entries)) ?? []).compactMap(\.value)
+        entries = ((try? c.decodeIfPresent([Lossy<DeckEntry>].self, forKey: .entries)) ?? []).compactMap(\.value)
         scale = (try? c.decodeIfPresent([String].self, forKey: .scale)) ?? []
         sleep = try? c.decodeIfPresent(DeckSleep.self, forKey: .sleep)
     }
@@ -157,10 +169,10 @@ struct DeckEntry: Decodable, Equatable, Hashable {
     private enum CodingKeys: String, CodingKey { case label, text }
 }
 
-/// Decodes one entry, or nothing when it is malformed, so a bad item never costs the list.
-private struct LossyEntry: Decodable {
-    let value: DeckEntry?
-    init(from decoder: Decoder) throws { value = try? DeckEntry(from: decoder) }
+/// Decodes one list item, or nothing when it is malformed, so a bad item never costs the list.
+private struct Lossy<Value: Decodable>: Decodable {
+    let value: Value?
+    init(from decoder: Decoder) throws { value = try? Value(from: decoder) }
 }
 
 struct DeckDraft: Decodable, Equatable {
@@ -232,6 +244,18 @@ struct DeckFeedback: Codable, Equatable {
         ("repeat", "Seen it too often"),
         ("length", "Too long")
     ]
+}
+
+extension DeckFeedback {
+    private enum CodingKeys: String, CodingKey { case verdict, reasons, note }
+
+    /// `reasons` and `note` may be missing; an unknown verdict fails only this answer.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        verdict = try c.decode(Verdict.self, forKey: .verdict)
+        reasons = (try? c.decodeIfPresent([String].self, forKey: .reasons)) ?? []
+        note = try? c.decodeIfPresent(String.self, forKey: .note)
+    }
 }
 
 /// What one swipe shows: a single card, or every follow-up together so they can be
@@ -312,13 +336,13 @@ struct DeckAnswersPayload: Encodable, Equatable, Sendable {
 
 /// The answers file the agent saved when a deck was filed: the same shape the app sends.
 enum DeckAnswersFile {
-    private struct Body: Decodable { let answers: [DeckAnswer]? }
+    private struct Body: Decodable { let answers: [Lossy<DeckAnswer>]? }
 
-    /// Card id → answer; empty when the file is unreadable.
+    /// Card id → answer; empty when the file is unreadable. A malformed answer is dropped alone.
     static func decodeAnswers(_ content: String) -> [String: DeckAnswer] {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        let answers = (try? decoder.decode(Body.self, from: Data(content.utf8)))?.answers ?? []
+        let answers = ((try? decoder.decode(Body.self, from: Data(content.utf8)))?.answers ?? []).compactMap(\.value)
         return Dictionary(answers.map { ($0.card, $0) }, uniquingKeysWith: { _, last in last })
     }
 }
