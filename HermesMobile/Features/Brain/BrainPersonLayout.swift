@@ -26,7 +26,7 @@ struct BrainPersonLayout: Equatable {
     let longItems: [String]
     /// Open questions, then a birthday line when the next birthday is within 30 days.
     let nextTime: [String]
-    /// Encounters and journal days, newest first; on one date, encounters before journal.
+    /// Encounters and journal days, newest first; on one date, encounters before journal. Ids are unique.
     let timeline: [Entry]
     /// Journal ids already shown in the timeline, to drop from "Mentioned in" and "Unlinked".
     let hiddenMentionIDs: Set<String>
@@ -39,6 +39,13 @@ struct BrainPersonLayout: Equatable {
         let journal = person.journal.filter { !$0.id.isEmpty }
         timeline = Self.timeline(encounters: person.encounters.filter { !$0.id.isEmpty }, journal: journal, days: days)
         hiddenMentionIDs = Set(journal.map(\.id))
+    }
+
+    /// A mention section's refs without the journal days the timeline already shows, and its
+    /// total less the refs dropped here.
+    func remainingMentions(_ refs: [BrainRef], total: Int) -> (refs: [BrainRef], total: Int) {
+        let shown = refs.filter { !hiddenMentionIDs.contains($0.id) }
+        return (shown, max(shown.count, total - (refs.count - shown.count)))
     }
 
     /// "today", "yesterday", "N days ago" (under 14), weeks (under 60 days), months (under 730), then years.
@@ -125,9 +132,12 @@ struct BrainPersonLayout: Equatable {
         let rows: [(sortDate: String, order: Int, entry: Entry)] =
             encounters.enumerated().map { ($1.date.isoDay ?? "", $0, encounterEntry($1, days: days)) }
             + journal.enumerated().map { ($1.date.isoDay ?? "", encounters.count + $0, journalEntry($1)) }
+        // A repeated id would collide in the timeline's `ForEach`; the first in timeline order wins.
+        var seen: Set<String> = []
         return rows
             .sorted { $0.sortDate == $1.sortDate ? $0.order < $1.order : $0.sortDate > $1.sortDate }
             .map(\.entry)
+            .filter { seen.insert($0.id).inserted }
     }
 
     private static func encounterEntry(_ encounter: BrainEncounter, days: DayMath) -> Entry {

@@ -56,6 +56,29 @@ final class BrainPersonLayoutTests: XCTestCase {
         XCTAssertTrue(layout.hiddenMentionIDs.isEmpty)
     }
 
+    func testDuplicateIDsKeepTheFirstInTimelineOrder() {
+        let person = BrainPerson(
+            encounters: [BrainEncounter(id: "dup", date: "2026-09-01", title: "Older"),
+                         BrainEncounter(id: "dup", date: "2026-10-01", title: "Newer")],
+            journal: [BrainJournalMention(id: "j", date: "2026-08-01", snippet: "First"),
+                      BrainJournalMention(id: "j", date: "2026-08-01", snippet: "Second")])
+        let layout = layout(person)
+        XCTAssertEqual(layout.timeline.map(\.id), ["dup", "journal:j"])
+        XCTAssertEqual(layout.timeline.map(\.headline), ["Newer", "First"])
+    }
+
+    func testRemainingMentionsDropTimelineJournalDays() {
+        let shownDay = "journal/2026/09-September/2026-09-25.md"
+        let layout = layout(BrainPerson(journal: [BrainJournalMention(id: shownDay, date: "2026-09-25", snippet: "Dinner")]))
+        let refs = [BrainRef(module: .journal, id: shownDay, title: "Thursday 25 September"),
+                    BrainRef(module: .wiki, id: "wiki/orbit.md", title: "Orbit Labs")]
+        let remaining = layout.remainingMentions(refs, total: 13)
+        XCTAssertEqual(remaining.refs.map(\.id), ["wiki/orbit.md"])
+        XCTAssertEqual(remaining.total, 12)
+        XCTAssertEqual(layout.remainingMentions([refs[0]], total: 1).total, 0)
+        XCTAssertEqual(layout.remainingMentions([refs[1]], total: 1).refs.map(\.id), ["wiki/orbit.md"])
+    }
+
     func testHeadlineAndFold() {
         let titled = BrainEncounter(id: "t", date: "2026-10-08", title: "Coffee",
                                     bullets: ["- one", "* two", "three", "four"])

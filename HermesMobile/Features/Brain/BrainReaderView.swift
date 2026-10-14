@@ -191,7 +191,9 @@ struct BrainReaderView: View {
 
 /// A loaded page, top to bottom: the cover (only without links), the trail, title block
 /// (or person card), tags, the linked-page cards, body, linked and unlinked mentions,
-/// Further reading, and journal paging.
+/// Further reading, and journal paging. A person page the server structured (`page.person`)
+/// adds Next time and the profile chips under its header, and reads as its timeline, then
+/// the leftover Markdown, with the timeline's journal days left out of the mentions.
 struct BrainReaderContent: View {
     let page: BrainPage
     let isShowingCachedCopy: Bool
@@ -207,6 +209,12 @@ struct BrainReaderContent: View {
     private let digest: BrainArticleDigest?
     /// Built once per page: the linked-page cards.
     private let linkCards: [BrainRef]
+    /// Built once per page: a structured person page's header, chips and timeline.
+    private let personLayout: BrainPersonLayout?
+    /// The mention sections, less the journal days a person's timeline already shows.
+    private let backlinks: [BrainRef]
+    private let unlinkedRefs: [BrainRef]
+    private let unlinkedTotal: Int
     @State private var showsAllBacklinks = false
 
     init(page: BrainPage, isShowingCachedCopy: Bool, isMissing: Bool = false,
@@ -220,6 +228,14 @@ struct BrainReaderContent: View {
         self.cover = BrainReaderLayout.cover(for: page.item)
         self.digest = BrainReaderLayout.digest(for: page)
         self.linkCards = BrainConnectionsLayout.linkCards(page)
+        let personLayout = page.person.map { BrainPersonLayout(page: page, person: $0, today: Date()) }
+        self.personLayout = personLayout
+        self.backlinks = personLayout?.remainingMentions(page.backlinks, total: page.backlinks.count).refs
+            ?? page.backlinks
+        let unlinked = personLayout?.remainingMentions(page.unlinked, total: page.unlinkedCount)
+            ?? (refs: page.unlinked, total: page.unlinkedCount)
+        self.unlinkedRefs = unlinked.refs
+        self.unlinkedTotal = unlinked.total
     }
 
     var body: some View {
@@ -235,7 +251,9 @@ struct BrainReaderContent: View {
                     if let hub = page.hub {
                         BrainTrail(hub: hub.ref)
                     }
-                    if page.item.module == .people {
+                    if let personLayout {
+                        BrainPersonCardView(item: page.item, facts: [], subtitle: personLayout.subtitle)
+                    } else if page.item.module == .people {
                         BrainPersonCardView(item: page.item, facts: page.facts)
                     } else {
                         titleBlock
@@ -243,6 +261,18 @@ struct BrainReaderContent: View {
                     if !BrainReaderLayout.displayTags(page.item.tags).isEmpty {
                         tagRow
                     }
+                }
+                if let personLayout, !personLayout.nextTime.isEmpty || !personLayout.chips.isEmpty
+                    || !personLayout.longItems.isEmpty {
+                    VStack(alignment: .leading, spacing: BrainStyle.l) {
+                        if !personLayout.nextTime.isEmpty {
+                            BrainNextTimeCard(lines: personLayout.nextTime)
+                        }
+                        if !personLayout.chips.isEmpty || !personLayout.longItems.isEmpty {
+                            BrainProfileChips(chips: personLayout.chips, longItems: personLayout.longItems)
+                        }
+                    }
+                    .environment(\.openURL, brainLinks)
                 }
                 if !linkCards.isEmpty {
                     BrainLinkCardsRow(refs: linkCards)
@@ -283,7 +313,16 @@ struct BrainReaderContent: View {
 
     @ViewBuilder
     private var bodyAndMentions: some View {
-        if !page.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if let personLayout, let person = page.person {
+            if !personLayout.timeline.isEmpty {
+                BrainPersonTimeline(entries: personLayout.timeline)
+                    .environment(\.openURL, brainLinks)
+            }
+            if !person.other.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                MarkdownRenderer(content: person.other)
+                    .environment(\.openURL, brainLinks)
+            }
+        } else if !page.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             Group {
                 if let digest {
                     BrainArticleDigestView(digest: digest)
@@ -291,20 +330,26 @@ struct BrainReaderContent: View {
                     MarkdownRenderer(content: page.content)
                 }
             }
-            .environment(\.openURL, OpenURLAction { url in
-                switch BrainReaderLayout.linkAction(for: url) {
-                case .push(let route):
-                    push(route)
-                    return .handled
-                case .discard:
-                    return .discarded
-                case .system:
-                    return .systemAction
-                }
-            })
+            .environment(\.openURL, brainLinks)
         }
         linkedFrom
         unlinked
+    }
+
+    /// Opens a page's `brain://` links in the reader, drops ones the app can't resolve, and
+    /// hands any other URL to the system.
+    private var brainLinks: OpenURLAction {
+        OpenURLAction { url in
+            switch BrainReaderLayout.linkAction(for: url) {
+            case .push(let route):
+                push(route)
+                return .handled
+            case .discard:
+                return .discarded
+            case .system:
+                return .systemAction
+            }
+        }
     }
 
     private var titleBlock: some View {
@@ -334,7 +379,6 @@ struct BrainReaderContent: View {
     /// Pages that link here, each with the words around its link.
     @ViewBuilder
     private var linkedFrom: some View {
-        let backlinks = page.backlinks
         if !backlinks.isEmpty {
             BrainMentionSection(
                 title: BrainReaderLayout.linkedFromTitle(page.item.module),
@@ -351,13 +395,13 @@ struct BrainReaderContent: View {
     /// Pages that name this one without linking to it (the server sends the first few).
     @ViewBuilder
     private var unlinked: some View {
-        if !page.unlinked.isEmpty {
+        if !unlinkedRefs.isEmpty {
             BrainMentionSection(
                 title: "Unlinked mentions",
-                count: page.unlinkedCount,
-                refs: page.unlinked,
+                count: unlinkedTotal,
+                refs: unlinkedRefs,
                 paper: page.item.module.paper,
-                footer: BrainConnectionsLayout.cappedFooter(shown: page.unlinked.count, total: page.unlinkedCount)
+                footer: BrainConnectionsLayout.cappedFooter(shown: unlinkedRefs.count, total: unlinkedTotal)
             )
         }
     }
