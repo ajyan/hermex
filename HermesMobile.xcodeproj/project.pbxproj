@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C7E5A1000000000000000001 /* IncomingURLRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7E5A1000000000000000011 /* IncomingURLRoute.swift */; };
+		C7E5A1000000000000000002 /* IncomingURLRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7E5A1000000000000000012 /* IncomingURLRouteTests.swift */; };
 		C0FFEE500000000000000003 /* MoneyModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE500000000000000002 /* MoneyModels.swift */; };
 		C0FFEE500000000000000005 /* MoneyViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE500000000000000004 /* MoneyViewModel.swift */; };
 		C0FFEE500000000000000007 /* MoneyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE500000000000000006 /* MoneyView.swift */; };
@@ -773,6 +775,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		C7E5A1000000000000000011 /* IncomingURLRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomingURLRoute.swift; sourceTree = "<group>"; };
+		C7E5A1000000000000000012 /* IncomingURLRouteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomingURLRouteTests.swift; sourceTree = "<group>"; };
 		C0FFEE500000000000000002 /* MoneyModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyModels.swift; sourceTree = "<group>"; };
 		C0FFEE500000000000000004 /* MoneyViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyViewModel.swift; sourceTree = "<group>"; };
 		C0FFEE500000000000000006 /* MoneyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyView.swift; sourceTree = "<group>"; };
@@ -1678,6 +1682,7 @@
 				A1C0FFEE0000000000000F02 /* VoiceCallAudioLevelsTests.swift */,
 				CC7685CE580C850A7254B14E /* VoiceCallChatSnapshotTests.swift */,
 				A01C6B585C5AD096D1B24540 /* VoiceCallDeepLinkTests.swift */,
+				C7E5A1000000000000000012 /* IncomingURLRouteTests.swift */,
 				D86FF2CBCD33B4B3E7DC44EF /* VoiceDisplayStripTests.swift */,
 				F71E01C788925F5B2DC4820E /* VoiceSelectionTests.swift */,
 				9094EEA2D39453D516E10424 /* VoiceCallControllerTests.swift */,
@@ -2397,6 +2402,7 @@
 			children = (
 				A04500000000000000000010 /* AgentRunActivityAttributes.swift */,
 				A04500000000000000000011 /* HermesDeepLink.swift */,
+				C7E5A1000000000000000011 /* IncomingURLRoute.swift */,
 				A04500000000000000000093 /* AtlasWidgetSnapshots.swift */,
 				A04500000000000000000012 /* AgentLiveActivityManager.swift */,
 			);
@@ -2912,6 +2918,7 @@
 				1FAEC70E0BFD4CA7AAAFC9B4 /* BotChatSettings.swift in Sources */,
 				1887ACCCA7594CEA88195FCD /* BotGroupRoom.swift in Sources */,
 				3C0CCE7773554B87B7E32D74 /* BotDeepLink.swift in Sources */,
+				C7E5A1000000000000000001 /* IncomingURLRoute.swift in Sources */,
 				4890A0000000000000000001 /* BotLiveActivityFeed.swift in Sources */,
 				FB790728981341218BFA1099 /* BotRoomReader.swift in Sources */,
 				7E6FEEC60114433F96B49C58 /* BotRoomCreator.swift in Sources */,
@@ -3284,6 +3291,7 @@
 				A1C0FFEE0000000000000B02 /* VoiceCallAudioLevelsTests.swift in Sources */,
 				BF7E56FE3F4B476686A0DCEF /* VoiceCallChatSnapshotTests.swift in Sources */,
 				847725A1C758CAFAB6320F5B /* VoiceCallDeepLinkTests.swift in Sources */,
+				C7E5A1000000000000000002 /* IncomingURLRouteTests.swift in Sources */,
 				983F200737186F6607CDB775 /* VoiceDisplayStripTests.swift in Sources */,
 				9458AB4DE05FB68351DA797B /* VoiceSelectionTests.swift in Sources */,
 				0E056C2716F8F8E35B29DD90 /* VoiceCallControllerTests.swift in Sources */,

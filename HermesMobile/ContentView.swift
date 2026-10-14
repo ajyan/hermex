@@ -136,67 +136,38 @@ struct ContentView: View {
     private func handleOpenURL(_ url: URL) {
         Task { await AgentLiveActivityManager.shared.dismissFinishedActivity(from: url) }
         pendingWebuiPush = nil
-        if let destination = WebuiPushDestination(url: url) {
+        switch IncomingURLRoute(url) {
+        case .webuiPush(let destination):
             pendingBotDestination = nil
             pendingDeepLinkedSessionID = nil
             pendingNewChatRequest = nil
             routeWebuiPush(destination)
-            return
-        }
-
         // A fresh request each time (new `id`) so a repeat invocation re-triggers navigation
         // even if the previous one's value still lingers downstream. The voice variant carries
         // `autoStartsVoiceInput` so the composer begins dictation once it appears (#338).
-        if HermesDeepLink.isNewChatVoiceURL(url) {
+        case .newChatVoice:
             if reachWebuiServer() { pendingNewChatRequest = NewChatRequest(autoStartsVoiceInput: true) }
-            return
-        }
-
-        if HermesDeepLink.isDailyBriefURL(url) {
-            if let deck = HermesDeepLink.dailyBriefDeck(from: url) { DailyBriefLaunch.request(date: deck.date, kind: deck.kind) }
+        case .dailyBrief(let date, let kind):
+            if let date, let kind { DailyBriefLaunch.request(date: date, kind: kind) }
             if reachWebuiServer() { pendingDailyBrief = true }
-            return
-        }
-
-        if HermesDeepLink.isNewCallURL(url) {
+        case .newCall:
             if reachWebuiServer() { pendingNewChatRequest = NewChatRequest(startsCall: true) }
-            return
-        }
-
-        // The profile variant carries the chosen profile name, so the composer creates the
-        // session pinned to it (#339). A malformed link with no profile falls back to a
-        // plain new chat (server's active profile) rather than failing.
-        if HermesDeepLink.isNewChatInProfileURL(url) {
-            if reachWebuiServer() {
-                pendingNewChatRequest = NewChatRequest(
-                    profileName: HermesDeepLink.profileName(fromNewChatInProfile: url)
-                )
-            }
-            return
-        }
-
-        if HermesDeepLink.isNewChatURL(url) {
+        // The profile variant pins the new session to the chosen profile (#339).
+        case .newChatInProfile(let profileName):
+            if reachWebuiServer() { pendingNewChatRequest = NewChatRequest(profileName: profileName) }
+        case .newChat:
             if reachWebuiServer() { pendingNewChatRequest = NewChatRequest(autoStartsVoiceInput: false) }
-            return
-        }
-
         // A bot link carries its own server, Bot connection and Profile, so it may
         // have to switch servers or wait for sign-in before it can open (#554).
-        if let destination = HermesDeepLink.botDestination(from: url) {
+        case .bot(let destination):
             routeBot(destination)
-            return
-        }
-
-        if let sessionID = HermesDeepLink.sessionID(from: url) {
+        case .session(let sessionID):
             if reachWebuiServer() { pendingDeepLinkedSessionID = sessionID }
-            return
+        case .shareOpen:
+            importPendingSharedDraftIfAvailable()
+        case .ignore:
+            break
         }
-
-        guard HermesShareDraft.isShareOpenURL(url) else {
-            return
-        }
-
-        importPendingSharedDraftIfAvailable()
     }
 
     private func routeWebuiPush(_ destination: WebuiPushDestination) {

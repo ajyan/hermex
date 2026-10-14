@@ -154,7 +154,7 @@ final class DailyDeckTests: XCTestCase {
     }
 
     @MainActor
-    func testMissingFolderOrDeckIsNoDeckAndAnAnswersFileIsFiled() async {
+    func testMissingFolderOrDeckIsNoDeck() async {
         store.setWorkspace("/vault", for: server)
 
         let noFolder = ScriptedDailyDeckClient(workspaces: [], names: nil, deck: Self.deckJSON)
@@ -166,7 +166,6 @@ final class DailyDeckTests: XCTestCase {
         let second = makeViewModel(otherDay)
         await second.load()
         XCTAssertEqual(second.state, .noDeck)
-
     }
 
     @MainActor
