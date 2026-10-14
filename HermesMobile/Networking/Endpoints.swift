@@ -167,6 +167,7 @@ enum Endpoint {
     /// A test out (`run: "testout"` with its unit) or a mock run (`run: "mock"`) of `/api/tutor/today`.
     case tutorRun(run: String, unit: String?)
     case tutorCourse
+    case tutorOverride
     case tutorLesson(id: String)
     case tutorMap(track: String)
     case tutorItem(id: String)
@@ -468,6 +469,8 @@ enum Endpoint {
             return "/api/tutor/today"
         case .tutorCourse:
             return "/api/tutor/course"
+        case .tutorOverride:
+            return "/api/tutor/override"
         case .tutorLesson:
             return "/api/tutor/lesson"
         case .tutorMap:

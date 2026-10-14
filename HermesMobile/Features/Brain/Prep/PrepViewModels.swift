@@ -141,6 +141,45 @@ struct PrepDaySummary: Equatable {
     var nextUp: String?
     /// The run's rep count, for the done screen's full ring.
     var repCount = 0
+    /// Lessons that became interview-ready during the run, and the course totals after it.
+    var readyGained: [String] = []
+    var readyCount = 0
+    var lessonTotal = 0
+    var milestones: [PrepMilestone] = []
+    /// The run started after a missed day: the end screen says welcome back, never "streak lost".
+    var welcomeBack = false
+}
+
+/// A moment the end screen celebrates once.
+enum PrepMilestone: Equatable, Sendable {
+    case bossPassed(String)
+    case ready(Int)
+    case streak(Int)
+
+    static let readyMarks = [10, 25]
+    static let streakMarks = [7, 30]
+
+    /// What changed between home before and after a run: newly passed units, ready counts crossing 10,
+    /// 25 or the whole course, and streaks crossing 7 or 30.
+    static func detect(before: PrepHome?, after: PrepHome?) -> [PrepMilestone] {
+        guard let after else { return [] }
+        var out: [PrepMilestone] = []
+        let passedBefore = Set((before?.course?.units ?? []).filter { $0.state == .passed }.map(\.id))
+        for unit in after.course?.units ?? [] where unit.state == .passed && !passedBefore.contains(unit.id) {
+            out.append(.bossPassed(unit.title))
+        }
+        let readyBefore = before?.course?.readyCount ?? 0
+        let readyAfter = after.course?.readyCount ?? 0
+        let total = after.course?.lessonTotal ?? 0
+        for mark in readyMarks + (total > 0 ? [total] : []) where readyBefore < mark && readyAfter >= mark {
+            out.append(.ready(mark))
+        }
+        let streakBefore = before?.streak.days ?? 0
+        for mark in streakMarks where streakBefore < mark && after.streak.days >= mark {
+            out.append(.streak(mark))
+        }
+        return out
+    }
 }
 
 /// One track's skill map.
@@ -203,6 +242,12 @@ final class PrepRunViewModel {
     private(set) var revealedLesson = false
     /// The XP the answer on screen earned, for the tick beside the result; nil when it earned none.
     private(set) var lastXP: Int?
+    /// A lesson rep starts on its teaching, then "I'm ready" hides it and asks for recall.
+    enum LessonStage: Equatable { case reading, recalling }
+    private(set) var lessonStage: LessonStage = .reading
+    /// The recall answer being dictated or typed, and how sure the user is.
+    var recallDraft = ""
+    var confidence: PrepConfidence?
     let runKind: PrepRunKind
     /// The unit a test out quizzes.
     let unit: String?
@@ -214,6 +259,8 @@ final class PrepRunViewModel {
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var isAdvancing = false
     @ObservationIgnored private var xpBefore: Int?
+    @ObservationIgnored private var homeBefore: PrepHome?
+    @ObservationIgnored private var readyBefore: Set<String>?
     @ObservationIgnored private var tally = PrepDaySummary()
 
     @ObservationIgnored private let onAPIError: (Error) -> Void
@@ -277,9 +324,47 @@ final class PrepRunViewModel {
         await submit(.choice(trimmed))
     }
 
-    /// A review rep: a learned lesson's check, asked again on its spaced-repetition day.
+    /// A review rep: a learned lesson asked again on its spaced-repetition day.
     func isReview(_ rep: PrepRep) -> Bool {
-        rep.drill == .lesson && rep.block == "review"
+        rep.drill == .recall || (rep.drill == .lesson && rep.block == "review")
+    }
+
+    /// "I'm ready": hide the lesson and ask for it from memory.
+    func beginRecall() {
+        guard case let .rep(rep, _) = phase, rep.item.lesson?.hasRecall == true else { return }
+        lessonStage = .recalling
+    }
+
+    var canSubmitRecall: Bool {
+        !recallDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && confidence != nil && !isSubmitting
+    }
+
+    /// Sends the dictated or typed recall with the confidence picked before grading.
+    func submitRecall() async {
+        guard canSubmitRecall, let confidence else { return }
+        await submit(.choice(PrepCopy.cappedApproach(recallDraft.trimmingCharacters(in: .whitespacesAndNewlines))),
+                     confidence: confidence)
+    }
+
+    /// "I don't know, show me": a recall with no answer, graded as a miss without the model.
+    func dontKnow() async {
+        await submit(.choice(""), confidence: .guess, dontKnow: true)
+    }
+
+    /// "I had that": count one missed key point as hit, keeping the rest of the result.
+    func overridePoint(_ point: String) async {
+        guard case let .result(rep, result, index) = phase, let attempt = result.attemptID else { return }
+        let token = generation
+        do {
+            let updated = try await client.override(attempt: attempt, point: point)
+            guard token == generation, case .result = phase else { return }
+            phase = .result(rep, PrepAttemptResult(merging: result, override: updated), index: index)
+            if let xp = updated.xp { lastXP = xp }
+        } catch {
+            guard token == generation, !prepIsCancellation(error) else { return }
+            onAPIError(error)
+            submitError = "Couldn't save that. Try again."
+        }
     }
 
     func showIdea() {
@@ -294,6 +379,7 @@ final class PrepRunViewModel {
     /// The XP an answer earned, mirroring the server's rules: 10 for a new lesson and 5 more when its
     /// check is right, 5 for a right review, 50 for the answer that passes a boss sitting.
     static func xp(for rep: PrepRep, result: PrepAttemptResult) -> Int? {
+        if let xp = result.xp { return xp > 0 ? xp : nil }
         switch rep.drill {
         case .lesson where rep.block == "review":
             return result.verdict == "pass" ? 5 : nil
@@ -384,16 +470,27 @@ final class PrepRunViewModel {
     /// any other run. Both are non-fatal.
     private func snapshot(_ run: PrepRun, token: Int) async {
         if Self.isCourse(run, kind: runKind) {
-            let xp = try? await client.home().course?.xp
-            if token == generation { xpBefore = xp }
+            let home = try? await client.home()
+            let ready = try? await client.course()
+            if token == generation {
+                homeBefore = home
+                xpBefore = home?.course?.xp
+                readyBefore = ready.map(Self.readyLessons)
+                tally.welcomeBack = PrepCopy.isWelcomeBack(lastDay: home?.streak.lastDay, today: now())
+            }
         } else {
             let map = try? await client.map(track: Self.track(of: run))
             if token == generation { mapBefore = map }
         }
     }
 
+    /// Lesson ids marked ready on the path.
+    static func readyLessons(_ course: PrepCourse) -> Set<String> {
+        Set(course.units.flatMap(\.lessons).filter { $0.state == .ready }.map(\.id))
+    }
+
     private func count(_ rep: PrepRep, _ result: PrepAttemptResult) {
-        guard rep.drill == .lesson, !result.isUngraded else { return }
+        guard rep.drill == .lesson || rep.drill == .recall, !result.isUngraded else { return }
         if isReview(rep) {
             tally.reviews += 1
         } else {
@@ -404,6 +501,9 @@ final class PrepRunViewModel {
 
     private func show(_ rep: PrepRep) {
         revealedLesson = false
+        lessonStage = rep.drill == .recall ? .recalling : .reading
+        recallDraft = ""
+        confidence = nil
         lastXP = nil
         hintsShown = 0
         submitError = nil
@@ -412,7 +512,7 @@ final class PrepRunViewModel {
         phase = .rep(rep, index: rep.index)
     }
 
-    private func submit(_ answer: PrepAnswer) async {
+    private func submit(_ answer: PrepAnswer, confidence: PrepConfidence? = nil, dontKnow: Bool = false) async {
         guard !isSubmitting, case let .rep(rep, _) = phase, let run else { return }
         let token = generation
         isSubmitting = true
@@ -421,7 +521,7 @@ final class PrepRunViewModel {
         let request = PrepAttemptRequest(
             date: run.date, index: rep.index, item: rep.item.id, drill: rep.drill,
             answer: answer, elapsedMS: elapsed, hintsUsed: hintsShown,
-            run: runKind, unit: runKind == .testout ? unit : nil)
+            run: runKind, unit: runKind == .testout ? unit : nil, confidence: confidence, dontKnow: dontKnow)
         do {
             let result = try await client.attempt(request)
             guard token == generation, !Task.isCancelled else {
@@ -478,6 +578,7 @@ final class PrepRunViewModel {
     private func finish(token: Int) async {
         if let run, Self.isCourse(run, kind: runKind) {
             let home = try? await client.home()
+            let course = try? await client.course()
             guard token == generation, !Task.isCancelled else { return }
             var summary = tally
             summary.isCourse = true
@@ -485,6 +586,14 @@ final class PrepRunViewModel {
             summary.streak = lastStreak ?? home?.streak ?? PrepStreak()
             if let before = xpBefore, let after = home?.course?.xp { summary.xpGained = max(0, after - before) }
             summary.nextUp = PrepCopy.nextUp(home?.course)
+            summary.readyCount = home?.course?.readyCount ?? 0
+            summary.lessonTotal = home?.course?.lessonTotal ?? 0
+            if let before = readyBefore, let course {
+                let titles = Dictionary(course.units.flatMap(\.lessons).map { ($0.id, $0.title) },
+                                        uniquingKeysWith: { first, _ in first })
+                summary.readyGained = Self.readyLessons(course).subtracting(before).sorted().compactMap { titles[$0] }
+            }
+            summary.milestones = PrepMilestone.detect(before: homeBefore, after: home)
             phase = .finished(summary)
             return
         }
@@ -552,6 +661,53 @@ enum PrepCopy {
     }
 
     static func starsLabel(_ stars: Int) -> String { "\(stars) of 3 stars" }
+    static func confidenceLabel(_ c: PrepConfidence) -> String {
+        switch c {
+        case .guess: "Guess"
+        case .fairly: "Fairly sure"
+        case .certain: "Certain"
+        }
+    }
+
+    static func lessonStateWord(_ state: PrepLessonState) -> String {
+        switch state {
+        case .ready: "interview-ready"
+        case .shaky: "back in reviews"
+        case .learned: "learned"
+        case .next: "next"
+        case .locked, .unknown: "locked"
+        }
+    }
+
+    static func readyLine(ready: Int, total: Int) -> String { "\(ready) of \(total) ready" }
+
+    static func keyPointsLine(hit: Int, total: Int) -> String { "\(hit) of \(total) key points" }
+
+    static func calibrationLine(_ c: PrepCalibration) -> String {
+        let percent = c.certainTotal > 0 ? Int((Double(c.certainRight) / Double(c.certainTotal) * 100).rounded()) : 0
+        return "When you say certain, you're right \(percent)% of the time"
+    }
+
+    static func milestoneTitle(_ m: PrepMilestone) -> String {
+        switch m {
+        case .bossPassed(let unit): "\(unit) passed"
+        case .ready(let n): "\(n) topics interview-ready"
+        case .streak(let n): "\(n)-day streak"
+        }
+    }
+
+    /// The last active day was before yesterday: greet, don't scold.
+    static func isWelcomeBack(lastDay: String?, today: Date) -> Bool {
+        guard let lastDay else { return false }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let yesterday = calendar.date(byAdding: .day, value: -1, to: today) else { return false }
+        return lastDay < formatter.string(from: yesterday)
+    }
+
     static func xpLabel(_ xp: Int) -> String { "+\(xp) XP" }
     static func xpSpoken(_ xp: Int) -> String { "Plus \(xp) XP" }
     static func percent(_ score: Double) -> String { "\(Int((score * 100).rounded()))%" }

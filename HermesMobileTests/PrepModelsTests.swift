@@ -427,4 +427,69 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertEqual(result.why, "Tags add tokens")
         XCTAssertNil(try decode(PrepAttemptResult.self, #"{"verdict": "pass"}"#).why)
     }
+
+    // MARK: - Recall
+
+    func testRecallRepDecodesPromptAndDrills() throws {
+        let json = #"""
+        {"date": "d", "run": "bonus", "index": 0, "reps": [
+          {"index": 0, "block": "warmup", "drill": "warmup", "item": {"id": "u1.l1", "idea_md": "I", "check": {"prompt": "Q?", "options": ["A", "B"]}}},
+          {"index": 1, "block": "new", "drill": "lesson", "item": {"id": "u1.l2", "idea_md": "I", "recall": {"prompt": "Explain tiers."}}},
+          {"index": 2, "block": "review", "drill": "recall", "item": {"id": "u1.l3", "idea_md": "I", "recall": {"prompt": "Explain caching."}}}]}
+        """#
+        let run = try decode(PrepRun.self, json)
+        XCTAssertEqual(run.run, .bonus)
+        XCTAssertEqual(run.reps.map(\.drill), [.warmup, .lesson, .recall])
+        XCTAssertNil(run.reps[0].item.lesson?.recall)
+        XCTAssertEqual(run.reps[1].item.lesson?.recall?.prompt, "Explain tiers.")
+        XCTAssertTrue(run.reps[2].item.lesson?.hasRecall == true)
+    }
+
+    func testRecallResultDecodesSurpriseXPAndAttempt() throws {
+        let json = #"""
+        {"verdict": "partial", "next_index": 1, "attempt": "a-1", "surprise": true, "xp": 10, "overridden": ["p.x"],
+         "grade": {"points_hit": [{"point_id": "p.a", "quote": ""}], "points_missed": [{"point_id": "p.b", "why": ""}], "strong_answer": "S"},
+         "points": [{"id": "p.a", "text": "A"}, {"id": "p.b", "text": "B"}]}
+        """#
+        let result = try decode(PrepAttemptResult.self, json)
+        XCTAssertEqual(result.attemptID, "a-1")
+        XCTAssertTrue(result.surprise)
+        XCTAssertEqual(result.xp, 10)
+        XCTAssertEqual(result.overridden, ["p.x"])
+        XCTAssertEqual(result.judgment?.pointsMissed.map(\.pointID), ["p.b"])
+        XCTAssertFalse(try decode(PrepAttemptResult.self, #"{"verdict": "pass"}"#).surprise)
+    }
+
+    func testRecallRequestEncodesConfidenceAndDontKnow() throws {
+        let request = PrepAttemptRequest(date: "d", index: 0, item: "u1.l1", drill: .recall, answer: .choice(""),
+                                         elapsedMS: 1, hintsUsed: 0, confidence: .certain, dontKnow: true)
+        let json = try XCTUnwrap(String(data: JSONEncoder().encode(request), encoding: .utf8))
+        XCTAssertTrue(json.contains(#""confidence":"certain""#))
+        XCTAssertTrue(json.contains(#""dont_know":true"#))
+        let plain = PrepAttemptRequest(date: "d", index: 0, item: "u1.l1", drill: .warmup, answer: .choice("A"),
+                                       elapsedMS: 1, hintsUsed: 0)
+        let plainJSON = try XCTUnwrap(String(data: JSONEncoder().encode(plain), encoding: .utf8))
+        XCTAssertFalse(plainJSON.contains("confidence"))
+        XCTAssertFalse(plainJSON.contains("dont_know"))
+    }
+
+    func testCourseDecodesReadinessAndCalibration() throws {
+        let json = #"""
+        {"xp": 40, "ready_count": 3, "lesson_total": 48, "calibration": {"certain_right": 4, "certain_total": 5},
+         "units": [{"id": "u1", "title": "F", "state": "current", "ready_count": 3,
+                    "lessons": [{"id": "u1.l1", "state": "ready"}, {"id": "u1.l2", "state": "shaky"}]}]}
+        """#
+        let course = try decode(PrepCourse.self, json)
+        XCTAssertEqual(course.readyCount, 3)
+        XCTAssertEqual(course.lessonTotal, 48)
+        XCTAssertEqual(course.calibration, PrepCalibration(certainRight: 4, certainTotal: 5))
+        XCTAssertEqual(course.units[0].readyCount, 3)
+        XCTAssertEqual(course.units[0].lessons.map(\.state), [.ready, .shaky])
+        XCTAssertNil(try decode(PrepCourse.self, #"{"units": []}"#).calibration)
+    }
+
+    func testStreakDecodesLastDay() throws {
+        XCTAssertEqual(try decode(PrepStreak.self, #"{"days": 2, "freezes": 0, "last_day": "2026-10-20"}"#).lastDay, "2026-10-20")
+        XCTAssertNil(try decode(PrepStreak.self, #"{"days": 0}"#).lastDay)
+    }
 }

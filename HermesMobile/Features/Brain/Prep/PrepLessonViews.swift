@@ -263,31 +263,46 @@ struct PrepBossResultView: View {
 /// The end of a course run: the day's ring, XP, streak, what was learned, and what comes next.
 struct PrepDayCompleteView: View {
     let summary: PrepDaySummary
+    var offersBonus = true
     let done: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var closed = false
+    @ScaledMetric(relativeTo: .largeTitle) private var ring: CGFloat = 132
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: BrainStyle.xl) {
-                VStack(spacing: BrainStyle.s) {
-                    PrepDayRing(done: summary.repCount, total: summary.repCount, side: 96)
-                    if summary.xpGained > 0 {
-                        Text(verbatim: PrepCopy.xpLabel(summary.xpGained))
-                            .font(AppFont.display(style: .title2))
-                            .foregroundStyle(Color.hxTextPrimary)
-                            .accessibilityLabel(Text(verbatim: PrepCopy.xpSpoken(summary.xpGained)))
-                    }
-                    Label {
-                        Text(verbatim: PrepCopy.streakTitle(days: summary.streak.days))
-                    } icon: {
-                        Image(systemName: "flame").foregroundStyle(prepRewardGold)
-                    }
-                    .font(BrainStyle.rowSubtitle)
-                    .foregroundStyle(Color.hxTextSecondary)
+                if summary.welcomeBack {
+                    Text(verbatim: "Welcome back. Picking up right where you left off.")
+                        .font(BrainStyle.rowTitle)
+                        .foregroundStyle(Color.hxTextSecondary)
                 }
-                .frame(maxWidth: .infinity)
+                hero
+                ForEach(Array(summary.milestones.enumerated()), id: \.offset) { _, milestone in
+                    Label {
+                        Text(verbatim: PrepCopy.milestoneTitle(milestone))
+                            .font(AppFont.display(style: .headline))
+                            .foregroundStyle(Color.hxTextPrimary)
+                    } icon: {
+                        Image(systemName: Self.symbol(milestone)).foregroundStyle(prepRewardGold)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
+                    .padding(.horizontal, BrainStyle.cardHorizontalPadding)
+                    .hxCard()
+                }
+                Label {
+                    Text(verbatim: PrepCopy.streakTitle(days: summary.streak.days))
+                } icon: {
+                    Image(systemName: "flame").foregroundStyle(prepRewardGold)
+                }
+                .font(BrainStyle.rowTitle)
+                .foregroundStyle(Color.hxTextPrimary)
+                .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
+                .padding(.horizontal, BrainStyle.cardHorizontalPadding)
+                .hxCard()
                 if !summary.learned.isEmpty || summary.reviews > 0 {
                     VStack(alignment: .leading, spacing: BrainStyle.s) {
-                        BrainSectionHeader(title: "Learned today")
+                        BrainSectionHeader(title: "Today")
                         SectionCard {
                             VStack(spacing: 0) {
                                 ForEach(Array(summary.learned.enumerated()), id: \.offset) { offset, title in
@@ -295,7 +310,7 @@ struct PrepDayCompleteView: View {
                                     Label {
                                         Text(verbatim: title).font(BrainStyle.rowTitle).foregroundStyle(Color.hxTextPrimary)
                                     } icon: {
-                                        Image(systemName: "checkmark").foregroundStyle(HermexPaper.knowledge.glow)
+                                        Image(systemName: "book").foregroundStyle(HermexPaper.knowledge.glow)
                                     }
                                     .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
                                 }
@@ -313,10 +328,82 @@ struct PrepDayCompleteView: View {
                         SectionCard { BrainRow(title: next) }
                     }
                 }
-                PrepPrimaryButton(title: "Done", action: done)
+                VStack(spacing: BrainStyle.s) {
+                    PrepPrimaryButton(title: "Done", action: done)
+                    if offersBonus {
+                        NavigationLink(value: ShellPushDestination.brainRoute(.prep(.bonus))) {
+                            Text(verbatim: "One more round")
+                                .font(AppFont.body(weight: .semibold))
+                                .foregroundStyle(Color.accentColor)
+                                .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint(Text(verbatim: "Up to five more recalls"))
+                    }
+                }
             }
             .padding(BrainStyle.l)
             .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
+        }
+        .sensoryFeedback(.success, trigger: closed)
+        .onAppear {
+            if reduceMotion {
+                closed = true
+            } else {
+                withAnimation(.easeOut(duration: 0.7)) { closed = true }
+            }
+        }
+    }
+
+    /// The day's ring closing once, the ready count inside, and what became interview-ready.
+    private var hero: some View {
+        PrepRunCard {
+            VStack(spacing: BrainStyle.s) {
+                ZStack {
+                    Circle().stroke(HermexPaper.knowledge.wash, lineWidth: ring * 0.09)
+                    Circle()
+                        .trim(from: 0, to: closed ? 1 : 0)
+                        .stroke(HermexPaper.knowledge.glow, style: StrokeStyle(lineWidth: ring * 0.09, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    VStack(spacing: 0) {
+                        Text(verbatim: "\(summary.readyCount)")
+                            .font(AppFont.display(style: .largeTitle))
+                            .foregroundStyle(Color.hxTextPrimary)
+                            .contentTransition(.numericText())
+                        Text(verbatim: "ready")
+                            .font(BrainStyle.meta)
+                            .foregroundStyle(HermexPaper.knowledge.glow)
+                    }
+                }
+                .frame(width: ring, height: ring)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text(verbatim: PrepCopy.readyLine(ready: summary.readyCount, total: summary.lessonTotal)))
+                Text(verbatim: summary.readyGained.isEmpty ? "Day complete"
+                     : "+\(summary.readyGained.count) interview-ready")
+                    .font(AppFont.display(style: .title2))
+                    .foregroundStyle(HermexPaper.knowledge.glow)
+                if !summary.readyGained.isEmpty {
+                    Text(verbatim: summary.readyGained.joined(separator: " · "))
+                        .font(BrainStyle.rowSubtitle)
+                        .foregroundStyle(Color.hxTextPrimary)
+                        .multilineTextAlignment(.center)
+                }
+                if summary.xpGained > 0 {
+                    Text(verbatim: PrepCopy.xpLabel(summary.xpGained))
+                        .font(BrainStyle.meta)
+                        .foregroundStyle(Color.hxTextSecondary)
+                        .accessibilityLabel(Text(verbatim: PrepCopy.xpSpoken(summary.xpGained)))
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private static func symbol(_ m: PrepMilestone) -> String {
+        switch m {
+        case .bossPassed: "crown"
+        case .ready: "star"
+        case .streak: "flame"
         }
     }
 }

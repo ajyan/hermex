@@ -49,6 +49,7 @@ enum PrepRunKind: String, Codable, Hashable, Sendable {
     case daily
     case testout
     case mock
+    case bonus
     case unknown
 
     init(from decoder: Decoder) throws {
@@ -96,7 +97,7 @@ enum PrepBossState: String, Decodable, Hashable, Sendable {
 }
 
 enum PrepLessonState: String, Decodable, Hashable, Sendable {
-    case learned, next, locked, unknown
+    case learned, ready, shaky, next, locked, unknown
 
     init(from decoder: Decoder) throws {
         let raw = try? decoder.singleValueContainer().decode(String.self)
@@ -138,11 +139,14 @@ struct PrepUnit: Decodable, Identifiable, Hashable, Sendable {
     let boss: PrepBossState
     let mock: Bool
     let lessons: [PrepLessonNode]
+    /// Lessons in this unit that are interview-ready.
+    let readyCount: Int
 
     private enum CodingKeys: String, CodingKey {
         case id, title, module, stage, state, stars, boss, mock, lessons
         case lessonsDone = "lessons_done"
         case lessonsTotal = "lessons_total"
+        case readyCount = "ready_count"
     }
 
     init(from decoder: Decoder) throws {
@@ -159,23 +163,52 @@ struct PrepUnit: Decodable, Identifiable, Hashable, Sendable {
         boss = c.optional(PrepBossState.self, .boss) ?? .unknown
         mock = c.bool(.mock)
         lessons = c.lossy(PrepLessonNode.self, .lessons)
+        readyCount = c.int(.readyCount)
     }
 }
 
 /// The course path: `course` on home (units without lessons) and `GET /api/tutor/course`.
+/// How often an answer marked "certain" was right over the last 30 days.
+struct PrepCalibration: Decodable, Hashable, Sendable {
+    let certainRight: Int
+    let certainTotal: Int
+
+    init(certainRight: Int, certainTotal: Int) {
+        self.certainRight = certainRight
+        self.certainTotal = certainTotal
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case certainRight = "certain_right"
+        case certainTotal = "certain_total"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        certainRight = c.int(.certainRight)
+        certainTotal = c.int(.certainTotal)
+    }
+}
+
 struct PrepCourse: Decodable, Hashable, Sendable {
     let units: [PrepUnit]
     let xp: Int
     let today: PrepDayCount
     let reteach: [String]
     let needsRewrite: [String]
+    /// Interview-ready lessons across the course, and how many lessons it has.
+    let readyCount: Int
+    let lessonTotal: Int
+    let calibration: PrepCalibration?
 
     /// The unit whose lessons are being taught now.
     var currentUnit: PrepUnit? { units.first { $0.state == .current } }
 
     private enum CodingKeys: String, CodingKey {
-        case units, xp, today, reteach
+        case units, xp, today, reteach, calibration
         case needsRewrite = "needs_rewrite"
+        case readyCount = "ready_count"
+        case lessonTotal = "lesson_total"
     }
 
     init(from decoder: Decoder) throws {
@@ -185,6 +218,9 @@ struct PrepCourse: Decodable, Hashable, Sendable {
         today = c.optional(PrepDayCount.self, .today) ?? PrepDayCount()
         reteach = (try? c.decodeIfPresent([String].self, forKey: .reteach)) ?? []
         needsRewrite = (try? c.decodeIfPresent([String].self, forKey: .needsRewrite)) ?? []
+        readyCount = c.int(.readyCount)
+        lessonTotal = c.int(.lessonTotal)
+        calibration = c.optional(PrepCalibration.self, .calibration).flatMap { $0.certainTotal > 0 ? $0 : nil }
     }
 }
 
@@ -247,6 +283,24 @@ struct PrepSource: Decodable, Hashable, Sendable {
     }
 }
 
+/// How sure the user is before a recall is graded.
+enum PrepConfidence: String, Codable, Hashable, Sendable, CaseIterable {
+    case guess, fairly, certain
+}
+
+/// A lesson's recall: the prompt the user answers from memory. Key points arrive with the graded result.
+struct PrepRecall: Decodable, Hashable, Sendable {
+    let prompt: String
+
+    private enum CodingKeys: String, CodingKey { case prompt }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        prompt = c.string(.prompt)
+        guard !prompt.isEmpty else { throw PrepCourseMissingID() }
+    }
+}
+
 /// A lesson: the idea, how you'd say it, and one check. Decodes from a lesson rep's item and from
 /// `GET /api/tutor/lesson`.
 struct PrepLesson: Decodable, Identifiable, Hashable, Sendable {
@@ -259,12 +313,16 @@ struct PrepLesson: Decodable, Identifiable, Hashable, Sendable {
     let sources: [PrepSource]
     let origin: String
     let reteachOf: String?
+    /// The recall prompt; nil for older lessons that only have a multiple-choice check.
+    let recall: PrepRecall?
+
+    var hasRecall: Bool { recall != nil }
 
     /// A coach-written "another way to see it" lesson; only these can be flagged.
     var isReteach: Bool { reteachOf != nil }
 
     private enum CodingKeys: String, CodingKey {
-        case id, unit, title, check, sources, origin
+        case id, unit, title, check, sources, origin, recall
         case ideaMD = "idea_md"
         case sayItMD = "say_it_md"
         case reteachOf = "reteach_of"
@@ -282,6 +340,7 @@ struct PrepLesson: Decodable, Identifiable, Hashable, Sendable {
         sources = c.lossy(PrepSource.self, .sources)
         origin = c.text(.origin) ?? "course"
         reteachOf = c.text(.reteachOf)
+        recall = c.optional(PrepRecall.self, .recall)
     }
 }
 

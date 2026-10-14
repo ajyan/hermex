@@ -13,6 +13,8 @@ protocol PrepDataClient: Sendable {
     func flag(item: String) async throws
     func course() async throws -> PrepCourse
     func lesson(id: String) async throws -> PrepLesson
+    /// "I had that": count one missed key point of a graded recall as hit.
+    func override(attempt: String, point: String) async throws -> PrepAttemptResult
 }
 
 extension PrepDataClient {
@@ -65,6 +67,12 @@ struct APIClientPrepAdapter: PrepDataClient {
         try await get(.tutorLesson(id: id))
     }
 
+    func override(attempt: String, point: String) async throws -> PrepAttemptResult {
+        let data = try await apiClient.sendData(endpoint: .tutorOverride, method: "POST",
+                                                body: PrepOverrideRequest(attempt: attempt, point: point))
+        return try decode(data)
+    }
+
     private func get<Value: Decodable>(_ endpoint: Endpoint) async throws -> Value {
         try decode(try await apiClient.sendData(endpoint: endpoint, method: "GET"))
     }
@@ -76,4 +84,9 @@ struct APIClientPrepAdapter: PrepDataClient {
             throw APIError.decoding(underlying: error)
         }
     }
+}
+
+struct PrepOverrideRequest: Encodable, Hashable, Sendable {
+    let attempt: String
+    let point: String
 }
