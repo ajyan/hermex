@@ -8,6 +8,12 @@ enum BrainReaderLayout {
     /// The cover's height, on a page with no links to show instead.
     static let headerHeight: CGFloat = 180
 
+    /// Whether the decorative cover tops the page: only when there are no link cards to show
+    /// instead, and never on a person page, whose header and Catch up card should sit at the top.
+    static func showsCover(for page: BrainPage, hasLinkCards: Bool) -> Bool {
+        !hasLinkCards && page.person == nil
+    }
+
     /// "<Kind> · <date>", the kind's first letter capitalised and the date in the one
     /// Brain format; either part may be absent.
     static func metaLine(kind: String, date: String, locale: Locale = .current) -> String {
@@ -268,7 +274,7 @@ struct BrainReaderContent: View {
         ScrollView {
             VStack(alignment: .leading, spacing: BrainStyle.xl) {
                 VStack(alignment: .leading, spacing: BrainStyle.l) {
-                    if linkCards.isEmpty {
+                    if BrainReaderLayout.showsCover(for: page, hasLinkCards: !linkCards.isEmpty) {
                         BrainCoverView(spec: cover)
                             .frame(height: BrainReaderLayout.headerHeight)
                             .frame(maxWidth: .infinity)
