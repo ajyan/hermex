@@ -637,7 +637,8 @@ struct PrepApproachGradeView: View {
                         ForEach(Array(grade.skillsMissed.enumerated()), id: \.offset) { offset, miss in
                             if offset > 0 { PrepRowDivider() }
                             BrainRow(title: PrepCopy.rubricTitle(miss.skill),
-                                     subtitle: miss.why.isEmpty ? nil : miss.why, subtitleLineLimit: 8)
+                                     subtitle: miss.why.isEmpty ? nil : miss.why, subtitleLineLimit: 8,
+                                     titleLineLimit: nil)
                         }
                     }
                 }
@@ -700,7 +701,8 @@ struct PrepJudgmentGradeView: View {
                         ForEach(Array(grade.pointsMissed.enumerated()), id: \.offset) { offset, miss in
                             if offset > 0 { PrepRowDivider() }
                             BrainRow(title: point(miss.pointID),
-                                     subtitle: miss.why.isEmpty ? nil : miss.why, subtitleLineLimit: 8)
+                                     subtitle: miss.why.isEmpty ? nil : miss.why, subtitleLineLimit: 8,
+                                     titleLineLimit: nil)
                                 .accessibilityElement(children: .ignore)
                                 .accessibilityLabel(Text(verbatim: "Missed: \(point(miss.pointID)). \(miss.why)"))
                         }
