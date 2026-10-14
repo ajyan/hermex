@@ -9,13 +9,48 @@ private final class FakeListener: SpeechListening {
     var startCount = 0
     var stopCount = 0
     var startError: Error?
+    /// True from a finished start until the next stop: the mic is live.
+    private(set) var isRunning = false
+    /// Starts that finished on a running listener. The real one installs a second
+    /// tap on the input bus, which crashes.
+    private(set) var overlappingStarts = 0
+    /// When set, each start waits for `releaseStarts()`, like a permission prompt or speech download.
+    var holdsStart = false
+    private var pendingStarts: [CheckedContinuation<Void, Never>] = []
+    /// Yields each time a held start begins waiting.
+    let startHeld: AsyncStream<Void>
+    private let startHeldContinuation: AsyncStream<Void>.Continuation
+
+    init() {
+        (startHeld, startHeldContinuation) = AsyncStream<Void>.makeStream()
+    }
 
     func start() async throws {
         startCount += 1
+        if holdsStart {
+            await withCheckedContinuation {
+                pendingStarts.append($0)
+                startHeldContinuation.yield()
+            }
+        }
         if let startError { throw startError }
+        if isRunning { overlappingStarts += 1 }
+        isRunning = true
     }
 
-    func stop() { stopCount += 1 }
+    /// Lets every held start finish, and later starts run straight through, so a start the
+    /// controller wrongly queues behind a held one fails its test rather than hanging it.
+    func releaseStarts() {
+        holdsStart = false
+        let starts = pendingStarts
+        pendingStarts = []
+        starts.forEach { $0.resume() }
+    }
+
+    func stop() {
+        stopCount += 1
+        isRunning = false
+    }
 
     var endTurnCount = 0
     func endTurn() { endTurnCount += 1 }
@@ -716,6 +751,102 @@ final class VoiceCallControllerTests: XCTestCase {
         await starting.value
         XCTAssertEqual(listener.startCount, 0)
         XCTAssertEqual(controller.startError, .callDidNotConnect)
+    }
+
+    func testEndWhileTheListenerIsStartingLeavesTheMicOff() async {
+        listener.holdsStart = true
+        var held = listener.startHeld.makeAsyncIterator()
+        let starting = Task { await controller.start() }
+        await held.next()
+        XCTAssertEqual(controller.state, .connecting)
+
+        controller.end()
+        listener.releaseStarts()
+        await starting.value
+        XCTAssertEqual(controller.state, .ended(nil))
+        XCTAssertFalse(listener.isRunning)
+    }
+
+    func testSystemEndWhileTheListenerIsStartingLeavesTheMicOff() async {
+        listener.holdsStart = true
+        var held = listener.startHeld.makeAsyncIterator()
+        let starting = Task { await controller.start() }
+        await held.next()
+
+        bridge.onEnded?()
+        listener.releaseStarts()
+        await starting.value
+        XCTAssertEqual(controller.state, .ended(nil))
+        XCTAssertFalse(listener.isRunning)
+    }
+
+    func testPermissionPromptDoesNotCountTowardTheConnectTimeout() async {
+        listener.holdsStart = true
+        var held = listener.startHeld.makeAsyncIterator()
+        let starting = Task { await controller.start() }
+        await held.next()
+
+        // The system call connected; the user is still reading the mic prompt.
+        clock += 30
+        controller.tick()
+        XCTAssertEqual(controller.state, .connecting)
+        XCTAssertNil(controller.startError)
+
+        listener.releaseStarts()
+        await starting.value
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertTrue(listener.isRunning)
+    }
+
+    func testMuteWhileTheListenerIsStartingStopsItWhenItStarts() async {
+        listener.holdsStart = true
+        var held = listener.startHeld.makeAsyncIterator()
+        let starting = Task { await controller.start() }
+        await held.next()
+
+        bridge.onMuteChanged?(true)
+        listener.releaseStarts()
+        await starting.value
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertFalse(listener.isRunning)
+
+        bridge.onMuteChanged?(false)
+        await controller.lastListenerTask?.value
+        XCTAssertTrue(listener.isRunning)
+        XCTAssertEqual(listener.overlappingStarts, 0)
+    }
+
+    func testUnmuteOnHoldWaitsForTheCallToComeOffHold() async {
+        await startSpeaking()
+        bridge.onHoldChanged?(true)
+        bridge.onMuteChanged?(true)
+        bridge.onMuteChanged?(false)
+        await controller.lastListenerTask?.value
+        // No mic while the other call has the line.
+        XCTAssertFalse(listener.isRunning)
+
+        bridge.onHoldChanged?(false)
+        await controller.lastListenerTask?.value
+        XCTAssertTrue(listener.isRunning)
+        XCTAssertEqual(listener.overlappingStarts, 0)
+        XCTAssertEqual(controller.state, .listening)
+    }
+
+    func testQuickMuteToggleNeverStartsTheListenerTwice() async {
+        await controller.start()
+        bridge.onMuteChanged?(true)
+        listener.holdsStart = true
+        var held = listener.startHeld.makeAsyncIterator()
+        bridge.onMuteChanged?(false)
+        await held.next()
+
+        // Mute and unmute again while the first restart is still starting.
+        bridge.onMuteChanged?(true)
+        bridge.onMuteChanged?(false)
+        listener.releaseStarts()
+        await controller.lastListenerTask?.value
+        XCTAssertTrue(listener.isRunning)
+        XCTAssertEqual(listener.overlappingStarts, 0)
     }
 
     func testMuteStopsListeningNotSpeaking() async {
