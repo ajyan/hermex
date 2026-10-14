@@ -479,18 +479,12 @@ struct DeckCardText: Equatable {
             }
             if let why = card.why { detail = Self.join(detail, "Why you saved it: \(why)") }
         case .item, .unknown:
-            if card.itemKind == "theme", let summary = card.context {
-                // A theme leads with its takeaway, named underneath, like a saved note.
-                lead = summary
-                attribution = card.title
-            } else {
-                lead = card.title ?? card.fallback
-                attribution = card.source == card.title ? nil : card.source
-                // A recap's entries, a mood chart, or goal meters are drawn; the plain `body` copy is only
-                // for older builds.
-                let drawn = !card.entries.isEmpty || !card.points.isEmpty || !card.meters.isEmpty
-                detail = card.context ?? (drawn ? nil : (card.body ?? (card.title == nil ? nil : card.fallback)))
-            }
+            lead = card.title ?? card.fallback
+            attribution = card.source == card.title ? nil : card.source
+            // A recap's entries, a mood chart, or goal meters are drawn; the plain `body` copy is only
+            // for older builds. A theme's summary is its `context`.
+            let drawn = !card.entries.isEmpty || !card.points.isEmpty || !card.meters.isEmpty
+            detail = card.context ?? (drawn ? nil : (card.body ?? (card.title == nil ? nil : card.fallback)))
         case .sleep:
             // The question leads; the numbers show after the rating so they don't decide it.
             lead = card.question

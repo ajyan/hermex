@@ -128,7 +128,7 @@ private struct DeckCardView: View {
             GoalMeters(meters: card.meters, palette: palette).padding(.top, 22)
         }
         if !card.entries.isEmpty {
-            RecapList(entries: card.entries, palette: palette, style: .of(card)).padding(.top, 22)
+            RecapList(entries: card.entries, palette: palette).padding(.top, 22)
         }
         if !text.leadIsQuestion, let question = viewModel.question(for: card) {
             Text(verbatim: question)
@@ -407,63 +407,8 @@ private struct SleepStrip: View {
 private struct RecapList: View {
     let entries: [DeckEntry]
     let palette: DeckPalette
-    var style: Style = .list
-
-    /// `quotes` sets a theme's own words on wash tiles; `insights` does the same for a review's
-    /// lessons, in the rounded voice since they're the brief's words, not yours.
-    enum Style {
-        case list, quotes, insights
-
-        static func of(_ card: DeckCard) -> Style {
-            switch card.itemKind {
-            case "theme": .quotes
-            case "lessons": .insights
-            default: .list
-            }
-        }
-    }
 
     var body: some View {
-        if style == .list { list } else { tiles }
-    }
-
-    private var tiles: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
-                VStack(alignment: .leading, spacing: 6) {
-                    if style == .quotes {
-                        Image(systemName: "quote.opening")
-                            .font(AppFont.display(style: .title3, weight: .semibold))
-                            .foregroundStyle(palette.ink.opacity(0.3))
-                            .accessibilityHidden(true)
-                    }
-                    Text(style == .quotes ? AttributedString(Self.unquoted(entry.text)) : inlineMarkdown(entry.text))
-                        .font(style == .quotes ? AppFont.serif(style: .title3) : AppFont.body(weight: .medium))
-                        .foregroundStyle(style == .quotes ? palette.ink : Color.hxTextPrimary)
-                        .lineSpacing(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if let label = entry.label {
-                        Text(verbatim: label)
-                            .font(AppFont.footnote(weight: .semibold))
-                            .foregroundStyle(palette.ink.opacity(style == .quotes ? 0.7 : 1))
-                            .textCase(style == .insights ? .uppercase : nil)
-                            .padding(.top, style == .quotes ? 4 : 0)
-                    }
-                }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
-                .accessibilityElement(children: .combine)
-            }
-        }
-    }
-
-    /// A quote without the curly marks the brief wraps it in, since the tile draws its own.
-    static func unquoted(_ text: String) -> String {
-        text.trimmingCharacters(in: CharacterSet(charactersIn: "“”\" ").union(.whitespacesAndNewlines))
-    }
-
-    private var list: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(entries.enumerated()), id: \.offset) { index, entry in
                 let newGroup = index == 0 || entry.label != entries[index - 1].label
@@ -500,28 +445,23 @@ private struct RecapList: View {
     }
 }
 
-/// A weekly review's headline numbers, two to a row on wash tiles: the number large, its label under it.
+/// A weekly review's headline numbers, two to a row: the number large, its label under it.
 private struct StatGrid: View {
     let stats: [DeckStat]
     let palette: DeckPalette
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10, alignment: .leading), GridItem(.flexible(), alignment: .leading)],
-                  alignment: .leading, spacing: 10) {
+        LazyVGrid(columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)],
+                  alignment: .leading, spacing: 18) {
             ForEach(stats, id: \.self) { stat in
                 VStack(alignment: .leading, spacing: 2) {
                     Text(verbatim: stat.value)
-                        .font(AppFont.display(style: .title, weight: .bold))
+                        .font(AppFont.serif(style: .largeTitle))
                         .monospacedDigit()
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
                     Text(verbatim: stat.label)
                         .font(AppFont.footnote(weight: .medium))
-                        .foregroundStyle(palette.ink.opacity(0.75))
+                        .foregroundStyle(palette.ink.opacity(0.7))
                 }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
                 .accessibilityElement(children: .combine)
             }
         }
@@ -583,8 +523,6 @@ private struct MoodChart: View {
                 AxisMarks { _ in AxisValueLabel().foregroundStyle(palette.ink.opacity(0.7)) }
             }
             .frame(height: 180)
-            .padding(14)
-            .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
             HStack(spacing: 14) {
                 if hasEnergy { legend("Energy", line: []) }
                 if hasMood { legend("Mood", line: [4, 4]) }
@@ -636,55 +574,36 @@ private struct GoalMeters: View {
     let meters: [DeckMeter]
     let palette: DeckPalette
 
-    /// Consecutive meters under the same goal, in order.
-    private var groups: [(name: String?, meters: [DeckMeter])] {
-        meters.reduce(into: []) { out, meter in
-            if let last = out.last, last.name == meter.group {
-                out[out.count - 1].meters.append(meter)
-            } else {
-                out.append((meter.group, [meter]))
-            }
-        }
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
-                VStack(alignment: .leading, spacing: 12) {
-                    if let name = group.name {
-                        Text(verbatim: name).font(AppFont.display(style: .headline, weight: .semibold))
-                    }
-                    ForEach(Array(group.meters.enumerated()), id: \.offset) { _, meter in
-                        meterRow(meter)
-                    }
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(Array(meters.enumerated()), id: \.offset) { index, meter in
+                if let group = meter.group, index == 0 || meters[index - 1].group != group {
+                    Text(verbatim: group)
+                        .font(AppFont.subheadline(weight: .semibold))
+                        .foregroundStyle(palette.ink.opacity(0.7))
+                        .padding(.top, index == 0 ? 0 : 6)
                 }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(verbatim: meter.label).font(AppFont.body())
+                        Spacer(minLength: 8)
+                        Text(verbatim: "\(meter.done) of \(meter.target)")
+                            .font(AppFont.subheadline(weight: .semibold))
+                            .monospacedDigit()
+                    }
+                    Capsule()
+                        .fill(palette.ink.opacity(0.12))
+                        .frame(height: 8)
+                        .overlay(alignment: .leading) {
+                            GeometryReader { proxy in
+                                Capsule().fill(palette.ink).frame(width: proxy.size.width * meter.fraction)
+                            }
+                        }
+                        .accessibilityHidden(true)
+                }
+                .accessibilityElement(children: .combine)
             }
         }
-    }
-
-    private func meterRow(_ meter: DeckMeter) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(verbatim: meter.label).font(AppFont.body())
-                Spacer(minLength: 8)
-                Text(verbatim: "\(meter.done) of \(meter.target)")
-                    .font(AppFont.subheadline(weight: .semibold))
-                    .monospacedDigit()
-            }
-            Capsule()
-                .fill(palette.ink.opacity(0.12))
-                .frame(height: 8)
-                .overlay(alignment: .leading) {
-                    GeometryReader { proxy in
-                        Capsule().fill(palette.ink).frame(width: proxy.size.width * meter.fraction)
-                    }
-                }
-                .accessibilityHidden(true)
-        }
-        .accessibilityElement(children: .combine)
     }
 }
 
