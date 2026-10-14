@@ -380,6 +380,5 @@ private struct MathTranscriptBenchmarkView: View {
             }
             .padding(12)
         }
-        .environment(\.allowsStreamedTextAnimation, false)
     }
 }
