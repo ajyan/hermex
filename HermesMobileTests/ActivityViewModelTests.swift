@@ -188,12 +188,13 @@ final class ActivityViewModelTests: XCTestCase {
 
     @MainActor
     func testEpisodeLoadMoreAppendsAndStopsAtNil() async throws {
-        let eventsFirst = pageJSON(events: [eventJSON(id: 3, summary: "First")], nextBefore: 2)
-        let eventsSecond = pageJSON(events: [eventJSON(id: 1, summary: "Second")], nextBefore: nil)
+        // Events fit on one page (no events cursor) while episodes have more:
+        // episodes still page on their own cursor.
+        let eventsOnly = pageJSON(events: [eventJSON(id: 3, summary: "First")], nextBefore: nil)
         let episodesFirst = episodePageJSON(episodes: [episodeJSON(firstId: 9, lastId: 4, count: 6)], nextBefore: 4)
         let episodesSecond = episodePageJSON(episodes: [episodeJSON(firstId: 3, lastId: 1, count: 2)], nextBefore: nil)
         let client = ScriptedActivityClient(
-            pages: [eventsFirst, eventsSecond],
+            pages: [eventsOnly],
             episodePages: [episodesFirst, episodesSecond]
         )
         let viewModel = ActivityViewModel(client: client)
@@ -209,19 +210,40 @@ final class ActivityViewModelTests: XCTestCase {
         await viewModel.loadMore()
 
         XCTAssertEqual(viewModel.episodes.map(\.id), [9, 3])
-        XCTAssertEqual(viewModel.events.map(\.id), [3, 1])
-        // The episode page was fetched with its own cursor.
+        XCTAssertEqual(viewModel.events.map(\.id), [3])
+        // The episode page was fetched with its own cursor; events had none.
         XCTAssertEqual(client.requestedEpisodeBefore, [nil, 4])
-        XCTAssertEqual(client.requestedBefore, [nil, 2])
+        XCTAssertEqual(client.requestedBefore, [nil])
+        XCTAssertFalse(viewModel.isLoadingMore)
 
-        // The events cursor is now nil, so a further loadMore is a no-op and
-        // no further episode page is fetched.
+        // Both cursors are now nil, so a further loadMore is a no-op.
         await viewModel.loadMore()
 
         XCTAssertEqual(viewModel.episodes.map(\.id), [9, 3])
-        XCTAssertEqual(viewModel.events.map(\.id), [3, 1])
         XCTAssertEqual(client.requestedEpisodeBefore, [nil, 4])
-        XCTAssertEqual(client.requestedBefore, [nil, 2])
+        XCTAssertEqual(client.requestedBefore, [nil])
+    }
+
+    @MainActor
+    func testEpisodeLoadMoreFailureKeepsLoadedEpisodes() async throws {
+        let eventsOnly = pageJSON(events: [eventJSON(id: 3, summary: "First")], nextBefore: nil)
+        let episodesFirst = episodePageJSON(episodes: [episodeJSON(firstId: 9, lastId: 4, count: 6)], nextBefore: 4)
+        // No second episode page is scripted, so the paging request fails.
+        let client = ScriptedActivityClient(pages: [eventsOnly], episodePages: [episodesFirst])
+        let viewModel = ActivityViewModel(client: client)
+        viewModel.filter = .attention
+
+        await viewModel.reload()
+        await viewModel.loadMore()
+
+        XCTAssertEqual(client.requestedEpisodeBefore, [nil, 4])
+        XCTAssertEqual(viewModel.state, .loaded)
+        XCTAssertTrue(viewModel.episodesAvailable)
+        XCTAssertEqual(viewModel.episodes.map(\.id), [9])
+
+        // The failure stops episode paging instead of retrying.
+        await viewModel.loadMore()
+        XCTAssertEqual(client.requestedEpisodeBefore, [nil, 4])
     }
 
     @MainActor
@@ -247,6 +269,82 @@ final class ActivityViewModelTests: XCTestCase {
         XCTAssertEqual(client.requestedEpisodeBefore, [nil, 4, nil])
         XCTAssertEqual(viewModel.episodes.map(\.id), [9])
         XCTAssertTrue(viewModel.episodesAvailable)
+    }
+
+    // MARK: - Superseded requests
+
+    @MainActor
+    func testSlowResponseForOldFilterIsDropped() async throws {
+        let client = GatedActivityClient()
+        let viewModel = ActivityViewModel(client: client)
+        var requests = client.requests.makeAsyncIterator()
+
+        let allLoad = Task { await viewModel.reload() }
+        let allRequest = try await nextRequest(&requests)
+        XCTAssertEqual(allRequest.filter, .all)
+
+        viewModel.filter = .cron
+        let cronLoad = Task { await viewModel.reload() }
+        let cronRequest = try await nextRequest(&requests)
+        XCTAssertEqual(cronRequest.filter, .cron)
+
+        // The new filter's response lands first, then the old one's.
+        cronRequest.respond(pageJSON(events: [eventJSON(id: 20, summary: "Cron")], nextBefore: nil))
+        await cronLoad.value
+        allRequest.respond(pageJSON(events: [eventJSON(id: 10, summary: "All")], nextBefore: nil))
+        await allLoad.value
+
+        XCTAssertEqual(viewModel.filter, .cron)
+        XCTAssertEqual(viewModel.events.map(\.id), [20])
+        XCTAssertEqual(viewModel.state, .loaded)
+    }
+
+    @MainActor
+    func testLoadMoreInFlightAcrossFilterChangeIsDropped() async throws {
+        let client = GatedActivityClient()
+        let viewModel = ActivityViewModel(client: client)
+        var requests = client.requests.makeAsyncIterator()
+
+        let firstLoad = Task { await viewModel.reload() }
+        try await nextRequest(&requests)
+            .respond(pageJSON(events: [eventJSON(id: 10, summary: "All")], nextBefore: 10))
+        await firstLoad.value
+
+        let moreLoad = Task { await viewModel.loadMore() }
+        let moreRequest = try await nextRequest(&requests)
+        XCTAssertEqual(moreRequest.before, 10)
+
+        viewModel.filter = .cron
+        let cronLoad = Task { await viewModel.reload() }
+        try await nextRequest(&requests)
+            .respond(pageJSON(events: [eventJSON(id: 20, summary: "Cron")], nextBefore: nil))
+        await cronLoad.value
+
+        moreRequest.respond(pageJSON(events: [eventJSON(id: 9, summary: "Older all")], nextBefore: nil))
+        await moreLoad.value
+
+        XCTAssertEqual(viewModel.events.map(\.id), [20])
+        XCTAssertFalse(viewModel.isLoadingMore)
+    }
+
+    private func nextRequest(
+        _ requests: inout AsyncStream<GatedActivityClient.Request>.Iterator
+    ) async throws -> GatedActivityClient.Request {
+        let request = await requests.next()
+        return try XCTUnwrap(request)
+    }
+
+    @MainActor
+    func testURLSessionCancellationIsNotAnError() async throws {
+        for error: Error in [URLError(.cancelled), APIError.network(underlying: URLError(.cancelled))] {
+            let viewModel = ActivityViewModel(client: ThrowingActivityClient(error: error))
+
+            await viewModel.reload()
+
+            if case .failed = viewModel.state {
+                XCTFail("A cancelled load should not show an error: \(error)")
+            }
+        }
     }
 
     // MARK: - Service down keeps the last page
@@ -341,6 +439,65 @@ final class ScriptedActivityClient: AtlasActivityDataClient, @unchecked Sendable
 
     func atlasRules() async throws -> AtlasRulesSnapshot {
         AtlasRulesSnapshot(rules: [], error: nil)
+    }
+}
+
+/// A client whose `atlasActivity` calls each suspend until the test answers
+/// them. Every call is published on `requests` in arrival order, carrying a
+/// `respond` that releases that one call, so a test can reorder responses.
+final class GatedActivityClient: AtlasActivityDataClient, @unchecked Sendable {
+    struct Request: Sendable {
+        let filter: AtlasActivityFilter
+        let before: Int?
+        let respond: @Sendable (AtlasActivityPage) -> Void
+    }
+
+    let requests: AsyncStream<Request>
+    private let requestsContinuation: AsyncStream<Request>.Continuation
+
+    init() {
+        (requests, requestsContinuation) = AsyncStream<Request>.makeStream()
+    }
+
+    func atlasActivity(before: Int?, limit: Int, filter: AtlasActivityFilter) async throws -> AtlasActivityPage {
+        let (response, responder) = AsyncStream<AtlasActivityPage>.makeStream()
+        requestsContinuation.yield(Request(filter: filter, before: before) { page in
+            responder.yield(page)
+            responder.finish()
+        })
+        for await page in response {
+            return page
+        }
+        throw CancellationError()
+    }
+
+    func atlasEpisodes(before: Int?, limit: Int, filter: AtlasActivityFilter) async throws -> AtlasEpisodePage {
+        throw APIError.http(statusCode: 404, body: nil)
+    }
+
+    func atlasRules() async throws -> AtlasRulesSnapshot {
+        AtlasRulesSnapshot(rules: [], error: nil)
+    }
+}
+
+/// A client whose every request throws one fixed error.
+final class ThrowingActivityClient: AtlasActivityDataClient, @unchecked Sendable {
+    private let error: Error
+
+    init(error: Error) {
+        self.error = error
+    }
+
+    func atlasActivity(before: Int?, limit: Int, filter: AtlasActivityFilter) async throws -> AtlasActivityPage {
+        throw error
+    }
+
+    func atlasEpisodes(before: Int?, limit: Int, filter: AtlasActivityFilter) async throws -> AtlasEpisodePage {
+        throw error
+    }
+
+    func atlasRules() async throws -> AtlasRulesSnapshot {
+        throw error
     }
 }
 

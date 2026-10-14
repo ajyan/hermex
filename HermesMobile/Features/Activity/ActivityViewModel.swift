@@ -37,8 +37,12 @@ final class ActivityViewModel {
     /// Cursor for the next (older) page: the last page's `nextBefore`.
     private var nextBefore: Int?
     /// Episode cursor for the next (older) episode page, separate from the
-    /// events cursor: the two paginates independently.
+    /// events cursor: the two paginate independently.
     private var nextBeforeEpisodes: Int?
+    /// Bumped by every `reload()`. A request whose generation is no longer
+    /// current was superseded (usually by a filter change) and its result is
+    /// dropped, so a slow response for the old filter never lands on screen.
+    private var generation = 0
     private let client: any AtlasActivityDataClient
     /// Page size for the sidecar's `limit` parameter.
     private let pageSize: Int = 50
@@ -58,8 +62,11 @@ final class ActivityViewModel {
     }
 
     /// Replaces the whole list with the first page for `filter`, resetting the
-    /// pagination cursor.
+    /// pagination cursor. Supersedes any reload or page load still in flight.
     func reload() async {
+        generation += 1
+        let requestGeneration = generation
+        let requestFilter = filter
         state = .loading
         nextBefore = nil
         nextBeforeEpisodes = nil
@@ -68,16 +75,16 @@ final class ActivityViewModel {
         isLoadingMore = false
 
         do {
-            let page = try await client.atlasActivity(before: nil, limit: pageSize, filter: filter)
+            let page = try await client.atlasActivity(before: nil, limit: pageSize, filter: requestFilter)
+            guard requestGeneration == generation else { return }
             apply(page: page)
-        } catch is CancellationError {
-            // Superseded by a newer reload; that one owns the state.
         } catch {
+            guard requestGeneration == generation, !Self.isCancellationError(error) else { return }
             state = Self.state(for: error)
         }
 
-        if filter == .attention {
-            await reloadEpisodes()
+        if requestFilter == .attention {
+            await reloadEpisodes(filter: requestFilter, generation: requestGeneration)
         }
     }
 
@@ -85,56 +92,67 @@ final class ActivityViewModel {
     /// The events fetch is primary — an episode failure never overrides the
     /// events state. A 404 means the sidecar predates episodes, so the feature
     /// is simply absent.
-    private func reloadEpisodes() async {
+    private func reloadEpisodes(filter: AtlasActivityFilter, generation requestGeneration: Int) async {
         do {
             let page = try await client.atlasEpisodes(before: nil, limit: episodePageSize, filter: filter)
+            guard requestGeneration == generation else { return }
             apply(page: page)
-        } catch is CancellationError {
-            // Superseded by a newer reload; that one owns the state.
         } catch {
+            guard requestGeneration == generation, !Self.isCancellationError(error) else { return }
             clearEpisodes()
         }
     }
 
-    /// Appends the next older page using the pagination cursor. A no-op when
-    /// there is nothing older (`nextBefore` is nil) or a load is in flight.
-    /// When episodes are available in attention mode, the next episode page is
-    /// appended in the same load; its failure never affects the events state.
+    /// Appends the next older page of events and, when episodes are shown in
+    /// attention mode, of episodes. Each pages on its own cursor, so one can
+    /// keep paging after the other runs out. A no-op when neither has anything
+    /// older or a load is in flight. An episode failure never affects the
+    /// events state.
     func loadMore() async {
-        guard state == .loaded, let cursor = nextBefore, !isLoadingMore else {
+        let episodeCursor = filter == .attention && episodesAvailable ? nextBeforeEpisodes : nil
+        guard state == .loaded, !isLoadingMore, nextBefore != nil || episodeCursor != nil else {
             return
         }
 
+        let requestGeneration = generation
+        let requestFilter = filter
         isLoadingMore = true
-        defer { isLoadingMore = false }
-
-        do {
-            let page = try await client.atlasActivity(before: cursor, limit: pageSize, filter: filter)
-            events.append(contentsOf: page.events)
-            nextBefore = page.nextBefore
-        } catch is CancellationError {
-            // Superseded by a newer reload; that one owns the state.
-        } catch {
-            keepEvents()
-            state = Self.state(for: error)
+        defer {
+            // A reload in between already reset this and may own a newer load.
+            if requestGeneration == generation { isLoadingMore = false }
         }
 
-        if filter == .attention, episodesAvailable, let episodeCursor = nextBeforeEpisodes {
-            await loadMoreEpisodes(cursor: episodeCursor)
+        if let cursor = nextBefore {
+            do {
+                let page = try await client.atlasActivity(before: cursor, limit: pageSize, filter: requestFilter)
+                guard requestGeneration == generation else { return }
+                events.append(contentsOf: page.events)
+                nextBefore = page.nextBefore
+            } catch {
+                guard requestGeneration == generation else { return }
+                if !Self.isCancellationError(error) {
+                    keepEvents()
+                    state = Self.state(for: error)
+                }
+            }
+        }
+
+        if let episodeCursor {
+            await loadMoreEpisodes(cursor: episodeCursor, filter: requestFilter, generation: requestGeneration)
         }
     }
 
-    private func loadMoreEpisodes(cursor: Int) async {
+    private func loadMoreEpisodes(cursor: Int, filter: AtlasActivityFilter, generation requestGeneration: Int) async {
         do {
             let page = try await client.atlasEpisodes(before: cursor, limit: episodePageSize, filter: filter)
+            guard requestGeneration == generation else { return }
             episodes.append(contentsOf: page.episodes)
             nextBeforeEpisodes = page.nextBefore
-        } catch is CancellationError {
-            // Superseded by a newer reload; that one owns the state.
         } catch {
+            guard requestGeneration == generation, !Self.isCancellationError(error) else { return }
             // The events fetch is primary: an episode pagination failure keeps
             // what we have and only stops further episode paging.
-            clearEpisodes()
+            nextBeforeEpisodes = nil
         }
     }
 
@@ -165,7 +183,7 @@ final class ActivityViewModel {
     }
 
     /// Clears episode state. Used when the sidecar does not serve episodes
-    /// (404) or an episode request fails: the view falls back to the events
+    /// (404) or the first episode request fails: the view falls back to the events
     /// list, which is always loaded independently.
     private func clearEpisodes() {
         episodes = []
@@ -177,6 +195,24 @@ final class ActivityViewModel {
     /// page on screen (the view shows a banner) instead of clearing it.
     private func keepEvents() {
         // Intentionally a no-op on `events` — the last page stays put.
+    }
+
+    /// Cancellation arrives as `CancellationError` or as a (possibly
+    /// `APIError.network`-wrapped) `URLError.cancelled` from URLSession.
+    private static func isCancellationError(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+
+        let underlying: Error
+        if case APIError.network(let wrapped) = error {
+            underlying = wrapped
+        } else {
+            underlying = error
+        }
+
+        guard let urlError = underlying as? URLError else { return false }
+        return urlError.code == .cancelled
     }
 
     private static func state(for error: Error) -> ActivityLoadState {
