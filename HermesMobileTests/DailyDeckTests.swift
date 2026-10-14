@@ -1038,3 +1038,42 @@ final class DeckReviewTests: XCTestCase {
         XCTAssertNil(deck.cards[1].recap)
     }
 }
+
+final class CardFanTests: XCTestCase {
+    func testFanFitsTheStackAndCentersOnTheMiddleCard() {
+        let width: CGFloat = 360
+        for count in [2, 5, 10, 14] {
+            let first = CardFan.spot(of: 0, count: count, width: width, picked: 0)
+            let last = CardFan.spot(of: count - 1, count: count, width: width, picked: 0)
+            XCTAssertLessThanOrEqual(last.x - first.x, width * 0.7 + 0.001, "\(count) cards fit the stack")
+            XCTAssertEqual(first.x, -last.x, accuracy: 0.001, "the fan is centered")
+            XCTAssertEqual(first.degrees, -last.degrees, accuracy: 0.001, "the ends turn the same amount")
+        }
+    }
+
+    func testAFingerPicksTheCardUnderItAndClampsToTheEnds() {
+        let width: CGFloat = 360, count = 10
+        let spacing = CardFan.spacing(count: count, width: width)
+        for position in 0..<count {
+            let x = width / 2 + CardFan.spot(of: position, count: count, width: width, picked: 0).x
+            XCTAssertEqual(CardFan.index(atX: x, count: count, width: width), position)
+            XCTAssertEqual(CardFan.index(atX: x + spacing * 0.4, count: count, width: width), position)
+        }
+        XCTAssertEqual(CardFan.index(atX: -500, count: count, width: width), 0)
+        XCTAssertEqual(CardFan.index(atX: 5000, count: count, width: width), count - 1)
+        XCTAssertEqual(CardFan.index(atX: 200, count: 1, width: width), 0)
+    }
+
+    func testThePickedCardRisesAboveTheRest() {
+        let count = 6
+        let picked = CardFan.spot(of: 4, count: count, width: 360, picked: 4)
+        let resting = CardFan.spot(of: 4, count: count, width: 360, picked: 1)
+        XCTAssertTrue(picked.isPicked)
+        XCTAssertFalse(resting.isPicked)
+        XCTAssertLessThan(picked.y, resting.y, "the picked card lifts")
+        XCTAssertGreaterThan(picked.scale, resting.scale)
+        for position in 0..<count where position != 4 {
+            XCTAssertGreaterThan(picked.zIndex, CardFan.spot(of: position, count: count, width: 360, picked: 4).zIndex)
+        }
+    }
+}
