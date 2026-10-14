@@ -125,7 +125,7 @@ One voice, three faces, all Dynamic Type through `AppFont`:
 
 - **Display: SF Pro Rounded** (`AppFont.display`): screen titles, card headlines, Brief questions, Goal titles, and headings in Atlas's replies (the Markdown theme's headings use `FontFamily(.system(.rounded))`). Semibold.
 - **Body: SF Pro**: everything you read at length, controls, metadata.
-- **Saved words: New York** (`AppFont.serif`), only for words a person saved: quotes, book highlights, past journal entries, and recap answers. Nothing else is serif.
+- **Saved words: New York** (`AppFont.serif`), only for words a person saved: quotes, book highlights, past journal entries, and recap answers. Prep's sample answers ("How you'd say it" and a boss's sample answer) count, because they are built from Andrew's own stories. Nothing else is serif.
 
 No `.system(size:)` on text. The one exception: an SF Symbol inside a fixed-size control (a round button, a media control) keeps a fixed point size, since a growing glyph would break the control.
 
@@ -135,6 +135,7 @@ A live chip fades in as its call arrives (off for replays and under Reduce Motio
 
 ## Decisions and exceptions
 
+- **Reward gold.** The streak flame, the boss crown, and stars in Prep use `HermexPaper.opener.glow` as a symbol color only — never a fill, wash, card, or text — because they are marks, not objects; amber still means "waiting on you" for objects.
 - **Links stay Nous blue**, `brain://` ones included: a link is a control (principle 4). The reply's Brain chips carry the Brain color. Coloring individual inline links would also mean replacing the Markdown renderer's link style.
 - **Brain covers** derive their ramps from the papers (`BrainStyle.coverPaletteValues`): light is the paper, its hue, its light glow; dark is the hue at 16% and 38% over the navy canvas, then its dark glow.
 - **Bot avatar colors** (`BotAvatarColor.palette`) are server data shared with Hermes Desktop, not app chrome, so they keep Desktop's hexes.

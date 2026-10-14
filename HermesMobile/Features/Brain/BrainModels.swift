@@ -519,6 +519,12 @@ enum PrepRoute: Hashable, Sendable {
     case track(String)
     case run
     case gap(String)
+    /// One course lesson to re-read.
+    case lesson(String)
+    /// A unit's boss, taken early.
+    case testout(String)
+    /// The optional critique run over passed units.
+    case mock
 }
 
 /// Opens a Brain page on the shell's stack from outside Brain (a `brain://` link in a

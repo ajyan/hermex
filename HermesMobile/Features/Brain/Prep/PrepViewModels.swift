@@ -27,6 +27,9 @@ final class PrepHomeViewModel {
     /// The gap ledger; nil when the server has no gaps route (an older fork) or it failed,
     /// in which case the home shows the older "Needs work" section instead.
     private(set) var gaps: [PrepGapSummary]?
+    /// The course path with the current unit's lessons; nil on servers without a course. When the full
+    /// path fails to load, home's summary (units without lessons) stands in.
+    private(set) var course: PrepCourse?
     @ObservationIgnored private let client: PrepDataClient
     @ObservationIgnored private var generation = 0
 
@@ -43,9 +46,14 @@ final class PrepHomeViewModel {
         async let gapsLoad = try? await client.gaps()
         do {
             let home = try await client.home()
+            var course: PrepCourse?
+            if let summary = home.course {
+                course = (try? await client.course()) ?? summary
+            }
             let gaps = await gapsLoad
             guard token == generation, !Task.isCancelled else { return }
             self.gaps = gaps
+            self.course = course
             state = .loaded(home)
         } catch {
             guard token == generation, !prepIsCancellation(error) else { return }
@@ -84,6 +92,55 @@ final class PrepGapViewModel {
             state = prepFailureState(error)
         }
     }
+}
+
+/// One lesson to re-read: a learned node on the path or a boss's revisit chip.
+@MainActor
+@Observable
+final class PrepLessonViewModel {
+    let id: String
+    private(set) var state: BrainLoadState<PrepLesson> = .loading
+    @ObservationIgnored private let client: PrepDataClient
+    @ObservationIgnored private var generation = 0
+    @ObservationIgnored private let onAPIError: (Error) -> Void
+
+    init(id: String, client: PrepDataClient, onAPIError: @escaping (Error) -> Void = { _ in }) {
+        self.id = id
+        self.client = client
+        self.onAPIError = onAPIError
+    }
+
+    func load() async {
+        generation += 1
+        let token = generation
+        state = .loading
+        do {
+            let lesson = try await client.lesson(id: id)
+            guard token == generation, !Task.isCancelled else { return }
+            state = .loaded(lesson)
+        } catch {
+            guard token == generation, !prepIsCancellation(error) else { return }
+            onAPIError(error)
+            // A 404 here is one missing lesson, not a server without Prep.
+            state = .failed(prepIsNotFound(error) ? "This lesson is no longer in the course." : error.localizedDescription)
+        }
+    }
+}
+
+/// What a finished run shows. Course runs fill the XP, lessons and next-up fields; a DSA run
+/// fills `moved`.
+struct PrepDaySummary: Equatable {
+    var streak = PrepStreak()
+    var moved: [PrepSkill] = []
+    var isCourse = false
+    var xpGained = 0
+    /// Titles of the lessons taught this run, in order.
+    var learned: [String] = []
+    var reviews = 0
+    var missedChecks = 0
+    var nextUp: String?
+    /// The run's rep count, for the done screen's full ring.
+    var repCount = 0
 }
 
 /// One track's skill map.
@@ -127,7 +184,7 @@ final class PrepRunViewModel {
         case loading
         case rep(PrepRep, index: Int)
         case result(PrepRep, PrepAttemptResult, index: Int)
-        case finished(PrepStreak, moved: [PrepSkill])
+        case finished(PrepDaySummary)
         case unavailable
         case failed(String)
     }
@@ -142,6 +199,13 @@ final class PrepRunViewModel {
     private(set) var flagError: String?
     /// When the current rep appeared: the start of `elapsedMS` and of the approach clock.
     private(set) var shownAt: Date
+    /// A review rep opens on its check; "Show the idea" reveals the lesson above it.
+    private(set) var revealedLesson = false
+    /// The XP the answer on screen earned, for the tick beside the result; nil when it earned none.
+    private(set) var lastXP: Int?
+    let runKind: PrepRunKind
+    /// The unit a test out quizzes.
+    let unit: String?
 
     @ObservationIgnored private let client: PrepDataClient
     @ObservationIgnored private let now: () -> Date
@@ -149,12 +213,16 @@ final class PrepRunViewModel {
     @ObservationIgnored private var lastStreak: PrepStreak?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var isAdvancing = false
+    @ObservationIgnored private var xpBefore: Int?
+    @ObservationIgnored private var tally = PrepDaySummary()
 
     @ObservationIgnored private let onAPIError: (Error) -> Void
 
-    init(client: PrepDataClient, now: @escaping () -> Date = Date.init,
+    init(client: PrepDataClient, run: PrepRunKind = .daily, unit: String? = nil, now: @escaping () -> Date = Date.init,
          onAPIError: @escaping (Error) -> Void = { _ in }) {
         self.client = client
+        self.runKind = run
+        self.unit = unit
         self.onAPIError = onAPIError
         self.now = now
         self.shownAt = now()
@@ -167,12 +235,12 @@ final class PrepRunViewModel {
         submitError = nil
         mapBefore = nil
         lastStreak = nil
+        xpBefore = nil
+        tally = PrepDaySummary()
         do {
-            let loaded = try await client.today()
-            // Non-fatal: only used to show which skills moved at the end.
-            let map = try? await client.map(track: Self.track(of: loaded))
+            let loaded = try await client.today(run: runKind, unit: unit)
+            await snapshot(loaded, token: token)
             guard token == generation, !Task.isCancelled else { return }
-            mapBefore = map
             run = loaded
             await advance(in: loaded, to: loaded.index, token: token)
         } catch {
@@ -207,6 +275,35 @@ final class PrepRunViewModel {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         await submit(.choice(trimmed))
+    }
+
+    /// A review rep: a learned lesson's check, asked again on its spaced-repetition day.
+    func isReview(_ rep: PrepRep) -> Bool {
+        rep.drill == .lesson && rep.block == "review"
+    }
+
+    func showIdea() {
+        revealedLesson = true
+    }
+
+    /// A course run teaches lessons, quizzes a boss or runs a mock; the rest are the older DSA and warm-up runs.
+    static func isCourse(_ run: PrepRun, kind: PrepRunKind) -> Bool {
+        kind != .daily || run.reps.contains { $0.drill == .lesson || $0.drill == .boss }
+    }
+
+    /// The XP an answer earned, mirroring the server's rules: 10 for a new lesson and 5 more when its
+    /// check is right, 5 for a right review, 50 for the answer that passes a boss sitting.
+    static func xp(for rep: PrepRep, result: PrepAttemptResult) -> Int? {
+        switch rep.drill {
+        case .lesson where rep.block == "review":
+            return result.verdict == "pass" ? 5 : nil
+        case .lesson:
+            return result.verdict == "pass" ? 15 : 10
+        case .boss:
+            return result.sitting?.passed == true ? 50 : nil
+        default:
+            return nil
+        }
     }
 
     /// The answered card was written by the coach and isn't flagged yet.
@@ -283,7 +380,31 @@ final class PrepRunViewModel {
         }
     }
 
+    /// What the end of the run compares against: the XP before a course run, or the skill map before
+    /// any other run. Both are non-fatal.
+    private func snapshot(_ run: PrepRun, token: Int) async {
+        if Self.isCourse(run, kind: runKind) {
+            let xp = try? await client.home().course?.xp
+            if token == generation { xpBefore = xp }
+        } else {
+            let map = try? await client.map(track: Self.track(of: run))
+            if token == generation { mapBefore = map }
+        }
+    }
+
+    private func count(_ rep: PrepRep, _ result: PrepAttemptResult) {
+        guard rep.drill == .lesson, !result.isUngraded else { return }
+        if isReview(rep) {
+            tally.reviews += 1
+        } else {
+            tally.learned.append(rep.item.title)
+        }
+        if result.verdict == "miss" { tally.missedChecks += 1 }
+    }
+
     private func show(_ rep: PrepRep) {
+        revealedLesson = false
+        lastXP = nil
         hintsShown = 0
         submitError = nil
         flagError = nil
@@ -299,7 +420,8 @@ final class PrepRunViewModel {
         let elapsed = max(0, Int(now().timeIntervalSince(shownAt) * 1000))
         let request = PrepAttemptRequest(
             date: run.date, index: rep.index, item: rep.item.id, drill: rep.drill,
-            answer: answer, elapsedMS: elapsed, hintsUsed: hintsShown)
+            answer: answer, elapsedMS: elapsed, hintsUsed: hintsShown,
+            run: runKind, unit: runKind == .testout ? unit : nil)
         do {
             let result = try await client.attempt(request)
             guard token == generation, !Task.isCancelled else {
@@ -314,6 +436,8 @@ final class PrepRunViewModel {
                 isSubmitting = false
             } else {
                 isSubmitting = false
+                lastXP = Self.xp(for: rep, result: result)
+                count(rep, result)
                 phase = .result(rep, result, index: rep.index)
             }
         } catch {
@@ -336,11 +460,12 @@ final class PrepRunViewModel {
         guard token == generation else { return }
         mapBefore = nil
         lastStreak = nil
+        xpBefore = nil
+        tally = PrepDaySummary()
         do {
-            let fresh = try await client.today()
-            let map = try? await client.map(track: Self.track(of: fresh))
+            let fresh = try await client.today(run: runKind, unit: unit)
+            await snapshot(fresh, token: token)
             guard token == generation, !Task.isCancelled else { return }
-            mapBefore = map
             run = fresh
             await advance(in: fresh, to: fresh.index, token: token)
         } catch {
@@ -351,6 +476,18 @@ final class PrepRunViewModel {
     }
 
     private func finish(token: Int) async {
+        if let run, Self.isCourse(run, kind: runKind) {
+            let home = try? await client.home()
+            guard token == generation, !Task.isCancelled else { return }
+            var summary = tally
+            summary.isCourse = true
+            summary.repCount = run.reps.count
+            summary.streak = lastStreak ?? home?.streak ?? PrepStreak()
+            if let before = xpBefore, let after = home?.course?.xp { summary.xpGained = max(0, after - before) }
+            summary.nextUp = PrepCopy.nextUp(home?.course)
+            phase = .finished(summary)
+            return
+        }
         var streak = lastStreak
         if streak == nil { streak = try? await client.home().streak }
         var moved: [PrepSkill] = []
@@ -364,7 +501,7 @@ final class PrepRunViewModel {
                 old[skill.id].map { $0 != skill.mastery } ?? false
             }
         }
-        phase = .finished(streak ?? PrepStreak(), moved: moved)
+        phase = .finished(PrepDaySummary(streak: streak ?? PrepStreak(), moved: moved))
     }
 }
 
@@ -373,6 +510,75 @@ final class PrepRunViewModel {
 /// The Prep screens' copy and small derivations, kept out of the views so they stay
 /// dumb and the wording is testable. English only, sentence case.
 enum PrepCopy {
+    /// Pinned source refs by readable name; vault notes all read as "Your notes".
+    private static let sourceNames: [String: String] = [
+        "prompt-docs": "Anthropic prompting docs", "prompt-caching": "Prompt caching docs",
+        "models": "Models overview", "effective-agents": "Building effective agents",
+        "constitution": "Claude's constitution", "usage-policy": "Usage policy", "rsp": "Responsible Scaling Policy",
+        "guide": "AI system design guide",
+    ]
+    private static let vaultRefs: Set<String> = [
+        "playbook", "loop", "question-bank", "discovery", "safety", "prompt-oa", "prepared-answers",
+        "story-refutation", "sysdesign", "roadmap", "evidence",
+    ]
+
+    /// A lesson's sources as one line, each name once, in order.
+    static func sourceLine(_ sources: [PrepSource]) -> String? {
+        var names: [String] = []
+        for source in sources {
+            let name = sourceNames[source.ref] ?? (vaultRefs.contains(source.ref) ? "Your notes" : source.ref)
+            if !names.contains(name) { names.append(name) }
+        }
+        return names.isEmpty ? nil : names.joined(separator: " · ")
+    }
+
+    /// The done screen's review row: "2 reviews · 1 check to look at again".
+    static func reviewLine(reviews: Int, missed: Int) -> String {
+        let parts = [reviews > 0 ? "\(reviews) review\(reviews == 1 ? "" : "s")" : nil,
+                     missed > 0 ? "\(missed) check\(missed == 1 ? "" : "s") to look at again" : nil]
+        return parts.compactMap { $0 }.joined(separator: " · ")
+    }
+
+    static func unitHeader(index: Int, title: String) -> String { "Unit \(index + 1) · \(title)" }
+
+    /// The ring card's line: the streak once there is one, then XP.
+    static func todayLine(days: Int, xp: Int) -> String {
+        days > 0 ? "\(streak(days: days)) · \(xp) XP" : "\(xp) XP"
+    }
+
+    static func bossNode(_ state: PrepBossState, next: String?) -> String {
+        if state == .ready { return "Boss quiz · ready" }
+        return next.map { "Boss quiz · unlocks \($0)" } ?? "Boss quiz"
+    }
+
+    static func starsLabel(_ stars: Int) -> String { "\(stars) of 3 stars" }
+    static func xpLabel(_ xp: Int) -> String { "+\(xp) XP" }
+    static func xpSpoken(_ xp: Int) -> String { "Plus \(xp) XP" }
+    static func percent(_ score: Double) -> String { "\(Int((score * 100).rounded()))%" }
+
+    static func sittingHeadline(_ sitting: PrepBossSitting) -> String {
+        if sitting.score == nil { return "Grading tonight" }
+        return sitting.passed ? "Boss passed" : "Not yet"
+    }
+
+    /// The line under a boss result. A failed test out changes nothing, so it points at the lessons instead.
+    static func unlockLine(_ sitting: PrepBossSitting, xp: Int?, testOut: Bool = false) -> String {
+        guard sitting.passed else {
+            if sitting.score == nil { return "Atlas grades it tonight; the unit unlocks if it passes." }
+            return testOut ? "Not yet. Start with the lessons below."
+                : "The lessons below come back tomorrow, then the boss again."
+        }
+        let parts = [sitting.unlocked.map { "\($0) unlocked" }, xp.map(xpLabel)].compactMap { $0 }
+        return parts.isEmpty ? "Course complete" : parts.joined(separator: " · ")
+    }
+
+    /// The done screen's "Tomorrow" line: the current unit's boss once it is ready, else its lessons.
+    static func nextUp(_ course: PrepCourse?) -> String? {
+        guard let unit = course?.currentUnit else { return nil }
+        if unit.boss == .ready { return "Boss quiz · \(unit.title)" }
+        return "\(unit.title) · \(unit.lessonsDone) of \(unit.lessonsTotal) lessons"
+    }
+
     /// What today's run button offers on Prep home.
     enum RunAction: Equatable { case start, resume, done }
 
@@ -469,6 +675,9 @@ enum PrepCopy {
         case "weak": "Weak spot"
         case "main": "Main rep"
         case "new": "New"
+        case "reteach": "Another way to see it"
+        case "review": "Review"
+        case "boss": "Boss quiz"
         default: block.prefix(1).uppercased() + block.dropFirst()
         }
     }
