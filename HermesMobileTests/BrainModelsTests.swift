@@ -125,6 +125,101 @@ final class BrainModelsTests: XCTestCase {
         XCTAssertEqual(try decoder.decode(BrainList.self, from: Data(list.utf8)).nextCursor, 40)
     }
 
+    private let personJSON = #"""
+    {
+      "encounters": [
+        {"id": "2026-10-03#0", "date": "2026-10-03", "title": "Dinner",
+         "bullets": ["met [Virtues](brain://wiki/wiki%2Fvirtues.md) fan", "talked about the move\n  to Lisbon next spring"],
+         "body": "- met [Virtues](brain://wiki/wiki%2Fvirtues.md) fan\n- talked about the move\n  to Lisbon next spring"},
+        {"id": "2026-06-05#0", "date": "2026-06-05", "title": null, "bullets": ["coffee near the park"],
+         "body": "- coffee near the park"}
+      ],
+      "profile": [{"label": "Family", "items": ["sister Mina"]}, {"label": "Company", "items": ["Orbit Labs"]}],
+      "questions": ["How is the move going?", "Did [Virtues](brain://wiki/wiki%2Fvirtues.md) come up again?"],
+      "other": "",
+      "last_seen": "2026-10-03",
+      "next_birthday": "2026-12-24",
+      "journal": [
+        {"id": "journal/2026/10-October/2026-10-09.md", "date": "2026-10-09",
+         "snippet": "Dara Quill texted about the move.", "mention": "Dara Quill"},
+        {"id": "journal/2026/10-October/2026-10-08.md", "date": "2026-10-08",
+         "snippet": "Lunch with Dara Quill downtown.", "mention": "Dara Quill"}
+      ]
+    }
+    """#
+
+    private var appDecoder: JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return decoder
+    }
+
+    private func pageJSON(withPerson person: String) -> Data {
+        Data(#"{"item": {"module": "people", "id": "people/dara.md"}, "content": "Dara", "person": \#(person)}"#.utf8)
+    }
+
+    func testPagePersonDecodes() throws {
+        let page = try appDecoder.decode(BrainPage.self, from: pageJSON(withPerson: personJSON))
+        let person = try XCTUnwrap(page.person)
+        XCTAssertEqual(person.encounters.map(\.id), ["2026-10-03#0", "2026-06-05#0"])
+        XCTAssertEqual(person.encounters[0].title, "Dinner")
+        XCTAssertEqual(person.encounters[0].bullets.count, 2)
+        XCTAssertTrue(person.encounters[0].body.hasPrefix("- met "))
+        XCTAssertNil(person.encounters[1].title)
+        XCTAssertEqual(person.profile, [BrainProfileSection(label: "Family", items: ["sister Mina"]),
+                                        BrainProfileSection(label: "Company", items: ["Orbit Labs"])])
+        XCTAssertEqual(person.questions.count, 2)
+        XCTAssertEqual(person.other, "")
+        XCTAssertEqual(person.lastSeen, "2026-10-03")
+        XCTAssertEqual(person.nextBirthday, "2026-12-24")
+        XCTAssertEqual(person.journal.map(\.date), ["2026-10-09", "2026-10-08"])
+        XCTAssertEqual(person.journal[0].mention, "Dara Quill")
+        XCTAssertEqual(person.journal[1].snippet, "Lunch with Dara Quill downtown.")
+    }
+
+    func testPersonCatchUpThreadsAndRhythmDecode() throws {
+        let json = #"{"catchup": "Moving to Lisbon in spring; ask about the flat.", "threads": ["the Lisbon move", 7, "her sister's visit"], "rhythm": [0, 1, 0, 0, 2, 0, 0, 0, 1, 0, 0, 3]}"#
+        let person = try appDecoder.decode(BrainPerson.self, from: Data(json.utf8))
+        XCTAssertEqual(person.catchup, "Moving to Lisbon in spring; ask about the flat.")
+        XCTAssertEqual(person.threads, ["the Lisbon move", "her sister's visit"])
+        XCTAssertEqual(person.rhythm, [0, 1, 0, 0, 2, 0, 0, 0, 1, 0, 0, 3])
+    }
+
+    func testPersonWithoutCatchUpKeysDefaults() throws {
+        let person = try appDecoder.decode(BrainPage.self, from: pageJSON(withPerson: personJSON)).person
+        XCTAssertNil(person?.catchup)
+        XCTAssertEqual(person?.threads, [])
+        XCTAssertEqual(person?.rhythm, [])
+        let nulls = #"{"catchup": null, "threads": null, "rhythm": "soon"}"#
+        let decoded = try appDecoder.decode(BrainPerson.self, from: Data(nulls.utf8))
+        XCTAssertNil(decoded.catchup)
+        XCTAssertEqual(decoded.threads, [])
+        XCTAssertEqual(decoded.rhythm, [])
+    }
+
+    func testPageWithoutPersonDecodesNil() throws {
+        let page = try appDecoder.decode(BrainPage.self, from: Data(pageJSON.utf8))
+        XCTAssertNil(page.person)
+        XCTAssertEqual(page.content, "# Virtues\n\nBody text.")
+    }
+
+    func testEncounterMissingFieldsDefault() throws {
+        let encounter = try appDecoder.decode(BrainEncounter.self, from: Data(#"{"id":"x","date":"2026-01-01"}"#.utf8))
+        XCTAssertNil(encounter.title)
+        XCTAssertEqual(encounter.bullets, [])
+        XCTAssertEqual(encounter.body, "")
+    }
+
+    /// The Brain cache stores pages with a plain encoder; a page cached before `person` existed
+    /// still reads, and one with a person round-trips.
+    func testPersonSurvivesCacheRoundTripAndOldCachedPageReads() throws {
+        let page = try appDecoder.decode(BrainPage.self, from: pageJSON(withPerson: personJSON))
+        let cached = try JSONEncoder().encode(page)
+        XCTAssertEqual(try JSONDecoder().decode(BrainPage.self, from: cached), page)
+        let old = try JSONEncoder().encode(try appDecoder.decode(BrainPage.self, from: Data(pageJSON.utf8)))
+        XCTAssertNil(try JSONDecoder().decode(BrainPage.self, from: old).person)
+    }
+
     func testOlderPageWithoutConnectionsStillDecodes() throws {
         let json = #"{"item": {"module": "wiki", "id": "w"}, "hub": {"ref": {"module": "goals", "id": "x"}}}"#
         let page = try JSONDecoder().decode(BrainPage.self, from: Data(json.utf8))

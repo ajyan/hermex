@@ -193,6 +193,18 @@ final class BrainVisualsTests: XCTestCase {
 
     // MARK: - Reader
 
+    func testReaderCoverIsSkippedOnPersonPagesAndPagesWithLinkCards() {
+        let person = BrainPerson(encounters: [], journal: [])
+        let people = BrainItem(module: .people, id: "people/ada-test.md", title: "Ada Test")
+        let wiki = BrainItem(module: .wiki, id: "self")
+        XCTAssertFalse(BrainReaderLayout.showsCover(for: BrainPage(item: people, person: person), hasLinkCards: false))
+        XCTAssertTrue(BrainReaderLayout.showsCover(for: BrainPage(item: people), hasLinkCards: false),
+                      "a person page without the person payload keeps the cover")
+        XCTAssertTrue(BrainReaderLayout.showsCover(for: BrainPage(item: wiki), hasLinkCards: false))
+        XCTAssertFalse(BrainReaderLayout.showsCover(for: BrainPage(item: wiki), hasLinkCards: true))
+        XCTAssertFalse(BrainReaderLayout.showsCover(for: BrainPage(item: people), hasLinkCards: true))
+    }
+
     func testReaderMetaLineCapitalisesKindAndOmitsEmptyDate() {
         let us = Locale(identifier: "en_US")
         XCTAssertEqual(BrainReaderLayout.metaLine(kind: "note", date: "2026-10-06", locale: us), "Note · Oct 6, 2026")

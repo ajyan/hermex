@@ -116,6 +116,10 @@ _Avoid_: quiz, rediscover, feed
 A wiki page where many other wiki pages meet (at least five link to or from it), found from the vault's links rather than curated. A Brain item's parent hub shows as its trail, and the reader's pager steps through the hub's pages. Front matter `up:` (or `parent:`) sets the parent by hand.
 _Avoid_: map of content, MOC, category
 
+**Encounter**:
+One dated meeting with a person, logged on their Brain item under a `###` date heading (an optional ` — title` after the date) and parsed by the server into the person page's timeline, newest first.
+_Avoid_: interaction, touchpoint, log entry
+
 **Unlinked mention**:
 A Brain item whose text names another item without a `[[link]]` to it. The reader lists them under the item's linked mentions.
 _Avoid_: missing link, implicit backlink

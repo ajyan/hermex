@@ -250,6 +250,129 @@ struct BrainFact: Codable, Hashable, Sendable {
     }
 }
 
+/// One dated entry in a person's encounter log. `bullets` are the entry's lines, `body` the raw markdown.
+struct BrainEncounter: Codable, Hashable, Sendable {
+    let id: String
+    let date: String
+    let title: String?
+    let bullets: [String]
+    let body: String
+
+    private enum CodingKeys: String, CodingKey { case id, date, title, bullets, body }
+
+    init(id: String, date: String, title: String? = nil, bullets: [String] = [], body: String = "") {
+        self.id = id
+        self.date = date
+        self.title = title
+        self.bullets = bullets
+        self.body = body
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.string(.id)
+        date = c.string(.date)
+        title = c.optional(String.self, .title)
+        bullets = c.strings(.bullets)
+        body = c.string(.body)
+    }
+}
+
+/// A labelled group of profile lines on a person page ("Family", ["sister Mina"]).
+struct BrainProfileSection: Codable, Hashable, Sendable {
+    let label: String
+    let items: [String]
+
+    private enum CodingKeys: String, CodingKey { case label, items }
+
+    init(label: String, items: [String] = []) {
+        self.label = label
+        self.items = items
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        label = c.string(.label)
+        items = c.strings(.items)
+    }
+}
+
+/// A journal day that names the person: the day's snippet and the name it matched.
+struct BrainJournalMention: Codable, Hashable, Sendable {
+    let id: String
+    let date: String
+    let snippet: String
+    let mention: String
+
+    private enum CodingKeys: String, CodingKey { case id, date, snippet, mention }
+
+    init(id: String, date: String, snippet: String = "", mention: String = "") {
+        self.id = id
+        self.date = date
+        self.snippet = snippet
+        self.mention = mention
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.string(.id)
+        date = c.string(.date)
+        snippet = c.string(.snippet)
+        mention = c.string(.mention)
+    }
+}
+
+/// The structured view of a person page the server builds: encounters, profile, open questions,
+/// leftover markdown, and journal mentions. Dates are ISO `YYYY-MM-DD` strings.
+struct BrainPerson: Codable, Hashable, Sendable {
+    let encounters: [BrainEncounter]
+    let profile: [BrainProfileSection]
+    let questions: [String]
+    let other: String
+    let lastSeen: String?
+    let nextBirthday: String?
+    let journal: [BrainJournalMention]
+    /// A short recap of where things stand with the person; nil until the nightly digest writes one.
+    let catchup: String?
+    /// Up to three open threads to pick up next time.
+    let threads: [String]
+    /// Days seen per calendar month, oldest first, ending with this month (12 when present).
+    let rhythm: [Int]
+
+    private enum CodingKeys: String, CodingKey {
+        case encounters, profile, questions, other, journal, lastSeen, nextBirthday, catchup, threads, rhythm
+    }
+
+    init(encounters: [BrainEncounter] = [], profile: [BrainProfileSection] = [], questions: [String] = [],
+         other: String = "", lastSeen: String? = nil, nextBirthday: String? = nil,
+         journal: [BrainJournalMention] = [], catchup: String? = nil, threads: [String] = [], rhythm: [Int] = []) {
+        self.encounters = encounters
+        self.profile = profile
+        self.questions = questions
+        self.other = other
+        self.lastSeen = lastSeen
+        self.nextBirthday = nextBirthday
+        self.journal = journal
+        self.catchup = catchup
+        self.threads = threads
+        self.rhythm = rhythm
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        encounters = c.lossy(BrainEncounter.self, .encounters)
+        profile = c.lossy(BrainProfileSection.self, .profile)
+        questions = c.strings(.questions)
+        other = c.string(.other)
+        lastSeen = c.optional(String.self, .lastSeen)
+        nextBirthday = c.optional(String.self, .nextBirthday)
+        journal = c.lossy(BrainJournalMention.self, .journal)
+        catchup = c.optional(String.self, .catchup)
+        threads = c.lossy(String.self, .threads)
+        rhythm = c.lossy(Int.self, .rhythm)
+    }
+}
+
 struct BrainPage: Codable, Hashable, Sendable {
     let item: BrainItem
     let content: String
@@ -266,15 +389,17 @@ struct BrainPage: Codable, Hashable, Sendable {
     let unlinkedCount: Int
     /// The page's place in its parent hub, for the trail and the pager.
     let hub: BrainHubContext?
+    /// People pages only: the structured encounters/profile view; nil for other pages or older servers.
+    let person: BrainPerson?
 
     private enum CodingKeys: String, CodingKey {
-        case item, content, links, backlinks, further, prev, next, highlights, facts, unlinked, hub, unlinkedCount
+        case item, content, links, backlinks, further, prev, next, highlights, facts, unlinked, hub, unlinkedCount, person
     }
 
     init(item: BrainItem, content: String = "", links: [BrainRef] = [], backlinks: [BrainRef] = [],
          further: [BrainRef] = [], prev: BrainRef? = nil, next: BrainRef? = nil,
          highlights: [BrainHighlight] = [], facts: [BrainFact] = [], unlinked: [BrainRef] = [],
-         unlinkedCount: Int? = nil, hub: BrainHubContext? = nil) {
+         unlinkedCount: Int? = nil, hub: BrainHubContext? = nil, person: BrainPerson? = nil) {
         self.item = item
         self.content = content
         self.links = links
@@ -287,6 +412,7 @@ struct BrainPage: Codable, Hashable, Sendable {
         self.unlinked = unlinked
         self.unlinkedCount = unlinkedCount ?? unlinked.count
         self.hub = hub
+        self.person = person
     }
 
     init(from decoder: Decoder) throws {
@@ -304,6 +430,7 @@ struct BrainPage: Codable, Hashable, Sendable {
         unlinkedCount = max(c.optional(Int.self, .unlinkedCount) ?? brainSnakeInt(decoder, "unlinked_count") ?? 0,
                             unlinked.count)
         hub = c.optional(BrainHubContext.self, .hub)
+        person = c.optional(BrainPerson.self, .person)
     }
 }
 

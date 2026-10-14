@@ -1,7 +1,9 @@
 import SwiftUI
 
-/// A person page's title block: monogram, name and relationship, then a grid of the
-/// page's facts (last contacted, birthday, location, industry; whichever exist).
+/// A person page's title block: monogram, name and a subtitle (the relationship, or the
+/// person layout's "relationship · location · seen 6 days ago"), then a grid of the page's
+/// facts (last contacted, birthday, location, industry; whichever exist). A page with the
+/// person layout passes no facts: its chips carry them.
 /// Dates read in the one Brain format (`BrainStyle.displayDate`); anything else shows as is.
 struct BrainPersonCardView: View {
     private struct Fact {
@@ -10,13 +12,15 @@ struct BrainPersonCardView: View {
     }
 
     let item: BrainItem
+    private let subtitle: String
     /// Formatted once, never in `body`.
     private let facts: [Fact]
     @ScaledMetric(relativeTo: .title) private var monogramSide: CGFloat = 56
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    init(item: BrainItem, facts: [BrainFact]) {
+    init(item: BrainItem, facts: [BrainFact], subtitle: String? = nil) {
         self.item = item
+        self.subtitle = subtitle ?? item.subtitle
         self.facts = facts
             .filter { !$0.label.isEmpty && !$0.value.isEmpty }
             .map { Fact(label: $0.label, value: BrainStyle.displayDate($0.value)) }
@@ -30,8 +34,8 @@ struct BrainPersonCardView: View {
                     Text(verbatim: item.title)
                         .brainText(.readerTitle)
                         .accessibilityAddTraits(.isHeader)
-                    if !item.subtitle.isEmpty {
-                        Text(verbatim: item.subtitle)
+                    if !subtitle.isEmpty {
+                        Text(verbatim: subtitle)
                             .brainText(.rowSubtitle)
                     }
                 }

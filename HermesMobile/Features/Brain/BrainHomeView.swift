@@ -14,7 +14,7 @@ struct BrainHomeView: View {
     @State private var prepViewModel: PrepHomeViewModel
     /// The review deck's height: about the rest of an iPhone screen, growing with Dynamic Type
     /// until it would run past the screen (`fittedDeckHeight`).
-    @ScaledMetric(relativeTo: .body) private var deckHeight: CGFloat = 480
+    @ScaledMetric(relativeTo: .body) private var deckHeight: CGFloat = BrainStyle.deckHeight
     /// The home scroll view's visible height, under the bars.
     @State private var viewportHeight: CGFloat = 0
     /// Where the deck starts in the home's content: the strip and header above it.
@@ -177,7 +177,7 @@ struct BrainHomeView: View {
                 }
             } edge: { page in
                 // Far down the stack only the card's paper shows, peeking out askew.
-                BrainBiteCard.shape
+                BrainDeckCard.shape
                     .fill(Self.edgeFill(page))
                     .hxShadow(.stacked)
                     .padding(.vertical, 12)
@@ -192,15 +192,13 @@ struct BrainHomeView: View {
     }
 
     private static let contentSpace = "brainHomeContent"
-    /// The smallest the deck gets on a short screen (landscape, the largest text).
-    private static let minimumDeckHeight: CGFloat = 240
 
     /// The scaled deck height, cut to what fits on screen below the strip and header when the
     /// home is scrolled to the top, so the footer stays visible and the card scrolls inside.
     private var fittedDeckHeight: CGFloat {
         guard viewportHeight > 0 else { return deckHeight }
         let available = viewportHeight - deckTop - BrainStyle.m
-        return max(min(deckHeight, available), Self.minimumDeckHeight)
+        return max(min(deckHeight, available), BrainStyle.minimumDeckHeight)
     }
 
     private func open(_ bite: BrainBite) {
