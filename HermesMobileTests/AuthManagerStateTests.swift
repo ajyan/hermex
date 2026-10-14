@@ -397,6 +397,100 @@ final class AuthManagerStateTests: XCTestCase {
         XCTAssertTrue(store.load(for: second).isEmpty)
     }
 
+    /// Runs `body` against the app-group widget stores AuthManager clears, restoring
+    /// whatever snapshots the simulator held before.
+    private func withWidgetStores(
+        _ body: (AtlasWidgetRecentsStore, AtlasWidgetGoalsStore) async throws -> Void
+    ) async throws {
+        let recents = AtlasWidgetRecentsStore()
+        let goals = AtlasWidgetGoalsStore()
+        let defaults = try XCTUnwrap(recents.defaults, "The widget stores need the app group")
+        let keys = [AtlasWidgetRecents.storageKey, AtlasWidgetGoals.storageKey]
+        let saved = keys.map { ($0, defaults.object(forKey: $0)) }
+        defer { for (key, value) in saved { defaults.set(value, forKey: key) } }
+        keys.forEach(defaults.removeObject(forKey:))
+        try await body(recents, goals)
+    }
+
+    private func saveWidgetSnapshots(for server: URL, recents: AtlasWidgetRecentsStore, goals: AtlasWidgetGoalsStore) {
+        recents.save(AtlasWidgetRecents(server: server, sessions: [
+            AtlasWidgetRecents.Session(id: "s1", title: "One", lastActivity: Date(timeIntervalSince1970: 1))
+        ]))
+        goals.save(AtlasWidgetGoals(server: server, today: "2026-10-13", streakDays: 2, items: []))
+    }
+
+    func testSignOutClearsTheSignedOutServersWidgetSnapshots() async throws {
+        let keychain = InMemoryKeychainStore()
+        let registry = ServerRegistry.inMemory(keychain: keychain)
+        let (manager, _, _) = try await makeTwoServerManager(keychain: keychain, registry: registry)
+        let first = try XCTUnwrap(URL(string: "https://a.test"))
+
+        try await withWidgetStores { recents, goals in
+            saveWidgetSnapshots(for: first, recents: recents, goals: goals)
+            XCTAssertEqual(recents.load()?.server, first)
+
+            await manager.signOut()
+
+            XCTAssertNil(recents.load())
+            XCTAssertNil(goals.load())
+        }
+    }
+
+    func testSignOutAndServerRemovalLeaveAnotherServersWidgetSnapshots() async throws {
+        let keychain = InMemoryKeychainStore()
+        let registry = ServerRegistry.inMemory(keychain: keychain)
+        let (manager, _, bAccount) = try await makeTwoServerManager(keychain: keychain, registry: registry)
+        let second = try XCTUnwrap(URL(string: "https://b.test"))
+
+        try await withWidgetStores { recents, goals in
+            saveWidgetSnapshots(for: second, recents: recents, goals: goals)
+
+            await manager.signOut()
+
+            XCTAssertEqual(recents.load()?.server, second)
+            XCTAssertEqual(goals.load()?.server, second)
+
+            await manager.removeServer(bAccount)
+
+            XCTAssertNil(recents.load())
+            XCTAssertNil(goals.load())
+        }
+    }
+
+    func testRemovingAnInactiveServerClearsItsWidgetSnapshots() async throws {
+        let keychain = InMemoryKeychainStore()
+        let registry = ServerRegistry.inMemory(keychain: keychain)
+        let (manager, _, bAccount) = try await makeTwoServerManager(keychain: keychain, registry: registry)
+        let first = try XCTUnwrap(URL(string: "https://a.test"))
+        let second = try XCTUnwrap(URL(string: "https://b.test"))
+
+        try await withWidgetStores { recents, goals in
+            saveWidgetSnapshots(for: second, recents: recents, goals: goals)
+
+            await manager.removeServer(bAccount)
+
+            XCTAssertEqual(manager.state, .loggedIn(server: first))
+            XCTAssertNil(recents.load())
+            XCTAssertNil(goals.load())
+        }
+    }
+
+    func testRemovingAnInactiveServerLeavesTheActiveServersWidgetSnapshots() async throws {
+        let keychain = InMemoryKeychainStore()
+        let registry = ServerRegistry.inMemory(keychain: keychain)
+        let (manager, _, bAccount) = try await makeTwoServerManager(keychain: keychain, registry: registry)
+        let first = try XCTUnwrap(URL(string: "https://a.test"))
+
+        try await withWidgetStores { recents, goals in
+            saveWidgetSnapshots(for: first, recents: recents, goals: goals)
+
+            await manager.removeServer(bAccount)
+
+            XCTAssertEqual(recents.load()?.server, first)
+            XCTAssertEqual(goals.load()?.server, first)
+        }
+    }
+
     func testConfiguringASecondServerAddsItAndMakesItActive() async throws {
         let keychain = InMemoryKeychainStore()
         let registry = ServerRegistry.inMemory(keychain: keychain)
