@@ -24,6 +24,23 @@ final class DesignSystemTests: XCTestCase {
         XCTAssertEqual(HermexPaper.request, .opener, "requests share the Brief's opener paper")
     }
 
+    func testCardRolesDrawTheirFillAndCorners() {
+        XCTAssertEqual(HXCardRole.glow(.book).fill, HermexPaper.book.card)
+        XCTAssertEqual(HXCardRole.glow(.book).radius, HXRadius.xl)
+        XCTAssertEqual(HXCardRole.wash(.knowledge).fill, HermexPaper.knowledge.wash)
+        XCTAssertEqual(HXCardRole.summary.fill, Color.hxSurface)
+        XCTAssertEqual(HXCardRole.summary.radius, HXRadius.xl, "a summary sits in a stack of glow cards")
+        XCTAssertEqual(HXCardRole.neutral.radius, HXRadius.lg)
+        XCTAssertEqual(HXCardRole.neutral.titleColor, Color.hxTextPrimary)
+        XCTAssertEqual(HXCardRole.glow(.wiki).titleColor, HermexPaper.wiki.glow)
+    }
+
+    func testDeckOpenerIsASummaryCardAndOtherKindsGlow() {
+        guard case .summary = DeckPalette.opener.cardRole else { return XCTFail("the opener summarizes the day") }
+        guard case .glow(let paper) = DeckPalette.quote.cardRole else { return XCTFail("a quote is one kind of thing") }
+        XCTAssertEqual(paper, .quote)
+    }
+
     func testLiveChipsKeepTheNewestCallsAndCountTheRest() {
         let all = entries((0..<6).map { ("terminal", ["command": .string("echo \($0)")]) }, isLive: true)
         let chips = ToolActivityPresentation.chips(all)

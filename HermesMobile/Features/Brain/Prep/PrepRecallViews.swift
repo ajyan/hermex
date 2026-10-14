@@ -4,18 +4,12 @@ import SwiftUI
 // glow card, the mic and primary buttons are Nous blue, missed key points are `hxWarning` with ◌, hits
 // are `hxSuccess` with ✓, and only sample answers are serif.
 
-/// A run card: the Prep paper's glow card, the same material as a Brief card.
+/// A run card: an `HXCard` in the Prep paper's wash, which floats its controls in the paper's tint.
 struct PrepRunCard<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: BrainStyle.m) {
-            content
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(BrainStyle.l)
-        .glowSurface(.knowledge, cornerRadius: HXRadius.xl, opaque: true)
-        .hxShadow(.paper)
+        HXCard(.wash(.knowledge), spacing: BrainStyle.m) { content }
     }
 }
 

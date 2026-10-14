@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Reports Swift code that bypasses the design system (DESIGN.md): fixed font sizes, one-off
+# corner radii, raw materials, and raw colors outside Config/. A warning, never a gate, like
+# check-swift-file-sizes. A line that is a documented exception (DESIGN.md § Decisions and
+# exceptions, or an SF Symbol in a fixed-size control) can end with `// design-drift: allow`.
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+scan_root="$repo_root/HermesMobile"
+
+warning_count=0
+
+# report <title> <hint> <extended regex> [exclude path regex]
+report() {
+  local title="$1" hint="$2" pattern="$3" exclude="${4:-^$}"
+  local count=0
+  while IFS= read -r match; do
+    local file="${match%%:*}" rest="${match#*:}"
+    local line="${rest%%:*}"
+    local relative_path="${file#"$repo_root/"}"
+    [[ "$relative_path" =~ $exclude ]] && continue
+    [[ "$rest" == *"design-drift: allow"* ]] && continue
+    count=$((count + 1))
+    if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+      printf "::warning file=%s,line=%s,title=Design drift::%s. %s\n" "$relative_path" "$line" "$title" "$hint"
+    fi
+    printf "warning: %s:%s: %s\n" "$relative_path" "$line" "$title"
+  done < <(grep -rnE --include='*.swift' "$pattern" "$scan_root" | sort -t: -k1,1 -k2,2n || true)
+  if (( count > 0 )); then
+    printf "  %d × %s: %s\n\n" "$count" "$title" "$hint"
+  fi
+  warning_count=$((warning_count + count))
+}
+
+report ".system(size:)" \
+  "use AppFont (Dynamic Type); a fixed size is only for an SF Symbol in a fixed-size control" \
+  '\.system\(size:'
+
+report "numeric cornerRadius" \
+  "use HXRadius (xs 6, sm 10, md 14, lg 18, xl 28) or HXCardRole.shape" \
+  'cornerRadius: *[0-9]'
+
+report "raw material" \
+  "content cards are opaque (hxCard, HXCard); floating controls use .glassEffect" \
+  '\.(ultraThin|thin|regular|thick|ultraThick)Material\b'
+
+report "raw color outside Config/" \
+  "use the hx* neutrals or a HermexPaper; new tokens go in Config/" \
+  'Color\(red:|Color\(hex|UIColor\(red:|"#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?"|0x[0-9A-Fa-f]{6}\b' \
+  '^HermesMobile/Config/'
+
+if (( warning_count == 0 )); then
+  echo "No design drift found."
+else
+  echo "$warning_count design drift warning(s). Not a gate: fix what you touch."
+fi

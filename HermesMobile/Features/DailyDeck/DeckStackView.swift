@@ -28,8 +28,9 @@ struct DeckStackView: View {
             DeckPageView(page: page, viewModel: viewModel, file: file, contentOpacity: contentOpacity)
         } edge: { page in
             // Far down the stack only the card's paper shows, peeking out askew.
-            DeckPageView.shape
-                .fill(DeckPalette.of(page).paper)
+            let role = DeckPalette.of(page).cardRole
+            role.shape
+                .fill(role.fill)
                 .hxShadow(.stacked)
                 .padding(.vertical, 12)
         }

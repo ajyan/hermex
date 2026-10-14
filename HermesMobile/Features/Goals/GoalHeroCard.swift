@@ -13,11 +13,10 @@ struct GoalHeroCard: View {
     var selection: (today: String, yesterday: String, selected: GoalDay)?
     var onSelect: (GoalDay) -> Void = { _ in }
 
-    private static let shape = RoundedRectangle(cornerRadius: HXRadius.xl, style: .continuous)
-
     var body: some View {
         let palette = GoalPaper.palette(for: goal)
-        VStack(alignment: .leading, spacing: BrainStyle.s) {
+        HXCard(.glow(palette.colors), title: goal.title, titleStyle: isCompact ? .title3 : .title,
+               spacing: BrainStyle.s) {
             HStack(alignment: .firstTextBaseline) {
                 Text(verbatim: GoalHeroCopy.countdown(goal))
                     .font(BrainStyle.meta)
@@ -28,9 +27,7 @@ struct GoalHeroCard: View {
 
                     .accessibilityHidden(true)
             }
-            Text(verbatim: goal.title)
-                .font(AppFont.display(style: isCompact ? .title3 : .title, weight: .semibold))
-                .fixedSize(horizontal: false, vertical: true)
+        } content: {
             if !goal.identity.isEmpty {
                 Text(verbatim: GoalHeroCopy.sentenceCase(goal.identity))
                     .font(AppFont.display(style: .subheadline, weight: .medium))
@@ -47,16 +44,12 @@ struct GoalHeroCard: View {
                               selection: selection, onSelect: onSelect)
                     .padding(.top, BrainStyle.xs)
             }
+        } footer: {
             Text(verbatim: GoalHeroCopy.weekSummary(goal.week.commitments))
                 .font(BrainStyle.meta)
                 .monospacedDigit()
         }
         .foregroundStyle(palette.ink)
-        .padding(BrainStyle.l)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(palette.colors.card, in: Self.shape)
-        .overlay(Self.shape.strokeBorder(palette.colors.edge, lineWidth: 0.5))
-        .hxShadow(.paper)
     }
 }
 

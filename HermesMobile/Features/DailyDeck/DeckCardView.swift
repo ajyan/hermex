@@ -12,8 +12,6 @@ struct DeckPageView: View {
     /// Cards under the top one show only their paper; their words fade in as they rise.
     var contentOpacity: Double = 1
 
-    static let shape = RoundedRectangle(cornerRadius: HXRadius.xl, style: .continuous)
-
     var body: some View {
         let palette = DeckPalette.of(page)
         Group {
@@ -25,10 +23,7 @@ struct DeckPageView: View {
             }
         }
         .opacity(contentOpacity)
-        .background(palette.paper, in: Self.shape)
-        .overlay(Self.shape.strokeBorder(palette.edge, lineWidth: 0.5))
-        .clipShape(Self.shape)
-        .hxShadow(.paper)
+        .hxCardSurface(palette.cardRole, clipsContent: true)
         .padding(.vertical, 12)
     }
 }

@@ -178,8 +178,9 @@ struct BrainHomeView: View {
                 }
             } edge: { page in
                 // Far down the stack only the card's paper shows, peeking out askew.
-                BrainDeckCard.shape
-                    .fill(Self.edgeFill(page))
+                let role = Self.cardRole(page)
+                role.shape
+                    .fill(role.fill)
                     .hxShadow(.stacked)
                     .padding(.vertical, 12)
             }
@@ -210,10 +211,10 @@ struct BrainHomeView: View {
         .bite(bite.ref.module, bite.ref.id, idea: bite.kind == .idea ? bite.index : nil)
     }
 
-    private static func edgeFill(_ page: BrainReviewPage) -> Color {
+    private static func cardRole(_ page: BrainReviewPage) -> HXCardRole {
         switch page {
-        case .bite(let bite): bite.paper.card
-        case .summary: .hxSurface
+        case .bite(let bite): .glow(bite.paper)
+        case .summary: .summary
         }
     }
 }
