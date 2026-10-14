@@ -16,6 +16,9 @@ struct BrainPersonLayout: Equatable {
         let preview: [String]
         /// Bullets beyond the headline and preview.
         let moreCount: Int
+        /// The encounter holds more than the headline and preview show: hidden bullets, or body
+        /// lines that are not bullets (prose, `_Source:` lines, `####` subheads).
+        let canExpand: Bool
     }
 
     /// Relationship, location, and "seen <relative>", non-empty parts joined by " · ".
@@ -154,14 +157,26 @@ struct BrainPersonLayout: Equatable {
         }
         var meta = BrainStyle.displayDate(encounter.date)
         if let ago = days.daysAgo(encounter.date) { meta += " · " + relative(daysAgo: ago) }
+        let preview = Array(rest.prefix(2))
+        let moreCount = max(0, rest.count - 2)
         return Entry(id: encounter.id, kind: .encounter(encounter), meta: meta, headline: headline,
-                     preview: Array(rest.prefix(2)), moreCount: max(0, rest.count - 2))
+                     preview: preview, moreCount: moreCount,
+                     canExpand: moreCount > 0 || hasUnshownLines(encounter.body, shown: [headline] + preview))
+    }
+
+    /// Whether `body` has a non-blank line, list marker aside, that none of `shown` contains.
+    private static func hasUnshownLines(_ body: String, shown: [String]) -> Bool {
+        let visible = Set(shown.flatMap { $0.split(whereSeparator: \.isNewline) }.map { stripMarker(String($0)) })
+        return body.split(whereSeparator: \.isNewline).contains { line in
+            let text = stripMarker(String(line))
+            return !text.isEmpty && !visible.contains(text)
+        }
     }
 
     private static func journalEntry(_ mention: BrainJournalMention) -> Entry {
         Entry(id: "journal:" + mention.id, kind: .journal(mention),
               meta: "Journal · " + BrainStyle.displayDate(mention.date),
-              headline: stripMarker(mention.snippet), preview: [], moreCount: 0)
+              headline: stripMarker(mention.snippet), preview: [], moreCount: 0, canExpand: false)
     }
 
     /// Drops one leading "- " or "* " list marker; nested lines after the first newline are kept.

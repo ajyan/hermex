@@ -78,8 +78,9 @@ struct BrainPersonTimeline: View {
     }
 }
 
-/// One encounter on a neutral card: when, the headline, two more bullets and "N more". Tapping
-/// the card swaps the preview for the encounter's full Markdown, where its links open.
+/// One encounter on a neutral card: when, the headline, two more bullets and "N more" (or "More"
+/// when the rest is prose). Tapping the card swaps the preview for the encounter's full Markdown,
+/// where its links open.
 struct BrainEncounterCard: View {
     let entry: BrainPersonLayout.Entry
     private let markdown: String
@@ -88,7 +89,8 @@ struct BrainEncounterCard: View {
     private let preview: [AttributedString]
     /// Untitled encounters lead with their first bullet, which the full Markdown repeats.
     private let keepsHeadlineExpanded: Bool
-    private let canExpand: Bool
+    /// An empty body leaves nothing to open, so the header is plain content, not a button.
+    private let hasBody: Bool
     @State private var expanded = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -98,41 +100,23 @@ struct BrainEncounterCard: View {
         self.headline = Self.unlinked(entry.headline)
         self.preview = entry.preview.map(Self.unlinked)
         self.keepsHeadlineExpanded = !(encounter.title ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        self.canExpand = !encounter.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        self.hasBody = !encounter.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
-            Button(action: toggle) {
-                VStack(alignment: .leading, spacing: BrainStyle.xs) {
-                    Text(verbatim: entry.meta)
-                        .brainText(.meta)
-                    if !entry.headline.isEmpty, !expanded || keepsHeadlineExpanded {
-                        Text(headline)
-                            .brainText(.rowTitle)
-                            .fontWeight(.semibold)
-                            .lineLimit(1)
-                    }
-                    if !expanded {
-                        if !preview.isEmpty {
-                            BrainBulletList(lines: preview, bullet: Color.hxTextSecondary)
-                        }
-                        if entry.moreCount > 0 {
-                            Text(verbatim: "\(entry.moreCount) more")
-                                .font(BrainStyle.rowSubtitle.weight(.semibold))
-                                .foregroundStyle(Color.accentColor)
-                        }
-                    }
+            Group {
+                if hasBody {
+                    Button(action: toggle) { header }
+                        .buttonStyle(.plain)
+                } else {
+                    header
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .disabled(!canExpand)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text(verbatim: accessibilityLabel))
-            .accessibilityValue(Text(verbatim: canExpand ? (expanded ? "Expanded" : "Collapsed") : ""))
-            .accessibilityHint(Text(verbatim: canExpand ? "Shows or hides every note" : ""))
+            .accessibilityValue(Text(verbatim: hasBody ? (expanded ? "Expanded" : "Collapsed") : ""))
+            .accessibilityHint(Text(verbatim: hasBody ? "Shows or hides every note" : ""))
             if expanded {
                 MarkdownRenderer(content: markdown)
             }
@@ -141,6 +125,32 @@ struct BrainEncounterCard: View {
         .padding(.vertical, BrainStyle.cardVerticalPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .brainCardSurface()
+    }
+
+    /// The meta line, headline and preview; the whole row (at least a tap target tall) toggles.
+    private var header: some View {
+        VStack(alignment: .leading, spacing: BrainStyle.xs) {
+            Text(verbatim: entry.meta)
+                .brainText(.meta)
+            if !entry.headline.isEmpty, !expanded || keepsHeadlineExpanded {
+                Text(headline)
+                    .brainText(.rowTitle)
+                    .fontWeight(.semibold)
+                    .lineLimit(1)
+            }
+            if !expanded {
+                if !preview.isEmpty {
+                    BrainBulletList(lines: preview, bullet: Color.hxTextSecondary)
+                }
+                if entry.canExpand {
+                    Text(verbatim: entry.moreCount > 0 ? "\(entry.moreCount) more" : "More")
+                        .font(BrainStyle.rowSubtitle.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .topLeading)
+        .contentShape(Rectangle())
     }
 
     /// "Oct 8, 2026 · 6 days ago. Gallery crawl. 2 more notes."

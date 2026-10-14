@@ -94,6 +94,30 @@ final class BrainPersonLayoutTests: XCTestCase {
         XCTAssertEqual(second.moreCount, 2)
     }
 
+    func testCanExpandWhenBodyHoldsMoreThanThePreview() {
+        let prose = BrainEncounter(id: "p", date: "2026-10-08", title: "Walk", bullets: ["- a"],
+                                   body: "- a\n\n_Source: invented note_")
+        let subhead = BrainEncounter(id: "s", date: "2026-10-07", bullets: ["- a", "- b"],
+                                     body: "- a\n#### Later\n- b")
+        let hidden = BrainEncounter(id: "h", date: "2026-10-06", title: "T", bullets: ["- a", "- b", "- c"],
+                                    body: "- a\n- b\n- c")
+        let timeline = layout(BrainPerson(encounters: [prose, subhead, hidden])).timeline
+        XCTAssertEqual(timeline.map(\.moreCount), [0, 0, 1])
+        XCTAssertEqual(timeline.map(\.canExpand), [true, true, true])
+    }
+
+    func testCannotExpandWhenThePreviewShowsEverything() {
+        let titled = BrainEncounter(id: "t", date: "2026-10-08", title: "Tea", bullets: ["- a", "* b"],
+                                    body: "- a\n\n* b\n")
+        let untitled = BrainEncounter(id: "u", date: "2026-10-07", bullets: ["- one", "- two\n  - nested"],
+                                      body: "- one\n- two\n  - nested")
+        let empty = BrainEncounter(id: "e", date: "2026-10-06", title: "Call")
+        let timeline = layout(BrainPerson(
+            encounters: [titled, untitled, empty],
+            journal: [BrainJournalMention(id: "j", date: "2026-10-05", snippet: "Saw Ada.", mention: "Ada")])).timeline
+        XCTAssertEqual(timeline.map(\.canExpand), [false, false, false, false])
+    }
+
     func testNestedBulletKeepsNewlines() {
         let encounter = BrainEncounter(id: "n", date: "2026-10-01", title: "T", bullets: ["- parent\n  - child"])
         XCTAssertEqual(layout(BrainPerson(encounters: [encounter])).timeline[0].preview, ["parent\n  - child"])
