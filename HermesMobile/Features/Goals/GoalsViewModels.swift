@@ -9,6 +9,12 @@ private func goalsFailureState<Value>(_ error: Error) -> BrainLoadState<Value> {
     ((error as? APIError)?.isNotFound ?? false) ? .unavailable : .failed(error.localizedDescription)
 }
 
+/// A reload that fails without a 404 keeps what's on screen; only a first load shows the error.
+private func goalsKeepsContent<Value>(_ state: BrainLoadState<Value>, after error: Error) -> Bool {
+    guard case .loaded = state else { return false }
+    return !((error as? APIError)?.isNotFound ?? false)
+}
+
 /// The Goals landing screen (and Brain's Goals row): streak, active goals, agent goals.
 @MainActor
 @Observable
@@ -33,6 +39,7 @@ final class GoalsHomeViewModel {
         } catch {
             guard token == generation, !goalsIsCancellation(error) else { return }
             onAPIError(error)
+            if goalsKeepsContent(state, after: error) { return }
             state = goalsFailureState(error)
         }
     }
@@ -53,6 +60,7 @@ final class GoalDetailViewModel {
     /// Commitment and check ids with a check-in in flight; further taps on them are ignored.
     private(set) var pending: Set<String> = []
     private(set) var error: String?
+    static let refreshFailed = "Couldn't refresh. Pull to try again."
 
     let slug: String
     @ObservationIgnored private let client: GoalsDataClient
@@ -72,9 +80,14 @@ final class GoalDetailViewModel {
             let detail = try await client.detail(slug: slug)
             guard token == generation, !Task.isCancelled else { return }
             state = .loaded(detail)
+            if error == Self.refreshFailed { error = nil }
         } catch {
             guard token == generation, !goalsIsCancellation(error) else { return }
             onAPIError(error)
+            if goalsKeepsContent(state, after: error) {
+                self.error = Self.refreshFailed
+                return
+            }
             state = goalsFailureState(error)
         }
     }
@@ -97,7 +110,8 @@ final class GoalDetailViewModel {
         }
     }
 
-    /// Applies the optimistic edit, posts, then takes the server's summary or restores the snapshot.
+    /// Applies the optimistic edit, posts, then takes the server's summary or restores this
+    /// item's pre-tap values (never another check-in's, which may have landed meanwhile).
     private func send(id: String, edit: (inout GoalDetail, String, String) -> GoalCheckInRequest) async {
         guard case .loaded(let snapshot) = state, !pending.contains(id) else { return }
         // The server's dates, never the phone's: the server decides what "today" is.
@@ -124,8 +138,23 @@ final class GoalDetailViewModel {
                 return
             }
             onAPIError(error)
-            state = .loaded(snapshot)
+            if case .loaded(var current) = state {
+                Self.restore(id, from: snapshot, in: &current)
+                state = .loaded(current)
+            }
             self.error = "Couldn't save. Try again."
+        }
+    }
+
+    /// Puts one commitment's or daily check's values from `snapshot` back into `detail`.
+    private static func restore(_ id: String, from snapshot: GoalDetail, in detail: inout GoalDetail) {
+        if let old = snapshot.summary.week.commitments.first(where: { $0.id == id }),
+           let i = detail.summary.week.commitments.firstIndex(where: { $0.id == id }) {
+            detail.summary.week.commitments[i] = old
+        }
+        if let old = snapshot.summary.dailyChecks.first(where: { $0.id == id }),
+           let i = detail.summary.dailyChecks.firstIndex(where: { $0.id == id }) {
+            detail.summary.dailyChecks[i] = old
         }
     }
 
@@ -134,9 +163,14 @@ final class GoalDetailViewModel {
         guard let i = detail.summary.week.commitments.firstIndex(where: { $0.id == id }) else { return }
         var row = detail.summary.week.commitments[i]
         let old: GoalStatus? = date == detail.today ? row.today : row.yesterday
-        if date >= detail.summary.week.start, date <= detail.summary.week.end {
-            adjust(&row, old, by: -1)
-            if status != .clear { adjust(&row, status, by: 1) }
+        let week = detail.summary.week
+        if date >= week.start, date <= week.end {
+            // Skip days this row is known to have: the counted ones, or today and yesterday.
+            let shown = [(detail.today, row.today), (detail.yesterday, row.yesterday)]
+                .filter { $0.1 == .skip && $0.0 >= week.start && $0.0 <= week.end }.count
+            let skipDays = max(row.skipped, shown)
+            adjust(&row, old, by: -1, skipDays: skipDays)
+            if status != .clear { adjust(&row, status, by: 1, skipDays: skipDays) }
             row.remaining = max(0, row.target - row.done - row.min)
             row.hit = row.done + row.min >= row.target
         }
@@ -145,12 +179,15 @@ final class GoalDetailViewModel {
         detail.summary.week.commitments[i] = row
     }
 
-    private static func adjust(_ row: inout GoalCommitmentProgress, _ status: GoalStatus?, by n: Int) {
+    /// The server counts a week's skips in day order and any past the budget as misses, so
+    /// adding one with the budget spent, or removing one while `skipDays` exceeds it, moves `missed`.
+    private static func adjust(_ row: inout GoalCommitmentProgress, _ status: GoalStatus?, by n: Int, skipDays: Int) {
         switch status {
         case .done: row.done += n
         case .min: row.min += n
         case .skip:
-            if n > 0, row.skipped >= row.skips { row.missed += n } else { row.skipped += n }
+            let overBudget = n > 0 ? row.skipped >= row.skips : skipDays > row.skips
+            if overBudget { row.missed += n } else { row.skipped += n }
         case .miss: row.missed += n
         default: break
         }
