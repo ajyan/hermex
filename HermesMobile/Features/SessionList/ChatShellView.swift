@@ -693,9 +693,14 @@ struct ChatShellView: View {
             PrepRunView(server: server, onAPIError: authManager.handleAPIError)
         case .prep(.gap(let id)):
             PrepGapView(id: id, server: server, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
         case .prep(.lesson(let id)):
             PrepLessonView(id: id, server: server, onAPIError: authManager.handleAPIError)
                 .adaptiveSecondaryNavigationTitle()
+        case .prep(.testout(let unit)):
+            PrepRunView(server: server, run: .testout, unit: unit, onAPIError: authManager.handleAPIError)
+        case .prep(.mock):
+            PrepRunView(server: server, run: .mock, onAPIError: authManager.handleAPIError)
         }
     }
 

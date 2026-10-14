@@ -30,6 +30,7 @@
 		B1A1C0DE00000000000F0003 /* GoalsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0002 /* GoalsModels.swift */; };
 		B1A1C0DE0000000000000E17 /* PrepViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E18 /* PrepViewModels.swift */; };
 		B1A1C0DE0000000000000E21 /* PrepHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E22 /* PrepHomeView.swift */; };
+		C0F5E9630000000000000000 /* PrepCourseViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F5E9620000000000000000 /* PrepCourseViews.swift */; };
 		B1A1C0DE0000000000000E23 /* PrepTrackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E24 /* PrepTrackView.swift */; };
 		B1A1C0DE0000000000000E25 /* PrepRunView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E26 /* PrepRunView.swift */; };
 		C0F5EE310000000000000000 /* PrepLessonViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F5EE300000000000000000 /* PrepLessonViews.swift */; };
@@ -800,6 +801,7 @@
 		B1A1C0DE00000000000F0002 /* GoalsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsModels.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E18 /* PrepViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepViewModels.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E22 /* PrepHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepHomeView.swift; sourceTree = "<group>"; };
+		C0F5E9620000000000000000 /* PrepCourseViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepCourseViews.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E24 /* PrepTrackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepTrackView.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E26 /* PrepRunView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepRunView.swift; sourceTree = "<group>"; };
 		C0F5EE300000000000000000 /* PrepLessonViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepLessonViews.swift; sourceTree = "<group>"; };
@@ -1576,6 +1578,7 @@
 				B1A1C0DE0000000000000E04 /* PrepDataClient.swift */,
 				B1A1C0DE0000000000000E18 /* PrepViewModels.swift */,
 				B1A1C0DE0000000000000E22 /* PrepHomeView.swift */,
+				C0F5E9620000000000000000 /* PrepCourseViews.swift */,
 				B1A1C0DE0000000000000E24 /* PrepTrackView.swift */,
 				B1A1C0DE0000000000000E26 /* PrepRunView.swift */,
 				C0F5EE300000000000000000 /* PrepLessonViews.swift */,
@@ -2854,6 +2857,7 @@
 				B1A1C0DE0000000000000E03 /* PrepDataClient.swift in Sources */,
 				B1A1C0DE0000000000000E17 /* PrepViewModels.swift in Sources */,
 				B1A1C0DE0000000000000E21 /* PrepHomeView.swift in Sources */,
+				C0F5E9630000000000000000 /* PrepCourseViews.swift in Sources */,
 				B1A1C0DE0000000000000E23 /* PrepTrackView.swift in Sources */,
 				B1A1C0DE0000000000000E25 /* PrepRunView.swift in Sources */,
 				C0F5EE310000000000000000 /* PrepLessonViews.swift in Sources */,

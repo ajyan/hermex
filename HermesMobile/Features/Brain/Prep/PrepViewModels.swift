@@ -27,6 +27,9 @@ final class PrepHomeViewModel {
     /// The gap ledger; nil when the server has no gaps route (an older fork) or it failed,
     /// in which case the home shows the older "Needs work" section instead.
     private(set) var gaps: [PrepGapSummary]?
+    /// The course path with the current unit's lessons; nil on servers without a course. When the full
+    /// path fails to load, home's summary (units without lessons) stands in.
+    private(set) var course: PrepCourse?
     @ObservationIgnored private let client: PrepDataClient
     @ObservationIgnored private var generation = 0
 
@@ -43,9 +46,14 @@ final class PrepHomeViewModel {
         async let gapsLoad = try? await client.gaps()
         do {
             let home = try await client.home()
+            var course: PrepCourse?
+            if let summary = home.course {
+                course = (try? await client.course()) ?? summary
+            }
             let gaps = await gapsLoad
             guard token == generation, !Task.isCancelled else { return }
             self.gaps = gaps
+            self.course = course
             state = .loaded(home)
         } catch {
             guard token == generation, !prepIsCancellation(error) else { return }
@@ -526,6 +534,18 @@ enum PrepCopy {
         let parts = [reviews > 0 ? "\(reviews) review\(reviews == 1 ? "" : "s")" : nil,
                      missed > 0 ? "\(missed) check\(missed == 1 ? "" : "s") to look at again" : nil]
         return parts.compactMap { $0 }.joined(separator: " · ")
+    }
+
+    static func unitHeader(index: Int, title: String) -> String { "Unit \(index + 1) · \(title)" }
+
+    /// The ring card's line: the streak once there is one, then XP.
+    static func todayLine(days: Int, xp: Int) -> String {
+        days > 0 ? "\(streak(days: days)) · \(xp) XP" : "\(xp) XP"
+    }
+
+    static func bossNode(_ state: PrepBossState, next: String?) -> String {
+        if state == .ready { return "Boss quiz · ready" }
+        return next.map { "Boss quiz · unlocks \($0)" } ?? "Boss quiz"
     }
 
     static func starsLabel(_ stars: Int) -> String { "\(stars) of 3 stars" }

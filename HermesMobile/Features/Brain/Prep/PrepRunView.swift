@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Today's run, one rep per screen. Pushed as `.brainRoute(.prep(.run))`; owns no
+/// A run, one rep per screen: today's (`.brainRoute(.prep(.run))`), a test out (`.prep(.testout(unit))`)
+/// or a mock (`.prep(.mock)`). Owns no
 /// `NavigationStack`. Closing pops: the server records every answer, so closing is
 /// save and quit. The drills themselves live in `PrepDrillViews.swift`.
 struct PrepRunView: View {
@@ -26,9 +27,10 @@ struct PrepRunView: View {
         var fix: String?
     }
 
-    init(server: URL, onAPIError: @escaping (Error) -> Void) {
+    init(server: URL, run: PrepRunKind = .daily, unit: String? = nil, onAPIError: @escaping (Error) -> Void) {
         self.init(viewModel: PrepRunViewModel(
-            client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
+            client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server)), run: run, unit: unit,
+            onAPIError: onAPIError))
     }
 
     init(viewModel: PrepRunViewModel) {

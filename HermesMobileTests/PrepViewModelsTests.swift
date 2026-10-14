@@ -313,6 +313,49 @@ final class PrepViewModelsTests: XCTestCase {
                        "The lessons below come back tomorrow, then the boss again.")
     }
 
+    func testHomeExposesCourseWhenPresent() async {
+        let client = FakePrepClient()
+        client.homeResults = [.success(courseHome(xp: 40))]
+        client.courseResults = [.success(decode(PrepCourse.self, #"""
+        {"xp": 40, "today": {"done": 0, "total": 10}, "units": [
+          {"id": "u1", "title": "LLM fundamentals", "state": "current", "lessons": [{"id": "u1.l1", "title": "Tokens", "state": "next"}]},
+          {"id": "u2", "title": "Prompt engineering", "state": "locked"}]}
+        """#))]
+        let vm = PrepHomeViewModel(client: client)
+        await vm.load()
+        XCTAssertEqual(vm.course?.units.count, 2)
+        XCTAssertEqual(vm.course?.units.first?.lessons.first?.state, .next)
+        XCTAssertTrue(client.log.contains("course"))
+    }
+
+    func testHomeWithoutCourseSkipsCourseCall() async {
+        let client = FakePrepClient()
+        client.homeResults = [.success(decode(PrepHome.self, #"{"streak": {"days": 1, "freezes": 0}}"#))]
+        let vm = PrepHomeViewModel(client: client)
+        await vm.load()
+        XCTAssertNil(vm.course)
+        XCTAssertFalse(client.log.contains("course"))
+    }
+
+    func testHomeFallsBackToHomeCourseWhenCourseFails() async {
+        let client = FakePrepClient()
+        client.homeResults = [.success(courseHome(xp: 40))]
+        client.courseResults = [.failure(http(500))]
+        let vm = PrepHomeViewModel(client: client)
+        await vm.load()
+        XCTAssertEqual(vm.course?.xp, 40)
+        XCTAssertEqual(vm.course?.units.first?.lessons, [])
+    }
+
+    func testPathCopy() {
+        XCTAssertEqual(PrepCopy.unitHeader(index: 1, title: "Prompt engineering"), "Unit 2 · Prompt engineering")
+        XCTAssertEqual(PrepCopy.todayLine(days: 6, xp: 340), "6-day streak · 340 XP")
+        XCTAssertEqual(PrepCopy.todayLine(days: 0, xp: 0), "0 XP")
+        XCTAssertEqual(PrepCopy.bossNode(.ready, next: "Agents"), "Boss quiz · ready")
+        XCTAssertEqual(PrepCopy.bossNode(.locked, next: "Agents"), "Boss quiz · unlocks Agents")
+        XCTAssertEqual(PrepCopy.bossNode(.locked, next: nil), "Boss quiz")
+    }
+
     // MARK: Home / track
 
     func testHome404IsUnavailable() async {
