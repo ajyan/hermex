@@ -59,4 +59,28 @@ final class BrainCacheTests: XCTestCase {
         XCTAssertNil(try BrainCache.load(Payload.self, server: a, kind: "page", id: "p1", in: ctx))
         XCTAssertNotNil(try BrainCache.load(Payload.self, server: b, kind: "page", id: "p1", in: ctx))
     }
+
+    func testHomeDeckIsCachedByDayAndBatch() async throws {
+        let cache = BrainCacheHandle(server: a, context: try makeContext())
+        let deck = BrainHome(
+            bites: [BrainBite(id: "b1", kind: .idea, text: "An idea", ref: BrainRef(module: .wiki, id: "wiki/a.md", title: "A"))],
+            batch: 0, hasMore: false)
+        let client = FakeBrainClient()
+        client.homeResult = .success(deck)
+        let store = BrainReviewStore(defaults: UserDefaults(suiteName: UUID().uuidString)!)
+        let online = BrainHomeViewModel(client: client, cache: cache, reviewStore: store, today: { "2026-10-14" })
+        await online.load()
+        let context = try XCTUnwrap(cache.context)
+        XCTAssertEqual(try BrainCache.load(BrainHome.self, server: cache.server, kind: "home", id: "2026-10-14-0", in: context), deck)
+
+        // A new day offline never shows yesterday's deck as today's.
+        client.homeResult = .failure(URLError(.notConnectedToInternet))
+        let nextDay = BrainHomeViewModel(client: client, cache: cache, reviewStore: store, today: { "2026-10-15" })
+        await nextDay.load()
+        XCTAssertTrue(nextDay.home.isEmpty)
+        // The same day offline still has its cached deck.
+        let sameDay = BrainHomeViewModel(client: client, cache: cache, reviewStore: store, today: { "2026-10-14" })
+        await sameDay.load()
+        XCTAssertEqual(sameDay.home, deck)
+    }
 }

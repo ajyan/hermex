@@ -1,17 +1,25 @@
 import SwiftData
 import SwiftUI
 
-/// The Brain's front door: a search field, then doors into the vault (a page brought back
-/// from a while ago, the hubs where pages meet, what changed recently), then the modules.
+/// The Brain's front door: a search field, the modules as a chip strip, then today's review
+/// deck of ten bites from saved reading.
 /// Pushed onto the shell's navigation stack, so it must not own a `NavigationStack`;
 /// every Brain screen is pushed as `ShellPushDestination.brainRoute(_:)`.
 /// Copy is English-only (personal fork).
 struct BrainHomeView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: BrainHomeViewModel
     @State private var searchViewModel: BrainSearchViewModel
-    /// Prep's summary for its row; the row shows only once it loads.
+    /// Prep's summary; its chip shows only once it loads.
     @State private var prepViewModel: PrepHomeViewModel
-    /// Programmatic pushes (graph nodes, `brain://` links) for the screens below.
+    /// The review deck's height: about the rest of an iPhone screen, growing with Dynamic Type
+    /// until it would run past the screen (`fittedDeckHeight`).
+    @ScaledMetric(relativeTo: .body) private var deckHeight: CGFloat = 480
+    /// The home scroll view's visible height, under the bars.
+    @State private var viewportHeight: CGFloat = 0
+    /// Where the deck starts in the home's content: the strip and header above it.
+    @State private var deckTop: CGFloat = 0
+    /// Programmatic pushes (graph nodes, `brain://` links, review bites) for the screens below.
     private let push: (BrainRoute) -> Void
 
     init(
@@ -38,8 +46,12 @@ struct BrainHomeView: View {
                 searchViewModel.resume()
                 await viewModel.load()
             }
-            // Alongside the modules; a server without Prep just never shows the row.
+            // Alongside the modules; a server without Prep just never shows the chip.
             .task { await prepViewModel.load() }
+            .onChange(of: scenePhase) { _, phase in
+                // Left open overnight, the deck moves on to the new day's ten.
+                if phase == .active, viewModel.needsNewDay { Task { await viewModel.load() } }
+            }
             .onDisappear { searchViewModel.cancel() }
     }
 
@@ -101,64 +113,19 @@ struct BrainHomeView: View {
         )
     }
 
-    private var isShowingPrepRow: Bool {
+    private var isShowingPrepChip: Bool {
         if case .loaded = prepViewModel.state { return true }
         return false
     }
 
-    /// Rediscover, Hubs and Recently changed (when the server sends them), then the modules
-    /// as one neutral card (DESIGN.md § Components).
+    /// The modules as a chip strip, then today's review deck (DESIGN.md § Components).
     private var moduleList: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: BrainStyle.s) {
-                if let pick = viewModel.rediscoverPick {
-                    BrainRediscoverCard(
-                        item: pick,
-                        canShowAnother: viewModel.home.rediscover.count > 1,
-                        onAnother: viewModel.showAnotherPick
-                    )
-                    .padding(.bottom, BrainStyle.m)
+            VStack(alignment: .leading, spacing: BrainStyle.l) {
+                BrainModuleStrip(modules: viewModel.modules, showsPrep: isShowingPrepChip)
+                if !viewModel.reviewPages.isEmpty {
+                    review.padding(.horizontal, 16)
                 }
-                if !viewModel.home.hubs.isEmpty {
-                    HXSectionHeader(title: "Hubs", trailing: "Where your pages meet")
-                    hubList.padding(.bottom, BrainStyle.m)
-                }
-                if !viewModel.home.recent.isEmpty {
-                    HXSectionHeader(title: "Recently changed")
-                    recentList.padding(.bottom, BrainStyle.m)
-                }
-                if !viewModel.home.isEmpty {
-                    HXSectionHeader(title: "Library")
-                }
-                VStack(spacing: 0) {
-                    ForEach(Array(viewModel.modules.enumerated()), id: \.element.id) { index, module in
-                        if index > 0 { moduleDivider }
-                        NavigationLink(value: ShellPushDestination.brainRoute(.module(module.id))) {
-                            BrainRow(
-                                leading: { BrainModuleIcon(module: module.id) },
-                                title: module.title.isEmpty ? module.id.defaultTitle : module.title,
-                                subtitle: module.subtitle,
-                                trailing: "\(module.count)"
-                            )
-                            .moduleRowPadding()
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    if case .loaded(let home) = prepViewModel.state {
-                        if !viewModel.modules.isEmpty { moduleDivider }
-                        NavigationLink(value: ShellPushDestination.brainRoute(.prep(.home))) {
-                            BrainRow(
-                                leading: { BrainModuleIcon(systemName: "target", paper: .knowledge) },
-                                title: "Interview prep",
-                                subtitle: PrepCopy.homeRowSubtitle(
-                                    streakDays: home.streak.days, remaining: home.run.remaining)
-                            )
-                            .moduleRowPadding()
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .hxCard()
                 if viewModel.isShowingCachedCopy {
                     Text(verbatim: "Offline, showing saved copy")
                         .brainText(.meta)
@@ -166,11 +133,16 @@ struct BrainHomeView: View {
                         .padding(.vertical, BrainStyle.s)
                 }
             }
-            .padding(.horizontal, 16)
             .padding(.vertical, BrainStyle.m)
+            .coordinateSpace(.named(Self.contentSpace))
+        }
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.height - proxy.safeAreaInsets.top - proxy.safeAreaInsets.bottom
+        } action: { height in
+            viewportHeight = height
         }
         .overlay {
-            if viewModel.modules.isEmpty, !isShowingPrepRow {
+            if viewModel.modules.isEmpty, !isShowingPrepChip, viewModel.reviewPages.isEmpty {
                 ContentUnavailableView {
                     Label { Text(verbatim: "Nothing in the Brain yet") } icon: { Image(systemName: "brain") }
                 } description: {
@@ -184,112 +156,61 @@ struct BrainHomeView: View {
             await prep
         }
     }
-}
 
-private extension BrainHomeView {
-    var moduleDivider: some View {
-        Rectangle().fill(Color.hxSeparator).frame(height: 0.5).padding(.leading, 60)
-    }
-
-    var hubList: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(viewModel.home.hubs.enumerated()), id: \.element.ref.id) { index, hub in
-                if index > 0 { moduleDivider }
-                NavigationLink(value: ShellPushDestination.brainRoute(.page(hub.ref.module, hub.ref.id))) {
-                    BrainRow(
-                        leading: { BrainModuleIcon(systemName: "point.3.connected.trianglepath.dotted", paper: .knowledge) },
-                        title: hub.ref.title,
-                        subtitle: hub.inside.joined(separator: ", "),
-                        trailing: "\(hub.count)",
-                        subtitleLineLimit: 1
-                    )
-                    .moduleRowPadding()
+    /// "Review · 3 of 10" over the day's deck of bites, ending on the summary card.
+    private var review: some View {
+        let bites = viewModel.home.bites
+        return VStack(alignment: .leading, spacing: BrainStyle.xs) {
+            HXSectionHeader(title: "Review", trailing: "\(min(viewModel.reviewIndex + 1, bites.count)) of \(bites.count)")
+                .padding(.horizontal, 4)
+            CardStack(
+                pages: viewModel.reviewPages,
+                index: $viewModel.reviewIndex,
+                tilt: { DeckStackView.tilt(ofID: $0.id) }
+            ) { page, contentOpacity in
+                switch page {
+                case .bite(let bite):
+                    BrainBiteCard(bite: bite, open: { open(bite) }, contentOpacity: contentOpacity)
+                case .summary:
+                    BrainReviewSummaryCard(bites: bites, hasMore: viewModel.home.hasMore,
+                                           onMore: { await viewModel.dealMore() }, contentOpacity: contentOpacity)
                 }
-                .buttonStyle(.plain)
+            } edge: { page in
+                // Far down the stack only the card's paper shows, peeking out askew.
+                BrainBiteCard.shape
+                    .fill(Self.edgeFill(page))
+                    .hxShadow(.stacked)
+                    .padding(.vertical, 12)
+            }
+            .frame(height: fittedDeckHeight)
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.frame(in: .named(Self.contentSpace)).minY
+            } action: { top in
+                deckTop = top
             }
         }
-        .hxCard()
     }
 
-    var recentList: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(viewModel.home.recent.enumerated()), id: \.element.id) { index, item in
-                if index > 0 { moduleDivider }
-                NavigationLink(value: ShellPushDestination.brainRoute(.page(item.module, item.id))) {
-                    BrainRow(
-                        leading: { BrainModuleIcon(module: item.module) },
-                        title: item.title,
-                        subtitle: BrainStyle.displayDate(item.date),
-                        subtitleLineLimit: 1
-                    )
-                    .moduleRowPadding()
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .hxCard()
+    private static let contentSpace = "brainHomeContent"
+    /// The smallest the deck gets on a short screen (landscape, the largest text).
+    private static let minimumDeckHeight: CGFloat = 240
+
+    /// The scaled deck height, cut to what fits on screen below the strip and header when the
+    /// home is scrolled to the top, so the footer stays visible and the card scrolls inside.
+    private var fittedDeckHeight: CGFloat {
+        guard viewportHeight > 0 else { return deckHeight }
+        let available = viewportHeight - deckTop - BrainStyle.m
+        return max(min(deckHeight, available), Self.minimumDeckHeight)
     }
-}
 
-/// A page brought back from a while ago: the screen's one glow card, in the page's paper,
-/// with Open and Another (today's other picks).
-struct BrainRediscoverCard: View {
-    let item: BrainItem
-    let canShowAnother: Bool
-    let onAnother: () -> Void
-
-    var body: some View {
-        let paper = item.module.paper
-        let shape = RoundedRectangle(cornerRadius: HXRadius.xl, style: .continuous)
-        VStack(alignment: .leading, spacing: BrainStyle.s) {
-            Text(verbatim: item.date.isEmpty ? "Rediscover" : "Rediscover · last touched \(BrainStyle.displayDate(item.date))")
-                .font(AppFont.caption(weight: .semibold))
-                .foregroundStyle(paper.glow)
-            Text(verbatim: item.title)
-                .font(AppFont.display(style: .title3, weight: .semibold))
-                .foregroundStyle(paper.glow)
-                .accessibilityAddTraits(.isHeader)
-            if !item.preview.isEmpty {
-                Text(verbatim: item.preview)
-                    .font(BrainStyle.rowSubtitle)
-                    .foregroundStyle(Color.hxTextPrimary)
-                    .lineLimit(3)
-            }
-            HStack(spacing: BrainStyle.s) {
-                NavigationLink(value: ShellPushDestination.brainRoute(.page(item.module, item.id))) {
-                    Text(verbatim: "Open")
-                }
-                .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
-                if canShowAnother {
-                    Button(action: onAnother) { Text(verbatim: "Another") }
-                        .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
-                        .accessibilityHint(Text(verbatim: "Shows another page from today's picks"))
-                }
-            }
-            .padding(.top, BrainStyle.xs)
-        }
-        .padding(BrainStyle.l)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(paper.card, in: shape)
-        .overlay(shape.strokeBorder(paper.edge, lineWidth: 0.5))
-        .hxShadow(.paper)
-        .environment(\.hxPaper, paper)
-        .tint(paper.glow)
+    private func open(_ bite: BrainBite) {
+        push(.bite(bite.ref.module, bite.ref.id, idea: bite.kind == .idea ? bite.index : nil))
     }
-}
 
-private extension View {
-    /// A module row's padding inside the card, with a chevron like the list rows had.
-    func moduleRowPadding() -> some View {
-        HStack(spacing: 8) {
-            self
-            Image(systemName: "chevron.forward")
-                .font(AppFont.caption(weight: .semibold))
-                .foregroundStyle(.tertiary)
-                .accessibilityHidden(true)
+    private static func edgeFill(_ page: BrainReviewPage) -> Color {
+        switch page {
+        case .bite(let bite): bite.paper.card
+        case .summary: .hxSurface
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .contentShape(Rectangle())
     }
 }

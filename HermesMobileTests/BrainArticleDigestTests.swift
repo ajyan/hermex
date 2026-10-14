@@ -26,6 +26,18 @@ final class BrainArticleDigestTests: XCTestCase {
     Start with the gateway when the interviewer says microservices.
     """
 
+    func testFocusIdeaStartsExpanded() throws {
+        let digest = try XCTUnwrap(BrainArticleDigest.parse(article))
+        XCTAssertEqual(BrainArticleDigestView.initiallyExpanded(2, in: digest), [2])
+    }
+
+    func testFocusIdeaWithoutDetailOrMissing() throws {
+        let digest = try XCTUnwrap(BrainArticleDigest.parse(article))
+        XCTAssertEqual(BrainArticleDigestView.initiallyExpanded(4, in: digest), [])
+        XCTAssertEqual(BrainArticleDigestView.initiallyExpanded(99, in: digest), [])
+        XCTAssertEqual(BrainArticleDigestView.initiallyExpanded(nil, in: digest), [])
+    }
+
     func testParsesTheSummaryOutline() throws {
         let digest = try XCTUnwrap(BrainArticleDigest.parse(article))
         XCTAssertEqual(digest.gist, "A guide to **gateways**: the [front desk](brain://wiki/wiki%2Fhotels.md) for services.")

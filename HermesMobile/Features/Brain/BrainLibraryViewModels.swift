@@ -34,32 +34,77 @@ private func brainIsNotFound(_ error: Error) -> Bool {
 final class BrainHomeViewModel {
     private(set) var state: BrainLoadState<[BrainModule]> = .loading
     private(set) var modules: [BrainModule] = []
-    /// Hubs, recent and rediscover picks. Best effort: empty on a server without the home
-    /// route, and a failed refresh keeps what was shown.
+    /// The daily deck. Best effort: empty on a server without the home route, and a failed
+    /// refresh keeps what was shown.
     private(set) var home = BrainHome()
-    /// Which rediscover pick is showing; "Another" steps through today's picks.
-    private(set) var rediscoverIndex = 0
     private(set) var isShowingCachedCopy = false
+
+    /// The deck's pages: the bites, then a summary once there are any.
+    var reviewPages: [BrainReviewPage] {
+        home.bites.isEmpty ? [] : home.bites.map(BrainReviewPage.bite) + [.summary]
+    }
+
+    /// The page the review pager shows. Setting it saves the position for this server and day.
+    var reviewIndex = 0 {
+        didSet {
+            guard reviewIndex != oldValue else { return }
+            persistPosition()
+        }
+    }
 
     private let client: any BrainDataClient
     private let cache: BrainCacheHandle
     private let onAPIError: (Error) -> Void
+    private let reviewStore: BrainReviewStore
+    private let today: () -> String
+    /// The batch `home` holds, which is what the saved position refers to.
+    private var currentBatch = 0
+    /// The day the shown batch was loaded for. A deck left open overnight keeps saving under it.
+    private(set) var deckDay: String?
 
-    init(client: any BrainDataClient, cache: BrainCacheHandle, onAPIError: @escaping (Error) -> Void = { _ in }) {
+    /// True once a deck is on screen and the day has moved on: the screen should `load()` again.
+    var needsNewDay: Bool { deckDay.map { $0 != today() } ?? false }
+
+    init(client: any BrainDataClient, cache: BrainCacheHandle, onAPIError: @escaping (Error) -> Void = { _ in },
+         reviewStore: BrainReviewStore = BrainReviewStore(), today: @escaping () -> String = BrainReviewStore.today) {
         self.client = client
         self.cache = cache
         self.onAPIError = onAPIError
+        self.reviewStore = reviewStore
+        self.today = today
     }
 
-    /// Bumped by every `load()`, so an older failure never overwrites a newer success.
+    /// Bumped by every `load()` and `dealMore()`, so an older result never overwrites a newer one.
     private var generation = 0
+
+    /// The saved position, if the user already started `day`'s deck.
+    private func saved(on day: String) -> BrainReviewPosition? {
+        guard let saved = reviewStore.position(for: cache.server), saved.day == day else { return nil }
+        return saved
+    }
+
+    private func persistPosition() {
+        reviewStore.save(BrainReviewPosition(day: deckDay ?? today(), batch: currentBatch, index: reviewIndex), for: cache.server)
+    }
+
+    /// Shows `deck` as `batch` of `day`, landing on `index` or the nearest page that exists.
+    private func show(_ deck: BrainHome, day: String, batch: Int, index: Int) {
+        home = deck
+        deckDay = day
+        currentBatch = batch
+        reviewIndex = min(max(index, 0), max(reviewPages.count - 1, 0))
+    }
 
     func load() async {
         generation += 1
         let token = generation
         if modules.isEmpty { state = .loading }
-        if home.isEmpty, let cached = cache.load(BrainHome.self, kind: "home", id: "") { home = cached }
-        async let fetchedHome: BrainHome? = try? client.home()
+        let day = today()
+        let batch = saved(on: day)?.batch ?? 0
+        if home.isEmpty, let cached = cache.load(BrainHome.self, kind: "home", id: "\(day)-\(batch)") {
+            show(cached, day: day, batch: batch, index: saved(on: day)?.index ?? 0)
+        }
+        async let fetchedHome: BrainHome? = try? client.home(batch: batch)
         do {
             let fetched = try await client.modules()
             guard !Task.isCancelled, token == generation else { return }
@@ -68,9 +113,9 @@ final class BrainHomeViewModel {
             isShowingCachedCopy = false
             cache.store(fetched, kind: "modules", id: "")
             if let loadedHome = await fetchedHome, !Task.isCancelled, token == generation {
-                if loadedHome.rediscover != home.rediscover { rediscoverIndex = 0 }
-                home = loadedHome
-                cache.store(loadedHome, kind: "home", id: "")
+                // Read the position now, not before the fetch, so a swipe made while it ran wins.
+                show(loadedHome, day: day, batch: batch, index: saved(on: day)?.index ?? 0)
+                cache.store(loadedHome, kind: "home", id: "\(day)-\(batch)")
             }
         } catch is CancellationError {
             // The screen went away; nothing to update.
@@ -89,14 +134,17 @@ final class BrainHomeViewModel {
         }
     }
 
-    /// The rediscover pick showing now, if the server sent any.
-    var rediscoverPick: BrainItem? {
-        home.rediscover.isEmpty ? nil : home.rediscover[rediscoverIndex % home.rediscover.count]
-    }
-
-    func showAnotherPick() {
-        guard home.rediscover.count > 1 else { return }
-        rediscoverIndex = (rediscoverIndex + 1) % home.rediscover.count
+    /// "Deal me more": the next batch of ten, from the first page. A failed fetch keeps the
+    /// current batch and position.
+    func dealMore() async {
+        generation += 1
+        let token = generation
+        let batch = currentBatch + 1
+        let day = deckDay ?? today()
+        guard let more = try? await client.home(batch: batch), !Task.isCancelled, token == generation else { return }
+        show(more, day: day, batch: batch, index: 0)
+        persistPosition()
+        cache.store(more, kind: "home", id: "\(day)-\(batch)")
     }
 }
 

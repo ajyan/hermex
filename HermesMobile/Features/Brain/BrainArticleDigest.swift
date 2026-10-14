@@ -165,9 +165,29 @@ struct BrainArticleDigest: Equatable {
 /// inside markdown go through the `openURL` action the reader installs.
 struct BrainArticleDigestView: View {
     let digest: BrainArticleDigest
-    @State private var expanded: Set<Int> = []
+    /// The idea a bite opened this page at: starts expanded and wears the article paper.
+    let focusIdea: Int?
+    @State private var expanded: Set<Int>
     @State private var showsFullGist = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    init(digest: BrainArticleDigest, focusIdea: Int? = nil) {
+        self.digest = digest
+        self.focusIdea = focusIdea
+        _expanded = State(initialValue: Self.initiallyExpanded(focusIdea, in: digest))
+    }
+
+    /// `[n]` when the digest has idea `n` with an explanation to show, else none.
+    static func initiallyExpanded(_ focusIdea: Int?, in digest: BrainArticleDigest) -> Set<Int> {
+        guard let focusIdea,
+              let idea = digest.ideas.first(where: { $0.number == focusIdea }),
+              !idea.detail.isEmpty
+        else { return [] }
+        return [focusIdea]
+    }
+
+    /// The scroll id of idea `number`'s card.
+    static func ideaAnchor(_ number: Int) -> String { "idea-\(number)" }
 
     var body: some View {
         VStack(alignment: .leading, spacing: BrainStyle.xl) {
@@ -239,6 +259,7 @@ struct BrainArticleDigestView: View {
             }
             ForEach(digest.ideas) { idea in
                 ideaCard(idea)
+                    .id(Self.ideaAnchor(idea.number))
             }
         }
     }
@@ -292,6 +313,14 @@ struct BrainArticleDigestView: View {
         .padding(.vertical, BrainStyle.cardVerticalPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .brainCardSurface()
+        .overlay {
+            // Over the card surface, which is opaque; the wash is translucent.
+            if idea.number == focusIdea {
+                let shape = BrainStyle.cardShape()
+                shape.fill(HermexPaper.reading.wash).allowsHitTesting(false)
+                shape.strokeBorder(HermexPaper.reading.edge, lineWidth: 1).allowsHitTesting(false)
+            }
+        }
     }
 
     private func takeawayCard(_ takeaway: String) -> some View {

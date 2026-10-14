@@ -134,20 +134,55 @@ final class BrainModelsTests: XCTestCase {
         XCTAssertEqual(BrainRef(module: .wiki, id: "w").mention, "")
     }
 
-    func testHomeDecodes() throws {
+    func testHomeDecodesBites() throws {
         let json = #"""
-        {"hubs": [{"ref": {"module": "wiki", "id": "wiki/career.md", "title": "Career"}, "count": 14, "inside": ["Anthropic", "OpenAI"]},
-                  {"ref": {"module": "goals", "id": "x"}}],
-         "recent": [{"module": "wiki", "id": "wiki/a.md", "title": "A", "date": "2026-10-12"}],
+        {"bites": [
+          {"id": "b1", "kind": "idea", "text": "T1", "detail": null, "byline": "Wiki",
+           "ref": {"module": "wiki", "id": "wiki/a.md", "title": "A", "tags": ["x"]}, "index": 2, "count": 5},
+          {"id": "b2", "kind": "quote", "text": "T2", "byline": "Ada",
+           "ref": {"module": "articles", "id": "art/b.md", "title": "B", "tags": []}},
+          {"id": "b3", "kind": "highlight", "text": "T3", "detail": "mine", "byline": "Book",
+           "ref": {"module": "highlights", "id": "h/c.md", "title": "C", "tags": []}},
+          {"id": "b4", "kind": "poem", "text": "T4", "byline": "?",
+           "ref": {"module": "wiki", "id": "wiki/d.md", "title": "D", "tags": []}},
+          {"id": "b5", "kind": "takeaway", "text": "T5", "byline": "Wiki",
+           "ref": {"module": "wiki", "id": "wiki/e.md", "title": "E", "tags": []}}
+         ], "batch": 1, "has_more": true}
+        """#
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let home = try decoder.decode(BrainHome.self, from: Data(json.utf8))
+        XCTAssertEqual(home.bites.map(\.id), ["b1", "b2", "b3", "b5"], "unknown kinds drop, order holds")
+        XCTAssertEqual(home.bites.map(\.kind), [.idea, .quote, .highlight, .takeaway])
+        XCTAssertTrue(home.hasMore)
+        XCTAssertEqual(home.batch, 1)
+        XCTAssertEqual(home.bites[0].index, 2)
+        XCTAssertEqual(home.bites[0].count, 5)
+        XCTAssertNil(home.bites[0].detail)
+        XCTAssertEqual(home.bites[0].ref.module, .wiki)
+        XCTAssertEqual(home.bites[0].ref.tags, ["x"])
+        XCTAssertEqual(home.bites[2].detail, "mine")
+        XCTAssertFalse(home.isEmpty)
+    }
+
+    func testOldHomeShapeDecodesEmpty() throws {
+        let json = #"""
+        {"hubs": [{"ref": {"module": "wiki", "id": "wiki/career.md", "title": "Career"}, "count": 14}],
+         "recent": [{"module": "wiki", "id": "wiki/a.md", "title": "A"}],
          "rediscover": [{"module": "wiki", "id": "wiki/old.md", "title": "Old"}]}
         """#
         let home = try JSONDecoder().decode(BrainHome.self, from: Data(json.utf8))
-        XCTAssertEqual(home.hubs.map(\.count), [14])
-        XCTAssertEqual(home.hubs[0].inside, ["Anthropic", "OpenAI"])
-        XCTAssertEqual(home.recent.map(\.id), ["wiki/a.md"])
-        XCTAssertEqual(home.rediscover.map(\.id), ["wiki/old.md"])
-        XCTAssertFalse(home.isEmpty)
+        XCTAssertTrue(home.bites.isEmpty)
+        XCTAssertEqual(home.batch, 0)
+        XCTAssertFalse(home.hasMore)
+        XCTAssertTrue(home.isEmpty)
         XCTAssertTrue(try JSONDecoder().decode(BrainHome.self, from: Data("{}".utf8)).isEmpty)
+    }
+
+    func testHomeEndpointAddsBatchOnlyPastZero() {
+        XCTAssertEqual(Endpoint.brainHome(batch: 0).path, "/api/brain/home")
+        XCTAssertEqual(Endpoint.brainHome(batch: 0).queryItems, [])
+        XCTAssertEqual(Endpoint.brainHome(batch: 2).queryItems, [URLQueryItem(name: "batch", value: "2")])
     }
 
     func testBrainLinkParsesPercentEncodedID() throws {
@@ -172,8 +207,6 @@ final class BrainModelsTests: XCTestCase {
                        [URLQueryItem(name: "module", value: "wiki"), URLQueryItem(name: "id", value: "x.md"),
                         URLQueryItem(name: "hub", value: "wiki/hub.md")])
         XCTAssertEqual(Endpoint.brainModules.queryItems, [])
-        XCTAssertEqual(Endpoint.brainHome.path, "/api/brain/home")
-        XCTAssertEqual(Endpoint.brainHome.queryItems, [])
     }
 
     func testSearchURLEncodesPlusAndSpace() throws {
@@ -207,5 +240,35 @@ final class BrainModelsTests: XCTestCase {
         action(.page(.wiki, "wiki/virtues.md"))
         XCTAssertTrue(action.isAvailable)
         XCTAssertEqual(opened, [.page(.wiki, "wiki/virtues.md")])
+    }
+
+    func testBiteCopy() {
+        func bite(_ kind: BrainBite.Kind, _ module: BrainModuleID = .articles, id: String = "articles/a.md",
+                  index: Int? = nil, count: Int? = nil) -> BrainBite {
+            BrainBite(id: "x", kind: kind, text: "t", ref: BrainRef(module: module, id: id), index: index, count: count)
+        }
+        XCTAssertEqual(BrainBiteCopy.kicker(bite(.idea, index: 2, count: 5)), "Key idea · 2 of 5")
+        XCTAssertEqual(BrainBiteCopy.kicker(bite(.idea)), "Key idea")
+        XCTAssertEqual(BrainBiteCopy.kicker(bite(.idea, index: 2)), "Key idea")
+        XCTAssertEqual(BrainBiteCopy.kicker(bite(.takeaway)), "Your takeaway")
+        XCTAssertEqual(BrainBiteCopy.kicker(bite(.quote)), "Quote")
+        XCTAssertEqual(BrainBiteCopy.kicker(bite(.highlight)), "Highlight")
+
+        XCTAssertEqual(BrainBiteCopy.open(bite(.idea)), "Open the article")
+        XCTAssertEqual(BrainBiteCopy.open(bite(.highlight, .highlights, id: "book:meditations")), "Open the book")
+        XCTAssertEqual(BrainBiteCopy.open(bite(.idea, .highlights, id: "highlights/video.md")), "Open the note")
+        XCTAssertEqual(BrainBiteCopy.open(bite(.quote, .wiki, id: "wiki/a.md")), "Open the note")
+
+        XCTAssertEqual(bite(.idea).paper, .reading)
+        XCTAssertEqual(bite(.takeaway).paper, .reading)
+        XCTAssertEqual(bite(.quote).paper, .quote)
+        XCTAssertEqual(bite(.highlight).paper, .book)
+
+        XCTAssertEqual([.idea, .takeaway, .quote, .highlight].map { BrainBiteCopy.kind(bite($0)) },
+                       ["Idea", "Takeaway", "Quote", "Highlight"])
+        let titled = BrainBite(id: "y", kind: .idea, text: "t",
+                               ref: BrainRef(module: .articles, id: "a.md", title: "The Bitter Lesson"), byline: "Rich Sutton")
+        XCTAssertEqual(BrainBiteCopy.attribution(titled), "The Bitter Lesson · Rich Sutton")
+        XCTAssertNil(BrainBiteCopy.attribution(bite(.idea)))
     }
 }

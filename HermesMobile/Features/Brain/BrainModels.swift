@@ -404,50 +404,70 @@ struct BrainSearchResult: Codable, Hashable, Sendable {
     }
 }
 
-/// One hub on the Brain home: the hub page, how many pages meet there, and a few of their titles.
-struct BrainHub: Codable, Hashable, Sendable {
+/// One card in the Brain home's daily deck: a short piece of the library with where it came from.
+/// `index` and `count` place an idea among its page's ideas; both nil for the other kinds.
+struct BrainBite: Codable, Hashable, Sendable, Identifiable {
+    enum Kind: String, Codable, Sendable { case idea, quote, highlight, takeaway, unknown }
+
+    let id: String
+    let kind: Kind
+    let text: String
+    let detail: String?
     let ref: BrainRef
-    let count: Int
-    let inside: [String]
+    let byline: String
+    let index: Int?
+    let count: Int?
 
-    private enum CodingKeys: String, CodingKey { case ref, count, inside }
+    private enum CodingKeys: String, CodingKey { case id, kind, text, detail, ref, byline, index, count }
 
-    init(ref: BrainRef, count: Int = 0, inside: [String] = []) {
+    init(id: String, kind: Kind, text: String, detail: String? = nil, ref: BrainRef,
+         byline: String = "", index: Int? = nil, count: Int? = nil) {
+        self.id = id
+        self.kind = kind
+        self.text = text
+        self.detail = detail
         self.ref = ref
+        self.byline = byline
+        self.index = index
         self.count = count
-        self.inside = inside
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        kind = (c.optional(String.self, .kind)).flatMap(Kind.init(rawValue:)) ?? .unknown
+        text = c.string(.text)
+        detail = c.optional(String.self, .detail)
         ref = try c.decode(BrainRef.self, forKey: .ref)
-        count = c.int(.count)
-        inside = c.strings(.inside)
+        byline = c.string(.byline)
+        index = c.optional(Int.self, .index)
+        count = c.optional(Int.self, .count)
     }
 }
 
-/// `GET /api/brain/home`: the hubs, recently changed wiki pages, and today's rediscover picks.
+/// `GET /api/brain/home[?batch=n]`: one batch of the daily deck. A server still sending the old
+/// hubs/recent/rediscover shape decodes as an empty deck.
 struct BrainHome: Codable, Hashable, Sendable {
-    let hubs: [BrainHub]
-    let recent: [BrainItem]
-    let rediscover: [BrainItem]
+    let bites: [BrainBite]
+    let batch: Int
+    let hasMore: Bool
 
-    private enum CodingKeys: String, CodingKey { case hubs, recent, rediscover }
+    private enum CodingKeys: String, CodingKey { case bites, batch, hasMore }
 
-    init(hubs: [BrainHub] = [], recent: [BrainItem] = [], rediscover: [BrainItem] = []) {
-        self.hubs = hubs
-        self.recent = recent
-        self.rediscover = rediscover
+    init(bites: [BrainBite] = [], batch: Int = 0, hasMore: Bool = false) {
+        self.bites = bites
+        self.batch = batch
+        self.hasMore = hasMore
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        hubs = c.lossy(BrainHub.self, .hubs)
-        recent = c.lossy(BrainItem.self, .recent)
-        rediscover = c.lossy(BrainItem.self, .rediscover)
+        bites = c.lossy(BrainBite.self, .bites).filter { $0.kind != .unknown }
+        batch = c.int(.batch)
+        hasMore = (c.optional(Bool.self, .hasMore)) ?? false
     }
 
-    var isEmpty: Bool { hubs.isEmpty && recent.isEmpty && rediscover.isEmpty }
+    var isEmpty: Bool { bites.isEmpty }
 }
 
 /// In-app links inside Brain Markdown: `brain://<module>/<percent-encoded id>`.
@@ -484,6 +504,9 @@ enum BrainRoute: Hashable, Sendable {
     case module(BrainModuleID)
     /// One page, by module and item id.
     case page(BrainModuleID, String)
+    /// One page opened from a review bite; `idea` is the key idea the bite came from,
+    /// which the article digest opens expanded and scrolled into view.
+    case bite(BrainModuleID, String, idea: Int?)
     /// Every search result in one module.
     case searchAll(BrainModuleID, query: String)
     /// A screen in the Prep module (the interview tutor).

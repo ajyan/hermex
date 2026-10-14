@@ -154,12 +154,12 @@ enum Endpoint {
     case transcribe
     case tts
     /// The Brain module library (`api/brain_catalog.py`): module counts, item lists, one page (optionally
-    /// placed in a given hub), search, and the home's hubs, recent and rediscover picks.
+    /// placed in a given hub), search, and the home's daily deck of bites.
     case brainModules
     case brainList(module: String, tag: String?, cursor: Int?)
     case brainPage(module: String, id: String, hub: String?)
     case brainSearch(query: String, module: String?)
-    case brainHome
+    case brainHome(batch: Int)
     /// The Prep interview tutor (`api/tutor.py`): today's run, home, a track map, one item, answer submission,
     /// the gap ledger (all gaps and one gap) and flagging a coach-written card.
     case tutorHome
@@ -708,6 +708,8 @@ enum Endpoint {
             var items = [URLQueryItem(name: "q", value: query)]
             if let module { items.append(URLQueryItem(name: "module", value: module)) }
             return items
+        case let .brainHome(batch):
+            return batch > 0 ? [URLQueryItem(name: "batch", value: String(batch))] : []
         case let .tutorMap(track):
             return [URLQueryItem(name: "track", value: track)]
         case let .tutorItem(id), let .tutorGap(id), let .tutorLesson(id):

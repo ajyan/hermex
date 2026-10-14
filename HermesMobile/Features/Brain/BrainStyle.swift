@@ -242,11 +242,6 @@ struct BrainModuleIcon: View {
     let paper: HermexPaper?
     @ScaledMetric(relativeTo: .body) private var side = BrainStyle.iconSize
 
-    init(module: BrainModuleID) {
-        self.symbolName = module.symbolName
-        self.paper = module.paper
-    }
-
     init(systemName: String, paper: HermexPaper? = nil) {
         self.symbolName = systemName
         self.paper = paper

@@ -10,7 +10,7 @@ protocol BrainDataClient: Sendable {
     /// One page; `hub` asks the server to place it in that hub (the pager keeps its hub this way).
     func page(module: BrainModuleID, id: String, hub: String?) async throws -> BrainPage
     func search(query: String, module: BrainModuleID?) async throws -> BrainSearchResult
-    func home() async throws -> BrainHome
+    func home(batch: Int) async throws -> BrainHome
 }
 
 enum BrainLoadState<Value: Equatable>: Equatable {
@@ -42,7 +42,7 @@ struct APIClientBrainAdapter: BrainDataClient {
         try await apiClient.send(endpoint: .brainSearch(query: query, module: module?.rawValue), method: "GET")
     }
 
-    func home() async throws -> BrainHome {
-        try await apiClient.send(endpoint: .brainHome, method: "GET")
+    func home(batch: Int) async throws -> BrainHome {
+        try await apiClient.send(endpoint: .brainHome(batch: batch), method: "GET")
     }
 }
