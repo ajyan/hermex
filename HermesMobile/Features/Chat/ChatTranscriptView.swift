@@ -742,6 +742,7 @@ private struct ChatTranscriptMessageBlock: View, Equatable {
                         streamingAssistantMessageID: streamingAssistantMessageID
                     ),
                     liveTokensPerSecond: liveTokensPerSecond,
+                    transcriptSpacing: transcriptSpacing,
                     isRegeneratingMessage: isRegeneratingMessage,
                     isEditingMessage: isEditingMessage,
                     isForkingMessage: isForkingMessage,
@@ -831,6 +832,7 @@ private struct ChatTranscriptMessageRow: View {
     let hasActiveStream: Bool
     let isStreaming: Bool
     let liveTokensPerSecond: Double?
+    let transcriptSpacing: CGFloat
     let isRegeneratingMessage: Bool
     let isEditingMessage: Bool
     let isForkingMessage: Bool
@@ -855,7 +857,7 @@ private struct ChatTranscriptMessageRow: View {
         if let markerKind = ChatMarkerMessageClassifier.classify(message) {
             MarkerMessageCardView(kind: markerKind, content: message.content)
         } else {
-            VStack(alignment: isUserMessage ? .trailing : .leading, spacing: 4) {
+            VStack(alignment: isUserMessage ? .trailing : .leading, spacing: metaRowSpacing) {
                 bubble
 
                 if showsMetaRow {
@@ -874,6 +876,13 @@ private struct ChatTranscriptMessageRow: View {
 
     private var isUserMessage: Bool {
         message.role == "user"
+    }
+
+    /// A reply's footer leaves the same visible gap below it as the turn's fold row
+    /// leaves above it. The footer's controls draw 13 pt glyphs centred in 28 pt
+    /// frames (`ChatCopyButton`), so their tops already sit 7.5 pt inside the row.
+    private var metaRowSpacing: CGFloat {
+        isUserMessage ? 4 : transcriptSpacing - (28 - 13) / 2
     }
 
     /// Keep actions reachable for every actionable reply, including active turns.
