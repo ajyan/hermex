@@ -521,7 +521,8 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
         revisit = base.revisit
         sitting = base.sitting
         why = base.why
-        surprise = base.surprise
+        // A surprise is a confident miss; claiming points back can turn it into a pass.
+        surprise = base.surprise && verdict != "pass"
         xp = override.xp ?? base.xp
         attemptID = override.attemptID ?? base.attemptID
         overridden = override.overridden

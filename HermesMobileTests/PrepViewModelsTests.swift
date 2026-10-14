@@ -23,6 +23,9 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
     /// When set, `attempt` signals `started` and then waits on `release`.
     var gate: (started: AsyncStream<Void>.Continuation, release: AsyncStream<Void>)?
 
+    /// Same, for `override`.
+    var overrideGate: (started: AsyncStream<Void>.Continuation, release: AsyncStream<Void>)?
+
     /// Same, for `home()`.
     var homeGate: (started: AsyncStream<Void>.Continuation, release: AsyncStream<Void>)?
 
@@ -64,7 +67,11 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
     func course() async throws -> PrepCourse { try next("course", &courseResults) }
     func lesson(id: String) async throws -> PrepLesson { try next("lesson:\(id)", &lessonResults) }
     func override(attempt: String, point: String) async throws -> PrepAttemptResult {
-        try next("override:\(attempt):\(point)", &overrideResults)
+        if let overrideGate {
+            overrideGate.started.yield()
+            for await _ in overrideGate.release { break }
+        }
+        return try next("override:\(attempt):\(point)", &overrideResults)
     }
 }
 
@@ -456,6 +463,49 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(result.pointTexts["p.b"], "B", "keeps the point texts")
         XCTAssertEqual(vm.lastXP, 15)
         XCTAssertEqual(client.log.last, "override:att-1:p.b")
+    }
+
+    func testDontKnowResultCannotBeOverridden() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([recallLessonRep(0, drill: "recall", block: "review")]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.success(recallResult("miss", next: 1, missed: ["p.a", "p.b"], xp: 5))]
+        let vm = makeVM(client)
+        await vm.load()
+        XCTAssertTrue(vm.canOverride)
+        await vm.dontKnow()
+        XCTAssertFalse(vm.canOverride)
+        await vm.overridePoint("p.a")
+        XCTAssertFalse(client.log.contains { $0.hasPrefix("override") })
+    }
+
+    func testOverrideIgnoresASecondTapWhileSaving() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([recallLessonRep(0, drill: "recall", block: "review")]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.success(recallResult("miss", next: 1, missed: ["p.a", "p.b"], xp: 5))]
+        client.overrideResults = [.success(recallResult("partial", next: 1, missed: ["p.b"], xp: 10))]
+        let vm = makeVM(client)
+        await vm.load()
+        vm.recallDraft = "x"
+        vm.confidence = .fairly
+        await vm.submitRecall()
+        let (started, startedCont) = AsyncStream<Void>.makeStream()
+        let (release, releaseCont) = AsyncStream<Void>.makeStream()
+        client.overrideGate = (startedCont, release)
+        let first = Task { await vm.overridePoint("p.a") }
+        for await _ in started { break }
+        XCTAssertEqual(vm.overridingPoint, "p.a")
+        await vm.overridePoint("p.b")
+        releaseCont.yield()
+        await first.value
+        XCTAssertEqual(client.log.filter { $0.hasPrefix("override") }, ["override:att-1:p.a"])
+        XCTAssertNil(vm.overridingPoint)
+    }
+
+    func testRecallOnlyDailyRunIsACourseRun() {
+        let run = courseRun([recallLessonRep(0, drill: "recall", block: "review")])
+        XCTAssertTrue(PrepRunViewModel.isCourse(run, kind: .daily))
     }
 
     func testBonusRunLoads() async {

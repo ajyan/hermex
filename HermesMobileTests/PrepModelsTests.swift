@@ -460,6 +460,14 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertFalse(try decode(PrepAttemptResult.self, #"{"verdict": "pass"}"#).surprise)
     }
 
+    func testOverrideToPassClearsTheSurprise() throws {
+        let base = try decode(PrepAttemptResult.self, #"{"verdict": "miss", "attempt": "a-1", "surprise": true}"#)
+        let partial = try decode(PrepAttemptResult.self, #"{"verdict": "partial", "attempt": "a-2"}"#)
+        let pass = try decode(PrepAttemptResult.self, #"{"verdict": "pass", "attempt": "a-3"}"#)
+        XCTAssertTrue(PrepAttemptResult(merging: base, override: partial).surprise)
+        XCTAssertFalse(PrepAttemptResult(merging: base, override: pass).surprise)
+    }
+
     func testRecallRequestEncodesConfidenceAndDontKnow() throws {
         let request = PrepAttemptRequest(date: "d", index: 0, item: "u1.l1", drill: .recall, answer: .choice(""),
                                          elapsedMS: 1, hintsUsed: 0, confidence: .certain, dontKnow: true)

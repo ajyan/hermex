@@ -276,7 +276,7 @@ private struct PrepNodeDisc: View {
             case .shaky:
                 Circle().fill(Color.hxSurface)
                 Circle().strokeBorder(Color.hxWarning, lineWidth: 2.5)
-                symbol("arrow.counterclockwise", weight: .semibold, color: .hxWarning)
+                symbol("circle.dashed", weight: .semibold, color: .hxWarning)
             case .next:
                 Circle().fill(Color.hxCanvas)
                 Circle().strokeBorder(Color.accentColor, lineWidth: 4)

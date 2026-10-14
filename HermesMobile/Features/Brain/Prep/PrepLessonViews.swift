@@ -369,7 +369,6 @@ struct PrepDayCompleteView: View {
                         Text(verbatim: "\(summary.readyCount)")
                             .font(AppFont.display(style: .largeTitle))
                             .foregroundStyle(Color.hxTextPrimary)
-                            .contentTransition(.numericText())
                         Text(verbatim: "ready")
                             .font(BrainStyle.meta)
                             .foregroundStyle(HermexPaper.knowledge.glow)

@@ -248,6 +248,10 @@ final class PrepRunViewModel {
     /// The recall answer being dictated or typed, and how sure the user is.
     var recallDraft = ""
     var confidence: PrepConfidence?
+    /// The result on screen came from "I don't know", which has no points to claim.
+    private(set) var answeredDontKnow = false
+    /// The missed point whose "I had that" is in flight; a second tap waits for it.
+    private(set) var overridingPoint: String?
     let runKind: PrepRunKind
     /// The unit a test out quizzes.
     let unit: String?
@@ -351,10 +355,16 @@ final class PrepRunViewModel {
         await submit(.choice(""), confidence: .guess, dontKnow: true)
     }
 
+    /// "I had that" is offered on a graded recall's misses, never on "I don't know".
+    var canOverride: Bool { !answeredDontKnow }
+
     /// "I had that": count one missed key point as hit, keeping the rest of the result.
     func overridePoint(_ point: String) async {
-        guard case let .result(rep, result, index) = phase, let attempt = result.attemptID else { return }
+        guard case let .result(rep, result, index) = phase, let attempt = result.attemptID,
+              !answeredDontKnow, overridingPoint == nil else { return }
         let token = generation
+        overridingPoint = point
+        defer { if token == generation { overridingPoint = nil } }
         do {
             let updated = try await client.override(attempt: attempt, point: point)
             guard token == generation, case .result = phase else { return }
@@ -373,7 +383,7 @@ final class PrepRunViewModel {
 
     /// A course run teaches lessons, quizzes a boss or runs a mock; the rest are the older DSA and warm-up runs.
     static func isCourse(_ run: PrepRun, kind: PrepRunKind) -> Bool {
-        kind != .daily || run.reps.contains { $0.drill == .lesson || $0.drill == .boss }
+        kind != .daily || run.reps.contains { [.lesson, .recall, .warmup, .boss].contains($0.drill) }
     }
 
     /// The XP an answer earned, mirroring the server's rules: 10 for a new lesson and 5 more when its
@@ -470,8 +480,9 @@ final class PrepRunViewModel {
     /// any other run. Both are non-fatal.
     private func snapshot(_ run: PrepRun, token: Int) async {
         if Self.isCourse(run, kind: runKind) {
-            let home = try? await client.home()
-            let ready = try? await client.course()
+            async let homeLoad = try? await client.home()
+            async let courseLoad = try? await client.course()
+            let (home, ready) = await (homeLoad, courseLoad)
             if token == generation {
                 homeBefore = home
                 xpBefore = home?.course?.xp
@@ -504,6 +515,8 @@ final class PrepRunViewModel {
         lessonStage = rep.drill == .recall ? .recalling : .reading
         recallDraft = ""
         confidence = nil
+        answeredDontKnow = false
+        overridingPoint = nil
         lastXP = nil
         hintsShown = 0
         submitError = nil
@@ -536,6 +549,7 @@ final class PrepRunViewModel {
                 isSubmitting = false
             } else {
                 isSubmitting = false
+                answeredDontKnow = dontKnow
                 lastXP = Self.xp(for: rep, result: result)
                 count(rep, result)
                 phase = .result(rep, result, index: rep.index)
@@ -577,8 +591,9 @@ final class PrepRunViewModel {
 
     private func finish(token: Int) async {
         if let run, Self.isCourse(run, kind: runKind) {
-            let home = try? await client.home()
-            let course = try? await client.course()
+            async let homeLoad = try? await client.home()
+            async let courseLoad = try? await client.course()
+            let (home, course) = await (homeLoad, courseLoad)
             guard token == generation, !Task.isCancelled else { return }
             var summary = tally
             summary.isCourse = true
@@ -703,6 +718,8 @@ enum PrepCopy {
         calendar.timeZone = .current
         let formatter = DateFormatter()
         formatter.calendar = calendar
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = calendar.timeZone
         formatter.dateFormat = "yyyy-MM-dd"
         guard let yesterday = calendar.date(byAdding: .day, value: -1, to: today) else { return false }
         return lastDay < formatter.string(from: yesterday)
