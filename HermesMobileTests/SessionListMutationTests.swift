@@ -1984,6 +1984,110 @@ final class SessionListMutationTests: XCTestCase {
     }
 
     @MainActor
+    func testFailedPinKeepsTheRowUnpinnedAndSurfacesTheServersReason() async throws {
+        var loadCount = 0
+        var pinRequests = 0
+        let viewModel = try makeViewModel { request in
+            switch request.url?.path {
+            case "/api/sessions":
+                loadCount += 1
+                return apiTestJSONResponse(self.sessionListJSON(forLoadCount: 1), for: request)
+            case "/api/session/pin":
+                pinRequests += 1
+                return apiTestJSONResponse(
+                    #"{"error": "Up to 3 sessions can be pinned. Unpin one before pinning another."}"#,
+                    for: request,
+                    status: 400
+                )
+            default:
+                XCTFail("Unexpected request path: \(request.url?.path ?? "nil")")
+                throw URLError(.badURL)
+            }
+        }
+
+        await viewModel.load()
+        let before = viewModel.sessions
+        let session = try XCTUnwrap(before.first)
+        XCTAssertNotEqual(session.pinned, true)
+
+        let didPin = await viewModel.setPinned(true, for: session)
+
+        XCTAssertFalse(didPin)
+        XCTAssertEqual(pinRequests, 1)
+        XCTAssertEqual(loadCount, 1)
+        XCTAssertEqual(viewModel.sessions, before)
+        XCTAssertNotEqual(viewModel.sessions.first?.pinned, true)
+        XCTAssertNotNil(viewModel.lastError)
+        XCTAssertTrue(viewModel.actionErrorMessage?.contains("Up to 3 sessions can be pinned") == true)
+        XCTAssertFalse(viewModel.isMutating(session))
+    }
+
+    @MainActor
+    func testFailedDeleteKeepsTheRowAndSurfacesTheError() async throws {
+        var loadCount = 0
+        var deleteRequests = 0
+        let viewModel = try makeViewModel { request in
+            switch request.url?.path {
+            case "/api/sessions":
+                loadCount += 1
+                return apiTestJSONResponse(self.sessionListJSON(forLoadCount: 1), for: request)
+            case "/api/session/delete":
+                deleteRequests += 1
+                throw URLError(.notConnectedToInternet)
+            default:
+                XCTFail("Unexpected request path: \(request.url?.path ?? "nil")")
+                throw URLError(.badURL)
+            }
+        }
+
+        await viewModel.load()
+        let before = viewModel.sessions
+        let session = try XCTUnwrap(before.first)
+
+        let didDelete = await viewModel.delete(session)
+
+        XCTAssertFalse(didDelete)
+        XCTAssertEqual(deleteRequests, 1)
+        XCTAssertEqual(loadCount, 1)
+        XCTAssertEqual(viewModel.sessions, before)
+        XCTAssertNotNil(viewModel.lastError)
+        XCTAssertEqual(viewModel.actionErrorMessage, viewModel.lastError?.localizedDescription)
+        XCTAssertFalse(viewModel.isMutating(session))
+    }
+
+    /// The server answers a delete it cannot take yet (the session is streaming and
+    /// holds its agent lock) with `503 {"error": "Session busy, try again"}`. Move
+    /// already maps that refusal to a specific message (#25); delete shows the
+    /// generic "could not connect" copy, telling the user the server is unreachable
+    /// when it just answered.
+    @MainActor
+    func testDeleteRefusedWhileSessionBusyDoesNotClaimTheServerIsUnreachable() async throws {
+        let viewModel = try makeViewModel { request in
+            switch request.url?.path {
+            case "/api/sessions":
+                return apiTestJSONResponse(self.sessionListJSON(forLoadCount: 1), for: request)
+            case "/api/session/delete":
+                return apiTestJSONResponse(#"{"error": "Session busy, try again"}"#, for: request, status: 503)
+            default:
+                XCTFail("Unexpected request path: \(request.url?.path ?? "nil")")
+                throw URLError(.badURL)
+            }
+        }
+
+        await viewModel.load()
+        let before = viewModel.sessions
+        let didDelete = await viewModel.delete(try XCTUnwrap(before.first))
+
+        XCTAssertFalse(didDelete)
+        XCTAssertEqual(viewModel.sessions, before)
+        XCTExpectFailure("Bug: delete maps the server's 503 'Session busy' refusal to the 'could not connect' copy")
+        XCTAssertNotEqual(
+            viewModel.actionErrorMessage,
+            APIError.http(statusCode: 503, body: nil).localizedDescription
+        )
+    }
+
+    @MainActor
     func testSuccessfulMutationReturnsFalseWhenFollowUpReloadFails() async throws {
         var loadCount = 0
         let viewModel = try makeViewModel { request in
