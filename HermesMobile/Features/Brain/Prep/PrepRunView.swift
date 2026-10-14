@@ -177,8 +177,8 @@ struct PrepRunView: View {
                 PrepPrimaryButton(title: "Continue") { Task { await viewModel.continue() } }
             }
             .id(rep.index)
-        case .finished(let streak, let moved):
-            PrepRunCompleteView(streak: streak, moved: moved) { dismiss() }
+        case .finished(let summary):
+            PrepRunCompleteView(streak: summary.streak, moved: summary.moved) { dismiss() }
         }
     }
 
