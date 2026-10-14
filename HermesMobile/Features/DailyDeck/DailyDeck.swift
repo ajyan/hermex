@@ -57,12 +57,11 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let reason: String?
     /// Other questions for the same material; Regenerate steps through them.
     let altQuestions: [String]
-    /// On the headline card: one sentence about yesterday, written by the brief.
+    /// On the headline card: one sentence about yesterday (a weekly review's: about the week), written by the brief.
     let recap: String?
-    /// A recap's items (a review's days, answers, or last week's plan), each under an optional label.
+    /// A recap's items (a review's days, answers, or last week's plan), each under an optional label;
+    /// on a weekly review's headline, the week's highlights under their days.
     let entries: [DeckEntry]
-    /// A weekly review's headline numbers ("7 days you wrote").
-    let stats: [DeckStat]
     /// A weekly review's mood card: energy and mood per weekday, nil where nothing was written.
     let points: [DeckPoint]
     /// A weekly review's goals card: one meter per commitment.
@@ -87,7 +86,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case id, type, title, body, source, lines, question, context, voice, why, draft, actions, fallback
-        case reason, altQuestions, entries, recap, scale, sleep, stats, points, meters, color
+        case reason, altQuestions, entries, recap, scale, sleep, points, meters, color
         case itemKind = "kind"
     }
 
@@ -112,7 +111,6 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
         altQuestions = (try? c.decodeIfPresent([String].self, forKey: .altQuestions)) ?? []
         entries = ((try? c.decodeIfPresent([Lossy<DeckEntry>].self, forKey: .entries)) ?? []).compactMap(\.value)
-        stats = ((try? c.decodeIfPresent([Lossy<DeckStat>].self, forKey: .stats)) ?? []).compactMap(\.value)
         points = ((try? c.decodeIfPresent([Lossy<DeckPoint>].self, forKey: .points)) ?? []).compactMap(\.value)
         meters = ((try? c.decodeIfPresent([Lossy<DeckMeter>].self, forKey: .meters)) ?? []).compactMap(\.value)
         color = try? c.decodeIfPresent(String.self, forKey: .color)
@@ -167,12 +165,6 @@ struct DeckEntry: Decodable, Equatable, Hashable {
     }
 
     private enum CodingKeys: String, CodingKey { case label, text }
-}
-
-/// One headline number: "7" over "days you wrote".
-struct DeckStat: Decodable, Equatable, Hashable {
-    let value: String
-    let label: String
 }
 
 /// One weekday on the mood card. Energy (Garmin Body Battery) and mood (read from what you

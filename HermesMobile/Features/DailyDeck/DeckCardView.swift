@@ -250,32 +250,26 @@ private struct DeckCardView: View {
 
     // MARK: Opener and close
 
-    /// The day's title, a line about yesterday, and the cards ahead, so you know what you're
-    /// about to get.
+    /// The day's title, a line about yesterday (on a weekly review, the week and its highlights),
+    /// and the cards ahead, so you know what you're about to get.
     @ViewBuilder
     private var opener: some View {
-        if card.stats.isEmpty {
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(card.lines, id: \.self) { line in
-                    Text(verbatim: line).font(AppFont.footnote())
-                }
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(card.lines, id: \.self) { line in
+                Text(verbatim: line).font(AppFont.footnote())
             }
-            .foregroundStyle(palette.ink)
-            .padding(.trailing, 24)
         }
+        .foregroundStyle(palette.ink)
+        .padding(.trailing, 24)
         Text(verbatim: card.title ?? "Today")
             .font(AppFont.display(style: .largeTitle, weight: .semibold))
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.top, card.stats.isEmpty ? 10 : 0)
-            .padding(.trailing, card.stats.isEmpty ? 0 : 24)
+            .padding(.top, 10)
         if let recap = card.recap {
-            (Text("Yesterday").font(AppFont.display(style: .subheadline, weight: .semibold))
-                + Text(verbatim: " · \(recap)").font(AppFont.subheadline()).foregroundStyle(Color.hxTextPrimary.opacity(0.85)))
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 14)
+            recapLine(viewModel.kind == "weekly" ? "This week" : "Yesterday", recap).padding(.top, 14)
         }
-        if !card.stats.isEmpty {
-            StatGrid(stats: card.stats, palette: palette).padding(.top, 22)
+        ForEach(Array(card.entries.enumerated()), id: \.offset) { _, entry in
+            recapLine(entry.label, entry.text).padding(.top, 10)
         }
         let ahead = viewModel.visiblePages.dropFirst().filter {
             if case .card(let c) = $0, c.type == .close { return false }
@@ -294,6 +288,13 @@ private struct DeckCardView: View {
             .font(AppFont.footnote())
             .foregroundStyle(palette.ink)
             .padding(.top, 16)
+    }
+
+    /// "Yesterday · …" on the opener: the label bold in the ink, the line in body text.
+    private func recapLine(_ label: String?, _ text: String) -> some View {
+        (Text(verbatim: label.map { "\($0) · " } ?? "").font(AppFont.display(style: .subheadline, weight: .semibold))
+            + Text(verbatim: text).font(AppFont.subheadline()).foregroundStyle(Color.hxTextPrimary.opacity(0.85)))
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     @ViewBuilder
@@ -442,29 +443,6 @@ private struct RecapList: View {
         else { return out }
         out[range].inlinePresentationIntent = .stronglyEmphasized
         return out
-    }
-}
-
-/// A weekly review's headline numbers, two to a row: the number large, its label under it.
-private struct StatGrid: View {
-    let stats: [DeckStat]
-    let palette: DeckPalette
-
-    var body: some View {
-        LazyVGrid(columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)],
-                  alignment: .leading, spacing: 18) {
-            ForEach(stats, id: \.self) { stat in
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(verbatim: stat.value)
-                        .font(AppFont.serif(style: .largeTitle))
-                        .monospacedDigit()
-                    Text(verbatim: stat.label)
-                        .font(AppFont.footnote(weight: .medium))
-                        .foregroundStyle(palette.ink.opacity(0.7))
-                }
-                .accessibilityElement(children: .combine)
-            }
-        }
     }
 }
 
