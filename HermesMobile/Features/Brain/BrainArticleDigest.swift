@@ -316,7 +316,7 @@ struct BrainArticleDigestView: View {
         .overlay {
             // Over the card surface, which is opaque; the wash is translucent.
             if idea.number == focusIdea {
-                let shape = RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous)
+                let shape = BrainStyle.cardShape()
                 shape.fill(HermexPaper.reading.wash).allowsHitTesting(false)
                 shape.strokeBorder(HermexPaper.reading.edge, lineWidth: 1).allowsHitTesting(false)
             }
