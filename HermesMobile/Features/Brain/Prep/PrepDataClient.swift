@@ -1,16 +1,25 @@
 import Foundation
 
 /// The Prep (interview tutor) API on this user's `hermes-webui` fork (`api/tutor.py`):
-/// `GET /api/tutor/{home,today,map,gaps,gap}` and `POST /api/tutor/{attempt,flag}`. Stock upstream
+/// `GET /api/tutor/{home,today,map,gaps,gap,course,lesson}` and `POST /api/tutor/{attempt,flag}`. Stock upstream
 /// servers answer 404, which screens treat as "no Prep on this server".
 protocol PrepDataClient: Sendable {
     func home() async throws -> PrepHome
-    func today() async throws -> PrepRun
+    func today(run: PrepRunKind, unit: String?) async throws -> PrepRun
     func map(track: String) async throws -> PrepTrackMap
     func attempt(_ r: PrepAttemptRequest) async throws -> PrepAttemptResult
     func gaps() async throws -> [PrepGapSummary]
     func gap(id: String) async throws -> PrepGapDetail
     func flag(item: String) async throws
+    func course() async throws -> PrepCourse
+    func lesson(id: String) async throws -> PrepLesson
+}
+
+extension PrepDataClient {
+    /// Today's daily run.
+    func today() async throws -> PrepRun {
+        try await today(run: .daily, unit: nil)
+    }
 }
 
 /// Wraps the `APIClient` actor in a `Sendable` value for the protocol. Responses decode
@@ -22,8 +31,8 @@ struct APIClientPrepAdapter: PrepDataClient {
         try await get(.tutorHome)
     }
 
-    func today() async throws -> PrepRun {
-        try await get(.tutorToday)
+    func today(run: PrepRunKind, unit: String?) async throws -> PrepRun {
+        try await get(run == .daily ? .tutorToday : .tutorRun(run: run.rawValue, unit: unit))
     }
 
     func map(track: String) async throws -> PrepTrackMap {
@@ -46,6 +55,14 @@ struct APIClientPrepAdapter: PrepDataClient {
 
     func flag(item: String) async throws {
         _ = try await apiClient.sendData(endpoint: .tutorFlag, method: "POST", body: PrepFlagRequest(item: item))
+    }
+
+    func course() async throws -> PrepCourse {
+        try await get(.tutorCourse)
+    }
+
+    func lesson(id: String) async throws -> PrepLesson {
+        try await get(.tutorLesson(id: id))
     }
 
     private func get<Value: Decodable>(_ endpoint: Endpoint) async throws -> Value {

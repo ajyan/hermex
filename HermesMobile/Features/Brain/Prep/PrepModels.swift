@@ -147,9 +147,11 @@ struct PrepHome: Decodable, Hashable, Sendable {
     let run: PrepRunSummary
     let tracks: [PrepTrackSummary]
     let needsWork: [PrepNeedsWork]
+    /// The learn-first course path; nil on servers without a course.
+    let course: PrepCourse?
 
     private enum CodingKeys: String, CodingKey {
-        case streak, readiness, run, tracks
+        case streak, readiness, run, tracks, course
         case needsWork = "needs_work"
     }
 
@@ -160,6 +162,7 @@ struct PrepHome: Decodable, Hashable, Sendable {
         run = c.object(PrepRunSummary.self, .run, default: PrepRunSummary())
         tracks = c.lossy(PrepTrackSummary.self, .tracks)
         needsWork = c.lossy(PrepNeedsWork.self, .needsWork)
+        course = c.optional(PrepCourse.self, .course)
     }
 }
 
@@ -173,6 +176,8 @@ enum PrepDrill: String, Encodable, Hashable, Sendable {
     case primer
     case fact
     case judgment
+    case lesson
+    case boss
     case unknown
 
     init(from decoder: Decoder) throws {
@@ -248,6 +253,8 @@ struct PrepItemExcerpt: Decodable, Identifiable, Hashable, Sendable {
     let stage: String
     let format: String
     let origin: String
+    /// A lesson rep's teaching and check; nil for every other drill.
+    let lesson: PrepLesson?
 
     /// A card the nightly coach wrote for a gap; only these can be flagged.
     var isCoachWritten: Bool { origin == "coach" }
@@ -257,6 +264,7 @@ struct PrepItemExcerpt: Decodable, Identifiable, Hashable, Sendable {
         case stage, format, origin
         case skillTitle = "skill_title"
         case referenceMD = "reference_md"
+        case ideaMD = "idea_md"
     }
 
     init(from decoder: Decoder) throws {
@@ -278,6 +286,7 @@ struct PrepItemExcerpt: Decodable, Identifiable, Hashable, Sendable {
         stage = c.string(.stage)
         format = c.string(.format)
         origin = c.string(.origin)
+        lesson = c.contains(.ideaMD) ? try? PrepLesson(from: decoder) : nil
     }
 }
 
@@ -306,14 +315,19 @@ struct PrepRep: Decodable, Identifiable, Hashable, Sendable {
 /// `GET /api/tutor/today`. `index` is the first unanswered rep's stable index.
 struct PrepRun: Decodable, Hashable, Sendable {
     let date: String
+    /// Which run these reps belong to; servers from before runs send none, which is the daily run.
+    let run: PrepRunKind
+    let unit: String?
     let index: Int
     let reps: [PrepRep]
 
-    private enum CodingKeys: String, CodingKey { case date, index, reps }
+    private enum CodingKeys: String, CodingKey { case date, run, unit, index, reps }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         date = c.string(.date)
+        run = c.optional(PrepRunKind.self, .run) ?? .daily
+        unit = c.optional(String.self, .unit)
         index = c.int(.index)
         reps = c.lossy(PrepRep.self, .reps).filter { $0.index >= 0 }
     }
@@ -360,9 +374,12 @@ struct PrepAttemptRequest: Encodable, Hashable, Sendable {
     let answer: PrepAnswer
     let elapsedMS: Int
     let hintsUsed: Int
+    var run: PrepRunKind = .daily
+    /// The unit a test out is for; omitted on other runs.
+    var unit: String?
 
     private enum CodingKeys: String, CodingKey {
-        case date, index, item, drill, answer
+        case date, index, item, drill, answer, run, unit
         case elapsedMS = "elapsed_ms"
         case hintsUsed = "hints_used"
     }
@@ -443,12 +460,20 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
     let logged: Bool
     /// A judgment card's reference point sentences by point id, sent once the answer is graded.
     let pointTexts: [String: String]
+    /// A boss answer's lessons to revisit, and the sitting once this answer completes it.
+    let revisit: [PrepRevisit]
+    let sitting: PrepBossSitting?
+    /// Why the option picked on a lesson check is wrong; nil when it was right.
+    let why: String?
+
+    /// The sample answer, from whichever grade shape the answer came back with.
+    var strongAnswer: String { judgment?.strongAnswer ?? grade?.strongAnswer ?? "" }
 
     /// The grader couldn't score the answer; there is no grade to show.
     var isUngraded: Bool { verdict == "ungraded" }
 
     private enum CodingKeys: String, CodingKey {
-        case verdict, correct, feedback, credit, links, streak, grade, logged, points
+        case verdict, correct, feedback, credit, links, streak, grade, logged, points, revisit, sitting, why
         case referenceMD = "reference_md"
         case nextIndex = "next_index"
         case gapMatch = "gap_match"
@@ -471,6 +496,9 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
         logged = c.bool(.logged)
         pointTexts = Dictionary(c.lossy(PrepPointText.self, .points).map { ($0.id, $0.text) },
                                 uniquingKeysWith: { first, _ in first })
+        revisit = c.optional(PrepRevisits.self, .revisit)?.values ?? []
+        sitting = c.optional(PrepBossSitting.self, .sitting)
+        why = c.optional(String.self, .why).flatMap { $0.isEmpty ? nil : $0 }
     }
 }
 

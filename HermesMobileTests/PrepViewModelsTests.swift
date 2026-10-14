@@ -16,6 +16,8 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
     var gapsResults: [Result<[PrepGapSummary], Error>] = []
     var gapResults: [Result<PrepGapDetail, Error>] = []
     var flagResults: [Result<Void, Error>] = [.success(())]
+    var courseResults: [Result<PrepCourse, Error>] = []
+    var lessonResults: [Result<PrepLesson, Error>] = []
 
     /// When set, `attempt` signals `started` and then waits on `release`.
     var gate: (started: AsyncStream<Void>.Continuation, release: AsyncStream<Void>)?
@@ -40,7 +42,10 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
         }
         return try next("home", &homeResults)
     }
-    func today() async throws -> PrepRun { try next("today", &todayResults) }
+    func today(run: PrepRunKind, unit: String?) async throws -> PrepRun {
+        let name = run == .daily ? "today" : "today:\(run.rawValue)" + (unit.map { ":\($0)" } ?? "")
+        return try next(name, &todayResults)
+    }
     func map(track: String) async throws -> PrepTrackMap { try next("map:\(track)", &mapResults) }
 
     func attempt(_ r: PrepAttemptRequest) async throws -> PrepAttemptResult {
@@ -55,6 +60,8 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
     func gaps() async throws -> [PrepGapSummary] { try next("gaps", &gapsResults) }
     func gap(id: String) async throws -> PrepGapDetail { try next("gap:\(id)", &gapResults) }
     func flag(item: String) async throws { try next("flag:\(item)", &flagResults) }
+    func course() async throws -> PrepCourse { try next("course", &courseResults) }
+    func lesson(id: String) async throws -> PrepLesson { try next("lesson:\(id)", &lessonResults) }
 }
 
 @MainActor
@@ -136,6 +143,222 @@ final class PrepViewModelsTests: XCTestCase {
     private func currentRep(_ vm: PrepRunViewModel) -> PrepRep? {
         if case let .rep(rep, _) = vm.phase { return rep }
         return nil
+    }
+
+    // MARK: Course runs
+
+    private func lessonRep(_ index: Int, block: String = "new", cloze: Bool = false) -> String {
+        let check = cloze ? #"{"format": "cloze", "prompt": "Fill"}"# : #"{"format": "choice", "prompt": "Why?", "options": ["A", "B", "C", "D"]}"#
+        return #"{"index": \#(index), "block": "\#(block)", "drill": "lesson", "item": {"id": "u2.l\#(index)", "title": "Lesson \#(index)", "idea_md": "Idea \#(index)", "say_it_md": "Say", "check": \#(check)}}"#
+    }
+
+    private func bossRep(_ index: Int) -> String {
+        #"{"index": \#(index), "block": "boss", "drill": "boss", "item": {"id": "anth.j.020\#(index)", "summary": "Design it"}}"#
+    }
+
+    private func courseRun(_ reps: [String], run kind: String = "daily") -> PrepRun {
+        decode(PrepRun.self, #"{"date": "2026-10-20", "run": "\#(kind)", "index": 0, "reps": [\#(reps.joined(separator: ","))]}"#)
+    }
+
+    private func checked(_ verdict: String, next: Int) -> PrepAttemptResult {
+        decode(PrepAttemptResult.self, #"{"verdict": "\#(verdict)", "correct": "A", "feedback": "Because.", "next_index": \#(next), "streak": {"days": 7, "freezes": 1}}"#)
+    }
+
+    private func courseHome(xp: Int, boss: String = "locked") -> PrepHome {
+        decode(PrepHome.self, #"{"streak": {"days": 7, "freezes": 1}, "course": {"xp": \#(xp), "today": {"done": 3, "total": 3}, "units": [{"id": "u2", "title": "Prompt engineering", "state": "current", "boss": "\#(boss)", "lessons_done": 7, "lessons_total": 7}]}}"#)
+    }
+
+    func testLessonRepSubmitsChoiceWithDailyRun() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([lessonRep(0)]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.success(checked("pass", next: 1))]
+        let vm = makeVM(client)
+        await vm.load()
+        await vm.choose(.choice("A"))
+        XCTAssertEqual(client.attempts.first?.drill, .lesson)
+        XCTAssertEqual(client.attempts.first?.run, .daily)
+        XCTAssertNil(client.attempts.first?.unit)
+        XCTAssertFalse(client.log.contains { $0.hasPrefix("map") }, "course runs skip the skill map")
+    }
+
+    func testLessonXPTicks() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([lessonRep(0), lessonRep(1), lessonRep(2, block: "review"), lessonRep(3, block: "review")]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.success(checked("pass", next: 1)), .success(checked("miss", next: 2)),
+                                 .success(checked("pass", next: 3)), .success(checked("miss", next: 4))]
+        let vm = makeVM(client)
+        await vm.load()
+        var ticks: [Int?] = []
+        for _ in 0..<4 {
+            await vm.choose(.choice("A"))
+            ticks.append(vm.lastXP)
+            await vm.continue()
+        }
+        XCTAssertEqual(ticks, [15, 10, 5, nil])
+    }
+
+    func testReviewStartsHiddenAndShowIdeaReveals() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([lessonRep(0, block: "review"), lessonRep(1)]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.success(checked("pass", next: 1))]
+        let vm = makeVM(client)
+        await vm.load()
+        let review = try! XCTUnwrap(currentRep(vm))
+        XCTAssertTrue(vm.isReview(review))
+        XCTAssertFalse(vm.revealedLesson)
+        vm.showIdea()
+        XCTAssertTrue(vm.revealedLesson)
+        await vm.choose(.choice("A"))
+        await vm.continue()
+        let next = try! XCTUnwrap(currentRep(vm))
+        XCTAssertFalse(vm.isReview(next))
+        XCTAssertFalse(vm.revealedLesson)
+    }
+
+    func testBossResultExposesSittingAndRevisit() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([bossRep(0)]))]
+        client.homeResults = [.success(courseHome(xp: 0, boss: "ready"))]
+        client.attemptResults = [.success(decode(PrepAttemptResult.self, #"""
+        {"verdict": "pass", "next_index": 1, "grade": {"points_hit": [{"point_id": "p.a", "quote": ""}], "strong_answer": "S"},
+         "revisit": [{"lesson_id": "u2.l4", "title": "Prefill"}],
+         "sitting": {"score": 0.9, "passed": true, "stars": 2, "unlocked": "Agents and evals"}}
+        """#))]
+        let vm = makeVM(client)
+        await vm.load()
+        await vm.submitJudgment("My design")
+        guard case let .result(rep, result, _) = vm.phase else { return XCTFail("phase \(vm.phase)") }
+        XCTAssertEqual(rep.drill, .boss)
+        XCTAssertEqual(result.sitting?.stars, 2)
+        XCTAssertEqual(result.revisit.map(\.lessonID), ["u2.l4"])
+        XCTAssertEqual(vm.lastXP, 50)
+        XCTAssertEqual(client.attempts.first?.drill, .boss)
+    }
+
+    func testTestoutRunSendsRunAndUnit() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([bossRep(0)], run: "testout"))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.success(checked("pass", next: 1))]
+        let vm = PrepRunViewModel(client: client, run: .testout, unit: "u3")
+        await vm.load()
+        await vm.submitJudgment("My design")
+        XCTAssertEqual(client.log.first, "today:testout:u3")
+        XCTAssertEqual(client.attempts.first?.run, .testout)
+        XCTAssertEqual(client.attempts.first?.unit, "u3")
+    }
+
+    func testFinishedSummaryCountsLearnedAndXP() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([lessonRep(0), lessonRep(1), lessonRep(2, block: "review")]))]
+        client.homeResults = [.success(courseHome(xp: 100)), .success(courseHome(xp: 130, boss: "ready"))]
+        client.attemptResults = [.success(checked("pass", next: 1)), .success(checked("miss", next: 2)),
+                                 .success(checked("pass", next: 3))]
+        let vm = makeVM(client)
+        await vm.load()
+        for _ in 0..<3 {
+            await vm.choose(.choice("A"))
+            await vm.continue()
+        }
+        guard case let .finished(summary) = vm.phase else { return XCTFail("phase \(vm.phase)") }
+        XCTAssertTrue(summary.isCourse)
+        XCTAssertEqual(summary.xpGained, 30)
+        XCTAssertEqual(summary.learned, ["Lesson 0", "Lesson 1"])
+        XCTAssertEqual(summary.reviews, 1)
+        XCTAssertEqual(summary.missedChecks, 1)
+        XCTAssertEqual(summary.streak.days, 7)
+        XCTAssertEqual(summary.nextUp, "Boss quiz · Prompt engineering")
+        XCTAssertEqual(summary.repCount, 3)
+    }
+
+    func testLessonReaderLoadStates() async {
+        let client = FakePrepClient()
+        client.lessonResults = [.failure(http(404))]
+        let vm = PrepLessonViewModel(id: "u2.l3", client: client)
+        await vm.load()
+        guard case .failed = vm.state else { return XCTFail("state \(vm.state)") }
+        client.lessonResults = [.success(decode(PrepLesson.self, #"{"id": "u2.l3", "title": "XML tags", "idea_md": "I", "check": {"answer": "A"}}"#))]
+        await vm.load()
+        guard case let .loaded(lesson) = vm.state else { return XCTFail("state \(vm.state)") }
+        XCTAssertEqual(lesson.check.answer, "A")
+        XCTAssertEqual(client.log, ["lesson:u2.l3", "lesson:u2.l3"])
+    }
+
+    func testLessonSourceLineNamesRefsOnce() throws {
+        let lesson = decode(PrepLesson.self, #"""
+        {"id": "u2.l3", "sources": [{"ref": "prompt-docs"}, {"ref": "guide", "path": "05/06.md"},
+                                    {"ref": "playbook"}, {"ref": "question-bank"}, {"ref": "mystery"}]}
+        """#)
+        XCTAssertEqual(PrepCopy.sourceLine(lesson.sources),
+                       "Anthropic prompting docs · AI system design guide · Your notes · mystery")
+        XCTAssertNil(PrepCopy.sourceLine([]))
+    }
+
+    func testRewardCopy() {
+        XCTAssertEqual(PrepCopy.starsLabel(2), "2 of 3 stars")
+        XCTAssertEqual(PrepCopy.xpLabel(15), "+15 XP")
+        XCTAssertEqual(PrepCopy.xpSpoken(15), "Plus 15 XP")
+        XCTAssertEqual(PrepCopy.percent(0.824), "82%")
+    }
+
+    func testSittingHeadline() {
+        XCTAssertEqual(PrepCopy.sittingHeadline(PrepBossSitting(score: 0.9, passed: true, stars: 2, unlocked: nil)), "Boss passed")
+        XCTAssertEqual(PrepCopy.sittingHeadline(PrepBossSitting(score: 0.5, passed: false, stars: 0, unlocked: nil)), "Not yet")
+        XCTAssertEqual(PrepCopy.sittingHeadline(PrepBossSitting(score: nil, passed: false, stars: 0, unlocked: nil)), "Grading tonight")
+        XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: 0.9, passed: true, stars: 2, unlocked: "Agents and evals"), xp: 50),
+                       "Agents and evals unlocked · +50 XP")
+        XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: 0.5, passed: false, stars: 0, unlocked: nil), xp: nil),
+                       "The lessons below come back tomorrow, then the boss again.")
+        XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: 0.5, passed: false, stars: 0, unlocked: nil), xp: nil,
+                                           testOut: true), "Not yet. Start with the lessons below.")
+        XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: 0.9, passed: true, stars: 2, unlocked: nil), xp: 50,
+                                           testOut: true), "+50 XP")
+    }
+
+    func testHomeExposesCourseWhenPresent() async {
+        let client = FakePrepClient()
+        client.homeResults = [.success(courseHome(xp: 40))]
+        client.courseResults = [.success(decode(PrepCourse.self, #"""
+        {"xp": 40, "today": {"done": 0, "total": 10}, "units": [
+          {"id": "u1", "title": "LLM fundamentals", "state": "current", "lessons": [{"id": "u1.l1", "title": "Tokens", "state": "next"}]},
+          {"id": "u2", "title": "Prompt engineering", "state": "locked"}]}
+        """#))]
+        let vm = PrepHomeViewModel(client: client)
+        await vm.load()
+        XCTAssertEqual(vm.course?.units.count, 2)
+        XCTAssertEqual(vm.course?.units.first?.lessons.first?.state, .next)
+        XCTAssertTrue(client.log.contains("course"))
+    }
+
+    func testHomeWithoutCourseSkipsCourseCall() async {
+        let client = FakePrepClient()
+        client.homeResults = [.success(decode(PrepHome.self, #"{"streak": {"days": 1, "freezes": 0}}"#))]
+        let vm = PrepHomeViewModel(client: client)
+        await vm.load()
+        XCTAssertNil(vm.course)
+        XCTAssertFalse(client.log.contains("course"))
+    }
+
+    func testHomeFallsBackToHomeCourseWhenCourseFails() async {
+        let client = FakePrepClient()
+        client.homeResults = [.success(courseHome(xp: 40))]
+        client.courseResults = [.failure(http(500))]
+        let vm = PrepHomeViewModel(client: client)
+        await vm.load()
+        XCTAssertEqual(vm.course?.xp, 40)
+        XCTAssertEqual(vm.course?.units.first?.lessons, [])
+    }
+
+    func testPathCopy() {
+        XCTAssertEqual(PrepCopy.unitHeader(index: 1, title: "Prompt engineering"), "Unit 2 · Prompt engineering")
+        XCTAssertEqual(PrepCopy.todayLine(days: 6, xp: 340), "6-day streak · 340 XP")
+        XCTAssertEqual(PrepCopy.todayLine(days: 0, xp: 0), "0 XP")
+        XCTAssertEqual(PrepCopy.bossNode(.ready, next: "Agents"), "Boss quiz · ready")
+        XCTAssertEqual(PrepCopy.bossNode(.locked, next: "Agents"), "Boss quiz · unlocks Agents")
+        XCTAssertEqual(PrepCopy.bossNode(.locked, next: nil), "Boss quiz")
     }
 
     // MARK: Home / track
@@ -231,9 +454,9 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(currentRep(vm)?.index, 5)
         await vm.choose(.choice("x"))
         await vm.continue()
-        guard case let .finished(streak, moved) = vm.phase else { return XCTFail("phase \(vm.phase)") }
-        XCTAssertEqual(streak.days, 3)
-        XCTAssertEqual(moved, [])
+        guard case let .finished(summary) = vm.phase else { return XCTFail("phase \(vm.phase)") }
+        XCTAssertEqual(summary.streak.days, 3)
+        XCTAssertEqual(summary.moved, [])
         XCTAssertEqual(client.attempts.map(\.index), [0, 3, 5])
     }
 
@@ -383,8 +606,9 @@ final class PrepViewModelsTests: XCTestCase {
         await vm.load()
         await vm.choose(.choice("a"))
         await vm.continue()
-        guard case let .finished(_, moved) = vm.phase else { return XCTFail("phase \(vm.phase)") }
-        XCTAssertEqual(moved.map(\.id), ["b", "c"])
+        guard case let .finished(summary) = vm.phase else { return XCTFail("phase \(vm.phase)") }
+        XCTAssertEqual(summary.moved.map(\.id), ["b", "c"])
+        XCTAssertFalse(summary.isCourse)
         XCTAssertEqual(client.log, ["today", "map:dsa", "attempt", "map:dsa"])
     }
 
@@ -397,8 +621,8 @@ final class PrepViewModelsTests: XCTestCase {
         await vm.load()
         await vm.choose(.choice("a"))
         await vm.continue()
-        guard case let .finished(_, moved) = vm.phase else { return XCTFail("phase \(vm.phase)") }
-        XCTAssertEqual(moved, [])
+        guard case let .finished(summary) = vm.phase else { return XCTFail("phase \(vm.phase)") }
+        XCTAssertEqual(summary.moved, [])
     }
 
     func testPrimerAcknowledgePostsSeen() async {
@@ -502,8 +726,8 @@ final class PrepViewModelsTests: XCTestCase {
         releaseCont.yield()
         await first.value
         XCTAssertEqual(client.log.filter { $0 == "home" }.count, 1)
-        guard case let .finished(streak, _) = vm.phase else { return XCTFail("phase \(vm.phase)") }
-        XCTAssertEqual(streak.days, 2)
+        guard case let .finished(summary) = vm.phase else { return XCTFail("phase \(vm.phase)") }
+        XCTAssertEqual(summary.streak.days, 2)
     }
 
     // MARK: New drills
@@ -684,6 +908,10 @@ final class PrepViewModelsTests: XCTestCase {
     func testBlockTitles() {
         XCTAssertEqual(["warmup", "weak", "main", "new", "bonus"].map(PrepCopy.blockTitle),
                        ["Warm-up", "Weak spot", "Main rep", "New", "Bonus"])
+        XCTAssertEqual(["reteach", "review", "boss"].map(PrepCopy.blockTitle),
+                       ["Another way to see it", "Review", "Boss quiz"])
+        XCTAssertEqual(PrepCopy.reviewLine(reviews: 2, missed: 1), "2 reviews · 1 check to look at again")
+        XCTAssertEqual(PrepCopy.reviewLine(reviews: 1, missed: 0), "1 review")
     }
 
     func testFeedbackSplitsAfterTheFirstSentence() {

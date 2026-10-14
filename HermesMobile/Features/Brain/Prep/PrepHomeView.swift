@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Prep's landing screen: today's run, the tracks as cover cards, and what needs
-/// work. Pushed as `.brainRoute(.prep(.home))`; owns no `NavigationStack`.
+/// Prep's landing screen: today's run (the course's ring card and path when the server has a
+/// course), the tracks as cover cards, and what needs work. Pushed as `.brainRoute(.prep(.home))`;
+/// owns no `NavigationStack`.
 struct PrepHomeView: View {
     @State private var viewModel: PrepHomeViewModel
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -35,8 +36,18 @@ struct PrepHomeView: View {
         case .loaded(let home):
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
-                    todaySection(home)
-                    if !home.tracks.isEmpty { tracksSection(home.tracks) }
+                    if let course = viewModel.course {
+                        // The course replaces the run row: a ring card, then the path. Skill maps and
+                        // gaps (fed by mocks) follow below.
+                        PrepTodayRingCard(course: course, streak: home.streak,
+                                          action: PrepCopy.runAction(reps: home.run.reps, remaining: home.run.remaining))
+                        PrepUnitPath(course: course)
+                    } else {
+                        todaySection(home)
+                    }
+                    if !home.tracks.isEmpty {
+                        tracksSection(home.tracks, title: viewModel.course == nil ? "Tracks" : "Skill maps")
+                    }
                     if let gaps = viewModel.gaps {
                         PrepGapsSection(gaps: gaps)
                     } else if !home.needsWork.isEmpty {
@@ -82,10 +93,10 @@ struct PrepHomeView: View {
 
     // MARK: Tracks
 
-    private func tracksSection(_ tracks: [PrepTrackSummary]) -> some View {
+    private func tracksSection(_ tracks: [PrepTrackSummary], title: String) -> some View {
         let columns = BrainListLayout.columnCount(2, dynamicType: dynamicTypeSize)
         return VStack(alignment: .leading, spacing: BrainStyle.s) {
-            BrainSectionHeader(title: "Tracks")
+            BrainSectionHeader(title: title)
             LazyVGrid(
                 columns: Array(repeating: GridItem(.flexible(), spacing: BrainStyle.m, alignment: .top), count: columns),
                 spacing: BrainStyle.m
@@ -123,7 +134,7 @@ struct PrepHomeView: View {
 
 /// Today's run action as a small accent capsule: Start or Resume push the run;
 /// Done is shown disabled once nothing is left today.
-private struct PrepRunButton: View {
+struct PrepRunButton: View {
     let action: PrepCopy.RunAction
 
     var body: some View {
