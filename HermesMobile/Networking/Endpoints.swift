@@ -154,12 +154,13 @@ enum Endpoint {
     case transcribe
     case tts
     /// The Brain module library (`api/brain_catalog.py`): module counts, item lists, one page (optionally
-    /// placed in a given hub), search, and the home's daily deck of bites.
+    /// placed in a given hub), search, the home's daily deck of bites, and the People screen's sections.
     case brainModules
     case brainList(module: String, tag: String?, cursor: Int?)
     case brainPage(module: String, id: String, hub: String?)
     case brainSearch(query: String, module: String?)
     case brainHome(batch: Int)
+    case brainPeopleHome
     /// The Prep interview tutor (`api/tutor.py`): today's run, home, a track map, one item, answer submission,
     /// the gap ledger (all gaps and one gap) and flagging a coach-written card.
     case tutorHome
@@ -463,6 +464,8 @@ enum Endpoint {
             return "/api/brain/search"
         case .brainHome:
             return "/api/brain/home"
+        case .brainPeopleHome:
+            return "/api/brain/people/home"
         case .tutorHome:
             return "/api/tutor/home"
         case .tutorToday, .tutorRun:

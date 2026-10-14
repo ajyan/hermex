@@ -699,6 +699,8 @@
 		B1A1C0DE0000000000000C03 /* BrainPersonCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000C04 /* BrainPersonCardView.swift */; };
 		B1A1C0DE0000000000001001 /* BrainPersonLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000001002 /* BrainPersonLayout.swift */; };
 		B1A1C0DE0000000000001005 /* BrainPersonTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000001006 /* BrainPersonTimelineView.swift */; };
+		B1A1C0DE0000000000001007 /* BrainPeopleList.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000001008 /* BrainPeopleList.swift */; };
+		B1A1C0DE0000000000001009 /* BrainPeopleListTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE000000000000100A /* BrainPeopleListTests.swift */; };
 		B1A1C0DE0000000000000903 /* BrainCoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000904 /* BrainCoverView.swift */; };
 		B1A1C0DE0000000000000905 /* BrainConnectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000906 /* BrainConnectionsView.swift */; };
 		B1A1C0DE0000000000000F01 /* BrainJournalCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000F02 /* BrainJournalCalendarView.swift */; };
@@ -1470,6 +1472,8 @@
 		B1A1C0DE0000000000000C04 /* BrainPersonCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainPersonCardView.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000001002 /* BrainPersonLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainPersonLayout.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000001006 /* BrainPersonTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainPersonTimelineView.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000001008 /* BrainPeopleList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainPeopleList.swift; sourceTree = "<group>"; };
+		B1A1C0DE000000000000100A /* BrainPeopleListTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainPeopleListTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000904 /* BrainCoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainCoverView.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000906 /* BrainConnectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainConnectionsView.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000F02 /* BrainJournalCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainJournalCalendarView.swift; sourceTree = "<group>"; };
@@ -1700,6 +1704,7 @@
 				B1A1C0DE0000000000000E16 /* PrepViewModelsTests.swift */,
 				B1A1C0DE0000000000000908 /* BrainVisualsTests.swift */,
 				B1A1C0DE0000000000001004 /* BrainPersonLayoutTests.swift */,
+				B1A1C0DE000000000000100A /* BrainPeopleListTests.swift */,
 				B1A1C0DE0000000000000D04 /* BrainArticleDigestTests.swift */,
 				F42EE649B1547E6CBDC22A5A /* VoiceCallFlowTests.swift */,
 				A1C0FFEE0000000000000F02 /* VoiceCallAudioLevelsTests.swift */,
@@ -2583,6 +2588,7 @@
 				B1A1C0DE0000000000000C04 /* BrainPersonCardView.swift */,
 				B1A1C0DE0000000000001002 /* BrainPersonLayout.swift */,
 				B1A1C0DE0000000000001006 /* BrainPersonTimelineView.swift */,
+				B1A1C0DE0000000000001008 /* BrainPeopleList.swift */,
 				B1A1C0DE0000000000000E10 /* Prep */,
 			);
 			path = Brain;
@@ -2896,6 +2902,7 @@
 				B1A1C0DE0000000000000D01 /* BrainArticleDigest.swift in Sources */,
 				B1A1C0DE0000000000000C03 /* BrainPersonCardView.swift in Sources */,
 				B1A1C0DE0000000000001001 /* BrainPersonLayout.swift in Sources */,
+				B1A1C0DE0000000000001007 /* BrainPeopleList.swift in Sources */,
 				B1A1C0DE0000000000001005 /* BrainPersonTimelineView.swift in Sources */,
 				218E7F5B009F877FF54BA04A /* DailyDeckView.swift in Sources */,
 				0D0A3A284474E49DBDD0F9E9 /* DailyDeckViewModel.swift in Sources */,
@@ -3322,6 +3329,7 @@
 				B1A1C0DE0000000000000E15 /* PrepViewModelsTests.swift in Sources */,
 				B1A1C0DE0000000000000907 /* BrainVisualsTests.swift in Sources */,
 				B1A1C0DE0000000000001003 /* BrainPersonLayoutTests.swift in Sources */,
+				B1A1C0DE0000000000001009 /* BrainPeopleListTests.swift in Sources */,
 				B1A1C0DE0000000000000D03 /* BrainArticleDigestTests.swift in Sources */,
 				B15C1E3E39CB8EAC55E8BD67 /* VoiceCallFlowTests.swift in Sources */,
 				A1C0FFEE0000000000000B02 /* VoiceCallAudioLevelsTests.swift in Sources */,
