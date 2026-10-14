@@ -75,6 +75,7 @@ struct PrepRecallCard: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
             VStack(spacing: BrainStyle.s) {
+                let transcribing = voiceInput.state == .transcribing
                 Button(action: toggleVoice) {
                     Image(systemName: voiceInput.isListening ? "stop.fill" : "mic.fill")
                         .font(.system(size: mic * 0.36, weight: .semibold))
@@ -83,9 +84,10 @@ struct PrepRecallCard: View {
                         .background(Color.accentColor, in: Circle())
                 }
                 .buttonStyle(.plain)
-                .disabled(isSubmitting)
+                .disabled(isSubmitting || transcribing)
                 .accessibilityLabel(Text(verbatim: voiceInput.isListening ? "Stop dictating" : "Answer out loud"))
-                Text(verbatim: voiceInput.isListening ? "Listening… tap to stop" : "Tap to answer out loud")
+                Text(verbatim: transcribing ? "Transcribing…"
+                     : voiceInput.isListening ? "Listening… tap to stop" : "Tap to answer out loud")
                     .font(BrainStyle.meta)
                     .foregroundStyle(Color.hxTextSecondary)
                 if let error = voiceInput.errorMessage {
@@ -122,6 +124,10 @@ struct PrepRecallCard: View {
 struct PrepRecallResultView: View {
     let result: PrepAttemptResult
     let xp: Int?
+    /// False after "I don't know": there are no points to claim back.
+    var canOverride = true
+    /// The point whose claim is saving; every "I had that" waits until it lands.
+    var overridingPoint: String?
     let overrideMissed: (String) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shown = 0
@@ -204,11 +210,13 @@ struct PrepRecallResultView: View {
                 if result.overridden.contains(id) {
                     Text(verbatim: "You had this").font(BrainStyle.meta).foregroundStyle(Color.hxTextSecondary)
                 }
-                if !hit {
+                if !hit && canOverride {
                     Button { overrideMissed(id) } label: {
-                        Text(verbatim: "I had that ›").font(BrainStyle.meta).foregroundStyle(Color.accentColor)
+                        Text(verbatim: overridingPoint == id ? "Saving…" : "I had that ›")
+                            .font(BrainStyle.meta).foregroundStyle(Color.accentColor)
                     }
                     .buttonStyle(.plain)
+                    .disabled(overridingPoint != nil)
                     .frame(minHeight: 32)
                     .accessibilityLabel(Text(verbatim: "I had that: \(text)"))
                 }
