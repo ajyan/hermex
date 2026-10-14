@@ -292,6 +292,17 @@ final class AutoArchiveRunnerTests: XCTestCase {
         return ["session_id": id, "title": title, "message_count": messages, "created_at": last - 60, "last_message_at": last]
     }
 
+    /// 2026-10-13 09:00 in the device's calendar.
+    private static let digestDay = Calendar.current.date(from: DateComponents(year: 2026, month: 10, day: 13, hour: 9))!
+
+    func testDigestPromptNamesTheDayTheVaultPathAndTheSkeleton() {
+        let prompt = ChatDigestSummarizer.prompt(on: Self.digestDay)
+        XCTAssertTrue(prompt.contains("~/Code/second-brain/notes/chat-digests/2026-10-13-<short-slug>.md (today is 2026-10-13)"))
+        XCTAssertTrue(prompt.contains("## About\n## Decisions\n## Follow-ups\n## People"))
+        XCTAssertTrue(prompt.contains("only for people named in this chat who already have a file in ~/Code/second-brain/crm/contacts"))
+        XCTAssertFalse(prompt.contains("YYYY"))
+    }
+
     @MainActor
     private func makeViewModel(_ fake: FakeServer) throws -> (SessionListViewModel, AutoArchiveStore) {
         MockURLProtocol.requestHandler = { try fake.handle($0) }
@@ -306,7 +317,8 @@ final class AutoArchiveRunnerTests: XCTestCase {
             client: client,
             pollInterval: .seconds(1),
             timeout: .seconds(3),
-            sleep: { _ in }
+            sleep: { _ in },
+            now: { Self.digestDay }
         )
         return (viewModel, store)
     }
@@ -412,7 +424,7 @@ final class AutoArchiveRunnerTests: XCTestCase {
         let failure = await viewModel.summarizeAndArchive(session)
 
         XCTAssertNil(failure)
-        XCTAssertEqual(fake.started, [ChatDigestSummarizer.prompt])
+        XCTAssertEqual(fake.started, [ChatDigestSummarizer.prompt(on: Self.digestDay)])
         XCTAssertEqual(fake.archived, ["a"])
         XCTAssertEqual(store.model(for: server).examples.map(\.kept), [true])
         XCTAssertFalse(viewModel.isSummarizing(session))

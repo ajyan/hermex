@@ -13,6 +13,7 @@ final class VoiceCallFlowTests: XCTestCase {
     private var speaker: FlowSpeaker!
     private var controller: VoiceCallController!
     private var clock: TimeInterval = 100
+    private static let callTime = Date(timeIntervalSince1970: 1_791_900_000)
 
     override func setUp() async throws {
         stream = ScriptedSSEStreamingClient()
@@ -22,17 +23,17 @@ final class VoiceCallFlowTests: XCTestCase {
         clock = 100
         controller = VoiceCallController(
             listener: listener, speaker: speaker, chat: chat, bridge: FlowBridge(),
-            now: { [unowned self] in clock }, suppressThinkingCue: { true }, tickInterval: nil
+            now: { [unowned self] in clock }, clock: { Self.callTime }, suppressThinkingCue: { true }, tickInterval: nil
         )
         await controller.start()
     }
 
     func testVoiceTurnSpeaksTheWholeReply() async throws {
         await say("what's the weather")
-        XCTAssertEqual(chat.messages.last?.content, "[voice] what's the weather")
+        XCTAssertEqual(chat.messages.last?.content, VoiceCallPhrases.voicePrefix(at: Self.callTime) + "what's the weather")
         XCTAssertEqual(controller.state, .thinking)
 
-        stream.emit(.token("[voice] It's sunny. "))
+        stream.emit(.token("[voice 2:41 PM] It's sunny. "))
         feed()
         XCTAssertEqual(speaker.spoken, ["It's sunny."])
 

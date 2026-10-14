@@ -304,7 +304,7 @@ private struct DeckCardView: View {
         Text(verbatim: filed ? "Filed" : count == 1 ? "1 reflection" : "\(count) reflections")
             .font(AppFont.display(style: .largeTitle, weight: .semibold))
         Text(verbatim: filed
-             ? "In your journal. Edit any card and file again to update it."
+             ? viewModel.filedNote?.summary ?? "In your journal. Edit any card and file again to update it."
              : viewModel.isFiled
              ? "Filing again updates the journal: changed answers replace what was filed, new ones are added, nothing is deleted."
              : count == 0
@@ -314,6 +314,17 @@ private struct DeckCardView: View {
             .foregroundStyle(Color.hxTextPrimary)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, 12)
+        if filed, let failures = viewModel.filedNote?.failures, !failures.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(Array(failures.enumerated()), id: \.offset) { _, failure in
+                    Label { Text(verbatim: failure) } icon: { Image(systemName: "exclamationmark.triangle") }
+                }
+            }
+            .font(AppFont.footnote())
+            .foregroundStyle(Color.hxWarning)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 12)
+        }
         if case .failed(let message) = viewModel.filing {
             Text(verbatim: message).font(AppFont.footnote()).foregroundStyle(Color.hxDanger).padding(.top, 12)
         }

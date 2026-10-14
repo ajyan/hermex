@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// Today's brief as a stack of cards, swiped left for the next and right for the
-/// previous, with "File it" on the last card. "Not for Me" lives in the More menu. Filing opens today's session so the
-/// agent's work on the answers is visible. Copy is English-only (personal fork).
+/// previous, with "File it" on the last card. "Not for Me" lives in the More menu. Filing stays on the
+/// deck when the server files it alone, and opens the session when the agent has work to do, so that
+/// work is visible. Copy is English-only (personal fork).
 struct DailyDeckView: View {
     @State private var viewModel: DailyDeckViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -209,7 +210,8 @@ struct DailyDeckView: View {
 
     private func file() {
         Task {
-            if let sessionID = await viewModel.file() { openSession(sessionID) }
+            // A filing the server finished stays here: the close card shows it as filed.
+            if case .openSession(let sessionID) = await viewModel.file() { openSession(sessionID) }
         }
     }
 }

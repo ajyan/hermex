@@ -295,7 +295,7 @@ enum DeckPage: Identifiable, Equatable {
 }
 
 /// The answers file the agent saves verbatim and files with `brain brief file`.
-struct DeckAnswersPayload: Encodable, Equatable {
+struct DeckAnswersPayload: Encodable, Equatable, Sendable {
     let version = 1
     let date: String
     let kind: String
@@ -332,6 +332,13 @@ struct DeckAnswersPayload: Encodable, Equatable {
         \(json)
         ```
         """
+    }
+
+    /// After the server filed the deck: the follow-ups only the agent can do, in order.
+    /// Carries no JSON, since the answers are already filed.
+    func followUpMessage(steps: [String]) -> String {
+        (["Finish filing the \(date) \(kind) brief. Do these follow-up steps in order, per followups/AGENTS.md:"]
+            + steps.map { "- \($0)" }).joined(separator: "\n")
     }
 }
 

@@ -630,7 +630,7 @@ struct MessageBubbleView: View {
 }
 
 extension MessageBubbleView {
-    /// A user message as shown: a call's leading `[voice] ` marker is hidden.
+    /// A user message as shown: a call's leading `[voice 2:41 PM] ` (or legacy `[voice] `) tag is hidden.
     /// Display-only; the stored and copied text keep it.
     static func displayText(forUserMessage content: String) -> String {
         VoiceCallPhrases.withoutVoiceTag(content)
