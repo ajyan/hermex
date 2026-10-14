@@ -262,7 +262,8 @@ final class DailyDeckTests: XCTestCase {
 
         let opened = await viewModel.file()
 
-        XCTAssertEqual(opened, "new-2", "Filing gets its own session, not the one that read the deck")
+        XCTAssertEqual(client.fileRequests.count, 1, "the server filer is tried first")
+        XCTAssertEqual(opened, .openSession("new-2"), "Filing gets its own session, not the one that read the deck")
         XCTAssertEqual(viewModel.state, .ready)
         XCTAssertTrue(viewModel.isFiled, "the filed deck stays open to reread")
         XCTAssertEqual(client.sent.map(\.sessionID), ["new-2"])
@@ -288,6 +289,106 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(viewModel.state, .ready)
         guard case .failed = viewModel.filing else { return XCTFail("Expected a failed filing") }
         XCTAssertEqual(store.answers(for: server, date: "2026-10-04", kind: "morning")["advisor"]?.text, "Ship it.")
+    }
+
+    @MainActor
+    func testServerFilerFilesWithoutAChatAndShowsItsReport() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.deckJSON)
+        client.filer = .success(BriefFileResponse(
+            ok: true, summary: " Filed 1 answer to the journal. ",
+            ran: [.init(step: "journal", ok: true), .init(step: "goals", ok: false, error: "goals/ missing")],
+            agentSteps: ["  "]))
+        let viewModel = makeViewModel(client)
+        await viewModel.load()
+        viewModel.setText("Ship it.", for: viewModel.cards[1])
+
+        let result = await viewModel.file()
+
+        XCTAssertEqual(result, .filed)
+        XCTAssertEqual(client.createdWorkspaces, ["/vault"], "only the reading session; filing opens no chat")
+        XCTAssertTrue(client.sent.isEmpty)
+        let request = try XCTUnwrap(client.fileRequests.first)
+        XCTAssertEqual(request.date, "2026-10-04")
+        XCTAssertEqual(request.kind, "morning")
+        XCTAssertEqual(request.answers.answers.map(\.text), ["Ship it."])
+        XCTAssertTrue(viewModel.isFiled)
+        XCTAssertFalse(viewModel.hasChanges)
+        XCTAssertEqual(viewModel.filing, .idle)
+        XCTAssertEqual(viewModel.filedNote, DailyDeckFiledNote(summary: "Filed 1 answer to the journal.", failures: ["goals: goals/ missing"]))
+        XCTAssertEqual(store.answers(for: server, date: "2026-10-04", kind: "morning"), [:])
+    }
+
+    @MainActor
+    func testServerFilerWithAgentStepsOpensASessionForTheFollowUpsOnly() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.deckJSON)
+        client.filer = .success(BriefFileResponse(ok: true, summary: "Filed.", agentSteps: ["Install the plugin", "Email Sam"]))
+        let viewModel = makeViewModel(client)
+        await viewModel.load()
+        viewModel.setText("Ship it.", for: viewModel.cards[1])
+
+        let result = await viewModel.file()
+
+        XCTAssertEqual(result, .openSession("new-2"))
+        XCTAssertEqual(client.sent.map(\.sessionID), ["new-2"])
+        XCTAssertEqual(client.sent.first?.message, """
+        Finish filing the 2026-10-04 morning brief. Do these follow-up steps in order, per followups/AGENTS.md:
+        - Install the plugin
+        - Email Sam
+        """)
+        XCTAssertTrue(viewModel.isFiled)
+        XCTAssertEqual(store.session(for: server, date: "2026-10-04"), "new-2")
+    }
+
+    @MainActor
+    func testServerFilerErrorFailsWithoutFallingBackToTheAgent() async {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.deckJSON)
+        client.filer = .failure(BriefFileError(message: "Filing failed: bad kind"))
+        let viewModel = makeViewModel(client)
+        await viewModel.load()
+        viewModel.setText("Ship it.", for: viewModel.cards[1])
+
+        let result = await viewModel.file()
+
+        XCTAssertNil(result)
+        XCTAssertEqual(viewModel.filing, .failed("Filing failed: bad kind"))
+        XCTAssertTrue(client.sent.isEmpty, "no second filing through the agent")
+        XCTAssertEqual(client.createdWorkspaces, ["/vault"])
+        XCTAssertFalse(viewModel.isFiled)
+        XCTAssertEqual(store.answers(for: server, date: "2026-10-04", kind: "morning")["advisor"]?.text, "Ship it.")
+    }
+
+    @MainActor
+    func testServerFilerReportingNotOKFails() async {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.deckJSON)
+        client.filer = .success(BriefFileResponse(ok: false, error: "journal locked"))
+        let viewModel = makeViewModel(client)
+        await viewModel.load()
+        viewModel.setText("Ship it.", for: viewModel.cards[1])
+
+        let result = await viewModel.file()
+
+        XCTAssertNil(result)
+        XCTAssertEqual(viewModel.filing, .failed("journal locked"))
+        XCTAssertTrue(client.sent.isEmpty)
+        XCTAssertFalse(viewModel.isFiled)
+    }
+
+    func testBriefFileRequestCarriesTheAnswersPayloadInSnakeCase() throws {
+        let deck = try DailyDeck.decode(Self.deckJSON)
+        let payload = DeckAnswersPayload(deck: deck, answers: ["advisor": DeckAnswer(card: "advisor", text: "Ship it.")], completedAt: morning)
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let data = try encoder.encode(BriefFileRequest(date: payload.date, kind: payload.kind, answers: payload))
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(object["date"] as? String, "2026-10-04")
+        XCTAssertEqual(object["kind"] as? String, "morning")
+        let answers = try XCTUnwrap(object["answers"] as? [String: Any])
+        XCTAssertNotNil(answers["completed_at"])
+        XCTAssertEqual((answers["answers"] as? [[String: Any]])?.first?["text"] as? String, "Ship it.")
     }
 
     // MARK: - Card text
@@ -562,6 +663,52 @@ final class DailyDeckTests: XCTestCase {
     """
 }
 
+/// `APIClient.fileBrief` against `URLProtocol` mocks.
+final class BriefFileHTTPTests: APIClientTestCase {
+    private var request: BriefFileRequest {
+        BriefFileRequest(date: "2026-10-04", kind: "morning", answers: DeckAnswersPayload(
+            deck: try! DailyDeck.decode(#"{"date":"2026-10-04","kind":"morning","cards":[]}"#),
+            answers: [:], completedAt: Date(timeIntervalSince1970: 0)))
+    }
+
+    func testPostsAndDecodesTolerantly() async throws {
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.url?.path, "/api/brief/file")
+            let body = try apiTestJSONBody(from: request)
+            XCTAssertEqual(body["date"] as? String, "2026-10-04")
+            XCTAssertEqual((body["answers"] as? [String: Any])?["kind"] as? String, "morning")
+            return apiTestJSONResponse(
+                #"{"ok":true,"summary":"Filed.","ran":[{"step":"journal","ok":false,"error":"x"},{"step":7}],"agent_steps":["Email Sam"],"extra":1}"#,
+                for: request)
+        }
+        let response = try await client.fileBrief(request)
+        XCTAssertEqual(response?.summary, "Filed.")
+        XCTAssertEqual(response?.agentSteps, ["Email Sam"])
+        XCTAssertEqual(response?.ran, [.init(step: "journal", ok: false, error: "x"), .init(step: nil, ok: nil)])
+    }
+
+    func testNotFoundMeansNoFiler() async throws {
+        let client = makeClient { request in
+            apiTestJSONResponse(#"{"error":"unavailable"}"#, for: request, status: 404)
+        }
+        let response = try await client.fileBrief(request)
+        XCTAssertNil(response)
+    }
+
+    func testServerErrorCarriesTheServersMessage() async {
+        let client = makeClient { request in
+            apiTestJSONResponse(#"{"error":"brain CLI exited 2"}"#, for: request, status: 500)
+        }
+        do {
+            _ = try await client.fileBrief(request)
+            XCTFail("Expected an error")
+        } catch {
+            XCTAssertEqual(error as? BriefFileError, BriefFileError(message: "Filing failed: brain CLI exited 2"))
+        }
+    }
+}
+
 /// A scripted server: one workspace list, one `briefs/` listing, one deck body.
 final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     struct Sent { let sessionID: String; let message: String; let workspace: String }
@@ -572,6 +719,9 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     let deck: String
     var vanished: Set<String> = []
     var sendError: Error?
+    /// The server filer's answer; nil (the default) is a server without one.
+    var filer: Result<BriefFileResponse?, Error> = .success(nil)
+    private(set) var fileRequests: [BriefFileRequest] = []
     /// Bodies by path; anything else reads as `deck`.
     var files: [String: String] = [:]
     /// Folder listings other than `briefs/`.
@@ -614,6 +764,11 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     func startChat(sessionID: String, message: String, workspace: String) async throws {
         if let sendError { throw sendError }
         sent.append(Sent(sessionID: sessionID, message: message, workspace: workspace))
+    }
+
+    func fileBrief(_ request: BriefFileRequest) async throws -> BriefFileResponse? {
+        fileRequests.append(request)
+        return try filer.get()
     }
 }
 

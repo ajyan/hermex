@@ -103,6 +103,9 @@ final class VoiceCallControllerTests: XCTestCase {
     private var chat: FakeChat!
     private var bridge: FakeBridge!
     private var clock: TimeInterval = 0
+    /// The wall clock each turn is tagged with, and that tag.
+    private static let callTime = Date(timeIntervalSince1970: 1_791_900_000)
+    private let tag = VoiceCallPhrases.voicePrefix(at: VoiceCallControllerTests.callTime)
     private var suppressCue = false
     private var controller: VoiceCallController!
     private var logLines: [String] = []
@@ -121,6 +124,7 @@ final class VoiceCallControllerTests: XCTestCase {
             chat: chat,
             bridge: bridge,
             now: { [unowned self] in clock },
+            clock: { Self.callTime },
             suppressThinkingCue: { [unowned self] in suppressCue },
             tickInterval: nil,
             log: { [unowned self] in logLines.append($0) }
@@ -183,7 +187,7 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(controller.state, .listening)
 
         await say("hello")
-        XCTAssertEqual(chat.sent, ["[voice] hello"])
+        XCTAssertEqual(chat.sent, [tag + "hello"])
         XCTAssertEqual(controller.state, .thinking)
 
         update(text: "Hi Andrew. It is")
@@ -198,7 +202,7 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(controller.state, .listening)
 
         await say("thanks")
-        XCTAssertEqual(chat.sent, ["[voice] hello", "[voice] thanks"])
+        XCTAssertEqual(chat.sent, [tag + "hello", tag + "thanks"])
     }
 
     func testQuietFirstUtteranceSendsEvenWhenVoiceActivityNeverFires() async {
@@ -211,7 +215,7 @@ final class VoiceCallControllerTests: XCTestCase {
         clock += 0.5
         controller.tick()
         await controller.lastChatTask?.value
-        XCTAssertEqual(chat.sent, ["[voice] what time is it"])
+        XCTAssertEqual(chat.sent, [tag + "what time is it"])
         XCTAssertEqual(controller.state, .thinking)
     }
 
@@ -236,7 +240,7 @@ final class VoiceCallControllerTests: XCTestCase {
         voice(true, for: 0.3)
         controller.tick()
         await controller.lastChatTask?.value
-        XCTAssertEqual(chat.sent, ["[voice] what time is it"])
+        XCTAssertEqual(chat.sent, [tag + "what time is it"])
     }
 
     func testFinalFollowedByMoreSpeechDoesNotSendEarly() async {
@@ -260,7 +264,7 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertTrue(chat.sent.isEmpty)
         listener.onFinal?("Explain how Tailscale works in detail.")
         await controller.lastChatTask?.value
-        XCTAssertEqual(chat.sent, ["[voice] Explain how Tailscale works in detail."])
+        XCTAssertEqual(chat.sent, [tag + "Explain how Tailscale works in detail."])
     }
 
     func testSilentListeningSaysIDidntCatchThatOnceThenRearms() async {
@@ -401,7 +405,7 @@ final class VoiceCallControllerTests: XCTestCase {
         await controller.start()
         await say("hello")
         await say("are you there")
-        XCTAssertEqual(chat.sent, ["[voice] hello"])
+        XCTAssertEqual(chat.sent, [tag + "hello"])
         XCTAssertEqual(controller.state, .thinking)
     }
 
@@ -424,7 +428,7 @@ final class VoiceCallControllerTests: XCTestCase {
         listener.onFinal?("hold on a second")
         voice(false, for: 0.9)
         await controller.lastChatTask?.value
-        XCTAssertEqual(chat.sent, ["[voice] hello", "[voice] hold on a second"])
+        XCTAssertEqual(chat.sent, [tag + "hello", tag + "hold on a second"])
         XCTAssertEqual(chat.cancelCount, 1)
     }
 
@@ -437,7 +441,7 @@ final class VoiceCallControllerTests: XCTestCase {
 
         controller.performTapAction()
         await controller.lastChatTask?.value
-        XCTAssertEqual(chat.sent, ["[voice] what's on my calendar"])
+        XCTAssertEqual(chat.sent, [tag + "what's on my calendar"])
         XCTAssertEqual(controller.state, .thinking)
         XCTAssertNil(controller.tapAction)
     }
@@ -457,7 +461,7 @@ final class VoiceCallControllerTests: XCTestCase {
         update(text: "First sentence. Second sentence. Third.")
         XCTAssertEqual(speaker.spoken, ["First sentence."])
         await say("never mind")
-        XCTAssertEqual(chat.sent, ["[voice] hello", "[voice] never mind"])
+        XCTAssertEqual(chat.sent, [tag + "hello", tag + "never mind"])
     }
 
     func testTapInterruptAfterTheRunFinishedDoesNotCancel() async {
@@ -497,7 +501,7 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(chat.sent, [])
         listener.onFinal?("Hi, can you recall my journal?")
         await controller.lastChatTask?.value
-        XCTAssertEqual(chat.sent, ["[voice] Hi, can you recall my journal?"])
+        XCTAssertEqual(chat.sent, [tag + "Hi, can you recall my journal?"])
     }
 
     func testTurnSendsPartialWhenFinalNeverComes() async {
@@ -513,7 +517,7 @@ final class VoiceCallControllerTests: XCTestCase {
         clock += 0.2
         controller.tick()
         await controller.lastChatTask?.value
-        XCTAssertEqual(chat.sent, ["[voice] what time is it"])
+        XCTAssertEqual(chat.sent, [tag + "what time is it"])
     }
 
     func testSpeakingAgainWhileWaitingForFinalContinuesTheTurn() async {
@@ -525,7 +529,7 @@ final class VoiceCallControllerTests: XCTestCase {
         listener.onFinal?("Hi, can you recall my journal?")
         voice(false, for: 0.9)
         await controller.lastChatTask?.value
-        XCTAssertEqual(chat.sent, ["[voice] Hi, can you recall my journal?"])
+        XCTAssertEqual(chat.sent, [tag + "Hi, can you recall my journal?"])
     }
 
     func testBargeInIgnoredWhileSpeakerEchoBelowThreshold() async {
@@ -636,7 +640,7 @@ final class VoiceCallControllerTests: XCTestCase {
 
         update(text: "First sentence. Second part.", streaming: false)
         XCTAssertEqual(speaker.spoken.last, "Second part.")
-        XCTAssertEqual(chat.sent, ["[voice] hello"])
+        XCTAssertEqual(chat.sent, [tag + "hello"])
     }
 
     func testReconnectGivesUpAfter30s() async {
