@@ -241,4 +241,34 @@ final class BrainModelsTests: XCTestCase {
         XCTAssertTrue(action.isAvailable)
         XCTAssertEqual(opened, [.page(.wiki, "wiki/virtues.md")])
     }
+
+    func testBiteCopy() {
+        func bite(_ kind: BrainBite.Kind, _ module: BrainModuleID = .articles, id: String = "articles/a.md",
+                  index: Int? = nil, count: Int? = nil) -> BrainBite {
+            BrainBite(id: "x", kind: kind, text: "t", ref: BrainRef(module: module, id: id), index: index, count: count)
+        }
+        XCTAssertEqual(BrainBiteCopy.kicker(bite(.idea, index: 2, count: 5)), "Key idea · 2 of 5")
+        XCTAssertEqual(BrainBiteCopy.kicker(bite(.idea)), "Key idea")
+        XCTAssertEqual(BrainBiteCopy.kicker(bite(.idea, index: 2)), "Key idea")
+        XCTAssertEqual(BrainBiteCopy.kicker(bite(.takeaway)), "Your takeaway")
+        XCTAssertEqual(BrainBiteCopy.kicker(bite(.quote)), "Quote")
+        XCTAssertEqual(BrainBiteCopy.kicker(bite(.highlight)), "Highlight")
+
+        XCTAssertEqual(BrainBiteCopy.open(bite(.idea)), "Open the article")
+        XCTAssertEqual(BrainBiteCopy.open(bite(.highlight, .highlights, id: "book:meditations")), "Open the book")
+        XCTAssertEqual(BrainBiteCopy.open(bite(.idea, .highlights, id: "highlights/video.md")), "Open the note")
+        XCTAssertEqual(BrainBiteCopy.open(bite(.quote, .wiki, id: "wiki/a.md")), "Open the note")
+
+        XCTAssertEqual(bite(.idea).paper, .reading)
+        XCTAssertEqual(bite(.takeaway).paper, .reading)
+        XCTAssertEqual(bite(.quote).paper, .quote)
+        XCTAssertEqual(bite(.highlight).paper, .book)
+
+        XCTAssertEqual([.idea, .takeaway, .quote, .highlight].map { BrainBiteCopy.kind(bite($0)) },
+                       ["Idea", "Takeaway", "Quote", "Highlight"])
+        let titled = BrainBite(id: "y", kind: .idea, text: "t",
+                               ref: BrainRef(module: .articles, id: "a.md", title: "The Bitter Lesson"), byline: "Rich Sutton")
+        XCTAssertEqual(BrainBiteCopy.attribution(titled), "The Bitter Lesson · Rich Sutton")
+        XCTAssertNil(BrainBiteCopy.attribution(bite(.idea)))
+    }
 }
