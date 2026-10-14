@@ -48,7 +48,7 @@ struct PrepTodayRingCard: View {
     let action: PrepCopy.RunAction
 
     var body: some View {
-        VStack(alignment: .leading, spacing: BrainStyle.m) {
+        HXCard(.wash(.knowledge), spacing: BrainStyle.m) {
             HStack(spacing: BrainStyle.m) {
                 PrepDayRing(done: course.today.done, total: course.today.total, side: 60)
                 VStack(alignment: .leading, spacing: BrainStyle.xs) {
@@ -72,9 +72,6 @@ struct PrepTodayRingCard: View {
                     .foregroundStyle(Color.hxTextSecondary)
             }
         }
-        .padding(BrainStyle.l)
-        .glowSurface(.knowledge, cornerRadius: HXRadius.xl, opaque: true)
-        .hxShadow(.paper)
     }
 }
 

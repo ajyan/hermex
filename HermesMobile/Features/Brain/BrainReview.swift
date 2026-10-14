@@ -193,10 +193,7 @@ struct BrainDeckCard<Content: View>: View {
         }
         .foregroundStyle(paper.glow)
         .opacity(contentOpacity)
-        .background(paper.card, in: shape)
-        .overlay(shape.strokeBorder(paper.edge, lineWidth: 0.5))
-        .clipShape(shape)
-        .hxShadow(.paper)
+        .hxCardSurface(.glow(paper), clipsContent: true)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: accessibilityLabel))
         .accessibilityValue(Text(verbatim: accessibilityValue))
@@ -219,7 +216,7 @@ struct BrainDeckCard<Content: View>: View {
         .padding(.vertical, 12)
     }
 
-    private var shape: RoundedRectangle { BrainDeckCard<EmptyView>.shape }
+    private var shape: RoundedRectangle { HXCardRole.glow(paper).shape }
 
     /// The footer and a chevron over a hairline in the paper's edge.
     private var footerRow: some View {
@@ -234,11 +231,6 @@ struct BrainDeckCard<Content: View>: View {
         .overlay(alignment: .top) { Rectangle().fill(paper.edge).frame(height: 0.5) }
         .padding(.horizontal, 24)
     }
-}
-
-extension BrainDeckCard where Content == EmptyView {
-    /// A deck card's shape (`xl` corners), for the bare papers far down a stack and the review summary.
-    static var shape: RoundedRectangle { RoundedRectangle(cornerRadius: HXRadius.xl, style: .continuous) }
 }
 
 // MARK: - Bite card
@@ -385,9 +377,7 @@ struct BrainReviewSummaryCard: View {
             }
         }
         .opacity(contentOpacity)
-        .clipShape(BrainDeckCard.shape)
-        .hxCard(cornerRadius: HXRadius.xl)
-        .hxShadow(.paper)
+        .hxCardSurface(.summary, clipsContent: true)
         .padding(.vertical, 12)
     }
 }

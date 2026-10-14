@@ -153,7 +153,8 @@ private struct LabelQueueCard: View {
         .padding(.top, 20)
         .padding(.bottom, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(palette.paper, in: DeckPageView.shape)
-        .overlay(DeckPageView.shape.strokeBorder(palette.edge, lineWidth: 0.5))
+        // A glow card laid flat in a list, so without the deck's shadow.
+        .background(palette.paper, in: palette.cardRole.shape)
+        .overlay(palette.cardRole.shape.strokeBorder(palette.edge, lineWidth: 0.5))
     }
 }

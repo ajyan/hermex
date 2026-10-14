@@ -15,12 +15,7 @@ struct BrainCatchUpCard: View {
 
     var body: some View {
         let paper = BrainModuleID.people.paper
-        let shape = RoundedRectangle(cornerRadius: HXRadius.xl, style: .continuous)
-        VStack(alignment: .leading, spacing: BrainStyle.s) {
-            Text(verbatim: "Catch up")
-                .font(AppFont.display(style: .headline, weight: .semibold))
-                .foregroundStyle(paper.glow)
-                .accessibilityAddTraits(.isHeader)
+        HXCard(.glow(paper), title: "Catch up", spacing: BrainStyle.s) {
             if let summary {
                 Text(summary)
                     .font(AppFont.body())
@@ -32,11 +27,6 @@ struct BrainCatchUpCard: View {
                                 font: AppFont.subheadline(weight: .medium))
             }
         }
-        .padding(BrainStyle.l)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(paper.card, in: shape)
-        .overlay(shape.strokeBorder(paper.edge, lineWidth: 0.5))
-        .hxShadow(.paper)
     }
 }
 
@@ -222,8 +212,9 @@ struct BrainPersonTimeline: View {
                 }
             } edge: { entry in
                 // Far down the stack only the card's paper shows, peeking out askew.
-                BrainDeckCard.shape
-                    .fill(BrainTimelineCard.paper(entry).card)
+                let role = HXCardRole.glow(BrainTimelineCard.paper(entry))
+                role.shape
+                    .fill(role.fill)
                     .hxShadow(.stacked)
                     .padding(.vertical, 12)
             }

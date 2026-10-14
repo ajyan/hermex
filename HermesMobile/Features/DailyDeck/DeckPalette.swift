@@ -9,6 +9,8 @@ struct DeckPalette: Equatable {
     let isNeutralCard: Bool
     /// The card's opaque fill: its glow card, or `hxSurface` for a neutral card.
     var paper: Color { isNeutralCard ? .hxSurface : colors.card }
+    /// The card's role: a glow card in its paper, or a summary card for a neutral one.
+    var cardRole: HXCardRole { isNeutralCard ? .summary : .glow(colors) }
     /// The card's hairline.
     var edge: Color { isNeutralCard ? .hxSeparator : colors.edge }
     /// Text and marks on the card: the paper's glow.

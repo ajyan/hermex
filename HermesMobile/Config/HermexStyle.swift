@@ -133,6 +133,133 @@ extension View {
     }
 }
 
+/// What a card is, which decides its fill, edge, corners, and shadow (DESIGN.md § Components, Card).
+enum HXCardRole {
+    /// One kind of thing (a Brief card, a review bite, the Goal hero, Catch up): the paper's
+    /// opaque `card` fill and `edge`, `xl` corners, the `paper` shadow.
+    case glow(HermexPaper)
+    /// Grouped content on any screen: `hxSurface`, an `hxSeparator` edge, `lg` corners, flat.
+    case neutral
+    /// A card that sits among glow cards but summarizes them (the Brief opener, the review
+    /// summary): neutral, at `xl` with the `paper` shadow.
+    case summary
+    /// A glow object floating over other content (Prep's run and home cards): the paper's wash
+    /// over `hxSurface` through `glowSurface`, so its tint and `\.hxPaper` reach the controls inside.
+    case wash(HermexPaper)
+
+    var radius: CGFloat {
+        if case .neutral = self { return HXRadius.lg }
+        return HXRadius.xl
+    }
+
+    var shape: RoundedRectangle { RoundedRectangle(cornerRadius: radius, style: .continuous) }
+
+    /// The bare fill, for a card far down a stack that shows only its paper.
+    var fill: Color {
+        switch self {
+        case .glow(let paper): paper.card
+        case .neutral, .summary: .hxSurface
+        case .wash(let paper): paper.wash
+        }
+    }
+
+    /// The headline's color: the hue on a colored card, primary text on a neutral one.
+    var titleColor: Color {
+        switch self {
+        case .glow(let paper), .wash(let paper): paper.glow
+        case .neutral, .summary: .hxTextPrimary
+        }
+    }
+}
+
+extension View {
+    /// Draws the content as a card of `role`. `clipsContent` cuts the content to the card's
+    /// corners, for cards whose words scroll inside them (deck cards).
+    func hxCardSurface(_ role: HXCardRole, clipsContent: Bool = false) -> some View {
+        modifier(HXCardSurface(role: role, clipsContent: clipsContent))
+    }
+}
+
+private struct HXCardSurface: ViewModifier {
+    let role: HXCardRole
+    let clipsContent: Bool
+
+    func body(content: Content) -> some View {
+        let shape = role.shape
+        let clipped = Group {
+            if clipsContent { content.clipShape(shape) } else { content }
+        }
+        switch role {
+        case .glow(let paper):
+            clipped
+                .background(paper.card, in: shape)
+                .overlay(shape.strokeBorder(paper.edge, lineWidth: 0.5))
+                .hxShadow(.paper)
+        case .neutral:
+            clipped.hxCard(cornerRadius: role.radius)
+        case .summary:
+            clipped.hxCard(cornerRadius: role.radius).hxShadow(.paper)
+        case .wash(let paper):
+            clipped.glowSurface(paper, cornerRadius: role.radius, opaque: true).hxShadow(.paper)
+        }
+    }
+}
+
+/// The one card (DESIGN.md § Components, Card): an optional kicker, a headline in the rounded
+/// display voice (in the hue on a colored card), the body, and an optional footer, stacked
+/// with `spacing` and padded on a `hxCardSurface`. Text keeps the colors its caller gives it;
+/// only the headline takes the role's color. Cards whose words scroll inside them (deck cards)
+/// use `hxCardSurface` directly.
+struct HXCard<Kicker: View, Content: View, Footer: View>: View {
+    let role: HXCardRole
+    var title: String?
+    var titleStyle: Font.TextStyle
+    var spacing: CGFloat
+    let kicker: Kicker
+    let content: Content
+    let footer: Footer
+
+    /// The padding inside every card.
+    static var padding: CGFloat { 16 }
+
+    init(_ role: HXCardRole, title: String? = nil, titleStyle: Font.TextStyle = .headline, spacing: CGFloat = 8,
+         @ViewBuilder kicker: () -> Kicker, @ViewBuilder content: () -> Content, @ViewBuilder footer: () -> Footer) {
+        self.role = role
+        self.title = title
+        self.titleStyle = titleStyle
+        self.spacing = spacing
+        self.kicker = kicker()
+        self.content = content()
+        self.footer = footer()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: spacing) {
+            kicker
+            if let title {
+                Text(verbatim: title)
+                    .font(AppFont.display(style: titleStyle, weight: .semibold))
+                    .foregroundStyle(role.titleColor)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+            }
+            content
+            footer
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Self.padding)
+        .hxCardSurface(role)
+    }
+}
+
+extension HXCard where Kicker == EmptyView, Footer == EmptyView {
+    init(_ role: HXCardRole, title: String? = nil, titleStyle: Font.TextStyle = .headline, spacing: CGFloat = 8,
+         @ViewBuilder content: () -> Content) {
+        self.init(role, title: title, titleStyle: titleStyle, spacing: spacing,
+                  kicker: { EmptyView() }, content: content, footer: { EmptyView() })
+    }
+}
+
 /// The one header title (DESIGN.md § Header): centered, the rounded display voice, an optional
 /// subtitle under it. Sits in the toolbar's principal slot, between the leading glass circle
 /// and the trailing glass capsule.
