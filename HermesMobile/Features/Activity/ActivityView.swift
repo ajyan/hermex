@@ -25,11 +25,11 @@ struct ActivityView: View {
                 }
             }
             .safeAreaInset(edge: .top, spacing: 0) { filterPicker }
-            .onChange(of: viewModel.filter) {
-                Task { await viewModel.reload() }
+            // Keyed on the filter so SwiftUI cancels the previous filter's load.
+            .task(id: viewModel.filter) {
+                await viewModel.reload()
             }
             .task {
-                await viewModel.reload()
                 await viewModel.loadRules()
             }
             .refreshable {

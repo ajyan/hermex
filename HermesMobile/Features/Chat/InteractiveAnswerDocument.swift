@@ -76,9 +76,15 @@ enum InteractiveAnswerDocument {
             ask: function (text) { if (tapped()) post({ type: 'ask', text: String(text) }); },
             open: function (url) { if (tapped()) post({ type: 'open', url: String(url) }); }
           };
-          document.addEventListener('click', function (e) {
+          // Window capture, registered before any tool script, so it runs
+          // first and a tool cannot stop it. A link never navigates the card;
+          // only a tapped one opens, so `a.click()` on load opens nothing.
+          window.addEventListener('click', function (e) {
             var link = e.target.closest && e.target.closest('a[href]');
-            if (link && /^https?:/i.test(link.href)) { e.preventDefault(); post({ type: 'open', url: link.href }); }
+            if (link && /^https?:/i.test(link.href)) {
+              e.preventDefault();
+              if (tapped()) post({ type: 'open', url: link.href });
+            }
           }, true);
           window.addEventListener('error', function (e) {
             var t = e.target;
