@@ -511,6 +511,8 @@ struct PrepJudgmentGrade: Decodable, Hashable, Sendable {
     let pointsHit: [PrepPointHit]
     let pointsMissed: [PrepPointMiss]
     let strongAnswer: String
+    /// A short Markdown lesson written after a miss or partial; nil when absent or blank.
+    let lessonMD: String?
 
     var hasPoints: Bool { !pointsHit.isEmpty || !pointsMissed.isEmpty }
 
@@ -518,6 +520,7 @@ struct PrepJudgmentGrade: Decodable, Hashable, Sendable {
         case pointsHit = "points_hit"
         case pointsMissed = "points_missed"
         case strongAnswer = "strong_answer"
+        case lessonMD = "lesson_md"
     }
 
     init(from decoder: Decoder) throws {
@@ -525,6 +528,8 @@ struct PrepJudgmentGrade: Decodable, Hashable, Sendable {
         pointsHit = c.lossy(PrepPointHit.self, .pointsHit)
         pointsMissed = c.lossy(PrepPointMiss.self, .pointsMissed)
         strongAnswer = c.string(.strongAnswer)
+        let lesson = c.optional(String.self, .lessonMD)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        lessonMD = lesson?.isEmpty == false ? lesson : nil
     }
 }
 

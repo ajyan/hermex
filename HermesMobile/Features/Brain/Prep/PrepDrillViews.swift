@@ -716,6 +716,12 @@ struct PrepJudgmentGradeView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        if let lesson = grade.lessonMD {
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                BrainSectionHeader(title: "Lesson")
+                MarkdownRenderer(content: lesson)
+            }
+        }
     }
 }
 
