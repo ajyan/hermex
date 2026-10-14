@@ -74,6 +74,7 @@ struct GoalsHomeView: View {
                 NavigationLink(value: ShellPushDestination.goal(goal.slug)) {
                     VStack(alignment: .leading, spacing: BrainStyle.s) {
                         GoalHeroCard(goal: goal, isCompact: true, today: home.today)
+                            .zoomSource(for: .goal(goal.slug), cornerRadius: HXRadius.xl)
                         if GoalsCopy.needsAttention(goal) {
                             Text(verbatim: "Needs attention: open to check in")
                                 .font(BrainStyle.meta)

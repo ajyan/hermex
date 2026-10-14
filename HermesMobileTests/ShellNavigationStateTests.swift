@@ -146,4 +146,18 @@ final class ShellNavigationStateTests: XCTestCase {
 
         XCTAssertEqual(state.beginDeepLinkedSessionLoad(id: "d2"), "d2")
     }
+
+    func testOnlyScreensACardOrChipOpensZoomFromTheirSource() {
+        XCTAssertTrue(ShellPushDestination.goal("marathon").zoomsFromSource)
+        XCTAssertTrue(ShellPushDestination.brainRoute(.page(.wiki, "prompt-caching")).zoomsFromSource)
+        XCTAssertTrue(ShellPushDestination.brainRoute(.prep(.home)).zoomsFromSource)
+        for drawerScreen: ShellPushDestination in [.projects, .tasks, .kanban, .dailyDeck, .brain, .goals, .money, .feedback, .settings(nil)] {
+            XCTAssertFalse(drawerScreen.zoomsFromSource, "\(drawerScreen) slides in from the drawer")
+        }
+    }
+
+    func testABrainCitationZoomsIntoThePageItLinks() {
+        let citation = BrainCitation.citations(in: "See [Prompt caching](brain://wiki/prompt-caching).").first
+        XCTAssertEqual(citation?.destination, .brainRoute(.page(.wiki, "prompt-caching")))
+    }
 }

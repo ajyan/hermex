@@ -360,6 +360,7 @@ struct BrainModuleListView: View {
         BrainCardRows(
             items: items,
             columns: BrainListLayout.columnCount(columns, dynamicType: dynamicTypeSize),
+            destination: link,
             open: { push(.page(module, $0)) },
             onLastAppear: { if items.last?.id == lastID { loadMore() } }
         )
@@ -439,6 +440,8 @@ struct BrainCardRows: View {
     let items: [BrainItem]
     let columns: Int
     var style: BrainCard.Style = .standard
+    /// The screen a card's item id opens, so the screen zooms out of the card.
+    var destination: ((String) -> ShellPushDestination)?
     /// Opens one card's item id.
     let open: (String) -> Void
     /// Called when the last row appears, for pagination.
@@ -452,7 +455,12 @@ struct BrainCardRows: View {
             HStack(alignment: .top, spacing: BrainStyle.m) {
                 ForEach(chunk.items, id: \.id) { item in
                     Button { open(item.id) } label: {
-                        BrainCard(item: item, style: style)
+                        if let destination {
+                            BrainCard(item: item, style: style)
+                                .zoomSource(for: destination(item.id), cornerRadius: BrainStyle.cardCorner)
+                        } else {
+                            BrainCard(item: item, style: style)
+                        }
                     }
                     .buttonStyle(.borderless)
                     .tint(.primary)

@@ -104,6 +104,7 @@ struct PrepHomeView: View {
                 ForEach(tracks) { track in
                     NavigationLink(value: ShellPushDestination.brainRoute(.prep(.track(track.id)))) {
                         PrepTrackCard(track: track)
+                            .zoomSource(for: .brainRoute(.prep(.track(track.id))), cornerRadius: BrainStyle.cardCorner)
                     }
                     .buttonStyle(.plain)
                 }

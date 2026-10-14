@@ -1,4 +1,4 @@
-import Foundation
+import SwiftUI
 
 /// The chat the shell's main stack is rooted on.
 enum ShellRoot: Hashable {
@@ -178,5 +178,74 @@ struct SessionUnreadStore {
 
     func remove(for server: URL) {
         defaults.removeObject(forKey: key(for: server))
+    }
+}
+
+// MARK: - Zoom transitions
+
+extension ShellPushDestination {
+    /// Whether this screen opens with a zoom out of the card or chip that pushed it. Screens
+    /// the drawer opens slide in as usual; a zoom screen pushed with no source on screen
+    /// (an inline link) falls back to the system's zoom from the middle of the screen.
+    var zoomsFromSource: Bool {
+        switch self {
+        case .goal, .brainRoute: true
+        case .projects, .project, .tasks, .kanban, .dailyDeck, .brain, .goals, .money, .feedback, .settings: false
+        }
+    }
+}
+
+private struct ShellZoomNamespaceKey: EnvironmentKey {
+    static let defaultValue: Namespace.ID? = nil
+}
+
+extension EnvironmentValues {
+    /// The namespace the shell's stack matches zoom sources in; nil outside the stack.
+    var shellZoomNamespace: Namespace.ID? {
+        get { self[ShellZoomNamespaceKey.self] }
+        set { self[ShellZoomNamespaceKey.self] = newValue }
+    }
+}
+
+extension View {
+    /// Marks this card or chip as where `destination` opens from: pushing it zooms out of
+    /// this view, rounded to `cornerRadius`, and going back shrinks the screen into it. A chip
+    /// passes `HXRadius.capsule`. Does nothing outside the shell's stack.
+    func zoomSource(for destination: ShellPushDestination, cornerRadius: CGFloat) -> some View {
+        modifier(ZoomSourceModifier(destination: destination, cornerRadius: cornerRadius))
+    }
+
+    /// Opens a pushed screen with a zoom out of its source, for destinations that have one.
+    func zoomDestination(_ destination: ShellPushDestination, in namespace: Namespace.ID) -> some View {
+        modifier(ZoomDestinationModifier(destination: destination, namespace: namespace))
+    }
+}
+
+private struct ZoomSourceModifier: ViewModifier {
+    let destination: ShellPushDestination
+    let cornerRadius: CGFloat
+    @Environment(\.shellZoomNamespace) private var namespace
+
+    func body(content: Content) -> some View {
+        if let namespace {
+            content.matchedTransitionSource(id: destination, in: namespace) { source in
+                source.clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            }
+        } else {
+            content
+        }
+    }
+}
+
+private struct ZoomDestinationModifier: ViewModifier {
+    let destination: ShellPushDestination
+    let namespace: Namespace.ID
+
+    func body(content: Content) -> some View {
+        if destination.zoomsFromSource {
+            content.navigationTransition(.zoom(sourceID: destination, in: namespace))
+        } else {
+            content
+        }
     }
 }
