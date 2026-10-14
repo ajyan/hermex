@@ -1,4 +1,5 @@
 import XCTest
+import JavaScriptCore
 @testable import HermesMobile
 
 final class InteractiveAnswerDocumentTests: XCTestCase {
@@ -74,5 +75,37 @@ final class InteractiveAnswerDocumentTests: XCTestCase {
 
     func testAskAndOpenRequireAUserTap() {
         XCTAssertTrue(lightHTML.contains("navigator.userActivation"))
+    }
+
+    /// Runs the bridge in JavaScriptCore with stub DOM globals: a link click
+    /// never navigates the card, and opens only while the user is tapping.
+    func testLinkClickOpensOnlyOnATap() throws {
+        let start = try XCTUnwrap(lightHTML.range(of: "<script>"))
+        let end = try XCTUnwrap(lightHTML.range(of: "</script>", range: start.upperBound..<lightHTML.endIndex))
+        let context = try XCTUnwrap(JSContext())
+        context.evaluateScript("""
+        var window = this, posted = [], windowListeners = {};
+        window.addEventListener = function (type, fn) { (windowListeners[type] = windowListeners[type] || []).push(fn); };
+        var document = { addEventListener: function () {} };
+        var navigator = { userActivation: { isActive: false } };
+        window.webkit = { messageHandlers: { atlas: { postMessage: function (m) { posted.push(m); } } } };
+        function click() {
+          var link = { href: 'https://example.com/' };
+          var event = { prevented: false, target: { closest: function () { return link; } },
+                        preventDefault: function () { this.prevented = true; } };
+          (windowListeners.click || []).forEach(function (fn) { fn(event); });
+          return event.prevented;
+        }
+        """)
+        context.evaluateScript(String(lightHTML[start.upperBound..<end.lowerBound]))
+        XCTAssertNil(context.exception)
+
+        // A script's `a.click()` on load: kept in the card, nothing opened.
+        XCTAssertTrue(context.evaluateScript("click()").toBool())
+        XCTAssertEqual(context.evaluateScript("posted.length").toInt32(), 0)
+
+        context.evaluateScript("navigator.userActivation.isActive = true")
+        XCTAssertTrue(context.evaluateScript("click()").toBool())
+        XCTAssertEqual(context.evaluateScript("JSON.stringify(posted)").toString(), #"[{"type":"open","url":"https://example.com/"}]"#)
     }
 }

@@ -67,15 +67,13 @@ struct InteractiveAnswerWebView: UIViewRepresentable {
             decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void
         ) {
             // The page's own HTML string loads as about:blank; everything else
-            // (link taps the bridge missed, redirects, form posts) stays put.
-            let url = navigationAction.request.url
-            if navigationAction.navigationType == .other, url?.absoluteString == "about:blank" {
+            // (links, redirects, form posts) stays put. Links open only through
+            // the bridge, which requires a tap: `.linkActivated` is also set for
+            // a script's `a.click()`, so opening here would bypass that gate.
+            if navigationAction.navigationType == .other,
+               navigationAction.request.url?.absoluteString == "about:blank" {
                 decisionHandler(.allow)
                 return
-            }
-            if navigationAction.navigationType == .linkActivated,
-               let url, url.scheme?.lowercased() == "https" {
-                parent?.onMessage(.open(url))
             }
             decisionHandler(.cancel)
         }
