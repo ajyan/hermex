@@ -135,6 +135,7 @@ A live chip fades in as its call arrives (off for replays and under Reduce Motio
 
 ## Decisions and exceptions
 
+- **Prep run cards are glow cards.** Every card in a Prep run (lesson, recall, result, warm-up) and the home ring card and current-unit banner use `.glowSurface(.knowledge, cornerRadius: HXRadius.xl, opaque: true)`: the course is the object on those screens. Missed recall key points use `hxWarning` with a ◌ icon, hits `hxSuccess` with ✓; color is never the only signal. The path's dotted connector is decorative, drawn in the paper's `edge`.
 - **Reward gold.** The streak flame, the boss crown, and stars in Prep use `HermexPaper.opener.glow` as a symbol color only — never a fill, wash, card, or text — because they are marks, not objects; amber still means "waiting on you" for objects.
 - **Links stay Nous blue**, `brain://` ones included: a link is a control (principle 4). The reply's Brain chips carry the Brain color. Coloring individual inline links would also mean replacing the Markdown renderer's link style.
 - **Brain covers** derive their ramps from the papers (`BrainStyle.coverPaletteValues`): light is the paper, its hue, its light glow; dark is the hue at 16% and 38% over the navy canvas, then its dark glow.
