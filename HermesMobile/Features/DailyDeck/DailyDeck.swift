@@ -57,10 +57,17 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let reason: String?
     /// Other questions for the same material; Regenerate steps through them.
     let altQuestions: [String]
-    /// On the headline card: one sentence about yesterday, written by the brief.
+    /// On the headline card: one sentence about yesterday (a weekly review's: about the week), written by the brief.
     let recap: String?
-    /// A recap's items (a review's days, answers, or last week's plan), each under an optional label.
+    /// A recap's items (a review's days, answers, or last week's plan), each under an optional label;
+    /// on a weekly review's headline, the week's highlights under their days.
     let entries: [DeckEntry]
+    /// A weekly review's mood card: energy and mood per weekday, nil where nothing was written.
+    let points: [DeckPoint]
+    /// A weekly review's goals card: one meter per commitment.
+    let meters: [DeckMeter]
+    /// A goals card's paper name ("wiki"), as its goal sets it.
+    let color: String?
     /// A sleep card's rating labels, worst to best; the answer's `rating` is a 1-based index.
     let scale: [String]
     /// A sleep card's numbers from the user's watch.
@@ -79,7 +86,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case id, type, title, body, source, lines, question, context, voice, why, draft, actions, fallback
-        case reason, altQuestions, entries, recap, scale, sleep
+        case reason, altQuestions, entries, recap, scale, sleep, points, meters, color
         case itemKind = "kind"
     }
 
@@ -103,7 +110,10 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         recap = (try? c.decodeIfPresent(String.self, forKey: .recap))
             .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
         altQuestions = (try? c.decodeIfPresent([String].self, forKey: .altQuestions)) ?? []
-        entries = ((try? c.decodeIfPresent([LossyEntry].self, forKey: .entries)) ?? []).compactMap(\.value)
+        entries = ((try? c.decodeIfPresent([Lossy<DeckEntry>].self, forKey: .entries)) ?? []).compactMap(\.value)
+        points = ((try? c.decodeIfPresent([Lossy<DeckPoint>].self, forKey: .points)) ?? []).compactMap(\.value)
+        meters = ((try? c.decodeIfPresent([Lossy<DeckMeter>].self, forKey: .meters)) ?? []).compactMap(\.value)
+        color = try? c.decodeIfPresent(String.self, forKey: .color)
         scale = (try? c.decodeIfPresent([String].self, forKey: .scale)) ?? []
         sleep = try? c.decodeIfPresent(DeckSleep.self, forKey: .sleep)
     }
@@ -157,10 +167,32 @@ struct DeckEntry: Decodable, Equatable, Hashable {
     private enum CodingKeys: String, CodingKey { case label, text }
 }
 
-/// Decodes one entry, or nothing when it is malformed, so a bad item never costs the list.
-private struct LossyEntry: Decodable {
-    let value: DeckEntry?
-    init(from decoder: Decoder) throws { value = try? DeckEntry(from: decoder) }
+/// One weekday on the mood card. Energy (Garmin Body Battery) and mood (read from what you
+/// wrote, with the `quote` it rests on) run 1–10; sleep is hours. nil is a gap.
+struct DeckPoint: Decodable, Equatable, Hashable {
+    let label: String
+    let energy: Int?
+    let mood: Int?
+    let sleep: Double?
+    let quote: String?
+    let note: String?
+}
+
+/// One commitment's week on the goals card, grouped under its goal.
+struct DeckMeter: Decodable, Equatable, Hashable {
+    let group: String?
+    let label: String
+    let done: Int
+    let target: Int
+
+    /// How full the meter is, 0–1.
+    var fraction: Double { target > 0 ? min(1, Double(done) / Double(target)) : 0 }
+}
+
+/// Decodes one item, or nothing when it is malformed, so a bad item never costs the list.
+private struct Lossy<Value: Decodable>: Decodable {
+    let value: Value?
+    init(from decoder: Decoder) throws { value = try? Value(from: decoder) }
 }
 
 struct DeckDraft: Decodable, Equatable {
@@ -448,8 +480,10 @@ struct DeckCardText: Equatable {
         case .item, .unknown:
             lead = card.title ?? card.fallback
             attribution = card.source == card.title ? nil : card.source
-            // A recap's entries are laid out as a list; its plain `body` copy is only for older builds.
-            detail = card.entries.isEmpty ? (card.body ?? (card.title == nil ? nil : card.fallback)) : nil
+            // A recap's entries, a mood chart, or goal meters are drawn; the plain `body` copy is only
+            // for older builds. A theme's summary is its `context`.
+            let drawn = !card.entries.isEmpty || !card.points.isEmpty || !card.meters.isEmpty
+            detail = card.context ?? (drawn ? nil : (card.body ?? (card.title == nil ? nil : card.fallback)))
         case .sleep:
             // The question leads; the numbers show after the rating so they don't decide it.
             lead = card.question
