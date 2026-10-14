@@ -11,8 +11,13 @@ struct BrainHomeView: View {
     @State private var searchViewModel: BrainSearchViewModel
     /// Prep's summary; its chip shows only once it loads.
     @State private var prepViewModel: PrepHomeViewModel
-    /// The review deck's height: about the rest of an iPhone screen, growing with Dynamic Type.
+    /// The review deck's height: about the rest of an iPhone screen, growing with Dynamic Type
+    /// until it would run past the screen (`fittedDeckHeight`).
     @ScaledMetric(relativeTo: .body) private var deckHeight: CGFloat = 480
+    /// The home scroll view's visible height, under the bars.
+    @State private var viewportHeight: CGFloat = 0
+    /// Where the deck starts in the home's content: the strip and header above it.
+    @State private var deckTop: CGFloat = 0
     /// Programmatic pushes (graph nodes, `brain://` links, review bites) for the screens below.
     private let push: (BrainRoute) -> Void
 
@@ -124,6 +129,12 @@ struct BrainHomeView: View {
                 }
             }
             .padding(.vertical, BrainStyle.m)
+            .coordinateSpace(.named(Self.contentSpace))
+        }
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.height - proxy.safeAreaInsets.top - proxy.safeAreaInsets.bottom
+        } action: { height in
+            viewportHeight = height
         }
         .overlay {
             if viewModel.modules.isEmpty, !isShowingPrepChip, viewModel.reviewPages.isEmpty {
@@ -166,8 +177,25 @@ struct BrainHomeView: View {
                     .hxShadow(.stacked)
                     .padding(.vertical, 12)
             }
-            .frame(height: deckHeight)
+            .frame(height: fittedDeckHeight)
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.frame(in: .named(Self.contentSpace)).minY
+            } action: { top in
+                deckTop = top
+            }
         }
+    }
+
+    private static let contentSpace = "brainHomeContent"
+    /// The smallest the deck gets on a short screen (landscape, the largest text).
+    private static let minimumDeckHeight: CGFloat = 240
+
+    /// The scaled deck height, cut to what fits on screen below the strip and header when the
+    /// home is scrolled to the top, so the footer stays visible and the card scrolls inside.
+    private var fittedDeckHeight: CGFloat {
+        guard viewportHeight > 0 else { return deckHeight }
+        let available = viewportHeight - deckTop - BrainStyle.m
+        return max(min(deckHeight, available), Self.minimumDeckHeight)
     }
 
     private func open(_ bite: BrainBite) {

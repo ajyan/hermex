@@ -160,8 +160,6 @@ struct BrainBiteCard: View {
     /// Cards under the top one show only their paper; their words fade in as they rise.
     var contentOpacity: Double = 1
 
-    @State private var overflows = false
-
     static let shape = RoundedRectangle(cornerRadius: HXRadius.xl, style: .continuous)
 
     var body: some View {
@@ -177,12 +175,7 @@ struct BrainBiteCard: View {
             .scrollIndicators(.hidden)
             // Short bites leave the drag to the Brain home's own scroll view.
             .scrollBounceBehavior(.basedOnSize)
-            .onScrollGeometryChange(for: Bool.self) { geometry in
-                geometry.contentSize.height - geometry.contentOffset.y > geometry.containerSize.height + 8
-            } action: { _, more in
-                overflows = more
-            }
-            .overlay(alignment: .bottom) { moreHint }
+            .moreBelowHint(fill: paper.card, mark: paper.glow)
             footer
         }
         .foregroundStyle(paper.glow)
@@ -248,24 +241,6 @@ struct BrainBiteCard: View {
         .padding(.horizontal, 24)
     }
 
-    /// A soft fade and arrow while there is more card below (as on a Daily Deck card).
-    @ViewBuilder
-    private var moreHint: some View {
-        if overflows {
-            LinearGradient(colors: [bite.paper.card.opacity(0), bite.paper.card], startPoint: .top, endPoint: .bottom)
-                .frame(height: 64)
-                .overlay(alignment: .bottom) {
-                    Image(systemName: "chevron.compact.down")
-                        .font(.system(.title3, weight: .semibold))
-                        .foregroundStyle(bite.paper.glow.opacity(0.45))
-                        .padding(.bottom, 8)
-                }
-                .allowsHitTesting(false)
-                .transition(.opacity)
-                .accessibilityHidden(true)
-        }
-    }
-
     private var accessibilityLabel: String {
         let text = String(BrainArticleDigestView.inlineMarkdown(bite.text).characters)
         return [BrainBiteCopy.kicker(bite), text, BrainBiteCopy.attribution(bite), bite.detail]
@@ -274,12 +249,10 @@ struct BrainBiteCard: View {
             .joined(separator: ". ")
     }
 
-    /// The Daily Deck's lead sizes (`DeckCardText.leadFont`): a quote at title size, everything
-    /// else smaller as it grows; the serif for saved words, the rounded display voice otherwise.
+    /// The Daily Deck's lead sizes (`DeckCardText.leadStyle`); the serif for saved words, the
+    /// rounded display voice otherwise.
     static func leadFont(for bite: BrainBite) -> Font {
-        let count = bite.text.count
-        let style: Font.TextStyle = bite.kind == .quote ? .title
-            : count > 480 ? .body : count > 220 ? .title3 : .title2
+        let style = DeckCardText.leadStyle(length: bite.text.count, isQuote: bite.kind == .quote)
         return bite.quotesSavedWords ? AppFont.serif(style: style) : AppFont.display(style: style, weight: .semibold)
     }
 }
@@ -298,6 +271,11 @@ struct BrainReviewSummaryCard: View {
 
     private static let shown = 5
 
+    /// The bite's source, or its own words when the source has no title.
+    private static func title(_ bite: BrainBite) -> String {
+        bite.ref.title.isEmpty ? String(BrainArticleDigestView.inlineMarkdown(bite.text).characters) : bite.ref.title
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
@@ -312,7 +290,10 @@ struct BrainReviewSummaryCard: View {
                         .padding(.top, 4)
                     VStack(spacing: 0) {
                         ForEach(bites.prefix(Self.shown)) { bite in
-                            BrainReviewSummaryRow(bite: bite)
+                            let palette = bite.deckPalette
+                            // A Brief opener row, with the kind in its glow.
+                            DeckAheadRow(symbol: palette.symbol, ink: palette.ink, wash: palette.colors.wash,
+                                         title: Self.title(bite), kind: BrainBiteCopy.kind(bite), kindColor: palette.ink)
                         }
                         if bites.count > Self.shown {
                             Text(verbatim: "+ \(bites.count - Self.shown) more")
@@ -355,34 +336,5 @@ struct BrainReviewSummaryCard: View {
         .hxCard(cornerRadius: HXRadius.xl)
         .hxShadow(.paper)
         .padding(.vertical, 12)
-    }
-}
-
-/// One of the summary's rows, as on the Brief opener's list of cards ahead (`DeckAheadRow`):
-/// the kind's symbol on a wash tile, the source's title, and the kind in one word.
-private struct BrainReviewSummaryRow: View {
-    let bite: BrainBite
-
-    var body: some View {
-        let palette = bite.deckPalette
-        HStack(spacing: 10) {
-            Image(systemName: palette.symbol)
-                .font(AppFont.caption(weight: .semibold))
-                .foregroundStyle(palette.ink)
-                .frame(width: 26, height: 26)
-                .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.xs + 2, style: .continuous))
-                .accessibilityHidden(true)
-            Text(verbatim: bite.ref.title.isEmpty ? String(BrainArticleDigestView.inlineMarkdown(bite.text).characters) : bite.ref.title)
-                .font(AppFont.subheadline())
-                .foregroundStyle(Color.hxTextPrimary)
-                .lineLimit(1)
-            Spacer(minLength: 8)
-            Text(verbatim: BrainBiteCopy.kind(bite))
-                .font(AppFont.caption())
-                .foregroundStyle(palette.ink)
-                .lineLimit(1)
-        }
-        .padding(.vertical, 7)
-        .accessibilityElement(children: .combine)
     }
 }
