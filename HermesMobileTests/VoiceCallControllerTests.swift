@@ -38,8 +38,10 @@ private final class FakeListener: SpeechListening {
         isRunning = true
     }
 
-    /// Lets every held start finish.
+    /// Lets every held start finish, and later starts run straight through, so a start the
+    /// controller wrongly queues behind a held one fails its test rather than hanging it.
     func releaseStarts() {
+        holdsStart = false
         let starts = pendingStarts
         pendingStarts = []
         starts.forEach { $0.resume() }
@@ -808,7 +810,6 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(controller.state, .listening)
         XCTAssertFalse(listener.isRunning)
 
-        listener.holdsStart = false
         bridge.onMuteChanged?(false)
         await controller.lastListenerTask?.value
         XCTAssertTrue(listener.isRunning)
@@ -844,7 +845,6 @@ final class VoiceCallControllerTests: XCTestCase {
         bridge.onMuteChanged?(false)
         listener.releaseStarts()
         await controller.lastListenerTask?.value
-        listener.releaseStarts()
         XCTAssertTrue(listener.isRunning)
         XCTAssertEqual(listener.overlappingStarts, 0)
     }
