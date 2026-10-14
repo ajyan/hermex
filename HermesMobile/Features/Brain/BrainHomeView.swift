@@ -7,6 +7,7 @@ import SwiftUI
 /// every Brain screen is pushed as `ShellPushDestination.brainRoute(_:)`.
 /// Copy is English-only (personal fork).
 struct BrainHomeView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: BrainHomeViewModel
     @State private var searchViewModel: BrainSearchViewModel
     /// Prep's summary; its chip shows only once it loads.
@@ -47,6 +48,10 @@ struct BrainHomeView: View {
             }
             // Alongside the modules; a server without Prep just never shows the chip.
             .task { await prepViewModel.load() }
+            .onChange(of: scenePhase) { _, phase in
+                // Left open overnight, the deck moves on to the new day's ten.
+                if phase == .active, viewModel.needsNewDay { Task { await viewModel.load() } }
+            }
             .onDisappear { searchViewModel.cancel() }
     }
 

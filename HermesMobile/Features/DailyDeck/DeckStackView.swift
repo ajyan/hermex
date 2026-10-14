@@ -1,9 +1,7 @@
 import SwiftUI
 
-/// The Daily Deck as a stack of cards: swipe left for the next card, right to pull the
-/// previous one back on top. Only the top two cards render content; the third is a bare
-/// edge peeking out underneath. "Not for Me" drops a card out of the stack with an Undo
-/// toast. Under Reduce Motion the cards stay put while dragging and crossfade on commit.
+/// The Daily Deck's cards in a `CardStack`, plus what the deck adds to it: "Not for Me"
+/// drops a card out of the stack with an Undo toast, and its sheet takes the reason.
 struct DeckStackView: View {
     let viewModel: DailyDeckViewModel
     /// The card whose "Not for Me" sheet is open; set by the toolbar menu.

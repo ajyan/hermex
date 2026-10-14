@@ -59,6 +59,11 @@ final class BrainHomeViewModel {
     private let today: () -> String
     /// The batch `home` holds, which is what the saved position refers to.
     private var currentBatch = 0
+    /// The day the shown batch was loaded for. A deck left open overnight keeps saving under it.
+    private(set) var deckDay: String?
+
+    /// True once a deck is on screen and the day has moved on: the screen should `load()` again.
+    var needsNewDay: Bool { deckDay.map { $0 != today() } ?? false }
 
     init(client: any BrainDataClient, cache: BrainCacheHandle, onAPIError: @escaping (Error) -> Void = { _ in },
          reviewStore: BrainReviewStore = BrainReviewStore(), today: @escaping () -> String = BrainReviewStore.today) {
@@ -72,19 +77,20 @@ final class BrainHomeViewModel {
     /// Bumped by every `load()` and `dealMore()`, so an older result never overwrites a newer one.
     private var generation = 0
 
-    /// Today's saved position, if the user already started today's deck.
-    private func savedToday() -> BrainReviewPosition? {
-        guard let saved = reviewStore.position(for: cache.server), saved.day == today() else { return nil }
+    /// The saved position, if the user already started `day`'s deck.
+    private func saved(on day: String) -> BrainReviewPosition? {
+        guard let saved = reviewStore.position(for: cache.server), saved.day == day else { return nil }
         return saved
     }
 
     private func persistPosition() {
-        reviewStore.save(BrainReviewPosition(day: today(), batch: currentBatch, index: reviewIndex), for: cache.server)
+        reviewStore.save(BrainReviewPosition(day: deckDay ?? today(), batch: currentBatch, index: reviewIndex), for: cache.server)
     }
 
-    /// Shows `deck` as `batch`, landing on `index` or the nearest page that exists.
-    private func show(_ deck: BrainHome, batch: Int, index: Int) {
+    /// Shows `deck` as `batch` of `day`, landing on `index` or the nearest page that exists.
+    private func show(_ deck: BrainHome, day: String, batch: Int, index: Int) {
         home = deck
+        deckDay = day
         currentBatch = batch
         reviewIndex = min(max(index, 0), max(reviewPages.count - 1, 0))
     }
@@ -93,9 +99,10 @@ final class BrainHomeViewModel {
         generation += 1
         let token = generation
         if modules.isEmpty { state = .loading }
-        let batch = savedToday()?.batch ?? 0
-        if home.isEmpty, let cached = cache.load(BrainHome.self, kind: "home", id: String(batch)) {
-            show(cached, batch: batch, index: savedToday()?.index ?? 0)
+        let day = today()
+        let batch = saved(on: day)?.batch ?? 0
+        if home.isEmpty, let cached = cache.load(BrainHome.self, kind: "home", id: "\(day)-\(batch)") {
+            show(cached, day: day, batch: batch, index: saved(on: day)?.index ?? 0)
         }
         async let fetchedHome: BrainHome? = try? client.home(batch: batch)
         do {
@@ -107,8 +114,8 @@ final class BrainHomeViewModel {
             cache.store(fetched, kind: "modules", id: "")
             if let loadedHome = await fetchedHome, !Task.isCancelled, token == generation {
                 // Read the position now, not before the fetch, so a swipe made while it ran wins.
-                show(loadedHome, batch: batch, index: savedToday()?.index ?? 0)
-                cache.store(loadedHome, kind: "home", id: String(batch))
+                show(loadedHome, day: day, batch: batch, index: saved(on: day)?.index ?? 0)
+                cache.store(loadedHome, kind: "home", id: "\(day)-\(batch)")
             }
         } catch is CancellationError {
             // The screen went away; nothing to update.
@@ -133,10 +140,11 @@ final class BrainHomeViewModel {
         generation += 1
         let token = generation
         let batch = currentBatch + 1
+        let day = deckDay ?? today()
         guard let more = try? await client.home(batch: batch), !Task.isCancelled, token == generation else { return }
-        show(more, batch: batch, index: 0)
+        show(more, day: day, batch: batch, index: 0)
         persistPosition()
-        cache.store(more, kind: "home", id: String(batch))
+        cache.store(more, kind: "home", id: "\(day)-\(batch)")
     }
 }
 

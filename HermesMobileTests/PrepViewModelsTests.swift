@@ -654,14 +654,7 @@ final class PrepViewModelsTests: XCTestCase {
 
     // MARK: - PrepCopy
 
-    func testHomeRowSubtitleSaysWhetherTheRunIsDone() {
-        XCTAssertEqual(PrepCopy.homeRowSubtitle(streakDays: 12, remaining: 4), "12-day streak · today's run is ready")
-        XCTAssertEqual(PrepCopy.homeRowSubtitle(streakDays: 12, remaining: 0), "12-day streak · run done")
-    }
-
     func testZeroStreakCopy() {
-        XCTAssertEqual(PrepCopy.homeRowSubtitle(streakDays: 0, remaining: 4), "Today's run is ready")
-        XCTAssertEqual(PrepCopy.homeRowSubtitle(streakDays: 0, remaining: 0), "Run done")
         XCTAssertEqual(PrepCopy.streakTitle(days: 0), "No streak yet")
         XCTAssertEqual(PrepCopy.streakTitle(days: 3), "3-day streak")
         XCTAssertEqual(PrepCopy.streakSubtitle(days: 0, freezes: 2), "Finish a run to start one")

@@ -436,13 +436,6 @@ enum PrepCopy {
         return freezes == 0 ? nil : Self.freezes(freezes)
     }
 
-    /// The Brain home row's subtitle; the streak part only when there is one.
-    static func homeRowSubtitle(streakDays: Int, remaining: Int) -> String {
-        let run = remaining == 0 ? "run done" : "today's run is ready"
-        if streakDays == 0 { return run == "run done" ? "Run done" : "Today's run is ready" }
-        return "\(streak(days: streakDays)) · " + run
-    }
-
     /// "32 min · 14 reps · Sliding window, Stack" (the focus part only when present).
     static func runSubtitle(minutes: Double, reps: Int, focus: [String]) -> String {
         var parts = ["\(Int(minutes.rounded())) min", "\(reps) reps"]

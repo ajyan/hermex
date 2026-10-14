@@ -463,6 +463,33 @@ extension BrainViewModelTests {
         XCTAssertEqual(store.position(for: reviewServer), BrainReviewPosition(day: "2026-10-14", batch: 0, index: 10))
     }
 
+    func testADeckLeftOpenOvernightKeepsItsOwnDay() async {
+        let store = makeReviewStore()
+        let client = FakeBrainClient()
+        client.homeResult = .success(BrainHome(bites: bites(10), batch: 0, hasMore: true))
+        var day = "2026-10-14"
+        let viewModel = BrainHomeViewModel(
+            client: client, cache: BrainCacheHandle(server: reviewServer, context: nil), onAPIError: { _ in },
+            reviewStore: store, today: { day })
+        XCTAssertFalse(viewModel.needsNewDay, "nothing on screen yet")
+        await viewModel.load()
+        await viewModel.dealMore()
+        XCTAssertEqual(viewModel.deckDay, "2026-10-14")
+        XCTAssertFalse(viewModel.needsNewDay)
+
+        day = "2026-10-15"
+        XCTAssertTrue(viewModel.needsNewDay)
+        viewModel.reviewIndex = 3
+        XCTAssertEqual(store.position(for: reviewServer), BrainReviewPosition(day: "2026-10-14", batch: 1, index: 3),
+                       "a swipe on yesterday's deck is saved as yesterday's")
+
+        await viewModel.load()
+        XCTAssertEqual(client.requestedBatches.last, 0, "the new day starts at batch 0")
+        XCTAssertEqual(viewModel.reviewIndex, 0)
+        XCTAssertEqual(viewModel.deckDay, "2026-10-15")
+        XCTAssertFalse(viewModel.needsNewDay)
+    }
+
     func testReviewStoreIsPerServer() {
         let store = makeReviewStore()
         let a = URL(string: "https://a.example")!

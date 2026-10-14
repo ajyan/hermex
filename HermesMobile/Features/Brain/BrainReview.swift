@@ -284,6 +284,7 @@ struct BrainReviewSummaryCard: View {
                         .font(AppFont.display(style: .title2, weight: .semibold))
                         .foregroundStyle(Color.hxTextPrimary)
                         .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityAddTraits(.isHeader)
                     Text(verbatim: "New bites tomorrow morning.")
                         .font(AppFont.subheadline())
                         .foregroundStyle(Color.hxTextSecondary)
@@ -322,8 +323,10 @@ struct BrainReviewSummaryCard: View {
                     }
                 } label: {
                     // The style draws a neutral capsule on the app's surface; the label takes
-                    // Nous blue, since this is a control (DESIGN.md principle 5).
-                    Text(verbatim: "Ten more").foregroundStyle(Color.accentColor)
+                    // Nous blue while enabled, since this is a control (DESIGN.md principle 5);
+                    // during a fetch the label takes the style's disabled foreground (a label color
+                    // would otherwise override it).
+                    Text(verbatim: "Ten more").foregroundStyle(isDealing ? Color.hxTextSecondary : Color.accentColor)
                 }
                 .buttonStyle(.chatDecision(.secondary))
                 .disabled(isDealing)
