@@ -463,6 +463,8 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
     /// A boss answer's lessons to revisit, and the sitting once this answer completes it.
     let revisit: [PrepRevisit]
     let sitting: PrepBossSitting?
+    /// Why the option picked on a lesson check is wrong; nil when it was right.
+    let why: String?
 
     /// The sample answer, from whichever grade shape the answer came back with.
     var strongAnswer: String { judgment?.strongAnswer ?? grade?.strongAnswer ?? "" }
@@ -471,7 +473,7 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
     var isUngraded: Bool { verdict == "ungraded" }
 
     private enum CodingKeys: String, CodingKey {
-        case verdict, correct, feedback, credit, links, streak, grade, logged, points, revisit, sitting
+        case verdict, correct, feedback, credit, links, streak, grade, logged, points, revisit, sitting, why
         case referenceMD = "reference_md"
         case nextIndex = "next_index"
         case gapMatch = "gap_match"
@@ -496,6 +498,7 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
                                 uniquingKeysWith: { first, _ in first })
         revisit = c.optional(PrepRevisits.self, .revisit)?.values ?? []
         sitting = c.optional(PrepBossSitting.self, .sitting)
+        why = c.optional(String.self, .why).flatMap { $0.isEmpty ? nil : $0 }
     }
 }
 

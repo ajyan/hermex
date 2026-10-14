@@ -26,7 +26,12 @@ struct PrepProblemCard: View {
     init(rep: PrepRep, maxHeight: CGFloat = .infinity) {
         self.maxHeight = maxHeight
         let item = rep.item
-        if rep.drill == .fact || rep.drill == .judgment {
+        if rep.drill == .boss {
+            meta = "Boss quiz"
+            title = item.summary
+            summary = ""
+            example = ""
+        } else if rep.drill == .fact || rep.drill == .judgment {
             meta = [PrepCopy.stageChip(item.stage) ?? "", item.skillTitle ?? item.title]
                 .filter { !$0.isEmpty }.joined(separator: " · ")
             title = item.summary

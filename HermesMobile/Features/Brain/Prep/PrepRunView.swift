@@ -158,6 +158,33 @@ struct PrepRunView: View {
             scaffold(rep, hasAction: hasAction(rep)) { repContent(rep) } bottom: { repAction(rep) }
                 // Fresh view state (timer start, example toggle) for every rep.
                 .id(rep.index)
+        case .result(let rep, let result, _) where rep.drill == .lesson:
+            scaffold(rep, hasAction: true) {
+                if let lesson = rep.item.lesson {
+                    if !viewModel.isReview(rep) || viewModel.revealedLesson || result.verdict == "miss" {
+                        PrepLessonBody(lesson: lesson)
+                    }
+                    PrepCheckResult(check: lesson.check, result: result,
+                                    chosenID: chosen?.rep == rep.index ? chosen?.id : nil,
+                                    typedAnswer: draft(for: rep).text, xp: viewModel.lastXP)
+                    if lesson.isReteach {
+                        PrepFlagCardButton(
+                            isFlagged: viewModel.isFlagged(rep.item.id),
+                            error: viewModel.flagError
+                        ) { Task { await viewModel.flagCurrent() } }
+                    }
+                }
+            } bottom: {
+                PrepPrimaryButton(title: "Continue") { Task { await viewModel.continue() } }
+            }
+            .id(rep.index)
+        case .result(let rep, let result, _) where rep.drill == .boss:
+            scaffold(rep, hasAction: true) {
+                PrepBossResultView(result: result, xp: viewModel.lastXP)
+            } bottom: {
+                PrepPrimaryButton(title: "Continue") { Task { await viewModel.continue() } }
+            }
+            .id(rep.index)
         case .result(let rep, let result, _):
             scaffold(rep, hasAction: true) {
                 PrepResultView(
@@ -177,6 +204,8 @@ struct PrepRunView: View {
                 PrepPrimaryButton(title: "Continue") { Task { await viewModel.continue() } }
             }
             .id(rep.index)
+        case .finished(let summary) where summary.isCourse:
+            PrepDayCompleteView(summary: summary) { dismiss() }
         case .finished(let summary):
             PrepRunCompleteView(streak: summary.streak, moved: summary.moved) { dismiss() }
         }
@@ -201,7 +230,9 @@ struct PrepRunView: View {
                 if let progress {
                     PrepSegmentBar(position: progress.position, count: progress.count)
                 }
-                PrepProblemCard(rep: rep, maxHeight: availableHeight * 0.45)
+                if rep.drill != .lesson {  // a lesson's teaching is its own content
+                    PrepProblemCard(rep: rep, maxHeight: availableHeight * 0.45)
+                }
             }
             .padding(.horizontal, BrainStyle.l)
             .padding(.bottom, BrainStyle.s)
@@ -331,19 +362,37 @@ struct PrepRunView: View {
                 ) { option in choose(option, in: rep) }
             }
         case .lesson:
-            if Self.isCloze(rep) {
-                PrepClozeView(
-                    text: Binding(get: { draft(for: rep).text }, set: { text in updateDraft(rep) { $0.text = text } }),
-                    isSubmitting: viewModel.isSubmitting
-                ) { Task { await viewModel.submitCloze(draft(for: rep).text) } }
-            } else {
-                PrepChoiceView(
-                    title: "Quick check",
-                    options: (rep.item.lesson?.check.options ?? []).map { PrepOption(id: $0, title: $0) },
-                    grading: nil,
-                    isSubmitting: viewModel.isSubmitting,
-                    submitError: viewModel.submitError
-                ) { option in choose(option, in: rep) }
+            if let lesson = rep.item.lesson {
+                let review = viewModel.isReview(rep)
+                if !review || viewModel.revealedLesson {
+                    PrepLessonBody(lesson: lesson)
+                }
+                PrepCheckPrompt(check: lesson.check)
+                if Self.isCloze(rep) {
+                    PrepClozeView(
+                        text: Binding(get: { draft(for: rep).text }, set: { text in updateDraft(rep) { $0.text = text } }),
+                        isSubmitting: viewModel.isSubmitting
+                    ) { Task { await viewModel.submitCloze(draft(for: rep).text) } }
+                } else {
+                    PrepChoiceView(
+                        title: "Your answer",
+                        options: lesson.check.options.map { PrepOption(id: $0, title: $0) },
+                        grading: nil,
+                        isSubmitting: viewModel.isSubmitting,
+                        submitError: viewModel.submitError
+                    ) { option in choose(option, in: rep) }
+                }
+                if review && !viewModel.revealedLesson {
+                    Button {
+                        viewModel.showIdea()
+                    } label: {
+                        Label { Text(verbatim: "Show the idea") } icon: { Image(systemName: "lightbulb") }
+                            .font(BrainStyle.rowTitle)
+                            .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.accentColor)
+                }
             }
         case .judgment, .boss:
             PrepApproachView(

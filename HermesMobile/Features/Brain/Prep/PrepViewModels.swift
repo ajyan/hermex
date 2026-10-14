@@ -499,6 +499,54 @@ final class PrepRunViewModel {
 /// The Prep screens' copy and small derivations, kept out of the views so they stay
 /// dumb and the wording is testable. English only, sentence case.
 enum PrepCopy {
+    /// Pinned source refs by readable name; vault notes all read as "Your notes".
+    private static let sourceNames: [String: String] = [
+        "prompt-docs": "Anthropic prompting docs", "prompt-caching": "Prompt caching docs",
+        "models": "Models overview", "effective-agents": "Building effective agents",
+        "constitution": "Claude's constitution", "usage-policy": "Usage policy", "rsp": "Responsible Scaling Policy",
+        "guide": "AI system design guide",
+    ]
+    private static let vaultRefs: Set<String> = [
+        "playbook", "loop", "question-bank", "discovery", "safety", "prompt-oa", "prepared-answers",
+        "story-refutation", "sysdesign", "roadmap", "evidence",
+    ]
+
+    /// A lesson's sources as one line, each name once, in order.
+    static func sourceLine(_ sources: [PrepSource]) -> String? {
+        var names: [String] = []
+        for source in sources {
+            let name = sourceNames[source.ref] ?? (vaultRefs.contains(source.ref) ? "Your notes" : source.ref)
+            if !names.contains(name) { names.append(name) }
+        }
+        return names.isEmpty ? nil : names.joined(separator: " · ")
+    }
+
+    /// The done screen's review row: "2 reviews · 1 check to look at again".
+    static func reviewLine(reviews: Int, missed: Int) -> String {
+        let parts = [reviews > 0 ? "\(reviews) review\(reviews == 1 ? "" : "s")" : nil,
+                     missed > 0 ? "\(missed) check\(missed == 1 ? "" : "s") to look at again" : nil]
+        return parts.compactMap { $0 }.joined(separator: " · ")
+    }
+
+    static func starsLabel(_ stars: Int) -> String { "\(stars) of 3 stars" }
+    static func xpLabel(_ xp: Int) -> String { "+\(xp) XP" }
+    static func xpSpoken(_ xp: Int) -> String { "Plus \(xp) XP" }
+    static func percent(_ score: Double) -> String { "\(Int((score * 100).rounded()))%" }
+
+    static func sittingHeadline(_ sitting: PrepBossSitting) -> String {
+        if sitting.score == nil { return "Grading tonight" }
+        return sitting.passed ? "Boss passed" : "Not yet"
+    }
+
+    static func unlockLine(_ sitting: PrepBossSitting, xp: Int?) -> String {
+        guard sitting.passed else {
+            return sitting.score == nil ? "Atlas grades it tonight; the unit unlocks if it passes."
+                : "The lessons below come back tomorrow, then the boss again."
+        }
+        let parts = [sitting.unlocked.map { "\($0) unlocked" }, xp.map(xpLabel)].compactMap { $0 }
+        return parts.isEmpty ? "Course complete" : parts.joined(separator: " · ")
+    }
+
     /// The done screen's "Tomorrow" line: the current unit's boss once it is ready, else its lessons.
     static func nextUp(_ course: PrepCourse?) -> String? {
         guard let unit = course?.currentUnit else { return nil }
@@ -609,6 +657,9 @@ enum PrepCopy {
         case "weak": "Weak spot"
         case "main": "Main rep"
         case "new": "New"
+        case "reteach": "Another way to see it"
+        case "review": "Review"
+        case "boss": "Boss quiz"
         default: block.prefix(1).uppercased() + block.dropFirst()
         }
     }

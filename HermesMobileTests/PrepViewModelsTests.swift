@@ -286,6 +286,33 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(client.log, ["lesson:u2.l3", "lesson:u2.l3"])
     }
 
+    func testLessonSourceLineNamesRefsOnce() throws {
+        let lesson = decode(PrepLesson.self, #"""
+        {"id": "u2.l3", "sources": [{"ref": "prompt-docs"}, {"ref": "guide", "path": "05/06.md"},
+                                    {"ref": "playbook"}, {"ref": "question-bank"}, {"ref": "mystery"}]}
+        """#)
+        XCTAssertEqual(PrepCopy.sourceLine(lesson.sources),
+                       "Anthropic prompting docs · AI system design guide · Your notes · mystery")
+        XCTAssertNil(PrepCopy.sourceLine([]))
+    }
+
+    func testRewardCopy() {
+        XCTAssertEqual(PrepCopy.starsLabel(2), "2 of 3 stars")
+        XCTAssertEqual(PrepCopy.xpLabel(15), "+15 XP")
+        XCTAssertEqual(PrepCopy.xpSpoken(15), "Plus 15 XP")
+        XCTAssertEqual(PrepCopy.percent(0.824), "82%")
+    }
+
+    func testSittingHeadline() {
+        XCTAssertEqual(PrepCopy.sittingHeadline(PrepBossSitting(score: 0.9, passed: true, stars: 2, unlocked: nil)), "Boss passed")
+        XCTAssertEqual(PrepCopy.sittingHeadline(PrepBossSitting(score: 0.5, passed: false, stars: 0, unlocked: nil)), "Not yet")
+        XCTAssertEqual(PrepCopy.sittingHeadline(PrepBossSitting(score: nil, passed: false, stars: 0, unlocked: nil)), "Grading tonight")
+        XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: 0.9, passed: true, stars: 2, unlocked: "Agents and evals"), xp: 50),
+                       "Agents and evals unlocked · +50 XP")
+        XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: 0.5, passed: false, stars: 0, unlocked: nil), xp: nil),
+                       "The lessons below come back tomorrow, then the boss again.")
+    }
+
     // MARK: Home / track
 
     func testHome404IsUnavailable() async {
@@ -833,6 +860,10 @@ final class PrepViewModelsTests: XCTestCase {
     func testBlockTitles() {
         XCTAssertEqual(["warmup", "weak", "main", "new", "bonus"].map(PrepCopy.blockTitle),
                        ["Warm-up", "Weak spot", "Main rep", "New", "Bonus"])
+        XCTAssertEqual(["reteach", "review", "boss"].map(PrepCopy.blockTitle),
+                       ["Another way to see it", "Review", "Boss quiz"])
+        XCTAssertEqual(PrepCopy.reviewLine(reviews: 2, missed: 1), "2 reviews · 1 check to look at again")
+        XCTAssertEqual(PrepCopy.reviewLine(reviews: 1, missed: 0), "1 review")
     }
 
     func testFeedbackSplitsAfterTheFirstSentence() {

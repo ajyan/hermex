@@ -420,4 +420,11 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertTrue(dailyJSON.contains(#""run":"daily""#))
         XCTAssertFalse(dailyJSON.contains("unit"))
     }
+
+    func testCheckResultDecodesWhy() throws {
+        let json = #"{"verdict": "miss", "correct": "Separates data", "feedback": "Tags mark data.", "why": "Tags add tokens"}"#
+        let result = try decode(PrepAttemptResult.self, json)
+        XCTAssertEqual(result.why, "Tags add tokens")
+        XCTAssertNil(try decode(PrepAttemptResult.self, #"{"verdict": "pass"}"#).why)
+    }
 }

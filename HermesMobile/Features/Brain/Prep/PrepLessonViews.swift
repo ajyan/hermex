@@ -1,0 +1,383 @@
+import SwiftUI
+
+// The learn-first course's screens inside a run: a lesson (the idea, how you'd say it, one
+// check), its graded check, a boss result without critique, and the end-of-day summary.
+// Prep wears the `.knowledge` paper; reward marks (flame, crown, stars) use the opener glow as a
+// symbol color only (DESIGN.md, "Reward gold").
+
+/// The reward mark color: the opener glow, for symbols only.
+private var prepRewardGold: Color { HermexPaper.opener.glow }
+
+/// A section label inside a lesson, in the Prep paper's glow.
+private struct PrepLessonLabel: View {
+    let title: String
+
+    var body: some View {
+        Text(verbatim: title)
+            .font(AppFont.display(style: .subheadline, weight: .semibold))
+            .foregroundStyle(HermexPaper.knowledge.glow)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// A lesson's teaching: the idea in Markdown, how you'd say it in the serif (the sample answers
+/// are built from the user's own stories), and where it comes from.
+struct PrepLessonBody: View {
+    let lesson: PrepLesson
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BrainStyle.l) {
+            if lesson.isReteach {
+                HXChip(paper: .knowledge, symbol: "arrow.triangle.2.circlepath", label: "Another way to see it") {
+                    EmptyView()
+                }
+            }
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                PrepLessonLabel(title: "The idea")
+                MarkdownRenderer(content: lesson.ideaMD)
+            }
+            if !lesson.sayItMD.isEmpty {
+                VStack(alignment: .leading, spacing: BrainStyle.s) {
+                    PrepLessonLabel(title: "How you'd say it")
+                    Text(verbatim: lesson.sayItMD)
+                        .brainText(.quote)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, BrainStyle.cardHorizontalPadding)
+                        .padding(.vertical, BrainStyle.cardVerticalPadding)
+                        .hxCard()
+                }
+            }
+            if let line = PrepCopy.sourceLine(lesson.sources) {
+                Label {
+                    Text(verbatim: line)
+                } icon: {
+                    Image(systemName: "quote.opening")
+                }
+                .brainText(.meta)
+                .accessibilityLabel(Text(verbatim: "Source: \(line)"))
+            }
+        }
+    }
+}
+
+/// The check's question, under its "Quick check" label.
+struct PrepCheckPrompt: View {
+    let check: PrepCheck
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BrainStyle.xs) {
+            PrepLessonLabel(title: "Quick check")
+            Text(verbatim: check.prompt)
+                .font(AppFont.body(weight: .semibold))
+                .foregroundStyle(Color.hxTextPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// The XP an answer earned, faded in once (shown at once under Reduce Motion).
+struct PrepXPTick: View {
+    let xp: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var shown = false
+
+    var body: some View {
+        Text(verbatim: PrepCopy.xpLabel(xp))
+            .font(AppFont.body(weight: .semibold))
+            .foregroundStyle(HermexPaper.knowledge.glow)
+            .monospacedDigit()
+            .opacity(shown ? 1 : 0)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .onAppear {
+                if reduceMotion {
+                    shown = true
+                } else {
+                    withAnimation(.easeOut(duration: 0.25)) { shown = true }
+                }
+            }
+            .accessibilityLabel(Text(verbatim: PrepCopy.xpSpoken(xp)))
+    }
+}
+
+/// A lesson's check once graded: the right answer marked, why a wrong pick is wrong, and the
+/// explanation. Never a critique of the user.
+struct PrepCheckResult: View {
+    let check: PrepCheck
+    let result: PrepAttemptResult
+    let chosenID: String?
+    let typedAnswer: String
+    let xp: Int?
+
+    private var correct: String? {
+        if case let .choice(text)? = result.correct { return text }
+        return nil
+    }
+
+    var body: some View {
+        PrepCheckPrompt(check: check)
+        if check.isCloze {
+            PrepNoteCard {
+                PrepLeadText(lead: result.verdict == "pass" ? "Right." : "Not quite.",
+                             rest: "You wrote \u{201C}\(typedAnswer.trimmingCharacters(in: .whitespacesAndNewlines))\u{201D}. "
+                                 + "The answer is \(correct ?? "").")
+            }
+        } else {
+            PrepChoiceView(title: "Your answer", options: check.options.map { PrepOption(id: $0, title: $0) },
+                           grading: .init(chosenID: chosenID, correctID: correct)) { _ in }
+        }
+        if result.why != nil || !result.feedback.isEmpty {
+            PrepNoteCard {
+                if let why = result.why {
+                    PrepLeadText(lead: "Why not that one:", rest: why)
+                }
+                if !result.feedback.isEmpty {
+                    Text(verbatim: result.feedback)
+                        .font(BrainStyle.rowTitle)
+                        .foregroundStyle(Color.hxTextPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        if let xp {
+            PrepXPTick(xp: xp)
+        }
+    }
+}
+
+/// One to three stars in reward gold.
+struct PrepStars: View {
+    let stars: Int
+
+    var body: some View {
+        HStack(spacing: BrainStyle.xs) {
+            ForEach(0..<3, id: \.self) { index in
+                Image(systemName: index < stars ? "star.fill" : "star")
+                    .foregroundStyle(index < stars ? prepRewardGold : Color.hxSeparator)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: PrepCopy.starsLabel(stars)))
+    }
+}
+
+/// A boss answer's result: the sitting (once complete), what the answer got right, the sample
+/// answer, and the lessons to revisit. No list of what was missed.
+struct PrepBossResultView: View {
+    let result: PrepAttemptResult
+    let xp: Int?
+
+    var body: some View {
+        if let sitting = result.sitting {
+            VStack(spacing: BrainStyle.s) {
+                Image(systemName: "crown")
+                    .font(AppFont.display(style: .title2))
+                    .foregroundStyle(prepRewardGold)
+                    .accessibilityLabel(Text(verbatim: "Boss quiz"))
+                Text(verbatim: PrepCopy.sittingHeadline(sitting))
+                    .font(AppFont.display(style: .title3))
+                    .foregroundStyle(HermexPaper.knowledge.glow)
+                if let score = sitting.score {
+                    HStack(spacing: BrainStyle.s) {
+                        PrepStars(stars: sitting.stars)
+                        Text(verbatim: PrepCopy.percent(score))
+                            .font(AppFont.body(weight: .semibold))
+                            .foregroundStyle(HermexPaper.knowledge.glow)
+                            .monospacedDigit()
+                    }
+                }
+                Text(verbatim: PrepCopy.unlockLine(sitting, xp: xp))
+                    .font(BrainStyle.rowSubtitle)
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(BrainStyle.l)
+            .glowSurface(.knowledge, cornerRadius: HXRadius.xl)
+        } else if result.isUngraded {
+            PrepNoteCard {
+                Text(verbatim: "Saved — Atlas will grade this tonight.")
+                    .font(BrainStyle.rowTitle)
+                    .foregroundStyle(Color.hxTextPrimary)
+            }
+        }
+        if let hits = result.judgment?.pointsHit, !hits.isEmpty {
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                BrainSectionHeader(title: "What you nailed")
+                SectionCard {
+                    VStack(spacing: 0) {
+                        ForEach(Array(hits.enumerated()), id: \.offset) { offset, hit in
+                            if offset > 0 { PrepRowDivider() }
+                            let point = result.pointTexts[hit.pointID] ?? PrepCopy.pointTitle(hit.pointID)
+                            Label {
+                                Text(verbatim: point)
+                                    .font(BrainStyle.rowTitle)
+                                    .foregroundStyle(Color.hxTextPrimary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            } icon: {
+                                Image(systemName: "checkmark").foregroundStyle(Color.hxSuccess)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
+                            .accessibilityElement(children: .combine)
+                        }
+                    }
+                }
+            }
+        }
+        if !result.strongAnswer.isEmpty {
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                BrainSectionHeader(title: "Sample answer")
+                Text(verbatim: result.strongAnswer)
+                    .brainText(.quote)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, BrainStyle.cardHorizontalPadding)
+                    .padding(.vertical, BrainStyle.cardVerticalPadding)
+                    .hxCard()
+            }
+        }
+        if !result.revisit.isEmpty {
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                BrainSectionHeader(title: "Revisit")
+                FlowRow(spacing: BrainStyle.s) {
+                    ForEach(result.revisit) { lesson in
+                        NavigationLink(value: ShellPushDestination.brainRoute(.prep(.lesson(lesson.lessonID)))) {
+                            HXChip(paper: .knowledge, symbol: "book", label: lesson.title) { EmptyView() }
+                                .frame(minHeight: BrainStyle.minTapTarget)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(Text(verbatim: "Revisit \(lesson.title)"))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// The end of a course run: the day's ring, XP, streak, what was learned, and what comes next.
+struct PrepDayCompleteView: View {
+    let summary: PrepDaySummary
+    let done: () -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: BrainStyle.xl) {
+                VStack(spacing: BrainStyle.s) {
+                    PrepMasteryRing(state: .mastered, mastery: 1, color: Color.accentColor)
+                        .scaleEffect(2)
+                        .padding(BrainStyle.xl)
+                    if summary.xpGained > 0 {
+                        Text(verbatim: PrepCopy.xpLabel(summary.xpGained))
+                            .font(AppFont.display(style: .title2))
+                            .foregroundStyle(Color.hxTextPrimary)
+                            .accessibilityLabel(Text(verbatim: PrepCopy.xpSpoken(summary.xpGained)))
+                    }
+                    Label {
+                        Text(verbatim: PrepCopy.streakTitle(days: summary.streak.days))
+                    } icon: {
+                        Image(systemName: "flame").foregroundStyle(prepRewardGold)
+                    }
+                    .font(BrainStyle.rowSubtitle)
+                    .foregroundStyle(Color.hxTextSecondary)
+                }
+                .frame(maxWidth: .infinity)
+                if !summary.learned.isEmpty || summary.reviews > 0 {
+                    VStack(alignment: .leading, spacing: BrainStyle.s) {
+                        BrainSectionHeader(title: "Learned today")
+                        SectionCard {
+                            VStack(spacing: 0) {
+                                ForEach(Array(summary.learned.enumerated()), id: \.offset) { offset, title in
+                                    if offset > 0 { PrepRowDivider() }
+                                    Label {
+                                        Text(verbatim: title).font(BrainStyle.rowTitle).foregroundStyle(Color.hxTextPrimary)
+                                    } icon: {
+                                        Image(systemName: "checkmark").foregroundStyle(HermexPaper.knowledge.glow)
+                                    }
+                                    .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
+                                }
+                                if summary.reviews > 0 || summary.missedChecks > 0 {
+                                    if !summary.learned.isEmpty { PrepRowDivider() }
+                                    BrainRow(title: PrepCopy.reviewLine(reviews: summary.reviews, missed: summary.missedChecks))
+                                }
+                            }
+                        }
+                    }
+                }
+                if let next = summary.nextUp {
+                    VStack(alignment: .leading, spacing: BrainStyle.s) {
+                        BrainSectionHeader(title: "Tomorrow")
+                        SectionCard { BrainRow(title: next) }
+                    }
+                }
+                PrepPrimaryButton(title: "Done", action: done)
+            }
+            .padding(BrainStyle.l)
+            .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
+        }
+    }
+}
+
+/// One lesson to re-read, pushed from a learned node or a revisit chip: the teaching and its
+/// check with the answer shown.
+struct PrepLessonView: View {
+    @State private var viewModel: PrepLessonViewModel
+    @State private var didLoad = false
+
+    init(id: String, server: URL, onAPIError: @escaping (Error) -> Void) {
+        _viewModel = State(initialValue: PrepLessonViewModel(
+            id: id, client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
+    }
+
+    var body: some View {
+        content
+            .hxNavigationTitle(title)
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .task {
+                guard !didLoad else { return }
+                didLoad = true
+                await viewModel.load()
+            }
+    }
+
+    private var title: String {
+        if case let .loaded(lesson) = viewModel.state { return lesson.title }
+        return "Lesson"
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch viewModel.state {
+        case .loading:
+            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .unavailable:
+            PrepUnavailableView()
+        case .failed(let message):
+            PrepFailedView(title: "Couldn't load this lesson", message: message) {
+                Task { await viewModel.load() }
+            }
+        case .loaded(let lesson):
+            ScrollView {
+                VStack(alignment: .leading, spacing: BrainStyle.xl) {
+                    PrepLessonBody(lesson: lesson)
+                    if !lesson.check.prompt.isEmpty {
+                        PrepNoteCard {
+                            PrepCheckPrompt(check: lesson.check)
+                            if let answer = lesson.check.answer {
+                                PrepLeadText(lead: "Answer:", rest: answer)
+                            }
+                            if let explain = lesson.check.explain {
+                                Text(verbatim: explain)
+                                    .font(BrainStyle.rowTitle)
+                                    .foregroundStyle(Color.hxTextSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                }
+                .padding(BrainStyle.l)
+                .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
+            }
+        }
+    }
+}
