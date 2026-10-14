@@ -328,25 +328,20 @@ final class BrainViewModelTests: XCTestCase {
 extension BrainViewModelTests {
     private var sampleHome: BrainHome {
         BrainHome(
-            hubs: [BrainHub(ref: BrainRef(module: .wiki, id: "wiki/hub.md", title: "Hub"), count: 3, inside: ["A", "B"])],
-            recent: [BrainItem(module: .wiki, id: "wiki/a.md", title: "A", date: "2026-10-12")],
-            rediscover: [BrainItem(module: .wiki, id: "wiki/old.md", title: "Old"),
-                         BrainItem(module: .wiki, id: "wiki/older.md", title: "Older")]
+            bites: [BrainBite(id: "b1", kind: .idea, text: "An idea", ref: BrainRef(module: .wiki, id: "wiki/a.md", title: "A"),
+                              byline: "Wiki", index: 1, count: 3)],
+            batch: 0,
+            hasMore: true
         )
     }
 
-    func testHomeLoadsHubsRecentAndRediscoverWithTheModules() async {
+    func testHomeLoadsTheDeckWithTheModules() async {
         let client = FakeBrainClient()
         client.modulesResult = .success([BrainModule(id: .wiki, title: "Wiki", count: 2)])
         client.homeResult = .success(sampleHome)
         let viewModel = BrainHomeViewModel(client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
         await viewModel.load()
         XCTAssertEqual(viewModel.home, sampleHome)
-        XCTAssertEqual(viewModel.rediscoverPick?.id, "wiki/old.md")
-        viewModel.showAnotherPick()
-        XCTAssertEqual(viewModel.rediscoverPick?.id, "wiki/older.md")
-        viewModel.showAnotherPick()
-        XCTAssertEqual(viewModel.rediscoverPick?.id, "wiki/old.md", "Another wraps around today's picks")
     }
 
     func testHomeWithoutTheHomeRouteStillShowsTheModules() async {
@@ -359,7 +354,6 @@ extension BrainViewModelTests {
         await viewModel.load()
         XCTAssertEqual(viewModel.state, .loaded(modules))
         XCTAssertTrue(viewModel.home.isEmpty)
-        XCTAssertNil(viewModel.rediscoverPick)
         XCTAssertEqual(reported, 0, "the home route is best effort and never reports an error")
     }
 
@@ -369,11 +363,9 @@ extension BrainViewModelTests {
         client.homeResult = .success(sampleHome)
         let viewModel = BrainHomeViewModel(client: client, cache: BrainCacheHandle(server: URL(string: "https://a.example")!, context: nil), onAPIError: { _ in })
         await viewModel.load()
-        viewModel.showAnotherPick()
         client.homeResult = .failure(URLError(.timedOut))
         await viewModel.load()
         XCTAssertEqual(viewModel.home, sampleHome)
-        XCTAssertEqual(viewModel.rediscoverPick?.id, "wiki/older.md", "a failed refresh keeps the pick showing")
     }
 }
 
@@ -458,5 +450,5 @@ final class FakeBrainClient: BrainDataClient, @unchecked Sendable {
         if failingSearches.contains(query) { throw URLError(.timedOut) }
         return BrainSearchResult()
     }
-    func home() async throws -> BrainHome { try homeResult.get() }
+    func home(batch: Int) async throws -> BrainHome { try homeResult.get() }
 }

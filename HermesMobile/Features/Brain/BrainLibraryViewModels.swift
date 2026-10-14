@@ -34,11 +34,9 @@ private func brainIsNotFound(_ error: Error) -> Bool {
 final class BrainHomeViewModel {
     private(set) var state: BrainLoadState<[BrainModule]> = .loading
     private(set) var modules: [BrainModule] = []
-    /// Hubs, recent and rediscover picks. Best effort: empty on a server without the home
-    /// route, and a failed refresh keeps what was shown.
+    /// The daily deck. Best effort: empty on a server without the home route, and a failed
+    /// refresh keeps what was shown.
     private(set) var home = BrainHome()
-    /// Which rediscover pick is showing; "Another" steps through today's picks.
-    private(set) var rediscoverIndex = 0
     private(set) var isShowingCachedCopy = false
 
     private let client: any BrainDataClient
@@ -59,7 +57,7 @@ final class BrainHomeViewModel {
         let token = generation
         if modules.isEmpty { state = .loading }
         if home.isEmpty, let cached = cache.load(BrainHome.self, kind: "home", id: "") { home = cached }
-        async let fetchedHome: BrainHome? = try? client.home()
+        async let fetchedHome: BrainHome? = try? client.home(batch: 0)
         do {
             let fetched = try await client.modules()
             guard !Task.isCancelled, token == generation else { return }
@@ -68,7 +66,6 @@ final class BrainHomeViewModel {
             isShowingCachedCopy = false
             cache.store(fetched, kind: "modules", id: "")
             if let loadedHome = await fetchedHome, !Task.isCancelled, token == generation {
-                if loadedHome.rediscover != home.rediscover { rediscoverIndex = 0 }
                 home = loadedHome
                 cache.store(loadedHome, kind: "home", id: "")
             }
@@ -87,16 +84,6 @@ final class BrainHomeViewModel {
             }
             onAPIError(error)
         }
-    }
-
-    /// The rediscover pick showing now, if the server sent any.
-    var rediscoverPick: BrainItem? {
-        home.rediscover.isEmpty ? nil : home.rediscover[rediscoverIndex % home.rediscover.count]
-    }
-
-    func showAnotherPick() {
-        guard home.rediscover.count > 1 else { return }
-        rediscoverIndex = (rediscoverIndex + 1) % home.rediscover.count
     }
 }
 
