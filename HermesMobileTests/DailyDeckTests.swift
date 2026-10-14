@@ -377,6 +377,133 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertFalse(viewModel.isFiled)
     }
 
+    /// Holds the next filing at the server until `release` is called; `reached` is fulfilled once it gets there.
+    private func holdFiling(_ client: ScriptedDailyDeckClient) -> (reached: XCTestExpectation, release: () -> Void) {
+        let reached = expectation(description: "filing reached the server")
+        let (gate, open) = AsyncStream<Void>.makeStream()
+        client.fileGate = {
+            reached.fulfill()
+            for await _ in gate { break }
+        }
+        return (reached, { open.finish() })
+    }
+
+    @MainActor
+    func testTextTypedWhileFilingStaysUnsent() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.deckJSON)
+        client.filer = .success(BriefFileResponse(ok: true, summary: "Filed."))
+        let viewModel = makeViewModel(client)
+        await viewModel.load()
+        let advisor = viewModel.cards[1]
+        viewModel.setText("Ship it.", for: advisor)
+        let (reached, release) = holdFiling(client)
+
+        let filing = Task { await viewModel.file() }
+        await fulfillment(of: [reached], timeout: 5)
+        viewModel.setText("Ship it today.", for: advisor)
+        release()
+        let result = await filing.value
+
+        XCTAssertEqual(result, .filed)
+        XCTAssertEqual(client.fileRequests.first?.answers.answers.map(\.text), ["Ship it."])
+        XCTAssertEqual(viewModel.filedAnswers?["advisor"]?.text, "Ship it.", "only what was sent is filed")
+        XCTAssertTrue(viewModel.hasChanges, "the later edit still needs filing")
+        XCTAssertEqual(store.answers(for: server, date: "2026-10-04", kind: "morning")["advisor"]?.text, "Ship it today.")
+    }
+
+    @MainActor
+    func testOpeningAnotherDayWhileFilingLeavesThatDayAlone() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-03.morning.json", "2026-10-04.morning.json"], deck: Self.deckJSON)
+        let viewModel = makeViewModel(client)
+        await viewModel.load()
+        viewModel.setText("Ship it.", for: viewModel.cards[1])
+        store.setAnswers(["book": DeckAnswer(card: "book", text: "Yesterday's draft.")], for: server, date: "2026-10-03", kind: "morning")
+        let (reached, release) = holdFiling(client)
+
+        let filing = Task { await viewModel.file() }
+        await fulfillment(of: [reached], timeout: 5)
+        await viewModel.show(date: "2026-10-03")
+        release()
+        let result = await filing.value
+
+        XCTAssertEqual(result, .openSession("new-2"))
+        XCTAssertEqual(client.renamed.last?.1, DailyDeckViewModel.sessionTitle(for: "2026-10-04"), "the session is named for the filed day")
+        XCTAssertEqual(viewModel.date, "2026-10-03")
+        XCTAssertFalse(viewModel.isFiled, "the day on screen was not filed")
+        XCTAssertEqual(viewModel.answer(for: viewModel.cards[4])?.text, "Yesterday's draft.")
+        XCTAssertEqual(store.answers(for: server, date: "2026-10-03", kind: "morning")["book"]?.text, "Yesterday's draft.")
+        XCTAssertEqual(store.answers(for: server, date: "2026-10-04", kind: "morning"), [:], "the filed day's draft is cleared")
+        XCTAssertEqual(viewModel.filing, .idle)
+    }
+
+    @MainActor
+    func testReturningOnANewDayMovesTodaysBriefForward() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json", "2026-10-05.morning.json"], deck: Self.deckJSON)
+        let clock = TestDeckClock(morning)
+        let viewModel = DailyDeckViewModel(server: server, client: client, store: store, now: { clock.now })
+        await viewModel.load()
+        let reads = client.readPaths.count
+
+        await viewModel.refreshDay()
+        XCTAssertEqual(client.readPaths.count, reads, "same day: nothing reloads")
+
+        clock.now = morning.addingTimeInterval(24 * 60 * 60)
+        await viewModel.refreshDay()
+
+        XCTAssertEqual(viewModel.today, "2026-10-05")
+        XCTAssertEqual(viewModel.date, "2026-10-05")
+        XCTAssertEqual(viewModel.state, .ready)
+        XCTAssertEqual(client.readPaths.last, "briefs/2026-10-05.morning.json")
+    }
+
+    @MainActor
+    func testReturningOnANewDayKeepsAPastDayTheUserOpened() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-03.morning.json", "2026-10-04.morning.json"], deck: Self.deckJSON)
+        let clock = TestDeckClock(morning)
+        let viewModel = DailyDeckViewModel(server: server, client: client, store: store, now: { clock.now })
+        await viewModel.load()
+        await viewModel.show(date: "2026-10-03")
+        let reads = client.readPaths.count
+
+        clock.now = morning.addingTimeInterval(24 * 60 * 60)
+        await viewModel.refreshDay()
+
+        XCTAssertEqual(viewModel.today, "2026-10-05")
+        XCTAssertEqual(viewModel.date, "2026-10-03")
+        XCTAssertEqual(client.readPaths.count, reads)
+    }
+
+    func testOneMalformedCardActionOrAnswerDropsOnlyItself() throws {
+        let deck = try DailyDeck.decode("""
+        {"date": "d", "kind": "morning", "cards": [
+          {"id": "a", "type": "prompt"},
+          {"type": "item", "title": "no id"},
+          "not a card",
+          {"id": "f", "type": "decision", "actions": [
+            {"id": "answer", "label": "Answer", "input": "text"}, {"label": "no id"}, {"id": "skip", "label": "Skip"}]},
+          {"id": "close", "type": "close"}
+        ]}
+        """)
+        XCTAssertEqual(deck.cards.map(\.id), ["a", "f", "close"])
+        XCTAssertEqual(deck.cards[1].actions.map(\.id), ["answer", "skip"])
+
+        let answers = DeckAnswersFile.decodeAnswers("""
+        {"version": 1, "answers": [
+          {"card": "a", "text": "Ship it."},
+          {"card": "b", "feedback": {"verdict": "meh"}},
+          {"text": "no card"},
+          {"card": "c", "feedback": {"verdict": "less"}}
+        ]}
+        """)
+        XCTAssertEqual(answers.keys.sorted(), ["a", "c"])
+        XCTAssertEqual(answers["a"]?.text, "Ship it.")
+        XCTAssertEqual(answers["c"]?.feedback, DeckFeedback(verdict: .less), "missing reasons read as none")
+    }
+
     func testBriefFileRequestCarriesTheAnswersPayloadInSnakeCase() throws {
         let deck = try DailyDeck.decode(Self.deckJSON)
         let payload = DeckAnswersPayload(deck: deck, answers: ["advisor": DeckAnswer(card: "advisor", text: "Ship it.")], completedAt: morning)
@@ -736,6 +863,12 @@ final class BriefFileHTTPTests: APIClientTestCase {
     }
 }
 
+/// A clock the test moves by hand.
+final class TestDeckClock: @unchecked Sendable {
+    var now: Date
+    init(_ now: Date) { self.now = now }
+}
+
 /// A scripted server: one workspace list, one `briefs/` listing, one deck body.
 final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     struct Sent { let sessionID: String; let message: String; let workspace: String }
@@ -748,6 +881,8 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     var sendError: Error?
     /// The server filer's answer; nil (the default) is a server without one.
     var filer: Result<BriefFileResponse?, Error> = .success(nil)
+    /// Runs inside `fileBrief` before it answers, to hold a filing in flight.
+    var fileGate: (@Sendable () async -> Void)?
     private(set) var fileRequests: [BriefFileRequest] = []
     /// Bodies by path; anything else reads as `deck`.
     var files: [String: String] = [:]
@@ -795,6 +930,7 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
 
     func fileBrief(_ request: BriefFileRequest) async throws -> BriefFileResponse? {
         fileRequests.append(request)
+        await fileGate?()
         return try filer.get()
     }
 }

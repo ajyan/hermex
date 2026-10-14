@@ -73,8 +73,8 @@ final class DailyDeckViewModel {
     var index = 0
 
     let server: URL
-    /// The user's today: its deck opens first.
-    let today: String
+    /// The user's today: its deck opens first. Rolls forward in `refreshDay()`.
+    private(set) var today: String
     /// The day of the deck on screen.
     private(set) var date: String
     /// "morning" for the Daily Brief; "weekly" or "monthly" for a review deck.
@@ -98,7 +98,8 @@ final class DailyDeckViewModel {
         self.client = client
         self.store = store
         self.now = now
-        self.today = DailyDeckPaths.day(now())
+        let today = DailyDeckPaths.day(now())
+        self.today = today
         self.date = today
     }
 
@@ -167,6 +168,19 @@ final class DailyDeckViewModel {
         } catch {
             state = .failed(error.localizedDescription)
         }
+    }
+
+    /// Rolls `today` forward when the app comes back on a new day. A screen left on the old
+    /// today's brief moves to the new one; a past day or review the user opened stays.
+    func refreshDay() async {
+        let day = DailyDeckPaths.day(now())
+        guard day != today else { return }
+        let wasOnToday = date == today && kind == "morning"
+        today = day
+        guard wasOnToday else { return }
+        date = day
+        index = 0
+        await load()
     }
 
     /// Opens another deck: a past day's brief to reread or edit, or a review.
@@ -386,7 +400,9 @@ final class DailyDeckViewModel {
     func file() async -> DailyDeckFilingResult? {
         guard let deck, let workspace, filing != .filing else { return nil }
         filing = .filing
-        let payload = DeckAnswersPayload(deck: deck, answers: answers, completedAt: now())
+        // What is sent: the user can type or open another day while it's in flight.
+        let (date, kind, sent) = (date, kind, answers)
+        let payload = DeckAnswersPayload(deck: deck, answers: sent, completedAt: now())
         let refiling = isFiled
         let filed: BriefFileResponse?
         do {
@@ -398,8 +414,9 @@ final class DailyDeckViewModel {
         guard let filed else {
             // No filer on this server: the agent files it from the message.
             do {
-                let sessionID = try await startSession(message: try payload.message(refiling: refiling), workspace: workspace)
-                markFiled(note: nil)
+                let sessionID = try await startSession(
+                    message: try payload.message(refiling: refiling), title: Self.sessionTitle(for: date, kind: kind), workspace: workspace)
+                markFiled(sent, date: date, kind: kind, note: nil)
                 return .openSession(sessionID)
             } catch {
                 filing = .failed(error.localizedDescription)
@@ -411,7 +428,7 @@ final class DailyDeckViewModel {
             return nil
         }
         // The answers are filed now; a failure below only loses the follow-ups.
-        markFiled(note: DailyDeckFiledNote(
+        markFiled(sent, date: date, kind: kind, note: DailyDeckFiledNote(
             summary: Self.trimmed(filed.summary),
             failures: (filed.ran ?? []).filter { $0.ok == false }.map { step in
                 [step.step, step.error].compactMap { $0 }.joined(separator: ": ")
@@ -419,7 +436,8 @@ final class DailyDeckViewModel {
         let steps = (filed.agentSteps ?? []).compactMap(Self.trimmed)
         guard !steps.isEmpty else { return .filed }
         do {
-            return .openSession(try await startSession(message: payload.followUpMessage(steps: steps), workspace: workspace))
+            return .openSession(try await startSession(
+                message: payload.followUpMessage(steps: steps), title: Self.sessionTitle(for: date, kind: kind), workspace: workspace))
         } catch {
             filing = .failed("Filed, but the follow-ups didn't start: \(error.localizedDescription)")
             return nil
@@ -431,18 +449,23 @@ final class DailyDeckViewModel {
         return text
     }
 
-    private func markFiled(note: DailyDeckFiledNote?) {
-        store.setAnswers([:], for: server, date: date, kind: kind)
-        filedAnswers = answers
-        filedNote = note
+    /// Records `sent` as filed for its deck. The draft is cleared only if it still matches what
+    /// was sent, so edits made while filing stay unsent; another deck on screen is left alone.
+    private func markFiled(_ sent: [String: DeckAnswer], date: String, kind: String, note: DailyDeckFiledNote?) {
+        if store.answers(for: server, date: date, kind: kind) == sent {
+            store.setAnswers([:], for: server, date: date, kind: kind)
+        }
         filing = .idle
+        guard date == self.date, kind == self.kind else { return }
+        filedAnswers = sent
+        filedNote = note
     }
 
     /// A fresh session (so the chat holds only this filing, never an earlier stopped attempt)
     /// with `message` sent; it becomes today's session.
-    private func startSession(message: String, workspace: String) async throws -> String {
+    private func startSession(message: String, title: String, workspace: String) async throws -> String {
         let sessionID = try await client.createSession(workspace: workspace)
-        try? await client.renameSession(id: sessionID, title: Self.sessionTitle(for: date, kind: kind))
+        try? await client.renameSession(id: sessionID, title: title)
         store.setSession(sessionID, for: server, date: today)
         self.sessionID = sessionID
         try await client.startChat(sessionID: sessionID, message: message, workspace: workspace)
