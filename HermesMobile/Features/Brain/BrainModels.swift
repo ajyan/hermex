@@ -504,6 +504,9 @@ enum BrainRoute: Hashable, Sendable {
     case module(BrainModuleID)
     /// One page, by module and item id.
     case page(BrainModuleID, String)
+    /// One page opened from a review bite; `idea` is the key idea the bite came from,
+    /// which the article digest opens expanded and scrolled into view.
+    case bite(BrainModuleID, String, idea: Int?)
     /// Every search result in one module.
     case searchAll(BrainModuleID, query: String)
     /// A screen in the Prep module (the interview tutor).
