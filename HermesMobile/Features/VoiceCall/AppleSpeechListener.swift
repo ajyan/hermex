@@ -54,6 +54,12 @@ final class AppleSpeechListener: SpeechListening {
             guard let self else { return }
             if isFinal { self.onFinal?(text) } else { self.onPartial?(text) }
         }
+        // Started again without a stop: release the running capture first, since a
+        // second tap on the input bus raises an exception.
+        if self.recognizer != nil {
+            log("listener: started while running; restarting capture")
+            stop()
+        }
         self.recognizer = recognizer
 
         let input = engine.inputNode
@@ -80,6 +86,7 @@ final class AppleSpeechListener: SpeechListening {
             log("listener: engine start failed: \(error)")
             input.removeTap(onBus: 0)
             recognizer.finish()
+            self.recognizer = nil
             throw error
         }
         log("listener: engine running \(elapsed())")

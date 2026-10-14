@@ -120,6 +120,8 @@ final class VoiceCallController {
     /// A turn has ended with only a partial transcript; waiting briefly for the final one.
     @ObservationIgnored private var awaitingFinalSince: TimeInterval?
     @ObservationIgnored private var isHeld = false
+    /// True from a listener start the call kept until the next stop.
+    @ObservationIgnored private var listenerIsOn = false
     /// When the current turn's first speech was heard, so the log can show how long it took to send.
     @ObservationIgnored private var turnStartedAt: TimeInterval?
     /// When the transcript last changed, for ending a turn the level meter never heard.
@@ -189,14 +191,19 @@ final class VoiceCallController {
     func start() async {
         guard state == .idle else { return }
         state = .connecting
-        connectingSince = now()
+        let startedAt = now()
+        connectingSince = startedAt
         startTicker()
         do {
             try await bridge.startCall()
-            log("system call connected \(since(connectingSince))")
+            log("system call connected \(since(startedAt))")
             guard state == .connecting else { return }
+            // The connect timeout is for the system call; the listener's permission
+            // prompts and speech download wait on the user, who can still end the call.
+            connectingSince = nil
             try await listener.start()
-            log("listener started \(since(connectingSince))")
+            log("listener started \(since(startedAt))")
+            listenerDidStart()
             guard state == .connecting else { return }
             state = .listening
         } catch {
@@ -261,7 +268,7 @@ final class VoiceCallController {
         state = .ended(message)
         ticker?.cancel()
         ticker = nil
-        listener.stop()
+        stopListener()
         setCue(false)
         replyActive = false
         partialTranscript = ""
@@ -736,10 +743,11 @@ final class VoiceCallController {
         guard isMuted != muted, !isEnded else { return }
         isMuted = muted
         if muted {
-            listener.stop()
+            stopListener()
             awaitingFinalSince = nil
             turnDetector.reset()
-        } else {
+        } else if !isHeld {
+            // Unmuting on hold only records it; taking the call off hold starts the mic.
             restartListener()
         }
     }
@@ -748,24 +756,51 @@ final class VoiceCallController {
         guard isHeld != held, !isEnded else { return }
         isHeld = held
         if held {
-            listener.stop()
+            stopListener()
             speaker.stopNow()
             setCue(false)
             replyActive = false
             pendingApproval = nil
             approvalListenStart = nil
         } else {
+            // While connecting, `start` brings the call up and decides about the mic.
+            guard state != .connecting else { return }
             returnToListening()
             if !isMuted { restartListener() }
         }
     }
 
+    /// The mic is wanted unless the call is over, muted, or on hold.
+    private var wantsListener: Bool { !isEnded && !isMuted && !isHeld }
+
+    private func stopListener() {
+        listener.stop()
+        listenerIsOn = false
+    }
+
+    /// A start can outlive the reason for it (End, the system ending the call, mute, hold):
+    /// keep the mic only if the call still wants it.
+    private func listenerDidStart() {
+        if wantsListener {
+            listenerIsOn = true
+        } else {
+            log("listener started after the call stopped wanting it; stopping")
+            listener.stop()
+        }
+    }
+
+    /// Starts the mic after mute or hold. Starts run one at a time and never on a
+    /// running listener: a second tap on the audio bus throws.
     private func restartListener() {
+        let previous = lastListenerTask
         lastListenerTask = Task { [weak self, listener] in
+            await previous?.value
+            guard let self, self.wantsListener, !self.listenerIsOn, self.state != .connecting else { return }
             do {
                 try await listener.start()
+                self.listenerDidStart()
             } catch {
-                self?.tearDown(endSystemCall: true, message: nil)
+                self.tearDown(endSystemCall: true, message: nil)
             }
         }
     }
