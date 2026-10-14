@@ -209,7 +209,7 @@ struct BrainReaderContent: View {
     private let digest: BrainArticleDigest?
     /// Built once per page: the linked-page cards.
     private let linkCards: [BrainRef]
-    /// Built once per page: a structured person page's header, chips and timeline.
+    /// Built once per page: a structured person page's header, chips, About and timeline.
     private let personLayout: BrainPersonLayout?
     /// The mention sections, less the journal days a person's timeline already shows.
     private let backlinks: [BrainRef]
@@ -263,13 +263,16 @@ struct BrainReaderContent: View {
                     }
                 }
                 if let personLayout, !personLayout.nextTime.isEmpty || !personLayout.chips.isEmpty
-                    || !personLayout.longItems.isEmpty {
+                    || !personLayout.aboutSections.isEmpty {
                     VStack(alignment: .leading, spacing: BrainStyle.l) {
                         if !personLayout.nextTime.isEmpty {
                             BrainNextTimeCard(lines: personLayout.nextTime)
                         }
-                        if !personLayout.chips.isEmpty || !personLayout.longItems.isEmpty {
-                            BrainProfileChips(chips: personLayout.chips, longItems: personLayout.longItems)
+                        if !personLayout.chips.isEmpty {
+                            BrainProfileChips(chips: personLayout.chips)
+                        }
+                        if !personLayout.aboutSections.isEmpty {
+                            BrainPersonAbout(sections: personLayout.aboutSections)
                         }
                     }
                     .environment(\.openURL, brainLinks)

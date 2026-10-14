@@ -14,22 +14,42 @@ struct BrainPersonLayout: Equatable {
         let headline: String
         /// Up to two bullets after the headline (encounters only).
         let preview: [String]
+        /// The bullets after the preview, shown when the card expands.
+        let rest: [String]
+        /// The body's other lines (prose, `_Source:` lines, `####` subheads), joined by newlines;
+        /// shown as Markdown under the bullets when the card expands. Empty when there are none.
+        let extra: String
+        /// A journal day with the encounter's date, shown at the card's foot instead of as its own
+        /// card. Its snippet has the list marker dropped.
+        let journal: BrainJournalMention?
+
         /// Bullets beyond the headline and preview.
-        let moreCount: Int
-        /// The encounter holds more than the headline and preview show: hidden bullets, or body
-        /// lines that are not bullets (prose, `_Source:` lines, `####` subheads).
-        let canExpand: Bool
+        var moreCount: Int { rest.count }
+        /// The encounter holds more than the headline and preview show.
+        var canExpand: Bool { !rest.isEmpty || !extra.isEmpty }
+    }
+
+    /// One titled group of profile lines in the About card ("Family", "Work", ...).
+    struct AboutSection: Equatable, Identifiable {
+        /// The title, lowercased.
+        let id: String
+        let title: String
+        /// Every item, including those past the card's per-section cap.
+        let items: [String]
     }
 
     /// Relationship, location, and "seen <relative>", non-empty parts joined by " · ".
     let subtitle: String
-    /// Birthday, Industry, then profile items by section (Family, Company, School, Likes, the rest); items of 40 characters or fewer.
+    /// At most three: "Birthday <MMM d>", the first Company item (else the Industry fact), the
+    /// first School item. A value over 32 characters is left out (it stays in About).
     let chips: [String]
-    /// Profile items longer than 40 characters, in chip order.
-    let longItems: [String]
-    /// Open questions, then a birthday line when the next birthday is within 30 days.
+    /// The profile less the chips: Family, Work, School, Likes, every other section under its own
+    /// label in server order, then the open questions. Same-title sections merge; empty ones drop.
+    let aboutSections: [AboutSection]
+    /// A birthday line when the next birthday is within 30 days, else empty.
     let nextTime: [String]
-    /// Encounters and journal days, newest first; on one date, encounters before journal. Ids are unique.
+    /// Encounters and journal days, newest first; on one date, encounters before journal. A
+    /// journal day with an encounter on its date folds into the first such encounter. Ids are unique.
     let timeline: [Entry]
     /// Journal ids already shown in the timeline, to drop from "Mentioned in" and "Unlinked".
     let hiddenMentionIDs: Set<String>
@@ -37,11 +57,21 @@ struct BrainPersonLayout: Equatable {
     init(page: BrainPage, person: BrainPerson, today: Date, calendar: Calendar = .current) {
         let days = DayMath(today: today, calendar: calendar)
         subtitle = Self.subtitle(page: page, person: person, days: days)
-        (chips, longItems) = Self.chipsAndLongItems(page: page, person: person)
+        (chips, aboutSections) = Self.chipsAndAbout(page: page, person: person)
         nextTime = Self.nextTime(person: person, days: days)
         let journal = person.journal.filter { !$0.id.isEmpty }
         timeline = Self.timeline(encounters: person.encounters.filter { !$0.id.isEmpty }, journal: journal, days: days)
         hiddenMentionIDs = Set(journal.map(\.id))
+    }
+
+    /// "Father: Bo Test" as a role and a value, when the text before the first ": " is a short
+    /// (20 characters or fewer) non-empty role and a value follows; else nil.
+    static func roleSplit(_ item: String) -> (role: String, value: String)? {
+        guard let colon = item.range(of: ": ") else { return nil }
+        let role = item[..<colon.lowerBound].trimmingCharacters(in: .whitespaces)
+        let value = item[colon.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !role.isEmpty, role.count <= 20, !value.isEmpty else { return nil }
+        return (role, value)
     }
 
     /// A mention section's refs without the journal days the timeline already shows, and its
@@ -82,44 +112,89 @@ struct BrainPersonLayout: Equatable {
     }
 
     private static func nextTime(person: BrainPerson, days: DayMath) -> [String] {
-        var lines = person.questions.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-        if let iso = person.nextBirthday, let away = days.daysAhead(iso), (0...30).contains(away) {
-            switch away {
-            case 0: lines.append("Birthday today")
-            case 1: lines.append("Birthday \(monthDay(iso) ?? iso), in 1 day")
-            default: lines.append("Birthday \(monthDay(iso) ?? iso), in \(away) days")
-            }
+        guard let iso = person.nextBirthday, let away = days.daysAhead(iso), (0...30).contains(away) else { return [] }
+        switch away {
+        case 0: return ["Birthday today"]
+        case 1: return ["Birthday \(monthDay(iso) ?? iso), in 1 day"]
+        default: return ["Birthday \(monthDay(iso) ?? iso), in \(away) days"]
         }
-        return lines
     }
 
-    // MARK: Chips
+    // MARK: Chips and About
 
-    private static let chipLimit = 40
-    private static let sectionOrder = ["family", "company", "school", "likes"]
+    private static let chipLimit = 32
+    /// About's leading sections, in order; any other title follows in server order, Questions last.
+    private static let sectionOrder = ["Family", "Work", "School", "Likes"]
+    private static let sectionTitles: [String: String] = [
+        "family": "Family",
+        "company": "Work", "linkedin": "Work", "work": "Work", "job": "Work", "career": "Work", "industry": "Work",
+        "school": "School", "education": "School",
+        "likes": "Likes", "interests": "Likes", "hobbies": "Likes",
+        "misc. notes": "Notes", "misc notes": "Notes", "misc": "Notes", "notes": "Notes", "": "Notes",
+        "questions": "Questions",
+    ]
 
-    private static func chipsAndLongItems(page: BrainPage, person: BrainPerson) -> ([String], [String]) {
-        var chips: [String] = []
-        if let birthday = fact("Birthday", in: page) {
-            chips.append("Birthday " + (monthDay(birthday) ?? birthday))
+    private static func chipsAndAbout(page: BrainPage, person: BrainPerson) -> ([String], [AboutSection]) {
+        // Each section's non-blank items, trimmed, with their index in the section.
+        let profile = person.profile.map { section in
+            section.items.enumerated().compactMap { index, item -> (index: Int, text: String)? in
+                let text = item.trimmingCharacters(in: .whitespacesAndNewlines)
+                return text.isEmpty ? nil : (index, text)
+            }
         }
-        if let industry = fact("Industry", in: page) { chips.append(industry) }
-        var long: [String] = []
-        let ranked = person.profile.enumerated().sorted { lhs, rhs in
-            let l = rank(lhs.element.label), r = rank(rhs.element.label)
+        func firstItem(labelled label: String) -> (key: String, text: String)? {
+            for (section, items) in profile.enumerated()
+            where key(person.profile[section].label) == label {
+                if let item = items.first { return ("\(section):\(item.index)", item.text) }
+            }
+            return nil
+        }
+
+        var chips: [String] = []
+        var usedItems: Set<String> = []
+        func addChip(_ text: String?, item: String? = nil) {
+            guard let text, !text.isEmpty, text.count <= chipLimit else { return }
+            chips.append(text)
+            if let item { usedItems.insert(item) }
+        }
+        if let birthday = fact("Birthday", in: page) { addChip("Birthday " + (monthDay(birthday) ?? birthday)) }
+        if let company = firstItem(labelled: "company") {
+            addChip(company.text, item: company.key)
+        } else {
+            addChip(fact("Industry", in: page))
+        }
+        if let school = firstItem(labelled: "school") { addChip(school.text, item: school.key) }
+
+        // Keyed by the lowercased title, so "Pets" and "pets" share one section (the first spelling wins).
+        var sections: [AboutSection] = []
+        func append(_ title: String, _ items: [String]) {
+            let id = title.lowercased()
+            if let index = sections.firstIndex(where: { $0.id == id }) {
+                sections[index] = AboutSection(id: id, title: sections[index].title, items: sections[index].items + items)
+            } else {
+                sections.append(AboutSection(id: id, title: title, items: items))
+            }
+        }
+        for (section, items) in profile.enumerated() {
+            let label = person.profile[section].label.trimmingCharacters(in: .whitespaces)
+            append(sectionTitles[key(label)] ?? label,
+                   items.filter { !usedItems.contains("\(section):\($0.index)") }.map(\.text))
+        }
+        append("Questions", person.questions.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
+
+        func rank(_ section: AboutSection) -> Int {
+            if section.id == "questions" { return sectionOrder.count + 1 }
+            return sectionOrder.firstIndex(of: section.title) ?? sectionOrder.count
+        }
+        let ordered = sections.enumerated().sorted { lhs, rhs in
+            let l = rank(lhs.element), r = rank(rhs.element)
             return l == r ? lhs.offset < rhs.offset : l < r
         }
-        for (_, section) in ranked {
-            for item in section.items where !item.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                if item.count > chipLimit { long.append(item) } else { chips.append(item) }
-            }
-        }
-        return (chips, long)
+        return (chips, ordered.map(\.element).filter { !$0.items.isEmpty })
     }
 
-    private static func rank(_ label: String) -> Int {
-        let key = label.trimmingCharacters(in: .whitespaces).lowercased()
-        return sectionOrder.firstIndex(of: key) ?? sectionOrder.count
+    private static func key(_ label: String) -> String {
+        label.trimmingCharacters(in: .whitespaces).lowercased()
     }
 
     private static func fact(_ label: String, in page: BrainPage) -> String? {
@@ -132,10 +207,26 @@ struct BrainPersonLayout: Equatable {
     // MARK: Timeline
 
     private static func timeline(encounters: [BrainEncounter], journal: [BrainJournalMention], days: DayMath) -> [Entry] {
+        let encounters = timelineOrder(encounters, date: \.date, id: \.id)
+        let journal = timelineOrder(journal, date: \.date, id: \.id)
+        var firstEncounterOfDay: [String: String] = [:]
+        for encounter in encounters {
+            if let day = encounter.date.isoDay, firstEncounterOfDay[day] == nil { firstEncounterOfDay[day] = encounter.id }
+        }
+        var folded: [String: BrainJournalMention] = [:]
+        var separate: [BrainJournalMention] = []
+        for mention in journal {
+            if let day = mention.date.isoDay, let encounterID = firstEncounterOfDay[day], folded[encounterID] == nil {
+                folded[encounterID] = BrainJournalMention(id: mention.id, date: mention.date,
+                                                          snippet: stripMarker(mention.snippet), mention: mention.mention)
+            } else {
+                separate.append(mention)
+            }
+        }
         let rows: [(sortDate: String, order: Int, entry: Entry)] =
-            encounters.enumerated().map { ($1.date.isoDay ?? "", $0, encounterEntry($1, days: days)) }
-            + journal.enumerated().map { ($1.date.isoDay ?? "", encounters.count + $0, journalEntry($1)) }
-        // A repeated id would collide in the timeline's `ForEach`; the first in timeline order wins.
+            encounters.enumerated().map { ($1.date.isoDay ?? "", $0, encounterEntry($1, journal: folded[$1.id], days: days)) }
+            + separate.enumerated().map { ($1.date.isoDay ?? "", encounters.count + $0, journalEntry($1)) }
+        // An encounter id can still collide with a `journal:` id; the first in timeline order wins.
         var seen: Set<String> = []
         return rows
             .sorted { $0.sortDate == $1.sortDate ? $0.order < $1.order : $0.sortDate > $1.sortDate }
@@ -143,40 +234,65 @@ struct BrainPersonLayout: Equatable {
             .filter { seen.insert($0.id).inserted }
     }
 
-    private static func encounterEntry(_ encounter: BrainEncounter, days: DayMath) -> Entry {
+    /// Newest first, server order within a date, a repeated id kept only the first time.
+    private static func timelineOrder<Item>(_ items: [Item], date: (Item) -> String, id: (Item) -> String) -> [Item] {
+        var seen: Set<String> = []
+        return items.enumerated()
+            .sorted { lhs, rhs in
+                let l = date(lhs.element).isoDay ?? "", r = date(rhs.element).isoDay ?? ""
+                return l == r ? lhs.offset < rhs.offset : l > r
+            }
+            .map(\.element)
+            .filter { seen.insert(id($0)).inserted }
+    }
+
+    private static func encounterEntry(_ encounter: BrainEncounter, journal: BrainJournalMention?, days: DayMath) -> Entry {
         let bullets = encounter.bullets.map(stripMarker).filter { !$0.isEmpty }
         let title = encounter.title.map(stripMarker).flatMap { $0.isEmpty ? nil : $0 }
         let headline: String
-        let rest: [String]
+        let items: [String]
         if let title {
             headline = title
-            rest = bullets
+            items = bullets
         } else {
             headline = bullets.first ?? ""
-            rest = Array(bullets.dropFirst())
+            items = Array(bullets.dropFirst())
         }
         var meta = BrainStyle.displayDate(encounter.date)
         if let ago = days.daysAgo(encounter.date) { meta += " · " + relative(daysAgo: ago) }
-        let preview = Array(rest.prefix(2))
-        let moreCount = max(0, rest.count - 2)
         return Entry(id: encounter.id, kind: .encounter(encounter), meta: meta, headline: headline,
-                     preview: preview, moreCount: moreCount,
-                     canExpand: moreCount > 0 || hasUnshownLines(encounter.body, shown: [headline] + preview))
+                     preview: Array(items.prefix(2)), rest: Array(items.dropFirst(2)),
+                     extra: extraLines(encounter.body, shown: Set(bullets + [headline])), journal: journal)
     }
 
-    /// Whether `body` has a non-blank line, list marker aside, that none of `shown` contains.
-    private static func hasUnshownLines(_ body: String, shown: [String]) -> Bool {
-        let visible = Set(shown.flatMap { $0.split(whereSeparator: \.isNewline) }.map { stripMarker(String($0)) })
-        return body.split(whereSeparator: \.isNewline).contains { line in
-            let text = stripMarker(String(line))
-            return !text.isEmpty && !visible.contains(text)
+    /// The body's non-blank lines that are not bullets (a column-0 `-` or `*` and the indented
+    /// lines after it), thematic breaks, or text already `shown` (the headline, or prose lines the
+    /// server made the items), trimmed and joined by newlines.
+    private static func extraLines(_ body: String, shown: Set<String>) -> String {
+        var inBullet = false
+        var lines: [String] = []
+        for line in body.split(whereSeparator: \.isNewline).map(String.init) {
+            let text = line.trimmingCharacters(in: .whitespaces)
+            let indented = line.first == " " || line.first == "\t"
+            if text.isEmpty { continue }
+            if text.range(of: #"^([-*_])(\s*\1){2,}$"#, options: .regularExpression) != nil {
+                inBullet = false
+            } else if line.range(of: #"^[-*]\s"#, options: .regularExpression) != nil {
+                inBullet = true
+            } else if inBullet && indented {
+                continue
+            } else {
+                inBullet = false
+                if !shown.contains(text) { lines.append(text) }
+            }
         }
+        return lines.joined(separator: "\n")
     }
 
     private static func journalEntry(_ mention: BrainJournalMention) -> Entry {
         Entry(id: "journal:" + mention.id, kind: .journal(mention),
               meta: "Journal · " + BrainStyle.displayDate(mention.date),
-              headline: stripMarker(mention.snippet), preview: [], moreCount: 0, canExpand: false)
+              headline: stripMarker(mention.snippet), preview: [], rest: [], extra: "", journal: nil)
     }
 
     /// Drops one leading "- " or "* " list marker; nested lines after the first newline are kept.
