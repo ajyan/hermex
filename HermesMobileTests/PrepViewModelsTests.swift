@@ -16,6 +16,8 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
     var gapsResults: [Result<[PrepGapSummary], Error>] = []
     var gapResults: [Result<PrepGapDetail, Error>] = []
     var flagResults: [Result<Void, Error>] = [.success(())]
+    var courseResults: [Result<PrepCourse, Error>] = []
+    var lessonResults: [Result<PrepLesson, Error>] = []
 
     /// When set, `attempt` signals `started` and then waits on `release`.
     var gate: (started: AsyncStream<Void>.Continuation, release: AsyncStream<Void>)?
@@ -40,7 +42,10 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
         }
         return try next("home", &homeResults)
     }
-    func today() async throws -> PrepRun { try next("today", &todayResults) }
+    func today(run: PrepRunKind, unit: String?) async throws -> PrepRun {
+        let name = run == .daily ? "today" : "today:\(run.rawValue)" + (unit.map { ":\($0)" } ?? "")
+        return try next(name, &todayResults)
+    }
     func map(track: String) async throws -> PrepTrackMap { try next("map:\(track)", &mapResults) }
 
     func attempt(_ r: PrepAttemptRequest) async throws -> PrepAttemptResult {
@@ -55,6 +60,8 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
     func gaps() async throws -> [PrepGapSummary] { try next("gaps", &gapsResults) }
     func gap(id: String) async throws -> PrepGapDetail { try next("gap:\(id)", &gapResults) }
     func flag(item: String) async throws { try next("flag:\(item)", &flagResults) }
+    func course() async throws -> PrepCourse { try next("course", &courseResults) }
+    func lesson(id: String) async throws -> PrepLesson { try next("lesson:\(id)", &lessonResults) }
 }
 
 @MainActor

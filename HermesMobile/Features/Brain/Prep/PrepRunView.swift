@@ -100,10 +100,10 @@ struct PrepRunView: View {
         switch rep.drill {
         case .complexity, .trace:
             return chosen?.rep == rep.index ? chosen.map { .choice($0.id) } : nil
-        case .approach, .judgment:
+        case .approach, .judgment, .boss:
             return .choice(draft(for: rep).text)
-        case .fact:
-            if rep.item.format == "cloze" { return .choice(draft(for: rep).text) }
+        case .fact, .lesson:
+            if Self.isCloze(rep) { return .choice(draft(for: rep).text) }
             return chosen?.rep == rep.index ? chosen.map { .choice($0.id) } : nil
         case .spotBug:
             let draft = draft(for: rep)
@@ -122,8 +122,15 @@ struct PrepRunView: View {
         case .primer: "Primer"
         case .fact: "Fact"
         case .judgment: "Judgment"
+        case .lesson: "Lesson"
+        case .boss: "Boss quiz"
         case .unknown: "Run"
         }
+    }
+
+    /// A fact or lesson check answered by typing rather than tapping an option.
+    fileprivate static func isCloze(_ rep: PrepRep) -> Bool {
+        rep.drill == .lesson ? rep.item.lesson?.check.isCloze == true : rep.item.format == "cloze"
     }
 
     /// The rep's position among today's reps (not its stable index, which can skip).
@@ -219,8 +226,8 @@ struct PrepRunView: View {
 
     private func hasAction(_ rep: PrepRep) -> Bool {
         switch rep.drill {
-        case .primer, .approach, .spotBug, .unknown, .judgment: true
-        case .fact: rep.item.format == "cloze"
+        case .primer, .approach, .spotBug, .unknown, .judgment, .boss: true
+        case .fact, .lesson: Self.isCloze(rep)
         case .complexity, .trace: false
         }
     }
@@ -248,13 +255,13 @@ struct PrepRunView: View {
                 guard let line = answer.line, let fix = answer.fix else { return }
                 Task { await viewModel.submitBugFix(line: line, fix: fix) }
             }
-        case .judgment:
+        case .judgment, .boss:
             let text = draft(for: rep).text
             PrepPrimaryButton(
                 title: viewModel.isSubmitting ? "Grading…" : "Submit",
                 enabled: PrepCopy.canSubmitJudgment(text) && !viewModel.isSubmitting
             ) { Task { await viewModel.submitJudgment(text) } }
-        case .fact:
+        case .fact, .lesson:
             let text = draft(for: rep).text
             PrepPrimaryButton(
                 title: "Submit",
@@ -323,7 +330,22 @@ struct PrepRunView: View {
                     submitError: viewModel.submitError
                 ) { option in choose(option, in: rep) }
             }
-        case .judgment:
+        case .lesson:
+            if Self.isCloze(rep) {
+                PrepClozeView(
+                    text: Binding(get: { draft(for: rep).text }, set: { text in updateDraft(rep) { $0.text = text } }),
+                    isSubmitting: viewModel.isSubmitting
+                ) { Task { await viewModel.submitCloze(draft(for: rep).text) } }
+            } else {
+                PrepChoiceView(
+                    title: "Quick check",
+                    options: (rep.item.lesson?.check.options ?? []).map { PrepOption(id: $0, title: $0) },
+                    grading: nil,
+                    isSubmitting: viewModel.isSubmitting,
+                    submitError: viewModel.submitError
+                ) { option in choose(option, in: rep) }
+            }
+        case .judgment, .boss:
             PrepApproachView(
                 text: Binding(
                     get: { draft(for: rep).text },

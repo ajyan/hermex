@@ -307,4 +307,117 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertEqual(Endpoint.tutorGap(id: "gap.a").queryItems, [URLQueryItem(name: "id", value: "gap.a")])
         XCTAssertEqual(Endpoint.tutorFlag.path, "/api/tutor/flag")
     }
+
+    // MARK: - Course
+
+    private let courseHomeJSON = #"""
+    {"streak": {"days": 6, "freezes": 1}, "readiness": null,
+     "run": {"minutes": 7, "reps": 10, "remaining": 3, "focus": []}, "tracks": [], "needs_work": [],
+     "course": {"xp": 340, "today": {"done": 7, "total": 10}, "units": [
+       {"id": "u1", "title": "LLM fundamentals", "module": null, "stage": "cross", "state": "passed", "stars": 3,
+        "lessons_done": 8, "lessons_total": 8, "boss": "passed", "mock": true},
+       {"id": "u2", "title": "Prompt engineering", "module": "M5.5", "stage": "2a", "state": "current", "stars": 0,
+        "lessons_done": 2, "lessons_total": 7, "boss": "locked", "mock": false,
+        "lessons": [{"id": "u2.l1", "title": "Clear instructions", "state": "learned", "due": "2026-10-20", "reteach": false},
+                    {"id": "u2.l3", "title": "XML tags", "state": "next", "due": null, "reteach": true}]},
+       {"id": "u3", "title": "Agents", "state": "glowing"}]}}
+    """#
+
+    func testHomeDecodesCourseAndKeepsOldFields() throws {
+        let home = try decode(PrepHome.self, courseHomeJSON)
+        XCTAssertEqual(home.streak.days, 6)
+        XCTAssertEqual(home.run.reps, 10)
+        let course = try XCTUnwrap(home.course)
+        XCTAssertEqual(course.xp, 340)
+        XCTAssertEqual(course.today, PrepDayCount(done: 7, total: 10))
+        XCTAssertEqual(course.units.map(\.state), [.passed, .current, .unknown])
+        XCTAssertEqual(course.units[0].stars, 3)
+        XCTAssertTrue(course.units[0].mock)
+        XCTAssertEqual(course.units[1].boss, .locked)
+        XCTAssertEqual(course.units[1].lessons.map(\.state), [.learned, .next])
+        XCTAssertEqual(course.units[1].lessons[0].due, "2026-10-20")
+        XCTAssertTrue(course.units[1].lessons[1].reteach)
+        XCTAssertEqual(course.currentUnit?.id, "u2")
+    }
+
+    func testHomeWithoutCourse() throws {
+        XCTAssertNil(try decode(PrepHome.self, homeJSON).course)
+    }
+
+    func testUnknownDrillAndRunDecodeAsUnknown() throws {
+        let json = #"""
+        {"date": "d", "run": "sprint", "index": 0, "reps": [{"index": 0, "block": "new", "drill": "quiz", "item": {"id": "x"}}]}
+        """#
+        let run = try decode(PrepRun.self, json)
+        XCTAssertEqual(run.run, .unknown)
+        XCTAssertEqual(run.reps.first?.drill, .unknown)
+        XCTAssertEqual(try decode(PrepRun.self, #"{"date": "d", "index": 0, "reps": []}"#).run, .daily)
+    }
+
+    func testLessonRepDecodesTeachingAndCheck() throws {
+        let json = #"""
+        {"date": "2026-10-20", "run": "daily", "index": 0, "reps": [
+          {"index": 0, "block": "new", "drill": "lesson", "item": {"id": "u2.l3", "title": "XML tags", "summary": "Why tag?",
+            "unit": "u2", "idea_md": "Wrap each part.", "say_it_md": "I tag every input.",
+            "check": {"format": "choice", "prompt": "Why tag?", "options": ["A", "B", "C", "D"]},
+            "sources": [{"ref": "prompt-docs"}, {"ref": "guide", "path": "05/06.md"}], "origin": "coach", "reteach_of": "u2.l2"}},
+          {"index": 1, "block": "boss", "drill": "boss", "item": {"id": "anth.j.0201", "summary": "Design a prompt"}}]}
+        """#
+        let run = try decode(PrepRun.self, json)
+        XCTAssertEqual(run.reps.map(\.drill), [.lesson, .boss])
+        let lesson = try XCTUnwrap(run.reps[0].item.lesson)
+        XCTAssertEqual(lesson.ideaMD, "Wrap each part.")
+        XCTAssertEqual(lesson.sayItMD, "I tag every input.")
+        XCTAssertEqual(lesson.check.format, "choice")
+        XCTAssertEqual(lesson.check.options, ["A", "B", "C", "D"])
+        XCTAssertNil(lesson.check.answer)
+        XCTAssertEqual(lesson.sources.map(\.ref), ["prompt-docs", "guide"])
+        XCTAssertEqual(lesson.reteachOf, "u2.l2")
+        XCTAssertTrue(lesson.isReteach)
+        XCTAssertNil(run.reps[1].item.lesson)
+    }
+
+    func testLessonDecodesWithMissingOptionalFields() throws {
+        let lesson = try decode(PrepLesson.self, #"{"id": "u1.l1", "title": "Tokens", "idea_md": "I", "check": {"answer": "A"}}"#)
+        XCTAssertEqual(lesson.sources, [])
+        XCTAssertNil(lesson.reteachOf)
+        XCTAssertEqual(lesson.sayItMD, "")
+        XCTAssertEqual(lesson.check.answer, "A")
+        XCTAssertEqual(lesson.check.format, "choice")
+    }
+
+    func testBossResultDecodesSittingAndRevisit() throws {
+        let json = #"""
+        {"verdict": "pass", "correct": null, "feedback": "", "credit": 1, "next_index": 2,
+         "grade": {"verdict": "pass", "points_hit": [{"point_id": "p.tail", "quote": "q"}], "strong_answer": "S"},
+         "points": [{"id": "p.tail", "text": "Averages hide the tail"}],
+         "revisit": [{"lesson_id": "u2.l4", "title": "Prefill"}, {"title": "no id"}],
+         "sitting": {"score": 0.82, "passed": true, "stars": 2, "unlocked": "Agents and evals"}}
+        """#
+        let result = try decode(PrepAttemptResult.self, json)
+        XCTAssertEqual(result.revisit, [PrepRevisit(lessonID: "u2.l4", title: "Prefill")])
+        XCTAssertEqual(result.sitting, PrepBossSitting(score: 0.82, passed: true, stars: 2, unlocked: "Agents and evals"))
+        XCTAssertEqual(result.strongAnswer, "S")
+        XCTAssertEqual(result.judgment?.pointsHit.map(\.pointID), ["p.tail"])
+    }
+
+    func testUngradedBossSittingHasNoScore() throws {
+        let json = #"{"verdict": "ungraded", "sitting": {"score": null, "passed": false, "stars": 0, "unlocked": null}}"#
+        let sitting = try XCTUnwrap(try decode(PrepAttemptResult.self, json).sitting)
+        XCTAssertNil(sitting.score)
+        XCTAssertNil(sitting.unlocked)
+    }
+
+    func testAttemptRequestEncodesRun() throws {
+        let request = PrepAttemptRequest(date: "d", index: 0, item: "anth.j.0301", drill: .boss, answer: .choice("a"),
+                                         elapsedMS: 1, hintsUsed: 0, run: .testout, unit: "u3")
+        let json = try XCTUnwrap(String(data: JSONEncoder().encode(request), encoding: .utf8))
+        XCTAssertTrue(json.contains(#""run":"testout""#))
+        XCTAssertTrue(json.contains(#""unit":"u3""#))
+        let daily = PrepAttemptRequest(date: "d", index: 0, item: "u1.l1", drill: .lesson, answer: .choice("a"),
+                                       elapsedMS: 1, hintsUsed: 0)
+        let dailyJSON = try XCTUnwrap(String(data: JSONEncoder().encode(daily), encoding: .utf8))
+        XCTAssertTrue(dailyJSON.contains(#""run":"daily""#))
+        XCTAssertFalse(dailyJSON.contains("unit"))
+    }
 }
