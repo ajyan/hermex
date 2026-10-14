@@ -63,18 +63,25 @@ private extension KeyedDecodingContainer {
 struct PrepStreak: Decodable, Hashable, Sendable {
     let days: Int
     let freezes: Int
+    /// The latest day with a graded answer (`yyyy-MM-dd`); nil before the first one.
+    let lastDay: String?
 
-    private enum CodingKeys: String, CodingKey { case days, freezes }
+    private enum CodingKeys: String, CodingKey {
+        case days, freezes
+        case lastDay = "last_day"
+    }
 
-    init(days: Int = 0, freezes: Int = 0) {
+    init(days: Int = 0, freezes: Int = 0, lastDay: String? = nil) {
         self.days = days
         self.freezes = freezes
+        self.lastDay = lastDay
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         days = c.int(.days)
         freezes = c.int(.freezes)
+        lastDay = c.optional(String.self, .lastDay).flatMap { $0.isEmpty ? nil : $0 }
     }
 }
 
@@ -177,6 +184,8 @@ enum PrepDrill: String, Encodable, Hashable, Sendable {
     case fact
     case judgment
     case lesson
+    case recall
+    case warmup
     case boss
     case unknown
 
@@ -377,11 +386,31 @@ struct PrepAttemptRequest: Encodable, Hashable, Sendable {
     var run: PrepRunKind = .daily
     /// The unit a test out is for; omitted on other runs.
     var unit: String?
+    /// How sure the user was before a recall was graded; omitted on other drills.
+    var confidence: PrepConfidence?
+    /// "I don't know, show me": a recall with no answer.
+    var dontKnow = false
 
     private enum CodingKeys: String, CodingKey {
-        case date, index, item, drill, answer, run, unit
+        case date, index, item, drill, answer, run, unit, confidence
         case elapsedMS = "elapsed_ms"
         case hintsUsed = "hints_used"
+        case dontKnow = "dont_know"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(date, forKey: .date)
+        try c.encode(index, forKey: .index)
+        try c.encode(item, forKey: .item)
+        try c.encode(drill, forKey: .drill)
+        try c.encode(answer, forKey: .answer)
+        try c.encode(elapsedMS, forKey: .elapsedMS)
+        try c.encode(hintsUsed, forKey: .hintsUsed)
+        try c.encode(run, forKey: .run)
+        try c.encodeIfPresent(unit, forKey: .unit)
+        try c.encodeIfPresent(confidence, forKey: .confidence)
+        if dontKnow { try c.encode(true, forKey: .dontKnow) }
     }
 }
 
@@ -465,6 +494,38 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
     let sitting: PrepBossSitting?
     /// Why the option picked on a lesson check is wrong; nil when it was right.
     let why: String?
+    /// A recall answered "certain" that wasn't a pass: the kind of miss that sticks once corrected.
+    let surprise: Bool
+    /// The XP this answer earned, when the server says.
+    let xp: Int?
+    /// The attempt's id, for "I had that" overrides.
+    let attemptID: String?
+    /// Key points the user overruled the grader on.
+    let overridden: [String]
+
+    /// The original result with an override's grade, verdict, XP and overridden points laid over it.
+    init(merging base: PrepAttemptResult, override: PrepAttemptResult) {
+        verdict = override.verdict.isEmpty ? base.verdict : override.verdict
+        correct = base.correct
+        feedback = base.feedback
+        credit = base.credit
+        referenceMD = base.referenceMD
+        links = base.links
+        nextIndex = base.nextIndex
+        streak = override.streak ?? base.streak
+        grade = base.grade
+        judgment = override.judgment ?? base.judgment
+        gapMatch = base.gapMatch
+        logged = base.logged
+        pointTexts = base.pointTexts
+        revisit = base.revisit
+        sitting = base.sitting
+        why = base.why
+        surprise = base.surprise
+        xp = override.xp ?? base.xp
+        attemptID = override.attemptID ?? base.attemptID
+        overridden = override.overridden
+    }
 
     /// The sample answer, from whichever grade shape the answer came back with.
     var strongAnswer: String { judgment?.strongAnswer ?? grade?.strongAnswer ?? "" }
@@ -474,6 +535,8 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case verdict, correct, feedback, credit, links, streak, grade, logged, points, revisit, sitting, why
+        case surprise, xp, overridden
+        case attemptID = "attempt"
         case referenceMD = "reference_md"
         case nextIndex = "next_index"
         case gapMatch = "gap_match"
@@ -499,6 +562,10 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
         revisit = c.optional(PrepRevisits.self, .revisit)?.values ?? []
         sitting = c.optional(PrepBossSitting.self, .sitting)
         why = c.optional(String.self, .why).flatMap { $0.isEmpty ? nil : $0 }
+        surprise = c.bool(.surprise)
+        xp = c.optional(Int.self, .xp)
+        attemptID = c.optional(String.self, .attemptID)
+        overridden = c.strings(.overridden)
     }
 }
 

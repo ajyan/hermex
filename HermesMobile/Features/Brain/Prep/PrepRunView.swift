@@ -13,6 +13,12 @@ struct PrepRunView: View {
     @State private var draft = Draft(rep: -1)
     @Environment(\.dismiss) private var dismiss
     @State private var screenHeight: CGFloat = 800
+    /// Tap-to-talk for recall answers, the same dictation the chat composer uses.
+    @State private var voiceInput = ComposerVoiceInputController()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(ComposerSTTProviderPreference.storageKey)
+    private var sttProviderPreferenceRawValue = ComposerSTTProviderPreference.defaultValue.rawValue
+    private let apiClient: APIClient?
 
     private struct ChosenOption: Equatable {
         let rep: Int
@@ -28,13 +34,15 @@ struct PrepRunView: View {
     }
 
     init(server: URL, run: PrepRunKind = .daily, unit: String? = nil, onAPIError: @escaping (Error) -> Void) {
+        let client = APIClient(baseURL: server)
         self.init(viewModel: PrepRunViewModel(
-            client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server)), run: run, unit: unit,
-            onAPIError: onAPIError))
+            client: APIClientPrepAdapter(apiClient: client), run: run, unit: unit,
+            onAPIError: onAPIError), apiClient: client)
     }
 
-    init(viewModel: PrepRunViewModel) {
+    init(viewModel: PrepRunViewModel, apiClient: APIClient? = nil) {
         _viewModel = State(initialValue: viewModel)
+        self.apiClient = apiClient
     }
 
     var body: some View {
@@ -75,6 +83,38 @@ struct PrepRunView: View {
                 didLoad = true
                 await viewModel.load()
             }
+            .sensoryFeedback(.success, trigger: passCount)
+            .sensoryFeedback(.impact(weight: .light), trigger: warmupCount)
+            .onChange(of: currentRep?.index) { _, _ in
+                if voiceInput.isListening { voiceInput.stopKeepingTranscript() }
+            }
+            .onDisappear { voiceInput.stopBeforeSubmittingDraft() }
+    }
+
+    /// Changes when a recall passes, for the success haptic; misses get none.
+    private var passCount: String {
+        if case let .result(rep, result, _) = viewModel.phase, rep.drill != .warmup, result.verdict == "pass" {
+            return "\(rep.index)-\(result.verdict)"
+        }
+        return ""
+    }
+
+    /// Changes when a warm-up is answered right, for a light tap.
+    private var warmupCount: String {
+        if case let .result(rep, result, _) = viewModel.phase, rep.drill == .warmup, result.verdict == "pass" {
+            return "\(rep.index)"
+        }
+        return ""
+    }
+
+    private func toggleVoice() {
+        voiceInput.apiClient = apiClient
+        voiceInput.providerPreference = ComposerSTTProviderPreference.storedValue(sttProviderPreferenceRawValue)
+        voiceInput.scheduleToggle(currentDraft: viewModel.recallDraft) { text in viewModel.recallDraft = text }
+    }
+
+    private static func usesRecall(_ rep: PrepRep) -> Bool {
+        (rep.drill == .lesson || rep.drill == .recall) && rep.item.lesson?.hasRecall == true
     }
 
     // MARK: Chrome
@@ -104,7 +144,9 @@ struct PrepRunView: View {
             return chosen?.rep == rep.index ? chosen.map { .choice($0.id) } : nil
         case .approach, .judgment, .boss:
             return .choice(draft(for: rep).text)
-        case .fact, .lesson:
+        case .lesson where Self.usesRecall(rep), .recall where Self.usesRecall(rep):
+            return .choice(viewModel.recallDraft)
+        case .fact, .lesson, .warmup, .recall:
             if Self.isCloze(rep) { return .choice(draft(for: rep).text) }
             return chosen?.rep == rep.index ? chosen.map { .choice($0.id) } : nil
         case .spotBug:
@@ -125,6 +167,8 @@ struct PrepRunView: View {
         case .fact: "Fact"
         case .judgment: "Judgment"
         case .lesson: "Lesson"
+        case .recall: "Recall"
+        case .warmup: "Warm-up"
         case .boss: "Boss quiz"
         case .unknown: "Run"
         }
@@ -132,7 +176,7 @@ struct PrepRunView: View {
 
     /// A fact or lesson check answered by typing rather than tapping an option.
     fileprivate static func isCloze(_ rep: PrepRep) -> Bool {
-        rep.drill == .lesson ? rep.item.lesson?.check.isCloze == true : rep.item.format == "cloze"
+        [.lesson, .warmup, .recall].contains(rep.drill) ? rep.item.lesson?.check.isCloze == true : rep.item.format == "cloze"
     }
 
     /// The rep's position among today's reps (not its stable index, which can skip).
@@ -160,6 +204,37 @@ struct PrepRunView: View {
             scaffold(rep, hasAction: hasAction(rep)) { repContent(rep) } bottom: { repAction(rep) }
                 // Fresh view state (timer start, example toggle) for every rep.
                 .id(rep.index)
+        case .result(let rep, let result, _) where Self.usesRecall(rep):
+            scaffold(rep, hasAction: true) {
+                PrepRecallResultView(result: result, xp: viewModel.lastXP) { point in
+                    Task { await viewModel.overridePoint(point) }
+                }
+                if let error = viewModel.submitError { PrepSubmitError(message: error) }
+                if rep.item.lesson?.isReteach == true {
+                    PrepFlagCardButton(
+                        isFlagged: viewModel.isFlagged(rep.item.id),
+                        error: viewModel.flagError
+                    ) { Task { await viewModel.flagCurrent() } }
+                }
+            } bottom: {
+                PrepPrimaryButton(title: "Next") { Task { await viewModel.continue() } }
+            }
+            .id(rep.index)
+        case .result(let rep, let result, _) where rep.drill == .warmup:
+            scaffold(rep, hasAction: true) {
+                if let lesson = rep.item.lesson {
+                    PrepRunCard {
+                        Text(verbatim: "Warm-up · \(lesson.title)").font(BrainStyle.meta)
+                            .foregroundStyle(HermexPaper.knowledge.glow)
+                        PrepCheckResult(check: lesson.check, result: result,
+                                        chosenID: chosen?.rep == rep.index ? chosen?.id : nil,
+                                        typedAnswer: draft(for: rep).text, xp: viewModel.lastXP)
+                    }
+                }
+            } bottom: {
+                PrepPrimaryButton(title: "Next") { Task { await viewModel.continue() } }
+            }
+            .id(rep.index)
         case .result(let rep, let result, _) where rep.drill == .lesson:
             scaffold(rep, hasAction: true) {
                 if let lesson = rep.item.lesson {
@@ -207,7 +282,7 @@ struct PrepRunView: View {
             }
             .id(rep.index)
         case .finished(let summary) where summary.isCourse:
-            PrepDayCompleteView(summary: summary) { dismiss() }
+            PrepDayCompleteView(summary: summary, offersBonus: viewModel.runKind != .bonus) { dismiss() }
         case .finished(let summary):
             PrepRunCompleteView(streak: summary.streak, moved: summary.moved) { dismiss() }
         }
@@ -232,7 +307,7 @@ struct PrepRunView: View {
                 if let progress {
                     PrepSegmentBar(position: progress.position, count: progress.count)
                 }
-                if rep.drill != .lesson {  // a lesson's teaching is its own content
+                if ![.lesson, .recall, .warmup].contains(rep.drill) {  // course cards carry their own content
                     PrepProblemCard(rep: rep, maxHeight: availableHeight * 0.45)
                 }
             }
@@ -260,7 +335,8 @@ struct PrepRunView: View {
     private func hasAction(_ rep: PrepRep) -> Bool {
         switch rep.drill {
         case .primer, .approach, .spotBug, .unknown, .judgment, .boss: true
-        case .fact, .lesson: Self.isCloze(rep)
+        case .lesson where Self.usesRecall(rep), .recall where Self.usesRecall(rep): true
+        case .fact, .lesson, .warmup, .recall: Self.isCloze(rep)
         case .complexity, .trace: false
         }
     }
@@ -294,7 +370,20 @@ struct PrepRunView: View {
                 title: viewModel.isSubmitting ? "Grading…" : "Submit",
                 enabled: PrepCopy.canSubmitJudgment(text) && !viewModel.isSubmitting
             ) { Task { await viewModel.submitJudgment(text) } }
-        case .fact, .lesson:
+        case .lesson where Self.usesRecall(rep) && viewModel.lessonStage == .reading:
+            PrepPrimaryButton(title: "I'm ready") {
+                if voiceInput.isListening { voiceInput.stopKeepingTranscript() }
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { viewModel.beginRecall() }
+            }
+        case .lesson where Self.usesRecall(rep), .recall where Self.usesRecall(rep):
+            PrepPrimaryButton(
+                title: viewModel.isSubmitting ? "Grading…" : "Submit",
+                enabled: viewModel.canSubmitRecall
+            ) {
+                if voiceInput.isListening { voiceInput.stopKeepingTranscript() }
+                Task { await viewModel.submitRecall() }
+            }
+        case .fact, .lesson, .warmup, .recall:
             let text = draft(for: rep).text
             PrepPrimaryButton(
                 title: "Submit",
@@ -363,7 +452,51 @@ struct PrepRunView: View {
                     submitError: viewModel.submitError
                 ) { option in choose(option, in: rep) }
             }
-        case .lesson:
+        case .lesson where Self.usesRecall(rep), .recall where Self.usesRecall(rep):
+            if let lesson = rep.item.lesson, let recall = lesson.recall {
+                if viewModel.lessonStage == .reading {
+                    PrepRunCard { PrepLessonBody(lesson: lesson) }
+                        .transition(.opacity)
+                } else {
+                    PrepRecallCard(
+                        prompt: recall.prompt,
+                        label: rep.drill == .recall ? "Recall · \(lesson.title)" : "Recall",
+                        draft: Binding(get: { viewModel.recallDraft }, set: { viewModel.recallDraft = $0 }),
+                        confidence: Binding(get: { viewModel.confidence }, set: { viewModel.confidence = $0 }),
+                        isSubmitting: viewModel.isSubmitting,
+                        voiceInput: voiceInput,
+                        toggleVoice: toggleVoice,
+                        dontKnow: {
+                            if voiceInput.isListening { voiceInput.stopKeepingTranscript() }
+                            Task { await viewModel.dontKnow() }
+                        }
+                    )
+                    .transition(.opacity)
+                }
+            }
+        case .warmup:
+            if let lesson = rep.item.lesson {
+                PrepRunCard {
+                    Text(verbatim: "Warm-up · \(lesson.title)").font(BrainStyle.meta)
+                        .foregroundStyle(HermexPaper.knowledge.glow)
+                    PrepCheckPrompt(check: lesson.check)
+                    if Self.isCloze(rep) {
+                        PrepClozeView(
+                            text: Binding(get: { draft(for: rep).text }, set: { text in updateDraft(rep) { $0.text = text } }),
+                            isSubmitting: viewModel.isSubmitting
+                        ) { Task { await viewModel.submitCloze(draft(for: rep).text) } }
+                    } else {
+                        PrepChoiceView(
+                            title: "Your answer",
+                            options: lesson.check.options.map { PrepOption(id: $0, title: $0) },
+                            grading: nil,
+                            isSubmitting: viewModel.isSubmitting,
+                            submitError: viewModel.submitError
+                        ) { option in choose(option, in: rep) }
+                    }
+                }
+            }
+        case .lesson, .recall:
             if let lesson = rep.item.lesson {
                 let review = viewModel.isReview(rep)
                 if !review || viewModel.revealedLesson {

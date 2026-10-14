@@ -320,6 +320,7 @@ final class ContractReadinessTests: XCTestCase {
                 query: ["run": "mock"]
             ),
             .init(name: "tutor course", method: "GET", endpoint: .tutorCourse, path: "/api/tutor/course"),
+            .init(name: "tutor override", method: "POST", endpoint: .tutorOverride, path: "/api/tutor/override"),
             .init(
                 name: "tutor lesson",
                 method: "GET",

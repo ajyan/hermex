@@ -525,6 +525,8 @@ enum PrepRoute: Hashable, Sendable {
     case testout(String)
     /// The optional critique run over passed units.
     case mock
+    /// "One more round": up to five more recalls after the day's run.
+    case bonus
 }
 
 /// Opens a Brain page on the shell's stack from outside Brain (a `brain://` link in a
