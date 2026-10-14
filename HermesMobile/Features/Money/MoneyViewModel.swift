@@ -125,7 +125,8 @@ final class MoneyViewModel {
         } catch is CancellationError {
             // A newer load owns the state.
         } catch {
-            state = .failed(error.localizedDescription)
+            // A failed refresh keeps the chart; only a first load shows the error.
+            if snapshot == nil || state != .ready { state = .failed(error.localizedDescription) }
         }
     }
 
@@ -148,14 +149,14 @@ final class MoneyViewModel {
         return created
     }
 
-    /// A file's text, or nil when it doesn't exist.
-    private func read(_ path: String, sessionID: String) async throws -> String? {
+    /// A file's text, or nil when it doesn't exist. A lost session is replaced once, like the Brief's.
+    private func read(_ path: String, sessionID: String, retry: Bool = true) async throws -> String? {
         do {
             return try await client.fileContent(sessionID: sessionID, path: path)
         } catch let error as APIError where error.isVanishedSession {
-            guard let workspace = store.workspace(for: server) else { throw error }
+            guard retry, let workspace = store.workspace(for: server) else { throw error }
             let fresh = try await session(workspace: workspace, replacing: sessionID)
-            return try await read(path, sessionID: fresh)
+            return try await read(path, sessionID: fresh, retry: false)
         } catch let error as APIError where error.isNotFound {
             return nil
         }

@@ -19,15 +19,29 @@ struct MoneySnapshot: Decodable, Equatable {
         asOf = (try? c.decodeIfPresent(String.self, forKey: .asOf)).flatMap { $0 }.flatMap(MoneyDates.timestamp)
         slot = try? c.decodeIfPresent(String.self, forKey: .slot)
         netWorth = (try? c.decodeIfPresent(Double.self, forKey: .netWorth)) ?? 0
-        series = (try? c.decodeIfPresent([MoneyPoint].self, forKey: .series)) ?? []
-        accounts = (try? c.decodeIfPresent([MoneyAccount].self, forKey: .accounts)) ?? []
+        series = c.lossy(MoneyPoint.self, .series)
+        accounts = c.lossy(MoneyAccount.self, .accounts)
         week = try? c.decodeIfPresent(MoneyWeek.self, forKey: .week)
-        stale = (try? c.decodeIfPresent([MoneyStale].self, forKey: .stale)) ?? []
+        stale = c.lossy(MoneyStale.self, .stale)
         holdingsMissing = (try? c.decodeIfPresent(Bool.self, forKey: .holdingsMissing)) ?? false
     }
 
     static func decode(_ data: Data) throws -> MoneySnapshot {
         try MoneyDates.decoder.decode(MoneySnapshot.self, from: data)
+    }
+}
+
+/// Decodes an element or yields nil, so one bad element never fails its array.
+private struct MoneyLossy<Value: Decodable>: Decodable {
+    let value: Value?
+    init(from decoder: Decoder) throws {
+        value = try? Value(from: decoder)
+    }
+}
+
+private extension KeyedDecodingContainer {
+    func lossy<Value: Decodable>(_ type: Value.Type, _ key: Key) -> [Value] {
+        ((try? decodeIfPresent([MoneyLossy<Value>].self, forKey: key)) ?? []).compactMap(\.value)
     }
 }
 

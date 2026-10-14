@@ -42,6 +42,16 @@ final class MoneyModelsTests: XCTestCase {
         XCTAssertTrue(snapshot.stale.isEmpty)
     }
 
+    func testBadSeriesPointOrAccountDropsOnlyItself() throws {
+        let json = #"""
+        {"series": [{"d": "2026-10-10", "v": 1}, {"d": "2026-10-11", "v": null}, {"d": "2026-10-12", "v": 3}],
+         "accounts": [{"id": "a", "balance": 5}, {"name": "no id"}]}
+        """#
+        let snapshot = try MoneySnapshot.decode(Data(json.utf8))
+        XCTAssertEqual(snapshot.series.map(\.d), ["2026-10-10", "2026-10-12"])
+        XCTAssertEqual(snapshot.accounts.map(\.id), ["a"])
+    }
+
     func testRangeFiltersByDate() {
         let series = (0...400).map { i in
             MoneyPoint(d: MoneyPoint.dayFormatter.string(from: Self.day("2025-09-07").addingTimeInterval(Double(i) * 86_400)), v: Double(i))
