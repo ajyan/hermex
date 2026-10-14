@@ -44,6 +44,12 @@ struct DeckPalette: Equatable {
     static let advisor = DeckPalette(.advisor, symbol: "bubble.left", name: "Check-in", shortName: "Check-in")
     static let plain = DeckPalette(.plain, symbol: "tray", name: "From your library", shortName: "Library")
     static let followUps = DeckPalette(.plain, symbol: "checklist", name: "Follow-ups", shortName: "Follow-ups")
+    // A weekly review's Wrapped cards. Themes quote your own past words; mood reads like a
+    // check-in; lessons come from your notes; the goals card wears its goal's paper.
+    static let theme = DeckPalette(.past, symbol: "quote.bubble", name: "Theme", shortName: "Theme")
+    static let mood = DeckPalette(.advisor, symbol: "waveform.path", name: "Energy and mood", shortName: "Mood")
+    static let lessons = DeckPalette(.notes, symbol: "lightbulb", name: "Lessons", shortName: "Lessons")
+    static let recap = DeckPalette(.plain, symbol: "list.bullet", name: "Recap", shortName: "Recap")
 
     static func of(_ page: DeckPage) -> DeckPalette {
         switch page {
@@ -59,7 +65,17 @@ struct DeckPalette: Equatable {
         case .prompt: return .advisor
         case .sleep: return .sleep
         case .decision: return .followUps
-        case .item, .unknown: return .plain
+        case .item, .unknown:
+            switch card.itemKind {
+            case "theme": return .theme
+            case "mood": return .mood
+            case "lessons": return .lessons
+            case "recap": return .recap
+            case "goals":
+                let goal = GoalPaper.palette(named: card.color ?? "", slug: card.meters.first?.group ?? card.id)
+                return DeckPalette(goal.colors, symbol: "flag", name: "Goals", shortName: "Goals")
+            default: return .plain
+            }
         case .reflect:
             switch card.itemKind {
             case "quote": return .quote

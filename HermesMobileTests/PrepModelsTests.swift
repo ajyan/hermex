@@ -230,6 +230,23 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertEqual(j.strongAnswer, "Name who.")
         XCTAssertEqual(r.gapMatch, [PrepGapMatch(id: "gap.harm", label: "Who bears the harm", misses: 3)])
         XCTAssertFalse(r.logged)
+        XCTAssertNil(j.lessonMD, "no lesson_md means no lesson")
+    }
+
+    func testJudgmentGradeDecodesLessonTolerantly() throws {
+        func lesson(_ field: String) throws -> String? {
+            let json = """
+            {"verdict": "miss", "next_index": 1,
+             "grade": {"points_hit": [], "points_missed": [{"point_id": "p.harm", "why": "w"}]\(field)}}
+            """
+            return try XCTUnwrap(decode(PrepAttemptResult.self, json).judgment).lessonMD
+        }
+        XCTAssertEqual(try lesson(###", "lesson_md": "## The idea\n\n```python\nx = 1\n```\n""###),
+                       "## The idea\n\n```python\nx = 1\n```")
+        XCTAssertNil(try lesson(""))
+        XCTAssertNil(try lesson(#", "lesson_md": "  \n ""#))
+        XCTAssertNil(try lesson(#", "lesson_md": null"#))
+        XCTAssertNil(try lesson(#", "lesson_md": 3"#))
     }
 
     func testApproachResultStillDecodesOpenGrade() throws {

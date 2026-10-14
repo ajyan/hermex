@@ -333,7 +333,8 @@ struct PrepRunView: View {
                 isSubmitting: viewModel.isSubmitting,
                 showHint: {},
                 shownAt: viewModel.shownAt,
-                prompt: "Your answer"
+                prompt: "Your answer",
+                showsClock: false
             )
         case .unknown:
             PrepNoteCard {

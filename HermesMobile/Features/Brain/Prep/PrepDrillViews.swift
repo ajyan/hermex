@@ -211,8 +211,9 @@ struct PrepChoiceView: View {
 
 // MARK: - Approach
 
-/// An approach rep: the answer in a plain editor, a 90-second clock in the toolbar,
-/// and the hint ladder. Submit lives in the run view's pinned bar.
+/// An approach rep: the answer in a plain editor, a 90-second clock in the toolbar
+/// (approach reps only; judgment cards hide it), and the hint ladder. Submit lives in
+/// the run view's pinned bar.
 struct PrepApproachView: View {
     @Binding var text: String
     let hints: [String]
@@ -223,6 +224,8 @@ struct PrepApproachView: View {
     let shownAt: Date
     /// The section title: "Your approach" on DSA reps, "Your answer" on judgment cards.
     var prompt = "Your approach"
+    /// Shows the countdown in the toolbar. Judgment cards pass false: they are untimed.
+    var showsClock = true
     @ScaledMetric(relativeTo: .body) private var editorHeight: CGFloat = 180
 
     var body: some View {
@@ -257,17 +260,19 @@ struct PrepApproachView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                TimelineView(.periodic(from: shownAt, by: 1)) { context in
-                    let clock = PrepCopy.approachClock(elapsed: context.date.timeIntervalSince(shownAt))
-                    Text(verbatim: clock.text)
-                        .brainText(.meta)
-                        .foregroundStyle(clock.isOver ? Color.hxDanger.opacity(0.8) : Color.hxTextSecondary)
-                        .monospacedDigit()
-                        .accessibilityLabel(Text(verbatim: clock.isOver ? "Over time" : "Time left"))
-                        .accessibilityValue(Text(verbatim: clock.text))
+            if showsClock {
+                ToolbarItem(placement: .topBarTrailing) {
+                    TimelineView(.periodic(from: shownAt, by: 1)) { context in
+                        let clock = PrepCopy.approachClock(elapsed: context.date.timeIntervalSince(shownAt))
+                        Text(verbatim: clock.text)
+                            .brainText(.meta)
+                            .foregroundStyle(clock.isOver ? Color.hxDanger.opacity(0.8) : Color.hxTextSecondary)
+                            .monospacedDigit()
+                            .accessibilityLabel(Text(verbatim: clock.isOver ? "Over time" : "Time left"))
+                            .accessibilityValue(Text(verbatim: clock.text))
+                    }
+                    .transaction { $0.animation = nil }
                 }
-                .transaction { $0.animation = nil }
             }
         }
 
@@ -637,7 +642,8 @@ struct PrepApproachGradeView: View {
                         ForEach(Array(grade.skillsMissed.enumerated()), id: \.offset) { offset, miss in
                             if offset > 0 { PrepRowDivider() }
                             BrainRow(title: PrepCopy.rubricTitle(miss.skill),
-                                     subtitle: miss.why.isEmpty ? nil : miss.why, subtitleLineLimit: 8)
+                                     subtitle: miss.why.isEmpty ? nil : miss.why, subtitleLineLimit: 8,
+                                     titleLineLimit: nil)
                         }
                     }
                 }
@@ -700,7 +706,8 @@ struct PrepJudgmentGradeView: View {
                         ForEach(Array(grade.pointsMissed.enumerated()), id: \.offset) { offset, miss in
                             if offset > 0 { PrepRowDivider() }
                             BrainRow(title: point(miss.pointID),
-                                     subtitle: miss.why.isEmpty ? nil : miss.why, subtitleLineLimit: 8)
+                                     subtitle: miss.why.isEmpty ? nil : miss.why, subtitleLineLimit: 8,
+                                     titleLineLimit: nil)
                                 .accessibilityElement(children: .ignore)
                                 .accessibilityLabel(Text(verbatim: "Missed: \(point(miss.pointID)). \(miss.why)"))
                         }
@@ -714,6 +721,12 @@ struct PrepJudgmentGradeView: View {
                 Text(verbatim: grade.strongAnswer)
                     .brainText(.rowTitle)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        if let lesson = grade.lessonMD {
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                BrainSectionHeader(title: "Lesson")
+                MarkdownRenderer(content: lesson)
             }
         }
     }

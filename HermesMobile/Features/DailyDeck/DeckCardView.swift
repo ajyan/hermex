@@ -1,3 +1,4 @@
+import Charts
 import SwiftUI
 
 /// One card of the Daily Deck stack, a glow card in its kind's paper (`DeckPalette`). A card
@@ -111,9 +112,6 @@ private struct DeckCardView: View {
                 .foregroundStyle(palette.ink)
                 .padding(.top, 12)
         }
-        if !card.entries.isEmpty {
-            RecapList(entries: card.entries, palette: palette).padding(.top, 22)
-        }
         if let detail = text.detail {
             Text(inlineMarkdown(detail))
                 .font(AppFont.body())
@@ -122,6 +120,15 @@ private struct DeckCardView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 22)
                 .textSelection(.enabled)
+        }
+        if !card.points.isEmpty {
+            MoodChart(points: card.points, palette: palette).padding(.top, 22)
+        }
+        if !card.meters.isEmpty {
+            GoalMeters(meters: card.meters, palette: palette).padding(.top, 22)
+        }
+        if !card.entries.isEmpty {
+            RecapList(entries: card.entries, palette: palette).padding(.top, 22)
         }
         if !text.leadIsQuestion, let question = viewModel.question(for: card) {
             Text(verbatim: question)
@@ -243,8 +250,8 @@ private struct DeckCardView: View {
 
     // MARK: Opener and close
 
-    /// The day's title, a line about yesterday, and the cards ahead, so you know what you're
-    /// about to get.
+    /// The day's title, a line about yesterday (on a weekly review, the week and its highlights),
+    /// and the cards ahead, so you know what you're about to get.
     @ViewBuilder
     private var opener: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -259,10 +266,10 @@ private struct DeckCardView: View {
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, 10)
         if let recap = card.recap {
-            (Text("Yesterday").font(AppFont.display(style: .subheadline, weight: .semibold))
-                + Text(verbatim: " · \(recap)").font(AppFont.subheadline()).foregroundStyle(Color.hxTextPrimary.opacity(0.85)))
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 14)
+            recapLine(viewModel.kind == "weekly" ? "This week" : "Yesterday", recap).padding(.top, 14)
+        }
+        ForEach(Array(card.entries.enumerated()), id: \.offset) { _, entry in
+            recapLine(entry.label, entry.text).padding(.top, 10)
         }
         let ahead = viewModel.visiblePages.dropFirst().filter {
             if case .card(let c) = $0, c.type == .close { return false }
@@ -281,6 +288,13 @@ private struct DeckCardView: View {
             .font(AppFont.footnote())
             .foregroundStyle(palette.ink)
             .padding(.top, 16)
+    }
+
+    /// "Yesterday · …" on the opener: the label bold in the ink, the line in body text.
+    private func recapLine(_ label: String?, _ text: String) -> some View {
+        (Text(verbatim: label.map { "\($0) · " } ?? "").font(AppFont.display(style: .subheadline, weight: .semibold))
+            + Text(verbatim: text).font(AppFont.subheadline()).foregroundStyle(Color.hxTextPrimary.opacity(0.85)))
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     @ViewBuilder
@@ -440,6 +454,145 @@ private struct RecapList: View {
         else { return out }
         out[range].inlinePresentationIntent = .stronglyEmphasized
         return out
+    }
+}
+
+/// The week on one 0–10 scale: sleep hours as bars, energy (Garmin Body Battery) as a solid line,
+/// mood (read from your writing) dashed. A missing reading leaves a gap. Under the chart, each
+/// day's mood with the words it was read from.
+private struct MoodChart: View {
+    let points: [DeckPoint]
+    let palette: DeckPalette
+
+    private var hasSleep: Bool { points.contains { $0.sleep != nil } }
+    private var hasEnergy: Bool { points.contains { $0.energy != nil } }
+    private var hasMood: Bool { points.contains { $0.mood != nil } }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Chart {
+                ForEach(points, id: \.label) { point in
+                    if let hours = point.sleep {
+                        BarMark(x: .value("Day", point.label), y: .value("Value", min(hours, 10)), width: .ratio(0.5))
+                            .foregroundStyle(palette.ink.opacity(0.13))
+                            .cornerRadius(4)
+                            .accessibilityLabel(Text(verbatim: "\(point.label), sleep"))
+                            .accessibilityValue(Text(verbatim: "\(hours.formatted(.number.precision(.fractionLength(0...1)))) hours"))
+                    }
+                }
+                ForEach(points.filter { $0.energy != nil }, id: \.label) { point in
+                    LineMark(x: .value("Day", point.label), y: .value("Value", point.energy ?? 0), series: .value("Kind", "Energy"))
+                        .foregroundStyle(palette.ink)
+                        .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    PointMark(x: .value("Day", point.label), y: .value("Value", point.energy ?? 0))
+                        .foregroundStyle(palette.ink)
+                        .accessibilityLabel(Text(verbatim: "\(point.label), energy"))
+                        .accessibilityValue(Text(verbatim: "\(point.energy ?? 0) of 10"))
+                }
+                ForEach(points.filter { $0.mood != nil }, id: \.label) { point in
+                    LineMark(x: .value("Day", point.label), y: .value("Value", point.mood ?? 0), series: .value("Kind", "Mood"))
+                        .foregroundStyle(palette.ink.opacity(0.55))
+                        .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, dash: [4, 4]))
+                    PointMark(x: .value("Day", point.label), y: .value("Value", point.mood ?? 0))
+                        .foregroundStyle(palette.ink.opacity(0.55))
+                        .symbolSize(30)
+                        .accessibilityLabel(Text(verbatim: "\(point.label), mood"))
+                        .accessibilityValue(Text(verbatim: "\(point.mood ?? 0) of 10"))
+                }
+            }
+            .chartXScale(domain: points.map(\.label))
+            .chartYScale(domain: 0...10)
+            .chartYAxis {
+                AxisMarks(values: [0, 5, 10]) { _ in
+                    AxisGridLine().foregroundStyle(palette.ink.opacity(0.12))
+                    AxisValueLabel().foregroundStyle(palette.ink.opacity(0.6))
+                }
+            }
+            .chartXAxis {
+                AxisMarks { _ in AxisValueLabel().foregroundStyle(palette.ink.opacity(0.7)) }
+            }
+            .frame(height: 180)
+            HStack(spacing: 14) {
+                if hasEnergy { legend("Energy", line: []) }
+                if hasMood { legend("Mood", line: [4, 4]) }
+                if hasSleep {
+                    HStack(spacing: 6) {
+                        RoundedRectangle(cornerRadius: 2).fill(palette.ink.opacity(0.13)).frame(width: 10, height: 12)
+                        Text(verbatim: "Sleep (h)")
+                    }
+                }
+            }
+            .font(AppFont.footnote(weight: .medium))
+            .foregroundStyle(palette.ink.opacity(0.7))
+            .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(points.filter { $0.mood != nil && !($0.quote ?? "").isEmpty }, id: \.label) { point in
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text(verbatim: point.label)
+                            .font(AppFont.footnote(weight: .semibold))
+                            .foregroundStyle(palette.ink.opacity(0.7))
+                            .frame(width: 34, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(verbatim: [point.mood.map { "Mood \($0)" }, point.note].compactMap { $0 }
+                                .filter { !$0.isEmpty }.joined(separator: " · "))
+                                .font(AppFont.subheadline(weight: .medium))
+                            Text(verbatim: "“\(point.quote ?? "")”")
+                                .font(AppFont.serif(style: .subheadline))
+                                .foregroundStyle(palette.ink.opacity(0.75))
+                        }
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
+    }
+
+    private func legend(_ name: String, line dash: [CGFloat]) -> some View {
+        HStack(spacing: 6) {
+            Path { $0.move(to: CGPoint(x: 0, y: 4)); $0.addLine(to: CGPoint(x: 18, y: 4)) }
+                .stroke(palette.ink.opacity(dash.isEmpty ? 1 : 0.55), style: StrokeStyle(lineWidth: 2, dash: dash))
+                .frame(width: 18, height: 8)
+            Text(verbatim: name)
+        }
+    }
+}
+
+/// A goals card's week: each commitment under its goal, with how many of its target you hit.
+private struct GoalMeters: View {
+    let meters: [DeckMeter]
+    let palette: DeckPalette
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(Array(meters.enumerated()), id: \.offset) { index, meter in
+                if let group = meter.group, index == 0 || meters[index - 1].group != group {
+                    Text(verbatim: group)
+                        .font(AppFont.subheadline(weight: .semibold))
+                        .foregroundStyle(palette.ink.opacity(0.7))
+                        .padding(.top, index == 0 ? 0 : 6)
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(verbatim: meter.label).font(AppFont.body())
+                        Spacer(minLength: 8)
+                        Text(verbatim: "\(meter.done) of \(meter.target)")
+                            .font(AppFont.subheadline(weight: .semibold))
+                            .monospacedDigit()
+                    }
+                    Capsule()
+                        .fill(palette.ink.opacity(0.12))
+                        .frame(height: 8)
+                        .overlay(alignment: .leading) {
+                            GeometryReader { proxy in
+                                Capsule().fill(palette.ink).frame(width: proxy.size.width * meter.fraction)
+                            }
+                        }
+                        .accessibilityHidden(true)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
     }
 }
 
