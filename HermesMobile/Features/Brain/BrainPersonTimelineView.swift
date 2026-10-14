@@ -91,7 +91,7 @@ struct BrainProfileChips: View {
     }
 }
 
-/// The rest of the profile on one neutral card titled "About": each section a sentence-case
+/// The rest of the profile under "About", on one neutral card: each section a sentence-case
 /// header and its items as compact rows whose links open, sections split by hairlines. A section
 /// shows three items and "+ N more" for the rest. Family items like "Father: Bo Test" show the
 /// role in secondary.
@@ -121,19 +121,22 @@ struct BrainPersonAbout: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: BrainStyle.m) {
-            BrainSectionHeader(title: "About")
-            ForEach(Array(sections.enumerated()), id: \.element.id) { index, section in
-                if index > 0 {
-                    Rectangle().fill(Color.hxSeparator).frame(height: 0.5).accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: BrainStyle.xs) {
+            HXSectionHeader(title: "About")
+                .padding(.horizontal, 4)
+            VStack(alignment: .leading, spacing: BrainStyle.m) {
+                ForEach(Array(sections.enumerated()), id: \.element.id) { index, section in
+                    if index > 0 {
+                        Rectangle().fill(Color.hxSeparator).frame(height: 0.5).accessibilityHidden(true)
+                    }
+                    BrainAboutSection(section: section)
                 }
-                BrainAboutSection(section: section)
             }
+            .padding(.horizontal, BrainStyle.cardHorizontalPadding)
+            .padding(.vertical, BrainStyle.cardVerticalPadding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .brainCardSurface()
         }
-        .padding(.horizontal, BrainStyle.cardHorizontalPadding)
-        .padding(.vertical, BrainStyle.cardVerticalPadding)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .brainCardSurface()
     }
 }
 
@@ -155,10 +158,10 @@ private struct BrainAboutSection: View {
             }
             if hidden > 0 {
                 Button(action: toggle) {
-                    // The review summary's "+ N more" row.
+                    // The review summary's "+ N more" row, in Nous blue since it is a control.
                     Text(verbatim: expanded ? "Show less" : "+ \(hidden) more")
                         .font(AppFont.subheadline())
-                        .foregroundStyle(Color.hxTextSecondary)
+                        .foregroundStyle(Color.accentColor)
                         .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
                         .contentShape(Rectangle())
                 }
@@ -197,25 +200,36 @@ private struct BrainAboutSection: View {
 struct BrainPersonTimeline: View {
     let entries: [BrainPersonLayout.Entry]
     let open: (BrainRoute) -> Void
+    /// Each card's words, parsed once here: `CardStack` rebuilds its top cards on every drag frame.
+    private let texts: [BrainPersonLayout.Entry.ID: BrainTimelineCardText]
     @State private var index = 0
-    @ScaledMetric(relativeTo: .body) private var deckHeight: CGFloat = BrainStyle.deckHeight
+    @ScaledMetric(relativeTo: .body) private var deckHeight: CGFloat = BrainStyle.timelineDeckHeight
+
+    init(entries: [BrainPersonLayout.Entry], open: @escaping (BrainRoute) -> Void) {
+        self.entries = entries
+        self.open = open
+        self.texts = Dictionary(entries.map { ($0.id, BrainTimelineCardText(entry: $0)) },
+                                uniquingKeysWith: { first, _ in first })
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: BrainStyle.xs) {
             HXSectionHeader(title: "Timeline", trailing: BrainPersonLayout.position(index: index, count: entries.count))
                 .padding(.horizontal, 4)
             CardStack(pages: entries, index: $index, tilt: { DeckStackView.tilt(ofID: $0.id) }) { entry, contentOpacity in
-                BrainTimelineCard(entry: entry, open: open, contentOpacity: contentOpacity)
+                if let text = texts[entry.id] {
+                    BrainTimelineCard(entry: entry, text: text, open: open, contentOpacity: contentOpacity)
+                }
             } edge: { entry in
                 // Far down the stack only the card's paper shows, peeking out askew.
-                BrainBiteCard.shape
+                BrainDeckCard.shape
                     .fill(BrainTimelineCard.paper(entry).card)
                     .hxShadow(.stacked)
                     .padding(.vertical, 12)
             }
-            // The review deck's height, cut to what fits in the reader's visible height.
+            // A fixed height, cut to what fits in the reader's visible height.
             .containerRelativeFrame(.vertical) { length, _ in
-                max(min(deckHeight, length - BrainStyle.xl * 2), BrainStyle.minimumDeckHeight)
+                max(min(deckHeight, length - BrainStyle.deckViewportMargin), BrainStyle.minimumDeckHeight)
             }
         }
         .onChange(of: entries.count) { _, count in
@@ -224,37 +238,70 @@ struct BrainPersonTimeline: View {
     }
 }
 
+/// One timeline card's words, built once per timeline rather than per drag frame.
+private struct BrainTimelineCardText {
+    struct Line {
+        let text: AttributedString
+        /// A `####` subhead, its marks dropped.
+        let isHeading: Bool
+    }
+
+    let lead: AttributedString
+    let bullets: [AttributedString]
+    /// `extra`, line by line.
+    let prose: [Line]
+    /// "Journal: <the day's words>" for a journal day folded into an encounter; nil otherwise.
+    let footnote: AttributedString?
+    /// "Encounter · Oct 8 · 6 days ago. Gallery crawl"
+    let accessibilityLabel: String
+    /// The notes under the lead, read after the label.
+    let accessibilityValue: String
+
+    init(entry: BrainPersonLayout.Entry) {
+        let person = BrainModuleID.people.paper
+        switch entry.kind {
+        case .encounter:
+            lead = BrainArticleDigestView.inlineMarkdown(entry.headline)
+        case .journal(let mention):
+            lead = BrainConnectionsLayout.highlighted(entry.headline, mention: mention.mention, paper: person)
+        }
+        bullets = entry.bullets.map(BrainArticleDigestView.inlineMarkdown)
+        prose = entry.extra.split(whereSeparator: \.isNewline).compactMap { raw in
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            let isHeading = line.hasPrefix("#")
+            let text = isHeading ? line.drop { $0 == "#" }.trimmingCharacters(in: .whitespaces) : line
+            return text.isEmpty ? nil : Line(text: BrainArticleDigestView.inlineMarkdown(text), isHeading: isHeading)
+        }
+        footnote = entry.journal.map { journal in
+            // The label keeps the card's glow; the day's words read in the body color.
+            var words = BrainConnectionsLayout.highlighted(journal.snippet, mention: journal.mention, paper: person)
+            for run in words.runs where run.foregroundColor == nil {
+                words[run.range].foregroundColor = Color.hxTextPrimary
+            }
+            return AttributedString("Journal: ") + words
+        }
+        accessibilityLabel = [entry.kicker, String(lead.characters)].filter { !$0.isEmpty }.joined(separator: ". ")
+        let notes = bullets.map { String($0.characters) } + prose.map { String($0.text.characters) }
+            + (footnote.map { [String($0.characters)] } ?? [])
+        accessibilityValue = notes.filter { !$0.isEmpty }.joined(separator: ". ")
+    }
+}
+
 /// One timeline card, drawn like a review bite. An encounter wears the person paper: its
 /// kicker, the headline as the lead, then its bullets and any prose; a same-day journal entry
-/// adds "Open the journal day". A journal day on its own wears the journal paper, its words in
-/// serif with the name marked, and opens the day.
+/// adds one line of its words and "Open the journal day". A journal day on its own wears the
+/// journal paper, its words in serif with the name marked, and opens the day.
 private struct BrainTimelineCard: View {
     let entry: BrainPersonLayout.Entry
+    let text: BrainTimelineCardText
     let open: (BrainRoute) -> Void
     var contentOpacity: Double = 1
-    /// Built once per card, never in `body`.
-    private let lead: AttributedString
-    private let bullets: [AttributedString]
 
     static func paper(_ entry: BrainPersonLayout.Entry) -> HermexPaper {
         switch entry.kind {
         case .encounter: BrainModuleID.people.paper
         case .journal: BrainModuleID.journal.paper
         }
-    }
-
-    init(entry: BrainPersonLayout.Entry, open: @escaping (BrainRoute) -> Void, contentOpacity: Double) {
-        self.entry = entry
-        self.open = open
-        self.contentOpacity = contentOpacity
-        switch entry.kind {
-        case .encounter:
-            self.lead = BrainArticleDigestView.inlineMarkdown(entry.headline)
-        case .journal(let mention):
-            self.lead = BrainConnectionsLayout.highlighted(entry.headline, mention: mention.mention,
-                                                           paper: BrainModuleID.people.paper)
-        }
-        self.bullets = (entry.preview + entry.rest).map(BrainArticleDigestView.inlineMarkdown)
     }
 
     /// The journal day the footer opens: the folded one, or the card's own.
@@ -269,26 +316,34 @@ private struct BrainTimelineCard: View {
         let paper = Self.paper(entry)
         BrainDeckCard(paper: paper, footer: "Open the journal day",
                       open: journalID.map { id in { open(.page(.journal, id)) } },
-                      accessibilityLabel: accessibilityLabel, accessibilityValue: accessibilityValue,
-                      contentOpacity: contentOpacity) {
+                      accessibilityLabel: text.accessibilityLabel, accessibilityValue: text.accessibilityValue,
+                      footnote: text.footnote, contentOpacity: contentOpacity) {
             Text(verbatim: entry.kicker)
                 .font(AppFont.footnote(weight: .semibold))
             if !entry.headline.isEmpty {
-                Text(lead)
+                Text(text.lead)
                     .font(leadFont)
                     .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 14)
             }
-            if !bullets.isEmpty {
-                BrainBulletList(lines: bullets, marker: "•", markerColor: paper.glow, textColor: Color.hxTextPrimary,
-                                font: AppFont.body())
+            if !text.bullets.isEmpty {
+                BrainBulletList(lines: text.bullets, marker: "•", markerColor: paper.glow,
+                                textColor: Color.hxTextPrimary, font: AppFont.body())
                     .padding(.top, 22)
             }
-            if !entry.extra.isEmpty {
-                MarkdownRenderer(content: entry.extra)
-                    .foregroundStyle(Color.hxTextPrimary)
-                    .padding(.top, bullets.isEmpty ? 22 : BrainStyle.m)
+            if !text.prose.isEmpty {
+                VStack(alignment: .leading, spacing: BrainStyle.s) {
+                    // A fixed list from one page load, so position is a stable id.
+                    ForEach(Array(text.prose.enumerated()), id: \.offset) { _, line in
+                        Text(line.text)
+                            .font(AppFont.body(weight: line.isHeading ? .semibold : nil))
+                            .foregroundStyle(Color.hxTextPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(.top, text.bullets.isEmpty ? 22 : BrainStyle.m)
             }
         }
     }
@@ -300,19 +355,6 @@ private struct BrainTimelineCard: View {
         case .encounter: return AppFont.display(style: style, weight: .semibold)
         case .journal: return AppFont.serif(style: style)
         }
-    }
-
-    /// "Encounter · Oct 8 · 6 days ago. Gallery crawl"
-    private var accessibilityLabel: String {
-        [entry.kicker, String(lead.characters)].filter { !$0.isEmpty }.joined(separator: ". ")
-    }
-
-    /// The notes under the lead, read after the label.
-    private var accessibilityValue: String {
-        let prose = entry.extra.split(whereSeparator: \.isNewline).map {
-            $0.trimmingCharacters(in: CharacterSet(charactersIn: "# ").union(.whitespaces))
-        }
-        return (bullets.map { String($0.characters) } + prose).filter { !$0.isEmpty }.joined(separator: ". ")
     }
 }
 

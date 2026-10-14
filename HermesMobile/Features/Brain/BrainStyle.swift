@@ -75,6 +75,12 @@ enum BrainStyle {
     static let deckHeight: CGFloat = 480
     /// The smallest a deck gets on a short screen (landscape, the largest text).
     static let minimumDeckHeight: CGFloat = 240
+    /// A person's timeline deck: shorter than the review, since most encounters are a few lines;
+    /// longer ones scroll inside the card. Scale it with `@ScaledMetric`.
+    static let timelineDeckHeight: CGFloat = 300
+    /// Height kept free when a deck is cut to the reader's visible height, so its section header
+    /// and the top of the next section still show around it.
+    static let deckViewportMargin: CGFloat = 48
 
     static func cardShape() -> RoundedRectangle {
         RoundedRectangle(cornerRadius: cardCorner, style: .continuous)

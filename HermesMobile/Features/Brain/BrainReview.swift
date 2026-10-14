@@ -161,6 +161,8 @@ struct BrainDeckCard<Content: View>: View {
     let open: (() -> Void)?
     let accessibilityLabel: String
     var accessibilityValue: String = ""
+    /// One line pinned above the footer, outside the scrolling words (a same-day journal entry).
+    var footnote: AttributedString?
     /// Cards under the top one show only their paper; their words fade in as they rise.
     var contentOpacity: Double = 1
     @ViewBuilder let content: () -> Content
@@ -178,13 +180,21 @@ struct BrainDeckCard<Content: View>: View {
             // Short cards leave the drag to the screen's own scroll view.
             .scrollBounceBehavior(.basedOnSize)
             .moreBelowHint(fill: paper.card, mark: paper.glow)
+            if let footnote {
+                Text(footnote)
+                    .font(AppFont.serif(style: .caption))
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, open == nil ? 22 : 12)
+            }
             if open != nil { footerRow }
         }
         .foregroundStyle(paper.glow)
         .opacity(contentOpacity)
-        .background(paper.card, in: BrainBiteCard.shape)
-        .overlay(BrainBiteCard.shape.strokeBorder(paper.edge, lineWidth: 0.5))
-        .clipShape(BrainBiteCard.shape)
+        .background(paper.card, in: shape)
+        .overlay(shape.strokeBorder(paper.edge, lineWidth: 0.5))
+        .clipShape(shape)
         .hxShadow(.paper)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: accessibilityLabel))
@@ -196,7 +206,7 @@ struct BrainDeckCard<Content: View>: View {
                     // A tap, not a Button: a Button fires on release even after the finger has
                     // dragged the card across, so a swipe would open the page. A tap gesture
                     // fails once the touch moves.
-                    .contentShape(BrainBiteCard.shape)
+                    .contentShape(shape)
                     .onTapGesture(perform: open)
                     .accessibilityHint(Text(verbatim: footer))
                     .accessibilityAddTraits(.isButton)
@@ -207,6 +217,8 @@ struct BrainDeckCard<Content: View>: View {
         }
         .padding(.vertical, 12)
     }
+
+    private var shape: RoundedRectangle { BrainDeckCard<EmptyView>.shape }
 
     /// The footer and a chevron over a hairline in the paper's edge.
     private var footerRow: some View {
@@ -223,6 +235,11 @@ struct BrainDeckCard<Content: View>: View {
     }
 }
 
+extension BrainDeckCard where Content == EmptyView {
+    /// A deck card's shape (`xl` corners), for the bare papers far down a stack and the review summary.
+    static var shape: RoundedRectangle { RoundedRectangle(cornerRadius: HXRadius.xl, style: .continuous) }
+}
+
 // MARK: - Bite card
 
 /// One bite of the review deck, drawn like a Daily Deck reading card (`DeckCardView.reading`):
@@ -234,8 +251,6 @@ struct BrainBiteCard: View {
     let open: () -> Void
     /// Cards under the top one show only their paper; their words fade in as they rise.
     var contentOpacity: Double = 1
-
-    static let shape = RoundedRectangle(cornerRadius: HXRadius.xl, style: .continuous)
 
     var body: some View {
         BrainDeckCard(paper: bite.paper, footer: BrainBiteCopy.open(bite), open: open,
@@ -369,7 +384,7 @@ struct BrainReviewSummaryCard: View {
             }
         }
         .opacity(contentOpacity)
-        .clipShape(BrainBiteCard.shape)
+        .clipShape(BrainDeckCard.shape)
         .hxCard(cornerRadius: HXRadius.xl)
         .hxShadow(.paper)
         .padding(.vertical, 12)

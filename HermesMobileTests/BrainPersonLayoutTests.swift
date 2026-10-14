@@ -108,7 +108,7 @@ final class BrainPersonLayoutTests: XCTestCase {
         XCTAssertEqual(layout.remainingMentions([refs[1]], total: 1).refs.map(\.id), ["wiki/orbit.md"])
     }
 
-    func testHeadlineAndFold() {
+    func testHeadlineAndBullets() {
         let titled = BrainEncounter(id: "t", date: "2026-10-08", title: "Coffee",
                                     bullets: ["- one", "* two", "three", "four"])
         let untitled = BrainEncounter(id: "u", date: "2026-10-07",
@@ -116,22 +116,19 @@ final class BrainPersonLayoutTests: XCTestCase {
         let layout = layout(BrainPerson(encounters: [titled, untitled]))
         let first = layout.timeline[0], second = layout.timeline[1]
         XCTAssertEqual(first.headline, "Coffee")
-        XCTAssertEqual(first.preview, ["one", "two"])
-        XCTAssertEqual(first.rest, ["three", "four"])
+        XCTAssertEqual(first.bullets, ["one", "two", "three", "four"])
         XCTAssertEqual(second.headline, "a")
-        XCTAssertEqual(second.preview, ["b", "c"])
-        XCTAssertEqual(second.rest, ["d", "e"])
+        XCTAssertEqual(second.bullets, ["b", "c", "d", "e"])
     }
 
-    func testExpandedSplitsRestBulletsFromExtraLines() {
+    func testBulletsSplitFromExtraLines() {
         let encounter = BrainEncounter(
             id: "w", date: "2026-10-08", title: "Walk",
             bullets: ["a", "b", "c\n  continued", "d"],
             body: "- a\n- b\n- c\n  continued\n\n- d\n\n#### Later\nprose line\n_Source: invented note_")
         let entry = layout(BrainPerson(encounters: [encounter])).timeline[0]
         XCTAssertEqual(entry.headline, "Walk")
-        XCTAssertEqual(entry.preview, ["a", "b"])
-        XCTAssertEqual(entry.rest, ["c\n  continued", "d"])
+        XCTAssertEqual(entry.bullets, ["a", "b", "c\n  continued", "d"])
         XCTAssertEqual(entry.extra, "#### Later\nprose line\n_Source: invented note_")
     }
 
@@ -145,13 +142,12 @@ final class BrainPersonLayoutTests: XCTestCase {
                                       body: "- a\n- b\n_Source: x_")
         let timeline = layout(BrainPerson(encounters: [prose, titled, untitled])).timeline
         XCTAssertEqual(timeline[0].headline, "First line")
-        XCTAssertEqual(timeline[0].rest, ["Fourth"])
+        XCTAssertEqual(timeline[0].bullets, ["Second", "Third", "Fourth"])
         XCTAssertEqual(timeline[0].extra, "")
         XCTAssertEqual(timeline[1].headline, "Tea")
         XCTAssertEqual(timeline[1].extra, "Afterthought")
         XCTAssertEqual(timeline[2].headline, "a")
-        XCTAssertEqual(timeline[2].preview, ["b"])
-        XCTAssertEqual(timeline[2].rest, [])
+        XCTAssertEqual(timeline[2].bullets, ["b"])
         XCTAssertEqual(timeline[2].extra, "_Source: x_")
     }
 
@@ -160,8 +156,7 @@ final class BrainPersonLayoutTests: XCTestCase {
                                        bullets: ["one", "two\n  - nested", "three", "four\n  deeper"],
                                        body: "- one\n- two\n  - nested\n- three\n- four\n\n  deeper")
         let entry = layout(BrainPerson(encounters: [encounter])).timeline[0]
-        XCTAssertEqual(entry.preview, ["one", "two\n  - nested"])
-        XCTAssertEqual(entry.rest, ["three", "four\n  deeper"])
+        XCTAssertEqual(entry.bullets, ["one", "two\n  - nested", "three", "four\n  deeper"])
         XCTAssertEqual(entry.extra, "")
     }
 
@@ -180,7 +175,7 @@ final class BrainPersonLayoutTests: XCTestCase {
 
     func testNestedBulletKeepsNewlines() {
         let encounter = BrainEncounter(id: "n", date: "2026-10-01", title: "T", bullets: ["- parent\n  - child"])
-        XCTAssertEqual(layout(BrainPerson(encounters: [encounter])).timeline[0].preview, ["parent\n  - child"])
+        XCTAssertEqual(layout(BrainPerson(encounters: [encounter])).timeline[0].bullets, ["parent\n  - child"])
     }
 
     func testChipsAreCappedAtThreeInOrder() {
@@ -253,6 +248,12 @@ final class BrainPersonLayoutTests: XCTestCase {
             ["a cat", "a dog"],
             ["How is the move?"],
         ])
+    }
+
+    func testUnmappedSectionLabelsReadInSentenceCase() {
+        let person = BrainPerson(profile: [BrainProfileSection(label: "favorite foods", items: ["dumplings"]),
+                                           BrainProfileSection(label: "Pets", items: ["a cat"])])
+        XCTAssertEqual(layout(person).aboutSections.map(\.title), ["Favorite foods", "Pets"])
     }
 
     func testQuestionsAloneMakeTheirOwnSection() {

@@ -177,7 +177,7 @@ struct BrainHomeView: View {
                 }
             } edge: { page in
                 // Far down the stack only the card's paper shows, peeking out askew.
-                BrainBiteCard.shape
+                BrainDeckCard.shape
                     .fill(Self.edgeFill(page))
                     .hxShadow(.stacked)
                     .padding(.vertical, 12)

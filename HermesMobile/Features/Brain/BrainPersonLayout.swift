@@ -13,10 +13,8 @@ struct BrainPersonLayout: Equatable {
         let kicker: String
         /// An encounter's title (else its first bullet); a journal day's snippet.
         let headline: String
-        /// Up to two bullets after the headline (encounters only).
-        let preview: [String]
-        /// The bullets after the preview.
-        let rest: [String]
+        /// The bullets after the headline (encounters only).
+        let bullets: [String]
         /// The body's other lines (prose, `_Source:` lines, `####` subheads), joined by newlines;
         /// shown as Markdown under the bullets. Empty when there are none.
         let extra: String
@@ -56,7 +54,8 @@ struct BrainPersonLayout: Equatable {
     /// out (it stays in About).
     let chips: [String]
     /// The profile less the chips: Family, Work, School, Likes, every other section under its own
-    /// label in server order, then the open questions. Same-title sections merge; empty ones drop.
+    /// label (first letter capitalized) in server order, then the open questions. Same-title
+    /// sections merge; empty ones drop.
     let aboutSections: [AboutSection]
     /// The recap and its lines (a birthday within 30 days, then the threads); nil when both are empty.
     let catchUp: CatchUp?
@@ -228,7 +227,7 @@ struct BrainPersonLayout: Equatable {
         }
         for (section, items) in profile.enumerated() {
             let label = person.profile[section].label.trimmingCharacters(in: .whitespaces)
-            append(sectionTitles[key(label)] ?? label,
+            append(sectionTitles[key(label)] ?? sentenceCase(label),
                    items.filter { !usedItems.contains("\(section):\($0.index)") }.map(\.text))
         }
         append("Questions", person.questions.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
@@ -242,6 +241,12 @@ struct BrainPersonLayout: Equatable {
             return l == r ? lhs.offset < rhs.offset : l < r
         }
         return (chips, ordered.map(\.element).filter { !$0.items.isEmpty })
+    }
+
+    /// "favorite foods" as "Favorite foods": the first letter capitalized, the rest kept.
+    private static func sentenceCase(_ label: String) -> String {
+        guard let first = label.first else { return label }
+        return first.uppercased() + label.dropFirst()
     }
 
     private static func key(_ label: String) -> String {
@@ -311,7 +316,7 @@ struct BrainPersonLayout: Equatable {
         }
         return Entry(id: encounter.id, kind: .encounter(encounter),
                      kicker: kicker("Encounter", date: encounter.date, days: days), headline: headline,
-                     preview: Array(items.prefix(2)), rest: Array(items.dropFirst(2)),
+                     bullets: items,
                      extra: extraLines(encounter.body, shown: Set(bullets + [headline])), journal: journal)
     }
 
@@ -342,7 +347,7 @@ struct BrainPersonLayout: Equatable {
     private static func journalEntry(_ mention: BrainJournalMention, days: DayMath) -> Entry {
         Entry(id: "journal:" + mention.id, kind: .journal(mention),
               kicker: kicker("Journal", date: mention.date, days: days),
-              headline: stripMarker(mention.snippet), preview: [], rest: [], extra: "", journal: nil)
+              headline: stripMarker(mention.snippet), bullets: [], extra: "", journal: nil)
     }
 
     /// "Encounter · Oct 8 · 6 days ago"; a date that is not an ISO day shows as sent, without
