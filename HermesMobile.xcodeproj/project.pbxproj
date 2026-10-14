@@ -30,10 +30,13 @@
 		B1A1C0DE00000000000F0003 /* GoalsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0002 /* GoalsModels.swift */; };
 		B1A1C0DE0000000000000E17 /* PrepViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E18 /* PrepViewModels.swift */; };
 		B1A1C0DE0000000000000E21 /* PrepHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E22 /* PrepHomeView.swift */; };
+		C0F5E9630000000000000000 /* PrepCourseViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F5E9620000000000000000 /* PrepCourseViews.swift */; };
 		B1A1C0DE0000000000000E23 /* PrepTrackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E24 /* PrepTrackView.swift */; };
 		B1A1C0DE0000000000000E25 /* PrepRunView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E26 /* PrepRunView.swift */; };
+		C0F5EE310000000000000000 /* PrepLessonViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F5EE300000000000000000 /* PrepLessonViews.swift */; };
 		B1A1C0DE0000000000000E27 /* PrepDrillViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E28 /* PrepDrillViews.swift */; };
 		B1A1C0DE0000000000000E01 /* PrepModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E02 /* PrepModels.swift */; };
+		C0F5E5470000000000000000 /* PrepCourseModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F5E5460000000000000000 /* PrepCourseModels.swift */; };
 		B1A1C0DE0000000000000E03 /* PrepDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E04 /* PrepDataClient.swift */; };
 		B1A1C0DE0000000000000E15 /* PrepViewModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E16 /* PrepViewModelsTests.swift */; };
 		B1A1C0DE0000000000000E05 /* PrepModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E06 /* PrepModelsTests.swift */; };
@@ -702,12 +705,14 @@
 		B1A1C0DE0000000000001003 /* BrainPersonLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000001004 /* BrainPersonLayoutTests.swift */; };
 		B1A1C0DE0000000000000D03 /* BrainArticleDigestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000D04 /* BrainArticleDigestTests.swift */; };
 		B1A1C0DE0000000000000801 /* BrainLibraryViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000802 /* BrainLibraryViewModels.swift */; };
+		B1A1C0DE0000000000001A01 /* BrainReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000001A02 /* BrainReview.swift */; };
 		B1A1C0DE00000000000000A3 /* BrainModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000103 /* BrainModels.swift */; };
 		2A8CB7ACCDBA9BBE34E57FDC /* DailyDeckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A997D807C262D12E5491E89 /* DailyDeckTests.swift */; };
 		456FFBA86135A0D6C5707B5E /* DeckCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59FBDD2AD47605DA28200130 /* DeckCalendarView.swift */; };
 		BBEB574715121587294478C7 /* DailyBriefReminder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A01557B2FAEFDDD7C94E6A /* DailyBriefReminder.swift */; };
 		3F522DC0F0540A319E63AB5A /* DeckFeedbackSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85E374D76D0C399DE79819AE /* DeckFeedbackSheet.swift */; };
 		1FE8B00FD19A1F67ACF1CA6C /* DeckStackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4449578C9E4BFBE64D09B3C2 /* DeckStackView.swift */; };
+		0813B8B3C81380A4B30C0E48 /* CardStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCE49620E7F7E6D8CA37C796 /* CardStack.swift */; };
 		39D0697E4167AB61D9640383 /* DeckPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = B87C4558BE2BEAAD59ECCE39 /* DeckPalette.swift */; };
 		FEEDB0DE00000000000000A1 /* FeedbackModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000A2 /* FeedbackModels.swift */; };
 		FEEDB0DE00000000000000A3 /* FeedbackDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000A4 /* FeedbackDataClient.swift */; };
@@ -801,10 +806,13 @@
 		B1A1C0DE00000000000F0002 /* GoalsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsModels.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E18 /* PrepViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepViewModels.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E22 /* PrepHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepHomeView.swift; sourceTree = "<group>"; };
+		C0F5E9620000000000000000 /* PrepCourseViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepCourseViews.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E24 /* PrepTrackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepTrackView.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E26 /* PrepRunView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepRunView.swift; sourceTree = "<group>"; };
+		C0F5EE300000000000000000 /* PrepLessonViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepLessonViews.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E28 /* PrepDrillViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepDrillViews.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E02 /* PrepModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepModels.swift; sourceTree = "<group>"; };
+		C0F5E5460000000000000000 /* PrepCourseModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepCourseModels.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E04 /* PrepDataClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepDataClient.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E16 /* PrepViewModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepViewModelsTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E06 /* PrepModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepModelsTests.swift; sourceTree = "<group>"; };
@@ -1467,6 +1475,7 @@
 		B1A1C0DE0000000000001004 /* BrainPersonLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainPersonLayoutTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000D04 /* BrainArticleDigestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainArticleDigestTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000802 /* BrainLibraryViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainLibraryViewModels.swift; sourceTree = "<group>"; };
+		B1A1C0DE0000000000001A02 /* BrainReview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainReview.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000103 /* BrainModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainModels.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainViewModelTests.swift; sourceTree = "<group>"; };
 		3A997D807C262D12E5491E89 /* DailyDeckTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDeckTests.swift; sourceTree = "<group>"; };
@@ -1474,6 +1483,7 @@
 		E4A01557B2FAEFDDD7C94E6A /* DailyBriefReminder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyBriefReminder.swift; sourceTree = "<group>"; };
 		85E374D76D0C399DE79819AE /* DeckFeedbackSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckFeedbackSheet.swift; sourceTree = "<group>"; };
 		4449578C9E4BFBE64D09B3C2 /* DeckStackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckStackView.swift; sourceTree = "<group>"; };
+		CCE49620E7F7E6D8CA37C796 /* CardStack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardStack.swift; sourceTree = "<group>"; };
 		B87C4558BE2BEAAD59ECCE39 /* DeckPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckPalette.swift; sourceTree = "<group>"; };
 		FEEDB0DE00000000000000A2 /* FeedbackModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackModels.swift; sourceTree = "<group>"; };
 		FEEDB0DE00000000000000A4 /* FeedbackDataClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackDataClient.swift; sourceTree = "<group>"; };
@@ -1574,11 +1584,14 @@
 			isa = PBXGroup;
 			children = (
 				B1A1C0DE0000000000000E02 /* PrepModels.swift */,
+				C0F5E5460000000000000000 /* PrepCourseModels.swift */,
 				B1A1C0DE0000000000000E04 /* PrepDataClient.swift */,
 				B1A1C0DE0000000000000E18 /* PrepViewModels.swift */,
 				B1A1C0DE0000000000000E22 /* PrepHomeView.swift */,
+				C0F5E9620000000000000000 /* PrepCourseViews.swift */,
 				B1A1C0DE0000000000000E24 /* PrepTrackView.swift */,
 				B1A1C0DE0000000000000E26 /* PrepRunView.swift */,
+				C0F5EE300000000000000000 /* PrepLessonViews.swift */,
 				B1A1C0DE0000000000000E28 /* PrepDrillViews.swift */,
 			);
 			path = Prep;
@@ -2537,6 +2550,7 @@
 				E4A01557B2FAEFDDD7C94E6A /* DailyBriefReminder.swift */,
 				85E374D76D0C399DE79819AE /* DeckFeedbackSheet.swift */,
 				4449578C9E4BFBE64D09B3C2 /* DeckStackView.swift */,
+				CCE49620E7F7E6D8CA37C796 /* CardStack.swift */,
 				B87C4558BE2BEAAD59ECCE39 /* DeckPalette.swift */,
 				7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */,
 				AD79724DF6D6FD92B594BBC5 /* DailyDeckView.swift */,
@@ -2552,6 +2566,7 @@
 				B1A1C0DE0000000000000102 /* BrainViewModel.swift */,
 				B1A1C0DE0000000000000103 /* BrainModels.swift */,
 				B1A1C0DE0000000000000802 /* BrainLibraryViewModels.swift */,
+				B1A1C0DE0000000000001A02 /* BrainReview.swift */,
 				B1A1C0DE0000000000000906 /* BrainConnectionsView.swift */,
 				B1A1C0DE0000000000000F02 /* BrainJournalCalendarView.swift */,
 				B1A1C0DE0000000000000904 /* BrainCoverView.swift */,
@@ -2825,11 +2840,13 @@
 				BBEB574715121587294478C7 /* DailyBriefReminder.swift in Sources */,
 				3F522DC0F0540A319E63AB5A /* DeckFeedbackSheet.swift in Sources */,
 				1FE8B00FD19A1F67ACF1CA6C /* DeckStackView.swift in Sources */,
+				0813B8B3C81380A4B30C0E48 /* CardStack.swift in Sources */,
 				39D0697E4167AB61D9640383 /* DeckPalette.swift in Sources */,
 				1F2EF7D6C585EAF7E1C46CD2 /* DeckCardView.swift in Sources */,
 				B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */,
 				B1A1C0DE00000000000000A3 /* BrainModels.swift in Sources */,
 				B1A1C0DE0000000000000E01 /* PrepModels.swift in Sources */,
+				C0F5E5470000000000000000 /* PrepCourseModels.swift in Sources */,
 				FEEDB0DE00000000000000A1 /* FeedbackModels.swift in Sources */,
 				FEEDB0DE00000000000000A3 /* FeedbackDataClient.swift in Sources */,
 				1ABE15000000000000000001 /* LabelsModels.swift in Sources */,
@@ -2856,10 +2873,13 @@
 				B1A1C0DE0000000000000E03 /* PrepDataClient.swift in Sources */,
 				B1A1C0DE0000000000000E17 /* PrepViewModels.swift in Sources */,
 				B1A1C0DE0000000000000E21 /* PrepHomeView.swift in Sources */,
+				C0F5E9630000000000000000 /* PrepCourseViews.swift in Sources */,
 				B1A1C0DE0000000000000E23 /* PrepTrackView.swift in Sources */,
 				B1A1C0DE0000000000000E25 /* PrepRunView.swift in Sources */,
+				C0F5EE310000000000000000 /* PrepLessonViews.swift in Sources */,
 				B1A1C0DE0000000000000E27 /* PrepDrillViews.swift in Sources */,
 				B1A1C0DE0000000000000801 /* BrainLibraryViewModels.swift in Sources */,
+				B1A1C0DE0000000000001A01 /* BrainReview.swift in Sources */,
 				B1A1C0DE0000000000000905 /* BrainConnectionsView.swift in Sources */,
 				B1A1C0DE0000000000000F01 /* BrainJournalCalendarView.swift in Sources */,
 				B1A1C0DE0000000000000903 /* BrainCoverView.swift in Sources */,

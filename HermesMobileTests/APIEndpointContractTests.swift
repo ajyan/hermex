@@ -305,6 +305,28 @@ final class ContractReadinessTests: XCTestCase {
                 query: ["id": "dsa.0217"]
             ),
             .init(name: "tutor attempt", method: "POST", endpoint: .tutorAttempt, path: "/api/tutor/attempt"),
+            .init(
+                name: "tutor test out",
+                method: "GET",
+                endpoint: .tutorRun(run: "testout", unit: "u3"),
+                path: "/api/tutor/today",
+                query: ["run": "testout", "unit": "u3"]
+            ),
+            .init(
+                name: "tutor mock",
+                method: "GET",
+                endpoint: .tutorRun(run: "mock", unit: nil),
+                path: "/api/tutor/today",
+                query: ["run": "mock"]
+            ),
+            .init(name: "tutor course", method: "GET", endpoint: .tutorCourse, path: "/api/tutor/course"),
+            .init(
+                name: "tutor lesson",
+                method: "GET",
+                endpoint: .tutorLesson(id: "u2.l3"),
+                path: "/api/tutor/lesson",
+                query: ["id": "u2.l3"]
+            ),
             .init(name: "goals home", method: "GET", endpoint: .goalsHome, path: "/api/goals"),
             .init(
                 name: "goal detail",

@@ -90,15 +90,22 @@ struct BrainReaderView: View {
     @State private var labels: LabelsViewModel
     @Environment(FeedbackAvailability.self) private var availability: FeedbackAvailability?
     private let push: (BrainRoute) -> Void
+    /// The page the route opened and the key idea to show on it. Stepping through the hub
+    /// leaves the opened page, and the idea no longer applies there.
+    private let opened: (module: BrainModuleID, id: String)
+    private let focusIdea: Int?
 
     init(module: BrainModuleID, id: String, server: URL, modelContext: ModelContext,
-         onAPIError: @escaping (Error) -> Void, push: @escaping (BrainRoute) -> Void) {
+         onAPIError: @escaping (Error) -> Void, push: @escaping (BrainRoute) -> Void,
+         focusIdea: Int? = nil) {
         let client = APIClientBrainAdapter(apiClient: APIClient(baseURL: server))
         let cache = BrainCacheHandle(server: server, context: modelContext)
         _viewModel = State(initialValue: BrainPageViewModel(
             module: module, id: id, client: client, cache: cache, onAPIError: onAPIError))
         _labels = State(initialValue: LabelsViewModel(client: APIClientLabelsAdapter(apiClient: APIClient(baseURL: server))))
         self.push = push
+        self.opened = (module, id)
+        self.focusIdea = focusIdea
     }
 
     var body: some View {
@@ -182,7 +189,8 @@ struct BrainReaderView: View {
                 push: push,
                 onStep: BrainConnectionsLayout.showsPager(page.hub) ? step : nil,
                 rating: labelsAvailable && labels.isLoaded(feature: ratingKey.feature, item: ratingKey.item)
-                    ? BrainPageRating(labels: labels, key: ratingKey) : nil
+                    ? BrainPageRating(labels: labels, key: ratingKey) : nil,
+                focusIdea: viewModel.module == opened.module && viewModel.id == opened.id ? focusIdea : nil
             )
             .refreshable { await viewModel.load() }
         }
@@ -203,6 +211,9 @@ struct BrainReaderContent: View {
     var onStep: ((Int) -> Void)?
     /// The page's Rate control; nil where the server has no labels.
     var rating: BrainPageRating?
+    /// The key idea a bite opened this page at; nil on any other page.
+    var focusIdea: Int?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Built once per page, never in `body`.
     private let cover: BrainCoverSpec
     /// Articles and video notes in the summary outline read as a digest.
@@ -218,13 +229,15 @@ struct BrainReaderContent: View {
     @State private var showsAllBacklinks = false
 
     init(page: BrainPage, isShowingCachedCopy: Bool, isMissing: Bool = false,
-         push: @escaping (BrainRoute) -> Void, onStep: ((Int) -> Void)? = nil, rating: BrainPageRating? = nil) {
+         push: @escaping (BrainRoute) -> Void, onStep: ((Int) -> Void)? = nil, rating: BrainPageRating? = nil,
+         focusIdea: Int? = nil) {
         self.page = page
         self.isShowingCachedCopy = isShowingCachedCopy
         self.isMissing = isMissing
         self.push = push
         self.onStep = onStep
         self.rating = rating
+        self.focusIdea = focusIdea
         self.cover = BrainReaderLayout.cover(for: page.item)
         self.digest = BrainReaderLayout.digest(for: page)
         self.linkCards = BrainConnectionsLayout.linkCards(page)
@@ -239,6 +252,18 @@ struct BrainReaderContent: View {
     }
 
     var body: some View {
+        ScrollViewReader { proxy in
+            scrollContent
+                .task(id: page.item.id) {
+                    guard let focusIdea, digest?.ideas.contains(where: { $0.number == focusIdea }) == true else { return }
+                    withAnimation(reduceMotion ? nil : .default) {
+                        proxy.scrollTo(BrainArticleDigestView.ideaAnchor(focusIdea), anchor: .top)
+                    }
+                }
+        }
+    }
+
+    private var scrollContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: BrainStyle.xl) {
                 VStack(alignment: .leading, spacing: BrainStyle.l) {
@@ -328,7 +353,7 @@ struct BrainReaderContent: View {
         } else if !page.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             Group {
                 if let digest {
-                    BrainArticleDigestView(digest: digest)
+                    BrainArticleDigestView(digest: digest, focusIdea: focusIdea)
                 } else {
                     MarkdownRenderer(content: page.content)
                 }

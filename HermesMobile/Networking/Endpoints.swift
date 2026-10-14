@@ -154,16 +154,20 @@ enum Endpoint {
     case transcribe
     case tts
     /// The Brain module library (`api/brain_catalog.py`): module counts, item lists, one page (optionally
-    /// placed in a given hub), search, and the home's hubs, recent and rediscover picks.
+    /// placed in a given hub), search, and the home's daily deck of bites.
     case brainModules
     case brainList(module: String, tag: String?, cursor: Int?)
     case brainPage(module: String, id: String, hub: String?)
     case brainSearch(query: String, module: String?)
-    case brainHome
+    case brainHome(batch: Int)
     /// The Prep interview tutor (`api/tutor.py`): today's run, home, a track map, one item, answer submission,
     /// the gap ledger (all gaps and one gap) and flagging a coach-written card.
     case tutorHome
     case tutorToday
+    /// A test out (`run: "testout"` with its unit) or a mock run (`run: "mock"`) of `/api/tutor/today`.
+    case tutorRun(run: String, unit: String?)
+    case tutorCourse
+    case tutorLesson(id: String)
     case tutorMap(track: String)
     case tutorItem(id: String)
     case tutorAttempt
@@ -460,8 +464,12 @@ enum Endpoint {
             return "/api/brain/home"
         case .tutorHome:
             return "/api/tutor/home"
-        case .tutorToday:
+        case .tutorToday, .tutorRun:
             return "/api/tutor/today"
+        case .tutorCourse:
+            return "/api/tutor/course"
+        case .tutorLesson:
+            return "/api/tutor/lesson"
         case .tutorMap:
             return "/api/tutor/map"
         case .tutorItem:
@@ -700,10 +708,16 @@ enum Endpoint {
             var items = [URLQueryItem(name: "q", value: query)]
             if let module { items.append(URLQueryItem(name: "module", value: module)) }
             return items
+        case let .brainHome(batch):
+            return batch > 0 ? [URLQueryItem(name: "batch", value: String(batch))] : []
         case let .tutorMap(track):
             return [URLQueryItem(name: "track", value: track)]
-        case let .tutorItem(id), let .tutorGap(id):
+        case let .tutorItem(id), let .tutorGap(id), let .tutorLesson(id):
             return [URLQueryItem(name: "id", value: id)]
+        case let .tutorRun(run, unit):
+            var items = [URLQueryItem(name: "run", value: run)]
+            if let unit { items.append(URLQueryItem(name: "unit", value: unit)) }
+            return items
         case let .goalDetail(slug):
             return [URLQueryItem(name: "slug", value: slug)]
         case let .labels(feature, item):

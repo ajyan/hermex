@@ -814,6 +814,15 @@ final class DailyDeckTests: XCTestCase {
       {"id": "close", "type": "close"}
      ]}
     """
+
+    /// The lead sizes the Daily Deck and Brain review bites share.
+    func testLeadStyleShrinksAsTheLeadGrows() {
+        XCTAssertEqual(DeckCardText.leadStyle(length: 900, isQuote: true), .title)
+        XCTAssertEqual(DeckCardText.leadStyle(length: 220, isQuote: false), .title2)
+        XCTAssertEqual(DeckCardText.leadStyle(length: 221, isQuote: false), .title3)
+        XCTAssertEqual(DeckCardText.leadStyle(length: 480, isQuote: false), .title3)
+        XCTAssertEqual(DeckCardText.leadStyle(length: 481, isQuote: false), .body)
+    }
 }
 
 /// `APIClient.fileBrief` against `URLProtocol` mocks.

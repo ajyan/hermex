@@ -104,6 +104,14 @@ _Avoid_: Brain section, category, collection
 One entry in a Brain module, identified by its module and vault id: a person, wiki page, article, journal day, book or video. It opens in the reader (books in the highlights view).
 _Avoid_: note, document, entry, page (for the item itself)
 
+**Bite**:
+One reviewable piece of a saved Brain item: a key idea or takeaway from an article, a quote, or a book highlight. A Bite is a card in the Review and opens its Brain item (a key idea opens its article with that idea expanded).
+_Avoid_: flashcard, snippet, excerpt
+
+**Review**:
+The Brain home's daily deck of Bites: ten cards you swipe through, then a summary with "Ten more" for another batch. Your position is kept per server and day.
+_Avoid_: quiz, rediscover, feed
+
 **Hub**:
 A wiki page where many other wiki pages meet (at least five link to or from it), found from the vault's links rather than curated. A Brain item's parent hub shows as its trail, and the reader's pager steps through the hub's pages. Front matter `up:` (or `parent:`) sets the parent by hand.
 _Avoid_: map of content, MOC, category

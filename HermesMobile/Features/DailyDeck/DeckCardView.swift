@@ -44,7 +44,6 @@ private struct DeckCardView: View {
     /// Set by the Daily Deck when the server takes labels.
     @Environment(LabelsViewModel.self) private var labels: LabelsViewModel?
     @State private var isWriting = false
-    @State private var overflows = false
     /// The sleep card's numbers, shown before rating when asked for.
     @State private var showsNumbers = false
 
@@ -64,12 +63,7 @@ private struct DeckCardView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollIndicators(.hidden)
-        .onScrollGeometryChange(for: Bool.self) { geometry in
-            geometry.contentSize.height - geometry.contentOffset.y > geometry.containerSize.height + 8
-        } action: { _, more in
-            overflows = more
-        }
-        .overlay(alignment: .bottom) { moreHint }
+        .moreBelowHint(fill: palette.paper, mark: palette.ink)
         .overlay(alignment: .topTrailing) {
             Image(systemName: palette.symbol)
                 .font(.system(.body, weight: .medium))
@@ -230,24 +224,6 @@ private struct DeckCardView: View {
         }
     }
 
-    /// A soft fade and arrow while there is more card below.
-    @ViewBuilder
-    private var moreHint: some View {
-        if overflows {
-            LinearGradient(colors: [palette.paper.opacity(0), palette.paper], startPoint: .top, endPoint: .bottom)
-                .frame(height: 64)
-                .overlay(alignment: .bottom) {
-                    Image(systemName: "chevron.compact.down")
-                        .font(.system(.title3, weight: .semibold))
-                        .foregroundStyle(palette.ink.opacity(0.45))
-                        .padding(.bottom, 8)
-                }
-                .allowsHitTesting(false)
-                .transition(.opacity)
-                .accessibilityHidden(true)
-        }
-    }
-
     // MARK: Opener and close
 
     /// The day's title, a line about yesterday (on a weekly review, the week and its highlights),
@@ -281,7 +257,7 @@ private struct DeckCardView: View {
             .padding(.bottom, 6)
         VStack(spacing: 0) {
             ForEach(Array(ahead.enumerated()), id: \.element.id) { _, page in
-                DeckAheadRow(page: page)
+                DeckAheadRow(page)
             }
         }
         Text(verbatim: "Swipe to begin")
@@ -778,26 +754,48 @@ private struct ChoiceButton: View {
 }
 
 /// One card ahead on the opener: its kind's icon on a glow tile, its title, and its kind.
-private struct DeckAheadRow: View {
-    let page: DeckPage
+struct DeckAheadRow: View {
+    let symbol: String
+    /// The symbol's color, on a tile in `wash`.
+    let ink: Color
+    let wash: Color
+    let title: String
+    /// The thing's kind in one word, at the row's end.
+    let kind: String
+    let kindColor: Color
+
+    /// A Brief opener row: the card's kind on its paper, its title, its kind in secondary text.
+    init(_ page: DeckPage) {
+        let palette = DeckPalette.of(page)
+        self.init(symbol: palette.symbol, ink: palette.ink, wash: palette.colors.wash,
+                  title: Self.title(page), kind: palette.shortName, kindColor: Color.hxTextSecondary)
+    }
+
+    init(symbol: String, ink: Color, wash: Color, title: String, kind: String, kindColor: Color) {
+        self.symbol = symbol
+        self.ink = ink
+        self.wash = wash
+        self.title = title
+        self.kind = kind
+        self.kindColor = kindColor
+    }
 
     var body: some View {
-        let palette = DeckPalette.of(page)
         HStack(spacing: 10) {
-            Image(systemName: palette.symbol)
+            Image(systemName: symbol)
                 .font(AppFont.caption(weight: .semibold))
-                .foregroundStyle(palette.ink)
+                .foregroundStyle(ink)
                 .frame(width: 26, height: 26)
-                .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.xs + 2, style: .continuous))
+                .background(wash, in: RoundedRectangle(cornerRadius: HXRadius.xs + 2, style: .continuous))
                 .accessibilityHidden(true)
-            Text(verbatim: Self.title(page))
+            Text(verbatim: title)
                 .font(AppFont.subheadline())
                 .foregroundStyle(Color.hxTextPrimary)
                 .lineLimit(1)
             Spacer(minLength: 8)
-            Text(verbatim: palette.shortName)
+            Text(verbatim: kind)
                 .font(AppFont.caption())
-                .foregroundStyle(Color.hxTextSecondary)
+                .foregroundStyle(kindColor)
                 .lineLimit(1)
         }
         .padding(.vertical, 7)
@@ -821,9 +819,55 @@ extension DeckCardText {
     /// a past journal entry) keep the serif; every other lead is the rounded display voice,
     /// smaller as the lead grows.
     static func leadFont(for card: DeckCard, lead: String) -> Font {
-        let style: Font.TextStyle = card.itemKind == "quote" ? .title
-            : lead.count > 480 ? .body : lead.count > 220 ? .title3 : .title2
+        let style = leadStyle(length: lead.count, isQuote: card.itemKind == "quote")
         let quotesSavedWords = ["quote", "book", "on_this_day"].contains(card.itemKind ?? "")
         return quotesSavedWords ? AppFont.serif(style: style) : AppFont.display(style: style, weight: .semibold)
+    }
+
+    /// A lead's text style: a quote at title size, anything else smaller as it grows.
+    static func leadStyle(length: Int, isQuote: Bool) -> Font.TextStyle {
+        isQuote ? .title : length > 480 ? .body : length > 220 ? .title3 : .title2
+    }
+}
+
+extension View {
+    /// On a card's ScrollView: a soft fade into `fill` and a down arrow in `mark` while there is
+    /// more card below. Daily Deck cards and Brain review bites share it.
+    func moreBelowHint(fill: Color, mark: Color) -> some View {
+        modifier(MoreBelowHint(fill: fill, mark: mark))
+    }
+}
+
+private struct MoreBelowHint: ViewModifier {
+    let fill: Color
+    let mark: Color
+
+    @State private var overflows = false
+
+    func body(content: Content) -> some View {
+        content
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.contentSize.height - geometry.contentOffset.y > geometry.containerSize.height + 8
+            } action: { _, more in
+                overflows = more
+            }
+            .overlay(alignment: .bottom) { hint }
+    }
+
+    @ViewBuilder
+    private var hint: some View {
+        if overflows {
+            LinearGradient(colors: [fill.opacity(0), fill], startPoint: .top, endPoint: .bottom)
+                .frame(height: 64)
+                .overlay(alignment: .bottom) {
+                    Image(systemName: "chevron.compact.down")
+                        .font(.system(.title3, weight: .semibold))
+                        .foregroundStyle(mark.opacity(0.45))
+                        .padding(.bottom, 8)
+                }
+                .allowsHitTesting(false)
+                .transition(.opacity)
+                .accessibilityHidden(true)
+        }
     }
 }
