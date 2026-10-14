@@ -27,6 +27,10 @@ struct PrepLessonBody: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: BrainStyle.l) {
+            Text(verbatim: lesson.title)
+                .font(AppFont.display(style: .title3))
+                .foregroundStyle(Color.hxTextPrimary)
+                .accessibilityAddTraits(.isHeader)
             if lesson.isReteach {
                 HXChip(paper: .knowledge, symbol: "arrow.triangle.2.circlepath", label: "Another way to see it") {
                     EmptyView()
@@ -166,6 +170,7 @@ struct PrepStars: View {
 struct PrepBossResultView: View {
     let result: PrepAttemptResult
     let xp: Int?
+    var isTestOut = false
 
     var body: some View {
         if let sitting = result.sitting {
@@ -186,7 +191,7 @@ struct PrepBossResultView: View {
                             .monospacedDigit()
                     }
                 }
-                Text(verbatim: PrepCopy.unlockLine(sitting, xp: xp))
+                Text(verbatim: PrepCopy.unlockLine(sitting, xp: xp, testOut: isTestOut))
                     .font(BrainStyle.rowSubtitle)
                     .foregroundStyle(Color.hxTextPrimary)
                     .multilineTextAlignment(.center)
@@ -264,9 +269,7 @@ struct PrepDayCompleteView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: BrainStyle.xl) {
                 VStack(spacing: BrainStyle.s) {
-                    PrepMasteryRing(state: .mastered, mastery: 1, color: Color.accentColor)
-                        .scaleEffect(2)
-                        .padding(BrainStyle.xl)
+                    PrepDayRing(done: summary.repCount, total: summary.repCount, side: 96)
                     if summary.xpGained > 0 {
                         Text(verbatim: PrepCopy.xpLabel(summary.xpGained))
                             .font(AppFont.display(style: .title2))

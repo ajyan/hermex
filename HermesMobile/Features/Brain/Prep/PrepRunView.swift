@@ -182,7 +182,7 @@ struct PrepRunView: View {
             .id(rep.index)
         case .result(let rep, let result, _) where rep.drill == .boss:
             scaffold(rep, hasAction: true) {
-                PrepBossResultView(result: result, xp: viewModel.lastXP)
+                PrepBossResultView(result: result, xp: viewModel.lastXP, isTestOut: viewModel.runKind == .testout)
             } bottom: {
                 PrepPrimaryButton(title: "Continue") { Task { await viewModel.continue() } }
             }

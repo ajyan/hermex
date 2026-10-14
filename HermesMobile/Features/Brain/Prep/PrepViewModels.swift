@@ -139,6 +139,8 @@ struct PrepDaySummary: Equatable {
     var reviews = 0
     var missedChecks = 0
     var nextUp: String?
+    /// The run's rep count, for the done screen's full ring.
+    var repCount = 0
 }
 
 /// One track's skill map.
@@ -479,6 +481,7 @@ final class PrepRunViewModel {
             guard token == generation, !Task.isCancelled else { return }
             var summary = tally
             summary.isCourse = true
+            summary.repCount = run.reps.count
             summary.streak = lastStreak ?? home?.streak ?? PrepStreak()
             if let before = xpBefore, let after = home?.course?.xp { summary.xpGained = max(0, after - before) }
             summary.nextUp = PrepCopy.nextUp(home?.course)
@@ -558,9 +561,11 @@ enum PrepCopy {
         return sitting.passed ? "Boss passed" : "Not yet"
     }
 
-    static func unlockLine(_ sitting: PrepBossSitting, xp: Int?) -> String {
+    /// The line under a boss result. A failed test out changes nothing, so it points at the lessons instead.
+    static func unlockLine(_ sitting: PrepBossSitting, xp: Int?, testOut: Bool = false) -> String {
         guard sitting.passed else {
-            return sitting.score == nil ? "Atlas grades it tonight; the unit unlocks if it passes."
+            if sitting.score == nil { return "Atlas grades it tonight; the unit unlocks if it passes." }
+            return testOut ? "Not yet. Start with the lessons below."
                 : "The lessons below come back tomorrow, then the boss again."
         }
         let parts = [sitting.unlocked.map { "\($0) unlocked" }, xp.map(xpLabel)].compactMap { $0 }

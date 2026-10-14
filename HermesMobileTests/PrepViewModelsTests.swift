@@ -271,6 +271,7 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(summary.missedChecks, 1)
         XCTAssertEqual(summary.streak.days, 7)
         XCTAssertEqual(summary.nextUp, "Boss quiz · Prompt engineering")
+        XCTAssertEqual(summary.repCount, 3)
     }
 
     func testLessonReaderLoadStates() async {
@@ -311,6 +312,10 @@ final class PrepViewModelsTests: XCTestCase {
                        "Agents and evals unlocked · +50 XP")
         XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: 0.5, passed: false, stars: 0, unlocked: nil), xp: nil),
                        "The lessons below come back tomorrow, then the boss again.")
+        XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: 0.5, passed: false, stars: 0, unlocked: nil), xp: nil,
+                                           testOut: true), "Not yet. Start with the lessons below.")
+        XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: 0.9, passed: true, stars: 2, unlocked: nil), xp: 50,
+                                           testOut: true), "+50 XP")
     }
 
     func testHomeExposesCourseWhenPresent() async {

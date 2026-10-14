@@ -9,7 +9,13 @@ import SwiftUI
 struct PrepDayRing: View {
     let done: Int
     let total: Int
-    @ScaledMetric(relativeTo: .body) private var side: CGFloat = 54
+    @ScaledMetric private var side: CGFloat
+
+    init(done: Int, total: Int, side: CGFloat = 54) {
+        self.done = done
+        self.total = total
+        _side = ScaledMetric(wrappedValue: side, relativeTo: .body)
+    }
 
     var body: some View {
         let line = max(4, side * 0.11)
@@ -18,7 +24,7 @@ struct PrepDayRing: View {
             Circle().stroke(Color.hxSeparator, lineWidth: line)
             Circle()
                 .trim(from: 0, to: fraction)
-                .stroke(Color.accentColor, style: StrokeStyle(lineWidth: line, lineCap: .round))
+                .stroke(HermexPaper.knowledge.glow, style: StrokeStyle(lineWidth: line, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             Text(verbatim: "\(done)/\(total)")
                 .font(AppFont.caption(weight: .semibold))
@@ -143,8 +149,18 @@ private struct PrepCurrentUnit: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
-            BrainSectionHeader(title: PrepCopy.unitHeader(index: index, title: unit.title),
-                               trailing: "\(unit.lessonsDone) of \(unit.lessonsTotal)")
+            HStack(alignment: .firstTextBaseline) {
+                BrainSectionHeader(title: PrepCopy.unitHeader(index: index, title: unit.title),
+                                   trailing: "\(unit.lessonsDone) of \(unit.lessonsTotal)")
+                if unit.boss != .ready {  // the boss early, for a unit you already know
+                    NavigationLink(value: ShellPushDestination.brainRoute(.prep(.testout(unit.id)))) {
+                        HXChip(paper: .knowledge, label: "Test out") { EmptyView() }
+                            .frame(minHeight: BrainStyle.minTapTarget)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(verbatim: "Test out of \(unit.title)"))
+                }
+            }
             VStack(alignment: .leading, spacing: BrainStyle.s) {
                 ForEach(Array(unit.lessons.enumerated()), id: \.element.id) { offset, lesson in
                     PrepLessonNodeRow(lesson: lesson)
