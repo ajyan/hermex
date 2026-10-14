@@ -148,10 +148,85 @@ struct BrainModuleStrip: View {
     }
 }
 
+// MARK: - Deck card
+
+/// A card of a Brain swipe deck, drawn like a Daily Deck reading card: a glow card in `paper`
+/// (`xl` corners, the `paper` shadow) whose words scroll inside it with the shared
+/// `moreBelowHint`, over a footer naming what a tap opens. Without `open` the card has no
+/// footer and does nothing on tap. The review's bites and a person's timeline use it.
+struct BrainDeckCard<Content: View>: View {
+    let paper: HermexPaper
+    /// "Open the article"; shown, with a chevron, only when the card opens something.
+    let footer: String
+    let open: (() -> Void)?
+    let accessibilityLabel: String
+    var accessibilityValue: String = ""
+    /// Cards under the top one show only their paper; their words fade in as they rise.
+    var contentOpacity: Double = 1
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        let card = VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) { content() }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 28)
+                    .padding(.bottom, 20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .scrollIndicators(.hidden)
+            // Short cards leave the drag to the screen's own scroll view.
+            .scrollBounceBehavior(.basedOnSize)
+            .moreBelowHint(fill: paper.card, mark: paper.glow)
+            if open != nil { footerRow }
+        }
+        .foregroundStyle(paper.glow)
+        .opacity(contentOpacity)
+        .background(paper.card, in: BrainBiteCard.shape)
+        .overlay(BrainBiteCard.shape.strokeBorder(paper.edge, lineWidth: 0.5))
+        .clipShape(BrainBiteCard.shape)
+        .hxShadow(.paper)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: accessibilityLabel))
+        .accessibilityValue(Text(verbatim: accessibilityValue))
+
+        Group {
+            if let open {
+                card
+                    // A tap, not a Button: a Button fires on release even after the finger has
+                    // dragged the card across, so a swipe would open the page. A tap gesture
+                    // fails once the touch moves.
+                    .contentShape(BrainBiteCard.shape)
+                    .onTapGesture(perform: open)
+                    .accessibilityHint(Text(verbatim: footer))
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { open() }
+            } else {
+                card
+            }
+        }
+        .padding(.vertical, 12)
+    }
+
+    /// The footer and a chevron over a hairline in the paper's edge.
+    private var footerRow: some View {
+        HStack {
+            Text(verbatim: footer)
+            Spacer(minLength: 8)
+            Image(systemName: "chevron.forward").accessibilityHidden(true)
+        }
+        .font(AppFont.subheadline(weight: .semibold))
+        .padding(.top, 14)
+        .padding(.bottom, 22)
+        .overlay(alignment: .top) { Rectangle().fill(paper.edge).frame(height: 0.5) }
+        .padding(.horizontal, 24)
+    }
+}
+
 // MARK: - Bite card
 
 /// One bite of the review deck, drawn like a Daily Deck reading card (`DeckCardView.reading`):
-/// a glow card in the bite's paper with its kicker, the lead (serif for saved words), the
+/// a `BrainDeckCard` in the bite's paper with its kicker, the lead (serif for saved words), the
 /// attribution in the glow, the detail, and a footer naming what a tap opens. Long text
 /// scrolls inside the card. The whole card opens the bite's page; swiping pages the deck.
 struct BrainBiteCard: View {
@@ -163,37 +238,10 @@ struct BrainBiteCard: View {
     static let shape = RoundedRectangle(cornerRadius: HXRadius.xl, style: .continuous)
 
     var body: some View {
-        let paper = bite.paper
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) { reading }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 28)
-                    .padding(.bottom, 20)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .scrollIndicators(.hidden)
-            // Short bites leave the drag to the Brain home's own scroll view.
-            .scrollBounceBehavior(.basedOnSize)
-            .moreBelowHint(fill: paper.card, mark: paper.glow)
-            footer
+        BrainDeckCard(paper: bite.paper, footer: BrainBiteCopy.open(bite), open: open,
+                      accessibilityLabel: accessibilityLabel, contentOpacity: contentOpacity) {
+            reading
         }
-        .foregroundStyle(paper.glow)
-        .opacity(contentOpacity)
-        .background(paper.card, in: Self.shape)
-        .overlay(Self.shape.strokeBorder(paper.edge, lineWidth: 0.5))
-        .clipShape(Self.shape)
-        .hxShadow(.paper)
-        // A tap, not a Button: a Button fires on release even after the finger has dragged the
-        // card across, so a swipe would open the page. A tap gesture fails once the touch moves.
-        .contentShape(Self.shape)
-        .onTapGesture(perform: open)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: accessibilityLabel))
-        .accessibilityHint(Text(verbatim: BrainBiteCopy.open(bite)))
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction { open() }
-        .padding(.vertical, 12)
     }
 
     @ViewBuilder
@@ -225,20 +273,6 @@ struct BrainBiteCard: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 22)
         }
-    }
-
-    /// "Open the article" and a chevron over a hairline in the paper's edge.
-    private var footer: some View {
-        HStack {
-            Text(verbatim: BrainBiteCopy.open(bite))
-            Spacer(minLength: 8)
-            Image(systemName: "chevron.forward").accessibilityHidden(true)
-        }
-        .font(AppFont.subheadline(weight: .semibold))
-        .padding(.top, 14)
-        .padding(.bottom, 22)
-        .overlay(alignment: .top) { Rectangle().fill(bite.paper.edge).frame(height: 0.5) }
-        .padding(.horizontal, 24)
     }
 
     private var accessibilityLabel: String {

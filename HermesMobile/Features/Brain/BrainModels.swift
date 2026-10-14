@@ -332,14 +332,20 @@ struct BrainPerson: Codable, Hashable, Sendable {
     let lastSeen: String?
     let nextBirthday: String?
     let journal: [BrainJournalMention]
+    /// A short recap of where things stand with the person; nil until the nightly digest writes one.
+    let catchup: String?
+    /// Up to three open threads to pick up next time.
+    let threads: [String]
+    /// Days seen per calendar month, oldest first, ending with this month (12 when present).
+    let rhythm: [Int]
 
     private enum CodingKeys: String, CodingKey {
-        case encounters, profile, questions, other, journal, lastSeen, nextBirthday
+        case encounters, profile, questions, other, journal, lastSeen, nextBirthday, catchup, threads, rhythm
     }
 
     init(encounters: [BrainEncounter] = [], profile: [BrainProfileSection] = [], questions: [String] = [],
          other: String = "", lastSeen: String? = nil, nextBirthday: String? = nil,
-         journal: [BrainJournalMention] = []) {
+         journal: [BrainJournalMention] = [], catchup: String? = nil, threads: [String] = [], rhythm: [Int] = []) {
         self.encounters = encounters
         self.profile = profile
         self.questions = questions
@@ -347,6 +353,9 @@ struct BrainPerson: Codable, Hashable, Sendable {
         self.lastSeen = lastSeen
         self.nextBirthday = nextBirthday
         self.journal = journal
+        self.catchup = catchup
+        self.threads = threads
+        self.rhythm = rhythm
     }
 
     init(from decoder: Decoder) throws {
@@ -358,6 +367,9 @@ struct BrainPerson: Codable, Hashable, Sendable {
         lastSeen = c.optional(String.self, .lastSeen)
         nextBirthday = c.optional(String.self, .nextBirthday)
         journal = c.lossy(BrainJournalMention.self, .journal)
+        catchup = c.optional(String.self, .catchup)
+        threads = c.lossy(String.self, .threads)
+        rhythm = c.lossy(Int.self, .rhythm)
     }
 }
 

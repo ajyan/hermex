@@ -36,8 +36,8 @@ final class BrainPersonLayoutTests: XCTestCase {
                       BrainJournalMention(id: "2026-09-10", date: "2026-09-10", snippet: "Earlier")])
         let layout = layout(person)
         XCTAssertEqual(layout.timeline.map(\.id), ["e-new", "e-mid", "journal:2026-09-24", "journal:2026-09-10", "e-old"])
-        XCTAssertEqual(layout.timeline[0].meta, BrainStyle.displayDate("2026-10-08") + " · 6 days ago")
-        XCTAssertEqual(layout.timeline[2].meta, "Journal · " + BrainStyle.displayDate("2026-09-24"))
+        XCTAssertEqual(layout.timeline[0].kicker, "Encounter · Oct 8 · 6 days ago")
+        XCTAssertEqual(layout.timeline[2].kicker, "Journal · Sep 24 · 2 weeks ago")
         XCTAssertEqual(layout.timeline[2].headline, "Dinner")
     }
 
@@ -72,7 +72,7 @@ final class BrainPersonLayoutTests: XCTestCase {
 
     func testFutureEncounterClampsToToday() {
         let layout = layout(BrainPerson(encounters: [BrainEncounter(id: "e", date: "2026-10-20", title: "Soon")]))
-        XCTAssertEqual(layout.timeline[0].meta, BrainStyle.displayDate("2026-10-20") + " · today")
+        XCTAssertEqual(layout.timeline[0].kicker, "Encounter · Oct 20 · today")
     }
 
     func testEmptyIDsAreDropped() {
@@ -118,11 +118,9 @@ final class BrainPersonLayoutTests: XCTestCase {
         XCTAssertEqual(first.headline, "Coffee")
         XCTAssertEqual(first.preview, ["one", "two"])
         XCTAssertEqual(first.rest, ["three", "four"])
-        XCTAssertEqual(first.moreCount, 2)
         XCTAssertEqual(second.headline, "a")
         XCTAssertEqual(second.preview, ["b", "c"])
         XCTAssertEqual(second.rest, ["d", "e"])
-        XCTAssertEqual(second.moreCount, 2)
     }
 
     func testExpandedSplitsRestBulletsFromExtraLines() {
@@ -135,7 +133,6 @@ final class BrainPersonLayoutTests: XCTestCase {
         XCTAssertEqual(entry.preview, ["a", "b"])
         XCTAssertEqual(entry.rest, ["c\n  continued", "d"])
         XCTAssertEqual(entry.extra, "#### Later\nprose line\n_Source: invented note_")
-        XCTAssertTrue(entry.canExpand)
     }
 
     func testExtraSkipsTheHeadlineAndProseShownAsItems() {
@@ -168,28 +165,17 @@ final class BrainPersonLayoutTests: XCTestCase {
         XCTAssertEqual(entry.extra, "")
     }
 
-    func testCanExpandWhenBodyHoldsMoreThanThePreview() {
-        let prose = BrainEncounter(id: "p", date: "2026-10-08", title: "Walk", bullets: ["- a"],
-                                   body: "- a\n\n_Source: invented note_")
-        let subhead = BrainEncounter(id: "s", date: "2026-10-07", bullets: ["- a", "- b"],
-                                     body: "- a\n#### Later\n- b")
-        let hidden = BrainEncounter(id: "h", date: "2026-10-06", title: "T", bullets: ["- a", "- b", "- c"],
-                                    body: "- a\n- b\n- c")
-        let timeline = layout(BrainPerson(encounters: [prose, subhead, hidden])).timeline
-        XCTAssertEqual(timeline.map(\.moreCount), [0, 0, 1])
-        XCTAssertEqual(timeline.map(\.canExpand), [true, true, true])
+    func testKickerFallsBackToTheRawDate() {
+        let person = BrainPerson(encounters: [BrainEncounter(id: "e", date: "spring", title: "Hike")],
+                                 journal: [BrainJournalMention(id: "j", date: "", snippet: "Saw Ada.")])
+        XCTAssertEqual(layout(person).timeline.map(\.kicker), ["Encounter · spring", "Journal"])
     }
 
-    func testCannotExpandWhenThePreviewShowsEverything() {
-        let titled = BrainEncounter(id: "t", date: "2026-10-08", title: "Tea", bullets: ["- a", "* b"],
-                                    body: "- a\n\n* b\n")
-        let untitled = BrainEncounter(id: "u", date: "2026-10-07", bullets: ["- one", "- two\n  - nested"],
-                                      body: "- one\n- two\n  - nested")
-        let empty = BrainEncounter(id: "e", date: "2026-10-06", title: "Call")
-        let timeline = layout(BrainPerson(
-            encounters: [titled, untitled, empty],
-            journal: [BrainJournalMention(id: "j", date: "2026-10-05", snippet: "Saw Ada.", mention: "Ada")])).timeline
-        XCTAssertEqual(timeline.map(\.canExpand), [false, false, false, false])
+    func testPositionReadsAsOneBased() {
+        XCTAssertEqual(BrainPersonLayout.position(index: 0, count: 5), "1 of 5")
+        XCTAssertEqual(BrainPersonLayout.position(index: 4, count: 5), "5 of 5")
+        XCTAssertEqual(BrainPersonLayout.position(index: 9, count: 5), "5 of 5")
+        XCTAssertEqual(BrainPersonLayout.position(index: 0, count: 0), "0 of 0")
     }
 
     func testNestedBulletKeepsNewlines() {
@@ -210,6 +196,14 @@ final class BrainPersonLayoutTests: XCTestCase {
         XCTAssertEqual(layout.aboutSections.map(\.title), ["Family", "Work", "School", "Likes"])
         XCTAssertEqual(layout.aboutSections[1].items, ["Old job"])
         XCTAssertEqual(layout.aboutSections[2].items, ["Night classes"])
+    }
+
+    func testIndustryChipWhenTheCompanyIsTooLong() {
+        let long = String(repeating: "x", count: 33)
+        let layout = layout(BrainPerson(profile: [BrainProfileSection(label: "Company", items: [long])]),
+                            facts: [BrainFact(label: "Industry", value: "Robotics")])
+        XCTAssertEqual(layout.chips, ["Robotics"])
+        XCTAssertEqual(layout.aboutSections.map(\.items), [[long]])
     }
 
     func testIndustryChipWhenThereIsNoCompany() {
@@ -279,16 +273,59 @@ final class BrainPersonLayoutTests: XCTestCase {
         XCTAssertNil(BrainPersonLayout.roleSplit("Father: "))
     }
 
-    func testNextTimeIsOnlyANearBirthday() {
+    func testCatchUpBirthdayLineIsOnlyANearBirthday() {
         let questions = ["Ask about the move"]
         let near = layout(BrainPerson(questions: questions, nextBirthday: "2026-10-26"))
-        XCTAssertEqual(near.nextTime, ["Birthday Oct 26, in 12 days"])
-        XCTAssertTrue(layout(BrainPerson(questions: questions, nextBirthday: "2027-01-19")).nextTime.isEmpty)
-        XCTAssertTrue(layout(BrainPerson(questions: questions)).nextTime.isEmpty)
-        XCTAssertEqual(layout(BrainPerson(nextBirthday: "2026-10-14")).nextTime, ["Birthday today"])
-        XCTAssertEqual(layout(BrainPerson(nextBirthday: "2026-10-15")).nextTime, ["Birthday Oct 15, in 1 day"])
-        XCTAssertEqual(layout(BrainPerson(nextBirthday: "2026-11-13")).nextTime, ["Birthday Nov 13, in 30 days"])
-        XCTAssertTrue(layout(BrainPerson(nextBirthday: "2026-11-14")).nextTime.isEmpty)
+        XCTAssertEqual(near.catchUp, BrainPersonLayout.CatchUp(summary: nil, lines: ["Birthday Oct 26, in 12 days"]))
+        XCTAssertNil(layout(BrainPerson(questions: questions, nextBirthday: "2027-01-19")).catchUp)
+        XCTAssertNil(layout(BrainPerson(questions: questions)).catchUp)
+        XCTAssertEqual(layout(BrainPerson(nextBirthday: "2026-10-14")).catchUp?.lines, ["Birthday today"])
+        XCTAssertEqual(layout(BrainPerson(nextBirthday: "2026-10-15")).catchUp?.lines, ["Birthday Oct 15, in 1 day"])
+        XCTAssertEqual(layout(BrainPerson(nextBirthday: "2026-11-13")).catchUp?.lines, ["Birthday Nov 13, in 30 days"])
+        XCTAssertNil(layout(BrainPerson(nextBirthday: "2026-11-14")).catchUp)
+    }
+
+    func testCatchUpPutsTheBirthdayBeforeTheThreads() {
+        let person = BrainPerson(nextBirthday: "2026-10-26", catchup: "  Moving to Lisbon in spring.  ",
+                                 threads: ["the Lisbon move", "  ", " her sister's visit "])
+        XCTAssertEqual(layout(person).catchUp, BrainPersonLayout.CatchUp(
+            summary: "Moving to Lisbon in spring.",
+            lines: ["Birthday Oct 26, in 12 days", "the Lisbon move", "her sister's visit"]))
+    }
+
+    func testCatchUpSummaryOrThreadsAlone() {
+        XCTAssertEqual(layout(BrainPerson(catchup: "Just back from Lisbon.")).catchUp,
+                       BrainPersonLayout.CatchUp(summary: "Just back from Lisbon.", lines: []))
+        XCTAssertEqual(layout(BrainPerson(threads: ["the move"])).catchUp,
+                       BrainPersonLayout.CatchUp(summary: nil, lines: ["the move"]))
+        XCTAssertNil(layout(BrainPerson(catchup: " ", threads: [""])).catchUp)
+    }
+
+    func testRhythmRunsFromElevenMonthsAgoToThisMonth() {
+        let counts = [1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 1, 3]
+        let layout = layout(BrainPerson(rhythm: counts))
+        XCTAssertEqual(layout.rhythm.map(\.id), Array(0..<12))
+        XCTAssertEqual(layout.rhythm.map(\.label),
+                       ["Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct"])
+        XCTAssertEqual(layout.rhythm.map(\.seen), counts.map { $0 > 0 })
+        XCTAssertEqual(layout.rhythmAccessibilityLabel, "Seen in 4 of the last 12 months")
+    }
+
+    func testRhythmCrossesTheYearFromEarlyInTheYear() {
+        let february = calendar.date(from: DateComponents(year: 2027, month: 2, day: 3, hour: 12))!
+        let person = BrainPerson(rhythm: Array(repeating: 0, count: 12))
+        let page = BrainPage(item: BrainItem(module: .people, id: "people/ada-test.md", title: "Ada Test"), person: person)
+        let layout = BrainPersonLayout(page: page, person: person, today: february, calendar: calendar)
+        XCTAssertEqual(layout.rhythm.first?.label, "Mar")
+        XCTAssertEqual(layout.rhythm.last?.label, "Feb")
+        XCTAssertEqual(layout.rhythmAccessibilityLabel, "Seen in 0 of the last 12 months")
+    }
+
+    func testRhythmNeedsTwelveMonths() {
+        XCTAssertTrue(layout(BrainPerson(rhythm: Array(repeating: 1, count: 11))).rhythm.isEmpty)
+        XCTAssertTrue(layout(BrainPerson(rhythm: Array(repeating: 1, count: 13))).rhythm.isEmpty)
+        XCTAssertTrue(layout(BrainPerson()).rhythm.isEmpty)
+        XCTAssertEqual(layout(BrainPerson()).rhythmAccessibilityLabel, "")
     }
 
     func testSubtitleSkipsEmptyParts() {

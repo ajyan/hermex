@@ -1,30 +1,73 @@
 import SwiftUI
 
-/// A birthday within 30 days, on a glow card in the person paper. Lines keep their inline
-/// Markdown, so a `brain://` link opens (in Nous blue: a link is a control, so the card sets no
-/// paper tint).
-struct BrainNextTimeCard: View {
+/// "Catch up": the nightly digest's recap and its lines (a near birthday, then the open
+/// threads) on a glow card in the person paper, like a Daily Brief card. Lines keep their
+/// inline Markdown, so a `brain://` link opens (in Nous blue: a link is a control, so the card
+/// sets no paper tint).
+struct BrainCatchUpCard: View {
+    private let summary: AttributedString?
     private let lines: [AttributedString]
 
-    init(lines: [String]) {
-        self.lines = lines.map(BrainArticleDigestView.inlineMarkdown)
+    init(catchUp: BrainPersonLayout.CatchUp) {
+        self.summary = catchUp.summary.map(BrainArticleDigestView.inlineMarkdown)
+        self.lines = catchUp.lines.map(BrainArticleDigestView.inlineMarkdown)
     }
 
     var body: some View {
         let paper = BrainModuleID.people.paper
         let shape = RoundedRectangle(cornerRadius: HXRadius.xl, style: .continuous)
         VStack(alignment: .leading, spacing: BrainStyle.s) {
-            Text(verbatim: "Next time")
+            Text(verbatim: "Catch up")
                 .font(AppFont.display(style: .headline, weight: .semibold))
                 .foregroundStyle(paper.glow)
                 .accessibilityAddTraits(.isHeader)
-            BrainBulletList(lines: lines, bullet: paper.glow)
+            if let summary {
+                Text(summary)
+                    .font(AppFont.body())
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !lines.isEmpty {
+                BrainBulletList(lines: lines, marker: "·", markerColor: paper.glow, textColor: paper.glow,
+                                font: AppFont.subheadline(weight: .medium))
+            }
         }
         .padding(BrainStyle.l)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(paper.card, in: shape)
         .overlay(shape.strokeBorder(paper.edge, lineWidth: 0.5))
         .hxShadow(.paper)
+    }
+}
+
+/// The last twelve months as dots, oldest first: filled in the person glow for a month they
+/// were seen, a hairline-gray dot otherwise, the first and last month named at the ends.
+/// VoiceOver reads it as one line ("Seen in 4 of the last 12 months").
+struct BrainRhythmStrip: View {
+    let months: [BrainPersonLayout.RhythmMonth]
+    let accessibilityLabel: String
+    @ScaledMetric(relativeTo: .caption) private var dot: CGFloat = 8
+
+    var body: some View {
+        let glow = BrainModuleID.people.paper.glow
+        HStack(spacing: BrainStyle.s) {
+            if let first = months.first {
+                Text(verbatim: first.label).brainText(.meta)
+            }
+            HStack(spacing: BrainStyle.xs) {
+                ForEach(months) { month in
+                    Circle()
+                        .fill(month.seen ? glow : Color.hxSeparator)
+                        .frame(width: dot, height: dot)
+                }
+            }
+            if let last = months.last {
+                Text(verbatim: last.label).brainText(.meta)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: accessibilityLabel))
     }
 }
 
@@ -48,9 +91,10 @@ struct BrainProfileChips: View {
     }
 }
 
-/// The rest of the profile on one neutral card titled "About": each section a small header and
-/// its items as compact rows whose links open, sections split by hairlines. A section shows three
-/// items and "N more" for the rest. Family items like "Father: Bo Test" show the role in secondary.
+/// The rest of the profile on one neutral card titled "About": each section a sentence-case
+/// header and its items as compact rows whose links open, sections split by hairlines. A section
+/// shows three items and "+ N more" for the rest. Family items like "Father: Bo Test" show the
+/// role in secondary.
 struct BrainPersonAbout: View {
     fileprivate struct Section: Identifiable {
         let id: String
@@ -93,7 +137,7 @@ struct BrainPersonAbout: View {
     }
 }
 
-/// One About section: its header, the first three rows, and "N more" / "Show less" for the rest.
+/// One About section: its header, the first three rows, and "+ N more" / "Show less" for the rest.
 private struct BrainAboutSection: View {
     let section: BrainPersonAbout.Section
     @State private var expanded = false
@@ -104,19 +148,17 @@ private struct BrainAboutSection: View {
     var body: some View {
         let hidden = section.rows.count - Self.cap
         VStack(alignment: .leading, spacing: BrainStyle.xs) {
-            Text(verbatim: section.title)
-                .font(BrainStyle.meta.weight(.semibold))
-                .foregroundStyle(Color.hxTextSecondary)
-                .accessibilityAddTraits(.isHeader)
+            HXSectionHeader(title: section.title)
             // A fixed list from one page load, so position is a stable id.
             ForEach(Array(section.rows.prefix(expanded ? section.rows.count : Self.cap).enumerated()), id: \.offset) { _, row in
                 rowView(row)
             }
             if hidden > 0 {
                 Button(action: toggle) {
-                    Text(verbatim: expanded ? "Show less" : "\(hidden) more")
-                        .font(BrainStyle.rowSubtitle.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
+                    // The review summary's "+ N more" row.
+                    Text(verbatim: expanded ? "Show less" : "+ \(hidden) more")
+                        .font(AppFont.subheadline())
+                        .foregroundStyle(Color.hxTextSecondary)
                         .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
                         .contentShape(Rectangle())
                 }
@@ -150,253 +192,160 @@ private struct BrainAboutSection: View {
     }
 }
 
-/// "Timeline": a person's encounters and the journal days that name them, newest first.
+/// "Timeline · 1 of 8" over a swipe deck (`CardStack`) of a person's encounters and the journal
+/// days that name them, newest first, one fixed-height `BrainDeckCard` each.
 struct BrainPersonTimeline: View {
     let entries: [BrainPersonLayout.Entry]
+    let open: (BrainRoute) -> Void
+    @State private var index = 0
+    @ScaledMetric(relativeTo: .body) private var deckHeight: CGFloat = BrainStyle.deckHeight
 
     var body: some View {
-        VStack(alignment: .leading, spacing: BrainStyle.s) {
-            BrainSectionHeader(title: "Timeline", count: entries.count)
-            LazyVStack(alignment: .leading, spacing: BrainStyle.s) {
-                ForEach(entries) { entry in
-                    switch entry.kind {
-                    case .encounter:
-                        BrainEncounterCard(entry: entry)
-                    case .journal(let mention):
-                        BrainJournalMentionCard(entry: entry, mention: mention)
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// One encounter on a neutral card: when, the headline, two more bullets and "N more" (or "More"
-/// when the rest is prose). Tapping the card adds the remaining bullets in the same style, then the
-/// prose as Markdown, where links open. A same-day journal entry sits at the foot.
-struct BrainEncounterCard: View {
-    let entry: BrainPersonLayout.Entry
-    /// The headline and preview without links: inside the tap target they could not open.
-    private let headline: AttributedString
-    private let preview: [AttributedString]
-    /// Every bullet after the headline, links kept, for the expanded card.
-    private let bullets: [AttributedString]
-    private let journalSnippet: AttributedString?
-    @State private var expanded = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    init(entry: BrainPersonLayout.Entry) {
-        self.entry = entry
-        self.headline = Self.unlinked(entry.headline)
-        self.preview = entry.preview.map(Self.unlinked)
-        self.bullets = (entry.preview + entry.rest).map(BrainArticleDigestView.inlineMarkdown)
-        self.journalSnippet = entry.journal.map {
-            BrainConnectionsLayout.highlighted($0.snippet, mention: $0.mention, paper: BrainModuleID.people.paper)
-        }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: BrainStyle.s) {
-            Group {
-                if entry.canExpand {
-                    Button(action: toggle) { header }
-                        .buttonStyle(.plain)
-                } else {
-                    header
-                }
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(Text(verbatim: accessibilityLabel))
-            .accessibilityValue(Text(verbatim: entry.canExpand ? (expanded ? "Expanded" : "Collapsed") : ""))
-            .accessibilityHint(Text(verbatim: entry.canExpand ? "Shows or hides every note" : ""))
-            if expanded {
-                if !bullets.isEmpty {
-                    BrainBulletList(lines: bullets, bullet: Color.hxTextSecondary)
-                }
-                if !entry.extra.isEmpty {
-                    MarkdownRenderer(content: entry.extra)
-                }
-                Button(action: toggle) {
-                    Text(verbatim: "Show less")
-                        .font(BrainStyle.rowSubtitle.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
-                        .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-            if let journal = entry.journal, let journalSnippet {
-                Rectangle().fill(Color.hxSeparator).frame(height: 0.5).accessibilityHidden(true)
-                BrainFoldedJournalRow(mention: journal, snippet: journalSnippet)
-            }
-        }
-        .padding(.horizontal, BrainStyle.cardHorizontalPadding)
-        .padding(.vertical, BrainStyle.cardVerticalPadding)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .brainCardSurface()
-    }
-
-    /// The meta line and headline, plus the preview and "N more" while collapsed; the whole row
-    /// (at least a tap target tall) toggles.
-    private var header: some View {
         VStack(alignment: .leading, spacing: BrainStyle.xs) {
-            Text(verbatim: entry.meta)
-                .brainText(.meta)
-            if !entry.headline.isEmpty {
-                Text(headline)
-                    .brainText(.rowTitle)
-                    .fontWeight(.semibold)
-                    .lineLimit(expanded ? nil : 1)
+            HXSectionHeader(title: "Timeline", trailing: BrainPersonLayout.position(index: index, count: entries.count))
+                .padding(.horizontal, 4)
+            CardStack(pages: entries, index: $index, tilt: { DeckStackView.tilt(ofID: $0.id) }) { entry, contentOpacity in
+                BrainTimelineCard(entry: entry, open: open, contentOpacity: contentOpacity)
+            } edge: { entry in
+                // Far down the stack only the card's paper shows, peeking out askew.
+                BrainBiteCard.shape
+                    .fill(BrainTimelineCard.paper(entry).card)
+                    .hxShadow(.stacked)
+                    .padding(.vertical, 12)
             }
-            if !expanded {
-                if !preview.isEmpty {
-                    BrainBulletList(lines: preview, bullet: Color.hxTextSecondary)
-                }
-                if entry.canExpand {
-                    Text(verbatim: entry.moreCount > 0 ? "\(entry.moreCount) more" : "More")
-                        .font(BrainStyle.rowSubtitle.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
-                }
+            // The review deck's height, cut to what fits in the reader's visible height.
+            .containerRelativeFrame(.vertical) { length, _ in
+                max(min(deckHeight, length - BrainStyle.xl * 2), BrainStyle.minimumDeckHeight)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .topLeading)
-        .contentShape(Rectangle())
-    }
-
-    /// "Oct 8, 2026 · 6 days ago. Gallery crawl. 2 more notes."
-    private var accessibilityLabel: String {
-        var parts = [entry.meta, String(headline.characters)].filter { !$0.isEmpty }
-        if !expanded, entry.moreCount > 0 {
-            parts.append("\(entry.moreCount) more \(entry.moreCount == 1 ? "note" : "notes")")
+        .onChange(of: entries.count) { _, count in
+            index = min(index, max(count - 1, 0))
         }
-        return parts.map { $0 + "." }.joined(separator: " ")
-    }
-
-    private func toggle() {
-        if reduceMotion {
-            expanded.toggle()
-        } else {
-            withAnimation(.snappy(duration: 0.2)) { expanded.toggle() }
-        }
-    }
-
-    private static func unlinked(_ text: String) -> AttributedString {
-        var attributed = BrainArticleDigestView.inlineMarkdown(text)
-        for run in attributed.runs where run.link != nil {
-            attributed[run.range].link = nil
-        }
-        return attributed
     }
 }
 
-/// A same-day journal entry at the foot of an encounter: the journal glyph, "Journal", and one
-/// line of the day's words in serif with the name marked. Opens the day.
-private struct BrainFoldedJournalRow: View {
-    let mention: BrainJournalMention
-    let snippet: AttributedString
-
-    var body: some View {
-        NavigationLink(value: ShellPushDestination.brainRoute(.page(.journal, mention.id))) {
-            HStack(alignment: .firstTextBaseline, spacing: BrainStyle.s) {
-                Image(systemName: BrainModuleID.journal.symbolName)
-                    .font(BrainStyle.meta.weight(.semibold))
-                    .foregroundStyle(Color.hxTextSecondary)
-                    .accessibilityHidden(true)
-                Text(verbatim: "Journal")
-                    .brainText(.meta)
-                Text(snippet)
-                    .font(AppFont.serif(style: .subheadline))
-                    .foregroundStyle(Color.hxTextPrimary)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .frame(minHeight: BrainStyle.minTapTarget)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isLink)
-    }
-}
-
-/// A journal day that names the person: lighter than an encounter, on a dashed hairline, with
-/// the day's words in serif and the name marked in the person paper. Opens the day.
-struct BrainJournalMentionCard: View {
+/// One timeline card, drawn like a review bite. An encounter wears the person paper: its
+/// kicker, the headline as the lead, then its bullets and any prose; a same-day journal entry
+/// adds "Open the journal day". A journal day on its own wears the journal paper, its words in
+/// serif with the name marked, and opens the day.
+private struct BrainTimelineCard: View {
     let entry: BrainPersonLayout.Entry
-    let mention: BrainJournalMention
-    private let snippet: AttributedString
+    let open: (BrainRoute) -> Void
+    var contentOpacity: Double = 1
+    /// Built once per card, never in `body`.
+    private let lead: AttributedString
+    private let bullets: [AttributedString]
 
-    init(entry: BrainPersonLayout.Entry, mention: BrainJournalMention) {
+    static func paper(_ entry: BrainPersonLayout.Entry) -> HermexPaper {
+        switch entry.kind {
+        case .encounter: BrainModuleID.people.paper
+        case .journal: BrainModuleID.journal.paper
+        }
+    }
+
+    init(entry: BrainPersonLayout.Entry, open: @escaping (BrainRoute) -> Void, contentOpacity: Double) {
         self.entry = entry
-        self.mention = mention
-        self.snippet = BrainConnectionsLayout.highlighted(entry.headline, mention: mention.mention,
-                                                          paper: BrainModuleID.people.paper)
+        self.open = open
+        self.contentOpacity = contentOpacity
+        switch entry.kind {
+        case .encounter:
+            self.lead = BrainArticleDigestView.inlineMarkdown(entry.headline)
+        case .journal(let mention):
+            self.lead = BrainConnectionsLayout.highlighted(entry.headline, mention: mention.mention,
+                                                           paper: BrainModuleID.people.paper)
+        }
+        self.bullets = (entry.preview + entry.rest).map(BrainArticleDigestView.inlineMarkdown)
+    }
+
+    /// The journal day the footer opens: the folded one, or the card's own.
+    private var journalID: String? {
+        switch entry.kind {
+        case .encounter: entry.journal?.id
+        case .journal(let mention): mention.id
+        }
     }
 
     var body: some View {
-        let shape = BrainStyle.cardShape()
-        NavigationLink(value: ShellPushDestination.brainRoute(.page(.journal, mention.id))) {
-            HStack(alignment: .firstTextBaseline, spacing: BrainStyle.m) {
-                Image(systemName: BrainModuleID.journal.symbolName)
-                    .font(BrainStyle.meta.weight(.semibold))
-                    .foregroundStyle(Color.hxTextSecondary)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: BrainStyle.xs) {
-                    Text(verbatim: entry.meta)
-                        .brainText(.meta)
-                    if !entry.headline.isEmpty {
-                        Text(snippet)
-                            .font(AppFont.serif(style: .subheadline))
-                            .foregroundStyle(Color.hxTextPrimary)
-                            .lineLimit(4)
-                            .multilineTextAlignment(.leading)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Image(systemName: "chevron.right")
-                    .font(BrainStyle.meta.weight(.semibold))
-                    .foregroundStyle(Color.hxTextSecondary)
-                    .accessibilityHidden(true)
+        let paper = Self.paper(entry)
+        BrainDeckCard(paper: paper, footer: "Open the journal day",
+                      open: journalID.map { id in { open(.page(.journal, id)) } },
+                      accessibilityLabel: accessibilityLabel, accessibilityValue: accessibilityValue,
+                      contentOpacity: contentOpacity) {
+            Text(verbatim: entry.kicker)
+                .font(AppFont.footnote(weight: .semibold))
+            if !entry.headline.isEmpty {
+                Text(lead)
+                    .font(leadFont)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 14)
             }
-            .padding(.horizontal, BrainStyle.cardHorizontalPadding)
-            .padding(.vertical, BrainStyle.cardVerticalPadding)
-            .frame(minHeight: BrainStyle.minTapTarget)
-            .background(Color.hxCanvas, in: shape)
-            .overlay(shape.strokeBorder(Color.hxSeparator, style: StrokeStyle(lineWidth: 0.5, dash: [4, 3])))
-            .contentShape(shape)
+            if !bullets.isEmpty {
+                BrainBulletList(lines: bullets, marker: "•", markerColor: paper.glow, textColor: Color.hxTextPrimary,
+                                font: AppFont.body())
+                    .padding(.top, 22)
+            }
+            if !entry.extra.isEmpty {
+                MarkdownRenderer(content: entry.extra)
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .padding(.top, bullets.isEmpty ? 22 : BrainStyle.m)
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isLink)
+    }
+
+    /// The Daily Deck's lead sizes; a journal day's words keep the serif.
+    private var leadFont: Font {
+        let style = DeckCardText.leadStyle(length: entry.headline.count, isQuote: false)
+        switch entry.kind {
+        case .encounter: return AppFont.display(style: style, weight: .semibold)
+        case .journal: return AppFont.serif(style: style)
+        }
+    }
+
+    /// "Encounter · Oct 8 · 6 days ago. Gallery crawl"
+    private var accessibilityLabel: String {
+        [entry.kicker, String(lead.characters)].filter { !$0.isEmpty }.joined(separator: ". ")
+    }
+
+    /// The notes under the lead, read after the label.
+    private var accessibilityValue: String {
+        let prose = entry.extra.split(whereSeparator: \.isNewline).map {
+            $0.trimmingCharacters(in: CharacterSet(charactersIn: "# ").union(.whitespaces))
+        }
+        return (bullets.map { String($0.characters) } + prose).filter { !$0.isEmpty }.joined(separator: ". ")
     }
 }
 
-/// Lines with a leading dot, the dot decorative.
+/// Lines with a leading marker, the marker decorative.
 private struct BrainBulletList: View {
     let lines: [AttributedString]
-    let bullet: Color
+    let marker: String
+    let markerColor: Color
+    let textColor: Color
+    let font: Font
 
     var body: some View {
-        VStack(alignment: .leading, spacing: BrainStyle.xs) {
+        VStack(alignment: .leading, spacing: BrainStyle.s) {
             // A fixed list from one page load, so position is a stable id.
             ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                 HStack(alignment: .firstTextBaseline, spacing: BrainStyle.s) {
-                    Text(verbatim: "•")
-                        .foregroundStyle(bullet)
+                    Text(verbatim: marker)
+                        .foregroundStyle(markerColor)
                         .accessibilityHidden(true)
                     Text(line)
-                        .foregroundStyle(Color.hxTextPrimary)
+                        .foregroundStyle(textColor)
                         .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .font(BrainStyle.rowSubtitle)
+                .font(font)
             }
         }
     }
 }
 
 #if DEBUG
-#Preview("Person timeline") {
+#Preview("Person page") {
     let person = BrainPerson(
         encounters: [
             BrainEncounter(id: "2026-10-08#0", date: "2026-10-08", title: "Gallery crawl",
@@ -417,7 +366,10 @@ private struct BrainBulletList: View {
         journal: [BrainJournalMention(id: "journal/2026/09-September/2026-09-25.md", date: "2026-09-25",
                                       snippet: "Dinner with Dara Quill after the opening.", mention: "Dara Quill"),
                   BrainJournalMention(id: "journal/2026/09-September/2026-09-10.md", date: "2026-09-10",
-                                      snippet: "Ran into Dara Quill at the market.", mention: "Dara Quill")])
+                                      snippet: "Ran into Dara Quill at the market.", mention: "Dara Quill")],
+        catchup: "Moving to Lisbon in spring and still deciding on the flat.",
+        threads: ["the Lisbon move", "her sister's visit"],
+        rhythm: [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 2, 1])
     let page = BrainPage(item: BrainItem(module: .people, id: "people/dara-quill.md", title: "Dara Quill",
                                          subtitle: "college friend"),
                          facts: [BrainFact(label: "Industry", value: "Robotics")], person: person)
@@ -425,11 +377,16 @@ private struct BrainBulletList: View {
     return NavigationStack {
         ScrollView {
             VStack(alignment: .leading, spacing: BrainStyle.xl) {
-                BrainPersonCardView(item: page.item, facts: [], subtitle: layout.subtitle)
-                BrainNextTimeCard(lines: layout.nextTime)
-                BrainProfileChips(chips: layout.chips)
+                VStack(alignment: .leading, spacing: BrainStyle.l) {
+                    BrainPersonCardView(item: page.item, facts: [], subtitle: layout.subtitle)
+                    BrainRhythmStrip(months: layout.rhythm, accessibilityLabel: layout.rhythmAccessibilityLabel)
+                    BrainProfileChips(chips: layout.chips)
+                }
+                if let catchUp = layout.catchUp {
+                    BrainCatchUpCard(catchUp: catchUp)
+                }
+                BrainPersonTimeline(entries: layout.timeline, open: { _ in })
                 BrainPersonAbout(sections: layout.aboutSections)
-                BrainPersonTimeline(entries: layout.timeline)
             }
             .padding(BrainStyle.l)
         }

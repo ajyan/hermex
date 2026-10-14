@@ -8,25 +8,36 @@ struct BrainPersonLayout: Equatable {
         /// The encounter id, or `"journal:" + journal id`.
         let id: String
         let kind: Kind
-        /// "Oct 8, 2026 · 6 days ago" for an encounter, "Journal · Sep 25, 2026" for a journal day.
-        let meta: String
+        /// "Encounter · Oct 8 · 6 days ago" or "Journal · Sep 25 · 3 weeks ago": the deck card's
+        /// first line. The relative part drops when the date is not an ISO day.
+        let kicker: String
         /// An encounter's title (else its first bullet); a journal day's snippet.
         let headline: String
         /// Up to two bullets after the headline (encounters only).
         let preview: [String]
-        /// The bullets after the preview, shown when the card expands.
+        /// The bullets after the preview.
         let rest: [String]
         /// The body's other lines (prose, `_Source:` lines, `####` subheads), joined by newlines;
-        /// shown as Markdown under the bullets when the card expands. Empty when there are none.
+        /// shown as Markdown under the bullets. Empty when there are none.
         let extra: String
-        /// A journal day with the encounter's date, shown at the card's foot instead of as its own
-        /// card. Its snippet has the list marker dropped.
+        /// A journal day with the encounter's date, opened from the card's footer instead of
+        /// getting a card of its own. Its snippet has the list marker dropped.
         let journal: BrainJournalMention?
+    }
 
-        /// Bullets beyond the headline and preview.
-        var moreCount: Int { rest.count }
-        /// The encounter holds more than the headline and preview show.
-        var canExpand: Bool { !rest.isEmpty || !extra.isEmpty }
+    /// The Catch up card: the nightly digest's recap, then its lines (a near birthday first,
+    /// then the open threads).
+    struct CatchUp: Equatable {
+        let summary: String?
+        let lines: [String]
+    }
+
+    /// One month of the rhythm strip, oldest (`id` 0) to this month (`id` 11).
+    struct RhythmMonth: Equatable, Identifiable {
+        let id: Int
+        /// "Nov"
+        let label: String
+        let seen: Bool
     }
 
     /// One titled group of profile lines in the About card ("Family", "Work", ...).
@@ -40,14 +51,18 @@ struct BrainPersonLayout: Equatable {
 
     /// Relationship, location, and "seen <relative>", non-empty parts joined by " · ".
     let subtitle: String
-    /// At most three: "Birthday <MMM d>", the first Company item (else the Industry fact), the
-    /// first School item. A value over 32 characters is left out (it stays in About).
+    /// At most three: "Birthday <MMM d>", the first Company item (else, or when it is over 32
+    /// characters, the Industry fact), the first School item. A value over 32 characters is left
+    /// out (it stays in About).
     let chips: [String]
     /// The profile less the chips: Family, Work, School, Likes, every other section under its own
     /// label in server order, then the open questions. Same-title sections merge; empty ones drop.
     let aboutSections: [AboutSection]
-    /// A birthday line when the next birthday is within 30 days, else empty.
-    let nextTime: [String]
+    /// The recap and its lines (a birthday within 30 days, then the threads); nil when both are empty.
+    let catchUp: CatchUp?
+    /// The last twelve months, oldest first, ending with today's month; empty unless the server
+    /// sent exactly twelve counts.
+    let rhythm: [RhythmMonth]
     /// Encounters and journal days, newest first; on one date, encounters before journal. A
     /// journal day with an encounter on its date folds into the first such encounter. Ids are unique.
     let timeline: [Entry]
@@ -58,10 +73,21 @@ struct BrainPersonLayout: Equatable {
         let days = DayMath(today: today, calendar: calendar)
         subtitle = Self.subtitle(page: page, person: person, days: days)
         (chips, aboutSections) = Self.chipsAndAbout(page: page, person: person)
-        nextTime = Self.nextTime(person: person, days: days)
+        catchUp = Self.catchUp(person: person, days: days)
+        rhythm = Self.rhythm(person.rhythm, today: today, calendar: calendar)
         let journal = person.journal.filter { !$0.id.isEmpty }
         timeline = Self.timeline(encounters: person.encounters.filter { !$0.id.isEmpty }, journal: journal, days: days)
         hiddenMentionIDs = Set(journal.map(\.id))
+    }
+
+    /// "Seen in 4 of the last 12 months"; empty without a rhythm.
+    var rhythmAccessibilityLabel: String {
+        rhythm.isEmpty ? "" : "Seen in \(rhythm.filter(\.seen).count) of the last 12 months"
+    }
+
+    /// The timeline header's "3 of 8" for the card at `index`.
+    static func position(index: Int, count: Int) -> String {
+        "\(min(index + 1, count)) of \(count)"
     }
 
     /// "Father: Bo Test" as a role and a value, when the text before the first ": " is a short
@@ -98,7 +124,7 @@ struct BrainPersonLayout: Equatable {
         "\(count) \(unit)\(count == 1 ? "" : "s") ago"
     }
 
-    // MARK: Subtitle and next time
+    // MARK: Subtitle, catch up and rhythm
 
     private static func subtitle(page: BrainPage, person: BrainPerson, days: DayMath) -> String {
         var parts = [page.item.subtitle, fact("Location", in: page) ?? ""]
@@ -111,14 +137,39 @@ struct BrainPersonLayout: Equatable {
             .joined(separator: " · ")
     }
 
-    private static func nextTime(person: BrainPerson, days: DayMath) -> [String] {
-        guard let iso = person.nextBirthday, let away = days.daysAhead(iso), (0...30).contains(away) else { return [] }
+    private static func catchUp(person: BrainPerson, days: DayMath) -> CatchUp? {
+        let summary = person.catchup?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let threads = person.threads.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        let lines = birthdayLine(person: person, days: days).map { [$0] + threads } ?? threads
+        let recap = summary?.isEmpty == false ? summary : nil
+        return recap == nil && lines.isEmpty ? nil : CatchUp(summary: recap, lines: lines)
+    }
+
+    /// "Birthday Oct 26, in 12 days" when the next birthday is within 30 days.
+    private static func birthdayLine(person: BrainPerson, days: DayMath) -> String? {
+        guard let iso = person.nextBirthday, let away = days.daysAhead(iso), (0...30).contains(away) else { return nil }
         switch away {
-        case 0: return ["Birthday today"]
-        case 1: return ["Birthday \(monthDay(iso) ?? iso), in 1 day"]
-        default: return ["Birthday \(monthDay(iso) ?? iso), in \(away) days"]
+        case 0: return "Birthday today"
+        case 1: return "Birthday \(monthDay(iso) ?? iso), in 1 day"
+        default: return "Birthday \(monthDay(iso) ?? iso), in \(away) days"
         }
     }
+
+    private static func rhythm(_ counts: [Int], today: Date, calendar: Calendar) -> [RhythmMonth] {
+        guard counts.count == 12 else { return [] }
+        let month = calendar.component(.month, from: today)
+        return counts.enumerated().map { offset, count in
+            // Eleven months back is `offset` 0; months are 1...12.
+            let label = monthSymbols[((month - 1 + offset - 11) % 12 + 12) % 12]
+            return RhythmMonth(id: offset, label: label, seen: count > 0)
+        }
+    }
+
+    private static let monthSymbols: [String] = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter.shortMonthSymbols
+    }()
 
     // MARK: Chips and About
 
@@ -158,7 +209,7 @@ struct BrainPersonLayout: Equatable {
             if let item { usedItems.insert(item) }
         }
         if let birthday = fact("Birthday", in: page) { addChip("Birthday " + (monthDay(birthday) ?? birthday)) }
-        if let company = firstItem(labelled: "company") {
+        if let company = firstItem(labelled: "company"), company.text.count <= chipLimit {
             addChip(company.text, item: company.key)
         } else {
             addChip(fact("Industry", in: page))
@@ -225,7 +276,7 @@ struct BrainPersonLayout: Equatable {
         }
         let rows: [(sortDate: String, order: Int, entry: Entry)] =
             encounters.enumerated().map { ($1.date.isoDay ?? "", $0, encounterEntry($1, journal: folded[$1.id], days: days)) }
-            + separate.enumerated().map { ($1.date.isoDay ?? "", encounters.count + $0, journalEntry($1)) }
+            + separate.enumerated().map { ($1.date.isoDay ?? "", encounters.count + $0, journalEntry($1, days: days)) }
         // An encounter id can still collide with a `journal:` id; the first in timeline order wins.
         var seen: Set<String> = []
         return rows
@@ -258,9 +309,8 @@ struct BrainPersonLayout: Equatable {
             headline = bullets.first ?? ""
             items = Array(bullets.dropFirst())
         }
-        var meta = BrainStyle.displayDate(encounter.date)
-        if let ago = days.daysAgo(encounter.date) { meta += " · " + relative(daysAgo: ago) }
-        return Entry(id: encounter.id, kind: .encounter(encounter), meta: meta, headline: headline,
+        return Entry(id: encounter.id, kind: .encounter(encounter),
+                     kicker: kicker("Encounter", date: encounter.date, days: days), headline: headline,
                      preview: Array(items.prefix(2)), rest: Array(items.dropFirst(2)),
                      extra: extraLines(encounter.body, shown: Set(bullets + [headline])), journal: journal)
     }
@@ -289,10 +339,19 @@ struct BrainPersonLayout: Equatable {
         return lines.joined(separator: "\n")
     }
 
-    private static func journalEntry(_ mention: BrainJournalMention) -> Entry {
+    private static func journalEntry(_ mention: BrainJournalMention, days: DayMath) -> Entry {
         Entry(id: "journal:" + mention.id, kind: .journal(mention),
-              meta: "Journal · " + BrainStyle.displayDate(mention.date),
+              kicker: kicker("Journal", date: mention.date, days: days),
               headline: stripMarker(mention.snippet), preview: [], rest: [], extra: "", journal: nil)
+    }
+
+    /// "Encounter · Oct 8 · 6 days ago"; a date that is not an ISO day shows as sent, without
+    /// the relative part.
+    private static func kicker(_ kind: String, date: String, days: DayMath) -> String {
+        let raw = date.trimmingCharacters(in: .whitespacesAndNewlines)
+        var parts = [kind, monthDay(raw) ?? raw]
+        if let ago = days.daysAgo(raw) { parts.append(relative(daysAgo: ago)) }
+        return parts.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
     /// Drops one leading "- " or "* " list marker; nested lines after the first newline are kept.

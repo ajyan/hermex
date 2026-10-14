@@ -177,6 +177,26 @@ final class BrainModelsTests: XCTestCase {
         XCTAssertEqual(person.journal[1].snippet, "Lunch with Dara Quill downtown.")
     }
 
+    func testPersonCatchUpThreadsAndRhythmDecode() throws {
+        let json = #"{"catchup": "Moving to Lisbon in spring; ask about the flat.", "threads": ["the Lisbon move", 7, "her sister's visit"], "rhythm": [0, 1, 0, 0, 2, 0, 0, 0, 1, 0, 0, 3]}"#
+        let person = try appDecoder.decode(BrainPerson.self, from: Data(json.utf8))
+        XCTAssertEqual(person.catchup, "Moving to Lisbon in spring; ask about the flat.")
+        XCTAssertEqual(person.threads, ["the Lisbon move", "her sister's visit"])
+        XCTAssertEqual(person.rhythm, [0, 1, 0, 0, 2, 0, 0, 0, 1, 0, 0, 3])
+    }
+
+    func testPersonWithoutCatchUpKeysDefaults() throws {
+        let person = try appDecoder.decode(BrainPage.self, from: pageJSON(withPerson: personJSON)).person
+        XCTAssertNil(person?.catchup)
+        XCTAssertEqual(person?.threads, [])
+        XCTAssertEqual(person?.rhythm, [])
+        let nulls = #"{"catchup": null, "threads": null, "rhythm": "soon"}"#
+        let decoded = try appDecoder.decode(BrainPerson.self, from: Data(nulls.utf8))
+        XCTAssertNil(decoded.catchup)
+        XCTAssertEqual(decoded.threads, [])
+        XCTAssertEqual(decoded.rhythm, [])
+    }
+
     func testPageWithoutPersonDecodesNil() throws {
         let page = try appDecoder.decode(BrainPage.self, from: Data(pageJSON.utf8))
         XCTAssertNil(page.person)

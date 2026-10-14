@@ -200,8 +200,9 @@ struct BrainReaderView: View {
 /// A loaded page, top to bottom: the cover (only without links), the trail, title block
 /// (or person card), tags, the linked-page cards, body, linked and unlinked mentions,
 /// Further reading, and journal paging. A person page the server structured (`page.person`)
-/// adds Next time and the profile chips under its header, and reads as its timeline, then
-/// the leftover Markdown, with the timeline's journal days left out of the mentions.
+/// adds the rhythm strip and profile chips under its header, then Catch up, the timeline deck
+/// and About, then the leftover Markdown, with the timeline's journal days left out of the
+/// mentions.
 struct BrainReaderContent: View {
     let page: BrainPage
     let isShowingCachedCopy: Bool
@@ -278,6 +279,13 @@ struct BrainReaderContent: View {
                     }
                     if let personLayout {
                         BrainPersonCardView(item: page.item, facts: [], subtitle: personLayout.subtitle)
+                        if !personLayout.rhythm.isEmpty {
+                            BrainRhythmStrip(months: personLayout.rhythm,
+                                             accessibilityLabel: personLayout.rhythmAccessibilityLabel)
+                        }
+                        if !personLayout.chips.isEmpty {
+                            BrainProfileChips(chips: personLayout.chips)
+                        }
                     } else if page.item.module == .people {
                         BrainPersonCardView(item: page.item, facts: page.facts)
                     } else {
@@ -287,20 +295,10 @@ struct BrainReaderContent: View {
                         tagRow
                     }
                 }
-                if let personLayout, !personLayout.nextTime.isEmpty || !personLayout.chips.isEmpty
-                    || !personLayout.aboutSections.isEmpty {
-                    VStack(alignment: .leading, spacing: BrainStyle.l) {
-                        if !personLayout.nextTime.isEmpty {
-                            BrainNextTimeCard(lines: personLayout.nextTime)
-                        }
-                        if !personLayout.chips.isEmpty {
-                            BrainProfileChips(chips: personLayout.chips)
-                        }
-                        if !personLayout.aboutSections.isEmpty {
-                            BrainPersonAbout(sections: personLayout.aboutSections)
-                        }
-                    }
-                    .environment(\.openURL, brainLinks)
+                if let personLayout {
+                    // Outside the body's hub swipe, so paging the timeline never pages the hub.
+                    personSections(personLayout)
+                        .environment(\.openURL, brainLinks)
                 }
                 if !linkCards.isEmpty {
                     BrainLinkCardsRow(refs: linkCards)
@@ -339,13 +337,23 @@ struct BrainReaderContent: View {
             }
     }
 
+    /// A structured person page's Catch up, Timeline and About, in that order.
+    @ViewBuilder
+    private func personSections(_ layout: BrainPersonLayout) -> some View {
+        if let catchUp = layout.catchUp {
+            BrainCatchUpCard(catchUp: catchUp)
+        }
+        if !layout.timeline.isEmpty {
+            BrainPersonTimeline(entries: layout.timeline, open: push)
+        }
+        if !layout.aboutSections.isEmpty {
+            BrainPersonAbout(sections: layout.aboutSections)
+        }
+    }
+
     @ViewBuilder
     private var bodyAndMentions: some View {
-        if let personLayout, let person = page.person {
-            if !personLayout.timeline.isEmpty {
-                BrainPersonTimeline(entries: personLayout.timeline)
-                    .environment(\.openURL, brainLinks)
-            }
+        if personLayout != nil, let person = page.person {
             if !person.other.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 MarkdownRenderer(content: person.other)
                     .environment(\.openURL, brainLinks)
