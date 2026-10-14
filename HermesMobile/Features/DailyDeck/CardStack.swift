@@ -1,0 +1,185 @@
+import SwiftUI
+
+/// A swipeable stack of cards: swipe left for the next card, right to pull the previous
+/// one back on top. Only the top two cards render content; the third is a bare edge
+/// peeking out underneath. Under Reduce Motion the cards stay put while dragging and
+/// crossfade on commit. Callers own the horizontal padding and anything drawn over the stack.
+struct CardStack<Page: Identifiable, Card: View, Edge: View>: View {
+    let pages: [Page]
+    @Binding var index: Int
+    /// The page animating out of the stack (Not for Me); nil otherwise.
+    var droppingID: Page.ID? = nil
+    let tilt: (Page) -> Double
+    @ViewBuilder let card: (Page, _ contentOpacity: Double) -> Card
+    /// What a card far down the stack shows: its bare paper.
+    @ViewBuilder let edge: (Page) -> Edge
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Horizontal drag of the top card (negative: toward next). A positive drag pulls
+    /// the previous card in from the left instead of moving the top one.
+    @State private var dragX: CGFloat = 0
+    /// Locks a drag to the axis it started on, so vertical scrolling never pages.
+    @State private var dragAxis: Axis?
+
+    /// How far past the edge a card flies, as a multiple of the stack's width.
+    private static var fly: CGFloat { 1.4 }
+    private static var peek: CGFloat { 8 }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = max(proxy.size.width, 1)
+            ZStack {
+                ForEach(layers(width: width)) { layer in
+                    cardView(layer, width: width)
+                }
+            }
+            .padding(.bottom, Self.peek * 2)
+            .contentShape(Rectangle())
+            .simultaneousGesture(drag(width: width))
+            .accessibilityElement(children: .contain)
+            .accessibilityScrollAction { edge in
+                switch edge {
+                case .trailing, .bottom: advance(width: width)
+                case .leading, .top: retreat(width: width)
+                }
+            }
+            .accessibilityAction(named: Text(verbatim: "Next Card")) { advance(width: width) }
+            .accessibilityAction(named: Text(verbatim: "Previous Card")) { retreat(width: width) }
+        }
+        .sensoryFeedback(.impact(weight: .light), trigger: currentID)
+    }
+
+    private var currentID: Page.ID? {
+        pages.indices.contains(index) ? pages[index].id : nil
+    }
+
+    // MARK: Layers
+
+    private struct Layer: Identifiable {
+        let page: Page
+        /// 0 is the top card; each level below sits a little lower and smaller.
+        let depth: CGFloat
+        let x: CGFloat
+        var id: Page.ID { page.id }
+    }
+
+    /// The cards to draw, top first. While the top card travels toward next (or drops),
+    /// the ones under it rise by the same fraction, so committing never jumps.
+    private func layers(width: CGFloat) -> [Layer] {
+        guard pages.indices.contains(index) else { return [] }
+        let travel = width * 0.6
+        let top: Layer, rise: CGFloat, firstBelow: Int
+        if dragX > 0, index > 0 {
+            // Pulling the previous card back in from the left, over the current one.
+            let incoming = min(0, -Self.fly * width + dragX * Self.fly)
+            top = Layer(page: pages[index - 1], depth: 0, x: incoming)
+            rise = min(-incoming / travel, 1)
+            firstBelow = index
+        } else {
+            top = Layer(page: pages[index], depth: 0, x: dragX)
+            rise = droppingID == nil ? min(max(-dragX / travel, 0), 1) : 1
+            firstBelow = index + 1
+        }
+        let below = (firstBelow..<min(firstBelow + 2, pages.count)).enumerated().map { offset, position in
+            Layer(page: pages[position], depth: CGFloat(offset + 1) - rise, x: 0)
+        }
+        return [top] + below
+    }
+
+    @ViewBuilder
+    private func cardView(_ layer: Layer, width: CGFloat) -> some View {
+        let isTop = layer.depth == 0 && layer.page.id == currentID
+        let dropping = layer.page.id == droppingID
+        Group {
+            if layer.depth < 1.5 {
+                card(layer.page, max(0, 1 - Double(layer.depth) * 1.6))
+            } else {
+                edge(layer.page)
+            }
+        }
+        .scaleEffect((1 - 0.04 * max(layer.depth, 0)) * (dropping ? 0.85 : 1), anchor: .bottom)
+        // Cards under the top one sit a little askew, like a real deck; they straighten as they rise.
+        .rotationEffect(.degrees(tilt(layer.page) * min(max(layer.depth, 0), 1)))
+        .offset(x: layer.x, y: Self.peek * max(layer.depth, 0) + (dropping ? 140 : 0))
+        .rotationEffect(.degrees(Double(layer.x / width) * 12), anchor: .bottom)
+        .opacity(dropping ? 0 : 1)
+        .zIndex(-Double(layer.depth))
+        .allowsHitTesting(isTop)
+        .accessibilityHidden(!isTop)
+        .transition(.opacity)
+    }
+
+    // MARK: Moving
+
+    private func drag(width: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 12)
+            .onChanged { value in
+                guard droppingID == nil else { return }
+                if dragAxis == nil {
+                    dragAxis = abs(value.translation.width) > abs(value.translation.height) ? .horizontal : .vertical
+                }
+                guard dragAxis == .horizontal, !reduceMotion else { return }
+                dragX = resisted(value.translation.width)
+            }
+            .onEnded { value in
+                defer { dragAxis = nil }
+                guard dragAxis == .horizontal, droppingID == nil else { return }
+                let moved = value.translation.width, flung = value.predictedEndTranslation.width
+                if moved < -width * 0.3 || flung < -width * 0.6 {
+                    advance(width: width)
+                } else if moved > width * 0.3 || flung > width * 0.6 {
+                    retreat(width: width)
+                } else {
+                    settle()
+                }
+            }
+    }
+
+    /// Past either end of the deck the card only gives a little.
+    private func resisted(_ x: CGFloat) -> CGFloat {
+        let atEnd = x < 0 ? index >= pages.count - 1 : index == 0
+        return atEnd ? x * 0.2 : x
+    }
+
+    private func advance(width: CGFloat) {
+        guard index < pages.count - 1 else { return settle() }
+        guard !reduceMotion else {
+            withAnimation(.easeInOut(duration: 0.2)) { index += 1 }
+            return
+        }
+        withAnimation(.spring(duration: 0.35, bounce: 0)) {
+            dragX = -Self.fly * width
+        } completion: {
+            withoutAnimation {
+                index += 1
+                dragX = 0
+            }
+        }
+    }
+
+    /// Pulls the previous card back over the top one, from wherever the drag left it.
+    private func retreat(width: CGFloat) {
+        guard index > 0 else { return settle() }
+        guard !reduceMotion else {
+            withAnimation(.easeInOut(duration: 0.2)) { index -= 1 }
+            return
+        }
+        let incoming = min(0, -Self.fly * width + max(dragX, 0) * Self.fly)
+        withoutAnimation {
+            index -= 1
+            dragX = incoming
+        }
+        withAnimation(.spring(duration: 0.4, bounce: 0.15)) { dragX = 0 }
+    }
+
+    private func settle() {
+        withAnimation(reduceMotion ? nil : .spring(duration: 0.4, bounce: 0.3)) { dragX = 0 }
+    }
+}
+
+/// Runs a state change with animations disabled, so a commit never replays as motion.
+func withoutAnimation(_ change: () -> Void) {
+    var transaction = Transaction()
+    transaction.disablesAnimations = true
+    withTransaction(transaction, change)
+}
