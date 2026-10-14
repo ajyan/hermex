@@ -416,3 +416,41 @@ final class BrainJournalCalendarTests: XCTestCase {
         XCTAssertEqual(Layout.spokenDate("2026-10-06", locale: english), "Tuesday, October 6, 2026")
     }
 }
+
+final class BrainPeopleSearchTests: XCTestCase {
+    private func person(_ name: String) -> BrainItem {
+        BrainItem(module: .people, id: "crm/contacts/\(name).md", title: name)
+    }
+
+    private func names(_ query: String, in list: [String]) -> [String] {
+        BrainPeopleSearch.matches(list.map(person), query: query).map(\.title)
+    }
+
+    func testBlankQueryKeepsEveryoneInOrder() {
+        let list = ["Brian Wang", "Alex Fisher", "Ann Lei"]
+        XCTAssertEqual(names("", in: list), list)
+        XCTAssertEqual(names("   ", in: list), list)
+    }
+
+    func testMatchesTheStartOfAnyWordInTheName() {
+        let list = ["Alex Fisher", "Brian Wang", "Ann Lei"]
+        XCTAssertEqual(names("wang", in: list), ["Brian Wang"])
+        XCTAssertEqual(names("fi", in: list), ["Alex Fisher"])
+        XCTAssertEqual(names("ang", in: list), [], "the middle of a word is not a match")
+    }
+
+    func testIgnoresCaseAndAccents() {
+        XCTAssertEqual(names("JOSE", in: ["José Núñez"]), ["José Núñez"])
+        XCTAssertEqual(names("nun", in: ["José Núñez"]), ["José Núñez"])
+    }
+
+    func testFirstNameMatchesRankAboveLaterWordMatches() {
+        let list = ["Alex Brown", "Brett Stallon", "Brian Wang"]
+        XCTAssertEqual(names("br", in: list), ["Brett Stallon", "Brian Wang", "Alex Brown"])
+    }
+
+    func testEveryTypedWordMustMatchSomeWord() {
+        let list = ["Ben Strawsburg", "Brett Stallon", "Ben Lee"]
+        XCTAssertEqual(names("ben st", in: list), ["Ben Strawsburg"])
+    }
+}
