@@ -304,6 +304,8 @@ struct BrainRow<Leading: View>: View {
     /// A trailing accent capsule (e.g. an upcoming birthday); read by VoiceOver.
     let badge: String?
     let subtitleLineLimit: Int
+    /// Nil lets the title wrap in full (the card grows), for rows whose title is a sentence.
+    let titleLineLimit: Int?
 
     init(
         @ViewBuilder leading: () -> Leading,
@@ -311,7 +313,8 @@ struct BrainRow<Leading: View>: View {
         subtitle: String? = nil,
         trailing: String? = nil,
         badge: String? = nil,
-        subtitleLineLimit: Int = 2
+        subtitleLineLimit: Int = 2,
+        titleLineLimit: Int? = 2
     ) {
         self.leading = leading()
         self.title = title
@@ -319,6 +322,7 @@ struct BrainRow<Leading: View>: View {
         self.trailing = trailing
         self.badge = badge
         self.subtitleLineLimit = subtitleLineLimit
+        self.titleLineLimit = titleLineLimit
     }
 
     var body: some View {
@@ -327,7 +331,8 @@ struct BrainRow<Leading: View>: View {
             VStack(alignment: .leading, spacing: BrainStyle.xs) {
                 Text(verbatim: title)
                     .brainText(.rowTitle)
-                    .lineLimit(2)
+                    .lineLimit(titleLineLimit)
+                    .fixedSize(horizontal: false, vertical: titleLineLimit == nil)
                 if let subtitle, !subtitle.isEmpty {
                     Text(verbatim: subtitle)
                         .brainText(.rowSubtitle)
@@ -373,9 +378,9 @@ struct BrainBadge: View {
 
 extension BrainRow where Leading == EmptyView {
     init(title: String, subtitle: String? = nil, trailing: String? = nil, badge: String? = nil,
-         subtitleLineLimit: Int = 2) {
+         subtitleLineLimit: Int = 2, titleLineLimit: Int? = 2) {
         self.init(leading: { EmptyView() }, title: title, subtitle: subtitle, trailing: trailing,
-                  badge: badge, subtitleLineLimit: subtitleLineLimit)
+                  badge: badge, subtitleLineLimit: subtitleLineLimit, titleLineLimit: titleLineLimit)
     }
 }
 
