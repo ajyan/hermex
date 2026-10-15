@@ -84,6 +84,36 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let scale: [String]
     /// A sleep card's numbers from the user's watch.
     let sleep: DeckSleep?
+    /// The vault file the card came from (`ref.link`, "wiki/nyc-marathon"); nil for pooled
+    /// material with no page of its own (books, quotes, videos).
+    let link: String?
+
+    /// The Brain page the card's source opens, by the vault folder its link lives in.
+    var sourceRoute: BrainRoute? { link.flatMap(Self.brainRoute(forLink:)) }
+
+    /// A vault path as the Brain page it is: the folder decides the module (the server's
+    /// `brain_catalog` scans the same folders) and the page id is the path with `.md`.
+    static func brainRoute(forLink link: String) -> BrainRoute? {
+        let folders: [(String, BrainModuleID)] = [
+            ("wiki/", .wiki), ("journal/", .journal), ("email_ingest/summaries/", .articles),
+            ("crm/contacts/", .people), ("youtube_highlights/summaries/", .highlights),
+        ]
+        let path = link.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+        guard let module = folders.first(where: { path.hasPrefix($0.0) })?.1 else { return nil }
+        return .page(module, path.hasSuffix(".md") ? path : path + ".md")
+    }
+
+    /// The open card's foot button for a source in `module`.
+    static func openTitle(for route: BrainRoute) -> String {
+        guard case .page(let module, _) = route else { return "Open in Brain" }
+        switch module {
+        case .wiki: return "Open the page"
+        case .journal: return "Open the journal day"
+        case .articles: return "Open the article"
+        case .people: return "Open their page"
+        case .highlights: return "Open the video"
+        }
+    }
 
     /// Whether answering this card means typing (prompt and reflect cards, and a sleep card's note).
     var takesText: Bool { type == .prompt || type == .reflect || type == .sleep }
@@ -98,9 +128,11 @@ struct DeckCard: Decodable, Equatable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case id, type, title, body, source, lines, question, context, voice, why, draft, actions, fallback
-        case reason, altQuestions, entries, recap, scale, sleep, points, meters, color
+        case reason, altQuestions, entries, recap, scale, sleep, points, meters, color, ref
         case itemKind = "kind"
     }
+
+    private struct Ref: Decodable { let link: String? }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -128,6 +160,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         color = try? c.decodeIfPresent(String.self, forKey: .color)
         scale = (try? c.decodeIfPresent([String].self, forKey: .scale)) ?? []
         sleep = try? c.decodeIfPresent(DeckSleep.self, forKey: .sleep)
+        link = (try? c.decodeIfPresent(Ref.self, forKey: .ref))?.link.flatMap { $0.isEmpty ? nil : $0 }
     }
 }
 

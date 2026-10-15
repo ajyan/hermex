@@ -171,7 +171,6 @@ struct BrainHomeView: View {
                 switch page {
                 case .bite(let bite):
                     BrainBiteCard(bite: bite, open: { open(bite) }, contentOpacity: contentOpacity)
-                        .zoomSource(for: .brainRoute(route(bite)), cornerRadius: HXRadius.xl)
                 case .summary:
                     BrainReviewSummaryCard(bites: bites, hasMore: viewModel.home.hasMore,
                                            onMore: { await viewModel.dealMore() }, contentOpacity: contentOpacity)

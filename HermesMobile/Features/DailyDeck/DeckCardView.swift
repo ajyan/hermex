@@ -11,10 +11,14 @@ struct DeckPageView: View {
     let file: () -> Void
     /// Cards under the top one show only their paper; their words fade in as they rise.
     var contentOpacity: Double = 1
+    /// The card opened to fill the screen: its words without the card's own surface.
+    var isOpen = false
+
+    @Environment(\.openBrainRoute) private var openBrainRoute
 
     var body: some View {
         let palette = DeckPalette.of(page)
-        Group {
+        let words = Group {
             switch page {
             case .card(let card):
                 DeckCardView(card: card, palette: palette, viewModel: viewModel, file: file)
@@ -23,8 +27,23 @@ struct DeckPageView: View {
             }
         }
         .opacity(contentOpacity)
-        .hxCardSurface(palette.cardRole, clipsContent: true)
-        .padding(.vertical, 12)
+        if isOpen {
+            words
+        } else {
+            words
+                .hxCardSurface(palette.cardRole, clipsContent: true)
+                .opensAsFullCard(palette.cardRole, title: palette.name, action: sourceAction) {
+                    DeckPageView(page: page, viewModel: viewModel, file: file, isOpen: true)
+                }
+                .padding(.vertical, 12)
+        }
+    }
+
+    /// "Open the page" on an open card whose source is a Brain page.
+    private var sourceAction: HXCardAction? {
+        guard case .card(let card) = page, let route = card.sourceRoute, openBrainRoute.isAvailable else { return nil }
+        let open = openBrainRoute
+        return HXCardAction(title: DeckCard.openTitle(for: route)) { open(route) }
     }
 }
 
