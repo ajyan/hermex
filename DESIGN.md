@@ -140,7 +140,7 @@ No `.system(size:)` on text. The one exception: an SF Symbol inside a fixed-size
 
 ## Motion
 
-A live chip fades in as its call arrives (off for replays and under Reduce Motion), and opening the log uses the chat disclosure motion. A card or chip that opens a screen is its zoom source (`.zoomSource(for:cornerRadius:)`): the screen grows out of it and shrinks back into it on the way back, with the system's crossfade under Reduce Motion. Goal cards, Brain home rows, link cards, module grid cards, Prep track cards, and chat citation chips zoom; screens the drawer opens slide in as usual. Nothing loops or repaints continuously.
+A live chip fades in as its call arrives (off for replays and under Reduce Motion), and opening the log uses the chat disclosure motion. A card or chip that opens a screen is its zoom source (`.zoomSource(for:cornerRadius:)`): the screen grows out of it and shrinks back into it on the way back, with the system's crossfade under Reduce Motion. Goal cards, Brain home rows, link cards, module grid cards, Prep track cards, and chat citation chips zoom; screens the drawer opens slide in as usual. Nothing loops or repaints continuously, with one exception: while Atlas grades a Prep answer, the submit button's sparkle breathes (a symbol effect, still under Reduce Motion) beside a once-a-second counter, because that wait runs long enough to look stuck.
 
 ## Decisions and exceptions
 

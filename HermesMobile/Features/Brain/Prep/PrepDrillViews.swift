@@ -830,18 +830,55 @@ struct PrepFlagCardButton: View {
 struct PrepPrimaryButton: View {
     let title: String
     var enabled = true
+    /// An answer is out for grading: the button keeps its tint, ignores taps, and shows
+    /// `PrepGradingLabel` in place of the title.
+    var isGrading = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Text(verbatim: title)
-                .font(AppFont.body(weight: .semibold))
-                .frame(maxWidth: .infinity)
+            Group {
+                if isGrading {
+                    PrepGradingLabel()
+                } else {
+                    Text(verbatim: title)
+                }
+            }
+            .font(AppFont.body(weight: .semibold))
+            .frame(maxWidth: .infinity)
         }
         .buttonStyle(.borderedProminent)
         .buttonBorderShape(.capsule)
         .controlSize(.large)
-        .disabled(!enabled)
+        .disabled(!enabled && !isGrading)
+        .allowsHitTesting(!isGrading)
+    }
+}
+
+/// The wait while Atlas grades an answer: a breathing sparkle and the seconds since submit.
+/// The symbol effect runs in the render server and the counter ticks once a second inside a
+/// `TimelineView` scoped to this label, so nothing else re-renders. Under Reduce Motion the
+/// sparkle holds still and the counter alone shows the wait is alive.
+private struct PrepGradingLabel: View {
+    @State private var startedAt = Date.now
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        TimelineView(.periodic(from: startedAt, by: 1)) { context in
+            let seconds = max(0, Int(context.date.timeIntervalSince(startedAt)))
+            HStack(spacing: BrainStyle.s) {
+                Image(systemName: "sparkles")
+                    .symbolEffect(.breathe, isActive: !reduceMotion)
+                Text(verbatim: "Grading")
+                Text(verbatim: "\(seconds)s")
+                    .monospacedDigit()
+                    .opacity(0.7)
+                    .contentTransition(.numericText(countsDown: false))
+                    .animation(reduceMotion ? nil : .default, value: seconds)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "Grading your answer"))
     }
 }
 
