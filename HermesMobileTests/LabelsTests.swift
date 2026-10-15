@@ -44,6 +44,21 @@ final class LabelsModelsTests: XCTestCase {
         XCTAssertEqual(question.part, "question")
     }
 
+    func testDeckRatingsAreCardThenOwnQuestionOnReflectCardsOnly() throws {
+        let deck = try DailyDeck.decode(#"{"date":"2026-10-13","kind":"morning","cards":[{"id":"q1","type":"reflect","kind":"quote","body":"A","question":"Why?"},{"id":"w1","type":"reflect","kind":"wiki","body":"C"},{"id":"p1","type":"prompt","question":"Plan?"}]}"#)
+        let reflect = deck.cards[0], noQuestion = deck.cards[1], prompt = deck.cards[2]
+        func keys(_ card: DeckCard, showsQuestion: Bool = true) -> [LabelKey] {
+            FeedbackRating.deck(card: card, date: "2026-10-13", kind: "morning", showsQuestion: showsQuestion).map(\.key)
+        }
+
+        XCTAssertEqual(keys(reflect), [.deckCard(date: "2026-10-13", kind: "morning", cardID: "q1"),
+                                       .deckQuestion(date: "2026-10-13", kind: "morning", cardID: "q1")])
+        XCTAssertEqual(keys(reflect, showsQuestion: false), [.deckCard(date: "2026-10-13", kind: "morning", cardID: "q1")],
+                       "a regenerated or typed question isn't the generator's, so it isn't rated")
+        XCTAssertEqual(keys(noQuestion), [.deckCard(date: "2026-10-13", kind: "morning", cardID: "w1")])
+        XCTAssertEqual(keys(prompt), [], "only reflect cards are rated")
+    }
+
     func testBrainPageKeyIsModuleSlashID() {
         let key = LabelKey.brainPage(module: .wiki, id: "stoicism")
         XCTAssertEqual(key, LabelKey(feature: "brain", item: "wiki/stoicism", part: "page"))
