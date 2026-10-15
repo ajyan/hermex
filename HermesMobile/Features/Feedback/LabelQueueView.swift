@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// The morning deck's closing-card link to Label recent cards: shown once the queue is built,
-/// while it has cards and the evals still want tapped labels. Opens the queue in a sheet.
+/// while it has cards and the evals still want tapped labels. Opens the queue in a sheet, which
+/// stays open after the last card is rated. The Daily Deck starts the build.
 struct RateRecentCardsLink: View {
     let queue: LabelQueueViewModel
     let palette: DeckPalette
@@ -9,7 +10,7 @@ struct RateRecentCardsLink: View {
     @State private var isOpen = false
 
     var body: some View {
-        Group {
+        VStack(spacing: 0) {
             if queue.state == .ready, queue.evalsWantLabels, queue.unlabeledCount > 0 {
                 Button { isOpen = true } label: {
                     Label {
@@ -24,7 +25,6 @@ struct RateRecentCardsLink: View {
                 .buttonStyle(.plain)
             }
         }
-        .onAppear { queue.start() }
         .sheet(isPresented: $isOpen) {
             NavigationStack {
                 LabelQueueView(viewModel: queue)

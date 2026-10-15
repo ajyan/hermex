@@ -44,6 +44,7 @@ struct DailyDeckView: View {
             .task(id: labelsAvailable) {
                 // Every deck's labels in one read, once per screen; a failed read retries on the next appear.
                 if labelsAvailable, !showsLabels { try? await labels.load(feature: LabelKey.dailyDeckFeature) }
+                if showsLabels { labelQueue.start() }
             }
             .hxNavigationTitle(viewModel.title, subtitle: viewModel.state == .ready ? progressSubtitle : nil)
             .background(Color.hxCanvas.ignoresSafeArea())
