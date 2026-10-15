@@ -176,6 +176,24 @@ final class GoalCheckInCardViewModelTests: XCTestCase {
         XCTAssertNil(stretch(vm)?.yesterday)
     }
 
+    func testConflictWithFailedReloadUndoesTheTap() async throws {
+        let client = FakeCardGoalsClient()
+        client.checkInResults = [.failure(APIError.http(statusCode: 409, body: nil))]
+        let vm = try await loaded(client)
+        client.homeResults = [.failure(URLError(.notConnectedToInternet))]
+        await vm.checkIn(slug: slug, commitment: "stretch-pm", status: .done)
+        XCTAssertNil(stretch(vm)?.yesterday, "nothing was saved, so nothing shows as saved")
+        XCTAssertEqual(stretch(vm)?.done, 0)
+        XCTAssertEqual(vm.error, "The day changed. Check in again.")
+    }
+
+    func testLiveOnlyForTheServersToday() async throws {
+        let vm = try await loaded(FakeCardGoalsClient())
+        XCTAssertTrue(vm.isLive(for: "2026-10-14"))
+        XCTAssertFalse(vm.isLive(for: "2026-10-13"), "an older deck shows its own text, not today's check-ins")
+        XCTAssertFalse(GoalCheckInCardViewModel(client: FakeCardGoalsClient()).isLive(for: "2026-10-14"))
+    }
+
     func testHome404IsUnavailable() async {
         let client = FakeCardGoalsClient()
         client.homeResults = [.failure(APIError.http(statusCode: 404, body: nil))]

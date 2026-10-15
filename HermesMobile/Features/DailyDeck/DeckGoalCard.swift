@@ -8,12 +8,14 @@ import SwiftUI
 struct DeckGoalCard: View {
     let card: DeckCard
     let palette: DeckPalette
+    /// The deck's day ("2026-10-15"): the card checks in only when it is the server's today.
+    let deckDate: String
 
     @Environment(GoalCheckInCardViewModel.self) private var model: GoalCheckInCardViewModel?
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let goals = model?.goals(for: card) ?? []
+        let goals = model?.isLive(for: deckDate) == true ? model?.goals(for: card) ?? [] : []
         VStack(alignment: .leading, spacing: 0) {
             if goals.isEmpty {
                 placeholder
@@ -31,8 +33,11 @@ struct DeckGoalCard: View {
                 }
             }
         }
-        .task {
-            guard let model, case .loading = model.state else { return }
+        .task(id: deckDate) {
+            // Once per screen, and again when the deck turns over to a new day while open.
+            guard let model else { return }
+            if case .loaded(let home) = model.state, home.today == deckDate { return }
+            if case .unavailable = model.state { return }
             await model.load()
         }
     }

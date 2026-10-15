@@ -37,6 +37,13 @@ final class GoalCheckInCardViewModel {
         }
     }
 
+    /// Whether the card shows live check-ins: only on the deck for the server's today. An older
+    /// deck, or one left open past midnight until the reload lands, shows the brief's own text.
+    func isLive(for deckDate: String) -> Bool {
+        guard case .loaded(let home) = state else { return false }
+        return home.today == deckDate
+    }
+
     /// The card's goals as the server has them now, in the card's order; a goal closed since the
     /// deck was built drops out.
     func goals(for card: DeckCard) -> [GoalSummary] {
@@ -95,17 +102,22 @@ final class GoalCheckInCardViewModel {
         } catch {
             guard !Self.isCancellation(error) else { return }
             if case .http(409, _)? = error as? APIError {
+                undo(id, slug: slug, from: snapshot)  // nothing was saved; a failed reload must not keep the tap
                 await load()
                 self.error = "The day changed. Check in again."
                 return
             }
             onAPIError(error)
-            if case .loaded(var current) = state, let i = current.goals.firstIndex(where: { $0.slug == slug }) {
-                GoalCheckInEdit.restore(id, from: snapshot, in: &current.goals[i])
-                state = .loaded(current)
-            }
+            undo(id, slug: slug, from: snapshot)
             self.error = "Couldn't save. Try again."
         }
+    }
+
+    /// Puts one item of one goal back as it was before the tap.
+    private func undo(_ id: String, slug: String, from snapshot: GoalSummary) {
+        guard case .loaded(var current) = state, let i = current.goals.firstIndex(where: { $0.slug == slug }) else { return }
+        GoalCheckInEdit.restore(id, from: snapshot, in: &current.goals[i])
+        state = .loaded(current)
     }
 
     private static func isCancellation(_ error: Error) -> Bool {

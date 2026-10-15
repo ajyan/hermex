@@ -232,7 +232,7 @@ private struct DeckCardView: View {
     /// The goal card: live check-ins, then a note on how yesterday went.
     @ViewBuilder
     private var goal: some View {
-        DeckGoalCard(card: card, palette: palette)
+        DeckGoalCard(card: card, palette: palette, deckDate: viewModel.date)
         reflection("Add a note").padding(.top, 24)
         if let reason = card.reason {
             Text(verbatim: reason)
