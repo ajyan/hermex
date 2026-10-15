@@ -9,7 +9,7 @@ enum GoalCheckInEdit {
                       in goal: inout GoalSummary) {
         guard let i = goal.week.commitments.firstIndex(where: { $0.id == id }) else { return }
         var row = goal.week.commitments[i]
-        let old: GoalStatus? = date == today ? row.today : row.yesterday
+        let old = row.effectiveStatus(date, today: today, yesterday: yesterday)
         let week = goal.week
         if date >= week.start, date <= week.end {
             // Skip days this row is known to have: the counted ones, or today and yesterday.
@@ -17,12 +17,33 @@ enum GoalCheckInEdit {
                 .filter { $0.1 == .skip && $0.0 >= week.start && $0.0 <= week.end }.count
             let skipDays = max(row.skipped, shown)
             adjust(&row, old, by: -1, skipDays: skipDays)
-            if status != .clear { adjust(&row, status, by: 1, skipDays: skipDays) }
+            // Clearing a day the source counted puts its done back.
+            let counted: GoalStatus? = status == .clear ? (row.sourceDays.contains(date) ? .done : nil) : status
+            adjust(&row, counted, by: 1, skipDays: skipDays)
             row.remaining = max(0, row.target - row.done - row.min)
             row.hit = row.done + row.min >= row.target
         }
         let shown: GoalStatus? = status == .clear ? nil : status
         if date == today { row.today = shown } else { row.yesterday = shown }
+        goal.week.commitments[i] = row
+    }
+
+    /// Adds (`n` > 0, with its `note`) or removes the last (`n` < 0) item of an item commitment,
+    /// as the server will. Removing from an empty row does nothing.
+    static func addItem(_ n: Int, note: String?, to id: String, on date: String, in goal: inout GoalSummary) {
+        guard let i = goal.week.commitments.firstIndex(where: { $0.id == id }) else { return }
+        var row = goal.week.commitments[i]
+        if n > 0 {
+            row.items.append(GoalItem(date: date, note: note))
+        } else if n < 0 {
+            guard !row.items.isEmpty else { return }
+            row.items.removeLast()
+        } else {
+            return
+        }
+        row.done = row.items.count
+        row.remaining = max(0, row.target - row.done)
+        row.hit = row.done >= row.target
         goal.week.commitments[i] = row
     }
 

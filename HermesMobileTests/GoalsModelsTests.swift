@@ -78,6 +78,58 @@ final class GoalsModelsTests: XCTestCase {
         XCTAssertEqual(a["status"], "clear")
     }
 
+    func testOldSampleDecodesWithItemDefaults() throws {
+        let home = try PrepDecoding.decode(GoalsHome.self, from: Data(Self.homeSample.utf8))
+        let goal = try XCTUnwrap(home.goals.first)
+        let row = goal.week.commitments[0]
+        XCTAssertEqual(row.unit, "day")
+        XCTAssertFalse(row.isItem)
+        XCTAssertNil(row.source)
+        XCTAssertEqual(row.sourceDays, [])
+        XCTAssertEqual(row.items, [])
+        XCTAssertNil(goal.weekPending)
+        XCTAssertEqual(goal.confirmedStarts, [])
+        XCTAssertEqual(goal.sourceErrors, [])
+    }
+
+    func testItemAndSourceRowsDecode() throws {
+        let json = #"{"id":"outreach","unit":"item","source":null,"source_days":[],"items":[{"date":"2026-10-14","note":"Anthropic"},{"date":"2026-10-15"},7],"due_today":false,"due_yesterday":false,"today":null,"yesterday":null}"#
+        let row = try PrepDecoding.decode(GoalCommitmentProgress.self, from: Data(json.utf8))
+        XCTAssertTrue(row.isItem)
+        XCTAssertEqual(row.items, [GoalItem(date: "2026-10-14", note: "Anthropic"), GoalItem(date: "2026-10-15", note: nil)])
+        let sourced = try PrepDecoding.decode(
+            GoalCommitmentProgress.self,
+            from: Data(#"{"id":"prep","unit":"day","source":"prep.days","source_days":["2026-10-13","2026-10-14"]}"#.utf8))
+        XCTAssertEqual(sourced.source, "prep.days")
+        XCTAssertEqual(sourced.sourceDays, ["2026-10-13", "2026-10-14"])
+        XCTAssertEqual(sourced.effectiveStatus("2026-10-14", today: "2026-10-15", yesterday: "2026-10-14"), .done)
+        XCTAssertNil(sourced.effectiveStatus("2026-10-15", today: "2026-10-15", yesterday: "2026-10-14"))
+        let odd = try PrepDecoding.decode(GoalCommitmentProgress.self, from: Data(#"{"id":"x","unit":"week"}"#.utf8))
+        XCTAssertFalse(odd.isItem)
+    }
+
+    func testGoalSummaryDecodesCoachFields() throws {
+        let json = #"{"slug":"a","week_pending":"2026-10-19","confirmed_starts":["2026-10-12T08:00:00"],"source_errors":["prep: unreadable"]}"#
+        let goal = try PrepDecoding.decode(GoalSummary.self, from: Data(json.utf8))
+        XCTAssertEqual(goal.weekPending, "2026-10-19")
+        XCTAssertEqual(goal.confirmedStarts, ["2026-10-12T08:00:00"])
+        XCTAssertEqual(goal.sourceErrors, ["prep: unreadable"])
+    }
+
+    /// Plain `JSONEncoder`; `APIClient`'s snake-case encoder leaves these explicit keys unchanged.
+    func testItemCheckInEncodesWithoutNilNote() throws {
+        let bare = GoalCheckInRequest.item(slug: "land-ai-role", date: "2026-10-15", asOf: "2026-10-15", id: "outreach", n: 1, note: nil)
+        let a = try JSONSerialization.jsonObject(with: JSONEncoder().encode(bare)) as! [String: Any]
+        XCTAssertEqual(Set(a.keys), ["slug", "date", "as_of", "commitment", "status", "n"])
+        XCTAssertEqual(a["status"] as? String, "item")
+        XCTAssertEqual(a["commitment"] as? String, "outreach")
+        XCTAssertEqual(a["n"] as? Int, 1)
+        let noted = GoalCheckInRequest.item(slug: "s", date: "d", asOf: "d", id: "x", n: -1, note: "Anthropic")
+        let b = try JSONSerialization.jsonObject(with: JSONEncoder().encode(noted)) as! [String: Any]
+        XCTAssertEqual(b["note"] as? String, "Anthropic")
+        XCTAssertEqual(b["n"] as? Int, -1)
+    }
+
     func testMissingFieldsDefault() throws {
         let home = try PrepDecoding.decode(GoalsHome.self, from: Data(#"{"goals":[{"slug":"a"}, 5]}"#.utf8))
         XCTAssertEqual(home.goals.map(\.slug), ["a"])

@@ -83,6 +83,25 @@ struct GoalMilestone: Decodable, Hashable, Sendable, Identifiable {
     }
 }
 
+/// One counted item on an item commitment, such as one outreach message.
+struct GoalItem: Decodable, Hashable, Sendable {
+    let date: String
+    let note: String?
+
+    private enum CodingKeys: String, CodingKey { case date, note }
+
+    init(date: String, note: String?) {
+        self.date = date
+        self.note = note
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        date = c.string(.date)
+        note = c.optional(String.self, .note)
+    }
+}
+
 struct GoalCommitmentProgress: Decodable, Hashable, Sendable, Identifiable {
     let id: String
     let action: String
@@ -101,10 +120,29 @@ struct GoalCommitmentProgress: Decodable, Hashable, Sendable, Identifiable {
     let dueYesterday: Bool
     var today: GoalStatus?
     var yesterday: GoalStatus?
+    /// `"day"` (checked per day) or `"item"` (counted by +1 check-ins); anything else reads as day.
+    let unit: String
+    /// What counts days automatically, such as `"prep.days"`; nil for hand-checked rows.
+    let source: String?
+    /// Days the source counted as done; an explicit check-in on one overrides it.
+    var sourceDays: [String]
+    /// The counted items of an item row, oldest first.
+    var items: [GoalItem]
+
+    var isItem: Bool { unit == "item" }
 
     private enum CodingKeys: String, CodingKey {
         case id, action, target, skips, cue, minimum, days, done, min, skipped, missed, hit, remaining, today, yesterday
-        case dueToday = "due_today", dueYesterday = "due_yesterday"
+        case unit, source, items
+        case dueToday = "due_today", dueYesterday = "due_yesterday", sourceDays = "source_days"
+    }
+
+    /// The status that counts for `date`: the explicit one the row shows for today or yesterday,
+    /// else done when the source counted the day.
+    func effectiveStatus(_ date: String, today todayDate: String, yesterday yesterdayDate: String) -> GoalStatus? {
+        let explicit: GoalStatus? = date == todayDate ? today : date == yesterdayDate ? yesterday : nil
+        if let explicit { return explicit }
+        return sourceDays.contains(date) ? .done : nil
     }
 
     init(from decoder: Decoder) throws {
@@ -126,6 +164,11 @@ struct GoalCommitmentProgress: Decodable, Hashable, Sendable, Identifiable {
         dueYesterday = c.bool(.dueYesterday)
         today = c.optional(GoalStatus.self, .today)
         yesterday = c.optional(GoalStatus.self, .yesterday)
+        let unit = c.string(.unit)
+        self.unit = unit.isEmpty ? "day" : unit
+        source = c.optional(String.self, .source)
+        sourceDays = c.optional([String].self, .sourceDays) ?? []
+        items = c.lossy(GoalItem.self, .items)
     }
 }
 
@@ -231,11 +274,17 @@ struct GoalSummary: Decodable, Hashable, Sendable, Identifiable {
     var week: GoalWeek
     var dailyChecks: [GoalDailyCheck]
     var flags: GoalFlags
+    /// The Monday of a next week whose plan is waiting to be confirmed or changed; nil when none.
+    var weekPending: String?
+    var confirmedStarts: [String]
+    /// Why a source such as Prep could not be read, shown instead of a silent zero.
+    var sourceErrors: [String]
 
     var id: String { slug }
 
     private enum CodingKeys: String, CodingKey {
         case slug, title, status, deadline, identity, week, flags, color, icon
+        case weekPending = "week_pending", confirmedStarts = "confirmed_starts", sourceErrors = "source_errors"
         case daysLeft = "days_left", nextMilestone = "next_milestone", dailyChecks = "daily_checks"
     }
 
@@ -253,6 +302,9 @@ struct GoalSummary: Decodable, Hashable, Sendable, Identifiable {
         week = c.optional(GoalWeek.self, .week) ?? GoalWeek()
         dailyChecks = c.lossy(GoalDailyCheck.self, .dailyChecks)
         flags = c.optional(GoalFlags.self, .flags) ?? GoalFlags()
+        weekPending = c.optional(String.self, .weekPending)
+        confirmedStarts = c.optional([String].self, .confirmedStarts) ?? []
+        sourceErrors = c.optional([String].self, .sourceErrors) ?? []
     }
 }
 
@@ -422,9 +474,11 @@ enum GoalCheckInRequest: Encodable, Equatable, Sendable {
     /// when its day has moved on, so a stale screen never writes to the wrong day.
     case commitment(slug: String, date: String, asOf: String, id: String, status: GoalStatus)
     case check(slug: String, date: String, asOf: String, id: String, value: String)
+    /// One +1 or -1 on an item commitment; a nil `note` is left out of the body.
+    case item(slug: String, date: String, asOf: String, id: String, n: Int, note: String?)
 
     private enum CodingKeys: String, CodingKey {
-        case slug, date, commitment, status, check, value, asOf = "as_of"
+        case slug, date, commitment, status, check, value, n, note, asOf = "as_of"
     }
 
     func encode(to encoder: Encoder) throws {
@@ -442,6 +496,14 @@ enum GoalCheckInRequest: Encodable, Equatable, Sendable {
             try c.encode(asOf, forKey: .asOf)
             try c.encode(id, forKey: .check)
             try c.encode(value, forKey: .value)
+        case let .item(slug, date, asOf, id, n, note):
+            try c.encode(slug, forKey: .slug)
+            try c.encode(date, forKey: .date)
+            try c.encode(asOf, forKey: .asOf)
+            try c.encode(id, forKey: .commitment)
+            try c.encode("item", forKey: .status)
+            try c.encode(n, forKey: .n)
+            try c.encodeIfPresent(note, forKey: .note)
         }
     }
 }

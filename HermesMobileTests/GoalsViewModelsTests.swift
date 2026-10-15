@@ -35,7 +35,7 @@ private final class FakeGoalsClient: GoalsDataClient, @unchecked Sendable {
         lock.withLock { _checkIns.append(r) }
         let id: String
         switch r {
-        case .commitment(_, _, _, let c, _), .check(_, _, _, let c, _): id = c
+        case .commitment(_, _, _, let c, _), .check(_, _, _, let c, _), .item(_, _, _, let c, _, _): id = c
         }
         if let item = lock.withLock({ perItem[id] }) {
             started?.yield(id)

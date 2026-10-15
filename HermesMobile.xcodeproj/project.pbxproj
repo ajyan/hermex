@@ -24,6 +24,7 @@
 		B1A1C0DE00000000000F000D /* GoalsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F000C /* GoalsHomeView.swift */; };
 		B1A1C0DE00000000000F000B /* GoalsViewModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */; };
 		A0DE000292B90F697F77D29E /* GoalCheckInCardViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE000292B90F697F77D29D /* GoalCheckInCardViewModelTests.swift */; };
+		A0DE0003F6338217394AF92B /* GoalCheckInEditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE0003300540C2C75C9B4A /* GoalCheckInEditTests.swift */; };
 		B1A1C0DE00000000000F0009 /* GoalsViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */; };
 		A0DE002C9AEE2AE3608A3D16 /* GoalCheckInCardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE002C9AEE2AE3608A3D15 /* GoalCheckInCardViewModel.swift */; };
 		A0DE0014FAAC7A19A48B2C56 /* GoalCheckInEdit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE0014FAAC7A19A48B2C55 /* GoalCheckInEdit.swift */; };
@@ -807,6 +808,7 @@
 		B1A1C0DE00000000000F000C /* GoalsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsHomeView.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsViewModelsTests.swift; sourceTree = "<group>"; };
 		A0DE000292B90F697F77D29D /* GoalCheckInCardViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCheckInCardViewModelTests.swift; sourceTree = "<group>"; };
+		A0DE0003300540C2C75C9B4A /* GoalCheckInEditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCheckInEditTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsViewModels.swift; sourceTree = "<group>"; };
 		A0DE002C9AEE2AE3608A3D15 /* GoalCheckInCardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCheckInCardViewModel.swift; sourceTree = "<group>"; };
 		A0DE0014FAAC7A19A48B2C55 /* GoalCheckInEdit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCheckInEdit.swift; sourceTree = "<group>"; };
@@ -1711,6 +1713,7 @@
 				B1A1C0DE00000000000F0012 /* GoalsDesignTests.swift */,
 				B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */,
 				A0DE000292B90F697F77D29D /* GoalCheckInCardViewModelTests.swift */,
+				A0DE0003300540C2C75C9B4A /* GoalCheckInEditTests.swift */,
 				B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */,
 				B1A1C0DE0000000000000E16 /* PrepViewModelsTests.swift */,
 				B1A1C0DE0000000000000908 /* BrainVisualsTests.swift */,
@@ -3341,6 +3344,7 @@
 				B1A1C0DE00000000000F0013 /* GoalsDesignTests.swift in Sources */,
 				B1A1C0DE00000000000F000B /* GoalsViewModelsTests.swift in Sources */,
 				A0DE000292B90F697F77D29E /* GoalCheckInCardViewModelTests.swift in Sources */,
+				A0DE0003F6338217394AF92B /* GoalCheckInEditTests.swift in Sources */,
 				B1A1C0DE00000000000F0007 /* GoalsModelsTests.swift in Sources */,
 				B1A1C0DE0000000000000E15 /* PrepViewModelsTests.swift in Sources */,
 				B1A1C0DE0000000000000907 /* BrainVisualsTests.swift in Sources */,
