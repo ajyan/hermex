@@ -44,6 +44,8 @@ struct DeckPalette: Equatable {
     static let past = DeckPalette(.past, symbol: "clock.arrow.circlepath", name: "On this day", shortName: "On this day")
     static let sleep = DeckPalette(.notes, symbol: "moon.zzz", name: "Sleep", shortName: "Sleep")
     static let advisor = DeckPalette(.advisor, symbol: "bubble.left", name: "Check-in", shortName: "Check-in")
+    /// The Dad card is the Dad advisor's, so it wears the advisor paper with its own mark.
+    static let letter = DeckPalette(.advisor, symbol: "heart", name: "Letter to her", shortName: "Letter")
     static let plain = DeckPalette(.plain, symbol: "tray", name: "From your library", shortName: "Library")
     static let followUps = DeckPalette(.plain, symbol: "checklist", name: "Follow-ups", shortName: "Follow-ups")
     // A weekly review's Wrapped cards. Themes quote your own past words; mood reads like a
@@ -64,7 +66,7 @@ struct DeckPalette: Equatable {
         switch card.type {
         case .headline: return .opener
         case .close: return .quote
-        case .prompt: return .advisor
+        case .prompt: return card.isLetter ? .letter : .advisor
         case .sleep: return .sleep
         case .decision: return .followUps
         case .item, .unknown:

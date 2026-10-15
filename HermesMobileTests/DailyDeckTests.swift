@@ -621,6 +621,32 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(unsynced.sleep?.nights, [])
     }
 
+    func testTheDadCardIsALetterPromptWithItsCountdown() throws {
+        let json = #"""
+        {"date": "2026-10-16", "kind": "morning", "cards": [
+          {"id": "letter", "type": "prompt", "kind": "letter", "voice": "Dad", "title": "To her",
+           "lines": ["92 days to go", "Due Jan 16 · 26 weeks along"],
+           "question": "Tell her how you met her mom.", "alt_questions": ["Tell her about your dad."],
+           "reason": "A letter for her · Her mom", "files_to": "letters"},
+          {"id": "advisor", "type": "prompt", "voice": "Dad", "question": "What's the gap?"}
+        ]}
+        """#
+        let cards = try DailyDeck.decode(json).cards
+        let letter = cards[0]
+        XCTAssertTrue(letter.isLetter)
+        XCTAssertFalse(cards[1].isLetter, "a plain check-in stays a check-in")
+        XCTAssertEqual(letter.lines, ["92 days to go", "Due Jan 16 · 26 weeks along"])
+        XCTAssertTrue(letter.takesText)
+        XCTAssertEqual(letter.altQuestions, ["Tell her about your dad."])
+        XCTAssertEqual(DeckPalette.of(letter).name, "Letter to her")
+        XCTAssertEqual(DeckPalette.of(letter).colors, HermexPaper.advisor, "the Dad advisor's paper")
+        XCTAssertEqual(DeckPalette.of(cards[1]).name, "Check-in")
+        let text = DeckCardText(letter)
+        XCTAssertEqual(text.lead, "Tell her how you met her mom.")
+        XCTAssertTrue(text.leadIsQuestion, "the prompt leads and isn't asked twice")
+        XCTAssertEqual(text.attribution, "Dad")
+    }
+
     func testARatingAloneAnswersTheSleepCardAndIsFiledAsSnakeCaseJSON() throws {
         let deck = try DailyDeck.decode(Self.sleepDeckJSON)
         let rated = DeckAnswer(card: "sleep", rating: 4)
