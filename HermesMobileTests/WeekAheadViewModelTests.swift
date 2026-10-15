@@ -80,6 +80,14 @@ final class WeekAheadViewModelTests: XCTestCase {
         WeekAheadViewModel(card: try weekCard(), client: client, today: "2026-10-18")
     }
 
+    func testUnknownUnitDecodesAsDay() throws {
+        let json = #"[{"id":"a","unit":"hours"},{"id":"b","unit":"item"},{"id":"c"},{"id":"d","unit":"day"}]"#
+        let rows = try PrepDecoding.decode([DeckWeekCommitment].self, from: Data(json.utf8))
+        XCTAssertEqual(rows.map(\.unit), ["day", "item", "day", "day"])
+        let sent = try JSONSerialization.jsonObject(with: JSONEncoder().encode(rows[0])) as? [String: Any]
+        XCTAssertEqual(sent?["unit"] as? String, "day", "an unknown unit is never posted back")
+    }
+
     func testKeepSendsEditedNonRemovedRowsWithoutReason() async throws {
         let client = FakeWeekGoalsClient()
         client.weekResults = [.success(try confirmed(starts: ["2026-10-19"]))]

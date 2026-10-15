@@ -106,6 +106,11 @@ struct GoalDetailView: View {
                     }
                 }
             }
+            if let sourceErrors = GoalDetailCopy.sourceErrors(d.summary.sourceErrors) {
+                Text(verbatim: sourceErrors)
+                    .font(BrainStyle.meta)
+                    .foregroundStyle(Color.hxTextSecondary)
+            }
             if viewModel.day == .today, let missed = d.summary.week.commitments.first(where: { d.summary.flags.missTwice.contains($0.id) }) {
                 Text(verbatim: GoalDetailCopy.missTwice(missed))
                     .font(BrainStyle.meta)
@@ -379,6 +384,18 @@ enum GoalDetailCopy {
     /// The nudge before a second miss in a row.
     static func missTwice(_ row: GoalCommitmentProgress) -> String {
         "Missed \(GoalsCopy.shortName(row.action).lowercased()) last night. Even the 2-min version counts."
+    }
+
+    /// The server's `source_errors` ("prep.days: attempts file not found"), one line each:
+    /// "Couldn't count Prep: attempts file not found". Nil when every source counted.
+    static func sourceErrors(_ errors: [String]) -> String? {
+        guard !errors.isEmpty else { return nil }
+        return errors.map { error in
+            guard let colon = error.range(of: ": ") else { return "Couldn't count \(error)" }
+            let source = String(error[..<colon.lowerBound])
+            let reason = String(error[colon.upperBound...])
+            return "Couldn't count \(source == "prep.days" ? "Prep" : source): \(reason)"
+        }.joined(separator: "\n")
     }
 
     static func countLine(_ row: GoalCommitmentProgress) -> String {

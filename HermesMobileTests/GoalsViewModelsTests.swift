@@ -453,6 +453,16 @@ final class GoalsCopyTests: XCTestCase {
         XCTAssertEqual(GoalHeroCopy.countdown(home.goals[0]), "22 days · Sun Nov 1")
     }
 
+    func testSourceErrorsLine() {
+        XCTAssertNil(GoalDetailCopy.sourceErrors([]))
+        XCTAssertEqual(GoalDetailCopy.sourceErrors(["prep.days: attempts file not found"]),
+                       "Couldn't count Prep: attempts file not found")
+        XCTAssertEqual(GoalDetailCopy.sourceErrors(["foo.bar: unknown source"]),
+                       "Couldn't count foo.bar: unknown source")
+        XCTAssertEqual(GoalDetailCopy.sourceErrors(["prep.days: down", "garmin.sleep: no file"]),
+                       "Couldn't count Prep: down\nCouldn't count garmin.sleep: no file")
+    }
+
     func testSkipDisabledWhenBudgetSpentUnlessAlreadySkipped() throws {
         var row = try PrepDecoding.decode(GoalCommitmentProgress.self, from: Data(#"{"id":"x","skips":1,"skipped":1}"#.utf8))
         XCTAssertTrue(GoalDetailCopy.skipDisabled(row, selected: nil))

@@ -9,7 +9,7 @@ struct DeckWeekCommitment: Codable, Equatable, Hashable, Sendable {
     let action: String
     var target: Int
     let skips: Int
-    /// "day" (checked per day) or "item" (counted by +1).
+    /// "day" (checked per day) or "item" (counted by +1); anything else reads as "day".
     let unit: String
     let source: String?
     let cue: String?
@@ -30,7 +30,7 @@ struct DeckWeekCommitment: Codable, Equatable, Hashable, Sendable {
         action = (try? c.decodeIfPresent(String.self, forKey: .action)) ?? ""
         target = (try? c.decodeIfPresent(Int.self, forKey: .target)) ?? 1
         skips = (try? c.decodeIfPresent(Int.self, forKey: .skips)) ?? 0
-        unit = (try? c.decodeIfPresent(String.self, forKey: .unit)) ?? "day"
+        unit = (try? c.decodeIfPresent(String.self, forKey: .unit)) == "item" ? "item" : "day"
         source = try? c.decodeIfPresent(String.self, forKey: .source)
         cue = try? c.decodeIfPresent(String.self, forKey: .cue)
         minimum = try? c.decodeIfPresent(String.self, forKey: .minimum)
