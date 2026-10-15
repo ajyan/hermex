@@ -515,6 +515,8 @@ struct ChatShellView: View {
                 }
         }
         .environment(\.shellZoomNamespace, zoomNamespace)
+        // Pushed screens (the Daily Brief's open cards) open Brain pages too.
+        .environment(\.openBrainRoute, brainRouteOpener)
         // A new root also drops screens ChatView pushed outside the typed path.
         .id(navigation.rootRevision)
         .background(Color.hxCanvas.ignoresSafeArea())
