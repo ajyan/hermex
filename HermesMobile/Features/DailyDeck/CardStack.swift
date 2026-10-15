@@ -2,8 +2,10 @@ import SwiftUI
 
 /// A swipeable stack of cards: swipe left for the next card, right to pull the previous
 /// one back on top. Only the top two cards render content; the third is a bare edge
-/// peeking out underneath. Under Reduce Motion the cards stay put while dragging and
-/// crossfade on commit. Callers own the horizontal padding and anything drawn over the stack.
+/// peeking out underneath. Press and hold to fan the whole deck out, slide across it to
+/// pick a card, and let go to jump there (`CardFan`). Under Reduce Motion the cards stay
+/// put while dragging and crossfade on commit, and the fan opens without moving.
+/// Callers own the horizontal padding and anything drawn over the stack.
 struct CardStack<Page: Identifiable, Card: View, Edge: View>: View {
     let pages: [Page]
     @Binding var index: Int
@@ -20,6 +22,8 @@ struct CardStack<Page: Identifiable, Card: View, Edge: View>: View {
     @State private var dragX: CGFloat = 0
     /// Locks a drag to the axis it started on, so vertical scrolling never pages.
     @State private var dragAxis: Axis?
+    /// The card a finger over the fanned deck points at; nil while the deck is stacked.
+    @State private var fanPick: Int?
 
     /// How far past the edge a card flies, as a multiple of the stack's width.
     private static var fly: CGFloat { 1.4 }
@@ -30,12 +34,13 @@ struct CardStack<Page: Identifiable, Card: View, Edge: View>: View {
             let width = max(proxy.size.width, 1)
             ZStack {
                 ForEach(layers(width: width)) { layer in
-                    cardView(layer, width: width)
+                    cardView(layer, width: width, height: proxy.size.height)
                 }
             }
             .padding(.bottom, Self.peek * 2)
             .contentShape(Rectangle())
             .simultaneousGesture(drag(width: width))
+            .simultaneousGesture(fan(width: width))
             .accessibilityElement(children: .contain)
             .accessibilityScrollAction { edge in
                 switch edge {
@@ -47,6 +52,8 @@ struct CardStack<Page: Identifiable, Card: View, Edge: View>: View {
             .accessibilityAction(named: Text(verbatim: "Previous Card")) { retreat(width: width) }
         }
         .sensoryFeedback(.impact(weight: .light), trigger: currentID)
+        .sensoryFeedback(.selection, trigger: fanPick) { old, new in old != nil && new != nil }
+        .sensoryFeedback(.impact(weight: .medium), trigger: fanPick == nil) { _, stacked in !stacked }
     }
 
     private var currentID: Page.ID? {
@@ -60,6 +67,8 @@ struct CardStack<Page: Identifiable, Card: View, Edge: View>: View {
         /// 0 is the top card; each level below sits a little lower and smaller.
         let depth: CGFloat
         let x: CGFloat
+        /// Where the card sits in the fanned deck; nil while stacked.
+        var fan: CardFan.Spot? = nil
         var id: Page.ID { page.id }
     }
 
@@ -67,6 +76,12 @@ struct CardStack<Page: Identifiable, Card: View, Edge: View>: View {
     /// the ones under it rise by the same fraction, so committing never jumps.
     private func layers(width: CGFloat) -> [Layer] {
         guard pages.indices.contains(index) else { return [] }
+        if let fanPick {
+            return pages.indices.map { position in
+                Layer(page: pages[position], depth: 0, x: 0,
+                      fan: CardFan.spot(of: position, count: pages.count, width: width, picked: fanPick))
+            }
+        }
         let travel = width * 0.6
         let top: Layer, rise: CGFloat, firstBelow: Int
         if dragX > 0, index > 0 {
@@ -87,23 +102,26 @@ struct CardStack<Page: Identifiable, Card: View, Edge: View>: View {
     }
 
     @ViewBuilder
-    private func cardView(_ layer: Layer, width: CGFloat) -> some View {
-        let isTop = layer.depth == 0 && layer.page.id == currentID
+    private func cardView(_ layer: Layer, width: CGFloat, height: CGFloat) -> some View {
+        let isTop = layer.fan == nil && layer.depth == 0 && layer.page.id == currentID
         let dropping = layer.page.id == droppingID
+        let fan = layer.fan
         Group {
-            if layer.depth < 1.5 {
-                card(layer.page, max(0, 1 - Double(layer.depth) * 1.6))
+            // Fanned, only the picked card shows its words; the rest are bare paper.
+            if fan?.isPicked ?? (layer.depth < 1.5) {
+                card(layer.page, fan == nil ? max(0, 1 - Double(layer.depth) * 1.6) : 1)
             } else {
                 edge(layer.page)
             }
         }
-        .scaleEffect((1 - 0.04 * max(layer.depth, 0)) * (dropping ? 0.85 : 1), anchor: .bottom)
+        .scaleEffect(fan?.scale ?? (1 - 0.04 * max(layer.depth, 0)) * (dropping ? 0.85 : 1), anchor: .bottom)
         // Cards under the top one sit a little askew, like a real deck; they straighten as they rise.
-        .rotationEffect(.degrees(tilt(layer.page) * min(max(layer.depth, 0), 1)))
-        .offset(x: layer.x, y: Self.peek * max(layer.depth, 0) + (dropping ? 140 : 0))
+        .rotationEffect(.degrees(fan?.degrees ?? tilt(layer.page) * min(max(layer.depth, 0), 1)))
+        .offset(x: fan?.x ?? layer.x,
+                y: fan.map { $0.y - height * CardFan.rise } ?? Self.peek * max(layer.depth, 0) + (dropping ? 140 : 0))
         .rotationEffect(.degrees(Double(layer.x / width) * 12), anchor: .bottom)
         .opacity(dropping ? 0 : 1)
-        .zIndex(-Double(layer.depth))
+        .zIndex(fan?.zIndex ?? -Double(layer.depth))
         .allowsHitTesting(isTop)
         .accessibilityHidden(!isTop)
         .transition(.opacity)
@@ -116,7 +134,9 @@ struct CardStack<Page: Identifiable, Card: View, Edge: View>: View {
             .onChanged { value in
                 guard droppingID == nil else { return }
                 if dragAxis == nil {
-                    dragAxis = abs(value.translation.width) > abs(value.translation.height) ? .horizontal : .vertical
+                    // A finger scrubbing the fanned deck never pages it.
+                    dragAxis = fanPick == nil && abs(value.translation.width) > abs(value.translation.height)
+                        ? .horizontal : .vertical
                 }
                 guard dragAxis == .horizontal, !reduceMotion else { return }
                 dragX = resisted(value.translation.width)
@@ -131,6 +151,31 @@ struct CardStack<Page: Identifiable, Card: View, Edge: View>: View {
                     retreat(width: width)
                 } else {
                     settle()
+                }
+            }
+    }
+
+    /// Press and hold to fan the deck out; the finger then picks a card, and letting go jumps there.
+    private func fan(width: CGFloat) -> some Gesture {
+        LongPressGesture(minimumDuration: 0.4, maximumDistance: 10)
+            .sequenced(before: DragGesture(minimumDistance: 0))
+            .onChanged { value in
+                guard case .second(true, let drag) = value, droppingID == nil, pages.count > 1 else { return }
+                let pick = drag.map { CardFan.index(atX: $0.location.x, count: pages.count, width: width) }
+                if fanPick == nil {
+                    withAnimation(reduceMotion ? nil : .spring(duration: 0.4, bounce: 0.2)) {
+                        dragX = 0
+                        fanPick = index
+                    }
+                } else if let pick, pick != fanPick {
+                    withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) { fanPick = pick }
+                }
+            }
+            .onEnded { _ in
+                guard let pick = fanPick else { return }
+                withAnimation(reduceMotion ? nil : .spring(duration: 0.4, bounce: 0.15)) {
+                    index = pick
+                    fanPick = nil
                 }
             }
     }
@@ -182,4 +227,54 @@ func withoutAnimation(_ change: () -> Void) {
     var transaction = Transaction()
     transaction.disablesAnimations = true
     withTransaction(transaction, change)
+}
+
+/// Where each card sits while a `CardStack` is fanned out, and which card a finger over the
+/// fan points at. The fan is an arc of small cards along the bottom of the stack, centered
+/// on its middle card, that always fits the stack's width.
+enum CardFan {
+    struct Spot: Equatable {
+        let x: CGFloat
+        let y: CGFloat
+        let degrees: Double
+        let scale: CGFloat
+        let zIndex: Double
+        let isPicked: Bool
+    }
+
+    /// How far above the stack's bottom edge the fan sits, as a share of the stack's height.
+    static let rise: CGFloat = 0.3
+    private static let scale: CGFloat = 0.42
+    private static let pickedScale: CGFloat = 0.5
+    private static let pickedLift: CGFloat = 28
+
+    /// Horizontal distance between neighboring cards, so the whole fan spans at most 70%
+    /// of `width`.
+    static func spacing(count: Int, width: CGFloat) -> CGFloat {
+        guard count > 1 else { return 0 }
+        return min(40, width * 0.7 / CGFloat(count - 1))
+    }
+
+    /// The card at `position`: spread from the middle, dropping and turning toward each end.
+    /// The picked card rises, grows, and sits on top.
+    static func spot(of position: Int, count: Int, width: CGFloat, picked: Int) -> Spot {
+        let offset = CGFloat(position) - CGFloat(count - 1) / 2
+        let turn = count > 1 ? min(6, 40 / Double(count - 1)) : 0
+        let isPicked = position == picked
+        return Spot(
+            x: offset * spacing(count: count, width: width),
+            y: offset * offset * 2.5 - (isPicked ? pickedLift : 0),
+            degrees: Double(offset) * turn,
+            scale: isPicked ? pickedScale : scale,
+            zIndex: isPicked ? Double(count) : Double(position),
+            isPicked: isPicked
+        )
+    }
+
+    /// The card under a finger at `x`, in the stack's coordinates, clamped to the deck.
+    static func index(atX x: CGFloat, count: Int, width: CGFloat) -> Int {
+        guard count > 1 else { return 0 }
+        let offset = (x - width / 2) / spacing(count: count, width: width)
+        return min(max(Int((offset + CGFloat(count - 1) / 2).rounded()), 0), count - 1)
+    }
 }
