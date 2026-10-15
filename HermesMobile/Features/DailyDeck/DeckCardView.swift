@@ -4,11 +4,13 @@ import SwiftUI
 /// One card of the Daily Deck stack, a glow card in its kind's paper (`DeckPalette`). A card
 /// leads with its takeaway in large rounded type (serif when it quotes your saved words) and
 /// scrolls into the rest: context, the question, and your reflection. Writing happens in `ReflectionSheet`, so a card never holds a text
-/// field and long text never fights the swipe.
+/// field and long text never fights the swipe. Pulling up past a card's end opens feedback on it.
 struct DeckPageView: View {
     let page: DeckPage
     let viewModel: DailyDeckViewModel
     let file: () -> Void
+    /// Opens Send feedback for this page; nil where the server takes no feedback.
+    var feedback: (() -> Void)?
     /// Cards under the top one show only their paper; their words fade in as they rise.
     var contentOpacity: Double = 1
     /// The card opened to fill the screen: its words without the card's own surface.
@@ -21,9 +23,9 @@ struct DeckPageView: View {
         let words = Group {
             switch page {
             case .card(let card):
-                DeckCardView(card: card, palette: palette, viewModel: viewModel, file: file)
+                DeckCardView(card: card, palette: palette, viewModel: viewModel, file: file, feedback: feedback)
             case .followUps(let cards):
-                FollowUpsPage(cards: cards, viewModel: viewModel)
+                FollowUpsPage(cards: cards, viewModel: viewModel, feedback: feedback)
             }
         }
         .opacity(contentOpacity)
@@ -53,10 +55,9 @@ private struct DeckCardView: View {
     let palette: DeckPalette
     let viewModel: DailyDeckViewModel
     let file: () -> Void
+    let feedback: (() -> Void)?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// Set by the Daily Deck when the server takes labels.
-    @Environment(LabelsViewModel.self) private var labels: LabelsViewModel?
     @State private var isWriting = false
     /// The sleep card's numbers, shown before rating when asked for.
     @State private var showsNumbers = false
@@ -78,6 +79,7 @@ private struct DeckCardView: View {
         }
         .scrollIndicators(.hidden)
         .moreBelowHint(fill: palette.paper, mark: palette.ink)
+        .swipeUpForFeedback(mark: palette.ink, action: feedback)
         .overlay(alignment: .topTrailing) {
             Image(systemName: palette.symbol)
                 .font(.system(.body, weight: .medium))
@@ -105,6 +107,19 @@ private struct DeckCardView: View {
                 .foregroundStyle(palette.ink.opacity(0.22))
                 .padding(.bottom, 10)
                 .accessibilityHidden(true)
+        }
+        if card.isLetter, let countdown = card.lines.first {
+            // The countdown to her birth, then her age; the date it counts from underneath.
+            VStack(alignment: .leading, spacing: 4) {
+                Text(verbatim: countdown)
+                    .font(AppFont.display(style: .title3, weight: .semibold))
+                ForEach(card.lines.dropFirst(), id: \.self) { line in
+                    Text(verbatim: line).font(AppFont.footnote(weight: .medium))
+                }
+            }
+            .padding(.trailing, 30)
+            .padding(.bottom, 18)
+            .accessibilityElement(children: .combine)
         }
         if let lead = text.lead {
             Text(inlineMarkdown(lead))
@@ -146,18 +161,12 @@ private struct DeckCardView: View {
                 .id(question)
                 .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
         }
-        if card.takesText { reflection().padding(.top, 16) }
+        if card.takesText { reflection(card.isLetter ? "Write to her" : "Write a reflection").padding(.top, 16) }
         if let reason = card.reason {
             Text(verbatim: reason)
                 .font(AppFont.footnote())
                 .foregroundStyle(palette.ink)
                 .padding(.top, 20)
-        }
-        if card.type == .reflect, let labels {
-            DeckRateRows(card: card, date: viewModel.date, kind: viewModel.kind,
-                         showsQuestion: viewModel.question(for: card) == card.question,
-                         labels: labels, palette: palette)
-                .padding(.top, 24)
         }
     }
 
@@ -645,6 +654,7 @@ private struct ReflectionSheet: View {
 private struct FollowUpsPage: View {
     let cards: [DeckCard]
     let viewModel: DailyDeckViewModel
+    let feedback: (() -> Void)?
 
     var body: some View {
         ScrollView {
@@ -662,6 +672,7 @@ private struct FollowUpsPage: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollIndicators(.hidden)
+        .swipeUpForFeedback(mark: DeckPalette.followUps.ink, action: feedback)
         .foregroundStyle(DeckPalette.followUps.ink)
     }
 }
@@ -882,6 +893,68 @@ private struct MoreBelowHint: ViewModifier {
                 .allowsHitTesting(false)
                 .transition(.opacity)
                 .accessibilityHidden(true)
+        }
+    }
+}
+
+extension View {
+    /// On a card's scroll view: pulling up past the end and letting go runs `action` (Send
+    /// feedback), with a cue that fades in as the card is pulled. Nil turns it off.
+    func swipeUpForFeedback(mark: Color, action: (() -> Void)?) -> some View {
+        modifier(SwipeUpForFeedback(mark: mark, action: action))
+    }
+}
+
+private struct SwipeUpForFeedback: ViewModifier {
+    let mark: Color
+    let action: (() -> Void)?
+
+    /// How far past the end a card is pulled before letting go opens feedback.
+    private static let threshold: CGFloat = 72
+    /// How far past the end the card is, clamped to the threshold.
+    @State private var pull: CGFloat = 0
+    @State private var isDragging = false
+    /// Pulled far enough by a finger (not a fling's bounce); letting go now opens feedback.
+    @State private var isArmed = false
+
+    func body(content: Content) -> some View {
+        content
+            .onScrollPhaseChange { old, new in
+                isDragging = new == .interacting
+                if old == .interacting, !isDragging, isArmed { action?() }
+                if !isDragging { isArmed = false }
+            }
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                let end = max(geometry.contentSize.height + geometry.contentInsets.bottom - geometry.containerSize.height,
+                              -geometry.contentInsets.top)
+                return min(max(geometry.contentOffset.y - end, 0), Self.threshold).rounded()
+            } action: { _, pull in
+                guard action != nil else { return }
+                self.pull = pull
+                if isDragging { isArmed = pull >= Self.threshold }
+            }
+            .overlay(alignment: .bottom) { cue }
+            .sensoryFeedback(.impact(weight: .light), trigger: isArmed) { _, armed in armed }
+            .accessibilityActions {
+                if let action {
+                    Button(action: action) { Text(verbatim: "Send Feedback") }
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var cue: some View {
+        // Only under a finger: a fling's bounce past the end never shows it.
+        if action != nil, isDragging, pull > 0 {
+            Label { Text(verbatim: isArmed ? "Release for feedback" : "Pull up for feedback") } icon: {
+                Image(systemName: "message")
+            }
+            .font(AppFont.footnote(weight: .semibold))
+            .foregroundStyle(mark)
+            .opacity(Double(pull / Self.threshold))
+            .padding(.bottom, 14)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
         }
     }
 }

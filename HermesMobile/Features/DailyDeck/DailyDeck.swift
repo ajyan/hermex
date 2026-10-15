@@ -52,7 +52,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
 
     let id: String
     let type: CardType
-    /// For `item` cards: book, insight, video, youtube, media.
+    /// For `item` cards: book, insight, video, youtube, media. A `prompt` card's is `letter` for the Dad card.
     let itemKind: String?
     let title: String?
     let body: String?
@@ -114,6 +114,10 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         case .highlights: return "Open the video"
         }
     }
+
+    /// The Dad card: a prompt to say something to his daughter, with the countdown to her birth
+    /// (then her age) in `lines`. Its answer is filed as a letter to her, not into the journal.
+    var isLetter: Bool { type == .prompt && itemKind == "letter" }
 
     /// Whether answering this card means typing (prompt and reflect cards, and a sleep card's note).
     var takesText: Bool { type == .prompt || type == .reflect || type == .sleep }

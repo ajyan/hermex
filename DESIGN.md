@@ -69,6 +69,7 @@ Named in `Config/HermexStyle.swift`; `HermexPaper.forTool(_:)` maps tool kinds.
 | Memory or skill | `.recall` | `advisor` |
 | Shell, code, delegation, everything else; chat source badges | `.tool` | `plain` |
 | Goal | the goal's own paper (`GoalPaper`) | any |
+| The Daily Brief's Dad card (a letter to his daughter: the countdown, then her age, over the prompt) | `DeckPalette.letter` | `advisor` (the Dad advisor's paper, with a heart mark instead of the check-in's bubble) |
 | Money: net worth, accounts, the market card | `.money` | `ledger` |
 | Feedback inbox | `.feedback` | `notes` |
 | Drawer sections: Daily Brief, Brain, People, Goals, Money, Feedback | `opener`, `.knowledge`, `BrainModuleID.people.paper`, `book`, `.money`, `.feedback` | |
