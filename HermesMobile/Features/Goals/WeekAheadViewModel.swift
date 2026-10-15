@@ -95,8 +95,8 @@ final class WeekAheadViewModel {
 
     let card: DeckCard
     @ObservationIgnored private let client: GoalsDataClient
-    /// The server's today, sent as `as_of`.
-    @ObservationIgnored private let today: String
+    /// The server's today, sent as `as_of`; follows the goals home (`sync`) and a 409's reload.
+    @ObservationIgnored private(set) var today: String
 
     init(card: DeckCard, client: GoalsDataClient, today: String) {
         self.card = card
@@ -130,6 +130,12 @@ final class WeekAheadViewModel {
         await save(eased)
     }
 
+    /// Takes a fresh goals home: its today for the next save, and whether the week is confirmed.
+    func sync(_ home: GoalsHome) {
+        today = home.today
+        markConfirmedIfKnown(home)
+    }
+
     /// Shows the card as confirmed when the server already has its week (confirmed elsewhere,
     /// or before the deck was reopened).
     func markConfirmedIfKnown(_ home: GoalsHome) {
@@ -141,17 +147,35 @@ final class WeekAheadViewModel {
     private func save(_ commitments: [DeckWeekCommitment]) async {
         guard canEdit, let slug = card.goal, let start = card.start else { return }
         phase = .saving
+        let asOf = today
         do {
-            result = try await client.confirmWeek(GoalWeekRequest(slug: slug, start: start, asOf: today,
+            result = try await client.confirmWeek(GoalWeekRequest(slug: slug, start: start, asOf: asOf,
                                                                   commitments: commitments))
             phase = .confirmed
         } catch {
             if case .http(409, _)? = error as? APIError {
-                phase = .failed(Self.conflictCopy)
+                await recoverFromConflict(sent: asOf, slug: slug, start: start)
             } else {
                 phase = .failed(Self.failureCopy)
             }
         }
+    }
+
+    /// A 409 means the server's day isn't the one sent, or the week can no longer be planned.
+    /// Reloads once: when only the day moved (a deck opened Sunday night, kept on Monday) and the
+    /// week is still plannable, editing resumes against the new today; otherwise the card locks.
+    private func recoverFromConflict(sent asOf: String, slug: String, start: String) async {
+        guard let home = try? await client.home() else {
+            phase = .failed(Self.failureCopy)
+            return
+        }
+        today = home.today
+        if home.goals.first(where: { $0.slug == slug })?.confirmedStarts.contains(start) == true {
+            phase = .confirmed
+            return
+        }
+        let plannable = home.today < start || home.goals.first(where: { $0.slug == slug })?.weekPending != nil
+        phase = home.today != asOf && plannable ? .editing : .failed(Self.conflictCopy)
     }
 
     /// The new chat's draft for Edit in chat: the proposal, then the command that saves it.

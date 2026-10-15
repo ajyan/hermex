@@ -7,10 +7,16 @@ private final class FakeWeekGoalsClient: GoalsDataClient, @unchecked Sendable {
     private let lock = NSLock()
     private var _weeks: [GoalWeekRequest] = []
     var weekResults: [Result<GoalCheckInResult, Error>] = []
+    /// What a reload after a 409 reads; empty throws.
+    var homeResults: [Result<GoalsHome, Error>] = []
 
     var weeks: [GoalWeekRequest] { lock.withLock { _weeks } }
 
-    func home() async throws -> GoalsHome { throw URLError(.unsupportedURL) }
+    func home() async throws -> GoalsHome {
+        let next: Result<GoalsHome, Error>? = lock.withLock { homeResults.isEmpty ? nil : homeResults.removeFirst() }
+        guard let next else { throw URLError(.badServerResponse) }
+        return try next.get()
+    }
     func detail(slug: String) async throws -> GoalDetail { throw URLError(.unsupportedURL) }
     func checkIn(_ r: GoalCheckInRequest) async throws -> GoalCheckInResult { throw URLError(.unsupportedURL) }
 
@@ -51,6 +57,14 @@ private func confirmed(starts: [String]) throws -> GoalCheckInResult {
     let body: [String: Any] = ["goal": ["slug": "career", "title": "Land an AI role", "confirmed_starts": starts],
                                "streak": ["days": 1], "today": "2026-10-18", "yesterday": "2026-10-17"]
     return try PrepDecoding.decode(GoalCheckInResult.self, from: JSONSerialization.data(withJSONObject: body))
+}
+
+/// The goals home on `today`, with `career`'s pending deck and confirmed weeks.
+private func goalsHome(today: String, weekPending: String? = nil, confirmed: [String] = []) throws -> GoalsHome {
+    var goal: [String: Any] = ["slug": "career", "title": "Land an AI role", "confirmed_starts": confirmed]
+    if let weekPending { goal["week_pending"] = weekPending }
+    let body: [String: Any] = ["today": today, "yesterday": "2026-10-17", "goals": [goal]]
+    return try PrepDecoding.decode(GoalsHome.self, from: JSONSerialization.data(withJSONObject: body))
 }
 
 /// The request as the server receives it: `APIClient` encodes with snake_case keys.
@@ -126,12 +140,56 @@ final class WeekAheadViewModelTests: XCTestCase {
     func testConflictShowsCarriedForwardCopy() async throws {
         let client = FakeWeekGoalsClient()
         client.weekResults = [.failure(APIError.http(statusCode: 409, body: #"{"error": "The day changed"}"#))]
+        client.homeResults = [.success(try goalsHome(today: "2026-10-18"))]  // the day didn't move
         let vm = try model(client)
 
         await vm.keep()
 
         XCTAssertEqual(vm.phase, .failed("This week has started; the plan carried forward."))
         XCTAssertFalse(vm.canEdit)
+    }
+
+    func testConflictFromAStaleDayReloadsAndKeepsEditing() async throws {
+        // Opened Sunday night, kept on Monday: the 409 is only the day moving on, and this
+        // week's plan is still waiting, so the card takes the new today and stays editable.
+        let client = FakeWeekGoalsClient()
+        client.weekResults = [.failure(APIError.http(statusCode: 409, body: #"{"error": "The day changed"}"#)),
+                              .success(try confirmed(starts: ["2026-10-19"]))]
+        client.homeResults = [.success(try goalsHome(today: "2026-10-19", weekPending: "2026-10-18"))]
+        let vm = try model(client)
+        vm.rows[0].target = 7
+
+        await vm.keep()
+
+        XCTAssertEqual(vm.phase, .editing)
+        XCTAssertTrue(vm.canEdit)
+        XCTAssertEqual(vm.today, "2026-10-19")
+        XCTAssertEqual(vm.rows[0].target, 7)
+
+        await vm.keep()
+
+        XCTAssertEqual(vm.phase, .confirmed)
+        XCTAssertEqual(client.weeks.map(\.asOf), ["2026-10-18", "2026-10-19"])
+    }
+
+    func testConflictWhoseReloadFailsStaysRetryable() async throws {
+        let client = FakeWeekGoalsClient()
+        client.weekResults = [.failure(APIError.http(statusCode: 409, body: ""))]
+        let vm = try model(client)
+
+        await vm.keep()
+
+        XCTAssertEqual(vm.phase, .failed("Couldn't save. Try again."))
+        XCTAssertTrue(vm.canEdit)
+    }
+
+    func testSyncTakesTheHomesToday() throws {
+        let vm = try model(FakeWeekGoalsClient())
+        vm.sync(try goalsHome(today: "2026-10-19", weekPending: "2026-10-18"))
+        XCTAssertEqual(vm.today, "2026-10-19")
+        XCTAssertEqual(vm.phase, .editing)
+        vm.sync(try goalsHome(today: "2026-10-19", confirmed: ["2026-10-19"]))
+        XCTAssertEqual(vm.phase, .confirmed)
     }
 
     func testFailureKeepsEdits() async throws {

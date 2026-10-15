@@ -62,13 +62,13 @@ struct DeckWeekAheadCard: View {
         if let home { adopt(home) }
     }
 
-    /// Builds the rows against the server's today on the first load, and marks the card
-    /// confirmed whenever the server says its week is.
+    /// Builds the rows on the first load, then keeps the server's today and the confirmed
+    /// state current with every reload.
     private func adopt(_ home: GoalsHome) {
         if model == nil, let goals {
             model = WeekAheadViewModel(card: card, client: goals.client, today: home.today)
         }
-        model?.markConfirmedIfKnown(home)
+        model?.sync(home)
     }
 
     /// Runs Keep or Ease off, then hands the server's answer to the goal card so it agrees.
@@ -77,7 +77,12 @@ struct DeckWeekAheadCard: View {
         case .keep: await model.keep()
         case .easeOff: await model.easeOff()
         }
-        if let result = model.result { goals?.apply(result) }
+        if let result = model.result {
+            goals?.apply(result)
+        } else if model.today != home?.today {
+            // A 409 reloaded a new day into the card; bring the deck's goal card along.
+            await goals?.load()
+        }
     }
 
     @ViewBuilder
