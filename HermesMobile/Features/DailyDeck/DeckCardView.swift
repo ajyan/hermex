@@ -50,6 +50,7 @@ private struct DeckCardView: View {
                 case .headline: opener
                 case .close: close
                 case .sleep: sleep
+                case .goal: goal
                 default: reading
                 }
             }
@@ -219,6 +220,19 @@ private struct DeckCardView: View {
                 .padding(.top, 22)
             }
         }
+        reflection("Add a note").padding(.top, 24)
+        if let reason = card.reason {
+            Text(verbatim: reason)
+                .font(AppFont.footnote())
+                .foregroundStyle(palette.ink)
+                .padding(.top, 20)
+        }
+    }
+
+    /// The goal card: live check-ins, then a note on how yesterday went.
+    @ViewBuilder
+    private var goal: some View {
+        DeckGoalCard(card: card, palette: palette)
         reflection("Add a note").padding(.top, 24)
         if let reason = card.reason {
             Text(verbatim: reason)

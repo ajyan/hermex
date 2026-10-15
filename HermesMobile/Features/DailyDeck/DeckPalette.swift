@@ -68,6 +68,9 @@ struct DeckPalette: Equatable {
         case .close: return .quote
         case .prompt: return card.isLetter ? .letter : .advisor
         case .sleep: return .sleep
+        case .goal:
+            let goal = GoalPaper.palette(named: card.color ?? "", slug: card.goals.first ?? card.id)
+            return DeckPalette(goal.colors, symbol: "flag", name: "Goals", shortName: "Goals")
         case .decision: return .followUps
         case .item, .unknown:
             switch card.itemKind {

@@ -94,18 +94,16 @@ final class GoalDetailViewModel {
 
     func checkIn(commitment id: String, status: GoalStatus) async {
         await send(id: id) { detail, date, asOf in
-            Self.apply(status, to: id, on: date, in: &detail)
+            GoalCheckInEdit.apply(status, to: id, on: date, today: detail.today, yesterday: detail.yesterday,
+                                  in: &detail.summary)
             return .commitment(slug: self.slug, date: date, asOf: asOf, id: id, status: status)
         }
     }
 
     func checkIn(check id: String, value: String) async {
         await send(id: id) { detail, date, asOf in
-            if let i = detail.summary.dailyChecks.firstIndex(where: { $0.id == id }) {
-                let shown = value == GoalCheckValue.clear ? nil : value
-                if date == detail.today { detail.summary.dailyChecks[i].today = shown }
-                if date == detail.yesterday { detail.summary.dailyChecks[i].yesterday = shown }
-            }
+            GoalCheckInEdit.setCheck(value, id: id, on: date, today: detail.today, yesterday: detail.yesterday,
+                                     in: &detail.summary)
             return .check(slug: self.slug, date: date, asOf: asOf, id: id, value: value)
         }
     }
@@ -139,57 +137,10 @@ final class GoalDetailViewModel {
             }
             onAPIError(error)
             if case .loaded(var current) = state {
-                Self.restore(id, from: snapshot, in: &current)
+                GoalCheckInEdit.restore(id, from: snapshot.summary, in: &current.summary)
                 state = .loaded(current)
             }
             self.error = "Couldn't save. Try again."
-        }
-    }
-
-    /// Puts one commitment's or daily check's values from `snapshot` back into `detail`.
-    private static func restore(_ id: String, from snapshot: GoalDetail, in detail: inout GoalDetail) {
-        if let old = snapshot.summary.week.commitments.first(where: { $0.id == id }),
-           let i = detail.summary.week.commitments.firstIndex(where: { $0.id == id }) {
-            detail.summary.week.commitments[i] = old
-        }
-        if let old = snapshot.summary.dailyChecks.first(where: { $0.id == id }),
-           let i = detail.summary.dailyChecks.firstIndex(where: { $0.id == id }) {
-            detail.summary.dailyChecks[i] = old
-        }
-    }
-
-    /// Moves one day's status between this week's counts, as the server will.
-    private static func apply(_ status: GoalStatus, to id: String, on date: String, in detail: inout GoalDetail) {
-        guard let i = detail.summary.week.commitments.firstIndex(where: { $0.id == id }) else { return }
-        var row = detail.summary.week.commitments[i]
-        let old: GoalStatus? = date == detail.today ? row.today : row.yesterday
-        let week = detail.summary.week
-        if date >= week.start, date <= week.end {
-            // Skip days this row is known to have: the counted ones, or today and yesterday.
-            let shown = [(detail.today, row.today), (detail.yesterday, row.yesterday)]
-                .filter { $0.1 == .skip && $0.0 >= week.start && $0.0 <= week.end }.count
-            let skipDays = max(row.skipped, shown)
-            adjust(&row, old, by: -1, skipDays: skipDays)
-            if status != .clear { adjust(&row, status, by: 1, skipDays: skipDays) }
-            row.remaining = max(0, row.target - row.done - row.min)
-            row.hit = row.done + row.min >= row.target
-        }
-        let shown: GoalStatus? = status == .clear ? nil : status
-        if date == detail.today { row.today = shown } else { row.yesterday = shown }
-        detail.summary.week.commitments[i] = row
-    }
-
-    /// The server counts a week's skips in day order and any past the budget as misses, so
-    /// adding one with the budget spent, or removing one while `skipDays` exceeds it, moves `missed`.
-    private static func adjust(_ row: inout GoalCommitmentProgress, _ status: GoalStatus?, by n: Int, skipDays: Int) {
-        switch status {
-        case .done: row.done += n
-        case .min: row.min += n
-        case .skip:
-            let overBudget = n > 0 ? row.skipped >= row.skips : skipDays > row.skips
-            if overBudget { row.missed += n } else { row.skipped += n }
-        case .miss: row.missed += n
-        default: break
         }
     }
 }

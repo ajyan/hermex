@@ -96,7 +96,7 @@ struct GoalDetailView: View {
                 }
             }
             if viewModel.day == .today, let missed = d.summary.week.commitments.first(where: { d.summary.flags.missTwice.contains($0.id) }) {
-                Text(verbatim: "Missed \(GoalsCopy.shortName(missed.action).lowercased()) last night. Even the 2-min version counts.")
+                Text(verbatim: GoalDetailCopy.missTwice(missed))
                     .font(BrainStyle.meta)
                     .foregroundStyle(Color.hxWarning)
             }
@@ -197,7 +197,7 @@ struct GoalDetailView: View {
 
 /// One commitment: short name and cue, with a check circle that marks Done on tap and
 /// offers the 2-minute version, Skip and Missed on long press.
-private struct GoalCommitmentRow: View {
+struct GoalCommitmentRow: View {
     let row: GoalCommitmentProgress
     let day: GoalDay
     let tint: GoalTint
@@ -248,7 +248,7 @@ private struct GoalCommitmentRow: View {
 }
 
 /// The check circle: empty until checked in, then filled in the goal's tint (or amber for Missed).
-private struct GoalCheckCircle: View {
+struct GoalCheckCircle: View {
     let status: GoalStatus?
     let tint: GoalTint
     let isPending: Bool
@@ -281,7 +281,7 @@ private struct GoalCheckCircle: View {
 
 /// A row of capsule choices, the selected one filled with the goal's tint. Wraps to two
 /// columns at accessibility text sizes.
-private struct GoalChoiceRow: View {
+struct GoalChoiceRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let options: [(value: String, label: String)]
     let selected: String?
@@ -398,7 +398,7 @@ private struct GoalCalendarCell: View {
 }
 
 /// A one-line note under the hero: an escalation or an unlock offer.
-private struct GoalNote: View {
+struct GoalNote: View {
     let systemImage: String
     let tint: Color
     let text: String
@@ -416,6 +416,11 @@ enum GoalDetailCopy {
     static let statusOptions: [(value: String, label: String)] = [
         ("done", "Done"), ("min", "2-min"), ("skip", "Skip"), ("miss", "Missed"),
     ]
+
+    /// The nudge before a second miss in a row.
+    static func missTwice(_ row: GoalCommitmentProgress) -> String {
+        "Missed \(GoalsCopy.shortName(row.action).lowercased()) last night. Even the 2-min version counts."
+    }
 
     static func countLine(_ row: GoalCommitmentProgress) -> String {
         let shown = "\(row.done + row.min)/\(row.target)"

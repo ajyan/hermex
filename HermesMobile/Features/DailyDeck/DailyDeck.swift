@@ -33,7 +33,7 @@ struct DailyDeck: Decodable, Equatable {
 /// fails to decode; an unknown `type` renders its `fallback` text as a plain card.
 struct DeckCard: Decodable, Equatable, Identifiable {
     enum CardType: Equatable {
-        case headline, prompt, decision, reflect, item, sleep, close
+        case headline, prompt, decision, reflect, item, sleep, goal, close
         case unknown(String)
 
         init(_ raw: String) {
@@ -44,6 +44,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case "reflect": self = .reflect
             case "item": self = .item
             case "sleep": self = .sleep
+            case "goal": self = .goal
             case "close": self = .close
             default: self = .unknown(raw)
             }
@@ -84,25 +85,28 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let scale: [String]
     /// A sleep card's numbers from the user's watch.
     let sleep: DeckSleep?
+    /// A goal card's personal goals (slugs). The card checks in on them live through the Goals API;
+    /// `fallback` is the brief's text for when the server can't serve them.
+    let goals: [String]
 
     /// The Dad card: a prompt to say something to his daughter, with the countdown to her birth
     /// (then her age) in `lines`. Its answer is filed as a letter to her, not into the journal.
     var isLetter: Bool { type == .prompt && itemKind == "letter" }
 
-    /// Whether answering this card means typing (prompt and reflect cards, and a sleep card's note).
-    var takesText: Bool { type == .prompt || type == .reflect || type == .sleep }
+    /// Whether answering this card means typing (prompt and reflect cards, and a sleep or goal card's note).
+    var takesText: Bool { type == .prompt || type == .reflect || type == .sleep || type == .goal }
 
     /// Whether "Not for Me" applies: material the brief chose, not the deck's own pages.
     var takesFeedback: Bool {
         switch type {
         case .prompt, .reflect, .item, .unknown: true
-        case .headline, .decision, .sleep, .close: false
+        case .headline, .decision, .sleep, .goal, .close: false
         }
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, type, title, body, source, lines, question, context, voice, why, draft, actions, fallback
-        case reason, altQuestions, entries, recap, scale, sleep, points, meters, color
+        case reason, altQuestions, entries, recap, scale, sleep, points, meters, color, goals
         case itemKind = "kind"
     }
 
@@ -132,6 +136,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         color = try? c.decodeIfPresent(String.self, forKey: .color)
         scale = (try? c.decodeIfPresent([String].self, forKey: .scale)) ?? []
         sleep = try? c.decodeIfPresent(DeckSleep.self, forKey: .sleep)
+        goals = (try? c.decodeIfPresent([String].self, forKey: .goals)) ?? []
     }
 }
 
@@ -516,6 +521,9 @@ struct DeckCardText: Equatable {
             // The question leads; the numbers show after the rating so they don't decide it.
             lead = card.question
             leadIsQuestion = true
+        case .goal:
+            // The check-ins are drawn live (`DeckGoalCard`); the title is the goal's.
+            lead = card.title ?? card.fallback
         case .headline, .decision, .close:
             lead = card.title
             detail = card.body

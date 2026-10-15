@@ -40,6 +40,22 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(deck.cards[6].lines, [])
     }
 
+    func testGoalCardDecodes() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"d","kind":"morning","cards":[
+          {"id":"goal","type":"goal","goals":["nyc-marathon-2026"],"color":"wiki","fallback":"Nightly stretch 2/6","extra":1},
+          {"id":"goal-2","type":"goal","goals":"nope"}]}
+        """#)
+        let card = deck.cards[0]
+        XCTAssertEqual(card.type, .goal)
+        XCTAssertEqual(card.goals, ["nyc-marathon-2026"])
+        XCTAssertEqual(card.fallback, "Nightly stretch 2/6")
+        XCTAssertTrue(card.takesText)
+        XCTAssertFalse(card.takesFeedback)
+        XCTAssertEqual(deck.cards[1].goals, [])
+        XCTAssertEqual(DeckPalette.of(card).name, "Goals")
+    }
+
     func testCardWithWrongFieldTypesStillDecodes() throws {
         let deck = try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"x","type":"item","title":7,"lines":"no"}]}"#)
         XCTAssertNil(deck.cards[0].title)
