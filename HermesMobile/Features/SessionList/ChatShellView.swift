@@ -81,6 +81,8 @@ struct ChatShellView: View {
     @State private var navigation = ShellNavigationState()
     /// Lets chat replies open Brain pages (`brain://` links) on this stack.
     @State private var brainRouteOpener = OpenBrainRouteAction()
+    /// Where cards and chips that push a screen meet the screen they zoom into.
+    @Namespace private var zoomNamespace
     /// Whether this server takes feedback; rechecked on return until yes, gone with the shell on a server switch.
     @State private var feedbackAvailability: FeedbackAvailability
     /// The drawer is built on first open and kept alive, so it keeps its scroll position.
@@ -509,8 +511,10 @@ struct ChatShellView: View {
                 .onDisappear { isRootVisible = false }
                 .navigationDestination(for: ShellPushDestination.self) { destination in
                     pushedView(destination)
+                        .zoomDestination(destination, in: zoomNamespace)
                 }
         }
+        .environment(\.shellZoomNamespace, zoomNamespace)
         // A new root also drops screens ChatView pushed outside the typed path.
         .id(navigation.rootRevision)
         .background(Color.hxCanvas.ignoresSafeArea())

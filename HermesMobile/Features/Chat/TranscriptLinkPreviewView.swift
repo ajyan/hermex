@@ -296,6 +296,12 @@ struct BrainCitation: Equatable, Identifiable {
 
     var id: String { url.absoluteString }
 
+    /// The Brain page the chip opens, which zooms out of the chip.
+    var destination: ShellPushDestination {
+        guard let (module, id) = BrainLink.ref(from: url) else { return .brainRoute(.module(module)) }
+        return .brainRoute(.page(module, id))
+    }
+
     /// Most cards a reply shows; the rest stay inline links.
     static let limit = 3
 
@@ -339,6 +345,7 @@ struct BrainCitationChips: View {
                     // A taller hit area than the chip draws, so a dense row still gets
                     // near-44 pt targets.
                     HXChip(paper: .knowledge, symbol: "leaf", label: citation.title)
+                        .zoomSource(for: citation.destination, cornerRadius: HXRadius.capsule)
                         .contentShape(.interaction, Capsule().inset(by: -7))
                 }
                 .buttonStyle(.plain)

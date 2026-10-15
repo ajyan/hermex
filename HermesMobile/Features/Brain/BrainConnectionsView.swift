@@ -102,6 +102,7 @@ struct BrainLinkCardsRow: View {
                     ForEach(refs, id: \.id) { ref in
                         NavigationLink(value: ShellPushDestination.brainRoute(.page(ref.module, ref.id))) {
                             BrainLinkCard(ref: ref)
+                                .zoomSource(for: .brainRoute(.page(ref.module, ref.id)), cornerRadius: HXRadius.md)
                         }
                         .buttonStyle(.plain)
                     }

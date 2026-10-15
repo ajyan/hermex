@@ -89,6 +89,7 @@ struct BrainHighlightsView: View {
                     items: items,
                     columns: BrainListLayout.columnCount(3, dynamicType: dynamicTypeSize),
                     style: .tile,
+                    destination: { .brainRoute(.page(.highlights, $0)) },
                     open: { push(.page(.highlights, $0)) },
                     onLastAppear: loadMore
                 )

@@ -171,6 +171,7 @@ struct BrainHomeView: View {
                 switch page {
                 case .bite(let bite):
                     BrainBiteCard(bite: bite, open: { open(bite) }, contentOpacity: contentOpacity)
+                        .zoomSource(for: .brainRoute(route(bite)), cornerRadius: HXRadius.xl)
                 case .summary:
                     BrainReviewSummaryCard(bites: bites, hasMore: viewModel.home.hasMore,
                                            onMore: { await viewModel.dealMore() }, contentOpacity: contentOpacity)
@@ -202,7 +203,11 @@ struct BrainHomeView: View {
     }
 
     private func open(_ bite: BrainBite) {
-        push(.bite(bite.ref.module, bite.ref.id, idea: bite.kind == .idea ? bite.index : nil))
+        push(route(bite))
+    }
+
+    private func route(_ bite: BrainBite) -> BrainRoute {
+        .bite(bite.ref.module, bite.ref.id, idea: bite.kind == .idea ? bite.index : nil)
     }
 
     private static func edgeFill(_ page: BrainReviewPage) -> Color {

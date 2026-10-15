@@ -141,6 +141,7 @@ struct BrainModuleStrip: View {
     private func chip(_ route: BrainRoute, paper: HermexPaper, symbol: String, label: String) -> some View {
         NavigationLink(value: ShellPushDestination.brainRoute(route)) {
             HXChip(paper: paper, symbol: symbol, label: label)
+                .zoomSource(for: .brainRoute(route), cornerRadius: HXRadius.capsule)
                 .frame(minHeight: 44)
                 .contentShape(Rectangle())
         }
