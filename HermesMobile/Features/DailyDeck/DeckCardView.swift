@@ -60,6 +60,8 @@ private struct DeckCardView: View {
     let feedback: (() -> Void)?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Today's morning deck only: earlier cards to rate, offered on the closing card.
+    @Environment(LabelQueueViewModel.self) private var labelQueue: LabelQueueViewModel?
     @State private var isWriting = false
     /// The sleep card's numbers, shown before rating when asked for.
     @State private var showsNumbers = false
@@ -357,6 +359,10 @@ private struct DeckCardView: View {
         .buttonStyle(.plain)
         .disabled(viewModel.filing == .filing || !viewModel.hasChanges)
         .padding(.top, 28)
+        if let labelQueue {
+            RateRecentCardsLink(queue: labelQueue, palette: palette)
+                .padding(.top, 8)
+        }
     }
 }
 
