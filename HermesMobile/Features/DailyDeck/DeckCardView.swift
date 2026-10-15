@@ -1,4 +1,5 @@
 import Charts
+import MessageUI
 import SwiftUI
 
 /// One card of the Daily Deck stack, a glow card in its kind's paper (`DeckPalette`). A card
@@ -13,10 +14,14 @@ struct DeckPageView: View {
     var feedback: (() -> Void)?
     /// Cards under the top one show only their paper; their words fade in as they rise.
     var contentOpacity: Double = 1
+    /// The card opened to fill the screen: its words without the card's own surface.
+    var isOpen = false
+
+    @Environment(\.openBrainRoute) private var openBrainRoute
 
     var body: some View {
         let palette = DeckPalette.of(page)
-        Group {
+        let words = Group {
             switch page {
             case .card(let card):
                 DeckCardView(card: card, palette: palette, viewModel: viewModel, file: file, feedback: feedback)
@@ -25,8 +30,24 @@ struct DeckPageView: View {
             }
         }
         .opacity(contentOpacity)
-        .hxCardSurface(palette.cardRole, clipsContent: true)
-        .padding(.vertical, 12)
+        if isOpen {
+            words
+        } else {
+            words
+                .hxCardSurface(palette.cardRole, clipsContent: true)
+                .opensAsFullCard(palette.cardRole, title: palette.name, action: sourceAction) {
+                    // No swipe-up feedback here: its sheet belongs to the deck under the open card.
+                    DeckPageView(page: page, viewModel: viewModel, file: file, isOpen: true)
+                }
+                .padding(.vertical, 12)
+        }
+    }
+
+    /// "Open the page" on an open card whose source is a Brain page.
+    private var sourceAction: HXCardAction? {
+        guard case .card(let card) = page, let route = card.sourceRoute, openBrainRoute.isAvailable else { return nil }
+        let open = openBrainRoute
+        return HXCardAction(title: DeckCard.openTitle(for: route)) { open(route) }
     }
 }
 
@@ -675,6 +696,9 @@ private struct FollowUpsPage: View {
 private struct FollowUpRow: View {
     let card: DeckCard
     let viewModel: DailyDeckViewModel
+    /// The Text action whose Messages sheet is up.
+    @State private var composing: DeckAction?
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         let chosen = viewModel.answer(for: card)?.action
@@ -683,12 +707,12 @@ private struct FollowUpRow: View {
             if let body = card.body, body != card.title {
                 Text(verbatim: body).font(AppFont.subheadline()).foregroundStyle(.secondary)
             }
-            if let draft = card.draft, let text = draft.text {
+            if let preview = draftPreview {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(verbatim: "Draft to \(draft.to ?? "them")\(draft.channel.map { " · \($0)" } ?? "")")
+                    Text(verbatim: preview.heading)
                         .font(AppFont.caption(weight: .semibold))
                         .foregroundStyle(.secondary)
-                    Text(verbatim: text).font(AppFont.body())
+                    Text(verbatim: preview.text).font(AppFont.body())
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -705,13 +729,84 @@ private struct FollowUpRow: View {
                 AnswerBox(card: card, viewModel: viewModel, prompt: "Anything to mention? (optional)", minHeight: 88)
             }
         }
+        .sheet(item: $composing) { action in
+            MessageComposer(message: action.message ?? DeckMessage(to: "", body: nil)) { sent in
+                composing = nil
+                if sent { viewModel.markTexted(action, for: card) }
+            }
+            .ignoresSafeArea()
+        }
     }
 
     private func buttons(_ chosen: String?) -> some View {
         ForEach(card.actions) { action in
-            ChoiceButton(title: action.label, isSelected: chosen == action.id) {
-                viewModel.choose(action, for: card)
+            let texted = action.message != nil && chosen == action.id
+            ChoiceButton(title: texted ? "Texted" : action.label, isSelected: chosen == action.id) {
+                if let message = action.message {
+                    text(message, with: action)
+                } else {
+                    viewModel.choose(action, for: card)
+                }
             }
+        }
+    }
+
+    /// The words to be sent, shown before sending: an agent's draft, else the Text action's suggestion.
+    private var draftPreview: (heading: String, text: String)? {
+        if let draft = card.draft, let text = draft.text {
+            return ("Draft to \(draft.to ?? "them")\(draft.channel.map { " · \($0)" } ?? "")", text)
+        }
+        if let body = card.actions.lazy.compactMap({ $0.message?.body }).first(where: { !$0.isEmpty }) {
+            return ("Suggested text", body)
+        }
+        return nil
+    }
+
+    /// Opens the Messages sheet. Where the device can't send texts (the simulator), it hands off
+    /// to Messages instead, which can't report back, so the card stays unanswered.
+    private func text(_ message: DeckMessage, with action: DeckAction) {
+        if MessageComposer.canSend {
+            composing = action
+        } else if let url = MessageComposer.smsURL(message) {
+            openURL(url)
+        }
+    }
+}
+
+/// The system Messages compose sheet, prefilled. Reports whether the text was actually sent:
+/// `false` for a cancel or a failure.
+private struct MessageComposer: UIViewControllerRepresentable {
+    let message: DeckMessage
+    let onFinish: (Bool) -> Void
+
+    static var canSend: Bool { MFMessageComposeViewController.canSendText() }
+
+    /// `sms:` to the same recipient and words, for a device without the sheet.
+    static func smsURL(_ message: DeckMessage) -> URL? {
+        let body = message.body?.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        return URL(string: "sms:\(message.to)" + (body.isEmpty ? "" : "&body=\(body)"))
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(onFinish: onFinish) }
+
+    func makeUIViewController(context: Context) -> MFMessageComposeViewController {
+        let controller = MFMessageComposeViewController()
+        controller.recipients = [message.to]
+        controller.body = message.body
+        controller.messageComposeDelegate = context.coordinator
+        return controller
+    }
+
+    func updateUIViewController(_ controller: MFMessageComposeViewController, context: Context) {}
+
+    final class Coordinator: NSObject, MFMessageComposeViewControllerDelegate {
+        let onFinish: (Bool) -> Void
+
+        init(onFinish: @escaping (Bool) -> Void) { self.onFinish = onFinish }
+
+        func messageComposeViewController(_ controller: MFMessageComposeViewController,
+                                          didFinishWith result: MessageComposeResult) {
+            onFinish(result == .sent)
         }
     }
 }
