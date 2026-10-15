@@ -209,9 +209,11 @@ extension EnvironmentValues {
 
 extension View {
     /// Marks this card or chip as where `destination` opens from: pushing it zooms out of
-    /// this view, rounded to `cornerRadius`, and going back shrinks the screen into it. A chip
-    /// passes `HXRadius.capsule`. Does nothing outside the shell's stack.
-    func zoomSource(for destination: ShellPushDestination, cornerRadius: CGFloat) -> some View {
+    /// this view, and going back shrinks the screen into it. A card passes its `cornerRadius`;
+    /// a chip passes none, because the zoom's clip takes the radius literally (no clamping to a
+    /// capsule) and an oversized one clips the chip away entirely. Does nothing outside the
+    /// shell's stack.
+    func zoomSource(for destination: ShellPushDestination, cornerRadius: CGFloat? = nil) -> some View {
         modifier(ZoomSourceModifier(destination: destination, cornerRadius: cornerRadius))
     }
 
@@ -223,14 +225,16 @@ extension View {
 
 private struct ZoomSourceModifier: ViewModifier {
     let destination: ShellPushDestination
-    let cornerRadius: CGFloat
+    let cornerRadius: CGFloat?
     @Environment(\.shellZoomNamespace) private var namespace
 
     func body(content: Content) -> some View {
-        if let namespace {
+        if let namespace, let cornerRadius {
             content.matchedTransitionSource(id: destination, in: namespace) { source in
                 source.clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             }
+        } else if let namespace {
+            content.matchedTransitionSource(id: destination, in: namespace)
         } else {
             content
         }

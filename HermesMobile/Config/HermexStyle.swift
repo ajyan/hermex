@@ -12,9 +12,6 @@ enum HXRadius {
     static let lg: CGFloat = 18
     /// Hero papers: Daily Brief cards and the Goal hero.
     static let xl: CGFloat = 28
-    /// A chip's capsule where only a rounded rectangle is accepted (a zoom source); the
-    /// rectangle clamps it to half the chip's height.
-    static let capsule: CGFloat = 999
 }
 
 /// The app's shadows (DESIGN.md § Elevation). Everything inline in chat is flat.
