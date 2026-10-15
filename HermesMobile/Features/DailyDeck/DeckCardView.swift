@@ -35,6 +35,7 @@ struct DeckPageView: View {
             words
                 .hxCardSurface(palette.cardRole, clipsContent: true)
                 .opensAsFullCard(palette.cardRole, title: palette.name, action: sourceAction) {
+                    // No swipe-up feedback here: its sheet belongs to the deck under the open card.
                     DeckPageView(page: page, viewModel: viewModel, file: file, isOpen: true)
                 }
                 .padding(.vertical, 12)
