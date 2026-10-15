@@ -56,6 +56,33 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(DeckPalette.of(card).name, "Goals")
     }
 
+    func testWeekAheadCardDecodesItsCommitmentsAndLastWeek() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"2026-10-18","kind":"weekly","cards":[
+          {"id":"week-career","type":"week_ahead","goal":"career","title":"Next week · Land an AI role","color":"wiki",
+           "start":"2026-10-19","fallback":"Next week: Outreach 6",
+           "commitments":[{"id":"outreach","action":"Outreach","target":6,"skips":0,"unit":"item","was":5,
+                           "reason":"Hit twice.","extra":{"x":1}},
+                          {"action":"No id"},
+                          {"id":"prep","action":"Prep session","target":5,"skips":1,"unit":"day","source":"prep.days",
+                           "days":["mon"]}],
+           "last_week":[{"id":"outreach","action":"Outreach","target":5,"skips":0,"unit":"item"}]}]}
+        """#)
+        let card = try XCTUnwrap(deck.cards.first)
+        XCTAssertEqual(card.type, .weekAhead)
+        XCTAssertEqual(card.goal, "career")
+        XCTAssertEqual(card.start, "2026-10-19")
+        XCTAssertEqual(card.weekCommitments.map(\.id), ["outreach", "prep"], "a malformed commitment is dropped alone")
+        XCTAssertEqual(card.weekCommitments[0].was, 5)
+        XCTAssertEqual(card.weekCommitments[0].reason, "Hit twice.")
+        XCTAssertEqual(card.weekCommitments[1].source, "prep.days")
+        XCTAssertEqual(card.weekCommitments[1].days, ["mon"])
+        XCTAssertNil(card.weekCommitments[1].was)
+        XCTAssertEqual(card.lastWeek.map(\.target), [5])
+        XCTAssertFalse(card.takesFeedback)
+        XCTAssertFalse(card.takesText)
+    }
+
     func testCardWithWrongFieldTypesStillDecodes() throws {
         let deck = try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"x","type":"item","title":7,"lines":"no"}]}"#)
         XCTAssertNil(deck.cards[0].title)
@@ -827,6 +854,25 @@ final class DailyDeckTests: XCTestCase {
       {"id": "close", "type": "close"}
     ]}
     """
+
+    @MainActor
+    func testShowWithACardIDLandsOnThatCard() async {
+        store.setWorkspace("/vault", for: server)
+        let weekly = #"{"date":"2026-10-04","kind":"weekly","cards":[{"id":"headline","type":"headline"},{"id":"recap","type":"item"},{"id":"week-career","type":"week_ahead","goal":"career"},{"id":"close","type":"close"}]}"#
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.weekly.json"], deck: weekly)
+
+        let viewModel = makeViewModel(client)
+        await viewModel.show(date: "2026-10-04", kind: "weekly", cardID: "week-career")
+        XCTAssertEqual(viewModel.index, 2)
+        viewModel.index = 0
+        await viewModel.show(date: "2026-10-04", kind: "weekly", cardID: "week-career")
+        XCTAssertEqual(viewModel.index, 2, "the deck already on screen still moves to the card")
+
+        let other = makeViewModel(client)
+        await other.show(date: "2026-10-04", kind: "weekly", cardID: "week-gone")
+        XCTAssertEqual(other.state, .ready)
+        XCTAssertEqual(other.index, 0)
+    }
 
     // MARK: - Journal calendar
 

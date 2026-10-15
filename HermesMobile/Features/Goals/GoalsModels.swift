@@ -274,7 +274,8 @@ struct GoalSummary: Decodable, Hashable, Sendable, Identifiable {
     var week: GoalWeek
     var dailyChecks: [GoalDailyCheck]
     var flags: GoalFlags
-    /// The Monday of a next week whose plan is waiting to be confirmed or changed; nil when none.
+    /// The date of the weekly deck (`briefs/<date>.weekly.json`) holding this week's plan while it
+    /// waits to be confirmed or changed; nil when none.
     var weekPending: String?
     var confirmedStarts: [String]
     /// Why a source such as Prep could not be read, shown instead of a silent zero.
@@ -506,6 +507,17 @@ enum GoalCheckInRequest: Encodable, Equatable, Sendable {
             try c.encodeIfPresent(note, forKey: .note)
         }
     }
+}
+
+/// `POST /api/goals/week`: the commitments for the week starting `start` (a Monday). `asOf` is
+/// the server's today, as for a check-in; the server answers 409 once that week can't be planned.
+struct GoalWeekRequest: Encodable, Equatable, Sendable {
+    let slug: String
+    let start: String
+    let asOf: String
+    let commitments: [DeckWeekCommitment]
+
+    private enum CodingKeys: String, CodingKey { case slug, start, commitments, asOf = "as_of" }
 }
 
 struct GoalCheckInResult: Decodable, Hashable, Sendable {

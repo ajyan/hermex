@@ -25,9 +25,11 @@
 		B1A1C0DE00000000000F000B /* GoalsViewModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */; };
 		A0DE000292B90F697F77D29E /* GoalCheckInCardViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE000292B90F697F77D29D /* GoalCheckInCardViewModelTests.swift */; };
 		A0DE0003F6338217394AF92B /* GoalCheckInEditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE0003300540C2C75C9B4A /* GoalCheckInEditTests.swift */; };
+		A0DE32DA8AE24542AF68361E /* WeekAheadViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE9E759868615CA68657FC /* WeekAheadViewModelTests.swift */; };
 		B1A1C0DE00000000000F0009 /* GoalsViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */; };
 		A0DE002C9AEE2AE3608A3D16 /* GoalCheckInCardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE002C9AEE2AE3608A3D15 /* GoalCheckInCardViewModel.swift */; };
 		A0DE0014FAAC7A19A48B2C56 /* GoalCheckInEdit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE0014FAAC7A19A48B2C55 /* GoalCheckInEdit.swift */; };
+		A0DEB2E8294CD05546F5B4B7 /* WeekAheadViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE7728054A2E1F9F736820 /* WeekAheadViewModel.swift */; };
 		A0DE0016FAAC7A19A48B2C72 /* GoalCommitmentRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE0016FAAC7A19A48B2C71 /* GoalCommitmentRow.swift */; };
 		A0DE0015FAAC7A19A48B2C62 /* GoalItemRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE0015FAAC7A19A48B2C61 /* GoalItemRow.swift */; };
 		B1A1C0DE00000000000F0007 /* GoalsModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */; };
@@ -693,6 +695,7 @@
 		218E7F5B009F877FF54BA04A /* DailyDeckView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD79724DF6D6FD92B594BBC5 /* DailyDeckView.swift */; };
 		1F2EF7D6C585EAF7E1C46CD2 /* DeckCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */; };
 		A0DE001C71B0EBD4FA4E885E /* DeckGoalCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE001C71B0EBD4FA4E885D /* DeckGoalCard.swift */; };
+		A0DE1106959C69CCBD66C799 /* DeckWeekAheadCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DEFBDBFEC0F250EDED2408 /* DeckWeekAheadCard.swift */; };
 		B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000102 /* BrainViewModel.swift */; };
 		B1A1C0DE0000000000000201 /* BrainViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */; };
 		B1A1C0DE0000000000000203 /* BrainModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000204 /* BrainModelsTests.swift */; };
@@ -717,6 +720,7 @@
 		B1A1C0DE0000000000000801 /* BrainLibraryViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000802 /* BrainLibraryViewModels.swift */; };
 		B1A1C0DE0000000000001A01 /* BrainReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000001A02 /* BrainReview.swift */; };
 		B1A1C0DE00000000000000A3 /* BrainModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000103 /* BrainModels.swift */; };
+		A0DEA60AD5799313DB0B6EDF /* OpenDraftChatAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE7EC6B4625B0CC63C3E3A /* OpenDraftChatAction.swift */; };
 		2A8CB7ACCDBA9BBE34E57FDC /* DailyDeckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A997D807C262D12E5491E89 /* DailyDeckTests.swift */; };
 		456FFBA86135A0D6C5707B5E /* DeckCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59FBDD2AD47605DA28200130 /* DeckCalendarView.swift */; };
 		BBEB574715121587294478C7 /* DailyBriefReminder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A01557B2FAEFDDD7C94E6A /* DailyBriefReminder.swift */; };
@@ -811,9 +815,11 @@
 		B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsViewModelsTests.swift; sourceTree = "<group>"; };
 		A0DE000292B90F697F77D29D /* GoalCheckInCardViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCheckInCardViewModelTests.swift; sourceTree = "<group>"; };
 		A0DE0003300540C2C75C9B4A /* GoalCheckInEditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCheckInEditTests.swift; sourceTree = "<group>"; };
+		A0DE9E759868615CA68657FC /* WeekAheadViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekAheadViewModelTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsViewModels.swift; sourceTree = "<group>"; };
 		A0DE002C9AEE2AE3608A3D15 /* GoalCheckInCardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCheckInCardViewModel.swift; sourceTree = "<group>"; };
 		A0DE0014FAAC7A19A48B2C55 /* GoalCheckInEdit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCheckInEdit.swift; sourceTree = "<group>"; };
+		A0DE7728054A2E1F9F736820 /* WeekAheadViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekAheadViewModel.swift; sourceTree = "<group>"; };
 		A0DE0016FAAC7A19A48B2C71 /* GoalCommitmentRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCommitmentRow.swift; sourceTree = "<group>"; };
 		A0DE0015FAAC7A19A48B2C61 /* GoalItemRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalItemRow.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsModelsTests.swift; sourceTree = "<group>"; };
@@ -1475,6 +1481,7 @@
 		B1A1C0DE0000000000000102 /* BrainViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainViewModel.swift; sourceTree = "<group>"; };
 		7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckCardView.swift; sourceTree = "<group>"; };
 		A0DE001C71B0EBD4FA4E885D /* DeckGoalCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckGoalCard.swift; sourceTree = "<group>"; };
+		A0DEFBDBFEC0F250EDED2408 /* DeckWeekAheadCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckWeekAheadCard.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000204 /* BrainModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainModelsTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000902 /* BrainStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainStyle.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000A02 /* BrainHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainHomeView.swift; sourceTree = "<group>"; };
@@ -1497,6 +1504,7 @@
 		B1A1C0DE0000000000000802 /* BrainLibraryViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainLibraryViewModels.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000001A02 /* BrainReview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainReview.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000103 /* BrainModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainModels.swift; sourceTree = "<group>"; };
+		A0DE7EC6B4625B0CC63C3E3A /* OpenDraftChatAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenDraftChatAction.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainViewModelTests.swift; sourceTree = "<group>"; };
 		3A997D807C262D12E5491E89 /* DailyDeckTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDeckTests.swift; sourceTree = "<group>"; };
 		59FBDD2AD47605DA28200130 /* DeckCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckCalendarView.swift; sourceTree = "<group>"; };
@@ -1595,6 +1603,7 @@
 				B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */,
 				A0DE002C9AEE2AE3608A3D15 /* GoalCheckInCardViewModel.swift */,
 				A0DE0014FAAC7A19A48B2C55 /* GoalCheckInEdit.swift */,
+				A0DE7728054A2E1F9F736820 /* WeekAheadViewModel.swift */,
 				A0DE0016FAAC7A19A48B2C71 /* GoalCommitmentRow.swift */,
 				A0DE0015FAAC7A19A48B2C61 /* GoalItemRow.swift */,
 				B1A1C0DE00000000000F0004 /* GoalsDataClient.swift */,
@@ -1720,6 +1729,7 @@
 				B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */,
 				A0DE000292B90F697F77D29D /* GoalCheckInCardViewModelTests.swift */,
 				A0DE0003300540C2C75C9B4A /* GoalCheckInEditTests.swift */,
+				A0DE9E759868615CA68657FC /* WeekAheadViewModelTests.swift */,
 				B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */,
 				B1A1C0DE0000000000000E16 /* PrepViewModelsTests.swift */,
 				B1A1C0DE0000000000000908 /* BrainVisualsTests.swift */,
@@ -2582,6 +2592,7 @@
 				B87C4558BE2BEAAD59ECCE39 /* DeckPalette.swift */,
 				7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */,
 				A0DE001C71B0EBD4FA4E885D /* DeckGoalCard.swift */,
+				A0DEFBDBFEC0F250EDED2408 /* DeckWeekAheadCard.swift */,
 				AD79724DF6D6FD92B594BBC5 /* DailyDeckView.swift */,
 				D71D8CEEBE37C8E43E46A2B4 /* DailyDeckViewModel.swift */,
 				22112FC4500BC48A8D86A376 /* DailyDeck.swift */,
@@ -2594,6 +2605,7 @@
 			children = (
 				B1A1C0DE0000000000000102 /* BrainViewModel.swift */,
 				B1A1C0DE0000000000000103 /* BrainModels.swift */,
+				A0DE7EC6B4625B0CC63C3E3A /* OpenDraftChatAction.swift */,
 				B1A1C0DE0000000000000802 /* BrainLibraryViewModels.swift */,
 				B1A1C0DE0000000000001A02 /* BrainReview.swift */,
 				B1A1C0DE0000000000000906 /* BrainConnectionsView.swift */,
@@ -2874,8 +2886,10 @@
 				39D0697E4167AB61D9640383 /* DeckPalette.swift in Sources */,
 				1F2EF7D6C585EAF7E1C46CD2 /* DeckCardView.swift in Sources */,
 				A0DE001C71B0EBD4FA4E885E /* DeckGoalCard.swift in Sources */,
+				A0DE1106959C69CCBD66C799 /* DeckWeekAheadCard.swift in Sources */,
 				B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */,
 				B1A1C0DE00000000000000A3 /* BrainModels.swift in Sources */,
+				A0DEA60AD5799313DB0B6EDF /* OpenDraftChatAction.swift in Sources */,
 				B1A1C0DE0000000000000E01 /* PrepModels.swift in Sources */,
 				C0F5E5470000000000000000 /* PrepCourseModels.swift in Sources */,
 				FEEDB0DE00000000000000A1 /* FeedbackModels.swift in Sources */,
@@ -2900,6 +2914,7 @@
 				B1A1C0DE00000000000F0009 /* GoalsViewModels.swift in Sources */,
 				A0DE002C9AEE2AE3608A3D16 /* GoalCheckInCardViewModel.swift in Sources */,
 				A0DE0014FAAC7A19A48B2C56 /* GoalCheckInEdit.swift in Sources */,
+				A0DEB2E8294CD05546F5B4B7 /* WeekAheadViewModel.swift in Sources */,
 				A0DE0016FAAC7A19A48B2C72 /* GoalCommitmentRow.swift in Sources */,
 				A0DE0015FAAC7A19A48B2C62 /* GoalItemRow.swift in Sources */,
 				B1A1C0DE00000000000F0005 /* GoalsDataClient.swift in Sources */,
@@ -3353,6 +3368,7 @@
 				B1A1C0DE00000000000F000B /* GoalsViewModelsTests.swift in Sources */,
 				A0DE000292B90F697F77D29E /* GoalCheckInCardViewModelTests.swift in Sources */,
 				A0DE0003F6338217394AF92B /* GoalCheckInEditTests.swift in Sources */,
+				A0DE32DA8AE24542AF68361E /* WeekAheadViewModelTests.swift in Sources */,
 				B1A1C0DE00000000000F0007 /* GoalsModelsTests.swift in Sources */,
 				B1A1C0DE0000000000000E15 /* PrepViewModelsTests.swift in Sources */,
 				B1A1C0DE0000000000000907 /* BrainVisualsTests.swift in Sources */,

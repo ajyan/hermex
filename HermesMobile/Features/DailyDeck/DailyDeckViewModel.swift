@@ -183,13 +183,17 @@ final class DailyDeckViewModel {
         await load()
     }
 
-    /// Opens another deck: a past day's brief to reread or edit, or a review.
-    func show(date: String, kind: String = "morning") async {
-        guard date != self.date || kind != self.kind || state != .ready else { return }
-        self.date = date
-        self.kind = kind
-        index = 0
-        await load()
+    /// Opens another deck: a past day's brief to reread or edit, or a review. With `cardID`, it
+    /// lands on that card once loaded (the deck already on screen just moves to it).
+    func show(date: String, kind: String = "morning", cardID: String? = nil) async {
+        if date != self.date || kind != self.kind || state != .ready {
+            self.date = date
+            self.kind = kind
+            index = 0
+            await load()
+        }
+        guard let cardID, state == .ready, let i = visiblePages.firstIndex(where: { $0.id == cardID }) else { return }
+        index = i
     }
 
     /// Loads the deck and, when it was filed, the filed answers. Unsent edits on this

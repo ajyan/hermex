@@ -12,7 +12,8 @@ final class GoalCheckInCardViewModel {
     private(set) var pending: Set<String> = []
     private(set) var error: String?
 
-    @ObservationIgnored private let client: GoalsDataClient
+    /// Shared with the deck's Week ahead cards, which confirm through the same server.
+    @ObservationIgnored let client: GoalsDataClient
     @ObservationIgnored private let onAPIError: (Error) -> Void
     @ObservationIgnored private var generation = 0
 
@@ -99,6 +100,15 @@ final class GoalCheckInCardViewModel {
                                      in: &goal)
             return .check(slug: slug, date: home.today, asOf: home.today, id: id, value: value)
         }
+    }
+
+    /// Takes a goal's summary from another write (a confirmed week), so the deck's cards agree.
+    func apply(_ result: GoalCheckInResult) {
+        guard case .loaded(var current) = state,
+              let i = current.goals.firstIndex(where: { $0.slug == result.goal.slug }) else { return }
+        current.goals[i] = result.goal
+        current.streak = result.streak
+        state = .loaded(current)
     }
 
     /// Applies the optimistic edit, posts, then takes the server's summary of that goal or restores

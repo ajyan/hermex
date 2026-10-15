@@ -25,6 +25,7 @@ private final class FakeCardGoalsClient: GoalsDataClient, @unchecked Sendable {
 
     func home() async throws -> GoalsHome { try next("home", &homeResults) }
     func detail(slug: String) async throws -> GoalDetail { throw URLError(.unsupportedURL) }
+    func confirmWeek(_ r: GoalWeekRequest) async throws -> GoalCheckInResult { throw URLError(.unsupportedURL) }
 
     func checkIn(_ r: GoalCheckInRequest) async throws -> GoalCheckInResult {
         lock.withLock { _checkIns.append(r) }

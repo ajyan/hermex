@@ -72,6 +72,7 @@ private struct DeckCardView: View {
                 case .close: close
                 case .sleep: sleep
                 case .goal: goal
+                case .weekAhead: DeckWeekAheadCard(card: card, palette: palette)
                 default: reading
                 }
             }

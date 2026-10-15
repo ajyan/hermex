@@ -81,6 +81,8 @@ struct ChatShellView: View {
     @State private var navigation = ShellNavigationState()
     /// Lets chat replies open Brain pages (`brain://` links) on this stack.
     @State private var brainRouteOpener = OpenBrainRouteAction()
+    /// Lets pushed screens (a Week ahead card's Edit in chat) start a new chat with a draft.
+    @State private var draftChatOpener = OpenDraftChatAction()
     /// Where cards and chips that push a screen meet the screen they zoom into.
     @Namespace private var zoomNamespace
     /// Whether this server takes feedback; rechecked on return until yes, gone with the shell on a server switch.
@@ -503,6 +505,7 @@ struct ChatShellView: View {
 
     private var mainStack: some View {
         brainRouteOpener.handler = { navigation.path.append(.brainRoute($0)) }
+        draftChatOpener.handler = { selectDestination(PendingNewChatRoute(initialDraft: $0)) }
         return NavigationStack(path: $navigation.path) {
             rootView
                 .environment(\.openBrainRoute, brainRouteOpener)
@@ -517,6 +520,7 @@ struct ChatShellView: View {
         .environment(\.shellZoomNamespace, zoomNamespace)
         // Pushed screens (the Daily Brief's open cards) open Brain pages too.
         .environment(\.openBrainRoute, brainRouteOpener)
+        .environment(\.openDraftChat, draftChatOpener)
         // A new root also drops screens ChatView pushed outside the typed path.
         .id(navigation.rootRevision)
         .background(Color.hxCanvas.ignoresSafeArea())
