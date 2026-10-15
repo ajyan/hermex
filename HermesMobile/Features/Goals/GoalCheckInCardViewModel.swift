@@ -52,8 +52,14 @@ final class GoalCheckInCardViewModel {
     }
 
     /// Yesterday's commitments: the ones due then, plus any already checked in for that day.
+    /// Item rows count whenever, so they live under `itemRows` instead.
     static func yesterdayRows(_ goal: GoalSummary) -> [GoalCommitmentProgress] {
-        goal.week.commitments.filter { $0.dueYesterday || $0.yesterday != nil }
+        goal.week.commitments.filter { !$0.isItem && ($0.dueYesterday || $0.yesterday != nil) }
+    }
+
+    /// The commitments counted by +1 (applications, outreach), shown under "This week".
+    static func itemRows(_ goal: GoalSummary) -> [GoalCommitmentProgress] {
+        goal.week.commitments.filter(\.isItem)
     }
 
     /// Commitments due today whose cue is worth a reminder.
@@ -68,6 +74,22 @@ final class GoalCheckInCardViewModel {
             GoalCheckInEdit.apply(status, to: id, on: home.yesterday, today: home.today, yesterday: home.yesterday,
                                   in: &goal)
             return .commitment(slug: slug, date: home.yesterday, asOf: home.today, id: id, status: status)
+        }
+    }
+
+    /// Counts one more item (with its optional note) for the server's today.
+    func addItem(slug: String, commitment id: String, note: String?) async {
+        await send(slug: slug, id: id) { goal, home in
+            GoalCheckInEdit.addItem(1, note: note, to: id, on: home.today, in: &goal)
+            return .item(slug: slug, date: home.today, asOf: home.today, id: id, n: 1, note: note)
+        }
+    }
+
+    /// Takes the latest counted item back off.
+    func removeLastItem(slug: String, commitment id: String) async {
+        await send(slug: slug, id: id) { goal, home in
+            GoalCheckInEdit.addItem(-1, note: nil, to: id, on: home.today, in: &goal)
+            return .item(slug: slug, date: home.today, asOf: home.today, id: id, n: -1, note: nil)
         }
     }
 

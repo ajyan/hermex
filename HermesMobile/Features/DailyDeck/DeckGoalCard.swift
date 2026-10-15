@@ -84,6 +84,7 @@ private struct GoalCheckInSection: View {
 
     var body: some View {
         let yesterday = GoalCheckInCardViewModel.yesterdayRows(goal)
+        let items = GoalCheckInCardViewModel.itemRows(goal)
         let cues = GoalCheckInCardViewModel.todayCues(goal)
         VStack(alignment: .leading, spacing: 0) {
             Text(verbatim: goal.title)
@@ -99,10 +100,22 @@ private struct GoalCheckInSection: View {
                 header("Yesterday")
                 ForEach(Array(yesterday.enumerated()), id: \.element.id) { index, row in
                     if index > 0 { Rectangle().fill(palette.ink.opacity(0.12)).frame(height: 0.5) }
-                    GoalCommitmentRow(row: row, day: .yesterday, tint: tint,
+                    GoalCommitmentRow(row: row, day: .yesterday, date: home.yesterday, tint: tint,
                                       isPending: model.pending.contains(GoalCheckInCardViewModel.key(goal.slug, row.id))) { status in
                         Task { await model.checkIn(slug: goal.slug, commitment: row.id, status: status) }
                     }
+                }
+            }
+            if !items.isEmpty {
+                header("This week")
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, row in
+                    if index > 0 { Rectangle().fill(palette.ink.opacity(0.12)).frame(height: 0.5) }
+                    GoalItemRow(
+                        row: row, tint: tint,
+                        isPending: model.pending.contains(GoalCheckInCardViewModel.key(goal.slug, row.id)),
+                        onAdd: { note in Task { await model.addItem(slug: goal.slug, commitment: row.id, note: note) } },
+                        onRemoveLast: { Task { await model.removeLastItem(slug: goal.slug, commitment: row.id) } }
+                    )
                 }
             }
             if !goal.dailyChecks.isEmpty || !cues.isEmpty {

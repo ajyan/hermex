@@ -84,13 +84,24 @@ struct GoalDetailView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(d.summary.week.commitments.enumerated()), id: \.element.id) { offset, row in
                         if offset > 0 { PrepRowDivider() }
-                        GoalCommitmentRow(
-                            row: row,
-                            day: viewModel.day,
-                            tint: tint,
-                            isPending: viewModel.pending.contains(row.id)
-                        ) { status in
-                            Task { await viewModel.checkIn(commitment: row.id, status: status) }
+                        if row.isItem {
+                            GoalItemRow(
+                                row: row,
+                                tint: tint,
+                                isPending: viewModel.pending.contains(row.id),
+                                onAdd: { note in Task { await viewModel.addItem(commitment: row.id, note: note) } },
+                                onRemoveLast: { Task { await viewModel.removeLastItem(commitment: row.id) } }
+                            )
+                        } else {
+                            GoalCommitmentRow(
+                                row: row,
+                                day: viewModel.day,
+                                date: viewModel.day == .today ? d.today : d.yesterday,
+                                tint: tint,
+                                isPending: viewModel.pending.contains(row.id)
+                            ) { status in
+                                Task { await viewModel.checkIn(commitment: row.id, status: status) }
+                            }
                         }
                     }
                 }
@@ -192,58 +203,6 @@ struct GoalDetailView: View {
             .tint(Color.hxTextSecondary)
             .padding(.vertical, BrainStyle.xs)
         }
-    }
-}
-
-/// One commitment: short name and cue, with a check circle that marks Done on tap and
-/// offers the 2-minute version, Skip and Missed on long press.
-struct GoalCommitmentRow: View {
-    let row: GoalCommitmentProgress
-    let day: GoalDay
-    let tint: GoalTint
-    let isPending: Bool
-    let onSelect: (GoalStatus) -> Void
-
-    var body: some View {
-        let isDue = day == .today ? row.dueToday : row.dueYesterday
-        let selected = day == .today ? row.today : row.yesterday
-        HStack(spacing: BrainStyle.m) {
-            VStack(alignment: .leading, spacing: BrainStyle.xs) {
-                Text(verbatim: GoalsCopy.shortTitle(row.action)).brainText(.rowTitle)
-                if !row.cue.isEmpty { Text(verbatim: row.cue).brainText(.rowSubtitle).lineLimit(2) }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .opacity(isDue || selected != nil ? 1 : 0.55)
-            Menu {
-                ForEach(GoalDetailCopy.statusOptions, id: \.value) { option in
-                    let status = GoalStatus(rawValue: option.value) ?? .done
-                    Button {
-                        onSelect(status)
-                    } label: {
-                        Label(GoalDetailCopy.menuTitle(status, row: row), systemImage: GoalDetailCopy.symbol(status))
-                    }
-                    .disabled(status == .skip && GoalDetailCopy.skipDisabled(row, selected: selected))
-                }
-                if selected != nil {
-                    Divider()
-                    Button(role: .destructive) { onSelect(.clear) } label: {
-                        Label("Clear check-in", systemImage: "arrow.uturn.backward")
-                    }
-                }
-            } label: {
-                GoalCheckCircle(status: selected, tint: tint, isPending: isPending)
-            } primaryAction: {
-                // Tap checks in as done; tapping a checked circle clears it.
-                onSelect(selected == nil ? .done : .clear)
-            }
-            .disabled(isPending)
-            .accessibilityLabel(Text(verbatim: "\(GoalsCopy.shortTitle(row.action)), \(GoalDetailCopy.spoken(selected))"))
-            .accessibilityHint(Text(verbatim: selected == nil
-                ? "Double-tap to mark done. Hold for more options."
-                : "Double-tap to clear. Hold for more options."))
-        }
-        .padding(.vertical, BrainStyle.s)
-        .frame(minHeight: BrainStyle.minTapTarget)
     }
 }
 
