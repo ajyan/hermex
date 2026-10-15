@@ -80,6 +80,21 @@ struct ShellNavigationState: Equatable {
         isDrawerOpen = false
     }
 
+    /// The Brain home, in place of the Brain screens on top of the path: back to the nearest
+    /// home in that run of screens, or, for a page opened from outside the Brain (a chat link,
+    /// a Daily Brief card), the run swapped for the home so Back still leads where it began.
+    mutating func showBrainHome() {
+        var start = path.endIndex
+        while start > path.startIndex, path[start - 1].isBrain { start -= 1 }
+        if let home = path[start...].lastIndex(of: .brain) {
+            path.removeSubrange(path.index(after: home)...)
+        } else {
+            path.removeSubrange(start...)
+            path.append(.brain)
+        }
+        isDrawerOpen = false
+    }
+
     mutating func markNewChatStarted() {
         guard case .newChat = root else { return }
         newChatHasStarted = true
@@ -184,6 +199,14 @@ struct SessionUnreadStore {
 // MARK: - Zoom transitions
 
 extension ShellPushDestination {
+    /// The Brain home or any screen inside the Brain.
+    var isBrain: Bool {
+        switch self {
+        case .brain, .brainRoute: true
+        case .projects, .project, .tasks, .kanban, .dailyDeck, .goals, .goal, .money, .feedback, .settings: false
+        }
+    }
+
     /// Whether this screen opens with a zoom out of the card or chip that pushed it. Screens
     /// the drawer opens slide in as usual; a zoom screen pushed with no source on screen
     /// (an inline link) falls back to the system's zoom from the middle of the screen.
@@ -209,9 +232,11 @@ extension EnvironmentValues {
 
 extension View {
     /// Marks this card or chip as where `destination` opens from: pushing it zooms out of
-    /// this view, rounded to `cornerRadius`, and going back shrinks the screen into it. A chip
-    /// passes `HXRadius.capsule`. Does nothing outside the shell's stack.
-    func zoomSource(for destination: ShellPushDestination, cornerRadius: CGFloat) -> some View {
+    /// this view, and going back shrinks the screen into it. A card passes its `cornerRadius`;
+    /// a chip passes none, because the zoom's clip takes the radius literally (no clamping to a
+    /// capsule) and an oversized one clips the chip away entirely. Does nothing outside the
+    /// shell's stack.
+    func zoomSource(for destination: ShellPushDestination, cornerRadius: CGFloat? = nil) -> some View {
         modifier(ZoomSourceModifier(destination: destination, cornerRadius: cornerRadius))
     }
 
@@ -223,14 +248,16 @@ extension View {
 
 private struct ZoomSourceModifier: ViewModifier {
     let destination: ShellPushDestination
-    let cornerRadius: CGFloat
+    let cornerRadius: CGFloat?
     @Environment(\.shellZoomNamespace) private var namespace
 
     func body(content: Content) -> some View {
-        if let namespace {
+        if let namespace, let cornerRadius {
             content.matchedTransitionSource(id: destination, in: namespace) { source in
                 source.clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             }
+        } else if let namespace {
+            content.matchedTransitionSource(id: destination, in: namespace)
         } else {
             content
         }

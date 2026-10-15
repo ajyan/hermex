@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 /// Where the user is in today's review deck: which day's deck, which batch of ten, which page.
@@ -106,46 +107,104 @@ enum BrainBiteCopy {
     }
 }
 
-// MARK: - Module strip
 
-/// The Brain's modules as a sideways row of chips under search, each in its kind's paper
-/// (DESIGN.md § Components). Interview prep joins at the end once Prep loads.
-struct BrainModuleStrip: View {
-    let modules: [BrainModule]
-    let showsPrep: Bool
+// MARK: - Review screen
 
-    private static let order: [BrainModuleID] = [.articles, .highlights, .people, .journal, .wiki]
+/// Today's review as its own screen, opened from the Brain home's Today list: the deck of
+/// bites fills the screen, ending on the summary card. The position is saved per server and
+/// day, so the home's row and this screen agree.
+struct BrainReviewView: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var viewModel: BrainHomeViewModel
+    /// Pushes a bite's page onto the shell's stack.
+    private let push: (BrainRoute) -> Void
 
-    private var ordered: [BrainModule] {
-        modules.sorted {
-            (Self.order.firstIndex(of: $0.id) ?? Self.order.count) < (Self.order.firstIndex(of: $1.id) ?? Self.order.count)
-        }
+    init(server: URL, modelContext: ModelContext, onAPIError: @escaping (Error) -> Void,
+         push: @escaping (BrainRoute) -> Void) {
+        let client = APIClientBrainAdapter(apiClient: APIClient(baseURL: server))
+        let cache = BrainCacheHandle(server: server, context: modelContext)
+        _viewModel = State(initialValue: BrainHomeViewModel(client: client, cache: cache, onAPIError: onAPIError))
+        self.push = push
     }
 
     var body: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 8) {
-                ForEach(ordered, id: \.id) { module in
-                    chip(.module(module.id), paper: module.id.paper, symbol: module.id.symbolName,
-                         label: module.title.isEmpty ? module.id.defaultTitle : module.title)
-                }
-                if showsPrep {
-                    chip(.prep(.home), paper: .knowledge, symbol: "target", label: "Interview prep")
-                }
+        content
+            .hxNavigationTitle("Review", subtitle: subtitle)
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .task { await viewModel.load() }
+            .onChange(of: scenePhase) { _, phase in
+                // Left open overnight, the deck moves on to the new day's ten.
+                if phase == .active, viewModel.needsNewDay { Task { await viewModel.load() } }
             }
-            .padding(.horizontal, 16)
-        }
-        .scrollIndicators(.hidden)
     }
 
-    private func chip(_ route: BrainRoute, paper: HermexPaper, symbol: String, label: String) -> some View {
-        NavigationLink(value: ShellPushDestination.brainRoute(route)) {
-            HXChip(paper: paper, symbol: symbol, label: label)
-                .zoomSource(for: .brainRoute(route), cornerRadius: HXRadius.capsule)
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
+    private var subtitle: String? {
+        let bites = viewModel.home.bites.count
+        guard bites > 0 else { return nil }
+        return viewModel.reviewIndex >= bites ? "Done" : "\(viewModel.reviewIndex + 1) of \(bites)"
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if !viewModel.reviewPages.isEmpty {
+            deck
+                .padding(.horizontal, 16)
+                .padding(.vertical, BrainStyle.m)
+        } else {
+            switch viewModel.state {
+            case .loading:
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .failed(let message):
+                ContentUnavailableView {
+                    Label { Text(verbatim: "Couldn't load the review") } icon: { Image(systemName: "exclamationmark.triangle") }
+                } description: {
+                    Text(verbatim: message)
+                } actions: {
+                    Button { Task { await viewModel.load() } } label: { Text(verbatim: "Try again") }
+                }
+            case .unavailable, .loaded:
+                ContentUnavailableView {
+                    Label { Text(verbatim: "Nothing to review today") } icon: { Image(systemName: "rectangle.stack") }
+                } description: {
+                    Text(verbatim: "Bites come from articles and highlights you've saved.")
+                }
+            }
         }
-        .buttonStyle(.plain)
+    }
+
+    private var deck: some View {
+        let bites = viewModel.home.bites
+        return CardStack(
+            pages: viewModel.reviewPages,
+            index: $viewModel.reviewIndex,
+            tilt: { DeckStackView.tilt(ofID: $0.id) }
+        ) { page, contentOpacity in
+            switch page {
+            case .bite(let bite):
+                BrainBiteCard(bite: bite, open: { push(Self.route(bite)) }, contentOpacity: contentOpacity)
+            case .summary:
+                BrainReviewSummaryCard(bites: bites, hasMore: viewModel.home.hasMore,
+                                       onMore: { await viewModel.dealMore() }, contentOpacity: contentOpacity)
+            }
+        } edge: { page in
+            // Far down the stack only the card's paper shows, peeking out askew.
+            let role = Self.cardRole(page)
+            role.shape
+                .fill(role.fill)
+                .hxShadow(.stacked)
+                .padding(.vertical, 12)
+        }
+    }
+
+    private static func route(_ bite: BrainBite) -> BrainRoute {
+        .bite(bite.ref.module, bite.ref.id, idea: bite.kind == .idea ? bite.index : nil)
+    }
+
+    private static func cardRole(_ page: BrainReviewPage) -> HXCardRole {
+        switch page {
+        case .bite(let bite): .glow(bite.paper)
+        case .summary: .summary
+        }
     }
 }
 

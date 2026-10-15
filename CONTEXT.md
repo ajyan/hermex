@@ -109,7 +109,7 @@ One reviewable piece of a saved Brain item: a key idea or takeaway from an artic
 _Avoid_: flashcard, snippet, excerpt
 
 **Review**:
-The Brain home's daily deck of Bites: ten cards you swipe through, then a summary with "Ten more" for another batch. Your position is kept per server and day.
+The Brain's daily deck of Bites, opened from Today on the Brain home: ten cards you swipe through, then a summary with "Ten more" for another batch. Your position is kept per server and day.
 _Avoid_: quiz, rediscover, feed
 
 **Hub**:

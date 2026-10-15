@@ -345,7 +345,7 @@ struct BrainCitationChips: View {
                     // A taller hit area than the chip draws, so a dense row still gets
                     // near-44 pt targets.
                     HXChip(paper: .knowledge, symbol: "leaf", label: citation.title)
-                        .zoomSource(for: citation.destination, cornerRadius: HXRadius.capsule)
+                        .zoomSource(for: citation.destination)
                         .contentShape(.interaction, Capsule().inset(by: -7))
                 }
                 .buttonStyle(.plain)
