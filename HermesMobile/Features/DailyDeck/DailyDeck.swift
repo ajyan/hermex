@@ -219,8 +219,18 @@ struct DeckAction: Decodable, Equatable, Identifiable {
     let id: String
     let label: String
     let input: String?
+    /// Set on a "Text <name>" action: the phone's own Messages sends it, and the
+    /// card is answered only once the message went out.
+    let message: DeckMessage?
 
     var takesText: Bool { input == "text" }
+}
+
+/// A text the phone sends itself: who to, and the suggested words (editable in the sheet).
+struct DeckMessage: Decodable, Equatable {
+    /// An iMessage phone number or email.
+    let to: String
+    let body: String?
 }
 
 /// What the user did with one card. Only non-empty answers are sent.

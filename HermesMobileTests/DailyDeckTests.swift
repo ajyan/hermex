@@ -242,6 +242,41 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(reopened.answer(for: reopened.cards[3])?.text, "Still true.")
     }
 
+    /// A follow-up with a contact's number: "Text Sina" opens the phone's Messages sheet; only a
+    /// sent text answers the card, and filing carries it to the server with no chat.
+    @MainActor
+    func testTextedFollowUpAnswersOnlyOnceSentAndFilesWithoutAChat() async throws {
+        let deckJSON = #"{"date":"2026-10-04","kind":"morning","cards":[{"id":"followup-5","type":"decision","title":"Sina","ref":{"followup":5,"person":"Sina"},"actions":[{"id":"text","label":"Text Sina","message":{"to":"+15550001111","body":" Yo! How've you been? "}},{"id":"skip","label":"Not now"}]},{"id":"close","type":"close"}]}"#
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: deckJSON)
+        client.filer = .success(BriefFileResponse(ok: true, summary: "Filed.", ran: [.init(step: "touch 5", ok: true)], agentSteps: []))
+        let viewModel = makeViewModel(client)
+        await viewModel.load()
+        let card = viewModel.cards[0], text = try XCTUnwrap(card.actions.first)
+        XCTAssertEqual(text.message, DeckMessage(to: "+15550001111", body: " Yo! How've you been? "))
+        XCTAssertNil(viewModel.answer(for: card), "nothing is recorded until Messages reports the text went out")
+
+        viewModel.markTexted(text, for: card)
+        XCTAssertEqual(viewModel.answer(for: card)?.action, "text")
+        XCTAssertEqual(viewModel.answer(for: card)?.text, "Yo! How've you been?")
+        XCTAssertEqual(viewModel.answeredCount, 1)
+
+        let result = await viewModel.file()
+        XCTAssertEqual(result, .filed, "the vault logs the contact itself; no follow-up chat")
+        XCTAssertTrue(client.sent.isEmpty)
+        let answer = try XCTUnwrap(client.fileRequests.first?.answers.answers.first)
+        XCTAssertEqual(answer.action, "text")
+        XCTAssertEqual(answer.text, "Yo! How've you been?")
+    }
+
+    func testTextActionWithoutABodyOrWithABadMessageStillDecodes() throws {
+        let deck = try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"f","type":"decision","actions":[{"id":"text","label":"Text Pat","message":{"to":"pat@example.com"}},{"id":"broken","label":"Broken","message":{"body":"no recipient"}},{"id":"skip","label":"Not now"}]}]}"#)
+        let actions = try XCTUnwrap(deck.cards.first?.actions)
+        XCTAssertEqual(actions.map(\.id), ["text", "skip"], "an action with a malformed message drops only itself")
+        XCTAssertEqual(actions[0].message, DeckMessage(to: "pat@example.com", body: nil))
+        XCTAssertNil(actions[1].message)
+    }
+
     func testFollowUpsShareOnePageWhereTheFirstOneSat() throws {
         let deck = try DailyDeck.decode(Self.deckJSON)
         let extra = try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"a","type":"prompt"},{"id":"f1","type":"decision"},{"id":"b","type":"reflect"},{"id":"f2","type":"decision"},{"id":"close","type":"close"}]}"#)
