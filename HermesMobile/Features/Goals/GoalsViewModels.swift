@@ -100,6 +100,22 @@ final class GoalDetailViewModel {
         }
     }
 
+    /// Counts one more item (with its optional note) on the selected day.
+    func addItem(commitment id: String, note: String?) async {
+        await send(id: id) { detail, date, asOf in
+            GoalCheckInEdit.addItem(1, note: note, to: id, on: date, in: &detail.summary)
+            return .item(slug: self.slug, date: date, asOf: asOf, id: id, n: 1, note: note)
+        }
+    }
+
+    /// Takes the latest counted item back off.
+    func removeLastItem(commitment id: String) async {
+        await send(id: id) { detail, date, asOf in
+            GoalCheckInEdit.addItem(-1, note: nil, to: id, on: date, in: &detail.summary)
+            return .item(slug: self.slug, date: date, asOf: asOf, id: id, n: -1, note: nil)
+        }
+    }
+
     func checkIn(check id: String, value: String) async {
         await send(id: id) { detail, date, asOf in
             GoalCheckInEdit.setCheck(value, id: id, on: date, today: detail.today, yesterday: detail.yesterday,

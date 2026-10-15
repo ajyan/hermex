@@ -1,12 +1,15 @@
 import Foundation
 
 /// The Goals API on this user's `hermes-webui` fork (`api/vault_goals.py`):
-/// `GET /api/goals`, `GET /api/goals/detail?slug=` and `POST /api/goals/checkin`. Stock
+/// `GET /api/goals`, `GET /api/goals/detail?slug=`, `POST /api/goals/checkin` and
+/// `POST /api/goals/week`. Stock
 /// upstream servers answer 404, which screens treat as "no Goals on this server".
 protocol GoalsDataClient: Sendable {
     func home() async throws -> GoalsHome
     func detail(slug: String) async throws -> GoalDetail
     func checkIn(_ r: GoalCheckInRequest) async throws -> GoalCheckInResult
+    /// Confirms a goal's commitments for the week starting `r.start`; answers like a check-in.
+    func confirmWeek(_ r: GoalWeekRequest) async throws -> GoalCheckInResult
 }
 
 /// Wraps the `APIClient` actor in a `Sendable` value for the protocol, decoding with
@@ -24,6 +27,10 @@ struct APIClientGoalsAdapter: GoalsDataClient {
 
     func checkIn(_ r: GoalCheckInRequest) async throws -> GoalCheckInResult {
         try decode(try await apiClient.sendData(endpoint: .goalCheckIn, method: "POST", body: r))
+    }
+
+    func confirmWeek(_ r: GoalWeekRequest) async throws -> GoalCheckInResult {
+        try decode(try await apiClient.sendData(endpoint: .goalWeek, method: "POST", body: r))
     }
 
     private func decode<Value: Decodable>(_ data: Data) throws -> Value {

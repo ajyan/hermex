@@ -33,7 +33,7 @@ struct DailyDeck: Decodable, Equatable {
 /// fails to decode; an unknown `type` renders its `fallback` text as a plain card.
 struct DeckCard: Decodable, Equatable, Identifiable {
     enum CardType: Equatable {
-        case headline, prompt, decision, reflect, item, sleep, goal, close
+        case headline, prompt, decision, reflect, item, sleep, goal, weekAhead, close
         case unknown(String)
 
         init(_ raw: String) {
@@ -45,6 +45,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case "item": self = .item
             case "sleep": self = .sleep
             case "goal": self = .goal
+            case "week_ahead": self = .weekAhead
             case "close": self = .close
             default: self = .unknown(raw)
             }
@@ -88,6 +89,12 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     /// A goal card's personal goals (slugs). The card checks in on them live through the Goals API;
     /// `fallback` is the brief's text for when the server can't serve them.
     let goals: [String]
+    /// A Week ahead card's goal (slug) and the Monday its proposed week starts.
+    let goal: String?
+    let start: String?
+    /// A Week ahead card's proposal for next week, and last week's plan (for Ease off).
+    let weekCommitments: [DeckWeekCommitment]
+    let lastWeek: [DeckWeekCommitment]
 
     /// The vault file the card came from (`ref.link`, "wiki/nyc-marathon"); nil for pooled
     /// material with no page of its own (books, quotes, videos).
@@ -133,13 +140,15 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     var takesFeedback: Bool {
         switch type {
         case .prompt, .reflect, .item, .unknown: true
-        case .headline, .decision, .sleep, .goal, .close: false
+        case .headline, .decision, .sleep, .goal, .weekAhead, .close: false
         }
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, type, title, body, source, lines, question, context, voice, why, draft, actions, fallback
         case reason, altQuestions, entries, recap, scale, sleep, points, meters, color, goals, ref
+        case goal, start, lastWeek
+        case weekCommitments = "commitments"
         case itemKind = "kind"
     }
 
@@ -172,6 +181,11 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         scale = (try? c.decodeIfPresent([String].self, forKey: .scale)) ?? []
         sleep = try? c.decodeIfPresent(DeckSleep.self, forKey: .sleep)
         goals = (try? c.decodeIfPresent([String].self, forKey: .goals)) ?? []
+        goal = try? c.decodeIfPresent(String.self, forKey: .goal)
+        start = try? c.decodeIfPresent(String.self, forKey: .start)
+        weekCommitments = ((try? c.decodeIfPresent([Lossy<DeckWeekCommitment>].self, forKey: .weekCommitments)) ?? [])
+            .compactMap(\.value)
+        lastWeek = ((try? c.decodeIfPresent([Lossy<DeckWeekCommitment>].self, forKey: .lastWeek)) ?? []).compactMap(\.value)
         link = (try? c.decodeIfPresent(Ref.self, forKey: .ref))?.link.flatMap { $0.isEmpty ? nil : $0 }
     }
 }
@@ -567,8 +581,8 @@ struct DeckCardText: Equatable {
             // The question leads; the numbers show after the rating so they don't decide it.
             lead = card.question
             leadIsQuestion = true
-        case .goal:
-            // The check-ins are drawn live (`DeckGoalCard`); the title is the goal's.
+        case .goal, .weekAhead:
+            // The check-ins and the week's plan are drawn (`DeckGoalCard`, `DeckWeekAheadCard`).
             lead = card.title ?? card.fallback
         case .headline, .decision, .close:
             lead = card.title

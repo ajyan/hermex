@@ -12,7 +12,8 @@ final class GoalCheckInCardViewModel {
     private(set) var pending: Set<String> = []
     private(set) var error: String?
 
-    @ObservationIgnored private let client: GoalsDataClient
+    /// Shared with the deck's Week ahead cards, which confirm through the same server.
+    @ObservationIgnored let client: GoalsDataClient
     @ObservationIgnored private let onAPIError: (Error) -> Void
     @ObservationIgnored private var generation = 0
 
@@ -52,8 +53,14 @@ final class GoalCheckInCardViewModel {
     }
 
     /// Yesterday's commitments: the ones due then, plus any already checked in for that day.
+    /// Item rows count whenever, so they live under `itemRows` instead.
     static func yesterdayRows(_ goal: GoalSummary) -> [GoalCommitmentProgress] {
-        goal.week.commitments.filter { $0.dueYesterday || $0.yesterday != nil }
+        goal.week.commitments.filter { !$0.isItem && ($0.dueYesterday || $0.yesterday != nil) }
+    }
+
+    /// The commitments counted by +1 (applications, outreach), shown under "This week".
+    static func itemRows(_ goal: GoalSummary) -> [GoalCommitmentProgress] {
+        goal.week.commitments.filter(\.isItem)
     }
 
     /// Commitments due today whose cue is worth a reminder.
@@ -71,12 +78,37 @@ final class GoalCheckInCardViewModel {
         }
     }
 
+    /// Counts one more item (with its optional note) for the server's today.
+    func addItem(slug: String, commitment id: String, note: String?) async {
+        await send(slug: slug, id: id) { goal, home in
+            GoalCheckInEdit.addItem(1, note: note, to: id, on: home.today, in: &goal)
+            return .item(slug: slug, date: home.today, asOf: home.today, id: id, n: 1, note: note)
+        }
+    }
+
+    /// Takes the latest counted item back off.
+    func removeLastItem(slug: String, commitment id: String) async {
+        await send(slug: slug, id: id) { goal, home in
+            GoalCheckInEdit.addItem(-1, note: nil, to: id, on: home.today, in: &goal)
+            return .item(slug: slug, date: home.today, asOf: home.today, id: id, n: -1, note: nil)
+        }
+    }
+
     func checkIn(slug: String, check id: String, value: String) async {
         await send(slug: slug, id: id) { goal, home in
             GoalCheckInEdit.setCheck(value, id: id, on: home.today, today: home.today, yesterday: home.yesterday,
                                      in: &goal)
             return .check(slug: slug, date: home.today, asOf: home.today, id: id, value: value)
         }
+    }
+
+    /// Takes a goal's summary from another write (a confirmed week), so the deck's cards agree.
+    func apply(_ result: GoalCheckInResult) {
+        guard case .loaded(var current) = state,
+              let i = current.goals.firstIndex(where: { $0.slug == result.goal.slug }) else { return }
+        current.goals[i] = result.goal
+        current.streak = result.streak
+        state = .loaded(current)
     }
 
     /// Applies the optimistic edit, posts, then takes the server's summary of that goal or restores

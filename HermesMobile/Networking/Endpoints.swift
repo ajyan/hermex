@@ -182,10 +182,12 @@ enum Endpoint {
     case feedbackDecision(id: String)
     /// Good/not-good labels on generated content (`api/labels.py`): read with a feature (and item), or POST one.
     case labels(feature: String?, item: String?)
-    /// Personal goals from the vault (`api/vault_goals.py`): home, one goal, and a check-in.
+    /// Personal goals from the vault (`api/vault_goals.py`): home, one goal, a check-in, and
+    /// confirming next week's commitments.
     case goalsHome
     case goalDetail(slug: String)
     case goalCheckIn
+    case goalWeek
     /// Files a Daily Deck's answers without the model (this user's webui fork):
     /// POST `{date, kind, answers}`. Servers without it answer 404.
     case briefFile
@@ -502,6 +504,8 @@ enum Endpoint {
             return "/api/goals/detail"
         case .goalCheckIn:
             return "/api/goals/checkin"
+        case .goalWeek:
+            return "/api/goals/week"
         case .briefFile:
             return "/api/brief/file"
         }

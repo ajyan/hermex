@@ -30,12 +30,13 @@ private final class FakeGoalsClient: GoalsDataClient, @unchecked Sendable {
 
     func home() async throws -> GoalsHome { try next("home", &homeResults) }
     func detail(slug: String) async throws -> GoalDetail { try next("detail:\(slug)", &detailResults) }
+    func confirmWeek(_ r: GoalWeekRequest) async throws -> GoalCheckInResult { throw URLError(.unsupportedURL) }
 
     func checkIn(_ r: GoalCheckInRequest) async throws -> GoalCheckInResult {
         lock.withLock { _checkIns.append(r) }
         let id: String
         switch r {
-        case .commitment(_, _, _, let c, _), .check(_, _, _, let c, _): id = c
+        case .commitment(_, _, _, let c, _), .check(_, _, _, let c, _), .item(_, _, _, let c, _, _): id = c
         }
         if let item = lock.withLock({ perItem[id] }) {
             started?.yield(id)
@@ -290,6 +291,54 @@ final class GoalsViewModelsTests: XCTestCase {
         XCTAssertEqual(vm.error, "Couldn't save. Try again.")
     }
 
+    func testOverrideSourceDayThenClear() async throws {
+        let client = FakeGoalsClient()
+        let (started, startedCont) = AsyncStream<Void>.makeStream()
+        let (release, releaseCont) = AsyncStream<Void>.makeStream()
+        client.gate = (startedCont, release)
+        // Prep counted today (the 13th) as done; the reload after the override reports the miss.
+        let source: [String: Any] = ["source": "prep.days", "source_days": ["2026-10-13"], "done": 1, "remaining": 5]
+        client.detailResults = [
+            .success(try detail(commitment: 0, source)),
+            .success(try detail(commitment: 0, source.merging(["today": "miss", "done": 0, "missed": 1]) { $1 })),
+        ]
+        client.checkInResults = [.success(try result(done: 0, today: "miss"))]
+        let vm = GoalDetailViewModel(slug: "nyc-marathon-2026", client: client)
+        await vm.load()
+        vm.day = .today
+        XCTAssertEqual(stretch(vm)?.done, 1)
+        let override = Task { await vm.checkIn(commitment: "stretch-pm", status: .miss) }
+        for await _ in started { break }
+        XCTAssertEqual(stretch(vm)?.today, .miss)
+        XCTAssertEqual(stretch(vm)?.done, 0, "the override takes the day back from the source")
+        XCTAssertEqual(stretch(vm)?.missed, 1)
+        releaseCont.yield()
+        await override.value
+        client.gate = nil
+        await vm.checkIn(commitment: "stretch-pm", status: .clear)
+        XCTAssertEqual(client.checkIns, [
+            .commitment(slug: "nyc-marathon-2026", date: "2026-10-13", asOf: "2026-10-13", id: "stretch-pm", status: .miss),
+            .commitment(slug: "nyc-marathon-2026", date: "2026-10-13", asOf: "2026-10-13", id: "stretch-pm", status: .clear),
+        ])
+    }
+
+    func testAddAndRemoveItemUseTheSelectedDay() async throws {
+        let client = FakeGoalsClient()
+        let item: [String: Any] = ["unit": "item", "target": 5, "done": 1,
+                                   "items": [["date": "2026-10-12", "note": "Acme"]]]
+        client.detailResults = [.success(try detail(commitment: 0, item))]
+        client.checkInResults = [.success(try result(done: 1, today: "done"))]
+        let vm = GoalDetailViewModel(slug: "nyc-marathon-2026", client: client)
+        await vm.load()
+        vm.day = .yesterday
+        await vm.addItem(commitment: "stretch-pm", note: "Anthropic")
+        await vm.removeLastItem(commitment: "stretch-pm")
+        XCTAssertEqual(client.checkIns, [
+            .item(slug: "nyc-marathon-2026", date: "2026-10-12", asOf: "2026-10-13", id: "stretch-pm", n: 1, note: "Anthropic"),
+            .item(slug: "nyc-marathon-2026", date: "2026-10-12", asOf: "2026-10-13", id: "stretch-pm", n: -1, note: nil),
+        ])
+    }
+
     func testClearingAnOverBudgetSkipMovesMissed() async throws {
         let client = FakeGoalsClient()
         let (started, startedCont) = AsyncStream<Void>.makeStream()
@@ -374,6 +423,18 @@ final class GoalsCopyTests: XCTestCase {
         XCTAssertEqual(GoalsCopy.weekLine(home.goals[0].week.commitments), "Stretch 0/6 · Run 0/1")
     }
 
+    func testItemRowCopy() throws {
+        let row = try PrepDecoding.decode(GoalCommitmentProgress.self, from: Data(("""
+            {"id":"outreach","action":"Outreach","target":5,"done":4,"unit":"item","items":[
+            {"date":"2026-10-12","note":"A"},{"date":"2026-10-12"},{"date":"2026-10-13","note":"B"},
+            {"date":"2026-10-13","note":"C"},{"date":"2026-10-14","note":"D"}]}
+            """).utf8))
+        XCTAssertEqual(GoalItemCopy.countLine(row), "4 of 5 this week")
+        XCTAssertEqual(GoalItemCopy.noteLine(row), "D · C · B", "the three latest notes, newest first")
+        XCTAssertEqual(GoalItemCopy.spoken(row), "Outreach, 4 of 5 this week")
+        XCTAssertNil(GoalItemCopy.noteLine(try PrepDecoding.decode(GoalCommitmentProgress.self, from: Data(#"{"id":"x","unit":"item"}"#.utf8))))
+    }
+
     func testRelativeDay() {
         XCTAssertEqual(GoalsCopy.relativeDay("2026-10-17", today: "2026-10-10"), "in 7 days")
         XCTAssertEqual(GoalsCopy.relativeDay("2026-10-11", today: "2026-10-10"), "tomorrow")
@@ -390,6 +451,16 @@ final class GoalsCopyTests: XCTestCase {
         let home = try PrepDecoding.decode(GoalsHome.self, from: Data(GoalsModelsTests.homeSample.utf8))
         XCTAssertEqual(GoalHeroCopy.weekSummary(home.goals[0].week.commitments), "Stretch 0/6 · Run 0/1 · 1 skip left")
         XCTAssertEqual(GoalHeroCopy.countdown(home.goals[0]), "22 days · Sun Nov 1")
+    }
+
+    func testSourceErrorsLine() {
+        XCTAssertNil(GoalDetailCopy.sourceErrors([]))
+        XCTAssertEqual(GoalDetailCopy.sourceErrors(["prep.days: attempts file not found"]),
+                       "Couldn't count Prep: attempts file not found")
+        XCTAssertEqual(GoalDetailCopy.sourceErrors(["foo.bar: unknown source"]),
+                       "Couldn't count foo.bar: unknown source")
+        XCTAssertEqual(GoalDetailCopy.sourceErrors(["prep.days: down", "garmin.sleep: no file"]),
+                       "Couldn't count Prep: down\nCouldn't count garmin.sleep: no file")
     }
 
     func testSkipDisabledWhenBudgetSpentUnlessAlreadySkipped() throws {

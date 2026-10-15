@@ -71,6 +71,9 @@ struct DeckPalette: Equatable {
         case .goal:
             let goal = GoalPaper.palette(named: card.color ?? "", slug: card.goals.first ?? card.id)
             return DeckPalette(goal.colors, symbol: "flag", name: "Goals", shortName: "Goals")
+        case .weekAhead:
+            let goal = GoalPaper.palette(named: card.color ?? "", slug: card.goal ?? card.id)
+            return DeckPalette(goal.colors, symbol: "calendar", name: "Week ahead", shortName: "Week ahead")
         case .decision: return .followUps
         case .item, .unknown:
             switch card.itemKind {

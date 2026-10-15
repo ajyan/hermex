@@ -133,9 +133,12 @@ enum GoalCalendar {
 struct GoalTint {
     let fill: Color
     let on: Color
+    /// The goal's paper, for chips.
+    let paper: HermexPaper
 
     init(_ palette: DeckPalette, scheme: ColorScheme) {
         fill = palette.ink
         on = palette.onInk
+        paper = palette.colors
     }
 }
