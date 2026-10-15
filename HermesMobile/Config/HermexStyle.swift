@@ -419,12 +419,11 @@ private struct OpensAsFullCard<Full: View>: ViewModifier {
             .onTapGesture { isOpen = true }
             .accessibilityAction(named: Text(verbatim: "Open Card")) { isOpen = true }
             .fullScreenCover(isPresented: $isOpen, onDismiss: runPending) {
+                // The open card closes itself through `dismiss`, so closing never depends on this
+                // card's state surviving while the cover is up.
                 HXFullCard(role: role, title: title, action: action.map { action in
-                    HXCardAction(title: action.title) {
-                        pending = action
-                        isOpen = false
-                    }
-                }, close: { isOpen = false }, content: full)
+                    HXCardAction(title: action.title) { pending = action }
+                }, content: full)
                 .navigationTransition(.zoom(sourceID: Self.sourceID, in: zoom))
             }
     }
@@ -441,9 +440,11 @@ private struct OpensAsFullCard<Full: View>: ViewModifier {
 private struct HXFullCard<Content: View>: View {
     let role: HXCardRole
     let title: String?
+    /// Sets up what runs once the card has closed; the foot button then closes it.
     let action: HXCardAction?
-    let close: () -> Void
     @ViewBuilder let content: () -> Content
+
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         content()
@@ -458,13 +459,17 @@ private struct HXFullCard<Content: View>: View {
 
     private var header: some View {
         HStack {
-            Button(action: close) {
+            Button { dismiss() } label: {
                 Image(systemName: "xmark")
                     .font(AppFont.body(weight: .semibold))
                     .frame(width: 44, height: 44)
                     .adaptiveGlass(.regular, in: Circle())
+                    // The whole circle and a margin around it take the tap, not just the glyph.
+                    .padding(6)
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
+            .padding(-6)
             .accessibilityLabel(Text(verbatim: "Close"))
             Spacer(minLength: 0)
         }
@@ -481,7 +486,10 @@ private struct HXFullCard<Content: View>: View {
     }
 
     private func foot(_ action: HXCardAction) -> some View {
-        Button(action: action.perform) {
+        Button {
+            action.perform()
+            dismiss()
+        } label: {
             HStack(spacing: 6) {
                 Text(verbatim: action.title)
                 Image(systemName: "chevron.forward").accessibilityHidden(true)
