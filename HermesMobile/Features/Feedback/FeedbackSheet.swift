@@ -1,19 +1,36 @@
 import SwiftUI
 
-/// Send feedback about the screen it was opened from: the screen's context in plain words,
-/// what goes along (a removable screenshot, screen state), then what should change.
-/// Presented by `.feedbackContext(_:)`. Copy is English-only (personal fork).
+/// Send feedback about the screen it was opened from: ✓/✗ rows for what it shows (when given),
+/// the screen's context in plain words, what goes along (a removable screenshot, screen state),
+/// then what should change. Presented by `.feedbackContext(_:)` and by swiping up on a Daily
+/// Deck card. Copy is English-only (personal fork).
 struct FeedbackSheet: View {
     @State private var viewModel: FeedbackSheetViewModel
+    private let ratings: [FeedbackRating]
+    private let labels: LabelsViewModel?
     @FocusState private var isEditing: Bool
     @Environment(\.dismiss) private var dismiss
 
-    init(context: FeedbackContext, client: any FeedbackDataClient, screenshot: UIImage? = nil) {
+    init(context: FeedbackContext, client: any FeedbackDataClient, screenshot: UIImage? = nil,
+         ratings: [FeedbackRating] = [], labels: LabelsViewModel? = nil) {
         _viewModel = State(initialValue: FeedbackSheetViewModel(context: context, client: client, screenshot: screenshot))
+        self.ratings = labels == nil ? [] : ratings
+        self.labels = labels
     }
 
     var body: some View {
         List {
+            if let labels, !ratings.isEmpty {
+                Section {
+                    ForEach(ratings) { rating in
+                        RateControl(label: rating.label, key: rating.key, title: rating.title, labels: labels)
+                            .listRowBackground(Color.hxSurface)
+                    }
+                } header: {
+                    Text(verbatim: "Rate")
+                }
+            }
+
             Section {
                 Text(verbatim: viewModel.context.about)
                     .font(AppFont.body())
@@ -57,7 +74,8 @@ struct FeedbackSheet: View {
         .presentationBackground(Color.hxCanvas)
         // A send in flight finishes or fails in view, so its result is never lost.
         .interactiveDismissDisabled(viewModel.isSending)
-        .onAppear { isEditing = true }
+        // With ratings to tap, the keyboard waits until the note is chosen.
+        .onAppear { isEditing = ratings.isEmpty }
         .onDisappear { viewModel.dismiss() }
     }
 

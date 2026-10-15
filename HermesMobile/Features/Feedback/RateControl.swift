@@ -83,9 +83,28 @@ struct RateControl: View {
     }
 }
 
-/// The Rate rows under a Daily Deck reflect card: the card's text, and its question while
-/// the card's own question is the one showing (a regenerated or typed one isn't the
-/// generator's).
+/// One ✓/✗ row: what it rates, its label key, and the item's name for the feedback inbox.
+struct FeedbackRating: Identifiable {
+    let label: String
+    let key: LabelKey
+    let title: String?
+    var id: LabelKey { key }
+
+    /// A Daily Deck reflect card's rows: its text, and its question while the card's own
+    /// question is the one showing (a regenerated or typed one isn't the generator's).
+    /// Other cards have none.
+    static func deck(card: DeckCard, date: String, kind: String, showsQuestion: Bool) -> [FeedbackRating] {
+        guard card.type == .reflect else { return [] }
+        var rows = [FeedbackRating(label: "Card", key: .deckCard(date: date, kind: kind, cardID: card.id), title: card.title)]
+        if showsQuestion, card.question != nil {
+            rows.append(FeedbackRating(label: "Question", key: .deckQuestion(date: date, kind: kind, cardID: card.id),
+                                       title: card.title ?? card.question))
+        }
+        return rows
+    }
+}
+
+/// The Rate rows under a reflect card in Label recent cards, in the card's ink.
 struct DeckRateRows: View {
     let card: DeckCard
     let date: String
@@ -97,11 +116,8 @@ struct DeckRateRows: View {
     var body: some View {
         VStack(spacing: 0) {
             Rectangle().fill(palette.edge).frame(height: 0.5).accessibilityHidden(true)
-            RateControl(label: "Card", key: .deckCard(date: date, kind: kind, cardID: card.id),
-                        title: card.title, labels: labels, ink: palette.ink)
-            if showsQuestion, card.question != nil {
-                RateControl(label: "Question", key: .deckQuestion(date: date, kind: kind, cardID: card.id),
-                            title: card.title ?? card.question, labels: labels, ink: palette.ink)
+            ForEach(FeedbackRating.deck(card: card, date: date, kind: kind, showsQuestion: showsQuestion)) { rating in
+                RateControl(label: rating.label, key: rating.key, title: rating.title, labels: labels, ink: palette.ink)
             }
         }
     }

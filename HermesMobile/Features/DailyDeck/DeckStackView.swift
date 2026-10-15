@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// The Daily Deck's cards in a `CardStack`, plus what the deck adds to it: "Not for Me"
-/// drops a card out of the stack with an Undo toast, and its sheet takes the reason.
+/// drops a card out of the stack with an Undo toast, and its sheet takes the reason; pulling
+/// up past a card's end opens Send feedback on it, with the card's ✓/✗ rows.
 struct DeckStackView: View {
     let viewModel: DailyDeckViewModel
     /// The card whose "Not for Me" sheet is open; set by the toolbar menu.
@@ -12,6 +13,11 @@ struct DeckStackView: View {
     @State private var droppingID: String?
     /// Feedback chosen in the sheet, applied once the sheet has finished closing.
     @State private var pendingFeedback: (card: DeckCard, feedback: DeckFeedback)?
+    /// The Send feedback sheet a swipe up opened; nil while closed.
+    @State private var swipeFeedback: SwipeFeedback?
+    @Environment(FeedbackAvailability.self) private var availability: FeedbackAvailability?
+    /// Set by the Daily Deck once the server's labels are read.
+    @Environment(LabelsViewModel.self) private var labels: LabelsViewModel?
 
     /// A page's resting tilt in the stack: about two degrees, left or right, fixed per page id.
     static func tilt(ofID id: String) -> Double {
@@ -25,7 +31,9 @@ struct DeckStackView: View {
             droppingID: droppingID,
             tilt: { Self.tilt(ofID: $0.id) }
         ) { page, contentOpacity in
-            DeckPageView(page: page, viewModel: viewModel, file: file, contentOpacity: contentOpacity)
+            DeckPageView(page: page, viewModel: viewModel, file: file,
+                         feedback: availability?.isAvailable == true ? { openFeedback(on: page) } : nil,
+                         contentOpacity: contentOpacity)
         } edge: { page in
             // Far down the stack only the card's paper shows, peeking out askew.
             let role = DeckPalette.of(page).cardRole
@@ -42,6 +50,35 @@ struct DeckStackView: View {
                 feedbackCard = nil
             }
         }
+        .sheet(item: $swipeFeedback) { sheet in
+            if let availability {
+                FeedbackSheet(context: sheet.context, client: availability.client, screenshot: sheet.screenshot,
+                              ratings: sheet.ratings, labels: labels)
+            }
+        }
+    }
+
+    // MARK: Send feedback
+
+    private struct SwipeFeedback: Identifiable {
+        let id = UUID()
+        let context: FeedbackContext
+        let ratings: [FeedbackRating]
+        let screenshot: UIImage?
+    }
+
+    private func openFeedback(on page: DeckPage) {
+        var ratings: [FeedbackRating] = []
+        if case .card(let card) = page {
+            ratings = FeedbackRating.deck(card: card, date: viewModel.date, kind: viewModel.kind,
+                                          showsQuestion: viewModel.question(for: card) == card.question)
+        }
+        swipeFeedback = SwipeFeedback(
+            context: .dailyDeck(title: viewModel.title, date: viewModel.date, kind: viewModel.kind, page: page),
+            ratings: ratings,
+            // Taken before the sheet covers the card.
+            screenshot: FeedbackScreenshot.capture(FeedbackScreenshot.keyWindow())
+        )
     }
 
     // MARK: Not for Me
