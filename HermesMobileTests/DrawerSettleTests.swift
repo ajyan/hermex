@@ -17,10 +17,24 @@ final class DrawerSettleTests: XCTestCase {
         XCTAssertTrue(DrawerSettle.isOpen(startedOpen: true, translation: -100, velocity: 0, width: 300))
     }
 
-    func testEdgeOpenOnlyAtRootNearLeftEdge() {
-        XCTAssertTrue(DrawerSettle.allowsEdgeOpen(startX: 10, pathIsEmpty: true))
-        XCTAssertFalse(DrawerSettle.allowsEdgeOpen(startX: 30, pathIsEmpty: true))
-        XCTAssertFalse(DrawerSettle.allowsEdgeOpen(startX: 10, pathIsEmpty: false))
+    func testRightwardSwipeOpensFromAnywhereOnTheChatRoot() {
+        XCTAssertTrue(DrawerSettle.allowsOpenDrag(startX: 10, translationX: 30, pathIsEmpty: true, startsOnSidewaysScroller: false))
+        XCTAssertTrue(DrawerSettle.allowsOpenDrag(startX: 180, translationX: 30, pathIsEmpty: true, startsOnSidewaysScroller: false))
+    }
+
+    func testPushedScreensKeepTheBackSwipe() {
+        XCTAssertFalse(DrawerSettle.allowsOpenDrag(startX: 10, translationX: 30, pathIsEmpty: false, startsOnSidewaysScroller: false))
+        XCTAssertFalse(DrawerSettle.allowsOpenDrag(startX: 180, translationX: 30, pathIsEmpty: false, startsOnSidewaysScroller: false))
+    }
+
+    func testLeftwardPanNeverOpens() {
+        XCTAssertFalse(DrawerSettle.allowsOpenDrag(startX: 180, translationX: -30, pathIsEmpty: true, startsOnSidewaysScroller: false))
+        XCTAssertFalse(DrawerSettle.allowsOpenDrag(startX: 10, translationX: -30, pathIsEmpty: true, startsOnSidewaysScroller: false))
+    }
+
+    func testSidewaysScrollerKeepsItsSwipeButTheEdgeStillOpens() {
+        XCTAssertFalse(DrawerSettle.allowsOpenDrag(startX: 180, translationX: 30, pathIsEmpty: true, startsOnSidewaysScroller: true))
+        XCTAssertTrue(DrawerSettle.allowsOpenDrag(startX: 10, translationX: 30, pathIsEmpty: true, startsOnSidewaysScroller: true))
     }
 
     func testOpenFractionClamps() {

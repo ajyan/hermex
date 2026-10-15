@@ -1,11 +1,12 @@
 import SwiftUI
+import UIKit
 
 /// The left-drawer layout: `main` slides right under a scrim while `drawer` slides
 /// in. The drag offset lives here, so a drag frame re-renders only this container;
 /// `main` and `drawer` arrive already built and are not re-evaluated per frame.
 struct DrawerContainer<Main: View, Drawer: View>: View {
     let isOpen: Bool
-    /// Whether a left-edge pan may open the drawer (the chat root is on screen).
+    /// Whether a rightward pan may open the drawer (the chat root is on screen).
     let canEdgeOpen: Bool
     /// Called once a drag starts that can open the drawer, so it can be built in time.
     let willOpen: () -> Void
@@ -17,6 +18,8 @@ struct DrawerContainer<Main: View, Drawer: View>: View {
     /// instead of snapping back to it first.
     @GestureState(resetTransaction: Transaction(animation: .spring(duration: 0.3)))
     private var drag: CGFloat = 0
+    /// Whether the current pan started on sideways-scrolling content, probed once per pan.
+    @State private var startProbe = SidewaysScrollProbe()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -66,7 +69,7 @@ struct DrawerContainer<Main: View, Drawer: View>: View {
         }
     }
 
-    /// Tracks a closed drawer's left-edge pan from the chat root, and an open
+    /// Tracks a closed drawer's rightward pan from the chat root, and an open
     /// drawer's pan from the scrim or its trailing edge (row swipes stay with rows).
     private func dragGesture(width: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 10, coordinateSpace: .global)
@@ -93,6 +96,45 @@ struct DrawerContainer<Main: View, Drawer: View>: View {
         if isOpen {
             return DrawerSettle.tracksCloseDrag(startX: value.startLocation.x, width: width)
         }
-        return DrawerSettle.allowsEdgeOpen(startX: value.startLocation.x, pathIsEmpty: canEdgeOpen)
+        guard canEdgeOpen, value.translation.width > 0 else { return false }
+        return DrawerSettle.allowsOpenDrag(
+            startX: value.startLocation.x,
+            translationX: value.translation.width,
+            pathIsEmpty: canEdgeOpen,
+            startsOnSidewaysScroller: startProbe.startsOnSidewaysScroller(value.startLocation)
+        )
+    }
+}
+
+/// Answers whether a pan's start point lies on a UIKit scroll view that scrolls
+/// sideways (SwiftUI's horizontal `ScrollView`, a code block, a web card). It hit-tests
+/// once per pan and caches the answer by start point, so a drag frame costs a compare.
+/// A reference type held in `@State`: updating the cache never re-renders the drawer.
+@MainActor
+final class SidewaysScrollProbe {
+    private var start: CGPoint?
+    private var result = false
+
+    func startsOnSidewaysScroller(_ point: CGPoint) -> Bool {
+        if point == start { return result }
+        start = point
+        result = Self.scrollsSideways(at: point)
+        return result
+    }
+
+    private static func scrollsSideways(at point: CGPoint) -> Bool {
+        let window = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)
+        var view = window?.hitTest(point, with: nil)
+        while let current = view {
+            if let scrollView = current as? UIScrollView, scrollView.isScrollEnabled,
+               scrollView.contentSize.width > scrollView.bounds.width + 1 {
+                return true
+            }
+            view = current.superview
+        }
+        return false
     }
 }

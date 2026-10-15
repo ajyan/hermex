@@ -3,7 +3,8 @@ import CoreGraphics
 /// Geometry and settle rules for the chat shell's left drawer. Pure, so the
 /// gesture's decisions are unit-tested without driving a real pan.
 enum DrawerSettle {
-    /// A pan must start this close to the left edge to open the drawer.
+    /// A pan that starts this close to the left edge opens the drawer even over
+    /// sideways-scrolling content; an open drawer's close pan starts this close to its trailing edge.
     static let edgeWidth: CGFloat = 20
     /// Open fraction at or past which a slow release settles open.
     static let openThreshold: CGFloat = 0.4
@@ -33,9 +34,17 @@ enum DrawerSettle {
         startX >= width - edgeWidth
     }
 
-    /// The edge pan opens the drawer only from the chat root, so the system
-    /// back-swipe keeps working on pushed screens.
-    static func allowsEdgeOpen(startX: CGFloat, pathIsEmpty: Bool) -> Bool {
-        pathIsEmpty && startX <= edgeWidth
+    /// A closed drawer opens from a rightward pan that starts anywhere on the chat
+    /// root; pushed screens keep the system back-swipe. A pan that starts on content
+    /// that scrolls sideways (a code block, the composer's chips) stays with that
+    /// content, except at the left edge, which always opens.
+    static func allowsOpenDrag(
+        startX: CGFloat,
+        translationX: CGFloat,
+        pathIsEmpty: Bool,
+        startsOnSidewaysScroller: Bool
+    ) -> Bool {
+        guard pathIsEmpty, translationX > 0 else { return false }
+        return startX <= edgeWidth || !startsOnSidewaysScroller
     }
 }
