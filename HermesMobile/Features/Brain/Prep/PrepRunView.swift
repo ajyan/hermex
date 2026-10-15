@@ -356,8 +356,9 @@ struct PrepRunView: View {
         case .approach:
             let text = draft(for: rep).text.trimmingCharacters(in: .whitespacesAndNewlines)
             PrepPrimaryButton(
-                title: viewModel.isSubmitting ? "Grading…" : "Submit",
-                enabled: !text.isEmpty && !viewModel.isSubmitting
+                title: "Submit",
+                enabled: !text.isEmpty && !viewModel.isSubmitting,
+                isGrading: viewModel.isSubmitting
             ) { Task { await viewModel.submitApproach(text) } }
         case .spotBug:
             let answer = draft(for: rep)
@@ -371,8 +372,9 @@ struct PrepRunView: View {
         case .judgment, .boss:
             let text = draft(for: rep).text
             PrepPrimaryButton(
-                title: viewModel.isSubmitting ? "Grading…" : "Submit",
-                enabled: PrepCopy.canSubmitJudgment(text) && !viewModel.isSubmitting
+                title: "Submit",
+                enabled: PrepCopy.canSubmitJudgment(text) && !viewModel.isSubmitting,
+                isGrading: viewModel.isSubmitting
             ) { Task { await viewModel.submitJudgment(text) } }
         case .lesson where Self.usesRecall(rep) && viewModel.lessonStage == .reading:
             PrepPrimaryButton(title: "I'm ready") {
@@ -382,8 +384,9 @@ struct PrepRunView: View {
         case .lesson where Self.usesRecall(rep), .recall where Self.usesRecall(rep):
             // Submit waits for dictation to stop and its transcript to land in the answer.
             PrepPrimaryButton(
-                title: viewModel.isSubmitting ? "Grading…" : "Submit",
-                enabled: viewModel.canSubmitRecall && !voiceInput.isListening
+                title: "Submit",
+                enabled: viewModel.canSubmitRecall && !voiceInput.isListening,
+                isGrading: viewModel.isSubmitting
             ) { Task { await viewModel.submitRecall() } }
         case .fact, .lesson, .warmup, .recall:
             let text = draft(for: rep).text
