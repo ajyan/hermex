@@ -141,12 +141,10 @@ struct BrainModuleListView: View {
     @State private var didLoad = false
     /// The chip bar, frozen from the unfiltered list so filtering never reshuffles it.
     @State private var chipTags: [String] = []
-    /// People only: the name being looked up, and whether the field has taken focus once.
+    /// People only: the name being looked up.
     @State private var peopleQuery = ""
-    @State private var didFocusPeopleSearch = false
     /// People only: Everyone narrowed to one `relationship_type`.
     @State private var relationship: String?
-    @FocusState private var isPeopleSearchFocused: Bool
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     init(
@@ -171,14 +169,6 @@ struct BrainModuleListView: View {
         content
             .safeAreaInset(edge: .top, spacing: 0) {
                 if module == .people { peopleSearchField }
-            }
-            .task {
-                // Keyboard up on first open only, not on the way back from a person. Focus set
-                // during the push is dropped, so it waits for the push to finish.
-                guard module == .people, !didFocusPeopleSearch else { return }
-                do { try await Task.sleep(for: .milliseconds(400)) } catch { return }
-                didFocusPeopleSearch = true
-                isPeopleSearchFocused = true
             }
             .hxNavigationTitle(module.defaultTitle)
             .background(Color.hxCanvas.ignoresSafeArea())
@@ -332,7 +322,6 @@ struct BrainModuleListView: View {
             TextField("Search people", text: $peopleQuery)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                .focused($isPeopleSearchFocused)
                 .submitLabel(.go)
                 .onSubmit {
                     guard let list = viewModel.list,
