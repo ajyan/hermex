@@ -87,6 +87,19 @@ private struct DeckCardView: View {
                 .padding(.bottom, 10)
                 .accessibilityHidden(true)
         }
+        if card.isLetter, let countdown = card.lines.first {
+            // The countdown to her birth, then her age; the date it counts from underneath.
+            VStack(alignment: .leading, spacing: 4) {
+                Text(verbatim: countdown)
+                    .font(AppFont.display(style: .title3, weight: .semibold))
+                ForEach(card.lines.dropFirst(), id: \.self) { line in
+                    Text(verbatim: line).font(AppFont.footnote(weight: .medium))
+                }
+            }
+            .padding(.trailing, 30)
+            .padding(.bottom, 18)
+            .accessibilityElement(children: .combine)
+        }
         if let lead = text.lead {
             Text(inlineMarkdown(lead))
                 .font(DeckCardText.leadFont(for: card, lead: lead))
@@ -127,7 +140,7 @@ private struct DeckCardView: View {
                 .id(question)
                 .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
         }
-        if card.takesText { reflection().padding(.top, 16) }
+        if card.takesText { reflection(card.isLetter ? "Write to her" : "Write a reflection").padding(.top, 16) }
         if let reason = card.reason {
             Text(verbatim: reason)
                 .font(AppFont.footnote())
