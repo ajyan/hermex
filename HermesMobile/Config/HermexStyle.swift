@@ -376,3 +376,144 @@ struct FlowRow: Layout {
         return view.sizeThatFits(ProposedViewSize(width: maxWidth, height: nil))
     }
 }
+
+// MARK: - Open card
+
+/// The button an open card pins at its foot, naming where it leads ("Open the article").
+struct HXCardAction {
+    let title: String
+    let perform: () -> Void
+}
+
+extension View {
+    /// Makes a card open into itself (DESIGN.md § Components, Open card): a tap zooms the card
+    /// to fill the screen in its role's fill, showing `full`, under a close button and `title`,
+    /// with `action` pinned at the foot. Controls inside the card keep their taps, and a touch
+    /// that moves (a swipe) never opens it. The action runs once the card has closed.
+    func opensAsFullCard<Full: View>(
+        _ role: HXCardRole,
+        title: String? = nil,
+        action: HXCardAction? = nil,
+        @ViewBuilder full: @escaping () -> Full
+    ) -> some View {
+        modifier(OpensAsFullCard(role: role, title: title, action: action, full: full))
+    }
+}
+
+private struct OpensAsFullCard<Full: View>: ViewModifier {
+    let role: HXCardRole
+    let title: String?
+    let action: HXCardAction?
+    let full: () -> Full
+
+    @Namespace private var zoom
+    @State private var isOpen = false
+    /// The foot button's action, run after the cover is gone so a push lands on the stack.
+    @State private var pending: HXCardAction?
+
+    private static var sourceID: String { "card" }
+
+    func body(content: Content) -> some View {
+        content
+            .matchedTransitionSource(id: Self.sourceID, in: zoom) { source in
+                source.clipShape(role.shape)
+            }
+            .contentShape(role.shape)
+            .onTapGesture { isOpen = true }
+            .accessibilityAction(named: Text(verbatim: "Open Card")) { isOpen = true }
+            .fullScreenCover(isPresented: $isOpen, onDismiss: runPending) {
+                HXFullCard(role: role, title: title, action: action.map { action in
+                    HXCardAction(title: action.title) {
+                        pending = action
+                        isOpen = false
+                    }
+                }, close: { isOpen = false }, content: full)
+                .navigationTransition(.zoom(sourceID: Self.sourceID, in: zoom))
+            }
+    }
+
+    private func runPending() {
+        guard let action = pending else { return }
+        pending = nil
+        action.perform()
+    }
+}
+
+/// A card opened to fill the screen: its role's fill edge to edge, a glass close button and the
+/// title above the content, and the primary action at the foot. Swiping down also closes it.
+private struct HXFullCard<Content: View>: View {
+    let role: HXCardRole
+    let title: String?
+    let action: HXCardAction?
+    let close: () -> Void
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .safeAreaInset(edge: .top, spacing: 0) { header }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let action { foot(action) }
+            }
+            .foregroundStyle(role.titleColor)
+            .background(role.fill.ignoresSafeArea())
+    }
+
+    private var header: some View {
+        HStack {
+            Button(action: close) {
+                Image(systemName: "xmark")
+                    .font(AppFont.body(weight: .semibold))
+                    .frame(width: 44, height: 44)
+                    .adaptiveGlass(.regular, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(verbatim: "Close"))
+            Spacer(minLength: 0)
+        }
+        .overlay {
+            if let title {
+                Text(verbatim: title)
+                    .font(AppFont.display(style: .subheadline, weight: .semibold))
+                    .lineLimit(1)
+                    .padding(.horizontal, 56)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+    }
+
+    private func foot(_ action: HXCardAction) -> some View {
+        Button(action: action.perform) {
+            HStack(spacing: 6) {
+                Text(verbatim: action.title)
+                Image(systemName: "chevron.forward").accessibilityHidden(true)
+            }
+            .font(AppFont.body(weight: .semibold))
+            .foregroundStyle(onFill)
+            .frame(maxWidth: .infinity, minHeight: 50)
+            .background(fill, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 24)
+        .padding(.top, 10)
+        .padding(.bottom, 8)
+        // The card's own fill behind the button, so the words scroll under it, not around it.
+        .background(role.fill.ignoresSafeArea(edges: .bottom))
+    }
+
+    /// A colored card's primary button fills with its glow; a neutral one's with Nous blue.
+    private var fill: Color {
+        switch role {
+        case .glow(let paper), .wash(let paper): paper.glow
+        case .neutral, .summary: .accentColor
+        }
+    }
+
+    private var onFill: Color {
+        switch role {
+        case .glow(let paper), .wash(let paper): paper.onGlow
+        case .neutral, .summary: .white
+        }
+    }
+}

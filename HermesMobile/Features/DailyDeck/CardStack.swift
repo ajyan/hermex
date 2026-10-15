@@ -24,6 +24,10 @@ struct CardStack<Page: Identifiable, Card: View, Edge: View>: View {
     @State private var dragAxis: Axis?
     /// The card a finger over the fanned deck points at; nil while the deck is stacked.
     @State private var fanPick: Int?
+    /// Fans the deck if the touch is still held, unmoved, when it fires.
+    @State private var hold: Task<Void, Never>?
+    /// The touch moved before the hold fired, so it is a swipe or a scroll, not a hold.
+    @State private var holdMoved = false
 
     /// How far past the edge a card flies, as a multiple of the stack's width.
     private static var fly: CGFloat { 1.4 }
@@ -156,22 +160,36 @@ struct CardStack<Page: Identifiable, Card: View, Edge: View>: View {
     }
 
     /// Press and hold to fan the deck out; the finger then picks a card, and letting go jumps there.
+    /// A drag from touch-down with a timer rather than a `LongPressGesture`: a long press on the
+    /// stack claims every touch, so taps on the card (opening it) never arrive.
     private func fan(width: CGFloat) -> some Gesture {
-        LongPressGesture(minimumDuration: 0.4, maximumDistance: 10)
-            .sequenced(before: DragGesture(minimumDistance: 0))
+        DragGesture(minimumDistance: 0)
             .onChanged { value in
-                guard case .second(true, let drag) = value, droppingID == nil, pages.count > 1 else { return }
-                let pick = drag.map { CardFan.index(atX: $0.location.x, count: pages.count, width: width) }
-                if fanPick == nil {
-                    withAnimation(reduceMotion ? nil : .spring(duration: 0.4, bounce: 0.2)) {
-                        dragX = 0
-                        fanPick = index
+                if let fanPick {
+                    let pick = CardFan.index(atX: value.location.x, count: pages.count, width: width)
+                    if pick != fanPick {
+                        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) { self.fanPick = pick }
                     }
-                } else if let pick, pick != fanPick {
-                    withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) { fanPick = pick }
+                    return
+                }
+                if hypot(value.translation.width, value.translation.height) > 10 {
+                    holdMoved = true
+                    hold?.cancel()
+                } else if hold == nil, !holdMoved, droppingID == nil, pages.count > 1 {
+                    hold = Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(400))
+                        guard !Task.isCancelled, !holdMoved else { return }
+                        withAnimation(reduceMotion ? nil : .spring(duration: 0.4, bounce: 0.2)) {
+                            dragX = 0
+                            fanPick = index
+                        }
+                    }
                 }
             }
             .onEnded { _ in
+                hold?.cancel()
+                hold = nil
+                holdMoved = false
                 guard let pick = fanPick else { return }
                 withAnimation(reduceMotion ? nil : .spring(duration: 0.4, bounce: 0.15)) {
                     index = pick

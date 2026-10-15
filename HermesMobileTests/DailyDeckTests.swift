@@ -1103,3 +1103,37 @@ final class CardFanTests: XCTestCase {
         }
     }
 }
+
+final class DeckCardSourceTests: XCTestCase {
+    private func card(_ json: String) throws -> DeckCard {
+        try JSONDecoder().decode(DeckCard.self, from: Data(json.utf8))
+    }
+
+    func testACardReadsItsVaultLinkAndOpensThatBrainPage() throws {
+        let wiki = try card(#"{"id": "w", "type": "reflect", "kind": "wiki", "ref": {"link": "wiki/nyc-marathon", "pool": "wiki:nyc-marathon"}}"#)
+        XCTAssertEqual(wiki.link, "wiki/nyc-marathon")
+        XCTAssertEqual(wiki.sourceRoute, .page(.wiki, "wiki/nyc-marathon.md"))
+        XCTAssertEqual(DeckCard.openTitle(for: try XCTUnwrap(wiki.sourceRoute)), "Open the page")
+    }
+
+    func testEachVaultFolderOpensItsModule() {
+        XCTAssertEqual(DeckCard.brainRoute(forLink: "journal/2025/10-October/2025-10-10"),
+                       .page(.journal, "journal/2025/10-October/2025-10-10.md"))
+        XCTAssertEqual(DeckCard.brainRoute(forLink: "email_ingest/summaries/america-summary.md"),
+                       .page(.articles, "email_ingest/summaries/america-summary.md"))
+        XCTAssertEqual(DeckCard.brainRoute(forLink: "wiki/sources/agent-complexity-ladder"),
+                       .page(.wiki, "wiki/sources/agent-complexity-ladder.md"))
+        XCTAssertEqual(DeckCard.brainRoute(forLink: "crm/contacts/alex"), .page(.people, "crm/contacts/alex.md"))
+        XCTAssertNil(DeckCard.brainRoute(forLink: "briefs/2026-10-15.morning.json"), "not a Brain folder")
+    }
+
+    func testPooledMaterialWithoutAPageHasNoSource() throws {
+        let book = try card(#"{"id": "b", "type": "reflect", "kind": "book", "ref": {"link": null, "pool": "book:a76c4922f1b4"}}"#)
+        XCTAssertNil(book.link)
+        XCTAssertNil(book.sourceRoute)
+        let followUp = try card(#"{"id": "f", "type": "decision", "ref": {"followup": 4, "key": "thread:f27b25f4cce6"}}"#)
+        XCTAssertNil(followUp.sourceRoute)
+        let bare = try card(#"{"id": "c", "type": "close"}"#)
+        XCTAssertNil(bare.link)
+    }
+}

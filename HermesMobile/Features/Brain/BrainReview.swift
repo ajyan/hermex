@@ -78,7 +78,7 @@ enum BrainBiteCopy {
         }
     }
 
-    /// The card's footer, naming what a tap opens.
+    /// The open card's foot button, naming the page it opens.
     static func open(_ bite: BrainBite) -> String {
         switch bite.ref.module {
         case .articles: "Open the article"
@@ -153,11 +153,11 @@ struct BrainModuleStrip: View {
 
 /// A card of a Brain swipe deck, drawn like a Daily Deck reading card: a glow card in `paper`
 /// (`xl` corners, the `paper` shadow) whose words scroll inside it with the shared
-/// `moreBelowHint`, over a footer naming what a tap opens. Without `open` the card has no
-/// footer and does nothing on tap. The review's bites and a person's timeline use it.
+/// `moreBelowHint`. A tap opens the card to fill the screen (`opensAsFullCard`), where `open`
+/// becomes the foot button ("Open the article"). The review's bites and a person's timeline use it.
 struct BrainDeckCard<Content: View>: View {
     let paper: HermexPaper
-    /// "Open the article"; shown, with a chevron, only when the card opens something.
+    /// "Open the article": the open card's foot button, when the card has a page to open.
     let footer: String
     let open: (() -> Void)?
     let accessibilityLabel: String
@@ -166,10 +166,13 @@ struct BrainDeckCard<Content: View>: View {
     var footnote: AttributedString?
     /// Cards under the top one show only their paper; their words fade in as they rise.
     var contentOpacity: Double = 1
+    /// The card opened to fill the screen: its words without the card's own surface, and
+    /// `open` as the foot button instead of the footer row.
+    var isOpen = false
     @ViewBuilder let content: () -> Content
 
     var body: some View {
-        let card = VStack(spacing: 0) {
+        let words = VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) { content() }
                     .padding(.horizontal, 24)
@@ -187,49 +190,28 @@ struct BrainDeckCard<Content: View>: View {
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 24)
-                    .padding(.bottom, open == nil ? 22 : 12)
+                    .padding(.bottom, 22)
             }
-            if open != nil { footerRow }
         }
         .foregroundStyle(paper.glow)
         .opacity(contentOpacity)
-        .hxCardSurface(.glow(paper), clipsContent: true)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: accessibilityLabel))
-        .accessibilityValue(Text(verbatim: accessibilityValue))
 
-        Group {
-            if let open {
-                card
-                    // A tap, not a Button: a Button fires on release even after the finger has
-                    // dragged the card across, so a swipe would open the page. A tap gesture
-                    // fails once the touch moves.
-                    .contentShape(shape)
-                    .onTapGesture(perform: open)
-                    .accessibilityHint(Text(verbatim: footer))
-                    .accessibilityAddTraits(.isButton)
-                    .accessibilityAction { open() }
-            } else {
-                card
-            }
+        if isOpen {
+            words
+        } else {
+            words
+                .hxCardSurface(.glow(paper), clipsContent: true)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text(verbatim: accessibilityLabel))
+                .accessibilityValue(Text(verbatim: accessibilityValue))
+                // A tap opens the card itself; its foot button then opens the page.
+                .opensAsFullCard(.glow(paper), action: open.map { HXCardAction(title: footer, perform: $0) }) {
+                    BrainDeckCard(paper: paper, footer: footer, open: open, accessibilityLabel: accessibilityLabel,
+                                  accessibilityValue: accessibilityValue, footnote: footnote, isOpen: true,
+                                  content: content)
+                }
+                .padding(.vertical, 12)
         }
-        .padding(.vertical, 12)
-    }
-
-    private var shape: RoundedRectangle { HXCardRole.glow(paper).shape }
-
-    /// The footer and a chevron over a hairline in the paper's edge.
-    private var footerRow: some View {
-        HStack {
-            Text(verbatim: footer)
-            Spacer(minLength: 8)
-            Image(systemName: "chevron.forward").accessibilityHidden(true)
-        }
-        .font(AppFont.subheadline(weight: .semibold))
-        .padding(.top, 14)
-        .padding(.bottom, 22)
-        .overlay(alignment: .top) { Rectangle().fill(paper.edge).frame(height: 0.5) }
-        .padding(.horizontal, 24)
     }
 }
 
@@ -237,8 +219,8 @@ struct BrainDeckCard<Content: View>: View {
 
 /// One bite of the review deck, drawn like a Daily Deck reading card (`DeckCardView.reading`):
 /// a `BrainDeckCard` in the bite's paper with its kicker, the lead (serif for saved words), the
-/// attribution in the glow, the detail, and a footer naming what a tap opens. Long text
-/// scrolls inside the card. The whole card opens the bite's page; swiping pages the deck.
+/// attribution in the glow, and the detail. Long text scrolls inside the card. A tap opens the
+/// card full screen with the bite's page as its foot button; swiping pages the deck.
 struct BrainBiteCard: View {
     let bite: BrainBite
     let open: () -> Void
