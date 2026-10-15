@@ -23,7 +23,10 @@
 		B1A1C0DE00000000000F000F /* GoalDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F000E /* GoalDetailView.swift */; };
 		B1A1C0DE00000000000F000D /* GoalsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F000C /* GoalsHomeView.swift */; };
 		B1A1C0DE00000000000F000B /* GoalsViewModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */; };
+		A0DE000292B90F697F77D29E /* GoalCheckInCardViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE000292B90F697F77D29D /* GoalCheckInCardViewModelTests.swift */; };
 		B1A1C0DE00000000000F0009 /* GoalsViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */; };
+		A0DE002C9AEE2AE3608A3D16 /* GoalCheckInCardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE002C9AEE2AE3608A3D15 /* GoalCheckInCardViewModel.swift */; };
+		A0DE0014FAAC7A19A48B2C56 /* GoalCheckInEdit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE0014FAAC7A19A48B2C55 /* GoalCheckInEdit.swift */; };
 		B1A1C0DE00000000000F0007 /* GoalsModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */; };
 		B1A1C0DE00000000000F0005 /* GoalsDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0004 /* GoalsDataClient.swift */; };
 		A045000000000000000000A1 /* GoalsWidgetSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = A045000000000000000000A0 /* GoalsWidgetSync.swift */; };
@@ -686,6 +689,7 @@
 		0D0A3A284474E49DBDD0F9E9 /* DailyDeckViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71D8CEEBE37C8E43E46A2B4 /* DailyDeckViewModel.swift */; };
 		218E7F5B009F877FF54BA04A /* DailyDeckView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD79724DF6D6FD92B594BBC5 /* DailyDeckView.swift */; };
 		1F2EF7D6C585EAF7E1C46CD2 /* DeckCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */; };
+		A0DE001C71B0EBD4FA4E885E /* DeckGoalCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE001C71B0EBD4FA4E885D /* DeckGoalCard.swift */; };
 		B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000102 /* BrainViewModel.swift */; };
 		B1A1C0DE0000000000000201 /* BrainViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */; };
 		B1A1C0DE0000000000000203 /* BrainModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000204 /* BrainModelsTests.swift */; };
@@ -802,7 +806,10 @@
 		B1A1C0DE00000000000F000E /* GoalDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalDetailView.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F000C /* GoalsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsHomeView.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsViewModelsTests.swift; sourceTree = "<group>"; };
+		A0DE000292B90F697F77D29D /* GoalCheckInCardViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCheckInCardViewModelTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsViewModels.swift; sourceTree = "<group>"; };
+		A0DE002C9AEE2AE3608A3D15 /* GoalCheckInCardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCheckInCardViewModel.swift; sourceTree = "<group>"; };
+		A0DE0014FAAC7A19A48B2C55 /* GoalCheckInEdit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCheckInEdit.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsModelsTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0004 /* GoalsDataClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsDataClient.swift; sourceTree = "<group>"; };
 		A045000000000000000000A0 /* GoalsWidgetSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsWidgetSync.swift; sourceTree = "<group>"; };
@@ -1461,6 +1468,7 @@
 		AD79724DF6D6FD92B594BBC5 /* DailyDeckView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDeckView.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000102 /* BrainViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainViewModel.swift; sourceTree = "<group>"; };
 		7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckCardView.swift; sourceTree = "<group>"; };
+		A0DE001C71B0EBD4FA4E885D /* DeckGoalCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckGoalCard.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000204 /* BrainModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainModelsTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000902 /* BrainStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainStyle.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000A02 /* BrainHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainHomeView.swift; sourceTree = "<group>"; };
@@ -1579,6 +1587,8 @@
 				B1A1C0DE00000000000F000E /* GoalDetailView.swift */,
 				B1A1C0DE00000000000F000C /* GoalsHomeView.swift */,
 				B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */,
+				A0DE002C9AEE2AE3608A3D15 /* GoalCheckInCardViewModel.swift */,
+				A0DE0014FAAC7A19A48B2C55 /* GoalCheckInEdit.swift */,
 				B1A1C0DE00000000000F0004 /* GoalsDataClient.swift */,
 				A045000000000000000000A0 /* GoalsWidgetSync.swift */,
 				B1A1C0DE00000000000F0002 /* GoalsModels.swift */,
@@ -1700,6 +1710,7 @@
 				FEEDB0DE00000000000000B2 /* FeedbackInboxViewModelTests.swift */,
 				B1A1C0DE00000000000F0012 /* GoalsDesignTests.swift */,
 				B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */,
+				A0DE000292B90F697F77D29D /* GoalCheckInCardViewModelTests.swift */,
 				B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */,
 				B1A1C0DE0000000000000E16 /* PrepViewModelsTests.swift */,
 				B1A1C0DE0000000000000908 /* BrainVisualsTests.swift */,
@@ -2561,6 +2572,7 @@
 				CCE49620E7F7E6D8CA37C796 /* CardStack.swift */,
 				B87C4558BE2BEAAD59ECCE39 /* DeckPalette.swift */,
 				7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */,
+				A0DE001C71B0EBD4FA4E885D /* DeckGoalCard.swift */,
 				AD79724DF6D6FD92B594BBC5 /* DailyDeckView.swift */,
 				D71D8CEEBE37C8E43E46A2B4 /* DailyDeckViewModel.swift */,
 				22112FC4500BC48A8D86A376 /* DailyDeck.swift */,
@@ -2852,6 +2864,7 @@
 				0813B8B3C81380A4B30C0E48 /* CardStack.swift in Sources */,
 				39D0697E4167AB61D9640383 /* DeckPalette.swift in Sources */,
 				1F2EF7D6C585EAF7E1C46CD2 /* DeckCardView.swift in Sources */,
+				A0DE001C71B0EBD4FA4E885E /* DeckGoalCard.swift in Sources */,
 				B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */,
 				B1A1C0DE00000000000000A3 /* BrainModels.swift in Sources */,
 				B1A1C0DE0000000000000E01 /* PrepModels.swift in Sources */,
@@ -2876,6 +2889,8 @@
 				B1A1C0DE00000000000F000F /* GoalDetailView.swift in Sources */,
 				B1A1C0DE00000000000F000D /* GoalsHomeView.swift in Sources */,
 				B1A1C0DE00000000000F0009 /* GoalsViewModels.swift in Sources */,
+				A0DE002C9AEE2AE3608A3D16 /* GoalCheckInCardViewModel.swift in Sources */,
+				A0DE0014FAAC7A19A48B2C56 /* GoalCheckInEdit.swift in Sources */,
 				B1A1C0DE00000000000F0005 /* GoalsDataClient.swift in Sources */,
 				A045000000000000000000A1 /* GoalsWidgetSync.swift in Sources */,
 				B1A1C0DE00000000000F0003 /* GoalsModels.swift in Sources */,
@@ -3325,6 +3340,7 @@
 				FEEDB0DE00000000000000B1 /* FeedbackInboxViewModelTests.swift in Sources */,
 				B1A1C0DE00000000000F0013 /* GoalsDesignTests.swift in Sources */,
 				B1A1C0DE00000000000F000B /* GoalsViewModelsTests.swift in Sources */,
+				A0DE000292B90F697F77D29E /* GoalCheckInCardViewModelTests.swift in Sources */,
 				B1A1C0DE00000000000F0007 /* GoalsModelsTests.swift in Sources */,
 				B1A1C0DE0000000000000E15 /* PrepViewModelsTests.swift in Sources */,
 				B1A1C0DE0000000000000907 /* BrainVisualsTests.swift in Sources */,

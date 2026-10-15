@@ -293,8 +293,8 @@ struct GoalLoadError: Decodable, Hashable, Sendable, Identifiable {
 struct GoalsHome: Decodable, Hashable, Sendable {
     let today: String
     let yesterday: String
-    let streak: GoalStreak
-    let goals: [GoalSummary]
+    var streak: GoalStreak
+    var goals: [GoalSummary]
     let agentGoals: [AgentGoalSummary]
     let errors: [GoalLoadError]
 
