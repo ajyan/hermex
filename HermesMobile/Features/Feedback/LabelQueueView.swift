@@ -1,5 +1,43 @@
 import SwiftUI
 
+/// The morning deck's closing-card link to Label recent cards: shown once the queue is built,
+/// while it has cards and the evals still want tapped labels. Opens the queue in a sheet.
+struct RateRecentCardsLink: View {
+    let queue: LabelQueueViewModel
+    let palette: DeckPalette
+
+    @State private var isOpen = false
+
+    var body: some View {
+        Group {
+            if queue.state == .ready, queue.evalsWantLabels, queue.unlabeledCount > 0 {
+                Button { isOpen = true } label: {
+                    Label {
+                        Text(verbatim: queue.unlabeledCount == 1 ? "Rate 1 earlier card" : "Rate \(queue.unlabeledCount) earlier cards")
+                    } icon: {
+                        Image(systemName: "checkmark.circle")
+                    }
+                    .font(AppFont.subheadline(weight: .semibold))
+                    .foregroundStyle(palette.ink)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .onAppear { queue.start() }
+        .sheet(isPresented: $isOpen) {
+            NavigationStack {
+                LabelQueueView(viewModel: queue)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button { isOpen = false } label: { Text(verbatim: "Done") }
+                        }
+                    }
+            }
+        }
+    }
+}
+
 /// The Feedback inbox's "Label recent cards" row: opens the queue, with how many cards are
 /// still unlabeled once it is built.
 struct LabelQueueRow: View {
@@ -97,7 +135,7 @@ struct LabelQueueView: View {
                     Label { Text(verbatim: "All caught up") } icon: { Image(systemName: "checkmark.circle") }
                 } description: {
                     Text(verbatim: viewModel.items.isEmpty
-                         ? "Every reflect card from the last 14 days is labeled."
+                         ? "Every reflect card from the last 14 days is answered, labeled, or has feedback."
                          : "That's every card in this batch.")
                 }
             }

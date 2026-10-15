@@ -12,6 +12,8 @@ final class LabelsViewModel {
     /// The verdict being saved for each key in flight.
     private(set) var pending: [LabelKey: LabelVerdict] = [:]
     private(set) var errors: [LabelKey: String] = [:]
+    /// Labels the server made from a feedback note rather than a tap.
+    private var fromNotes: Set<LabelKey> = []
     /// Scopes read successfully: `feature` alone for a feature-wide read, `feature|item` for one item.
     private var loadedScopes: Set<String> = []
 
@@ -24,6 +26,11 @@ final class LabelsViewModel {
     func verdict(for key: LabelKey) -> LabelVerdict? { verdicts[key] }
     func isPending(_ key: LabelKey) -> Bool { pending[key] != nil }
     func error(for key: LabelKey) -> String? { errors[key] }
+
+    /// How many of `feature`'s `part` labels were tapped, not made from a feedback note.
+    func tappedCount(feature: String, part: String) -> Int {
+        verdicts.keys.filter { $0.feature == feature && $0.part == part && !fromNotes.contains($0) }.count
+    }
 
     /// Whether `item`'s labels have been read, by a feature-wide read or its own. Rate rows
     /// stay hidden until then, so "unlabeled" never stands in for "couldn't read".
@@ -40,6 +47,7 @@ final class LabelsViewModel {
         }
         for record in records where pending[record.key] == nil {
             verdicts[record.key] = record.currentVerdict
+            if record.source == "feedback" { fromNotes.insert(record.key) } else { fromNotes.remove(record.key) }
         }
         loadedScopes.insert(item.map { "\(feature)|\($0)" } ?? feature)
     }
@@ -60,6 +68,7 @@ final class LabelsViewModel {
         do {
             let saved = try await client.save(body)
             verdicts[key] = saved.currentVerdict
+            fromNotes.remove(key)
         } catch {
             errors[key] = "Couldn't save. Try again."
         }

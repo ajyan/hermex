@@ -13,6 +13,8 @@ struct DailyDeckView: View {
     @AppStorage(DailyBriefReminder.enabledKey) private var notifies = false
     /// Good/not-good labels on reflect cards; shown only where the server has labels.
     @State private var labels: LabelsViewModel
+    /// Earlier cards to rate, offered on today's closing card; shares `labels`.
+    @State private var labelQueue: LabelQueueViewModel
     /// The goal card's live check-ins, read once per screen from the Goals API.
     @State private var goals: GoalCheckInCardViewModel
     @Environment(FeedbackAvailability.self) private var availability: FeedbackAvailability?
@@ -20,7 +22,10 @@ struct DailyDeckView: View {
 
     init(server: URL, openSession: @escaping (String) -> Void) {
         _viewModel = State(initialValue: DailyDeckViewModel(server: server))
-        _labels = State(initialValue: LabelsViewModel(client: APIClientLabelsAdapter(apiClient: APIClient(baseURL: server))))
+        let labels = LabelsViewModel(client: APIClientLabelsAdapter(apiClient: APIClient(baseURL: server)))
+        _labels = State(initialValue: labels)
+        _labelQueue = State(initialValue: LabelQueueViewModel(
+            server: server, deckClient: APIClientDailyDeckAdapter(apiClient: APIClient(baseURL: server)), labels: labels))
         _goals = State(initialValue: GoalCheckInCardViewModel(client: APIClientGoalsAdapter(apiClient: APIClient(baseURL: server))))
         self.openSession = openSession
     }
@@ -34,6 +39,7 @@ struct DailyDeckView: View {
     var body: some View {
         content
             .environment(showsLabels ? labels : nil)
+            .environment(showsLabels && viewModel.date == viewModel.today && !viewModel.isReview ? labelQueue : nil)
             .environment(goals)
             .task(id: labelsAvailable) {
                 // Every deck's labels in one read, once per screen; a failed read retries on the next appear.

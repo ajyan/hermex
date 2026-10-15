@@ -16,11 +16,13 @@ struct LabelQueueItem: Identifiable, Equatable {
     }
 }
 
-/// Settings › Feedback › Label recent cards: reflect cards from the last 14 days of morning
-/// Daily Decks, newest first, without the ones already labeled. Read-only: it reads `briefs/`
-/// through the session the Daily Deck already opened, and never creates or renames a session,
-/// stores a workspace, or reads answers. Built once, by one task the row and the screen share;
-/// every tap saves at once, so leaving at any point loses nothing.
+/// Label recent cards (Settings › Feedback, and the morning deck's closing card): up to five
+/// reflect cards from the last 14 days of morning Daily Decks, newest first, that haven't said
+/// how they landed yet: not labeled (a feedback note on a card labels it on the server), not
+/// written about, not sent away with Not for Me. Read-only: it reads `briefs/` through the session
+/// the Daily Deck already opened, and never creates or renames a session or stores a workspace.
+/// Built once, by one task its entry points share; every tap saves at once, so leaving at any
+/// point loses nothing.
 @MainActor
 @Observable
 final class LabelQueueViewModel {
@@ -33,6 +35,11 @@ final class LabelQueueViewModel {
     }
 
     static let windowDays = 14
+    /// Cards in one batch: a few at a time, never a backlog.
+    static let batchSize = 5
+    /// Tapped labels per part the Deck evals want (`deck_evals.py` MIN_EXPLICIT); past that on
+    /// both parts, the closing card stops asking.
+    static let tappedLabelsWanted = 20
 
     private(set) var state: State = .idle
     /// Fixed once built, so "N of M" holds still while cards are labeled.
@@ -69,7 +76,14 @@ final class LabelQueueViewModel {
     var unlabeledCount: Int { items.filter { !isLabeled($0) }.count }
 
     func isLabeled(_ item: LabelQueueItem) -> Bool {
-        Self.isDone(item) { labels.verdict(for: $0) != nil }
+        Self.hasLabel(item) { labels.verdict(for: $0) != nil }
+    }
+
+    /// Whether the evals still want tapped labels on cards or questions.
+    var evalsWantLabels: Bool {
+        ["card", "question"].contains {
+            labels.tappedCount(feature: LabelKey.dailyDeckFeature, part: $0) < Self.tappedLabelsWanted
+        }
     }
 
     /// Moves to the next card, labeled or skipped.
@@ -129,8 +143,33 @@ final class LabelQueueViewModel {
             return [] // No `briefs/` yet: nothing to label.
         }
         let dates = Self.windowDates(DailyDeckViewModel.deckDates(in: names, kind: "morning"), now: now())
+        let filed = DailyDeckViewModel.filedDates(in: names, kind: "morning")
         let decks = try await read(dates: dates, sessionID: sessionID)
-        return Self.items(decks: decks) { labels.verdict(for: $0) != nil }
+        let answers = await readAnswers(dates: dates.filter(filed.contains), sessionID: sessionID)
+        return Self.items(decks: decks, limit: Self.batchSize,
+                          isLabeled: { labels.verdict(for: $0) != nil },
+                          landed: { date, cardID in
+                              let unsent = store.answers(for: server, date: date, kind: "morning")[cardID]
+                              return (unsent ?? answers[date]?[cardID])?.saysHowItLanded == true
+                          })
+    }
+
+    /// The filed answers for `dates` by day. A file that can't be read or decoded counts as none:
+    /// at worst the queue asks about a card that was answered.
+    private func readAnswers(dates: [String], sessionID: String) async -> [String: [String: DeckAnswer]] {
+        let client = deckClient
+        return await withTaskGroup(of: (String, String?).self) { group in
+            for date in dates {
+                group.addTask {
+                    (date, try? await client.fileContent(sessionID: sessionID, path: DailyDeckPaths.answers(date: date, kind: "morning")))
+                }
+            }
+            var byDate: [String: [String: DeckAnswer]] = [:]
+            for await (date, content) in group {
+                if let content { byDate[date] = DeckAnswersFile.decodeAnswers(content) }
+            }
+            return byDate
+        }
     }
 
     /// Today's Daily Deck session, else the newest stored one inside the window.
@@ -170,20 +209,22 @@ final class LabelQueueViewModel {
         return dates.filter { $0 >= start && $0 <= today }.sorted(by: >)
     }
 
-    /// Reflect cards in deck order, decks in the order given, without the ones `isLabeled`
-    /// says are done.
-    static func items(decks: [(date: String, kind: String, deck: DailyDeck)],
-                      isLabeled: (LabelKey) -> Bool) -> [LabelQueueItem] {
-        decks.flatMap { entry in
+    /// The first `limit` reflect cards in deck order, decks in the order given, that are neither
+    /// labeled nor `landed` (answered or Not for Me'd, by date and card id).
+    static func items(decks: [(date: String, kind: String, deck: DailyDeck)], limit: Int = .max,
+                      isLabeled: (LabelKey) -> Bool,
+                      landed: (String, String) -> Bool = { _, _ in false }) -> [LabelQueueItem] {
+        Array(decks.flatMap { entry in
             entry.deck.cards
                 .filter { $0.type == .reflect }
                 .map { LabelQueueItem(date: entry.date, kind: entry.kind, card: $0) }
-                .filter { !isDone($0, isLabeled: isLabeled) }
         }
+        .filter { !hasLabel($0, isLabeled: isLabeled) && !landed($0.date, $0.card.id) }
+        .prefix(limit))
     }
 
-    /// Labeled for its card, and for its question when it has one.
-    private static func isDone(_ item: LabelQueueItem, isLabeled: (LabelKey) -> Bool) -> Bool {
-        isLabeled(item.cardKey) && (item.questionKey.map(isLabeled) ?? true)
+    /// A label on its card or its question: either says how the card landed.
+    private static func hasLabel(_ item: LabelQueueItem, isLabeled: (LabelKey) -> Bool) -> Bool {
+        isLabeled(item.cardKey) || item.questionKey.map(isLabeled) == true
     }
 }

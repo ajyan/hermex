@@ -312,6 +312,10 @@ struct DeckAnswer: Codable, Equatable {
         !(text?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
     }
 
+    /// Written about, or sent away with Not for Me: the card already says how it landed, so
+    /// Label recent cards doesn't ask again.
+    var saysHowItLanded: Bool { hasText || feedback != nil }
+
     /// Whether this answers `card`: a decision whose chosen action needs text
     /// (Answer, Edit) answers nothing until the text is there.
     func isAnswer(for card: DeckCard) -> Bool {
