@@ -120,6 +120,10 @@ _Avoid_: map of content, MOC, category
 One dated meeting with a person, logged on their Brain item under a `###` date heading (an optional ` — title` after the date) and parsed by the server into the person page's timeline, newest first.
 _Avoid_: interaction, touchpoint, log entry
 
+**Due for a catch-up**:
+A person whose last visit is well past their own rhythm: more than twice their cadence (the median gap between their last six visits, days within three days of each other counting as one visit; 90 days with fewer than three) and at least three weeks. Contacts marked `Contact Frequency: Infrequent` (or Low) are never due; Annual ones fall back to half a year. The first section of the People list.
+_Avoid_: overdue, stale contact, relationship pulse (the older vault script this replaces in the app)
+
 **Unlinked mention**:
 A Brain item whose text names another item without a `[[link]]` to it. The reader lists them under the item's linked mentions.
 _Avoid_: missing link, implicit backlink

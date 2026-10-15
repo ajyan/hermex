@@ -592,4 +592,8 @@ final class FakeBrainClient: BrainDataClient, @unchecked Sendable {
         lock.withLock { _requestedBatches.append(batch) }
         return try homeResult.get()
     }
+    var peopleHomeResult: Result<BrainPeopleHome, Error> = .success(BrainPeopleHome())
+    func peopleHome() async throws -> BrainPeopleHome {
+        try peopleHomeResult.get()
+    }
 }

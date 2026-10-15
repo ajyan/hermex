@@ -106,13 +106,16 @@ struct BrainItem: Codable, Identifiable, Hashable, Sendable {
     let preview: String
     let kind: String
     let badge: String
+    /// People only: the front matter's `relationship_type` (lowercased), for the list's filter.
+    let relationshipType: String?
 
     private enum CodingKeys: String, CodingKey {
-        case module, id, title, subtitle, date, tags, preview, kind, badge
+        case module, id, title, subtitle, date, tags, preview, kind, badge, relationshipType
     }
 
     init(module: BrainModuleID, id: String, title: String = "", subtitle: String = "", date: String = "",
-         tags: [String] = [], preview: String = "", kind: String = "", badge: String = "") {
+         tags: [String] = [], preview: String = "", kind: String = "", badge: String = "",
+         relationshipType: String? = nil) {
         self.module = module
         self.id = id
         self.title = title
@@ -122,6 +125,7 @@ struct BrainItem: Codable, Identifiable, Hashable, Sendable {
         self.preview = preview
         self.kind = kind
         self.badge = badge
+        self.relationshipType = relationshipType
     }
 
     init(from decoder: Decoder) throws {
@@ -135,6 +139,7 @@ struct BrainItem: Codable, Identifiable, Hashable, Sendable {
         preview = c.string(.preview)
         kind = c.string(.kind)
         badge = c.string(.badge)
+        relationshipType = c.optional(String.self, .relationshipType)
     }
 }
 
@@ -595,6 +600,67 @@ struct BrainHome: Codable, Hashable, Sendable {
     }
 
     var isEmpty: Bool { bites.isEmpty }
+}
+
+/// `GET /api/brain/people/home`: the People screen's sections, each already ordered by the server.
+/// An older server answers 404 and the screen shows only Everyone.
+struct BrainPeopleHome: Codable, Hashable, Sendable {
+    let due: [BrainPersonRow]
+    let birthdays: [BrainPersonRow]
+    let recent: [BrainPersonRow]
+
+    private enum CodingKeys: String, CodingKey { case due, birthdays, recent }
+
+    init(due: [BrainPersonRow] = [], birthdays: [BrainPersonRow] = [], recent: [BrainPersonRow] = []) {
+        self.due = due
+        self.birthdays = birthdays
+        self.recent = recent
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        due = c.lossy(BrainPersonRow.self, .due)
+        birthdays = c.lossy(BrainPersonRow.self, .birthdays)
+        recent = c.lossy(BrainPersonRow.self, .recent)
+    }
+}
+
+/// One person in a People section. `lastSeen` and `nextBirthday` are ISO days; `headline` is the
+/// newest encounter's title or first bullet; `cadenceDays` is their usual gap between visits.
+struct BrainPersonRow: Codable, Hashable, Sendable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let lastSeen: String?
+    let headline: String?
+    let cadenceDays: Int?
+    let nextBirthday: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, title, subtitle, lastSeen, headline, cadenceDays, nextBirthday
+    }
+
+    init(id: String, title: String, subtitle: String = "", lastSeen: String? = nil, headline: String? = nil,
+         cadenceDays: Int? = nil, nextBirthday: String? = nil) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.lastSeen = lastSeen
+        self.headline = headline
+        self.cadenceDays = cadenceDays
+        self.nextBirthday = nextBirthday
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        title = c.string(.title)
+        subtitle = c.string(.subtitle)
+        lastSeen = c.optional(String.self, .lastSeen)
+        headline = c.optional(String.self, .headline)
+        cadenceDays = c.optional(Int.self, .cadenceDays)
+        nextBirthday = c.optional(String.self, .nextBirthday)
+    }
 }
 
 /// In-app links inside Brain Markdown: `brain://<module>/<percent-encoded id>`.

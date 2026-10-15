@@ -389,7 +389,7 @@ struct BrainPersonLayout: Equatable {
     }
 
     /// Whole calendar days between an ISO day (read in `calendar`'s time zone) and today's day.
-    private struct DayMath {
+    struct DayMath {
         let today: Date
         let calendar: Calendar
 

@@ -307,6 +307,8 @@ struct BrainRow<Leading: View>: View {
     let title: String
     let subtitle: String?
     let trailing: String?
+    /// The trailing text's colour when it marks an object (a due catch-up's opener glow).
+    let trailingTint: Color?
     /// A trailing accent capsule (e.g. an upcoming birthday); read by VoiceOver.
     let badge: String?
     let subtitleLineLimit: Int
@@ -318,6 +320,7 @@ struct BrainRow<Leading: View>: View {
         title: String,
         subtitle: String? = nil,
         trailing: String? = nil,
+        trailingTint: Color? = nil,
         badge: String? = nil,
         subtitleLineLimit: Int = 2,
         titleLineLimit: Int? = 2
@@ -326,6 +329,7 @@ struct BrainRow<Leading: View>: View {
         self.title = title
         self.subtitle = subtitle
         self.trailing = trailing
+        self.trailingTint = trailingTint
         self.badge = badge
         self.subtitleLineLimit = subtitleLineLimit
         self.titleLineLimit = titleLineLimit
@@ -351,7 +355,8 @@ struct BrainRow<Leading: View>: View {
             }
             if let trailing, !trailing.isEmpty {
                 Text(verbatim: trailing)
-                    .brainText(.meta)
+                    .font(BrainStyle.Role.meta.font)
+                    .foregroundStyle(trailingTint ?? BrainStyle.Role.meta.color)
                     .monospacedDigit()
                     .lineLimit(1)
                     .fixedSize()

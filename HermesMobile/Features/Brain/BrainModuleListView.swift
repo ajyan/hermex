@@ -136,12 +136,16 @@ struct BrainModuleListView: View {
     /// Pushes onto the shell's stack; grid cards push through this, not `NavigationLink`.
     private let push: (BrainRoute) -> Void
     @State private var viewModel: BrainListViewModel
+    /// People only: the sections above Everyone.
+    @State private var peopleHome: BrainPeopleHomeViewModel
     @State private var didLoad = false
     /// The chip bar, frozen from the unfiltered list so filtering never reshuffles it.
     @State private var chipTags: [String] = []
     /// People only: the name being looked up, and whether the field has taken focus once.
     @State private var peopleQuery = ""
     @State private var didFocusPeopleSearch = false
+    /// People only: Everyone narrowed to one `relationship_type`.
+    @State private var relationship: String?
     @FocusState private var isPeopleSearchFocused: Bool
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -158,6 +162,7 @@ struct BrainModuleListView: View {
         let cache = BrainCacheHandle(server: server, context: modelContext)
         _viewModel = State(initialValue: BrainListViewModel(
             module: module, client: client, cache: cache, onAPIError: onAPIError))
+        _peopleHome = State(initialValue: BrainPeopleHomeViewModel(client: client, cache: cache))
     }
 
     private var hasChipBar: Bool { module == .wiki || module == .articles }
@@ -182,7 +187,7 @@ struct BrainModuleListView: View {
                 // Re-run a first load that was cancelled before it finished, or it spins forever.
                 guard !didLoad || viewModel.state == .loading else { return }
                 didLoad = true
-                await viewModel.load()
+                await reload()
             }
             .onChange(of: viewModel.list) { _, list in
                 guard hasChipBar, viewModel.selectedTag == nil, let list, !list.tags.isEmpty else { return }
@@ -223,7 +228,7 @@ struct BrainModuleListView: View {
             BrainListStateView(viewModel: viewModel) { list in
                 List { loadedSections(list) }
                     .brainListStyle()
-                    .refreshable { await viewModel.load() }
+                    .refreshable { await reload() }
             }
         }
     }
@@ -246,17 +251,44 @@ struct BrainModuleListView: View {
         }
     }
 
+    /// The list, plus the People sections beside it.
+    private func reload() async {
+        guard module == .people else { return await viewModel.load() }
+        async let home: Void = peopleHome.load()
+        await viewModel.load()
+        await home
+    }
+
     private func link(_ id: String) -> ShellPushDestination {
         .brainRoute(.page(module, id))
     }
 
     // MARK: People
 
+    @ViewBuilder
     private func peopleSection(_ list: BrainList) -> some View {
-        let items = peopleMatches(list)
-        let lastID = items.last?.id
         let query = peopleQuery.trimmingCharacters(in: .whitespaces)
-        return Section {
+        let everyone = BrainListLayout.uniqueItems(list.items)
+        let items = query.isEmpty
+            ? BrainPeopleLayout.filtered(everyone, relationship: relationship)
+            : peopleMatches(list)
+        let lastID = items.last?.id
+        // A search covers everyone, so the sections step aside while there's a query.
+        if query.isEmpty {
+            ForEach(peopleHome.sections) { section in
+                Section {
+                    ForEach(section.rows) { row in
+                        NavigationLink(value: link(row.id)) {
+                            BrainPeopleSectionRow(row: row)
+                        }
+                        .brainListRow()
+                    }
+                } header: {
+                    BrainSectionHeader(title: section.title)
+                }
+            }
+        }
+        Section {
             ForEach(items, id: \.id) { item in
                 NavigationLink(value: link(item.id)) {
                     BrainPeopleRow(item: item)
@@ -271,10 +303,18 @@ struct BrainModuleListView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .brainListRow()
             }
+        } header: {
+            if query.isEmpty {
+                BrainPeopleEveryoneHeader(
+                    count: items.count,
+                    relationships: BrainPeopleLayout.relationships(everyone),
+                    selected: $relationship
+                )
+            }
         }
-        // A search covers everyone, so pages past the first load while there's a query.
-        .task(id: query.isEmpty ? nil : list.nextCursor) {
-            if !query.isEmpty, list.nextCursor != nil { await viewModel.loadMore() }
+        // A search or a relationship covers everyone, so pages past the first load while one is set.
+        .task(id: query.isEmpty && relationship == nil ? nil : list.nextCursor) {
+            if !query.isEmpty || relationship != nil, list.nextCursor != nil { await viewModel.loadMore() }
         }
     }
 
