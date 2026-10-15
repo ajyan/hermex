@@ -217,6 +217,8 @@ extension BrainModuleID {
         case .journal: .past
         case .articles: .reading
         case .highlights: .book
+        // Letters to his daughter wear the Daily Deck's Dad card paper.
+        case .letters: .advisor
         }
     }
 
@@ -228,6 +230,7 @@ extension BrainModuleID {
         case .journal: "Journal"
         case .articles: "Article"
         case .highlights: "Highlight"
+        case .letters: "Letter"
         }
     }
 
@@ -239,6 +242,7 @@ extension BrainModuleID {
         case .articles: "newspaper"
         case .journal: "book.closed"
         case .highlights: "quote.opening"
+        case .letters: "heart"
         }
     }
 }

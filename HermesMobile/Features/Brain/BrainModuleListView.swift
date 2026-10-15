@@ -233,6 +233,7 @@ struct BrainModuleListView: View {
         // Highlights routes to `BrainHighlightsView`; it shares the article grid only to
         // keep the switch exhaustive.
         case .articles, .highlights: articleSection(list)
+        case .letters: letterSections(list)
         }
         // A clear row, not a section footer: a plain list paints footers in the system background.
         Section {
@@ -367,6 +368,33 @@ struct BrainModuleListView: View {
                         .brainListRow()
                         .onAppear { if item.id == lastID { loadMore() } }
                     }
+                }
+            } header: {
+                if !section.title.isEmpty {
+                    BrainSectionHeader(title: section.title, count: section.items.count)
+                }
+            }
+        }
+    }
+
+    // MARK: Letters
+
+    /// Letters to her by month, newest first: the day, and the prompt he answered.
+    private func letterSections(_ list: BrainList) -> some View {
+        let sections = BrainListLayout.sections(list)
+        let lastID = sections.last?.items.last?.id
+        return ForEach(sections, id: \.title) { section in
+            Section {
+                ForEach(section.items, id: \.id) { item in
+                    NavigationLink(value: link(item.id)) {
+                        BrainRow(
+                            leading: { BrainModuleIcon(systemName: BrainModuleID.letters.symbolName, paper: BrainModuleID.letters.paper) },
+                            title: item.title,
+                            subtitle: item.preview
+                        )
+                    }
+                    .brainListRow()
+                    .onAppear { if item.id == lastID { loadMore() } }
                 }
             } header: {
                 if !section.title.isEmpty {

@@ -9,7 +9,7 @@ import SwiftUI
 /// The five Brain modules. An unknown raw value fails to decode; arrays of module
 /// content skip such elements via `BrainLossy`.
 enum BrainModuleID: String, CaseIterable, Codable, Hashable, Sendable {
-    case people, wiki, articles, journal, highlights
+    case people, wiki, articles, journal, highlights, letters
 }
 
 /// A snake_case field read as written. `APIClient` decodes with `.convertFromSnakeCase`, so
@@ -686,6 +686,7 @@ extension BrainModuleID {
         case .articles: "Articles"
         case .journal: "Journal"
         case .highlights: "Highlights"
+        case .letters: "Letters"
         }
     }
 }
