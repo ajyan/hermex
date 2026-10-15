@@ -59,6 +59,10 @@ struct TurnTrace: Sendable {
         self.init(baseURL: baseURL, using: &rng)
     }
 
+    /// Lets the per-token and per-flush paths skip the clock read once the mark is set.
+    var hasMarkedFirstToken: Bool { firstToken != nil }
+    var hasMarkedRendered: Bool { rendered != nil }
+
     mutating func markHeaders(at instant: ContinuousClock.Instant) {
         if headers == nil { headers = instant }
     }

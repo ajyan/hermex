@@ -125,6 +125,10 @@ final class ChatStreamCoordinator {
     private let isNetworkAvailable: @MainActor () -> Bool
     private var showsLiveActivityResponseExcerpts: Bool
 
+    /// The turn `ChatViewModel.sendMessage` started, held until the response ends and then uploaded once.
+    /// Reattached and replayed streams never carry one. Not observed: marks change on the token path.
+    @ObservationIgnored private(set) var turnTrace: TurnTrace?
+
     /// Retains hydration requirements through transport teardown, which can arrive
     /// before SwiftUI observes the successful completion.
     struct SuccessfulResponseCompletion {
@@ -232,6 +236,17 @@ final class ChatStreamCoordinator {
         setLiveTokensPerSecondIfChanged(nil)
         hasInMemorySnapshotForActiveStream = false
         invalidateReconnectTask()
+        turnTrace = nil
+    }
+
+    /// Called when the first non-empty text of the turn is applied to the transcript.
+    func markTurnRendered() {
+        guard turnTrace?.hasMarkedRendered == false else { return }
+        turnTrace?.markRendered(at: .now)
+    }
+
+    func noteTurnBackgrounded() {
+        turnTrace?.backgrounded = true
     }
 
     func isTerminalFenceActiveForTesting() -> Bool {
@@ -252,12 +267,22 @@ final class ChatStreamCoordinator {
     /// server's `pending_started_at` from `/api/chat/start`, else the local send
     /// time. Reconnects and replays pass nil: they rejoin the same stream, whose
     /// start is already recorded.
+    ///
+    /// `turnTrace` is passed only by the call that begins a turn. A later `start` for
+    /// the same stream (reconnect or replay) passes none and counts as a reconnect of
+    /// the held trace.
     func start(
         streamID: String,
         replayAfterSeq: Int? = nil,
         recoveryState: ActiveStreamRecoveryState = .idle,
-        runStartedAt: Date? = nil
+        runStartedAt: Date? = nil,
+        turnTrace newTrace: TurnTrace? = nil
     ) {
+        if let newTrace {
+            turnTrace = newTrace
+        } else {
+            turnTrace?.reconnects += 1
+        }
         hasCompletedCurrentResponse = false
         isTerminalContentFenceActive = false
         isTransportFinished = false
@@ -811,6 +836,9 @@ final class ChatStreamCoordinator {
 
         switch event {
         case .token(let text):
+            if turnTrace?.hasMarkedFirstToken == false {
+                turnTrace?.markFirstToken(at: .now)
+            }
             if showsLiveActivityResponseExcerpts {
                 liveActivityManager.update(.token(text))
             }
@@ -1031,6 +1059,7 @@ final class ChatStreamCoordinator {
         delegate?.streamCoordinatorRemoveSnapshot(streamID: activeStreamID)
         delegate?.streamCoordinatorStopAuxiliaryMonitoring(clearPrompt: true)
         recordRunEndingIfRunning(.completed)
+        uploadTurnTrace(outcome: .done)
         if let completedStreamID = completedStreamID ?? activeStreamID {
             successfulResponseCompletion = SuccessfulResponseCompletion(
                 streamID: completedStreamID, needsTranscriptRefresh: needsTranscriptRefresh
@@ -1101,6 +1130,11 @@ final class ChatStreamCoordinator {
         let completedNormally = hasCompletedCurrentResponse
         let finishedStreamID = activeStreamID
         recordRunEndingIfRunning(ending)
+        switch ending {
+        case .cancelled: uploadTurnTrace(outcome: .cancelled)
+        case .failed: uploadTurnTrace(outcome: .error)
+        case .completed: uploadTurnTrace(outcome: .done)
+        }
         streamClient.stop()
         delegate?.streamCoordinatorStopAuxiliaryMonitoring(clearPrompt: true)
         delegate?.streamCoordinatorFlushPinnedLocalNoticesToTranscript()
@@ -1133,6 +1167,16 @@ final class ChatStreamCoordinator {
         guard activeStreamID != nil, let startedAt else { return }
         let clamped = min(startedAt, now)
         activeRunStartedAt = min(activeRunStartedAt ?? clamped, clamped)
+    }
+
+    /// Sends the held trace to the turn's own server and drops it, so a turn uploads at most once
+    /// and a later server switch cannot redirect it. No-op for turns without a trace.
+    private func uploadTurnTrace(outcome: TurnTrace.Outcome) {
+        guard let trace = turnTrace else { return }
+        turnTrace = nil
+        let upload = trace.upload(outcome: outcome, endedAt: .now)
+        let client = client
+        Task(priority: .utility) { await TurnTraceUploader.send(upload, client: client) }
     }
 
     /// Records the run's span once. `completeCurrentResponse` already cleared

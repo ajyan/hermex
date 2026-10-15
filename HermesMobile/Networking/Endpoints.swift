@@ -35,6 +35,7 @@ enum Endpoint {
     case renameProject
     case deleteProject
     case chatStart
+    case telemetryTurn
     case chatStream(streamID: String, replayAfterSeq: Int? = nil)
     case chatCancel(streamID: String)
     case chatStreamStatus(streamID: String)
@@ -252,6 +253,8 @@ enum Endpoint {
             return "/api/projects/delete"
         case .chatStart:
             return "/api/chat/start"
+        case .telemetryTurn:
+            return "/api/telemetry/turn"
         case .chatStream:
             return "/api/chat/stream"
         case .chatCancel:

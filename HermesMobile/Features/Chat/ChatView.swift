@@ -3127,6 +3127,7 @@ struct ChatView: View {
     }
 
     private func beginResponseCompletionBackgroundTask() {
+        viewModel.noteTurnBackgrounded()
         guard responseCompletionBackgroundTask == .invalid else { return }
 
         let taskIdentifier = UIApplication.shared.beginBackgroundTask(withName: "Hermes response completion") {

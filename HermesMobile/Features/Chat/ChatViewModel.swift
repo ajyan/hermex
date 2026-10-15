@@ -234,6 +234,9 @@ final class ChatViewModel {
     private(set) var isCancellingStream = false
     private(set) var isViewingCachedData = false
     var activeStreamID: String? { streamCoordinator.activeStreamID }
+
+    /// The app moved to the background while this turn was streaming (recorded in its trace).
+    func noteTurnBackgrounded() { streamCoordinator.noteTurnBackgrounded() }
     var successfulResponseCompletion: ChatStreamCoordinator.SuccessfulResponseCompletion? {
         streamCoordinator.successfulResponseCompletion
     }
@@ -2676,6 +2679,7 @@ final class ChatViewModel {
             #endif
             let explicitModelPick = explicitModelPickForChatStart()
             let sentAt = Date()
+            var trace = TurnTrace(baseURL: server)
             let response = try await client.startChat(
                 sessionID: sessionID,
                 message: messageForAPI,
@@ -2684,8 +2688,10 @@ final class ChatViewModel {
                 modelProvider: requestModelProvider,
                 profile: requestProfileName,
                 explicitModelPick: explicitModelPick,
-                attachments: apiPayloads
+                attachments: apiPayloads,
+                traceparent: trace.traceparent
             )
+            trace.markHeaders(at: .now)
 
             guard let streamID = response.streamId else {
                 sendErrorMessage = response.error ?? String(localized: "The server did not return a stream ID.")
@@ -2698,7 +2704,8 @@ final class ChatViewModel {
             completeExplicitModelPickForChatStart(explicitModelPick)
             streamCoordinator.start(
                 streamID: streamID,
-                runStartedAt: response.runStartedAt(sentAt: sentAt)
+                runStartedAt: response.runStartedAt(sentAt: sentAt),
+                turnTrace: trace
             )
             return true
         } catch {
@@ -5487,6 +5494,7 @@ final class ChatViewModel {
             heldStreamingFragmentLastTick = false
         }
 
+        streamCoordinator.markTurnRendered()
         let messageID = ensureStreamingAssistantMessage()
         if !liveReasoningText.isEmpty && reasoningAnchorMessageID == nil {
             reasoningAnchorMessageID = messageID

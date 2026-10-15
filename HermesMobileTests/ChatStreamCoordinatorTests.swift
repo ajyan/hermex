@@ -1832,6 +1832,22 @@ final class ChatStreamCoordinatorTests: APIClientTestCase {
     }
 
     @MainActor
+    func testReattachedStreamDoesNotHoldOrUploadATurnTrace() throws {
+        let streamClient = CoordinatorSpySSEStreamingClient()
+        let coordinator = makeCoordinator(streamClient: streamClient) { request in
+            XCTFail("Unexpected request: \(request.url?.path ?? "nil")")
+            throw URLError(.badURL)
+        }
+
+        coordinator.start(streamID: "stream-123", replayAfterSeq: 0)
+        XCTAssertNil(coordinator.turnTrace)
+
+        streamClient.emit(.token("Hi"))
+        streamClient.emit(.done(DoneStreamEvent()))
+        XCTAssertNil(coordinator.turnTrace)
+    }
+
+    @MainActor
     func testCompletionErrorAndCancelFinalizeLiveActivity() async throws {
         let streamClient = CoordinatorSpySSEStreamingClient()
         let liveActivityManager = CoordinatorSpyLiveActivityManager()

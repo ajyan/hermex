@@ -266,6 +266,7 @@
 		A02400000000000000000001 /* Goal.swift in Sources */ = {isa = PBXBuildFile; fileRef = A02400000000000000000002 /* Goal.swift */; };
 		C04600000000000000000001 /* ChatStreamCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04600000000000000000002 /* ChatStreamCoordinator.swift */; };
 		C0A100000000000000000001 /* TurnTrace.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A100000000000000000002 /* TurnTrace.swift */; };
+		C0A100000000000000000005 /* TurnTraceUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A100000000000000000006 /* TurnTraceUploader.swift */; };
 		C04600000000000000000003 /* ChatStreamCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04600000000000000000004 /* ChatStreamCoordinatorTests.swift */; };
 		532000000000000000000003 /* RatingPromptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 532000000000000000000004 /* RatingPromptTests.swift */; };
 		531000000000000000000201 /* TipJarPromptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 531000000000000000000202 /* TipJarPromptTests.swift */; };
@@ -274,6 +275,7 @@
 		C25420000000000000000001 /* SteerMessageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C25420000000000000000002 /* SteerMessageTests.swift */; };
 		C22600000000000000000003 /* StreamReconnectContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C22600000000000000000004 /* StreamReconnectContractTests.swift */; };
 		C0A100000000000000000003 /* TurnTraceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A100000000000000000004 /* TurnTraceTests.swift */; };
+		C0A100000000000000000007 /* TurnTraceFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A100000000000000000008 /* TurnTraceFlowTests.swift */; };
 		1A2B3C4D5E6F7000000000D4 /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000D5 /* ChatViewModel.swift */; };
 		1A2B3C4D5E6F7000000000D6 /* SSEClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000D7 /* SSEClient.swift */; };
 		C0FF000000000000000000A1 /* CustomHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FF000000000000000000A2 /* CustomHeader.swift */; };
@@ -1031,6 +1033,7 @@
 		A02400000000000000000002 /* Goal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Goal.swift; sourceTree = "<group>"; };
 		C04600000000000000000002 /* ChatStreamCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStreamCoordinator.swift; sourceTree = "<group>"; };
 		C0A100000000000000000002 /* TurnTrace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurnTrace.swift; sourceTree = "<group>"; };
+		C0A100000000000000000006 /* TurnTraceUploader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurnTraceUploader.swift; sourceTree = "<group>"; };
 		C04600000000000000000004 /* ChatStreamCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStreamCoordinatorTests.swift; sourceTree = "<group>"; };
 		532000000000000000000004 /* RatingPromptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RatingPromptTests.swift; sourceTree = "<group>"; };
 		531000000000000000000202 /* TipJarPromptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TipJarPromptTests.swift; sourceTree = "<group>"; };
@@ -1039,6 +1042,7 @@
 		C25420000000000000000002 /* SteerMessageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteerMessageTests.swift; sourceTree = "<group>"; };
 		C22600000000000000000004 /* StreamReconnectContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamReconnectContractTests.swift; sourceTree = "<group>"; };
 		C0A100000000000000000004 /* TurnTraceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurnTraceTests.swift; sourceTree = "<group>"; };
+		C0A100000000000000000008 /* TurnTraceFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurnTraceFlowTests.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7000000000D5 /* ChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7000000000D7 /* SSEClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSEClient.swift; sourceTree = "<group>"; };
 		C0FF000000000000000000A2 /* CustomHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomHeader.swift; sourceTree = "<group>"; };
@@ -1837,6 +1841,7 @@
 				C25420000000000000000002 /* SteerMessageTests.swift */,
 				C22600000000000000000004 /* StreamReconnectContractTests.swift */,
 				C0A100000000000000000004 /* TurnTraceTests.swift */,
+				C0A100000000000000000008 /* TurnTraceFlowTests.swift */,
 				C22300000000000000000004 /* CompressionAnchorResolverTests.swift */,
 				C21200000000000000000004 /* StreamingRevealGateTests.swift */,
 				C21200000000000000000006 /* ChatViewModelStreamingPaceTests.swift */,
@@ -2292,6 +2297,7 @@
 					C04100000000000000000002 /* ChatComposerConfigLoader.swift */,
 					C04600000000000000000002 /* ChatStreamCoordinator.swift */,
 					C0A100000000000000000002 /* TurnTrace.swift */,
+					C0A100000000000000000006 /* TurnTraceUploader.swift */,
 					C04700000000000000000002 /* ChatPendingActionCoordinator.swift */,
 					C04800000000000000000002 /* ChatAttachmentCoordinator.swift */,
 					1A2B3C4D5E6F7000000000D5 /* ChatViewModel.swift */,
@@ -3240,6 +3246,7 @@
 					C04100000000000000000001 /* ChatComposerConfigLoader.swift in Sources */,
 					C04600000000000000000001 /* ChatStreamCoordinator.swift in Sources */,
 					C0A100000000000000000001 /* TurnTrace.swift in Sources */,
+					C0A100000000000000000005 /* TurnTraceUploader.swift in Sources */,
 					C04700000000000000000001 /* ChatPendingActionCoordinator.swift in Sources */,
 					C04800000000000000000001 /* ChatAttachmentCoordinator.swift in Sources */,
 					1A2B3C4D5E6F7000000000D4 /* ChatViewModel.swift in Sources */,
@@ -3464,6 +3471,7 @@
 				C25420000000000000000001 /* SteerMessageTests.swift in Sources */,
 				C22600000000000000000003 /* StreamReconnectContractTests.swift in Sources */,
 				C0A100000000000000000003 /* TurnTraceTests.swift in Sources */,
+				C0A100000000000000000007 /* TurnTraceFlowTests.swift in Sources */,
 				C22300000000000000000003 /* CompressionAnchorResolverTests.swift in Sources */,
 				C21200000000000000000003 /* StreamingRevealGateTests.swift in Sources */,
 				C21200000000000000000005 /* ChatViewModelStreamingPaceTests.swift in Sources */,
