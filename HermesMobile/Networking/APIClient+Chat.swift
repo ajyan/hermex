@@ -9,7 +9,8 @@ extension APIClient {
         modelProvider: String? = nil,
         profile: String? = nil,
         explicitModelPick: Bool = false,
-        attachments: [JSONValue]? = nil
+        attachments: [JSONValue]? = nil,
+        traceparent: String? = nil
     ) async throws -> ChatStartResponse {
         try await send(
             endpoint: .chatStart,
@@ -23,7 +24,8 @@ extension APIClient {
                 profile: profile,
                 explicitModelPick: explicitModelPick ? true : nil,
                 attachments: attachments
-            )
+            ),
+            extraHeaders: traceparent.map { ["traceparent": $0] } ?? [:]
         )
     }
 

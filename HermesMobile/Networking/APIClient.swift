@@ -85,10 +85,17 @@ actor APIClient {
         endpoint: Endpoint,
         method: String,
         body: Body?,
-        timeout: TimeInterval? = nil
+        timeout: TimeInterval? = nil,
+        extraHeaders: [String: String] = [:]
     ) async throws -> Response {
         let encodedBody = try body.map { try encoder.encode($0) }
-        let data = try await sendData(endpoint: endpoint, method: method, encodedBody: encodedBody, timeout: timeout)
+        let data = try await sendData(
+            endpoint: endpoint,
+            method: method,
+            encodedBody: encodedBody,
+            timeout: timeout,
+            extraHeaders: extraHeaders
+        )
         return try decode(Response.self, from: data)
     }
 

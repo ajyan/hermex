@@ -45,6 +45,9 @@ final class ScriptedSSEStreamingClient: SSEStreamingClient {
     /// transcript assertions never race the real ~16ms coalescing window.
     var flushPendingStreamingContent: (() -> Void)?
 
+    /// Runs after each `start(url:onEvent:)`, so a test can wait for a reconnect with an expectation.
+    var onStart: (@MainActor (URL) -> Void)?
+
     init(connectionScripts: [[ScriptedEvent]] = []) {
         self.connectionScripts = connectionScripts
     }
@@ -59,6 +62,7 @@ final class ScriptedSSEStreamingClient: SSEStreamingClient {
         } else {
             armedScript = nil
         }
+        onStart?(url)
     }
 
     func stop() {
