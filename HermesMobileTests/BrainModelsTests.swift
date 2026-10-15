@@ -381,4 +381,38 @@ final class BrainModelsTests: XCTestCase {
         XCTAssertEqual(BrainBiteCopy.attribution(titled), "The Bitter Lesson · Rich Sutton")
         XCTAssertNil(BrainBiteCopy.attribution(bite(.idea)))
     }
+
+    // MARK: Brain home
+
+    func testHomeBrowseOrderPutsPeopleFirstAndKeepsUnknownOrderLast() {
+        let modules = [BrainModule(id: .journal), BrainModule(id: .letters), BrainModule(id: .articles),
+                       BrainModule(id: .people), BrainModule(id: .wiki), BrainModule(id: .highlights)]
+
+        XCTAssertEqual(BrainHomeLayout.ordered(modules).map(\.id),
+                       [.people, .wiki, .articles, .highlights, .journal, .letters])
+    }
+
+    func testHomeReviewProgress() {
+        XCTAssertNil(BrainHomeLayout.reviewProgress(index: 0, bites: 10), "nothing before the first swipe")
+        XCTAssertEqual(BrainHomeLayout.reviewProgress(index: 3, bites: 10), "4 of 10")
+        XCTAssertEqual(BrainHomeLayout.reviewProgress(index: 10, bites: 10), "Done", "the summary card")
+        XCTAssertNil(BrainHomeLayout.reviewProgress(index: 2, bites: 0))
+    }
+
+    func testHomeTodayTakesOnlyDueCatchUps() {
+        func row(_ id: String, due: Bool) -> BrainPeopleLayout.Row {
+            BrainPeopleLayout.Row(id: id, title: id, subtitle: "", trailing: "", isDue: due, accessibilityLabel: id)
+        }
+        let sections = [
+            BrainPeopleLayout.Section(title: "Due for a catch-up", rows: [row("a", due: true), row("b", due: true), row("c", due: true)]),
+            BrainPeopleLayout.Section(title: "Recently seen", rows: [row("d", due: false)]),
+        ]
+
+        XCTAssertEqual(BrainHomeLayout.dueCatchUps(sections).map(\.id), ["a", "b"])
+        XCTAssertEqual(BrainHomeLayout.dueCatchUps([sections[1]]), [])
+    }
+
+    func testAskDraftTrimsTheQuery() {
+        XCTAssertEqual(BrainHomeLayout.askDraft("  caching tips \n"), "caching tips")
+    }
 }

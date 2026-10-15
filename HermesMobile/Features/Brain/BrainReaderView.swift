@@ -280,9 +280,7 @@ struct BrainReaderContent: View {
                             .frame(maxWidth: .infinity)
                             .clipShape(BrainStyle.cardShape())
                     }
-                    if let hub = page.hub {
-                        BrainTrail(hub: hub.ref)
-                    }
+                    BrainTrail(hub: page.hub?.ref)
                     if let personLayout {
                         BrainPersonCardView(item: page.item, facts: [], subtitle: personLayout.subtitle)
                         if !personLayout.rhythm.isEmpty {

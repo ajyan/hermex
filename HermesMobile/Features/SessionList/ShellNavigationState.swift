@@ -80,6 +80,21 @@ struct ShellNavigationState: Equatable {
         isDrawerOpen = false
     }
 
+    /// The Brain home, in place of the Brain screens on top of the path: back to the nearest
+    /// home in that run of screens, or, for a page opened from outside the Brain (a chat link,
+    /// a Daily Brief card), the run swapped for the home so Back still leads where it began.
+    mutating func showBrainHome() {
+        var start = path.endIndex
+        while start > path.startIndex, path[start - 1].isBrain { start -= 1 }
+        if let home = path[start...].lastIndex(of: .brain) {
+            path.removeSubrange(path.index(after: home)...)
+        } else {
+            path.removeSubrange(start...)
+            path.append(.brain)
+        }
+        isDrawerOpen = false
+    }
+
     mutating func markNewChatStarted() {
         guard case .newChat = root else { return }
         newChatHasStarted = true
@@ -184,6 +199,14 @@ struct SessionUnreadStore {
 // MARK: - Zoom transitions
 
 extension ShellPushDestination {
+    /// The Brain home or any screen inside the Brain.
+    var isBrain: Bool {
+        switch self {
+        case .brain, .brainRoute: true
+        case .projects, .project, .tasks, .kanban, .dailyDeck, .goals, .goal, .money, .feedback, .settings: false
+        }
+    }
+
     /// Whether this screen opens with a zoom out of the card or chip that pushed it. Screens
     /// the drawer opens slide in as usual; a zoom screen pushed with no source on screen
     /// (an inline link) falls back to the system's zoom from the middle of the screen.
