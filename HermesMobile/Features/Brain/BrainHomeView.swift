@@ -206,19 +206,24 @@ struct BrainHomeView: View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
             HXSectionHeader(title: "Ask Atlas")
                 .padding(.horizontal, 4)
-            FlowRow(spacing: 8) {
-                ForEach(BrainAskSuggestion.all) { suggestion in
-                    Button { ask(suggestion.question) } label: {
-                        HXChip(paper: suggestion.module.paper, symbol: suggestion.module.symbolName,
-                               label: suggestion.question)
-                            // A taller hit area than the chip draws, so the rows stay dense.
-                            .contentShape(.interaction, Capsule().inset(by: -7))
+            // One row that slides sideways, running to the screen's edges.
+            ScrollView(.horizontal) {
+                HStack(spacing: 8) {
+                    ForEach(BrainAskSuggestion.all) { suggestion in
+                        Button { ask(suggestion.question) } label: {
+                            HXChip(paper: suggestion.module.paper, symbol: suggestion.module.symbolName,
+                                   label: suggestion.question)
+                                .frame(minHeight: BrainStyle.minTapTarget)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint(Text(verbatim: "Starts a chat with Atlas"))
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityHint(Text(verbatim: "Starts a chat with Atlas"))
                 }
+                .padding(.horizontal, 16)
             }
-            .padding(.vertical, 4)
+            .scrollIndicators(.hidden)
+            .padding(.horizontal, -16)
         }
     }
 
