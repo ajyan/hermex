@@ -703,6 +703,8 @@ enum BrainRoute: Hashable, Sendable {
     case bite(BrainModuleID, String, idea: Int?)
     /// Every search result in one module.
     case searchAll(BrainModuleID, query: String)
+    /// Today's review deck, full screen.
+    case review
     /// A screen in the Prep module (the interview tutor).
     case prep(PrepRoute)
 }
@@ -724,15 +726,20 @@ enum PrepRoute: Hashable, Sendable {
 }
 
 /// Opens a Brain page on the shell's stack from outside Brain (a `brain://` link in a
-/// chat reply). A reference, like `ChatDisclosureToggleAction`: the shell keeps one
-/// instance and refreshes `handler`, so chat readers never see a new value.
+/// chat reply), or the Brain home from a page's trail. A reference, like
+/// `ChatDisclosureToggleAction`: the shell keeps one instance and refreshes its handlers,
+/// so chat readers never see a new value.
 final class OpenBrainRouteAction {
     var handler: ((BrainRoute) -> Void)?
+    /// Shows the Brain home (`ShellNavigationState.showBrainHome`).
+    var homeHandler: (() -> Void)?
 
     /// True when a shell is listening; without one, Brain links can't open.
     var isAvailable: Bool { handler != nil }
 
     func callAsFunction(_ route: BrainRoute) { handler?(route) }
+
+    func openHome() { homeHandler?() }
 }
 
 struct OpenBrainRouteKey: EnvironmentKey {
