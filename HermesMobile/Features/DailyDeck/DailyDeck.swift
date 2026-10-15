@@ -102,6 +102,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         let folders: [(String, BrainModuleID)] = [
             ("wiki/", .wiki), ("journal/", .journal), ("email_ingest/summaries/", .articles),
             ("crm/contacts/", .people), ("youtube_highlights/summaries/", .highlights),
+            ("daughter/letters/", .letters),
         ]
         let path = link.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
         guard let module = folders.first(where: { path.hasPrefix($0.0) })?.1 else { return nil }
@@ -117,6 +118,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         case .articles: return "Open the article"
         case .people: return "Open their page"
         case .highlights: return "Open the video"
+        case .letters: return "Open the letter"
         }
     }
 

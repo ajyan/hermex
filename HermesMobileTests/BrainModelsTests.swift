@@ -79,6 +79,21 @@ final class BrainModelsTests: XCTestCase {
         XCTAssertEqual(list.nextCursor, 40)
     }
 
+    func testLettersDecodeAsTheirOwnModuleOnTheDadCardsPaper() throws {
+        let json = #"""
+        {"items": [{"module": "letters", "id": "daughter/letters/2026-10-15.md", "title": "Oct 15, 2026",
+                    "subtitle": "93 days to go · Due Jan 16 · 26 weeks along",
+                    "preview": "Tell her how you met her mom.", "kind": "letter"}],
+         "groups": [{"title": "October 2026", "ids": ["daughter/letters/2026-10-15.md"]}]}
+        """#
+        let list = try JSONDecoder().decode(BrainList.self, from: Data(json.utf8))
+        XCTAssertEqual(list.items.map(\.module), [.letters])
+        XCTAssertEqual(list.items[0].preview, "Tell her how you met her mom.")
+        XCTAssertEqual(BrainModuleID.letters.paper, .advisor)
+        XCTAssertEqual(BrainModuleID.letters.defaultTitle, "Letters")
+        XCTAssertEqual(BrainModuleID.letters.symbolName, "heart")
+    }
+
     func testSearchDecode() throws {
         let search = #"{"groups": [{"module": "wiki", "total": 3, "items": [{"module": "wiki", "id": "w", "title": "T", "snippet": "S", "tags": ["stoicism"]}, {"module": "wiki", "id": "u", "title": "U"}]}, {"module": "goals", "total": 1, "items": []}]}"#
         let result = try JSONDecoder().decode(BrainSearchResult.self, from: Data(search.utf8))

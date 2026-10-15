@@ -1175,6 +1175,8 @@ final class DeckCardSourceTests: XCTestCase {
         XCTAssertEqual(DeckCard.brainRoute(forLink: "wiki/sources/agent-complexity-ladder"),
                        .page(.wiki, "wiki/sources/agent-complexity-ladder.md"))
         XCTAssertEqual(DeckCard.brainRoute(forLink: "crm/contacts/alex"), .page(.people, "crm/contacts/alex.md"))
+        XCTAssertEqual(DeckCard.brainRoute(forLink: "daughter/letters/2026-10-15.md"),
+                       .page(.letters, "daughter/letters/2026-10-15.md"))
         XCTAssertNil(DeckCard.brainRoute(forLink: "briefs/2026-10-15.morning.json"), "not a Brain folder")
     }
 

@@ -61,7 +61,7 @@ Named in `Config/HermexStyle.swift`; `HermexPaper.forTool(_:)` maps tool kinds.
 | Approval, clarification, anything waiting on the user | `.request` | `opener` |
 | Brain or wiki page (`brain://` citation) | `.knowledge` | `wiki` |
 | Brain review bite: idea or takeaway, quote, book highlight | `BrainBite.paper` | `reading`, `quote`, `book` |
-| Inside the Brain, a page of each kind: wiki, person, journal day, article, highlight | `BrainModuleID.paper` | `wiki`, `advisor`, `past`, `reading`, `book` (each source's Brief card paper) |
+| Inside the Brain, a page of each kind: wiki, person, journal day, article, highlight, letter to his daughter | `BrainModuleID.paper` | `wiki`, `advisor`, `past`, `reading`, `book`, `advisor` (each source's Brief card paper; letters wear the Dad card's) |
 | The People list's "Due for a catch-up" rows: the time since last seen | `HermexPaper.opener` | `opener` (the trailing "4 mo" in the glow; other rows' times stay `meta`) |
 | On a person page: Catch up, the rhythm strip, an encounter card in the timeline deck, and a journal day in it | `BrainModuleID.people.paper`; a journal day on its own `BrainModuleID.journal.paper` | `advisor` (Catch up and encounters as glow cards, seen months as `advisor` glow dots, unseen ones `hxSeparator`); `past` for a journal day; the name in a journal snippet is marked in `advisor` |
 | File read, written, listed, or searched (grep, find); file attachments | `.file` | `notes` |
