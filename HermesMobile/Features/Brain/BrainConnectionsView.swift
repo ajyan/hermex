@@ -64,26 +64,37 @@ enum BrainConnectionsLayout {
     }
 }
 
-/// Where the page sits: "Brain › <hub>", the hub tappable. Nous blue, since it navigates.
+/// Where the page sits: "Brain", then its hub when it has one. Both are Nous blue, since they
+/// navigate: "Brain" goes to the Brain home from any page, including one opened from chat.
 struct BrainTrail: View {
-    let hub: BrainRef
+    let hub: BrainRef?
+    @Environment(\.openBrainRoute) private var openBrainRoute
 
     var body: some View {
         HStack(spacing: BrainStyle.xs) {
-            Text(verbatim: "Brain")
-                .foregroundStyle(Color.hxTextSecondary)
-            Image(systemName: "chevron.forward")
-                .font(BrainStyle.meta.weight(.semibold))
-                .foregroundStyle(Color.hxTextSecondary)
-                .accessibilityHidden(true)
-            NavigationLink(value: ShellPushDestination.brainRoute(.page(hub.module, hub.id))) {
-                Text(verbatim: hub.title.isEmpty ? hub.id : hub.title)
+            Button { openBrainRoute.openHome() } label: {
+                Text(verbatim: "Brain")
                     .foregroundStyle(Color.accentColor)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(Text(verbatim: "In \(hub.title), open"))
+            // A taller hit area than the line draws, so the trail stays compact.
+            .contentShape(.interaction, Rectangle().inset(by: -11))
+            .disabled(openBrainRoute.homeHandler == nil)
+            .accessibilityLabel(Text(verbatim: "Brain home"))
+            if let hub {
+                Image(systemName: "chevron.forward")
+                    .font(BrainStyle.meta.weight(.semibold))
+                    .foregroundStyle(Color.hxTextSecondary)
+                    .accessibilityHidden(true)
+                NavigationLink(value: ShellPushDestination.brainRoute(.page(hub.module, hub.id))) {
+                    Text(verbatim: hub.title.isEmpty ? hub.id : hub.title)
+                        .foregroundStyle(Color.accentColor)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(verbatim: "In \(hub.title), open"))
+            }
         }
         .font(BrainStyle.rowSubtitle)
         .frame(minHeight: BrainStyle.minTapTarget / 2, alignment: .leading)

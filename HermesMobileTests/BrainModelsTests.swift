@@ -79,6 +79,21 @@ final class BrainModelsTests: XCTestCase {
         XCTAssertEqual(list.nextCursor, 40)
     }
 
+    func testLettersDecodeAsTheirOwnModuleOnTheDadCardsPaper() throws {
+        let json = #"""
+        {"items": [{"module": "letters", "id": "daughter/letters/2026-10-15.md", "title": "Oct 15, 2026",
+                    "subtitle": "93 days to go · Due Jan 16 · 26 weeks along",
+                    "preview": "Tell her how you met her mom.", "kind": "letter"}],
+         "groups": [{"title": "October 2026", "ids": ["daughter/letters/2026-10-15.md"]}]}
+        """#
+        let list = try JSONDecoder().decode(BrainList.self, from: Data(json.utf8))
+        XCTAssertEqual(list.items.map(\.module), [.letters])
+        XCTAssertEqual(list.items[0].preview, "Tell her how you met her mom.")
+        XCTAssertEqual(BrainModuleID.letters.paper, .advisor)
+        XCTAssertEqual(BrainModuleID.letters.defaultTitle, "Letters")
+        XCTAssertEqual(BrainModuleID.letters.symbolName, "heart")
+    }
+
     func testSearchDecode() throws {
         let search = #"{"groups": [{"module": "wiki", "total": 3, "items": [{"module": "wiki", "id": "w", "title": "T", "snippet": "S", "tags": ["stoicism"]}, {"module": "wiki", "id": "u", "title": "U"}]}, {"module": "goals", "total": 1, "items": []}]}"#
         let result = try JSONDecoder().decode(BrainSearchResult.self, from: Data(search.utf8))
@@ -365,5 +380,39 @@ final class BrainModelsTests: XCTestCase {
                                ref: BrainRef(module: .articles, id: "a.md", title: "The Bitter Lesson"), byline: "Rich Sutton")
         XCTAssertEqual(BrainBiteCopy.attribution(titled), "The Bitter Lesson · Rich Sutton")
         XCTAssertNil(BrainBiteCopy.attribution(bite(.idea)))
+    }
+
+    // MARK: Brain home
+
+    func testHomeBrowseOrderPutsPeopleFirstAndKeepsUnknownOrderLast() {
+        let modules = [BrainModule(id: .journal), BrainModule(id: .letters), BrainModule(id: .articles),
+                       BrainModule(id: .people), BrainModule(id: .wiki), BrainModule(id: .highlights)]
+
+        XCTAssertEqual(BrainHomeLayout.ordered(modules).map(\.id),
+                       [.people, .wiki, .articles, .highlights, .journal, .letters])
+    }
+
+    func testHomeReviewProgress() {
+        XCTAssertNil(BrainHomeLayout.reviewProgress(index: 0, bites: 10), "nothing before the first swipe")
+        XCTAssertEqual(BrainHomeLayout.reviewProgress(index: 3, bites: 10), "4 of 10")
+        XCTAssertEqual(BrainHomeLayout.reviewProgress(index: 10, bites: 10), "Done", "the summary card")
+        XCTAssertNil(BrainHomeLayout.reviewProgress(index: 2, bites: 0))
+    }
+
+    func testHomeTodayTakesOnlyDueCatchUps() {
+        func row(_ id: String, due: Bool) -> BrainPeopleLayout.Row {
+            BrainPeopleLayout.Row(id: id, title: id, subtitle: "", trailing: "", isDue: due, accessibilityLabel: id)
+        }
+        let sections = [
+            BrainPeopleLayout.Section(title: "Due for a catch-up", rows: [row("a", due: true), row("b", due: true), row("c", due: true)]),
+            BrainPeopleLayout.Section(title: "Recently seen", rows: [row("d", due: false)]),
+        ]
+
+        XCTAssertEqual(BrainHomeLayout.dueCatchUps(sections).map(\.id), ["a", "b"])
+        XCTAssertEqual(BrainHomeLayout.dueCatchUps([sections[1]]), [])
+    }
+
+    func testAskDraftTrimsTheQuery() {
+        XCTAssertEqual(BrainHomeLayout.askDraft("  caching tips \n"), "caching tips")
     }
 }

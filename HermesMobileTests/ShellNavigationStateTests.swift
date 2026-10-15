@@ -37,6 +37,44 @@ final class ShellNavigationStateTests: XCTestCase {
         XCTAssertFalse(state.isDrawerOpen)
     }
 
+    func testBrainHomePopsBackToTheHomeInThePath() {
+        var state = ShellNavigationState()
+        state.path = [.brain, .brainRoute(.module(.wiki)), .brainRoute(.page(.wiki, "wiki/a.md"))]
+
+        state.showBrainHome()
+
+        XCTAssertEqual(state.path, [.brain])
+    }
+
+    func testBrainHomeReplacesAPageOpenedFromChat() {
+        var state = ShellNavigationState()
+        state.path = [.brainRoute(.page(.wiki, "wiki/a.md")), .brainRoute(.page(.people, "crm/sam.md"))]
+
+        state.showBrainHome()
+
+        XCTAssertEqual(state.path, [.brain])
+    }
+
+    func testBrainHomeKeepsTheScreenThePageWasOpenedFrom() {
+        var state = ShellNavigationState()
+        state.path = [.dailyDeck, .brainRoute(.page(.journal, "journal/2026-10-01.md"))]
+
+        state.showBrainHome()
+
+        XCTAssertEqual(state.path, [.dailyDeck, .brain])
+    }
+
+    func testBrainHomeUsesTheNearestHomeAfterAChatLink() {
+        var state = ShellNavigationState()
+        state.path = [.brainRoute(.page(.wiki, "wiki/a.md")), .brain, .brainRoute(.module(.people))]
+        state.isDrawerOpen = true
+
+        state.showBrainHome()
+
+        XCTAssertEqual(state.path, [.brainRoute(.page(.wiki, "wiki/a.md")), .brain])
+        XCTAssertFalse(state.isDrawerOpen)
+    }
+
     func testRememberedNewChatReportsCreatedSession() {
         var state = ShellNavigationState()
         let route = PendingNewChatRoute()

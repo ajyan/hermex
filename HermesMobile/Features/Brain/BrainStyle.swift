@@ -70,9 +70,6 @@ enum BrainStyle {
     static let iconSize: CGFloat = 32
     /// Base side of a search result's cover or avatar; scale it with `@ScaledMetric`.
     static let searchThumbnailSize: CGFloat = 28
-    /// A swipe deck's height (the review, a person's timeline): about the rest of an iPhone
-    /// screen; scale it with `@ScaledMetric` and cut it to what fits on screen.
-    static let deckHeight: CGFloat = 480
     /// The smallest a deck gets on a short screen (landscape, the largest text).
     static let minimumDeckHeight: CGFloat = 240
     /// A person's timeline deck: shorter than the review, since most encounters are a few lines;
@@ -217,6 +214,8 @@ extension BrainModuleID {
         case .journal: .past
         case .articles: .reading
         case .highlights: .book
+        // Letters to his daughter wear the Daily Deck's Dad card paper.
+        case .letters: .advisor
         }
     }
 
@@ -228,6 +227,7 @@ extension BrainModuleID {
         case .journal: "Journal"
         case .articles: "Article"
         case .highlights: "Highlight"
+        case .letters: "Letter"
         }
     }
 
@@ -239,6 +239,7 @@ extension BrainModuleID {
         case .articles: "newspaper"
         case .journal: "book.closed"
         case .highlights: "quote.opening"
+        case .letters: "heart"
         }
     }
 }

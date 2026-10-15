@@ -506,6 +506,7 @@ struct ChatShellView: View {
     private var mainStack: some View {
         brainRouteOpener.handler = { navigation.path.append(.brainRoute($0)) }
         draftChatOpener.handler = { selectDestination(PendingNewChatRoute(initialDraft: $0)) }
+        brainRouteOpener.homeHandler = { navigation.showBrainHome() }
         return NavigationStack(path: $navigation.path) {
             rootView
                 .environment(\.openBrainRoute, brainRouteOpener)
@@ -617,7 +618,7 @@ struct ChatShellView: View {
                 server: server,
                 modelContext: modelContext,
                 onAPIError: authManager.handleAPIError,
-                push: { navigation.path.append(.brainRoute($0)) }
+                ask: { selectDestination(PendingNewChatRoute(initialDraft: $0)) }
             )
             .adaptiveSecondaryNavigationTitle()
         case .goals:
@@ -704,6 +705,13 @@ struct ChatShellView: View {
                     focusIdea: idea
                 )
             }
+        case .review:
+            BrainReviewView(
+                server: server,
+                modelContext: modelContext,
+                onAPIError: authManager.handleAPIError,
+                push: { navigation.path.append(.brainRoute($0)) }
+            )
         case .searchAll(let module, let query):
             BrainSearchView(module: module, query: query, server: server, onAPIError: authManager.handleAPIError)
                 .adaptiveSecondaryNavigationTitle()
