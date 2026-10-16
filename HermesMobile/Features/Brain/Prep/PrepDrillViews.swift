@@ -666,11 +666,16 @@ struct PrepApproachGradeView: View {
 }
 
 /// A judgment card's grade: the points made, quoted in the serif; the points missed and why;
-/// then what a strong answer says.
+/// then what a strong answer says. After a miss, the lesson's sections show as their own
+/// cards: the repeat misses, the idea, the code, and a check whose answer unlocks Remember.
 struct PrepJudgmentGradeView: View {
     let grade: PrepJudgmentGrade
     /// Each reference point's sentence by id; a point without one shows its id as a title.
     var pointTexts: [String: String] = [:]
+    /// The user's answer in the lesson's "Check yourself" box; it stays on this screen only.
+    @State private var checkAnswer = ""
+    @State private var checkDone = false
+    @FocusState private var checkFocused: Bool
 
     private func point(_ id: String) -> String { pointTexts[id] ?? PrepCopy.pointTitle(id) }
 
@@ -728,12 +733,131 @@ struct PrepJudgmentGradeView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        if let lesson = grade.lessonMD {
+        if let lesson = grade.lesson {
+            PrepJudgmentLessonCards(lesson: lesson, checkAnswer: $checkAnswer,
+                                    checkDone: $checkDone, checkFocused: $checkFocused)
+        }
+    }
+}
+
+/// The cards for a judgment miss's lesson, in the lesson's order: the repeat misses, the idea,
+/// the code, the check, and Remember (locked behind the check's answer).
+struct PrepJudgmentLessonCards: View {
+    let lesson: PrepJudgmentLesson
+    @Binding var checkAnswer: String
+    @Binding var checkDone: Bool
+    @FocusState.Binding var checkFocused: Bool
+
+    var body: some View {
+        if let repeatText = lesson.repeatText {
+            SectionCard { BrainRow(title: repeatText, titleLineLimit: nil) }
+        }
+        if let repeats = lesson.repeats, !repeats.isEmpty {
             VStack(alignment: .leading, spacing: BrainStyle.s) {
-                BrainSectionHeader(title: "Lesson")
-                MarkdownRenderer(content: lesson)
+                BrainSectionHeader(title: "Missed before")
+                SectionCard {
+                    VStack(spacing: 0) {
+                        ForEach(Array(repeats.enumerated()), id: \.offset) { offset, item in
+                            if offset > 0 { PrepRowDivider() }
+                            BrainRow(title: PrepCopy.pointTitle(item.concept),
+                                     trailing: repeatLabel(item.misses),
+                                     titleLineLimit: nil)
+                        }
+                    }
+                }
             }
         }
+        if !lesson.idea.isEmpty {
+            PrepNoteCard {
+                HXSectionHeader(title: "The idea")
+                Text(PrepJudgmentLessonCards.attributed(body: lesson.idea))
+                    .brainText(.rowTitle)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        if let code = lesson.code {
+            PrepCodeCard {
+                MarkdownRenderer(content: code)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, BrainStyle.xs)
+            }
+        }
+        if let check = lesson.check {
+            checkCard(check)
+            if checkDone {
+                rememberCard
+            }
+        } else {
+            rememberCard
+        }
+    }
+
+    /// "3rd miss", "2×": ordinals read better for small counts.
+    private func repeatLabel(_ misses: Int) -> String {
+        switch misses {
+        case 2: "2nd miss"
+        case 3: "3rd miss"
+        case 4: "4th miss"
+        default: "\(misses)×"
+        }
+    }
+
+    private func checkCard(_ check: String) -> some View {
+        SectionCard(title: "Check yourself") {
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                Text(PrepJudgmentLessonCards.attributed(body: check))
+                    .brainText(.rowTitle)
+                    .fixedSize(horizontal: false, vertical: true)
+                if checkDone {
+                    PrepPrimaryButton(title: "Done") {
+                        checkAnswer = ""
+                        withAnimation { checkDone = false }
+                    }
+                } else {
+                    TextField(axis: .vertical) { Text(verbatim: "Answer with what you just learned") }
+                        .lineLimit(1...4)
+                        .font(AppFont.body())
+                        .foregroundStyle(Color.hxTextPrimary)
+                        .focused($checkFocused)
+                        .submitLabel(.done)
+                        .onSubmit { done() }
+                        .frame(minHeight: BrainStyle.minTapTarget, alignment: .topLeading)
+                    PrepPrimaryButton(title: "Done", enabled: !checkAnswer.isEmpty) { done() }
+                }
+            }
+        }
+    }
+
+    private var rememberCard: some View {
+        SectionCard(title: "Remember") {
+            VStack(spacing: 0) {
+                ForEach(Array(lesson.remember.enumerated()), id: \.offset) { offset, item in
+                    if offset > 0 { PrepRowDivider() }
+                    HStack(alignment: .firstTextBaseline, spacing: BrainStyle.s) {
+                        Text(verbatim: "•")
+                            .font(BrainStyle.rowTitle)
+                            .foregroundStyle(Color.hxTextSecondary)
+                        Text(verbatim: item)
+                            .brainText(.rowTitle)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, BrainStyle.xs)
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
+    }
+
+    private func done() {
+        checkFocused = false
+        withAnimation { checkDone = true }
+    }
+
+    /// The lesson's text with inline bold and code intact; a parse failure shows the plain text.
+    static func attributed(body: String) -> AttributedString {
+        (try? AttributedString(markdown: body, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
+            ?? AttributedString(body)
     }
 }
 

@@ -249,6 +249,119 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertNil(try lesson(#", "lesson_md": 3"#))
     }
 
+    // MARK: - Judgment lesson parsing
+
+    func testJudgmentLessonParsesRealRepeatLine() throws {
+        let md = """
+        Third miss on measure-on-fixtures, second miss on add-missing-context.
+
+        ## The idea
+
+        Averages hide the tail. **Name who bears the harm.**
+
+        ## How you'd say it
+
+        Averages hide the tail; name who bears the harm.
+
+        ## Remember
+
+        - Averages hide the tail
+        * Name who bears the harm
+
+        ## Check yourself
+
+        When an average looks fine, what do you check next?
+        """
+        let lesson = try XCTUnwrap(PrepJudgmentLesson(markdown: md))
+        XCTAssertEqual(lesson.repeats,
+                       [PrepLessonRepeat(concept: "measure-on-fixtures", misses: 3),
+                        PrepLessonRepeat(concept: "add-missing-context", misses: 2)])
+        XCTAssertNil(lesson.repeatText)
+        XCTAssertEqual(lesson.idea, "Averages hide the tail. **Name who bears the harm.**")
+        XCTAssertTrue(lesson.code == nil, "\"How you'd say it\" is dropped, not treated as code")
+        XCTAssertEqual(lesson.remember, ["Averages hide the tail", "Name who bears the harm"])
+        XCTAssertEqual(lesson.check, "When an average looks fine, what do you check next?")
+    }
+
+    func testJudgmentLessonParsesNumericOrdinalAndCode() throws {
+        let md = """
+        11th miss on caching, third miss on idempotency.
+
+        ## The idea
+
+        Cache the result or you recompute the same thing.
+
+        ## Code
+
+        ```python
+        # A sketch: ## The idea is not a heading inside the fence
+        memo = {}
+        ```
+
+        ## Remember
+
+        - Cache the result
+        """
+        let lesson = try XCTUnwrap(PrepJudgmentLesson(markdown: md))
+        XCTAssertEqual(lesson.repeats,
+                       [PrepLessonRepeat(concept: "caching", misses: 11),
+                        PrepLessonRepeat(concept: "idempotency", misses: 3)])
+        XCTAssertTrue(lesson.idea.contains("Cache the result or you recompute"))
+        XCTAssertTrue(lesson.code?.contains("memo = {}") == true)
+        XCTAssertTrue(lesson.code?.contains("## The idea") == true,
+                      "a `## ` line inside the fence is code, not a heading")
+        XCTAssertTrue(lesson.check == nil)
+    }
+
+    func testJudgmentLessonKeepsUnparseableRepeatLineAsText() throws {
+        let lesson = try XCTUnwrap(PrepJudgmentLesson(markdown: """
+        Seen before: you keep missing this one.
+
+        ## The idea
+
+        Some idea.
+        """))
+        XCTAssertNil(lesson.repeats)
+        XCTAssertEqual(lesson.repeatText, "Seen before: you keep missing this one.")
+        XCTAssertEqual(lesson.idea, "Some idea.")
+    }
+
+    func testJudgmentLessonWithoutHeadingsShowsWholeText() throws {
+        let text = "Just a paragraph, no headings at all.\n\nStill none."
+        let lesson = try XCTUnwrap(PrepJudgmentLesson(markdown: text))
+        XCTAssertNil(lesson.repeats)
+        XCTAssertNil(lesson.repeatText)
+        XCTAssertEqual(lesson.idea, text)
+        XCTAssertNil(lesson.code)
+        XCTAssertTrue(lesson.remember.isEmpty)
+        XCTAssertNil(lesson.check)
+    }
+
+    func testJudgmentGradeDecodesLessonSections() throws {
+        let json = """
+        {"verdict": "miss", "next_index": 1,
+         "grade": {"points_hit": [], "points_missed": [{"point_id": "p.harm", "why": "w"}],
+                   "lesson_md": "Second miss on p.harm.\\n\\n## The idea\\n\\nIdea.\\n\\n## Remember\\n\\n- One\\n\\n## Check yourself\\n\\nWhy?"}}
+        """
+        let grade = try XCTUnwrap(decode(PrepAttemptResult.self, json).judgment)
+        let lesson = try XCTUnwrap(grade.lesson)
+        XCTAssertEqual(lesson.repeats, [PrepLessonRepeat(concept: "p.harm", misses: 2)])
+        XCTAssertEqual(lesson.idea, "Idea.")
+        XCTAssertEqual(lesson.remember, ["One"])
+        XCTAssertEqual(lesson.check, "Why?")
+        XCTAssertEqual(grade.lessonMD, "Second miss on p.harm.\n\n## The idea\n\nIdea.\n\n## Remember\n\n- One\n\n## Check yourself\n\nWhy?")
+    }
+
+    func testOrdinalNumberAndRepeatLine() throws {
+        XCTAssertEqual(PrepJudgmentLesson.ordinalNumber("third"), 3)
+        XCTAssertEqual(PrepJudgmentLesson.ordinalNumber("11th"), 11)
+        XCTAssertEqual(PrepJudgmentLesson.ordinalNumber("1st"), 1)
+        XCTAssertNil(PrepJudgmentLesson.ordinalNumber("sometimes"))
+        XCTAssertNil(PrepJudgmentLesson.parseRepeatLine("just a sentence."))
+        XCTAssertEqual(PrepJudgmentLesson.parseRepeatLine("Tenth miss on a."),
+                       [PrepLessonRepeat(concept: "a", misses: 10)])
+    }
+
     func testApproachResultStillDecodesOpenGrade() throws {
         let json = #"""
         {"verdict": "pass", "credit": 1, "next_index": 1,
