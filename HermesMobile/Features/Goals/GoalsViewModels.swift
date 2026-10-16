@@ -24,6 +24,13 @@ final class GoalsHomeViewModel {
     @ObservationIgnored private let onAPIError: (Error) -> Void
     @ObservationIgnored private var generation = 0
 
+    /// New goal shows only once the server has served goals: a goal written on a server
+    /// without the goals API would never appear.
+    var offersNewGoal: Bool {
+        if case .loaded = state { return true }
+        return false
+    }
+
     init(client: GoalsDataClient, onAPIError: @escaping (Error) -> Void = { _ in }) {
         self.client = client
         self.onAPIError = onAPIError

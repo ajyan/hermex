@@ -2,12 +2,15 @@ import SwiftUI
 
 /// Goals' landing screen: the show-up streak, active personal goals with this week's
 /// progress, and the goals Atlas works on. Pushed from the drawer as `.goals`.
+/// New goal opens a chat drafted to start Atlas's goal interview (`onNewGoal`).
 struct GoalsHomeView: View {
     @State private var viewModel: GoalsHomeViewModel
     private let server: URL
+    private let onNewGoal: () -> Void
 
-    init(server: URL, onAPIError: @escaping (Error) -> Void) {
+    init(server: URL, onAPIError: @escaping (Error) -> Void, onNewGoal: @escaping () -> Void) {
         self.server = server
+        self.onNewGoal = onNewGoal
         _viewModel = State(initialValue: GoalsHomeViewModel(
             client: APIClientGoalsAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
     }
@@ -16,6 +19,14 @@ struct GoalsHomeView: View {
         content
             .hxNavigationTitle("Goals")
             .background(Color.hxCanvas.ignoresSafeArea())
+            .toolbar {
+                if viewModel.offersNewGoal {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(action: onNewGoal) { Image(systemName: "plus") }
+                            .accessibilityLabel(Text(verbatim: "New goal"))
+                    }
+                }
+            }
             // Every appear refreshes, so check-ins made in a goal show on the way back.
             .task {
                 await viewModel.load()
@@ -120,6 +131,10 @@ struct GoalsHomeView: View {
 
 /// Goals copy and small derivations shared by Goals home and goal detail.
 enum GoalsCopy {
+    /// New goal's chat draft: he types the wish after it and sends. Naming the skill makes
+    /// Atlas load it rather than guess from the wording.
+    static let newGoalDraft = "New goal (goal-interview skill): "
+
     static func streakTitle(_ days: Int) -> String {
         days == 1 ? "1-day show-up streak" : "\(days)-day show-up streak"
     }
