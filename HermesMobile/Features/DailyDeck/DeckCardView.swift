@@ -703,9 +703,18 @@ private struct FollowUpsPage: View {
 private struct FollowUpRow: View {
     let card: DeckCard
     let viewModel: DailyDeckViewModel
-    /// The Text action whose Messages sheet is up.
-    @State private var composing: DeckAction?
+    /// The Messages sheet that is up: its Text action and the words it opened with.
+    @State private var composing: Compose?
+    /// The suggested text as edited here; nil until it is changed. Text sends these words.
+    @State private var editedText: String?
+    @FocusState private var isEditingText: Bool
     @Environment(\.openURL) private var openURL
+
+    private struct Compose: Identifiable {
+        let id = UUID()
+        let action: DeckAction
+        let message: DeckMessage
+    }
 
     var body: some View {
         let chosen = viewModel.answer(for: card)?.action
@@ -716,14 +725,33 @@ private struct FollowUpRow: View {
             }
             if let preview = draftPreview {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(verbatim: preview.heading)
-                        .font(AppFont.caption(weight: .semibold))
-                        .foregroundStyle(.secondary)
-                    Text(verbatim: preview.text).font(AppFont.body())
+                    HStack(spacing: 4) {
+                        Text(verbatim: preview.heading)
+                        if preview.editable {
+                            Spacer(minLength: 8)
+                            Image(systemName: "pencil").accessibilityHidden(true)
+                        }
+                    }
+                    .font(AppFont.caption(weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    if preview.editable {
+                        // The words Text sends: tap to change them before Messages opens.
+                        TextField(text: Binding(get: { editedText ?? preview.text }, set: { editedText = $0 }),
+                                  axis: .vertical) {
+                            Text(verbatim: "Your message")
+                        }
+                        .font(AppFont.body())
+                        .focused($isEditingText)
+                        .accessibilityLabel(Text(verbatim: "Message to send"))
+                    } else {
+                        Text(verbatim: preview.text).font(AppFont.body())
+                    }
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .onTapGesture { if preview.editable { isEditingText = true } }
             }
             // Side by side when they fit; stacked at large text sizes.
             ViewThatFits(in: .horizontal) {
@@ -736,10 +764,10 @@ private struct FollowUpRow: View {
                 AnswerBox(card: card, viewModel: viewModel, prompt: "Anything to mention? (optional)", minHeight: 88)
             }
         }
-        .sheet(item: $composing) { action in
-            MessageComposer(message: action.message ?? DeckMessage(to: "", body: nil)) { sent in
+        .sheet(item: $composing) { compose in
+            MessageComposer(message: compose.message) { sent in
                 composing = nil
-                if sent { viewModel.markTexted(action, for: card) }
+                if sent { viewModel.markTexted(compose.action, body: compose.message.body, for: card) }
             }
             .ignoresSafeArea()
         }
@@ -758,22 +786,27 @@ private struct FollowUpRow: View {
         }
     }
 
-    /// The words to be sent, shown before sending: an agent's draft, else the Text action's suggestion.
-    private var draftPreview: (heading: String, text: String)? {
+    /// The words to be sent, shown before sending: an agent's draft, else the Text action's
+    /// suggestion. Editable when a Text action will send them from this phone.
+    private var draftPreview: (heading: String, text: String, editable: Bool)? {
+        let sendsHere = card.actions.contains { $0.message != nil }
         if let draft = card.draft, let text = draft.text {
-            return ("Draft to \(draft.to ?? "them")\(draft.channel.map { " · \($0)" } ?? "")", text)
+            return ("Draft to \(draft.to ?? "them")\(draft.channel.map { " · \($0)" } ?? "")", text, sendsHere)
         }
         if let body = card.actions.lazy.compactMap({ $0.message?.body }).first(where: { !$0.isEmpty }) {
-            return ("Suggested text", body)
+            return ("Suggested text", body, true)
         }
         return nil
     }
 
-    /// Opens the Messages sheet. Where the device can't send texts (the simulator), it hands off
-    /// to Messages instead, which can't report back, so the card stays unanswered.
+    /// Opens the Messages sheet with the edited words, if any. Where the device can't send texts
+    /// (the simulator), it hands off to Messages instead, which can't report back, so the card
+    /// stays unanswered.
     private func text(_ message: DeckMessage, with action: DeckAction) {
+        isEditingText = false
+        let message = DeckMessage(to: message.to, body: editedText ?? message.body)
         if MessageComposer.canSend {
-            composing = action
+            composing = Compose(action: action, message: message)
         } else if let url = MessageComposer.smsURL(message) {
             openURL(url)
         }
