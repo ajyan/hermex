@@ -312,6 +312,21 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(answer.text, "Yo! How've you been?")
     }
 
+    /// Words edited on the card are what the sheet opened with, so they're what filing records.
+    @MainActor
+    func testTextedFollowUpRecordsTheEditedWords() async throws {
+        let deckJSON = #"{"date":"2026-10-04","kind":"morning","cards":[{"id":"followup-5","type":"decision","title":"Sina","ref":{"followup":5,"person":"Sina"},"actions":[{"id":"text","label":"Text Sina","message":{"to":"+15550001111","body":"Yo!"}}]},{"id":"close","type":"close"}]}"#
+        store.setWorkspace("/vault", for: server)
+        let viewModel = makeViewModel(ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: deckJSON))
+        await viewModel.load()
+        let card = viewModel.cards[0], text = try XCTUnwrap(card.actions.first)
+
+        viewModel.markTexted(text, body: " Yo! Coffee Saturday? ", for: card)
+
+        XCTAssertEqual(viewModel.answer(for: card)?.text, "Yo! Coffee Saturday?")
+        XCTAssertEqual(viewModel.answer(for: card)?.action, "text")
+    }
+
     func testTextActionWithoutABodyOrWithABadMessageStillDecodes() throws {
         let deck = try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"f","type":"decision","actions":[{"id":"text","label":"Text Pat","message":{"to":"pat@example.com"}},{"id":"broken","label":"Broken","message":{"body":"no recipient"}},{"id":"skip","label":"Not now"}]}]}"#)
         let actions = try XCTUnwrap(deck.cards.first?.actions)

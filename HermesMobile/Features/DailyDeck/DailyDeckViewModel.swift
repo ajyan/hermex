@@ -342,9 +342,10 @@ final class DailyDeckViewModel {
 
     /// Records that the phone sent `action`'s message, so filing logs the contact. Only called
     /// after Messages reports the text went out; a cancelled sheet leaves the card as it was.
-    /// The sheet doesn't say what was finally sent, so this records the suggested words.
-    func markTexted(_ action: DeckAction, for card: DeckCard) {
-        let body = action.message?.body?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    /// The sheet doesn't say what was finally sent, so this records the words it opened with:
+    /// `body` when given (edited on the card), else the suggestion.
+    func markTexted(_ action: DeckAction, body: String? = nil, for card: DeckCard) {
+        let body = (body ?? action.message?.body)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         update(card) { answer in
             answer.action = action.id
             answer.text = body.isEmpty ? nil : body
