@@ -826,7 +826,8 @@ struct PrepFlagCardButton: View {
 
 // MARK: - Small pieces
 
-/// The run's full-width primary action.
+/// The run's full-width primary action: a capsule in the course's paper, as the run's cards are
+/// (`DESIGN.md`: a wash card's controls take its paper's tint), like the Daily Deck's File It.
 struct PrepPrimaryButton: View {
     let title: String
     var enabled = true
@@ -834,6 +835,9 @@ struct PrepPrimaryButton: View {
     /// `PrepGradingLabel` in place of the title.
     var isGrading = false
     let action: () -> Void
+
+    private var paper: HermexPaper { .knowledge }
+    private var isActive: Bool { enabled || isGrading }
 
     var body: some View {
         Button(action: action) {
@@ -845,11 +849,13 @@ struct PrepPrimaryButton: View {
                 }
             }
             .font(AppFont.body(weight: .semibold))
-            .frame(maxWidth: .infinity)
+            .foregroundStyle(isActive ? paper.onGlow : paper.glow.opacity(0.6))
+            .frame(maxWidth: .infinity, minHeight: 50)
+            // Disabled: a faint wash with readable ink, so the label never disappears.
+            .background(isActive ? paper.glow : paper.glow.opacity(0.15), in: Capsule())
+            .contentShape(Capsule())
         }
-        .buttonStyle(.borderedProminent)
-        .buttonBorderShape(.capsule)
-        .controlSize(.large)
+        .buttonStyle(.plain)
         .disabled(!enabled && !isGrading)
         .allowsHitTesting(!isGrading)
     }
