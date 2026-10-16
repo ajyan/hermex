@@ -266,12 +266,47 @@ final class BrainPersonLayoutTests: XCTestCase {
         let split = BrainPersonLayout.roleSplit("Father: Bo Test")
         XCTAssertEqual(split?.role, "Father")
         XCTAssertEqual(split?.value, "Bo Test")
+        XCTAssertEqual(BrainPersonLayout.roleSplit("**Wife**: Meg Fisher")?.role, "Wife")
+        XCTAssertEqual(BrainPersonLayout.roleSplit("**Wife**: Meg Fisher")?.value, "Meg Fisher")
+        XCTAssertEqual(BrainPersonLayout.roleSplit("__Wife__: Meg Fisher")?.role, "Wife")
         XCTAssertEqual(BrainPersonLayout.roleSplit("Step-sister: Ana: twin")?.value, "Ana: twin")
-        XCTAssertNil(BrainPersonLayout.roleSplit("Twenty-one characters: x"))
+        // 28 characters: "Paris & French Culture" fits, a 29-character role does not.
+        XCTAssertEqual(BrainPersonLayout.roleSplit("**Paris & French Culture**: speaks fluent French")?.role, "Paris & French Culture")
+        XCTAssertNil(BrainPersonLayout.roleSplit("Twenty-nine characters here and: x"))
         XCTAssertNil(BrainPersonLayout.roleSplit("sister Mina"))
         XCTAssertNil(BrainPersonLayout.roleSplit("Mother:Ann"))
         XCTAssertNil(BrainPersonLayout.roleSplit(": nobody"))
         XCTAssertNil(BrainPersonLayout.roleSplit("Father: "))
+    }
+
+    func testIsBoldLeadIn() {
+        XCTAssertTrue(BrainPersonLayout.isBoldLeadIn("**Education**: M.S. in Robotics"))
+        XCTAssertTrue(BrainPersonLayout.isBoldLeadIn("**Paris & French Culture**: plans to teach"))
+        // A plain sentence with a colon is not a label.
+        XCTAssertFalse(BrainPersonLayout.isBoldLeadIn("Philosophy: Doesn't accept compliments."))
+        XCTAssertFalse(BrainPersonLayout.isBoldLeadIn("sister Mina"))
+        // A colon inside the bold text: "**Note: see**: …" is not a "**X**:" lead-in.
+        XCTAssertFalse(BrainPersonLayout.isBoldLeadIn("**Note: see**: details"))
+    }
+
+    func testAboutItemStripsBrokenWikiLinks() {
+        XCTAssertEqual(
+            BrainPersonLayout.aboutItem("Douglas Fisher (Alex's half-brother) - See [Douglas Fisher.md](Douglas Fisher.md)"),
+            "Douglas Fisher (Alex's half-brother)")
+        // The em-dash spelling and a spaceless `.md` target are dropped too.
+        XCTAssertEqual(
+            BrainPersonLayout.aboutItem("cousin Teo — See [Teo Quill.md](Teo Quill.md)"),
+            "cousin Teo")
+        // A vault link that is not a trailing "See" keeps its plain text (no ".md").
+        XCTAssertEqual(BrainPersonLayout.aboutItem("worked with [Orbit Labs.md](Orbit Labs.md)"),
+                       "worked with Orbit Labs")
+        // A valid web link is kept intact.
+        XCTAssertEqual(BrainPersonLayout.aboutItem("[profile](https://example.com/ada)"),
+                       "[profile](https://example.com/ada)")
+        // A "See" note that is not a link passes through.
+        XCTAssertEqual(BrainPersonLayout.aboutItem("a cat - See the photos"), "a cat - See the photos")
+        // Ordinary text is untouched.
+        XCTAssertEqual(BrainPersonLayout.aboutItem("Father: Bo Test"), "Father: Bo Test")
     }
 
     func testCatchUpBirthdayLineIsOnlyANearBirthday() {
