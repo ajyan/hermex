@@ -75,29 +75,29 @@ struct PrepTodayRingCard: View {
     }
 }
 
-/// The course: passed units as rows with stars, the current unit as a banner over a winding path,
-/// the next unit with Test out, and the rest as a quiet "Coming up" list.
+/// The course: passed units as rows with stars, each current unit (the one being taught, and any whose
+/// boss is still to beat) as a banner over a winding path, the next unit with Test out, and the rest as a
+/// quiet "Coming up" list.
 struct PrepUnitPath: View {
     let course: PrepCourse
 
     var body: some View {
-        let current = course.units.firstIndex { $0.state == .current }
+        let lastCurrent = course.units.lastIndex { $0.state == .current }
         let nextLocked = course.units.indices.first { i in
-            course.units[i].state != .passed && i != current && current.map { i > $0 } ?? true
+            course.units[i].state != .passed && course.units[i].state != .current && lastCurrent.map { i > $0 } ?? true
         }
         VStack(alignment: .leading, spacing: BrainStyle.l) {
             ForEach(Array(course.units.enumerated()), id: \.element.id) { index, unit in
                 if unit.state == .passed {
                     PrepPassedUnitRow(index: index, unit: unit)
-                } else if index == current {
-                    PrepCurrentUnit(index: index, unit: unit,
-                                    next: course.units.indices.contains(index + 1) ? course.units[index + 1].title : nil)
+                } else if unit.state == .current {
+                    PrepCurrentUnit(index: index, unit: unit)
                 } else if index == nextLocked {
                     PrepLockedUnitRow(index: index, unit: unit, prominent: true)
                 }
             }
             let later = course.units.indices.filter { i in
-                course.units[i].state != .passed && i != current && i != nextLocked
+                course.units[i].state != .passed && course.units[i].state != .current && i != nextLocked
             }
             if !later.isEmpty {
                 VStack(alignment: .leading, spacing: BrainStyle.xs) {
@@ -178,7 +178,6 @@ private struct PrepLockedUnitRow: View {
 private struct PrepCurrentUnit: View {
     let index: Int
     let unit: PrepUnit
-    let next: String?
     @ScaledMetric(relativeTo: .body) private var step: CGFloat = 30
 
     private static let pattern: [CGFloat] = [0, 1, 2, 1]
@@ -213,7 +212,7 @@ private struct PrepCurrentUnit: View {
                     }
                 }
                 PrepPathRow(offset: x(unit.lessons.count), next: nil) {
-                    PrepBossNodeRow(unit: unit, next: next)
+                    PrepBossNodeRow(unit: unit)
                 }
             }
             .padding(.leading, BrainStyle.s)
@@ -355,10 +354,9 @@ private struct PrepLessonNodeLink: View {
 
 private struct PrepBossNodeRow: View {
     let unit: PrepUnit
-    let next: String?
 
     var body: some View {
-        let label = PrepCopy.bossNode(unit.boss, next: next)
+        let label = PrepCopy.bossNode(unit.boss)
         let row = HStack(spacing: BrainStyle.m) {
             PrepNodeDisc(kind: .boss)
             Text(verbatim: label)

@@ -671,9 +671,12 @@ enum PrepCopy {
         days > 0 ? "\(streak(days: days)) · \(xp) XP" : "\(xp) XP"
     }
 
-    static func bossNode(_ state: PrepBossState, next: String?) -> String {
-        if state == .ready { return "Boss quiz · ready" }
-        return next.map { "Boss quiz · unlocks \($0)" } ?? "Boss quiz"
+    static func bossNode(_ state: PrepBossState) -> String {
+        switch state {
+        case .ready: "Boss quiz · ready"
+        case .resting: "Boss quiz · back in a few days"
+        case .locked, .passed, .unknown: "Boss quiz"
+        }
     }
 
     static func starsLabel(_ stars: Int) -> String { "\(stars) of 3 stars" }
@@ -740,10 +743,10 @@ enum PrepCopy {
         guard sitting.passed else {
             if sitting.score == nil { return "Atlas grades it tonight; the unit unlocks if it passes." }
             return testOut ? "Not yet. Start with the lessons below."
-                : "The lessons below come back tomorrow, then the boss again."
+                : "The next unit keeps going. This boss comes back in a few days."
         }
         let parts = [sitting.unlocked.map { "\($0) unlocked" }, xp.map(xpLabel)].compactMap { $0 }
-        return parts.isEmpty ? "Course complete" : parts.joined(separator: " · ")
+        return parts.isEmpty ? "Unit passed" : parts.joined(separator: " · ")
     }
 
     /// The done screen's "Tomorrow" line: the current unit's boss once it is ready, else its lessons.

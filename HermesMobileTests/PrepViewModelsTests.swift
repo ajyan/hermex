@@ -322,7 +322,7 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: 0.9, passed: true, stars: 2, unlocked: "Agents and evals"), xp: 50),
                        "Agents and evals unlocked · +50 XP")
         XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: 0.5, passed: false, stars: 0, unlocked: nil), xp: nil),
-                       "The lessons below come back tomorrow, then the boss again.")
+                       "The next unit keeps going. This boss comes back in a few days.")
         XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: 0.5, passed: false, stars: 0, unlocked: nil), xp: nil,
                                            testOut: true), "Not yet. Start with the lessons below.")
         XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: 0.9, passed: true, stars: 2, unlocked: nil), xp: 50,
@@ -367,9 +367,9 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(PrepCopy.unitHeader(index: 1, title: "Prompt engineering"), "Unit 2 · Prompt engineering")
         XCTAssertEqual(PrepCopy.todayLine(days: 6, xp: 340), "6-day streak · 340 XP")
         XCTAssertEqual(PrepCopy.todayLine(days: 0, xp: 0), "0 XP")
-        XCTAssertEqual(PrepCopy.bossNode(.ready, next: "Agents"), "Boss quiz · ready")
-        XCTAssertEqual(PrepCopy.bossNode(.locked, next: "Agents"), "Boss quiz · unlocks Agents")
-        XCTAssertEqual(PrepCopy.bossNode(.locked, next: nil), "Boss quiz")
+        XCTAssertEqual(PrepCopy.bossNode(.ready), "Boss quiz · ready")
+        XCTAssertEqual(PrepCopy.bossNode(.resting), "Boss quiz · back in a few days")
+        XCTAssertEqual(PrepCopy.bossNode(.locked), "Boss quiz")
     }
 
     // MARK: Recall
