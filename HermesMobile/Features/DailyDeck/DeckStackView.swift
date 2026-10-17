@@ -24,6 +24,12 @@ struct DeckStackView: View {
         id.unicodeScalars.reduce(0) { $0 + Int($1.value) } % 2 == 0 ? 2.2 : -1.8
     }
 
+    /// True except on the follow-ups page, whose AnswerBox needs the keyboard inset.
+    private var ignoresKeyboard: Bool {
+        if case .followUps? = viewModel.currentPage { return false }
+        return true
+    }
+
     var body: some View {
         CardStack(
             pages: viewModel.visiblePages,
@@ -43,6 +49,9 @@ struct DeckStackView: View {
                 .padding(.vertical, 12)
         }
         .padding(.horizontal, 16)
+        // The deck's cards never hold a text field (only the follow-ups page does), so a
+        // keyboard inset left over from AnswerBox would otherwise shrink the whole stack.
+        .ignoresSafeArea(ignoresKeyboard ? .keyboard : [], edges: .bottom)
         .overlay(alignment: .bottom) { toast }
         .sheet(item: $feedbackCard, onDismiss: applyPendingFeedback) { card in
             DeckFeedbackSheet(card: card, viewModel: viewModel) { feedback in
