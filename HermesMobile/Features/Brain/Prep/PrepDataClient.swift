@@ -13,7 +13,7 @@ protocol PrepDataClient: Sendable {
     func flag(item: String) async throws
     func course() async throws -> PrepCourse
     func lesson(id: String) async throws -> PrepLesson
-    /// "I had that": count one missed key point of a graded recall as hit.
+    /// "I had that": count one missed key point of a graded recall or boss answer as hit.
     func override(attempt: String, point: String) async throws -> PrepAttemptResult
 }
 

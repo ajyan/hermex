@@ -355,7 +355,7 @@ final class PrepRunViewModel {
         await submit(.choice(""), confidence: .guess, dontKnow: true)
     }
 
-    /// "I had that" is offered on a graded recall's misses, never on "I don't know".
+    /// "I had that" is offered on a graded recall's or boss answer's misses, never on "I don't know".
     var canOverride: Bool { !answeredDontKnow }
 
     /// "I had that": count one missed key point as hit, keeping the rest of the result.
@@ -368,8 +368,9 @@ final class PrepRunViewModel {
         do {
             let updated = try await client.override(attempt: attempt, point: point)
             guard token == generation, case .result = phase else { return }
-            phase = .result(rep, PrepAttemptResult(merging: result, override: updated), index: index)
-            if let xp = updated.xp { lastXP = xp }
+            let merged = PrepAttemptResult(merging: result, override: updated)
+            phase = .result(rep, merged, index: index)
+            lastXP = Self.xp(for: rep, result: merged)
         } catch {
             guard token == generation, !prepIsCancellation(error) else { return }
             onAPIError(error)

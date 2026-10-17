@@ -468,6 +468,26 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertFalse(PrepAttemptResult(merging: base, override: pass).surprise)
     }
 
+    func testBossOverrideRescoresTheSittingAndRevisit() throws {
+        let base = try decode(PrepAttemptResult.self, #"""
+        {"verdict": "partial", "attempt": "a-1", "revisit": [{"lesson_id": "u1.l7", "title": "Seven"}],
+         "sitting": {"score": 0.67, "passed": false, "stars": 0, "unlocked": null},
+         "grade": {"points_hit": [{"point_id": "p.a", "quote": ""}], "points_missed": [{"point_id": "p.b", "why": ""}], "strong_answer": "S"}}
+        """#)
+        let claimed = try decode(PrepAttemptResult.self, #"""
+        {"verdict": "pass", "attempt": "a-2", "overridden": ["p.b"], "revisit": [],
+         "sitting": {"score": 0.78, "passed": true, "stars": 1, "unlocked": "Prompt engineering"},
+         "grade": {"points_hit": [{"point_id": "p.a", "quote": ""}, {"point_id": "p.b", "quote": ""}], "points_missed": [], "strong_answer": "S"}}
+        """#)
+        let merged = PrepAttemptResult(merging: base, override: claimed)
+        XCTAssertEqual(merged.sitting, PrepBossSitting(score: 0.78, passed: true, stars: 1, unlocked: "Prompt engineering"))
+        XCTAssertTrue(merged.revisit.isEmpty)
+        XCTAssertEqual(merged.attemptID, "a-2")
+        let recall = try decode(PrepAttemptResult.self, #"{"verdict": "pass", "attempt": "a-3"}"#)
+        XCTAssertEqual(PrepAttemptResult(merging: base, override: recall).sitting, base.sitting,
+                       "a response without a sitting keeps the one shown")
+    }
+
     func testRecallRequestEncodesConfidenceAndDontKnow() throws {
         let request = PrepAttemptRequest(date: "d", index: 0, item: "u1.l1", drill: .recall, answer: .choice(""),
                                          elapsedMS: 1, hintsUsed: 0, confidence: .certain, dontKnow: true)
