@@ -90,13 +90,58 @@ struct BrainPersonLayout: Equatable {
     }
 
     /// "Father: Bo Test" as a role and a value, when the text before the first ": " is a short
-    /// (20 characters or fewer) non-empty role and a value follows; else nil.
+    /// (28 characters or fewer) non-empty role and a value follows; else nil. The role's bold
+    /// marks are dropped ("**Wife**" reads "Wife").
     static func roleSplit(_ item: String) -> (role: String, value: String)? {
         guard let colon = item.range(of: ": ") else { return nil }
-        let role = item[..<colon.lowerBound].trimmingCharacters(in: .whitespaces)
+        let role = BrainPersonLayout.unboldRole(item[..<colon.lowerBound].trimmingCharacters(in: .whitespaces))
         let value = item[colon.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !role.isEmpty, role.count <= 20, !value.isEmpty else { return nil }
+        guard !role.isEmpty, role.count <= 28, !value.isEmpty else { return nil }
         return (role, value)
+    }
+
+    /// True when an item opens with a bold lead-in ("**Education**: …") whose text ends before
+    /// the first ": ": a bold label. Outside the Family section only such items take the label
+    /// layout, so plain sentences with a colon ("Philosophy: Doesn't accept…") stay whole.
+    static func isBoldLeadIn(_ item: String) -> Bool {
+        guard item.hasPrefix("**"), let end = item.range(of: "**:") else { return false }
+        return item[..<end.lowerBound].range(of: ": ") == nil
+    }
+
+    /// An About item with its broken wiki-link noise removed, before Markdown parsing. A link
+    /// whose target holds a space or ends in `.md` is a vault page name that could never resolve:
+    /// a trailing ` - See <link>` (dash or em dash) to one is dropped as redundant (the row
+    /// already names the person), and any other is flattened to its text without `.md`. Valid
+    /// links such as `[profile]` with a real URL target are kept.
+    static func aboutItem(_ raw: String) -> String {
+        var text = raw
+        if let see = text.firstMatch(of: seeLink), isVaultTarget(see.output.1) {
+            text.removeSubrange(see.range)
+        }
+        return text.replacing(link) { match -> String in
+            let (whole, label, target) = match.output
+            guard isVaultTarget(target) else { return String(whole) }
+            let name = label.hasSuffix(".md") ? label.dropLast(3) : label
+            return name.trimmingCharacters(in: .whitespaces)
+        }
+    }
+
+    /// `[label](target)`.
+    private static let link = try! Regex(#"\[([^\]]+)\]\(([^)]*)\)"#, as: (Substring, Substring, Substring).self)
+    /// A trailing ` - See [label](target)` (dash or em dash); the capture is the target.
+    private static let seeLink = try! Regex(#"\s+[-—]\s+See\s+\[[^\]]+\]\(([^)]*)\)\s*$"#, as: (Substring, Substring).self)
+
+    /// A link target that names a vault page (it holds a space or ends in `.md`), so it can never resolve.
+    private static func isVaultTarget(_ target: Substring) -> Bool {
+        target.contains(" ") || target.hasSuffix(".md")
+    }
+
+    /// "**Wife**" as "Wife": a role wrapped in bold (or `__`) marks loses them.
+    private static func unboldRole(_ role: String) -> String {
+        for mark in ["**", "__"] where role.hasPrefix(mark) && role.hasSuffix(mark) && role.count > 2 * mark.count {
+            return String(role.dropFirst(mark.count).dropLast(mark.count)).trimmingCharacters(in: .whitespaces)
+        }
+        return role
     }
 
     /// A mention section's refs without the journal days the timeline already shows, and its

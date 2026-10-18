@@ -83,8 +83,8 @@ struct BrainProfileChips: View {
 
 /// The rest of the profile under "About", on one neutral card: each section a sentence-case
 /// header and its items as compact rows whose links open, sections split by hairlines. A section
-/// shows three items and "+ N more" for the rest. Family items like "Father: Bo Test" show the
-/// role in secondary.
+/// shows three items and "+ N more" for the rest. Labelled items like "Father: Bo Test" (and,
+/// elsewhere, "**Education**: …") show the label in secondary on its own line above the value.
 struct BrainPersonAbout: View {
     fileprivate struct Section: Identifiable {
         let id: String
@@ -102,10 +102,14 @@ struct BrainPersonAbout: View {
     init(sections: [BrainPersonLayout.AboutSection]) {
         self.sections = sections.map { section in
             Section(id: section.id, title: section.title, rows: section.items.map { item in
-                if section.id == "family", let split = BrainPersonLayout.roleSplit(item) {
-                    return Row(role: split.role, text: BrainArticleDigestView.inlineMarkdown(split.value))
+                // Family items ("Father: Bo Test") always take the label layout; elsewhere only
+                // a bold lead-in ("**Education**: …"), so plain sentences with a colon stay whole.
+                let labelled = section.id == "family" || BrainPersonLayout.isBoldLeadIn(item)
+                if labelled, let split = BrainPersonLayout.roleSplit(item) {
+                    return Row(role: split.role,
+                               text: BrainArticleDigestView.inlineMarkdown(BrainPersonLayout.aboutItem(split.value)))
                 }
-                return Row(role: nil, text: BrainArticleDigestView.inlineMarkdown(item))
+                return Row(role: nil, text: BrainArticleDigestView.inlineMarkdown(BrainPersonLayout.aboutItem(item)))
             })
         }
     }
@@ -143,8 +147,10 @@ private struct BrainAboutSection: View {
         VStack(alignment: .leading, spacing: BrainStyle.xs) {
             HXSectionHeader(title: section.title)
             // A fixed list from one page load, so position is a stable id.
-            ForEach(Array(section.rows.prefix(expanded ? section.rows.count : Self.cap).enumerated()), id: \.offset) { _, row in
-                rowView(row)
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                ForEach(Array(section.rows.prefix(expanded ? section.rows.count : Self.cap).enumerated()), id: \.offset) { _, row in
+                    rowView(row)
+                }
             }
             if hidden > 0 {
                 Button(action: toggle) {
@@ -162,17 +168,26 @@ private struct BrainAboutSection: View {
     }
 
     private func rowView(_ row: BrainPersonAbout.Row) -> some View {
+        // Like `BrainBulletList`: a decorative marker, the row's words after it.
         HStack(alignment: .firstTextBaseline, spacing: BrainStyle.s) {
-            if let role = row.role {
-                Text(verbatim: role)
-                    .foregroundStyle(Color.hxTextSecondary)
+            Text(verbatim: "·")
+                .foregroundStyle(Color.hxTextSecondary)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: BrainStyle.xs) {
+                if let role = row.role {
+                    Text(verbatim: role)
+                        .font(AppFont.footnote())
+                        .foregroundStyle(Color.hxTextSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                Text(row.text)
+                    .font(BrainStyle.rowSubtitle)
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Text(row.text)
-                .foregroundStyle(Color.hxTextPrimary)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .font(BrainStyle.rowSubtitle)
         .accessibilityElement(children: .combine)
     }
 
@@ -390,9 +405,15 @@ private struct BrainBulletList: View {
             BrainEncounter(id: "2026-06-05#0", date: "2026-06-05", bullets: ["coffee near the park"],
                            body: "- coffee near the park")
         ],
-        profile: [BrainProfileSection(label: "Family", items: ["Father: Bo Quill", "sister Mina", "Mother: Ana Quill",
+        profile: [BrainProfileSection(label: "Family", items: ["**Wife**: Meg Quill",
+                                                               "**Daughter**: Nina (Alex's half-sister) - See [Douglas Quill.md](Douglas Quill.md)",
+                                                               "Father: Bo Quill", "sister Mina", "Mother: Ana Quill",
                                                                "cousin Teo"]),
                   BrainProfileSection(label: "Company", items: ["Orbit Labs", "Was at Lumen before"]),
+                  BrainProfileSection(label: "Professional", items: [
+                    "**Education**: M.S. in Robotics from State U after a B.S. in Mechanical Engineering.",
+                    "**Paris & French Culture**: Speaks fluent French and plans to teach in Paris next year.",
+                    "Philosophy: Doesn't accept compliments."]),
                   BrainProfileSection(label: "Likes", items: ["jazz", "climbing"])],
         questions: ["How is the move going?"],
         nextBirthday: "2026-10-26",
