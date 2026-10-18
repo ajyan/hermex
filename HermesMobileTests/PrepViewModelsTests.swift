@@ -21,6 +21,9 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
     var overrideResults: [Result<PrepAttemptResult, Error>] = []
     var storiesResults: [Result<PrepStoryList, Error>] = []
     var candidateResults: [Result<Void, Error>] = [.success(())]
+    var mocksResults: [Result<PrepMocks, Error>] = []
+    var mockStartResults: [Result<PrepMockStart, Error>] = []
+    var mockGradeResults: [Result<Void, Error>] = [.success(())]
     private var _storiesGate: (started: AsyncStream<Void>.Continuation, release: AsyncStream<Void>)?
 
     /// When set, the next `stories()` call signals `started` and then waits on `release`.
@@ -95,6 +98,13 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
             for await _ in overrideGate.release { break }
         }
         return try next("override:\(attempt):\(point)", &overrideResults)
+    }
+    func mocks() async throws -> PrepMocks { try next("mocks", &mocksResults) }
+    func mockStart(kind: PrepMockKind) async throws -> PrepMockStart {
+        try next("mockStart:\(kind.rawValue)", &mockStartResults)
+    }
+    func mockGrade(mockID: String, sessionID: String, turnMS: [Int]) async throws {
+        try next("mockGrade:\(mockID)", &mockGradeResults)
     }
 }
 
@@ -422,6 +432,29 @@ final class PrepViewModelsTests: XCTestCase {
         await vm.load()
         XCTAssertNil(vm.stories)
         guard case .loaded = vm.state else { return XCTFail("a stories failure never fails home: \(vm.state)") }
+    }
+
+    func testMockLaddersHideOnServerWithoutMocks() async {
+        let client = FakePrepClient()
+        client.mocksResults = [.failure(http(404))]
+        let vm = PrepMockViewModel(client: client)
+        await vm.load()
+        XCTAssertEqual(vm.state, .unavailable)
+        XCTAssertNil(vm.mocks, "the home's mock section hides")
+    }
+
+    func testMockLaddersLoad() async {
+        let client = FakePrepClient()
+        client.mocksResults = [.success(decode(PrepMocks.self, #"""
+        {"ladders": {"behavioral": {"level": "B2", "unlocked": ["B1", "B2"], "best": "B1",
+          "levels": [{"level": "B1", "title": "One story", "minutes": 6}, {"level": "B2", "title": "Two probes", "minutes": 8}],
+          "last_score": 4.2}}, "recent": []}
+        """#))]
+        let vm = PrepMockViewModel(client: client)
+        await vm.load()
+        XCTAssertEqual(vm.mocks?.ladder(.behavioral)?.current?.title, "Two probes")
+        XCTAssertNil(vm.mocks?.ladder(.design))
+        XCTAssertEqual(client.log, ["mocks"])
     }
 
     func testStoryRunRequestsStoryRunWithUnit() async {

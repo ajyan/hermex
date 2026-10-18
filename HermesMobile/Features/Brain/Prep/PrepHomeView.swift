@@ -5,11 +5,15 @@ import SwiftUI
 /// owns no `NavigationStack`.
 struct PrepHomeView: View {
     @State private var viewModel: PrepHomeViewModel
+    /// The voice mock ladders, loaded beside home; their section hides until they load.
+    @State private var mockViewModel: PrepMockViewModel
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     init(server: URL, onAPIError: @escaping (Error) -> Void) {
-        _viewModel = State(initialValue: PrepHomeViewModel(
-            client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
+        let client = APIClientPrepAdapter(apiClient: APIClient(baseURL: server))
+        _viewModel = State(initialValue: PrepHomeViewModel(client: client, onAPIError: onAPIError))
+        // Quiet: a server without mocks just has no section, and home reports its own failures.
+        _mockViewModel = State(initialValue: PrepMockViewModel(client: client))
     }
 
     var body: some View {
@@ -18,8 +22,14 @@ struct PrepHomeView: View {
             .toolbar { ToolbarItem(placement: .topBarTrailing) { FeedbackMoreMenu() } }
             .feedbackContext(FeedbackContext(feature: "Prep", screen: "Home"))
             .background(Color.hxCanvas.ignoresSafeArea())
-            // Every appear refreshes quietly, so a finished run shows on the way back.
-            .task { await viewModel.load() }
+            // Every appear refreshes quietly, so a finished run or graded mock shows on the way back.
+            .task { await load() }
+    }
+
+    private func load() async {
+        async let mocks: Void = mockViewModel.load()
+        await viewModel.load()
+        await mocks
     }
 
     @ViewBuilder
@@ -41,9 +51,13 @@ struct PrepHomeView: View {
                         // gaps (fed by mocks) follow below.
                         PrepTodayRingCard(course: course, streak: home.streak,
                                           action: PrepCopy.runAction(reps: home.run.reps, remaining: home.run.remaining))
-                        PrepUnitPath(course: course) { storiesSection }
+                        PrepUnitPath(course: course) {
+                            storiesSection
+                            mockSection
+                        }
                     } else {
                         todaySection(home)
+                        mockSection
                     }
                     if !home.tracks.isEmpty {
                         tracksSection(home.tracks, title: viewModel.course == nil ? "Tracks" : "Skill maps")
@@ -57,7 +71,16 @@ struct PrepHomeView: View {
                 .padding(BrainStyle.l)
                 .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
             }
-            .refreshable { await viewModel.load() }
+            .refreshable { await load() }
+        }
+    }
+
+    // MARK: Mocks
+
+    @ViewBuilder
+    private var mockSection: some View {
+        if let mocks = mockViewModel.mocks {
+            PrepMockSection(mocks: mocks)
         }
     }
 

@@ -1,7 +1,9 @@
 import Foundation
 
 /// The Prep (interview tutor) API on this user's `hermes-webui` fork (`api/tutor.py`):
-/// `GET /api/tutor/{home,today,map,gaps,gap,course,lesson,stories}` and `POST /api/tutor/{attempt,flag,stories/candidate}`. Stock upstream
+/// `GET /api/tutor/{home,today,map,gaps,gap,course,lesson,stories,mocks}` and
+/// `POST /api/tutor/{attempt,flag,stories/candidate,mock/start,mock/grade}`. None of them is scoped to a Hermes
+/// profile, so they answer the same whichever profile the client has active. Stock upstream
 /// servers answer 404, which screens treat as "no Prep on this server".
 protocol PrepDataClient: Sendable {
     func home() async throws -> PrepHome
@@ -20,6 +22,13 @@ protocol PrepDataClient: Sendable {
     func storyCandidate(id: String, action: String) async throws
     /// "I had that": count one missed key point of a graded recall or boss answer as hit.
     func override(attempt: String, point: String) async throws -> PrepAttemptResult
+    /// Both voice mock ladders and the newest mocks.
+    func mocks() async throws -> PrepMocks
+    /// Starts a mock at the kind's current level: its brief and the profile to call in. 409 when the
+    /// server has no interviewer profile.
+    func mockStart(kind: PrepMockKind) async throws -> PrepMockStart
+    /// Hands a finished call to the grader (202 while it grades in the background).
+    func mockGrade(mockID: String, sessionID: String, turnMS: [Int]) async throws
 }
 
 extension PrepDataClient {
@@ -85,6 +94,21 @@ struct APIClientPrepAdapter: PrepDataClient {
         let data = try await apiClient.sendData(endpoint: .tutorOverride, method: "POST",
                                                 body: PrepOverrideRequest(attempt: attempt, point: point))
         return try decode(data)
+    }
+
+    func mocks() async throws -> PrepMocks {
+        try await get(.tutorMocks)
+    }
+
+    func mockStart(kind: PrepMockKind) async throws -> PrepMockStart {
+        let data = try await apiClient.sendData(endpoint: .tutorMockStart, method: "POST",
+                                                body: PrepMockStartRequest(kind: kind.rawValue))
+        return try decode(data)
+    }
+
+    func mockGrade(mockID: String, sessionID: String, turnMS: [Int]) async throws {
+        _ = try await apiClient.sendData(endpoint: .tutorMockGrade, method: "POST",
+                                         body: PrepMockGradeRequest(mockID: mockID, sessionID: sessionID, turnMS: turnMS))
     }
 
     private func get<Value: Decodable>(_ endpoint: Endpoint) async throws -> Value {

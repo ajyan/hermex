@@ -80,7 +80,7 @@ struct PrepTodayRingCard: View {
 /// quiet "Coming up" list.
 struct PrepUnitPath<Between: View>: View {
     let course: PrepCourse
-    /// Shown between the units and the mock row (the story bank).
+    /// Shown under the units (the story bank and the mock ladders).
     @ViewBuilder let between: Between
 
     var body: some View {
@@ -110,14 +110,6 @@ struct PrepUnitPath<Between: View>: View {
                 }
             }
             between
-            if course.units.contains(where: { $0.mock }) {
-                NavigationLink(value: ShellPushDestination.brainRoute(.prep(.mock))) {
-                    BrainRow(title: "Mock interview", subtitle: "Full critique on what you've passed")
-                        .padding(.horizontal, BrainStyle.cardHorizontalPadding)
-                        .hxCard()
-                }
-                .buttonStyle(.plain)
-            }
         }
     }
 }

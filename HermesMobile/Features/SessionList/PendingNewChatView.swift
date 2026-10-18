@@ -20,6 +20,10 @@ struct PendingNewChatView: View {
     let profileName: String?
     let projectID: String?
     let startsCall: Bool
+    /// A voice mock: the call's opening turn (the brief), its id, and what to do with its grade.
+    let openingTurn: String?
+    let mockID: String?
+    let onMockCallEnded: ((MockCallGrade) -> Void)?
     let callRequest: Int
     let draftStore: ChatDraftStore
     /// True while the shell still has this chat as its root. A push over the root
@@ -43,6 +47,9 @@ struct PendingNewChatView: View {
         profileName: String? = nil,
         projectID: String? = nil,
         startsCall: Bool = false,
+        openingTurn: String? = nil,
+        mockID: String? = nil,
+        onMockCallEnded: ((MockCallGrade) -> Void)? = nil,
         callRequest: Int = 0,
         server: URL,
         viewModel: SessionListViewModel,
@@ -62,6 +69,9 @@ struct PendingNewChatView: View {
         self.profileName = profileName
         self.projectID = projectID
         self.startsCall = startsCall
+        self.openingTurn = openingTurn
+        self.mockID = mockID
+        self.onMockCallEnded = onMockCallEnded
         self.callRequest = callRequest
         self.draftStore = draftStore ?? .shared
         self.isStillRoot = isStillRoot
@@ -81,6 +91,9 @@ struct PendingNewChatView: View {
                     loadsInitialMessages: false,
                     autoStartsVoiceInput: autoStartsVoiceInput,
                     startsCall: startsCall,
+                    openingTurn: openingTurn,
+                    mockID: mockID,
+                    onMockCallEnded: onMockCallEnded,
                     callRequest: callRequest,
                     draftStore: draftStore,
                     restoresDraftSettings: true,

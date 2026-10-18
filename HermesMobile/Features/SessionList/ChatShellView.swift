@@ -84,6 +84,8 @@ struct ChatShellView: View {
     @State private var brainRouteOpener = OpenBrainRouteAction()
     /// Lets pushed screens (a Week ahead card's Edit in chat) start a new chat with a draft.
     @State private var draftChatOpener = OpenDraftChatAction()
+    /// Lets Prep's mock brief open a voice mock: a new interviewer chat already in a call.
+    @State private var mockCallOpener = OpenMockCallAction()
     /// Where cards and chips that push a screen meet the screen they zoom into.
     @Namespace private var zoomNamespace
     /// Whether this server takes feedback; rechecked on return until yes, gone with the shell on a server switch.
@@ -508,6 +510,7 @@ struct ChatShellView: View {
     private var mainStack: some View {
         brainRouteOpener.handler = { navigation.path.append(.brainRoute($0)) }
         draftChatOpener.handler = { selectDestination(PendingNewChatRoute(initialDraft: $0)) }
+        mockCallOpener.handler = { await openMockCall($0) }
         brainRouteOpener.homeHandler = { navigation.showBrainHome() }
         return NavigationStack(path: $navigation.path) {
             rootView
@@ -528,6 +531,7 @@ struct ChatShellView: View {
         // Pushed screens (the Daily Brief's open cards) open Brain pages too.
         .environment(\.openBrainRoute, brainRouteOpener)
         .environment(\.openDraftChat, draftChatOpener)
+        .environment(\.openMockCall, mockCallOpener)
         // A new root also drops screens ChatView pushed outside the typed path.
         .id(navigation.rootRevision)
         .background(Color.hxCanvas.ignoresSafeArea())
@@ -556,6 +560,9 @@ struct ChatShellView: View {
                 profileName: route.profileName,
                 projectID: route.projectID,
                 startsCall: route.startsCall,
+                openingTurn: route.openingTurn,
+                mockID: route.mockID,
+                onMockCallEnded: { finishMockCall($0, restoring: route.profileAfterCall) },
                 callRequest: callRequest,
                 server: server,
                 viewModel: viewModel,
@@ -745,6 +752,12 @@ struct ChatShellView: View {
             PrepRunView(server: server, run: .bonus, onAPIError: authManager.handleAPIError)
         case .prep(.story(let id)):
             PrepRunView(server: server, run: .story, unit: id, onAPIError: authManager.handleAPIError)
+        case .prep(.mockLadder(let kind)):
+            PrepMockBriefView(kind: kind, server: server, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
+        case .prep(.mockResult(let id)):
+            PrepMockResultView(mockID: id, server: server, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
         }
     }
 
@@ -1427,6 +1440,35 @@ struct ChatShellView: View {
         selectDestination(PendingNewChatRoute(profileName: route.profileName, projectID: route.projectID, startsCall: true))
     }
 
+    /// A voice mock: the mock's profile goes active first, so the opening turn (sent as soon as the
+    /// call connects) reaches the server under it, then a new chat in that profile opens straight into
+    /// the call. The chat carries the profile that was active before, to switch back when the call ends.
+    private func openMockCall(_ start: PrepMockStart) async {
+        let previous = await PrepMockProfile.enter(
+            start.profile, fallback: viewModel.activeProfileName, client: APIClient(baseURL: server))
+        selectDestination(PendingNewChatRoute(
+            profileName: start.profile,
+            startsCall: true,
+            openingTurn: start.brief,
+            mockID: start.mockID,
+            profileAfterCall: previous
+        ))
+    }
+
+    /// The voice mock's call ended: ask for its grade, show its result over the call's chat, and
+    /// switch back to the profile that was active before. Grading and the result are tutor routes,
+    /// which no profile scopes. If the chat was replaced meanwhile, the new chat sets its own profile.
+    private func finishMockCall(_ grade: MockCallGrade, restoring profile: String?) {
+        let revision = navigation.rootRevision
+        let apiClient = APIClient(baseURL: server)
+        Task {
+            try? await grade.post(to: APIClientPrepAdapter(apiClient: apiClient))
+            guard navigation.rootRevision == revision else { return }
+            navigation.push(.brainRoute(.prep(.mockResult(grade.mockID))))
+            await PrepMockProfile.leave(to: profile, client: apiClient)
+        }
+    }
+
     private func selectSession(_ session: SessionSummary) {
         selectDestination(session)
     }
@@ -1632,6 +1674,12 @@ struct PendingNewChatRoute: Identifiable, Hashable {
     let projectID: String?
     /// When true, the new chat opens straight into a voice call.
     let startsCall: Bool
+    /// Sent as the call's first turn (a voice mock's brief), so the other side speaks first.
+    let openingTurn: String?
+    /// The voice mock this call is, graded once the call ends.
+    let mockID: String?
+    /// The profile to switch back to once the voice mock's call ends; nil when nothing changed.
+    let profileAfterCall: String?
 
     init(
         initialDraft: String = "",
@@ -1639,7 +1687,10 @@ struct PendingNewChatRoute: Identifiable, Hashable {
         autoStartsVoiceInput: Bool = false,
         profileName: String? = nil,
         projectID: String? = nil,
-        startsCall: Bool = false
+        startsCall: Bool = false,
+        openingTurn: String? = nil,
+        mockID: String? = nil,
+        profileAfterCall: String? = nil
     ) {
         self.initialDraft = initialDraft
         self.initialAttachments = initialAttachments
@@ -1647,6 +1698,9 @@ struct PendingNewChatRoute: Identifiable, Hashable {
         self.profileName = profileName
         self.projectID = projectID
         self.startsCall = startsCall
+        self.openingTurn = openingTurn
+        self.mockID = mockID
+        self.profileAfterCall = profileAfterCall
     }
 
     static func == (lhs: PendingNewChatRoute, rhs: PendingNewChatRoute) -> Bool {

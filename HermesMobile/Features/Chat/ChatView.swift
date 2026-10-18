@@ -290,6 +290,9 @@ struct ChatView: View {
     let startsCall: Bool
     /// Bumped by the shell's call button to call on this chat.
     let callRequest: Int
+    /// A voice mock's chat: its first call opens with the brief and asks for the grade once it ends
+    /// (`onMockCallEnded`, after the call screen is gone).
+    let onMockCallEnded: ((MockCallGrade) -> Void)?
     let draftStore: ChatDraftStore
     /// Store holding the durable app-owned copies of staged attachments.
     let draftAttachmentStore: any ChatDraftAttachmentStoring
@@ -313,6 +316,9 @@ struct ChatView: View {
     @State private var isVoiceCallPresented = false
     @State private var isFileBrowserPresented = false
     @State private var didAutoStartCall = false
+    @State private var mockCall: MockCallState
+    /// The mock's grade, from hang-up until the call screen has gone.
+    @State private var endedMockCall: MockCallGrade?
     /// Rename sheet opened by tapping the chat title.
     @State private var isTitleRenamePresented = false
     @State private var titleRenameIsSubmitting = false
@@ -422,6 +428,9 @@ struct ChatView: View {
         loadsInitialMessages: Bool = true,
         autoStartsVoiceInput: Bool = false,
         startsCall: Bool = false,
+        openingTurn: String? = nil,
+        mockID: String? = nil,
+        onMockCallEnded: ((MockCallGrade) -> Void)? = nil,
         callRequest: Int = 0,
         draftStore: ChatDraftStore? = nil,
         draftAttachmentStore: (any ChatDraftAttachmentStoring)? = nil,
@@ -435,6 +444,8 @@ struct ChatView: View {
         self.loadsInitialMessages = loadsInitialMessages
         self.autoStartsVoiceInput = autoStartsVoiceInput
         self.startsCall = startsCall
+        self.onMockCallEnded = onMockCallEnded
+        _mockCall = State(initialValue: MockCallState(mockID: mockID, openingTurn: openingTurn))
         self.callRequest = callRequest
         self.draftStore = draftStore ?? .shared
         let resolvedDraftAttachmentStore = draftAttachmentStore ?? ChatDraftAttachmentStore.shared
@@ -1015,8 +1026,17 @@ struct ChatView: View {
             .fullScreenCover(isPresented: $isVoiceCallPresented, onDismiss: {
                 // Call turns don't go through the composer's send path.
                 if !viewModel.messages.isEmpty { onConversationStarted() }
+                if let grade = endedMockCall {
+                    endedMockCall = nil
+                    onMockCallEnded?(grade)
+                }
             }) {
-                VoiceCallView(chat: viewModel) { _ in isVoiceCallPresented = false }
+                VoiceCallView(chat: viewModel, openingTurn: mockCall.openingTurn) { summary in
+                    isVoiceCallPresented = false
+                    if let grade = mockCall.callEnded(sessionID: session.sessionId, turnMS: summary.turnMS) {
+                        endedMockCall = grade
+                    }
+                }
             }
             .onAppear {
                 guard startsCall, !didAutoStartCall else { return }

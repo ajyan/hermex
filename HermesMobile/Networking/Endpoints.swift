@@ -182,6 +182,11 @@ enum Endpoint {
     case tutorFlag
     case tutorStories
     case tutorStoryCandidate
+    /// The voice mock ladders (`api/tutor_mock.py`): both ladders with recent mocks, starting one
+    /// (its brief), and asking for its grade after the call.
+    case tutorMocks
+    case tutorMockStart
+    case tutorMockGrade
     /// The feedback loop (`api/feedback.py`): list or create entries, read a plan, decide on an entry.
     case feedbackList
     case feedbackPlan(id: String)
@@ -504,6 +509,12 @@ enum Endpoint {
             return "/api/tutor/stories"
         case .tutorStoryCandidate:
             return "/api/tutor/stories/candidate"
+        case .tutorMocks:
+            return "/api/tutor/mocks"
+        case .tutorMockStart:
+            return "/api/tutor/mock/start"
+        case .tutorMockGrade:
+            return "/api/tutor/mock/grade"
         case .feedbackList:
             return "/api/feedback"
         case let .feedbackPlan(id):
