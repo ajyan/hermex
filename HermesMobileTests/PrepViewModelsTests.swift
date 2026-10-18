@@ -21,6 +21,13 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
     var overrideResults: [Result<PrepAttemptResult, Error>] = []
     var storiesResults: [Result<PrepStoryList, Error>] = []
     var candidateResults: [Result<Void, Error>] = [.success(())]
+    private var _storiesGate: (started: AsyncStream<Void>.Continuation, release: AsyncStream<Void>)?
+
+    /// When set, the next `stories()` call signals `started` and then waits on `release`.
+    var storiesGate: (started: AsyncStream<Void>.Continuation, release: AsyncStream<Void>)? {
+        get { lock.withLock { _storiesGate } }
+        set { lock.withLock { _storiesGate = newValue } }
+    }
 
     /// When set, `attempt` signals `started` and then waits on `release`.
     var gate: (started: AsyncStream<Void>.Continuation, release: AsyncStream<Void>)?
@@ -68,7 +75,17 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
     func flag(item: String) async throws { try next("flag:\(item)", &flagResults) }
     func course() async throws -> PrepCourse { try next("course", &courseResults) }
     func lesson(id: String) async throws -> PrepLesson { try next("lesson:\(id)", &lessonResults) }
-    func stories() async throws -> PrepStoryList { try next("stories", &storiesResults) }
+    func stories() async throws -> PrepStoryList {
+        let gate = lock.withLock { () -> (started: AsyncStream<Void>.Continuation, release: AsyncStream<Void>)? in
+            defer { _storiesGate = nil }
+            return _storiesGate
+        }
+        if let gate {
+            gate.started.yield()
+            for await _ in gate.release { break }
+        }
+        return try next("stories", &storiesResults)
+    }
     func storyCandidate(id: String, action: String) async throws {
         try next("candidate:\(id):\(action)", &candidateResults)
     }
@@ -478,6 +495,69 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertNotNil(vm.candidateErrors["c1"])
         XCTAssertEqual(client.log.filter { $0 == "stories" }.count, 1, "no refresh after a failed action")
         XCTAssertFalse(vm.isActing(on: "c1"))
+    }
+
+    func testStoriesNeverGateHomesFirstPaint() async {
+        let client = FakePrepClient()
+        client.homeResults = [.success(decode(PrepHome.self, #"{"streak": {"days": 1, "freezes": 0}}"#))]
+        client.storiesResults = [.success(storyList())]
+        let started = AsyncStream<Void>.makeStream()
+        let release = AsyncStream<Void>.makeStream()
+        client.storiesGate = (started.continuation, release.stream)
+        let vm = PrepHomeViewModel(client: client)
+        let loading = Task { await vm.load() }
+        for await _ in started.stream { break }
+        guard case .loaded = vm.state else { return XCTFail("home waited on stories: \(vm.state)") }
+        XCTAssertNil(vm.stories)
+        release.continuation.yield()
+        await loading.value
+        XCTAssertEqual(vm.stories?.readyCount, 1)
+    }
+
+    func testStaleVerdictRefreshNeverOverwritesNewerLoad() async {
+        let client = FakePrepClient()
+        // The first answer is the initial load, the second the load below, the third the stale refresh.
+        client.storiesResults = [.success(storyList(candidates: candidateJSON("c1"))),
+                                 .success(storyList(candidates: candidateJSON("c2"))),
+                                 .success(storyList(candidates: candidateJSON("c1")))]
+        let vm = await homeVM(client)
+        let started = AsyncStream<Void>.makeStream()
+        let release = AsyncStream<Void>.makeStream()
+        client.storiesGate = (started.continuation, release.stream)
+        let acting = Task { await vm.act(on: try! XCTUnwrap(vm.stories?.candidates.first), action: .add) }
+        for await _ in started.stream { break }
+        await vm.load()
+        release.continuation.yield()
+        await acting.value
+        XCTAssertEqual(vm.stories?.candidates.map(\.id), ["c2"])
+    }
+
+    func testStaleLoadNeverOverwritesNewerVerdictRefresh() async {
+        let client = FakePrepClient()
+        client.storiesResults = [.success(storyList(candidates: candidateJSON("c1"))),
+                                 .success(storyList(candidates: candidateJSON("c2"))),
+                                 .success(storyList(candidates: candidateJSON("c1")))]
+        let vm = await homeVM(client)
+        let started = AsyncStream<Void>.makeStream()
+        let release = AsyncStream<Void>.makeStream()
+        client.storiesGate = (started.continuation, release.stream)
+        let loading = Task { await vm.load() }
+        for await _ in started.stream { break }
+        await vm.act(on: try! XCTUnwrap(vm.stories?.candidates.first), action: .add)
+        release.continuation.yield()
+        await loading.value
+        XCTAssertEqual(vm.stories?.candidates.map(\.id), ["c2"], "the older load's answer is dropped")
+    }
+
+    func testAddedCandidateReadsDraftingWhenRefreshFails() async {
+        let client = FakePrepClient()
+        client.storiesResults = [.success(storyList(candidates: candidateJSON("c1"))), .failure(http(500))]
+        let vm = await homeVM(client)
+        let candidate = try! XCTUnwrap(vm.stories?.candidates.first)
+        await vm.act(on: candidate, action: .add)
+        XCTAssertEqual(vm.stories?.candidates.first?.status, "drafting")
+        await vm.act(on: try! XCTUnwrap(vm.stories?.candidates.first), action: .add)
+        XCTAssertEqual(client.log.filter { $0.hasPrefix("candidate:") }.count, 1, "no second POST")
     }
 
     func testCandidateActionIgnoresDraftingCandidate() async {

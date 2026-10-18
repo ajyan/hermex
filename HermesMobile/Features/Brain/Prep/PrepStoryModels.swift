@@ -190,6 +190,20 @@ struct PrepStoryCandidate: Decodable, Identifiable, Hashable, Sendable {
         case forPrompt = "for_prompt"
     }
 
+    private init(copying other: PrepStoryCandidate, status: String) {
+        id = other.id
+        title = other.title
+        summary = other.summary
+        forPrompt = other.forPrompt
+        why = other.why
+        verdict = other.verdict
+        self.status = status
+        error = nil
+    }
+
+    /// The same candidate once the server has taken it to draft.
+    var drafting: PrepStoryCandidate { PrepStoryCandidate(copying: self, status: "drafting") }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.requiredID(.id)
@@ -221,6 +235,12 @@ struct PrepStoryList: Decodable, Hashable, Sendable {
         self.readyCount = readyCount
         self.activeTotal = activeTotal
         self.candidates = candidates
+    }
+
+    /// The list with one candidate marked drafting, for a card just added.
+    func markingCandidateDrafting(_ id: String) -> PrepStoryList {
+        PrepStoryList(stories: stories, readyCount: readyCount, activeTotal: activeTotal,
+                      candidates: candidates.map { $0.id == id ? $0.drafting : $0 })
     }
 
     /// The list without one candidate, for a dismissed card.

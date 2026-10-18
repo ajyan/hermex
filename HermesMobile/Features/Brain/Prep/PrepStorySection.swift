@@ -56,6 +56,17 @@ struct PrepStoryCandidateCard: View {
 
     private var isDrafting: Bool { candidate.status == "drafting" }
 
+    @ViewBuilder
+    private var buttons: some View {
+        PrepCandidateButton(
+            title: isDrafting ? "Drafting\u{2026}" : "Add to bench", prominent: true,
+            accessibility: isDrafting ? "Drafting \(candidate.title)" : "Add \(candidate.title) to bench",
+            enabled: !isDrafting && !isActing) { onAct(.add) }
+        PrepCandidateButton(
+            title: "Not now", prominent: false, accessibility: "Not now for \(candidate.title)",
+            enabled: !isDrafting && !isActing) { onAct(.dismiss) }
+    }
+
     var body: some View {
         let paper = HermexPaper.knowledge
         HXCard(.wash(paper), title: candidate.title, spacing: BrainStyle.s, kicker: {
@@ -80,14 +91,10 @@ struct PrepStoryCandidateCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }, footer: {
-            HStack(spacing: BrainStyle.s) {
-                PrepCandidateButton(
-                    title: isDrafting ? "Drafting\u{2026}" : "Add to bench", prominent: true,
-                    accessibility: isDrafting ? "Drafting \(candidate.title)" : "Add \(candidate.title) to bench",
-                    enabled: !isDrafting && !isActing) { onAct(.add) }
-                PrepCandidateButton(
-                    title: "Not now", prominent: false, accessibility: "Not now for \(candidate.title)",
-                    enabled: !isDrafting && !isActing) { onAct(.dismiss) }
+            // Side by side when they fit; stacked at accessibility text sizes.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: BrainStyle.s) { buttons }
+                VStack(alignment: .leading, spacing: BrainStyle.s) { buttons }
             }
         })
         .accessibilityElement(children: .contain)
@@ -131,15 +138,22 @@ private struct PrepStoryRow: View {
                 title: story.title,
                 subtitle: story.last.map { "Last told \($0)" },
                 badge: story.ready ? "Ready" : nil)
-            HStack(spacing: BrainStyle.m) {
-                PrepStoryMark(kind: .time, value: story.marks.time)
-                PrepStoryMark(kind: .score, value: story.marks.score)
-                PrepStoryMark(kind: .probes, value: story.marks.probes)
+            // One line when it fits; stacked at accessibility text sizes.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: BrainStyle.m) { marks }
+                VStack(alignment: .leading, spacing: BrainStyle.xs) { marks }
             }
         }
         .padding(.vertical, BrainStyle.xs)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private var marks: some View {
+        PrepStoryMark(kind: .time, value: story.marks.time)
+        PrepStoryMark(kind: .score, value: story.marks.score)
+        PrepStoryMark(kind: .probes, value: story.marks.probes)
     }
 }
 
@@ -150,7 +164,7 @@ private struct PrepStoryMark: View {
     let value: Bool?
 
     var body: some View {
-        HStack(spacing: 3) {
+        HStack(spacing: BrainStyle.xs) {
             Text(verbatim: kind.rawValue.capitalized)
                 .font(BrainStyle.meta)
                 .foregroundStyle(Color.hxTextSecondary)

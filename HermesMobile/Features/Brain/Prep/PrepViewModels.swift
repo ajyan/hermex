@@ -39,6 +39,9 @@ final class PrepHomeViewModel {
     private(set) var candidateErrors: [String: String] = [:]
     @ObservationIgnored private let client: PrepDataClient
     @ObservationIgnored private var generation = 0
+    /// Bumped by every stories request (a load's or a verdict's refresh); only the newest may
+    /// assign `stories`, so a stale response never overwrites a newer list.
+    @ObservationIgnored private var storiesGeneration = 0
 
     @ObservationIgnored private let onAPIError: (Error) -> Void
 
@@ -51,7 +54,6 @@ final class PrepHomeViewModel {
         generation += 1
         let token = generation
         async let gapsLoad = try? await client.gaps()
-        async let storiesLoad = try? await client.stories()
         do {
             let home = try await client.home()
             var course: PrepCourse?
@@ -59,26 +61,32 @@ final class PrepHomeViewModel {
                 course = (try? await client.course()) ?? summary
             }
             let gaps = await gapsLoad
-            let stories = await storiesLoad
             guard token == generation, !Task.isCancelled else { return }
             self.gaps = gaps
-            self.stories = stories
             self.course = course
             state = .loaded(home)
         } catch {
             guard token == generation, !prepIsCancellation(error) else { return }
             onAPIError(error)
             state = prepFailureState(error)
+            return
         }
+        // Stories trail home's first paint: a slow or failed call never delays or fails it.
+        storiesGeneration += 1
+        let storiesToken = storiesGeneration
+        let loaded = try? await client.stories()
+        guard token == generation, storiesToken == storiesGeneration, !Task.isCancelled else { return }
+        stories = loaded
     }
 
     func isActing(on candidateID: String) -> Bool {
         candidatesInFlight.contains(candidateID)
     }
 
-    /// Sends a verdict on a story candidate, then refreshes the stories once (an added candidate
-    /// reads "drafting" from there; nothing polls). A dismissed card goes at once, so a failed
-    /// refresh never brings it back. A failed verdict keeps the card and records why.
+    /// Sends a verdict on a story candidate, then refreshes the stories once (nothing polls). The
+    /// card changes at once: a dismissed one goes, an added one reads "drafting", so a failed
+    /// refresh never brings back a card whose buttons would repeat the verdict. A failed verdict
+    /// keeps the card and records why.
     func act(on candidate: PrepStoryCandidate, action: PrepStoryCandidateAction) async {
         guard candidate.status == "new", !candidatesInFlight.contains(candidate.id) else { return }
         candidatesInFlight.insert(candidate.id)
@@ -92,13 +100,14 @@ final class PrepHomeViewModel {
             candidateErrors[candidate.id] = error.localizedDescription
             return
         }
-        if action == .dismiss { removeCandidate(candidate.id) }
-        if let refreshed = try? await client.stories() { stories = refreshed }
-    }
-
-    private func removeCandidate(_ id: String) {
-        guard let list = stories else { return }
-        stories = list.removingCandidate(id)
+        if let list = stories {
+            stories = action == .dismiss ? list.removingCandidate(candidate.id) : list.markingCandidateDrafting(candidate.id)
+        }
+        storiesGeneration += 1
+        let storiesToken = storiesGeneration
+        if let refreshed = try? await client.stories(), storiesToken == storiesGeneration, !Task.isCancelled {
+            stories = refreshed
+        }
     }
 }
 
