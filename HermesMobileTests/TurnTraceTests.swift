@@ -41,6 +41,7 @@ final class TurnTraceTests: XCTestCase {
         var trace = makeTrace(startedAt: Date(timeIntervalSince1970: 1_700_000_000), start: start)
         trace.reconnects = 1
         trace.backgrounded = true
+        trace.detached = true
         trace.markHeaders(at: start + .milliseconds(312))
         trace.markFirstToken(at: start + .milliseconds(2410))
         trace.markRendered(at: start + .milliseconds(2462))
@@ -60,6 +61,7 @@ final class TurnTraceTests: XCTestCase {
         XCTAssertEqual(json["outcome"] as? String, "done")
         XCTAssertEqual(json["reconnects"] as? Int, 1)
         XCTAssertEqual(json["backgrounded"] as? Bool, true)
+        XCTAssertEqual(json["detached"] as? Bool, true)
     }
 
     func testMissingMarksEncodeAsNull() throws {

@@ -60,6 +60,7 @@ final class TurnTraceFlowTests: APIClientTestCase {
         XCTAssertEqual(body["connection"] as? String, "tunnel")
         XCTAssertEqual(body["reconnects"] as? Int, 0)
         XCTAssertEqual(body["backgrounded"] as? Bool, false)
+        XCTAssertEqual(body["detached"] as? Bool, false)
         let marks = try XCTUnwrap(body["marks_ms"] as? [String: Any])
         let headers = try XCTUnwrap(marks["headers"] as? Int)
         let firstToken = try XCTUnwrap(marks["first_token"] as? Int)
@@ -121,6 +122,38 @@ final class TurnTraceFlowTests: APIClientTestCase {
         await fulfillment(of: [uploaded], timeout: 5)
 
         XCTAssertEqual(recorder.uploads.count, 1)
+        XCTAssertEqual(recorder.uploads.first?["reconnects"] as? Int, 1)
+        XCTAssertEqual(recorder.uploads.first?["outcome"] as? String, "done")
+        XCTAssertEqual(recorder.uploads.first?["detached"] as? Bool, false, "a dropped connection is not the user leaving")
+    }
+
+    /// Leaving the chat mid-turn suspends the stream; the turn finishes from the replay on return, and its
+    /// upload says so, so the gap reads as time away rather than latency.
+    @MainActor
+    func testLeavingTheChatMarksTheTurnDetached() async throws {
+        let recorder = RequestRecorder()
+        let uploaded = expectation(description: "turn uploaded")
+        recorder.onUpload = { uploaded.fulfill() }
+        let streamClient = ScriptedSSEStreamingClient(connectionScripts: [
+            [],
+            [
+                .init(.token("Alpha "), lastEventID: "stream-123:1"),
+                .init(.done(DoneStreamEvent())),
+                .init(.streamEnd)
+            ]
+        ])
+        let viewModel = try makeViewModel(streamClient: streamClient, recorder: recorder)
+
+        let didStart = await viewModel.sendMessage("Keep working")
+        XCTAssertTrue(didStart)
+        viewModel.suspendStreamForNavigation()
+        await viewModel.reconnectStreamIfNeeded()
+        XCTAssertEqual(streamClient.startedURLs.count, 2)
+        streamClient.playArmedConnectionScript()
+        await fulfillment(of: [uploaded], timeout: 5)
+
+        XCTAssertEqual(recorder.uploads.count, 1)
+        XCTAssertEqual(recorder.uploads.first?["detached"] as? Bool, true)
         XCTAssertEqual(recorder.uploads.first?["reconnects"] as? Int, 1)
         XCTAssertEqual(recorder.uploads.first?["outcome"] as? String, "done")
     }
