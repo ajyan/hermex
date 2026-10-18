@@ -322,10 +322,12 @@ struct PrepRep: Decodable, Identifiable, Hashable, Sendable {
     let item: PrepItemExcerpt
     /// A story told earlier whose probes are still open; the player resumes at `probe`.
     let pending: PrepStoryPending?
+    /// Why a gap rep is here ("From your mock"); nil on every other rep.
+    let label: String?
 
     var id: Int { index }
 
-    private enum CodingKeys: String, CodingKey { case index, block, drill, item, pending }
+    private enum CodingKeys: String, CodingKey { case index, block, drill, item, pending, label }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -334,6 +336,7 @@ struct PrepRep: Decodable, Identifiable, Hashable, Sendable {
         drill = c.optional(PrepDrill.self, .drill) ?? .unknown
         item = try c.decode(PrepItemExcerpt.self, forKey: .item)
         pending = c.optional(PrepStoryPending.self, .pending)
+        label = c.optional(String.self, .label).flatMap { $0.isEmpty ? nil : $0 }
     }
 }
 

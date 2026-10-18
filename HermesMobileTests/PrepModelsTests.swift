@@ -704,6 +704,20 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertNil(reps[1].pending)
     }
 
+    func testRepLabelDecodes() throws {
+        let json = #"""
+        {"date": "2026-10-18", "index": 0, "reps": [
+          {"index": 0, "block": "gap", "drill": "recall", "label": "From your mock", "item": {"id": "a"}},
+          {"index": 1, "block": "review", "drill": "recall", "item": {"id": "b"}},
+          {"index": 2, "block": "gap", "drill": "recall", "label": 7, "item": {"id": "c"}}]}
+        """#
+        let reps = try decode(PrepRun.self, json).reps
+        XCTAssertEqual(reps[0].block, "gap")
+        XCTAssertEqual(reps[0].label, "From your mock")
+        XCTAssertNil(reps[1].label)
+        XCTAssertNil(reps[2].label)
+    }
+
     func testDecodesStoryAttemptResultWithProbe() throws {
         let json = #"""
         {"verdict": "pass", "correct": null, "feedback": "", "credit": 1.0, "reference_md": null, "links": {},

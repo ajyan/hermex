@@ -450,6 +450,10 @@ struct PrepRunView: View {
             }
         case .lesson where Self.usesRecall(rep), .recall where Self.usesRecall(rep):
             if let lesson = rep.item.lesson, let recall = lesson.recall {
+                if let label = rep.label {
+                    HXChip(paper: .knowledge, symbol: "arrow.uturn.backward", label: label)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 if viewModel.lessonStage == .reading {
                     PrepRunCard { PrepLessonBody(lesson: lesson) }
                         .transition(.opacity)
