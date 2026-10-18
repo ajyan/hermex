@@ -180,7 +180,8 @@ struct PrepStoryCandidate: Decodable, Identifiable, Hashable, Sendable {
     let forPrompt: String?
     let why: String?
     let verdict: String?
-    /// "new" waits for a verdict; "drafting" is being written into a story.
+    /// "new" waits for a verdict; "drafting" is being written into a story; "dismissed" was set
+    /// aside with Not now and can still be added.
     let status: String
     /// Why the last draft failed, when it did; the candidate is back to "new".
     let error: String?
@@ -204,6 +205,14 @@ struct PrepStoryCandidate: Decodable, Identifiable, Hashable, Sendable {
     /// The same candidate once the server has taken it to draft.
     var drafting: PrepStoryCandidate { PrepStoryCandidate(copying: self, status: "drafting") }
 
+    /// The same candidate once set aside with Not now.
+    var dismissed: PrepStoryCandidate { PrepStoryCandidate(copying: self, status: "dismissed") }
+
+    /// Whether `action` can be taken on it: a verdict on a new candidate, or adding a dismissed one.
+    func allows(_ action: PrepStoryCandidateAction) -> Bool {
+        status == "new" || (status == "dismissed" && action == .add)
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.requiredID(.id)
@@ -223,30 +232,38 @@ struct PrepStoryList: Decodable, Hashable, Sendable {
     let readyCount: Int
     let activeTotal: Int
     let candidates: [PrepStoryCandidate]
+    /// Candidates set aside with Not now, still addable; empty from a server that doesn't list them.
+    let dismissed: [PrepStoryCandidate]
 
     private enum CodingKeys: String, CodingKey {
-        case stories, candidates
+        case stories, candidates, dismissed
         case readyCount = "ready_count"
         case activeTotal = "active_total"
     }
 
-    private init(stories: [PrepStorySummary], readyCount: Int, activeTotal: Int, candidates: [PrepStoryCandidate]) {
+    private init(stories: [PrepStorySummary], readyCount: Int, activeTotal: Int, candidates: [PrepStoryCandidate],
+                 dismissed: [PrepStoryCandidate]) {
         self.stories = stories
         self.readyCount = readyCount
         self.activeTotal = activeTotal
         self.candidates = candidates
+        self.dismissed = dismissed
     }
 
-    /// The list with one candidate marked drafting, for a card just added.
+    /// The list with one candidate marked drafting, for a card just added; a dismissed one comes
+    /// back to the cards.
     func markingCandidateDrafting(_ id: String) -> PrepStoryList {
-        PrepStoryList(stories: stories, readyCount: readyCount, activeTotal: activeTotal,
-                      candidates: candidates.map { $0.id == id ? $0.drafting : $0 })
+        let revived = dismissed.filter { $0.id == id }.map(\.drafting)
+        return PrepStoryList(stories: stories, readyCount: readyCount, activeTotal: activeTotal,
+                             candidates: candidates.map { $0.id == id ? $0.drafting : $0 } + revived,
+                             dismissed: dismissed.filter { $0.id != id })
     }
 
-    /// The list without one candidate, for a dismissed card.
-    func removingCandidate(_ id: String) -> PrepStoryList {
+    /// The list with one candidate moved from the cards to the dismissed, for Not now.
+    func dismissingCandidate(_ id: String) -> PrepStoryList {
         PrepStoryList(stories: stories, readyCount: readyCount, activeTotal: activeTotal,
-                      candidates: candidates.filter { $0.id != id })
+                      candidates: candidates.filter { $0.id != id },
+                      dismissed: dismissed + candidates.filter { $0.id == id }.map(\.dismissed))
     }
 
     init(from decoder: Decoder) throws {
@@ -255,6 +272,7 @@ struct PrepStoryList: Decodable, Hashable, Sendable {
         readyCount = c.int(.readyCount)
         activeTotal = c.int(.activeTotal)
         candidates = c.lossy(PrepStoryCandidate.self, .candidates)
+        dismissed = c.lossy(PrepStoryCandidate.self, .dismissed)
     }
 
     /// The stories being drilled.

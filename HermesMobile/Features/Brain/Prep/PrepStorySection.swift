@@ -2,14 +2,17 @@ import SwiftUI
 
 /// The behavioral stories on Prep home: each active story with its three readiness marks (told
 /// in time, scored 4 or better, probes held), tapping a row to drill that story on its own, then
-/// the bench stories under a Bench label, drillable the same way (spec §3.1). Hidden by the home
-/// when the server has no stories.
+/// the bench stories under a Bench label, drillable the same way (spec §3.1), and last a
+/// Dismissed (N) row that reveals the candidates set aside with Not now, each with Add to bench.
+/// Hidden by the home when the server has no stories or candidates.
 struct PrepStorySection: View {
     let list: PrepStoryList
     /// Candidate ids with a verdict in flight, and why the last verdict on one failed.
     var inFlight: Set<String> = []
     var errors: [String: String] = [:]
     var onAct: (PrepStoryCandidate, PrepStoryCandidateAction) -> Void = { _, _ in }
+
+    @State private var showsDismissed = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
@@ -45,11 +48,48 @@ struct PrepStorySection: View {
                     }
                 }
             }
+            if !list.dismissed.isEmpty {
+                dismissedCard
+            }
         }
     }
 }
 
 private extension PrepStorySection {
+    /// "Dismissed (N)", tapping to show or hide the set-aside candidates.
+    var dismissedCard: some View {
+        SectionCard {
+            VStack(spacing: 0) {
+                Button {
+                    showsDismissed.toggle()
+                } label: {
+                    HStack {
+                        Text(verbatim: "Dismissed (\(list.dismissed.count))")
+                            .font(BrainStyle.meta.weight(.semibold))
+                            .foregroundStyle(Color.hxTextSecondary)
+                        Spacer(minLength: BrainStyle.s)
+                        Image(systemName: showsDismissed ? "chevron.up" : "chevron.down")
+                            .font(BrainStyle.meta)
+                            .foregroundStyle(Color.hxTextSecondary)
+                    }
+                    .frame(minHeight: BrainStyle.minTapTarget)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(verbatim: "Dismissed stories, \(list.dismissed.count)"))
+                .accessibilityValue(Text(verbatim: showsDismissed ? "Shown" : "Hidden"))
+                if showsDismissed {
+                    ForEach(list.dismissed) { candidate in
+                        PrepRowDivider()
+                        PrepDismissedCandidateRow(
+                            candidate: candidate, isActing: inFlight.contains(candidate.id),
+                            failure: errors[candidate.id], onAdd: { onAct(candidate, .add) })
+                    }
+                }
+            }
+        }
+    }
+
     /// One row per story, each drilling that story on its own.
     func rows(_ stories: [PrepStorySummary]) -> some View {
         ForEach(Array(stories.enumerated()), id: \.element.id) { offset, story in
@@ -116,6 +156,45 @@ struct PrepStoryCandidateCard: View {
             }
         })
         .accessibilityElement(children: .contain)
+    }
+}
+
+/// A candidate set aside with Not now: its title, the prompt it would answer, and Add to bench.
+private struct PrepDismissedCandidateRow: View {
+    let candidate: PrepStoryCandidate
+    let isActing: Bool
+    let failure: String?
+    let onAdd: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BrainStyle.xs) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: BrainStyle.m) {
+                    BrainRow(title: candidate.title, subtitle: subtitle)
+                    button
+                }
+                VStack(alignment: .leading, spacing: BrainStyle.s) {
+                    BrainRow(title: candidate.title, subtitle: subtitle)
+                    button
+                }
+            }
+            if let failure, !failure.isEmpty {
+                Text(verbatim: failure)
+                    .font(BrainStyle.meta)
+                    .foregroundStyle(Color.hxDanger)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.vertical, BrainStyle.xs)
+        .accessibilityElement(children: .contain)
+    }
+
+    private var subtitle: String? { candidate.forPrompt.flatMap { $0.isEmpty ? nil : "For: \($0)" } }
+
+    private var button: some View {
+        PrepCandidateButton(
+            title: "Add to bench", prominent: true, accessibility: "Add \(candidate.title) to bench",
+            enabled: !isActing) { onAdd() }
     }
 }
 
