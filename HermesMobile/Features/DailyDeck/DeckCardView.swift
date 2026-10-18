@@ -251,6 +251,20 @@ private struct DeckCardView: View {
             }
         }
         .padding(.top, 18)
+        if !card.tags.isEmpty {
+            let tapped = viewModel.answer(for: card)?.tags ?? []
+            Text(verbatim: "Anything that played a part?")
+                .font(AppFont.subheadline(weight: .semibold))
+                .padding(.top, 20)
+            FlowRow(spacing: 8) {
+                ForEach(card.tags) { tag in
+                    ChoiceButton(title: tag.label, isSelected: tapped.contains(tag.id)) {
+                        viewModel.toggleTag(tag.id, for: card)
+                    }
+                }
+            }
+            .padding(.top, 10)
+        }
         if let numbers = card.sleep {
             if rating != nil || showsNumbers {
                 SleepNumbers(sleep: numbers, palette: palette) { showsSleepHistory = true }
@@ -404,12 +418,22 @@ private struct SleepNumbers: View {
                     .font(AppFont.display(style: .title3, weight: .semibold))
                     .fixedSize(horizontal: false, vertical: true)
             }
+            if let insight = sleep.insight {
+                Text(verbatim: insight)
+                    .font(AppFont.body(weight: .semibold))
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 8)
+            }
             ForEach(Array(sleep.lines.enumerated()), id: \.offset) { _, line in
                 Text(verbatim: line)
                     .font(AppFont.body())
                     .foregroundStyle(Color.hxTextPrimary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 6)
+            }
+            if !sleep.parts.isEmpty {
+                SleepParts(parts: sleep.parts, palette: palette).padding(.top, 18)
             }
             if sleep.nights.contains(where: { $0.hours != nil }) {
                 SleepStrip(nights: sleep.nights, palette: palette).padding(.top, 20)
@@ -424,6 +448,40 @@ private struct SleepNumbers: View {
             .padding(.top, 12)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Last night's parts in a grid: each label in the card's ink, its value, and how it compares
+/// with the 30-night average.
+private struct SleepParts: View {
+    let parts: [DeckSleepPart]
+    let palette: DeckPalette
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .topLeading),
+                                 count: dynamicTypeSize.isAccessibilitySize ? 2 : 3),
+                  alignment: .leading, spacing: 12) {
+            ForEach(parts, id: \.label) { part in
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(verbatim: part.label)
+                        .font(AppFont.caption(weight: .semibold))
+                        .foregroundStyle(palette.ink)
+                    Text(verbatim: part.value)
+                        .font(AppFont.display(style: .headline, weight: .semibold))
+                        .foregroundStyle(Color.hxTextPrimary)
+                    if let vs = part.vs {
+                        Text(verbatim: vs)
+                            .font(AppFont.caption2())
+                            .foregroundStyle(Color.hxTextPrimary)
+                    }
+                }
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .accessibilityElement(children: .combine)
+            }
+        }
     }
 }
 
