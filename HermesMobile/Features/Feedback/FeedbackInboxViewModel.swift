@@ -12,7 +12,7 @@ final class FeedbackInboxViewModel {
     }
 
     /// Section order on screen.
-    static let groupOrder: [FeedbackGroup] = [.needsReview, .inProgress, .done]
+    static let groupOrder: [FeedbackGroup] = [.toApprove, .toMerge, .toRetry, .inProgress, .done]
 
     private(set) var state: BrainLoadState<[FeedbackGroup: [FeedbackEntry]]> = .loading
     /// The last decision's failure, shown until `clearError()`.
@@ -152,7 +152,9 @@ extension FeedbackGroup {
     /// The inbox section header.
     var title: String {
         switch self {
-        case .needsReview: "Needs you"
+        case .toApprove: "Approve to build tonight"
+        case .toMerge: "Ready to merge"
+        case .toRetry: "Needs a retry"
         case .inProgress: "In progress"
         case .done: "Done"
         }
@@ -166,23 +168,23 @@ extension FeedbackStatus {
         self == .planned || self == .ready || self == .failed
     }
 
-    /// Whether Reject is offered (in the detail's menu): for every status with decisions, and
-    /// for a note still waiting for tonight.
+    /// Whether Drop (a `reject` decision) is offered in the detail's action bar: for every
+    /// status with decisions, and for a note still waiting for tonight.
     var canReject: Bool { hasDecisions || self == .new }
 
     /// Whether Undo is offered: a fix the nightly job shipped.
     var canUndo: Bool { self == .shipped }
 
-    /// Whether the detail shows its action bar: the decisions, Undo on a shipped fix, or
-    /// Redo plan on an undone one.
-    var hasActions: Bool { hasDecisions || self == .shipped || self == .reverted }
+    /// Whether the detail shows its action bar: the decisions, Drop on a new note, Undo on a
+    /// shipped fix, or Redo plan on an undone one.
+    var hasActions: Bool { canReject || self == .shipped || self == .reverted }
 
-    /// The Reject confirmation's title and message.
+    /// The Drop confirmation's title and message.
     var rejectConfirmation: (title: String, message: String) {
         switch self {
-        case .ready: ("Reject this branch?", "It moves to Done. The branch stays on your Mac until you delete it.")
-        case .new: ("Reject this note?", "It moves to Done and won't be planned.")
-        default: ("Reject this plan?", "It moves to Done and won't be built.")
+        case .ready: ("Drop this branch?", "It moves to Done. The branch stays on your Mac until you delete it.")
+        case .new: ("Drop this note?", "It moves to Done and won't be planned.")
+        default: ("Drop this?", "It moves to Done and won't be built.")
         }
     }
 
@@ -202,17 +204,52 @@ extension FeedbackEntry {
         return firstLine ?? "Untitled"
     }
 
-    /// What a Needs you card asks of the user, as its chip: questions to answer, a plan to
-    /// approve, a branch to merge, or a failure to retry.
-    var needsYouChip: (symbol: String, label: String) {
+    /// The one-line result a request card shows: the plan's `after`, else its summary.
+    var outcome: String? {
+        [after, summary].compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }.first { !$0.isEmpty }
+    }
+
+    /// The button on a request card. A plan with questions opens to answer them first, so
+    /// nothing gets built on answers the user never saw; a branch opens to its checks.
+    enum QuickAction: Equatable {
+        case build, answer, review, retry
+    }
+
+    var quickAction: QuickAction? {
         switch status {
-        case .ready: ("arrow.triangle.branch", "Branch ready")
-        case .failed: ("exclamationmark.triangle", "Failed")
-        default:
-            questionCount > 0
-                ? ("questionmark.circle", questionCount == 1 ? "1 question" : "\(questionCount) questions")
-                : ("checkmark", "Ready to approve")
+        case .planned: questionCount > 0 ? .answer : .build
+        case .ready: .review
+        case .failed: .retry
+        default: nil
         }
+    }
+
+    /// A failure's first line, for its card.
+    var errorLine: String {
+        error?.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .first { !$0.isEmpty } ?? "Failed"
+    }
+
+    /// The change's size in a word.
+    var sizeWord: String? {
+        switch size {
+        case "S": "Small"
+        case "M": "Medium"
+        case "L": "Large"
+        default: nil
+        }
+    }
+
+    /// Where the change lands and how big it is, e.g. "second-brain · Small".
+    var placeLine: String? {
+        let parts = [planRepo ?? repo, sizeWord].compactMap { $0 }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// How many of the build's checks passed, couldn't be checked, or failed.
+    func checkCount(_ state: FeedbackCheck.State) -> Int {
+        checks.lazy.filter { $0.state == state }.count
     }
 
     /// An In progress row's status in one word.

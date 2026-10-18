@@ -84,10 +84,14 @@ struct ChatShellView: View {
     @State private var brainRouteOpener = OpenBrainRouteAction()
     /// Lets pushed screens (a Week ahead card's Edit in chat) start a new chat with a draft.
     @State private var draftChatOpener = OpenDraftChatAction()
+    /// Lets Prep's mock brief open a voice mock: a new interviewer chat already in a call.
+    @State private var mockCallOpener = OpenMockCallAction()
     /// Where cards and chips that push a screen meet the screen they zoom into.
     @Namespace private var zoomNamespace
     /// Whether this server takes feedback; rechecked on return until yes, gone with the shell on a server switch.
     @State private var feedbackAvailability: FeedbackAvailability
+    /// Today's Daily Ask, one per server: the Prep gate and the Brain tile read it.
+    @State private var dailyAsk: DailyAskModel
     /// The drawer is built on first open and kept alive, so it keeps its scroll position.
     @State private var hasOpenedDrawer = false
     /// False while ChatView pushes its own screens (Files, forks), which the typed path cannot see.
@@ -165,6 +169,8 @@ struct ChatShellView: View {
         _feedbackAvailability = State(initialValue: FeedbackAvailability(
             client: APIClientFeedbackAdapter(apiClient: APIClient(baseURL: server)),
             labels: APIClientLabelsAdapter(apiClient: APIClient(baseURL: server))))
+        _dailyAsk = State(initialValue: DailyAskModel(
+            client: APIClientDailyAskAdapter(apiClient: APIClient(baseURL: server))))
         _showsCliSessions = AppStorage(
             wrappedValue: SessionRowDisplaySettings.showsCliSessions(for: server),
             SessionRowDisplaySettings.showCliSessionsKey(for: server)
@@ -178,10 +184,15 @@ struct ChatShellView: View {
     var body: some View {
         routedNavigationContainer
             .environment(feedbackAvailability)
+            .environment(dailyAsk)
             .task { await feedbackAvailability.check() }
+            .task { await recoverMockProfileIfNeeded() }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background {
                     wasBackgrounded = true
+                }
+                if phase == .active {
+                    Task { await recoverMockProfileIfNeeded() }
                 }
                 if phase == .active, wasBackgrounded {
                     wasBackgrounded = false
@@ -508,6 +519,7 @@ struct ChatShellView: View {
     private var mainStack: some View {
         brainRouteOpener.handler = { navigation.path.append(.brainRoute($0)) }
         draftChatOpener.handler = { selectDestination(PendingNewChatRoute(initialDraft: $0)) }
+        mockCallOpener.handler = { try await openMockCall($0) }
         brainRouteOpener.homeHandler = { navigation.showBrainHome() }
         return NavigationStack(path: $navigation.path) {
             rootView
@@ -528,6 +540,7 @@ struct ChatShellView: View {
         // Pushed screens (the Daily Brief's open cards) open Brain pages too.
         .environment(\.openBrainRoute, brainRouteOpener)
         .environment(\.openDraftChat, draftChatOpener)
+        .environment(\.openMockCall, mockCallOpener)
         // A new root also drops screens ChatView pushed outside the typed path.
         .id(navigation.rootRevision)
         .background(Color.hxCanvas.ignoresSafeArea())
@@ -556,6 +569,10 @@ struct ChatShellView: View {
                 profileName: route.profileName,
                 projectID: route.projectID,
                 startsCall: route.startsCall,
+                openingTurn: route.openingTurn,
+                mockID: route.mockID,
+                onMockCallProgress: { mockInFlight.save($0) },
+                onMockCallEnded: finishMockCall,
                 callRequest: callRequest,
                 server: server,
                 viewModel: viewModel,
@@ -724,25 +741,55 @@ struct ChatShellView: View {
             BrainSearchView(module: module, query: query, server: server, onAPIError: authManager.handleAPIError)
                 .adaptiveSecondaryNavigationTitle()
         case .prep(.home):
-            PrepHomeView(server: server, onAPIError: authManager.handleAPIError)
-                .adaptiveSecondaryNavigationTitle()
+            PrepGate {
+                PrepHomeView(server: server, onAPIError: authManager.handleAPIError)
+                    .adaptiveSecondaryNavigationTitle()
+            }
         case .prep(.track(let track)):
-            PrepTrackView(track: track, server: server, onAPIError: authManager.handleAPIError)
-                .adaptiveSecondaryNavigationTitle()
+            PrepGate {
+                PrepTrackView(track: track, server: server, onAPIError: authManager.handleAPIError)
+                    .adaptiveSecondaryNavigationTitle()
+            }
         case .prep(.run):
-            PrepRunView(server: server, onAPIError: authManager.handleAPIError)
+            PrepGate {
+                PrepRunView(server: server, onAPIError: authManager.handleAPIError)
+            }
         case .prep(.gap(let id)):
-            PrepGapView(id: id, server: server, onAPIError: authManager.handleAPIError)
-                .adaptiveSecondaryNavigationTitle()
+            PrepGate {
+                PrepGapView(id: id, server: server, onAPIError: authManager.handleAPIError)
+                    .adaptiveSecondaryNavigationTitle()
+            }
         case .prep(.lesson(let id)):
-            PrepLessonView(id: id, server: server, onAPIError: authManager.handleAPIError)
-                .adaptiveSecondaryNavigationTitle()
+            PrepGate {
+                PrepLessonView(id: id, server: server, onAPIError: authManager.handleAPIError)
+                    .adaptiveSecondaryNavigationTitle()
+            }
         case .prep(.testout(let unit)):
-            PrepRunView(server: server, run: .testout, unit: unit, onAPIError: authManager.handleAPIError)
+            PrepGate {
+                PrepRunView(server: server, run: .testout, unit: unit, onAPIError: authManager.handleAPIError)
+            }
         case .prep(.mock):
-            PrepRunView(server: server, run: .mock, onAPIError: authManager.handleAPIError)
+            PrepGate {
+                PrepRunView(server: server, run: .mock, onAPIError: authManager.handleAPIError)
+            }
         case .prep(.bonus):
-            PrepRunView(server: server, run: .bonus, onAPIError: authManager.handleAPIError)
+            PrepGate {
+                PrepRunView(server: server, run: .bonus, onAPIError: authManager.handleAPIError)
+            }
+        case .prep(.story(let id)):
+            PrepGate {
+                PrepRunView(server: server, run: .story, unit: id, onAPIError: authManager.handleAPIError)
+            }
+        case .prep(.mockLadder(let kind)):
+            PrepGate {
+                PrepMockBriefView(kind: kind, server: server, onAPIError: authManager.handleAPIError)
+                    .adaptiveSecondaryNavigationTitle()
+            }
+        case .prep(.mockResult(let id, let unsent)):
+            PrepGate {
+                PrepMockResultView(mockID: id, unsent: unsent, server: server, onAPIError: authManager.handleAPIError)
+                    .adaptiveSecondaryNavigationTitle()
+            }
         }
     }
 
@@ -1425,6 +1472,78 @@ struct ChatShellView: View {
         selectDestination(PendingNewChatRoute(profileName: route.profileName, projectID: route.projectID, startsCall: true))
     }
 
+    /// The voice mock profile switch on this server, with its saved way back.
+    private var mockProfile: PrepMockProfile {
+        PrepMockProfile(client: APIClient(baseURL: server),
+                        store: PrepMockReturnStore(serverID: authManager.activeServerID ?? server.absoluteString))
+    }
+
+    /// The voice mock under way on this server, kept until its grade is sent.
+    private var mockInFlight: PrepMockInFlightStore {
+        PrepMockInFlightStore(serverID: authManager.activeServerID ?? server.absoluteString)
+    }
+
+    /// A voice mock (`PrepMockCallOpener`): the interviewer profile goes active first, so the opening
+    /// turn (sent as soon as the call connects) reaches the server under it, and only then is the mock
+    /// started; a new chat in that profile opens straight into the call. A failed switch throws to the
+    /// brief, which shows why, and starts and opens nothing. An earlier mock still waiting to send its
+    /// grade sends it first, before the new mock takes its place.
+    private func openMockCall(_ start: @escaping OpenMockCallAction.Start) async throws {
+        let profile = mockProfile
+        let inFlight = mockInFlight
+        let client = APIClientPrepAdapter(apiClient: APIClient(baseURL: server))
+        await inFlight.recover { try await $0.post(to: client) }
+        let fallback = viewModel.activeProfileName
+        let opener = PrepMockCallOpener(
+            enter: { try await profile.enter($0, fallback: fallback) },
+            leave: { _ = await profile.leave() },
+            remember: { inFlight.save($0) },
+            openChat: { mock in
+                selectDestination(PendingNewChatRoute(
+                    profileName: mock.profile,
+                    startsCall: true,
+                    openingTurn: mock.brief,
+                    mockID: mock.mockID
+                ))
+            }
+        )
+        try await opener.open(start)
+    }
+
+    /// The voice mock's call ended: `PrepMockCallFinisher` switches back, asks for the grade, and
+    /// swaps the mock's chat for Prep with the result on top.
+    private func finishMockCall(_ end: MockCallEnd) {
+        let revision = navigation.rootRevision
+        let apiClient = APIClient(baseURL: server)
+        let profile = mockProfile
+        let inFlight = mockInFlight
+        let finisher = PrepMockCallFinisher(
+            leave: { await profile.leave() },
+            postGrade: { try await $0.post(to: APIClientPrepAdapter(apiClient: apiClient)) },
+            isStillOnMockChat: { navigation.rootRevision == revision },
+            replaceRoot: { selectDestination(PendingNewChatRoute()) },
+            show: { routes in navigation.path = routes.map { .brainRoute(.prep($0)) } },
+            push: { navigation.push(.brainRoute(.prep($0))) },
+            forget: { inFlight.clear(mockID: $0) }
+        )
+        Task { await finisher.finish(end) }
+    }
+
+    /// A voice mock cut short (the app was killed mid-call, or the switch back or the grade failed):
+    /// on launch and on each return to the foreground, unless a mock's chat is still open, send the
+    /// grade it never got, then switch back. The drawer's profile is reloaded, and a bare new chat
+    /// (one that carries nothing) is replaced so it isn't left in the interviewer profile. A new chat
+    /// carrying a draft, attachments, a profile, a project or a call stays: the cookie is already back.
+    private func recoverMockProfileIfNeeded() async {
+        guard !navigation.isOnMockChat else { return }
+        let client = APIClientPrepAdapter(apiClient: APIClient(baseURL: server))
+        await mockInFlight.recover { try await $0.post(to: client) }
+        let profile = mockProfile
+        guard profile.store.profile != nil, !navigation.isOnMockChat, await profile.leave() else { return }
+        await viewModel.loadActiveProfile()
+        if navigation.isOnBareNewChat { selectDestination(PendingNewChatRoute()) }
+    }
+
     private func selectSession(_ session: SessionSummary) {
         selectDestination(session)
     }
@@ -1630,6 +1749,10 @@ struct PendingNewChatRoute: Identifiable, Hashable {
     let projectID: String?
     /// When true, the new chat opens straight into a voice call.
     let startsCall: Bool
+    /// Sent as the call's first turn (a voice mock's brief), so the other side speaks first.
+    let openingTurn: String?
+    /// The voice mock this call is, graded once the call ends.
+    let mockID: String?
 
     init(
         initialDraft: String = "",
@@ -1637,7 +1760,9 @@ struct PendingNewChatRoute: Identifiable, Hashable {
         autoStartsVoiceInput: Bool = false,
         profileName: String? = nil,
         projectID: String? = nil,
-        startsCall: Bool = false
+        startsCall: Bool = false,
+        openingTurn: String? = nil,
+        mockID: String? = nil
     ) {
         self.initialDraft = initialDraft
         self.initialAttachments = initialAttachments
@@ -1645,6 +1770,8 @@ struct PendingNewChatRoute: Identifiable, Hashable {
         self.profileName = profileName
         self.projectID = projectID
         self.startsCall = startsCall
+        self.openingTurn = openingTurn
+        self.mockID = mockID
     }
 
     static func == (lhs: PendingNewChatRoute, rhs: PendingNewChatRoute) -> Bool {
@@ -1653,6 +1780,12 @@ struct PendingNewChatRoute: Identifiable, Hashable {
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
+    }
+
+    /// True when the route asks for nothing beyond a plain new chat.
+    var carriesNothing: Bool {
+        initialDraft.isEmpty && initialAttachments.isEmpty && !autoStartsVoiceInput && profileName == nil
+            && projectID == nil && !startsCall && openingTurn == nil && mockID == nil
     }
 }
 

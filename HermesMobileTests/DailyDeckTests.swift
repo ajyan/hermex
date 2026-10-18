@@ -57,6 +57,20 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(DeckPalette.of(card).name, "Goals")
     }
 
+    func testAskCardDecodes() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"2026-10-19","kind":"morning","cards":[
+          {"id":"ask","type":"ask","title":"Today's Ask","reason":"From your job search",
+           "fallback":"Apply: Harvey — Applied AI Engineer · Ramp — Applied AI Engineer"}]}
+        """#)
+        let card = deck.cards[0]
+        XCTAssertEqual(card.type, .ask)
+        XCTAssertEqual(card.fallback, "Apply: Harvey — Applied AI Engineer · Ramp — Applied AI Engineer")
+        XCTAssertFalse(card.takesText)
+        XCTAssertFalse(card.takesFeedback)
+        XCTAssertEqual(DeckPalette.of(card).name, "Today's Ask")
+    }
+
     func testWeekAheadCardDecodesItsCommitmentsAndLastWeek() throws {
         let deck = try DailyDeck.decode(#"""
         {"date":"2026-10-18","kind":"weekly","cards":[

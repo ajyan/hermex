@@ -61,6 +61,19 @@ struct ShellNavigationState: Equatable {
         return !newChatHasStarted
     }
 
+    /// The root is an untouched new chat that carries nothing (no draft, attachments, profile,
+    /// project or call) and nothing is pushed over it, so swapping it for a fresh one loses nothing.
+    var isOnBareNewChat: Bool {
+        guard isOnEmptyNewChat, path.isEmpty, case .newChat(let route) = root else { return false }
+        return route.carriesNothing
+    }
+
+    /// The root is a voice mock's chat, whose call may still be live.
+    var isOnMockChat: Bool {
+        guard case .newChat(let route) = root else { return false }
+        return route.mockID != nil
+    }
+
     mutating func select(_ session: SessionSummary) {
         setRoot(.session(session))
     }

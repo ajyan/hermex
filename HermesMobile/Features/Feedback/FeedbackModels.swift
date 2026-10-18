@@ -10,8 +10,9 @@ enum FeedbackDecoding {
     }
 }
 
+/// Inbox sections. The first three are named by the decision they wait on.
 enum FeedbackGroup: Hashable, Sendable {
-    case needsReview, inProgress, done
+    case toApprove, toMerge, toRetry, inProgress, done
 }
 
 enum FeedbackStatus: String, Hashable, Sendable {
@@ -46,7 +47,9 @@ enum FeedbackStatus: String, Hashable, Sendable {
 
     var group: FeedbackGroup {
         switch self {
-        case .planned, .ready, .failed: .needsReview
+        case .planned: .toApprove
+        case .ready: .toMerge
+        case .failed: .toRetry
         case .new, .planning, .approved, .building, .unknown: .inProgress
         case .merged, .rejected, .shipped, .reverted: .done
         }
@@ -87,6 +90,37 @@ struct FeedbackAttachment: Decodable, Hashable, Sendable {
     }
 }
 
+/// One line of a build's checklist: what the build verified (`ok`), couldn't check (`warn`)
+/// or saw fail (`fail`). The server reads them from the report's `CHECK` lines, or for an
+/// older report from its eval and `TESTS:` lines.
+struct FeedbackCheck: Decodable, Hashable, Sendable {
+    enum State: String, Sendable {
+        case ok, warn, fail, unknown
+    }
+
+    let state: State
+    let text: String
+
+    private enum CodingKeys: String, CodingKey { case state, text }
+
+    init(state: State, text: String) {
+        self.state = state
+        self.text = text
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        text = try c.decode(String.self, forKey: .text)
+        state = (try? c.decodeIfPresent(String.self, forKey: .state)).flatMap(State.init(rawValue:)) ?? .unknown
+    }
+}
+
+/// A commit the build made on its branch: the short sha and its title.
+struct FeedbackCommit: Decodable, Hashable, Sendable {
+    let sha: String
+    let title: String
+}
+
 struct FeedbackEntry: Decodable, Identifiable, Hashable, Sendable {
     let id: String
     let ts: String?
@@ -116,6 +150,14 @@ struct FeedbackEntry: Decodable, Identifiable, Hashable, Sendable {
     let evidence: String?
     /// The merge commit of a shipped fix; on an undone one, its revert commit.
     let mergeSha: String?
+    /// The plan's one-line "what you see today" and "what you'll see after"; nil on older plans.
+    let now: String?
+    let after: String?
+    /// The main files the plan will change.
+    let files: [String]
+    /// The build's checklist and commits, once there is a build report.
+    let checks: [FeedbackCheck]
+    let commits: [FeedbackCommit]
 
     /// Whether the nightly job folded this entry into another entry's plan.
     var isMerged: Bool { status == .rejected && mergedInto != nil }
@@ -128,6 +170,7 @@ struct FeedbackEntry: Decodable, Identifiable, Hashable, Sendable {
         case questionCount = "question_count"
         case recurred, evidence
         case mergeSha = "merge_sha"
+        case now, after, files, checks, commits
     }
 
     init(from decoder: Decoder) throws {
@@ -157,6 +200,11 @@ struct FeedbackEntry: Decodable, Identifiable, Hashable, Sendable {
         recurred = try? c.decodeIfPresent(Int.self, forKey: .recurred)
         evidence = str(.evidence)
         mergeSha = str(.mergeSha)
+        now = str(.now).flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
+        after = str(.after).flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
+        files = ((try? c.decodeIfPresent([FeedbackLossy<String>].self, forKey: .files)) ?? []).compactMap(\.value)
+        checks = ((try? c.decodeIfPresent([FeedbackLossy<FeedbackCheck>].self, forKey: .checks)) ?? []).compactMap(\.value)
+        commits = ((try? c.decodeIfPresent([FeedbackLossy<FeedbackCommit>].self, forKey: .commits)) ?? []).compactMap(\.value)
     }
 }
 

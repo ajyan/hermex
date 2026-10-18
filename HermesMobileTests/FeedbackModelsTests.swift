@@ -25,6 +25,37 @@ final class FeedbackModelsTests: XCTestCase {
         XCTAssertTrue(bare.notes.isEmpty)
     }
 
+    func testDecodesPlanOutcomeAndBuildChecks() throws {
+        let e = try decode(FeedbackEntry.self, #"""
+        {"id": "f1", "status": "ready", "now": "One line", "after": "", "files": ["a.py", 3, "b.py"],
+         "checks": [{"state": "ok", "text": "Tests pass"}, {"state": "maybe", "text": "Odd"}, {"state": "warn"}],
+         "commits": [{"sha": "abc1234", "title": "fix: x"}, {"sha": 1}]}
+        """#)
+        XCTAssertEqual(e.now, "One line")
+        XCTAssertNil(e.after, "a blank line is no line")
+        XCTAssertEqual(e.files, ["a.py", "b.py"])
+        XCTAssertEqual(e.checks, [FeedbackCheck(state: .ok, text: "Tests pass"), FeedbackCheck(state: .unknown, text: "Odd")])
+        XCTAssertEqual(e.commits, [FeedbackCommit(sha: "abc1234", title: "fix: x")])
+
+        let old = try decode(FeedbackEntry.self, #"{"id": "f2"}"#)
+        XCTAssertNil(old.now)
+        XCTAssertTrue(old.files.isEmpty && old.checks.isEmpty && old.commits.isEmpty)
+    }
+
+    func testStageFollowsStatus() throws {
+        func stage(_ json: String) throws -> FeedbackStage? {
+            FeedbackStage(entry: try decode(FeedbackEntry.self, json))
+        }
+        XCTAssertEqual(try stage(#"{"status": "planning"}"#), FeedbackStage(index: 1, mark: .working))
+        XCTAssertEqual(try stage(#"{"status": "planned"}"#), FeedbackStage(index: 1, mark: .waiting))
+        XCTAssertEqual(try stage(#"{"status": "building"}"#), FeedbackStage(index: 2, mark: .working))
+        XCTAssertEqual(try stage(#"{"status": "ready"}"#), FeedbackStage(index: 3, mark: .waiting))
+        XCTAssertEqual(try stage(#"{"status": "merged"}"#), FeedbackStage(index: 3, mark: .finished))
+        XCTAssertEqual(try stage(#"{"status": "failed"}"#), FeedbackStage(index: 1, mark: .failed))
+        XCTAssertEqual(try stage(#"{"status": "failed", "summary": "Planned"}"#), FeedbackStage(index: 2, mark: .failed))
+        XCTAssertNil(try stage(#"{"status": "rejected"}"#))
+    }
+
     func testUnknownStatus() throws {
         let e = try decode(FeedbackEntry.self, #"{"id": "f1", "status": "teleporting"}"#)
         XCTAssertEqual(e.status, .unknown)
@@ -35,11 +66,11 @@ final class FeedbackModelsTests: XCTestCase {
         let expected: [(FeedbackStatus, String, FeedbackGroup)] = [
             (.new, "Waiting for tonight", .inProgress),
             (.planning, "Planning", .inProgress),
-            (.planned, "Plan ready", .needsReview),
+            (.planned, "Plan ready", .toApprove),
             (.approved, "Approved", .inProgress),
             (.building, "Building", .inProgress),
-            (.ready, "Branch ready", .needsReview),
-            (.failed, "Failed", .needsReview),
+            (.ready, "Branch ready", .toMerge),
+            (.failed, "Failed", .toRetry),
             (.rejected, "Rejected", .done),
             (.merged, "Merged", .done),
             (.shipped, "Shipped", .done),

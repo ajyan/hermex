@@ -213,7 +213,106 @@ final class VoiceCallControllerTests: XCTestCase {
         update(text: "First sentence. Second")
     }
 
+    /// A controller wired to the same fakes, with an opening turn.
+    private func makeController(openingTurn: String?) -> VoiceCallController {
+        VoiceCallController(
+            listener: listener,
+            speaker: speaker,
+            chat: chat,
+            bridge: bridge,
+            openingTurn: openingTurn,
+            now: { [unowned self] in clock },
+            clock: { Self.callTime },
+            suppressThinkingCue: { [unowned self] in suppressCue },
+            tickInterval: nil,
+            log: { [unowned self] in logLines.append($0) }
+        )
+    }
+
     // MARK: - Tests
+
+    func testOpeningTurnSentOnceAfterListening() async {
+        controller = makeController(openingTurn: "[mock brief] Interview me for the role.")
+        listener.holdsStart = true
+        let start = Task { await controller.start() }
+        for await _ in listener.startHeld { break }
+        XCTAssertEqual(controller.state, .connecting)
+        XCTAssertTrue(chat.sent.isEmpty)
+        listener.releaseStarts()
+        await start.value
+        await controller.lastChatTask?.value
+        XCTAssertEqual(controller.state, .thinking)
+        XCTAssertEqual(chat.sent, [tag + "[mock brief] Interview me for the role."])
+        XCTAssertNil(controller.lastSentTurn)
+
+        // A mute and unmute restarts the listener; the brief is not sent again.
+        XCTAssertEqual(listener.startCount, 1)
+        bridge.onMuteChanged?(true)
+        bridge.onMuteChanged?(false)
+        await controller.lastListenerTask?.value
+        XCTAssertEqual(listener.startCount, 2)
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.sent.count, 1)
+    }
+
+    func testOpeningTurnWaitsOutAHoldDuringConnecting() async {
+        controller = makeController(openingTurn: "[mock brief] go")
+        listener.holdsStart = true
+        let start = Task { await controller.start() }
+        for await _ in listener.startHeld { break }
+        bridge.onHoldChanged?(true)
+        listener.releaseStarts()
+        await start.value
+        await controller.lastChatTask?.value
+        XCTAssertTrue(chat.sent.isEmpty)
+        bridge.onHoldChanged?(false)
+        await controller.lastListenerTask?.value
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.sent, [tag + "[mock brief] go"])
+        XCTAssertEqual(controller.state, .thinking)
+    }
+
+    func testApprovalPauseDoesNotRecordASecondLatencySample() async {
+        controller = makeController(openingTurn: "[mock brief] go")
+        clock = 10
+        await controller.start()
+        await controller.lastChatTask?.value
+        clock = 11
+        update(text: "First sentence. Second", streaming: true)
+        XCTAssertEqual(controller.turnLatenciesMS, [1000])
+        update(text: "First sentence. Second", streaming: true, approval: approval())
+        XCTAssertEqual(controller.state, .awaitingApproval("send email to Sam"))
+        controller.approvalAnsweredOnScreen()
+        XCTAssertEqual(controller.state, .thinking)
+        clock = 40
+        update(text: "First sentence. Second sentence. Third", streaming: true)
+        XCTAssertEqual(controller.state, .speaking)
+        XCTAssertEqual(controller.turnLatenciesMS, [1000])
+    }
+
+    func testNoOpeningTurnSendsNothing() async {
+        await controller.start()
+        await controller.lastChatTask?.value
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertTrue(chat.sent.isEmpty)
+    }
+
+    func testTurnLatencyRecordedAtFirstReplyText() async {
+        controller = makeController(openingTurn: "[mock brief] go")
+        clock = 10
+        await controller.start()
+        await controller.lastChatTask?.value
+        XCTAssertTrue(controller.turnLatenciesMS.isEmpty)
+        update(text: nil, streaming: true)
+        XCTAssertTrue(controller.turnLatenciesMS.isEmpty)
+        clock = 12.5
+        update(text: "Hello there. Welcome", streaming: true)
+        XCTAssertEqual(controller.turnLatenciesMS, [2500])
+        // Later text in the same reply does not add another sample.
+        clock = 14
+        update(text: "Hello there. Welcome in.", streaming: true)
+        XCTAssertEqual(controller.turnLatenciesMS, [2500])
+    }
 
     func testFullLoopListenThinkSpeakListen() async {
         await controller.start()

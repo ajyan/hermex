@@ -86,6 +86,8 @@ final class VoiceCallController {
     /// What the user last said, kept on screen until their next words are recognized.
     private(set) var lastSentTurn: String?
     private(set) var currentTool: String?
+    /// Milliseconds each sent turn waited for its first reply text, in call order.
+    private(set) var turnLatenciesMS: [Int] = []
     private(set) var isMuted = false
     private(set) var startError: VoiceCallStartError?
     /// True once the system call is gone: the call screen can close.
@@ -102,6 +104,9 @@ final class VoiceCallController {
     @ObservationIgnored private let tickInterval: Duration?
     /// Diagnostics sink (Debug builds write it to a file on the device).
     @ObservationIgnored private let log: (String) -> Void
+    /// Sent once as the call's first turn, so the other side speaks first.
+    /// The opening turn until it is sent (held calls wait for the unhold).
+    @ObservationIgnored private var pendingOpeningTurn: String?
 
     /// The latest chat call (send, cancel, respond) and listener restart; tests await them.
     @ObservationIgnored private(set) var lastChatTask: Task<Void, Never>?
@@ -136,6 +141,8 @@ final class VoiceCallController {
     /// False once the reply is abandoned (barge-in, hold) or not yet sent.
     @ObservationIgnored private var replyActive = false
     @ObservationIgnored private var replyStarted = false
+    /// True once this turn's first reply text was timed; an approval pause doesn't add a second sample.
+    @ObservationIgnored private var latencyRecorded = false
     @ObservationIgnored private var runSeenStreaming = false
     @ObservationIgnored private var runFinished = false
     @ObservationIgnored private var runFinishedAt: TimeInterval?
@@ -161,6 +168,7 @@ final class VoiceCallController {
         speaker: SpeechSpeaking,
         chat: VoiceCallChatDriving,
         bridge: CallSystemBridging,
+        openingTurn: String? = nil,
         now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
         clock: @escaping () -> Date = Date.init,
         suppressThinkingCue: @escaping @MainActor () -> Bool = { UIAccessibility.isReduceMotionEnabled },
@@ -168,6 +176,7 @@ final class VoiceCallController {
         log: @escaping (String) -> Void = { _ in }
     ) {
         self.log = log
+        self.pendingOpeningTurn = openingTurn
         self.listener = listener
         self.speaker = speaker
         self.chat = chat
@@ -206,6 +215,7 @@ final class VoiceCallController {
             listenerDidStart()
             guard state == .connecting else { return }
             state = .listening
+            sendOpeningTurnIfReady()
         } catch {
             log("start failed: \(error)")
             if startError == nil { startError = error as? VoiceCallStartError }
@@ -496,22 +506,36 @@ final class VoiceCallController {
         awaitingFinalSince = nil
         let text = partialTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+        lastSentTurn = text
+        let spokenFor = turnStartedAt.map { String(format: " (turn started %.1fs ago)", now() - $0) } ?? ""
+        turnStartedAt = nil
+        send(text, note: spokenFor)
+    }
+
+    /// Sends the opening turn once, the first time the call is listening and not on hold.
+    private func sendOpeningTurnIfReady() {
+        guard let turn = pendingOpeningTurn, state == .listening, !isHeld else { return }
+        pendingOpeningTurn = nil
+        log("opening turn")
+        send(turn)
+    }
+
+    /// Hands `text` to the chat as the next turn and moves the call to `thinking`.
+    private func send(_ text: String, note: String = "") {
         state = .thinking
         spokenWords = []
-        lastSentTurn = text
         discardFinals = true
         clearTranscript()
         shaper = SpeechTextShaper()
         replyActive = true
         replyStarted = false
+        latencyRecorded = false
         runSeenStreaming = false
         runFinished = false
         runFinishedAt = nil
         thinkingSince = now()
-        let spokenFor = turnStartedAt.map { String(format: " (turn started %.1fs ago)", now() - $0) } ?? ""
-        turnStartedAt = nil
         sentAt = now()
-        log("send: \"\(text)\"\(spokenFor)")
+        log("send: \"\(text)\"\(note)")
         lastChatTask = Task { [weak self, chat] in
             let sent = await chat.sendVoiceMessage(VoiceCallPhrases.voicePrefix(at: clock()) + text)
             self?.log("send \(sent ? "accepted" : "FAILED") \(self?.since(self?.sentAt) ?? "")")
@@ -611,6 +635,10 @@ final class VoiceCallController {
             speak(shaper.append(streamingText, final: runFinished))
             if !replyStarted {
                 log("first reply text \(since(sentAt))")
+                if !latencyRecorded, let sentAt {
+                    latencyRecorded = true
+                    turnLatenciesMS.append(Int((now() - sentAt) * 1000))
+                }
                 replyStarted = true
                 setCue(false)
                 state = .speaking
@@ -767,6 +795,7 @@ final class VoiceCallController {
             guard state != .connecting else { return }
             returnToListening()
             if !isMuted { restartListener() }
+            sendOpeningTurnIfReady()
         }
     }
 

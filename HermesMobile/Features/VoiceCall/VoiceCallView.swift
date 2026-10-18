@@ -86,14 +86,26 @@ struct VoiceCallChatSnapshot: Equatable {
     }
 }
 
+/// What a finished call hands back to whoever opened it.
+struct VoiceCallSummary: Equatable {
+    /// Milliseconds each turn waited for its first reply text. A turn that never
+    /// got reply text records no sample.
+    let turnMS: [Int]
+}
+
 /// The full-screen call with Atlas on one chat. It owns the call controller and
 /// feeds it the chat's stream state; closing it leaves the chat on screen.
 struct VoiceCallView: View {
     let chat: ChatViewModel
-    let onClose: () -> Void
+    let openingTurn: String?
+    /// The turn times so far, each time a turn is timed (a voice mock saves them as it goes).
+    let onTurnTimed: (([Int]) -> Void)?
+    let onDismiss: (VoiceCallSummary) -> Void
 
     @State private var controller: VoiceCallController?
     @State private var startMessage: String?
+    /// The close paths overlap (a Close button, then its sheet's dismissal); report once.
+    @State private var didReport = false
     @State private var levels = VoiceCallAudioLevels()
     /// When the call first started listening, for the call timer.
     @State private var connectedAt: Date?
@@ -102,6 +114,21 @@ struct VoiceCallView: View {
     @State private var orbSlot: CGRect = .zero
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    init(chat: ChatViewModel, openingTurn: String? = nil, onTurnTimed: (([Int]) -> Void)? = nil,
+         onDismiss: @escaping (VoiceCallSummary) -> Void) {
+        self.chat = chat
+        self.openingTurn = openingTurn
+        self.onTurnTimed = onTurnTimed
+        self.onDismiss = onDismiss
+    }
+
+    /// Closes the screen, reporting how long each turn took to answer.
+    private func onClose() {
+        guard !didReport else { return }
+        didReport = true
+        onDismiss(VoiceCallSummary(turnMS: controller?.turnLatenciesMS ?? []))
+    }
 
     var body: some View {
         ZStack {
@@ -137,6 +164,7 @@ struct VoiceCallView: View {
         // A call is an immersive, dark surface in either appearance, like the Phone app.
         .preferredColorScheme(.dark)
         .task { await startCall() }
+        .onChange(of: controller?.turnLatenciesMS ?? []) { _, turnMS in onTurnTimed?(turnMS) }
         // However the screen goes away, its system call goes with it; a call left
         // live blocks the next one from connecting.
         .onDisappear {
@@ -162,7 +190,7 @@ struct VoiceCallView: View {
         .sensoryFeedback(trigger: controller?.lastSentTurn) { _, sent in
             sent == nil ? nil : .impact(weight: .light)
         }
-        .sheet(isPresented: permissionSheetBinding, onDismiss: onClose) {
+        .sheet(isPresented: permissionSheetBinding, onDismiss: { onClose() }) {
             permissionSheet
         }
         .alert(
@@ -193,6 +221,7 @@ struct VoiceCallView: View {
             speaker: makeSpeaker(),
             chat: chat,
             bridge: CallSystemBridge(),
+            openingTurn: openingTurn,
             log: VoiceCallDiagnostics.write
         )
         self.controller = controller
@@ -408,7 +437,7 @@ struct VoiceCallView: View {
                 if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
             }
             .buttonStyle(.borderedProminent)
-            Button("Close", action: onClose)
+            Button("Close") { onClose() }
         }
         .padding(24)
         .presentationDetents([.medium])

@@ -57,6 +57,9 @@ struct DeckPalette: Equatable {
     static let recap = DeckPalette(.plain, symbol: "list.bullet", name: "Recap", shortName: "Recap")
     /// The week's fixes from the feedback loop, on the recap's paper.
     static let changes = DeckPalette(.plain, symbol: "wrench.and.screwdriver", name: "What changed", shortName: "Changes")
+    /// The Daily Ask wears its goal's paper (`land-ai-role`, color `notes`).
+    static let ask = DeckPalette(GoalPaper.palette(named: "notes", slug: "land-ai-role").colors,
+                                 symbol: "briefcase", name: "Today's Ask", shortName: "Ask")
 
     static func of(_ page: DeckPage) -> DeckPalette {
         switch page {
@@ -77,6 +80,7 @@ struct DeckPalette: Equatable {
         case .weekAhead:
             let goal = GoalPaper.palette(named: card.color ?? "", slug: card.goal ?? card.id)
             return DeckPalette(goal.colors, symbol: "calendar", name: "Week ahead", shortName: "Week ahead")
+        case .ask: return .ask
         case .decision: return .followUps
         case .changes: return .changes
         case .item, .unknown:

@@ -30,12 +30,14 @@ final class FeedbackInboxViewModelTests: XCTestCase {
         await viewModel.load()
 
         let sections = viewModel.sections
-        XCTAssertEqual(sections.map(\.group), [.needsReview, .inProgress, .done])
-        XCTAssertEqual(sections[0].entries.map(\.id), ["d", "g", "b"])
-        XCTAssertEqual(sections[1].entries.map(\.id), ["c", "f"])
-        XCTAssertEqual(sections[2].entries.map(\.id), ["e", "a"])
+        XCTAssertEqual(sections.map(\.group), [.toApprove, .toMerge, .toRetry, .inProgress, .done])
+        XCTAssertEqual(sections[0].entries.map(\.id), ["b"])
+        XCTAssertEqual(sections[1].entries.map(\.id), ["g"])
+        XCTAssertEqual(sections[2].entries.map(\.id), ["d"])
+        XCTAssertEqual(sections[3].entries.map(\.id), ["c", "f"])
+        XCTAssertEqual(sections[4].entries.map(\.id), ["e", "a"])
         guard case .loaded(let groups) = viewModel.state else { return XCTFail("not loaded") }
-        XCTAssertEqual(groups[.needsReview]?.map(\.id), ["d", "g", "b"])
+        XCTAssertEqual(groups[.toApprove]?.map(\.id), ["b"])
     }
 
     func testEmptyGroupsAreLeftOut() async {
@@ -140,8 +142,9 @@ final class FeedbackInboxViewModelTests: XCTestCase {
 
     func testRejectAvailableForNew() {
         XCTAssertTrue(FeedbackStatus.new.canReject)
-        XCTAssertFalse(FeedbackStatus.new.hasDecisions, "a new note's Reject is in the menu, with no action bar")
-        XCTAssertEqual(FeedbackStatus.new.rejectConfirmation.title, "Reject this note?")
+        XCTAssertFalse(FeedbackStatus.new.hasDecisions, "a new note has no decisions to make")
+        XCTAssertTrue(FeedbackStatus.new.hasActions, "its Drop sits alone in the action bar")
+        XCTAssertEqual(FeedbackStatus.new.rejectConfirmation.title, "Drop this note?")
     }
 
     func testOnlyShippedCanBeUndone() {
@@ -240,15 +243,23 @@ final class FeedbackInboxViewModelTests: XCTestCase {
         XCTAssertEqual(decisions.map(\.decision), [.approveAnswering("Q1 Keep? → No")])
     }
 
-    func testNeedsYouChipAndWords() throws {
+    func testRequestCardActionsAndWords() throws {
         func make(_ json: String) throws -> FeedbackEntry {
             try FeedbackDecoding.decode(FeedbackEntry.self, from: Data(json.utf8))
         }
-        XCTAssertEqual(try make(#"{"id":"a","status":"planned","question_count":2}"#).needsYouChip.label, "2 questions")
-        XCTAssertEqual(try make(#"{"id":"a","status":"planned","question_count":1}"#).needsYouChip.label, "1 question")
-        XCTAssertEqual(try make(#"{"id":"a","status":"planned"}"#).needsYouChip.label, "Ready to approve")
-        XCTAssertEqual(try make(#"{"id":"a","status":"ready"}"#).needsYouChip.label, "Branch ready")
-        XCTAssertEqual(try make(#"{"id":"a","status":"failed"}"#).needsYouChip.label, "Failed")
+        // A plan with questions opens to answer them; only a plan without any builds from the card.
+        XCTAssertEqual(try make(#"{"id":"a","status":"planned","question_count":1}"#).quickAction, .answer)
+        XCTAssertEqual(try make(#"{"id":"a","status":"planned"}"#).quickAction, .build)
+        XCTAssertEqual(try make(#"{"id":"a","status":"ready"}"#).quickAction, .review)
+        XCTAssertEqual(try make(#"{"id":"a","status":"failed"}"#).quickAction, .retry)
+        XCTAssertNil(try make(#"{"id":"a","status":"building"}"#).quickAction)
+        XCTAssertEqual(try make(#"{"id":"a","after":"Cards lead with the gist","summary":"s"}"#).outcome, "Cards lead with the gist")
+        XCTAssertEqual(try make(#"{"id":"a","after":" ","summary":"The summary"}"#).outcome, "The summary")
+        XCTAssertEqual(try make(#"{"id":"a","error":"\nBlocked by a rule\nmore"}"#).errorLine, "Blocked by a rule")
+        XCTAssertEqual(try make(#"{"id":"a","plan_repo":"second-brain","size":"S"}"#).placeLine, "second-brain · Small")
+        XCTAssertNil(try make(#"{"id":"a"}"#).placeLine)
+        let built = try make(#"{"id":"a","checks":[{"state":"ok","text":"a"},{"state":"ok","text":"b"},{"state":"warn","text":"c"}]}"#)
+        XCTAssertEqual([built.checkCount(.ok), built.checkCount(.warn), built.checkCount(.fail)], [2, 1, 0])
         XCTAssertEqual(try make(#"{"id":"a","status":"new"}"#).progressWord, "Tonight")
         XCTAssertEqual(try make(#"{"id":"a","feature":"Daily Deck","size":"S","plan_repo":"second-brain"}"#).detailMetaLine,
                        "Daily Deck · small change · second-brain")

@@ -91,11 +91,17 @@ struct FeedbackInboxView: View {
     @ViewBuilder
     private func sectionView(_ section: FeedbackInboxViewModel.InboxSection) -> some View {
         switch section.group {
-        case .needsReview:
-            HXSectionHeader(title: section.group.title)
+        case .toApprove, .toMerge, .toRetry:
+            HXSectionHeader(title: section.group.title, trailing: "\(section.entries.count)")
                 .padding(.top, 4)
             ForEach(section.entries) { entry in
-                FeedbackRequestCard(entry: entry) { openedID = viewModel.openedID(for: entry) }
+                FeedbackRequestCard(
+                    entry: entry,
+                    isSaving: viewModel.pendingID == entry.id,
+                    isBusy: viewModel.pendingID != nil,
+                    open: { openedID = viewModel.openedID(for: entry) },
+                    decide: { decision in Task { await viewModel.decide(entry, decision) } }
+                )
             }
         case .inProgress:
             HXSectionHeader(title: section.group.title)
@@ -152,63 +158,189 @@ struct FeedbackInboxView: View {
     }
 }
 
-/// A Needs you entry: a request card with its title in the glow, the plan's one-line summary,
-/// and a chip naming what it needs.
+/// An entry waiting on a decision: its title in the glow, the one-line outcome, chips for what
+/// it needs, and the decision's button. Tapping the card opens the entry; the button acts
+/// in place (Build, Retry) or opens it to answer questions or review a branch.
 private struct FeedbackRequestCard: View {
     let entry: FeedbackEntry
+    let isSaving: Bool
+    let isBusy: Bool
     let open: () -> Void
+    let decide: (FeedbackDecision) -> Void
 
     var body: some View {
-        let chip = entry.needsYouChip
-        Button(action: open) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(verbatim: entry.headline)
-                    .font(AppFont.display(style: .headline))
-                    .foregroundStyle(HermexPaper.request.glow)
-                    .multilineTextAlignment(.leading)
-                if let summary = entry.summary, !summary.isEmpty {
-                    Text(verbatim: summary)
-                        .font(AppFont.subheadline())
-                        .foregroundStyle(Color.hxTextPrimary)
+        HStack(alignment: .center, spacing: 10) {
+            Button(action: open) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(verbatim: entry.headline)
+                        .font(AppFont.display(style: .headline))
+                        .foregroundStyle(HermexPaper.request.glow)
                         .multilineTextAlignment(.leading)
+                    if let line = entry.status == .failed ? entry.errorLine : entry.outcome {
+                        Text(verbatim: line)
+                            .font(AppFont.subheadline())
+                            .foregroundStyle(entry.status == .failed ? Color.hxDanger : Color.hxTextPrimary)
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(2)
+                    }
+                    FlowRow(spacing: 6) { chips }
+                        .padding(.top, 5)
                 }
-                HXChip(paper: .request, symbol: chip.symbol, label: chip.label)
-                    .padding(.top, 4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .combine)
+            .accessibilityHint(Text(verbatim: "Opens it."))
+
+            action
         }
-        .buttonStyle(.plain)
+        .padding(.leading, 14)
+        .padding(.trailing, 12)
+        .padding(.vertical, 12)
         .glowSurface(.request, cornerRadius: HXRadius.lg)
-        .accessibilityElement(children: .combine)
-        .accessibilityHint(Text(verbatim: "Opens the plan."))
+    }
+
+    @ViewBuilder
+    private var chips: some View {
+        switch entry.status {
+        case .ready:
+            if entry.checks.isEmpty {
+                HXChip(paper: .tool, symbol: "arrow.triangle.branch", label: entry.repo ?? "Branch ready")
+            }
+            ForEach([FeedbackCheck.State.ok, .warn, .fail], id: \.self) { state in
+                let count = entry.checkCount(state)
+                if count > 0 {
+                    FeedbackCheckChip(state: state, count: count)
+                }
+            }
+        default:
+            if entry.questionCount > 0 {
+                HXChip(paper: .request, symbol: "questionmark.circle",
+                       label: entry.questionCount == 1 ? "1 question" : "\(entry.questionCount) questions")
+            }
+            if let place = entry.placeLine {
+                HXChip(paper: .tool, label: place)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var action: some View {
+        if isSaving {
+            ProgressView()
+                .frame(minWidth: 44, minHeight: 44)
+                .accessibilityLabel(Text(verbatim: "Saving"))
+        } else if let quick = entry.quickAction {
+            let (title, primary): (String, Bool) = switch quick {
+            case .build: ("Build", true)
+            case .answer: ("Answer", false)
+            case .review: ("Review", false)
+            case .retry: ("Retry", true)
+            }
+            Button {
+                switch quick {
+                case .build: decide(.approve)
+                case .retry: decide(.retry)
+                case .answer, .review: open()
+                }
+            } label: {
+                Text(verbatim: title)
+            }
+            .buttonStyle(ChatDecisionButtonStyle(emphasis: primary ? .primary : .secondary))
+            .fixedSize()
+            .disabled(isBusy)
+            .accessibilityHint(Text(verbatim: quick.hint))
+        }
+    }
+}
+
+/// A count of build checks in one state, as a chip: green passed, amber unchecked, red failed.
+struct FeedbackCheckChip: View {
+    let state: FeedbackCheck.State
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: state.symbol)
+                .font(AppFont.caption2(weight: .bold))
+                .accessibilityHidden(true)
+            Text(verbatim: state.countLabel(count))
+                .font(AppFont.caption(weight: .medium))
+                .lineLimit(1)
+        }
+        .foregroundStyle(state.color)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(state.color.opacity(0.14), in: Capsule())
+    }
+}
+
+extension FeedbackCheck.State {
+    var symbol: String {
+        switch self {
+        case .ok: "checkmark"
+        case .warn: "exclamationmark"
+        case .fail: "xmark"
+        case .unknown: "circle"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .ok: .hxSuccess
+        case .warn: .hxWarning
+        case .fail: .hxDanger
+        case .unknown: .hxTextSecondary
+        }
+    }
+
+    func countLabel(_ count: Int) -> String {
+        switch self {
+        case .ok: count == 1 ? "1 check passed" : "\(count) checks passed"
+        case .warn: "\(count) unchecked"
+        case .fail: "\(count) failed"
+        case .unknown: "\(count) other"
+        }
+    }
+}
+
+private extension FeedbackEntry.QuickAction {
+    var hint: String {
+        switch self {
+        case .build: "Approves the plan. It builds tonight."
+        case .answer: "Opens the plan to answer its questions."
+        case .review: "Opens the branch's checks."
+        case .retry: "Tries the failed step again tonight."
+        }
     }
 }
 
 extension View {
     /// The free-text Reply prompt: a note for the planner, sent as a `reply` decision while
-    /// `target` is set.
-    func feedbackReplyPrompt(for target: Binding<FeedbackEntry?>, viewModel: FeedbackInboxViewModel) -> some View {
-        modifier(FeedbackReplyPrompt(target: target, viewModel: viewModel))
+    /// `target` is set. `prefix` (the plan's answers) leads the note when there is one. A plan
+    /// goes back for another pass; a built branch is set aside and replanned.
+    func feedbackReplyPrompt(for target: Binding<FeedbackEntry?>, viewModel: FeedbackInboxViewModel,
+                             prefix: String? = nil) -> some View {
+        modifier(FeedbackReplyPrompt(target: target, viewModel: viewModel, prefix: prefix))
     }
 }
 
 private struct FeedbackReplyPrompt: ViewModifier {
     @Binding var target: FeedbackEntry?
     let viewModel: FeedbackInboxViewModel
+    let prefix: String?
     @State private var note = ""
 
     func body(content: Content) -> some View {
         content.alert(
-            Text(verbatim: "Redo the plan"),
+            Text(verbatim: target?.status == .ready ? "Send it back" : "Change the plan"),
             isPresented: Binding(get: { target != nil }, set: { if !$0 { target = nil } }),
             presenting: target
         ) { entry in
             TextField(text: $note) { Text(verbatim: "What should change?") }
             Button {
-                let text = note
+                let text = [prefix, note].compactMap { $0 }.joined(separator: "\n")
                 note = ""
                 Task { await viewModel.decide(entry, .reply(text)) }
             } label: {
@@ -216,8 +348,10 @@ private struct FeedbackReplyPrompt: ViewModifier {
             }
             .disabled(note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             Button(role: .cancel) { note = "" } label: { Text(verbatim: "Cancel") }
-        } message: { _ in
-            Text(verbatim: "The plan goes back for another pass tonight.")
+        } message: { entry in
+            Text(verbatim: entry.status == .ready
+                 ? "It gets a new plan tonight with your note. This branch is set aside."
+                 : "The plan goes back for another pass tonight.")
         }
     }
 }
