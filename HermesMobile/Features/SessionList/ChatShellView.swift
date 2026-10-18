@@ -1474,20 +1474,22 @@ struct ChatShellView: View {
             postGrade: { try await $0.post(to: APIClientPrepAdapter(apiClient: apiClient)) },
             isStillOnMockChat: { navigation.rootRevision == revision },
             replaceRoot: { selectDestination(PendingNewChatRoute()) },
-            show: { routes in navigation.path = routes.map { .brainRoute(.prep($0)) } }
+            show: { routes in navigation.path = routes.map { .brainRoute(.prep($0)) } },
+            push: { navigation.push(.brainRoute(.prep($0))) }
         )
         Task { await finisher.finish(end) }
     }
 
     /// A voice mock that never switched back (the app was killed mid-call, or the switch back
     /// failed): switch back now, on launch and on each return to the foreground, unless a mock's
-    /// chat is still open. The drawer's profile is reloaded, and an untouched new chat is replaced so
-    /// it isn't left in the interviewer profile.
+    /// chat is still open. The drawer's profile is reloaded, and a bare new chat (one that carries
+    /// nothing) is replaced so it isn't left in the interviewer profile. A new chat carrying a draft,
+    /// attachments, a profile, a project or a call stays: the cookie is already back.
     private func recoverMockProfileIfNeeded() async {
         let profile = mockProfile
         guard profile.store.profile != nil, !navigation.isOnMockChat, await profile.leave() else { return }
         await viewModel.loadActiveProfile()
-        if navigation.isOnEmptyNewChat, navigation.path.isEmpty { selectDestination(PendingNewChatRoute()) }
+        if navigation.isOnBareNewChat { selectDestination(PendingNewChatRoute()) }
     }
 
     private func selectSession(_ session: SessionSummary) {
@@ -1726,6 +1728,12 @@ struct PendingNewChatRoute: Identifiable, Hashable {
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
+    }
+
+    /// True when the route asks for nothing beyond a plain new chat.
+    var carriesNothing: Bool {
+        initialDraft.isEmpty && initialAttachments.isEmpty && !autoStartsVoiceInput && profileName == nil
+            && projectID == nil && !startsCall && openingTurn == nil && mockID == nil
     }
 }
 

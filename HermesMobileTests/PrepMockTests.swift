@@ -449,6 +449,7 @@ final class PrepMockTests: APIClientTestCase {
             isStillOnMockChat: { stillOnMockChat },
             replaceRoot: { log.append("root") },
             show: { log.shown = $0; log.append("show") },
+            push: { log.pushed.append($0); log.append("push") },
             pause: { log.append("pause:\($0)") }
         )
     }
@@ -500,6 +501,51 @@ final class PrepMockTests: APIClientTestCase {
 
         XCTAssertEqual(log.events, ["leave", "grade:m1"])
         XCTAssertNil(log.shown)
+        XCTAssertTrue(log.pushed.isEmpty, "a graded mock is in Prep's recent list; nothing is pushed over the new chat")
+    }
+
+    func testFinishAfterLeavingTheChatKeepsAnUnsentGrade() async {
+        let log = FinishLog()
+        let grade = MockCallGrade(mockID: "m1", sessionID: "sess-1", turnMS: [900])
+
+        await finisher(log: log, gradeFailures: 3, stillOnMockChat: false).finish(MockCallEnd(mockID: "m1", grade: grade))
+
+        XCTAssertFalse(log.events.contains("root"), "the chat the user went to stays")
+        XCTAssertNil(log.shown)
+        XCTAssertEqual(log.pushed, [.mockResult("m1", unsent: grade)], "Send for grading stays reachable")
+    }
+
+    // MARK: Recovering the profile
+
+    func testRecoveryReplacesOnlyABareNewChat() {
+        var navigation = ShellNavigationState()
+        navigation.select(PendingNewChatRoute())
+        XCTAssertTrue(navigation.isOnBareNewChat)
+
+        navigation.push(.brain)
+        XCTAssertFalse(navigation.isOnBareNewChat, "a screen pushed over it stays")
+
+        navigation.select(PendingNewChatRoute())
+        navigation.markNewChatStarted()
+        XCTAssertFalse(navigation.isOnBareNewChat, "a chat already talked in stays")
+    }
+
+    func testRecoveryKeepsANewChatCarryingSomething() {
+        let attachment = SharedAttachmentImport(filename: "scan.pdf", typeIdentifier: "com.adobe.pdf", data: Data([1]))
+        let carrying: [(String, PendingNewChatRoute)] = [
+            ("a Week ahead draft", PendingNewChatRoute(initialDraft: "Edit this week")),
+            ("a share import", PendingNewChatRoute(initialAttachments: [attachment])),
+            ("dictation", PendingNewChatRoute(autoStartsVoiceInput: true)),
+            ("a pinned profile", PendingNewChatRoute(profileName: "work")),
+            ("a project", PendingNewChatRoute(projectID: "p1")),
+            ("a live call", PendingNewChatRoute(startsCall: true)),
+            ("a mock", PendingNewChatRoute(profileName: "interviewer", startsCall: true, openingTurn: "brief", mockID: "m1"))
+        ]
+        for (name, route) in carrying {
+            var navigation = ShellNavigationState()
+            navigation.select(route)
+            XCTAssertFalse(navigation.isOnBareNewChat, "a new chat with \(name) is never swapped out")
+        }
     }
 }
 
@@ -507,6 +553,7 @@ final class PrepMockTests: APIClientTestCase {
 private final class FinishLog {
     var events: [String] = []
     var shown: [PrepRoute]?
+    var pushed: [PrepRoute] = []
 
     func append(_ event: String) { events.append(event) }
 }

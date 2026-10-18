@@ -154,7 +154,8 @@ struct PrepMockProfile {
 /// ask for the grade (retrying twice), then, if the mock's chat is still on screen, replace it with a
 /// fresh chat and show Prep with the mock's result on top, so Back lands in Prep and no interviewer
 /// chat stays behind. A grade that never got through rides on the result route, for its Send for
-/// grading button. A call with nothing to grade shows Prep home alone.
+/// grading button. A call with nothing to grade shows Prep home alone. If the user already left the
+/// mock's chat, nothing is swapped; only a grade that never got through is pushed, so it isn't lost.
 @MainActor
 struct PrepMockCallFinisher {
     var leave: @MainActor () async -> Void
@@ -162,7 +163,10 @@ struct PrepMockCallFinisher {
     /// False once the mock's chat is no longer the shell's root (the user went elsewhere).
     var isStillOnMockChat: @MainActor () -> Bool
     var replaceRoot: @MainActor () -> Void
+    /// Replaces whatever is pushed with these screens.
     var show: @MainActor ([PrepRoute]) -> Void
+    /// Pushes one screen over whatever is showing.
+    var push: @MainActor (PrepRoute) -> Void
     /// Waits before retry `n` (1, 2).
     var pause: @MainActor (Int) async -> Void = { try? await Task.sleep(for: .seconds($0)) }
 
@@ -172,7 +176,10 @@ struct PrepMockCallFinisher {
         await leave()
         var unsent: MockCallGrade?
         if let grade = end.grade, !(await post(grade)) { unsent = grade }
-        guard isStillOnMockChat() else { return }
+        guard isStillOnMockChat() else {
+            if let unsent { push(.mockResult(end.mockID, unsent: unsent)) }
+            return
+        }
         replaceRoot()
         show(end.grade == nil ? [.home] : [.home, .mockResult(end.mockID, unsent: unsent)])
     }
