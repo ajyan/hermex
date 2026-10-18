@@ -319,6 +319,14 @@ final class ContractReadinessTests: XCTestCase {
                 path: "/api/tutor/today",
                 query: ["run": "mock"]
             ),
+            .init(
+                name: "tutor story rep",
+                method: "GET",
+                endpoint: .tutorRun(run: "story", unit: "s1"),
+                path: "/api/tutor/today",
+                query: ["run": "story", "unit": "s1"]
+            ),
+            .init(name: "tutor stories", method: "GET", endpoint: .tutorStories, path: "/api/tutor/stories"),
             .init(name: "tutor course", method: "GET", endpoint: .tutorCourse, path: "/api/tutor/course"),
             .init(name: "tutor override", method: "POST", endpoint: .tutorOverride, path: "/api/tutor/override"),
             .init(

@@ -135,7 +135,7 @@ struct PrepRunView: View {
         case .spotBug:
             let draft = draft(for: rep)
             return draft.line.map { .bugFix(line: $0, fix: draft.fix ?? "") }
-        case .primer, .unknown:
+        case .primer, .unknown, .story, .probe:  // story reps have no view yet; the player skips them
             return nil
         }
     }
@@ -153,6 +153,8 @@ struct PrepRunView: View {
         case .recall: "Recall"
         case .warmup: "Warm-up"
         case .boss: "Boss quiz"
+        case .story: "Story"
+        case .probe: "Probe"
         case .unknown: "Run"
         }
     }
@@ -322,7 +324,7 @@ struct PrepRunView: View {
 
     private func hasAction(_ rep: PrepRep) -> Bool {
         switch rep.drill {
-        case .primer, .approach, .spotBug, .unknown, .judgment, .boss: true
+        case .primer, .approach, .spotBug, .unknown, .judgment, .boss, .story, .probe: true
         case .lesson where Self.usesRecall(rep), .recall where Self.usesRecall(rep): true
         case .fact, .lesson, .warmup, .recall: Self.isCloze(rep)
         case .complexity, .trace: false
@@ -376,7 +378,7 @@ struct PrepRunView: View {
                 title: "Submit",
                 enabled: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !viewModel.isSubmitting
             ) { Task { await viewModel.submitCloze(text) } }
-        case .unknown:
+        case .unknown, .story, .probe:  // story reps have no view yet
             PrepPrimaryButton(title: "Skip") { Task { await viewModel.skip() } }
         case .complexity, .trace:
             EmptyView()
@@ -524,7 +526,7 @@ struct PrepRunView: View {
                 prompt: "Your answer",
                 showsClock: false
             )
-        case .unknown:
+        case .unknown, .story, .probe:  // story reps have no view yet
             PrepNoteCard {
                 Text(verbatim: "Update Atlas to do this rep")
                     .font(BrainStyle.rowTitle)

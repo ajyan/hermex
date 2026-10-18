@@ -19,6 +19,7 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
     var courseResults: [Result<PrepCourse, Error>] = []
     var lessonResults: [Result<PrepLesson, Error>] = []
     var overrideResults: [Result<PrepAttemptResult, Error>] = []
+    var storiesResults: [Result<PrepStoryList, Error>] = []
 
     /// When set, `attempt` signals `started` and then waits on `release`.
     var gate: (started: AsyncStream<Void>.Continuation, release: AsyncStream<Void>)?
@@ -66,6 +67,7 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
     func flag(item: String) async throws { try next("flag:\(item)", &flagResults) }
     func course() async throws -> PrepCourse { try next("course", &courseResults) }
     func lesson(id: String) async throws -> PrepLesson { try next("lesson:\(id)", &lessonResults) }
+    func stories() async throws -> PrepStoryList { try next("stories", &storiesResults) }
     func override(attempt: String, point: String) async throws -> PrepAttemptResult {
         if let overrideGate {
             overrideGate.started.yield()

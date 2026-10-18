@@ -187,6 +187,9 @@ enum PrepDrill: String, Encodable, Hashable, Sendable {
     case recall
     case warmup
     case boss
+    /// A behavioral story told against the clock, and one follow-up attack on it.
+    case story
+    case probe
     case unknown
 
     init(from decoder: Decoder) throws {
@@ -264,13 +267,20 @@ struct PrepItemExcerpt: Decodable, Identifiable, Hashable, Sendable {
     let origin: String
     /// A lesson rep's teaching and check; nil for every other drill.
     let lesson: PrepLesson?
+    /// A story rep's question (the story's own title is hidden so it doesn't give the answer away;
+    /// empty on other drills), and the time limit and the point the clock warns (nil on other drills).
+    let prompt: String
+    let limitMS: Int?
+    let warnMS: Int?
 
     /// A card the nightly coach wrote for a gap; only these can be flagged.
     var isCoachWritten: Bool { origin == "coach" }
 
     private enum CodingKeys: String, CodingKey {
         case id, title, summary, example, difficulty, hints, links, primer, options, code, fixes, input
-        case stage, format, origin
+        case stage, format, origin, prompt
+        case limitMS = "limit_ms"
+        case warnMS = "warn_ms"
         case skillTitle = "skill_title"
         case referenceMD = "reference_md"
         case ideaMD = "idea_md"
@@ -296,6 +306,9 @@ struct PrepItemExcerpt: Decodable, Identifiable, Hashable, Sendable {
         format = c.string(.format)
         origin = c.string(.origin)
         lesson = c.contains(.ideaMD) ? try? PrepLesson(from: decoder) : nil
+        prompt = c.string(.prompt)
+        limitMS = c.optional(Int.self, .limitMS)
+        warnMS = c.optional(Int.self, .warnMS)
     }
 }
 
@@ -307,10 +320,12 @@ struct PrepRep: Decodable, Identifiable, Hashable, Sendable {
     let block: String
     let drill: PrepDrill
     let item: PrepItemExcerpt
+    /// A story told earlier whose probes are still open; the player resumes at `probe`.
+    let pending: PrepStoryPending?
 
     var id: Int { index }
 
-    private enum CodingKeys: String, CodingKey { case index, block, drill, item }
+    private enum CodingKeys: String, CodingKey { case index, block, drill, item, pending }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -318,6 +333,7 @@ struct PrepRep: Decodable, Identifiable, Hashable, Sendable {
         block = c.string(.block)
         drill = c.optional(PrepDrill.self, .drill) ?? .unknown
         item = try c.decode(PrepItemExcerpt.self, forKey: .item)
+        pending = c.optional(PrepStoryPending.self, .pending)
     }
 }
 
@@ -390,9 +406,12 @@ struct PrepAttemptRequest: Encodable, Hashable, Sendable {
     var confidence: PrepConfidence?
     /// "I don't know, show me": a recall with no answer.
     var dontKnow = false
+    /// A probe's story attempt id and the probe's id; omitted on every other drill.
+    var parent: String?
+    var probe: String?
 
     private enum CodingKeys: String, CodingKey {
-        case date, index, item, drill, answer, run, unit, confidence
+        case date, index, item, drill, answer, run, unit, confidence, parent, probe
         case elapsedMS = "elapsed_ms"
         case hintsUsed = "hints_used"
         case dontKnow = "dont_know"
@@ -411,6 +430,8 @@ struct PrepAttemptRequest: Encodable, Hashable, Sendable {
         try c.encodeIfPresent(unit, forKey: .unit)
         try c.encodeIfPresent(confidence, forKey: .confidence)
         if dontKnow { try c.encode(true, forKey: .dontKnow) }
+        try c.encodeIfPresent(parent, forKey: .parent)
+        try c.encodeIfPresent(probe, forKey: .probe)
     }
 }
 
@@ -502,6 +523,20 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
     let attemptID: String?
     /// Key points the user overruled the grader on.
     let overridden: [String]
+    /// A story rep: the 0-5 score, the time taken, the weakest beat's id, the story the grader heard
+    /// and the role it played for the question ("lead", "backup", "other" or "wrong"), the first
+    /// probe still to answer, and the model telling. `lead` and `backup` name the right stories
+    /// when the role is "wrong". A probe's last answer carries `repVerdict` ("pass" or "fail").
+    let score: Int?
+    let elapsedMS: Int?
+    let weakest: String?
+    let storyTold: String?
+    let role: String?
+    let lead: PrepStoryRef?
+    let backup: PrepStoryRef?
+    let probe: PrepProbe?
+    let repVerdict: String?
+    let sayItMD: String?
 
     /// The original result with an override's grade, verdict, XP, overridden points and boss sitting laid over it.
     init(merging base: PrepAttemptResult, override: PrepAttemptResult) {
@@ -527,6 +562,16 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
         xp = override.xp ?? base.xp
         attemptID = override.attemptID ?? base.attemptID
         overridden = override.overridden
+        score = override.score ?? base.score
+        elapsedMS = base.elapsedMS
+        weakest = base.weakest
+        storyTold = base.storyTold
+        role = base.role
+        lead = base.lead
+        backup = base.backup
+        probe = base.probe
+        repVerdict = override.repVerdict ?? base.repVerdict
+        sayItMD = base.sayItMD
     }
 
     /// The sample answer, from whichever grade shape the answer came back with.
@@ -537,7 +582,11 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case verdict, correct, feedback, credit, links, streak, grade, logged, points, revisit, sitting, why
-        case surprise, xp, overridden
+        case surprise, xp, overridden, score, weakest, role, lead, backup, probe
+        case elapsedMS = "elapsed_ms"
+        case storyTold = "story_told"
+        case repVerdict = "rep_verdict"
+        case sayItMD = "say_it_md"
         case attemptID = "attempt"
         case referenceMD = "reference_md"
         case nextIndex = "next_index"
@@ -568,6 +617,16 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
         xp = c.optional(Int.self, .xp)
         attemptID = c.optional(String.self, .attemptID)
         overridden = c.strings(.overridden)
+        score = c.optional(Int.self, .score)
+        elapsedMS = c.optional(Int.self, .elapsedMS)
+        weakest = c.optional(String.self, .weakest)
+        storyTold = c.optional(String.self, .storyTold)
+        role = c.optional(String.self, .role)
+        lead = c.optional(PrepStoryRef.self, .lead)
+        backup = c.optional(PrepStoryRef.self, .backup)
+        probe = c.optional(PrepProbe.self, .probe)
+        repVerdict = c.optional(String.self, .repVerdict)
+        sayItMD = c.optional(String.self, .sayItMD)
     }
 }
 

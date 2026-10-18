@@ -50,6 +50,7 @@ enum PrepRunKind: String, Codable, Hashable, Sendable {
     case testout
     case mock
     case bonus
+    case story
     case unknown
 
     init(from decoder: Decoder) throws {

@@ -633,4 +633,187 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertEqual(try decode(PrepStreak.self, #"{"days": 2, "freezes": 0, "last_day": "2026-10-20"}"#).lastDay, "2026-10-20")
         XCTAssertNil(try decode(PrepStreak.self, #"{"days": 0}"#).lastDay)
     }
+
+    // MARK: - Story reps
+
+    func testDecodesStoryList() throws {
+        let json = #"""
+        {"stories": [
+          {"id": "s1", "title": "Story s1", "status": "active", "primary_signal": "ownership", "ready": false,
+           "marks": {"time": true, "score": true, "probes": true}, "last": "2026-10-18"},
+          {"id": "s2", "title": "Story s2", "status": "active", "primary_signal": "ownership", "ready": false,
+           "marks": {"time": null, "score": null, "probes": null}, "last": null},
+          {"id": "s4", "title": "Story s4", "status": "bench", "primary_signal": null, "ready": false,
+           "marks": {}, "last": null}],
+         "ready_count": 0, "active_total": 3,
+         "candidates": [{"id": "c1", "title": "The outage", "for_prompt": "a failure", "why": "strong number",
+                         "verdict": "keep", "status": "new"}]}
+        """#
+        let list = try decode(PrepStoryList.self, json)
+        XCTAssertEqual(list.stories.map(\.id), ["s1", "s2", "s4"])
+        XCTAssertEqual(list.stories[0].primarySignal, "ownership")
+        XCTAssertEqual(list.stories[0].marks.time, true)
+        XCTAssertEqual(list.stories[0].marks.probes, true)
+        XCTAssertNil(list.stories[1].marks.score)
+        XCTAssertNil(list.stories[2].primarySignal)
+        XCTAssertNil(list.stories[2].marks.time)
+        XCTAssertEqual(list.stories[2].status, "bench")
+        XCTAssertFalse(list.stories[0].ready)
+        XCTAssertEqual(list.readyCount, 0)
+        XCTAssertEqual(list.activeTotal, 3)
+        XCTAssertEqual(list.candidates.first?.forPrompt, "a failure")
+        XCTAssertEqual(list.candidates.first?.verdict, "keep")
+        XCTAssertEqual(list.candidates.first?.status, "new")
+        // A server with nothing to say still decodes.
+        let empty = try decode(PrepStoryList.self, "{}")
+        XCTAssertTrue(empty.stories.isEmpty)
+        XCTAssertTrue(empty.candidates.isEmpty)
+        XCTAssertEqual(empty.activeTotal, 0)
+    }
+
+    func testDecodesStoryRepExcerpt() throws {
+        let json = #"""
+        {"date": "2026-10-18", "index": 3, "reps": [
+          {"index": 3, "block": "story", "drill": "story",
+           "item": {"id": "s1", "title": null, "prompt": "Describe a time you disagreed with a plan (s1).",
+                    "limit_ms": 240000, "warn_ms": 210000}}]}
+        """#
+        let rep = try XCTUnwrap(decode(PrepRun.self, json).reps.first)
+        XCTAssertEqual(rep.drill, .story)
+        XCTAssertEqual(rep.item.id, "s1")
+        XCTAssertEqual(rep.item.prompt, "Describe a time you disagreed with a plan (s1).")
+        XCTAssertEqual(rep.item.limitMS, 240_000)
+        XCTAssertEqual(rep.item.warnMS, 210_000)
+        // Other drills carry no limits.
+        let plain = try decode(PrepItemExcerpt.self, #"{"id": "x"}"#)
+        XCTAssertNil(plain.limitMS)
+        XCTAssertNil(plain.warnMS)
+    }
+
+    func testDecodesStoryRepWithPendingProbe() throws {
+        let json = #"""
+        {"date": "2026-10-18", "index": 3, "reps": [
+          {"index": 3, "block": "story", "drill": "story",
+           "item": {"id": "s1", "title": null, "prompt": "p", "limit_ms": 240000, "warn_ms": 210000},
+           "pending": {"attempt": "942bad09", "number": 2, "probe": {"id": "p2", "attack": "What did it not fix?"}}},
+          {"index": 4, "block": "new", "drill": "approach", "item": {"id": "y"}}]}
+        """#
+        let reps = try decode(PrepRun.self, json).reps
+        XCTAssertEqual(reps[0].pending, PrepStoryPending(
+            attempt: "942bad09", number: 2, probe: PrepProbe(id: "p2", attack: "What did it not fix?")))
+        XCTAssertNil(reps[1].pending)
+    }
+
+    func testDecodesStoryAttemptResultWithProbe() throws {
+        let json = #"""
+        {"verdict": "pass", "correct": null, "feedback": "", "credit": 1.0, "reference_md": null, "links": {},
+         "next_index": 0, "streak": {"days": 1, "freezes": 0, "last_day": "2026-10-18"},
+         "grade": {"verdict": "pass",
+                   "points_hit": [{"point_id": "b.situation", "quote": ""}, {"point_id": "b.task", "quote": ""}],
+                   "points_missed": [{"point_id": "b.number", "why": "w"}],
+                   "strong_answer": "I'd tell s1 like this.", "weakest": "b.number"},
+         "score": 4, "elapsed_ms": 200000, "weakest": "b.number", "story_told": "s1", "role": "backup",
+         "points": [{"id": "b.situation", "text": "Beat b.situation of s1"},
+                    {"id": "b.number", "text": "Beat b.number of s1"}],
+         "attempt": "942bad09-74ec-4893-a90b-65cbae0c9971",
+         "probe": {"id": "s1.p1", "attack": "What was the number for s1?"},
+         "say_it_md": "I'd tell s1 like this."}
+        """#
+        let result = try decode(PrepAttemptResult.self, json)
+        XCTAssertEqual(result.verdict, "pass")
+        XCTAssertEqual(result.score, 4)
+        XCTAssertEqual(result.elapsedMS, 200_000)
+        XCTAssertEqual(result.weakest, "b.number")
+        XCTAssertEqual(result.storyTold, "s1")
+        XCTAssertEqual(result.role, "backup")
+        XCTAssertEqual(result.probe, PrepProbe(id: "s1.p1", attack: "What was the number for s1?"))
+        XCTAssertEqual(result.sayItMD, "I'd tell s1 like this.")
+        XCTAssertNil(result.repVerdict)
+        XCTAssertNil(result.lead)
+        XCTAssertNil(result.backup)
+        XCTAssertEqual(result.attemptID, "942bad09-74ec-4893-a90b-65cbae0c9971")
+        XCTAssertEqual(result.judgment?.pointsHit.count, 2)
+        XCTAssertEqual(result.pointTexts["b.number"], "Beat b.number of s1")
+    }
+
+    func testDecodesWrongStoryNamesLeadAndBackup() throws {
+        let json = #"""
+        {"verdict": "partial", "score": 3, "role": "wrong", "story_told": "s2", "probe": null,
+         "lead": {"id": "s1", "title": "The migration"}, "backup": {"id": "s3", "title": "The outage"}}
+        """#
+        let result = try decode(PrepAttemptResult.self, json)
+        XCTAssertEqual(result.role, "wrong")
+        XCTAssertEqual(result.lead, PrepStoryRef(id: "s1", title: "The migration"))
+        XCTAssertEqual(result.backup, PrepStoryRef(id: "s3", title: "The outage"))
+        XCTAssertNil(result.probe)
+    }
+
+    func testDecodesProbeAttemptResults() throws {
+        let first = try decode(PrepAttemptResult.self, #"""
+        {"verdict": "pass", "credit": 1.0, "next_index": 0,
+         "grade": {"verdict": "pass", "points_hit": [{"point_id": "s1.p1.1", "quote": ""}], "points_missed": [], "strong_answer": ""},
+         "points": [{"id": "s1.p1.1", "text": "States the number"}],
+         "attempt": "4125ebc9", "probe": {"id": "s1.p2", "attack": "What did it not fix in s1?"}}
+        """#)
+        XCTAssertEqual(first.probe?.id, "s1.p2")
+        XCTAssertNil(first.repVerdict)
+        let last = try decode(PrepAttemptResult.self, #"""
+        {"verdict": "pass", "credit": 1.0, "next_index": 0, "attempt": "78262740", "probe": null, "rep_verdict": "pass"}
+        """#)
+        XCTAssertNil(last.probe)
+        XCTAssertEqual(last.repVerdict, "pass")
+        let failed = try decode(PrepAttemptResult.self, #"{"verdict": "fail", "probe": null, "rep_verdict": "fail"}"#)
+        XCTAssertEqual(failed.repVerdict, "fail")
+    }
+
+    func testMergingOverrideKeepsStoryFields() throws {
+        let base = try decode(PrepAttemptResult.self, #"""
+        {"verdict": "partial", "score": 3, "weakest": "b.number", "story_told": "s1", "role": "backup",
+         "probe": {"id": "p1", "attack": "a"}, "say_it_md": "say", "elapsed_ms": 1000}
+        """#)
+        let override = try decode(PrepAttemptResult.self, #"{"verdict": "pass", "score": 4}"#)
+        let merged = PrepAttemptResult(merging: base, override: override)
+        XCTAssertEqual(merged.verdict, "pass")
+        XCTAssertEqual(merged.score, 4)
+        XCTAssertEqual(merged.weakest, "b.number")
+        XCTAssertEqual(merged.storyTold, "s1")
+        XCTAssertEqual(merged.probe?.id, "p1")
+        XCTAssertEqual(merged.sayItMD, "say")
+    }
+
+    func testUnknownDrillStillDecodes() throws {
+        XCTAssertEqual(try decode(PrepDrill.self, #""story""#), .story)
+        XCTAssertEqual(try decode(PrepDrill.self, #""probe""#), .probe)
+        XCTAssertEqual(try decode(PrepDrill.self, #""hologram""#), .unknown)
+        XCTAssertEqual(try decode(PrepRunKind.self, #""story""#), .story)
+        XCTAssertEqual(try decode(PrepRunKind.self, #""hologram""#), .unknown)
+    }
+
+    func testProbeRequestEncodesParentAndProbe() throws {
+        let data = try JSONEncoder().encode(PrepAttemptRequest(
+            date: "2026-10-18", index: 3, item: "s1", drill: .probe,
+            answer: .choice("It was 40%."), elapsedMS: 30_000, hintsUsed: 0,
+            parent: "942bad09", probe: "s1.p1"))
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(body["drill"] as? String, "probe")
+        XCTAssertEqual(body["parent"] as? String, "942bad09")
+        XCTAssertEqual(body["probe"] as? String, "s1.p1")
+        XCTAssertEqual(body["answer"] as? String, "It was 40%.")
+        XCTAssertEqual(body["elapsed_ms"] as? Int, 30_000)
+    }
+
+    func testStoryRequestOmitsConfidence() throws {
+        let data = try JSONEncoder().encode(PrepAttemptRequest(
+            date: "2026-10-18", index: 3, item: "s1", drill: .story,
+            answer: .choice("So the plan was..."), elapsedMS: 200_000, hintsUsed: 0))
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(body["drill"] as? String, "story")
+        XCTAssertEqual(body["run"] as? String, "daily")
+        XCTAssertEqual(body["item"] as? String, "s1")
+        XCTAssertNil(body["confidence"])
+        XCTAssertNil(body["parent"])
+        XCTAssertNil(body["probe"])
+        XCTAssertNil(body["unit"])
+        XCTAssertNil(body["dont_know"])
+    }
 }

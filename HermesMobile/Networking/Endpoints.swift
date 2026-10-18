@@ -168,7 +168,8 @@ enum Endpoint {
     /// the gap ledger (all gaps and one gap) and flagging a coach-written card.
     case tutorHome
     case tutorToday
-    /// A test out (`run: "testout"` with its unit) or a mock run (`run: "mock"`) of `/api/tutor/today`.
+    /// A test out (`run: "testout"` with its unit), a mock run (`run: "mock"`) or one story rep
+    /// (`run: "story"` with its story id) of `/api/tutor/today`.
     case tutorRun(run: String, unit: String?)
     case tutorCourse
     case tutorOverride
@@ -179,6 +180,7 @@ enum Endpoint {
     case tutorGaps
     case tutorGap(id: String)
     case tutorFlag
+    case tutorStories
     /// The feedback loop (`api/feedback.py`): list or create entries, read a plan, decide on an entry.
     case feedbackList
     case feedbackPlan(id: String)
@@ -497,6 +499,8 @@ enum Endpoint {
             return "/api/tutor/gap"
         case .tutorFlag:
             return "/api/tutor/flag"
+        case .tutorStories:
+            return "/api/tutor/stories"
         case .feedbackList:
             return "/api/feedback"
         case let .feedbackPlan(id):
