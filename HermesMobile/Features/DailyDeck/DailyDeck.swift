@@ -223,16 +223,20 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     }
 }
 
-/// Last night from the user's watch, already written as lines by the brief: `headline` is hours
-/// against need ("8.5 h of 9 h needed", nil before the watch syncs), `lines` the timing and
-/// recovery, `nights` the last seven, oldest first, for the strip chart. `insight` is the one thing
-/// that stood out and `parts` the WHOOP-style parts against the 30-night average.
+/// Last night from the user's watch, already written by the brief: `headline` is hours against need
+/// ("8.5 h of 9 h needed", nil before the watch syncs), `lines` the timing and recovery (for decks
+/// without tiles), `nights` the last seven, oldest first, for the charts. `tiles` are last night's
+/// stats (asleep, woke, slept, wake-ups), `coach` the sleep coach's note and `insight` the one-line
+/// fallback when there is no note. `hrvBand` is Garmin's normal range for HRV.
 struct DeckSleep: Decodable, Equatable {
     let headline: String?
     let lines: [String]
     let nights: [DeckNight]
     let insight: String?
-    let parts: [DeckSleepPart]
+    let tiles: [DeckSleepTile]
+    let coach: DeckSleepCoach?
+    let hrvBand: ClosedRange<Double>?
+    let hrvStatus: String?
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -240,17 +244,28 @@ struct DeckSleep: Decodable, Equatable {
         lines = (try? c.decodeIfPresent([String].self, forKey: .lines)) ?? []
         nights = (try? c.decodeIfPresent([DeckNight].self, forKey: .nights)) ?? []
         insight = (try? c.decodeIfPresent(String.self, forKey: .insight)).flatMap { $0.isEmpty ? nil : $0 }
-        parts = ((try? c.decodeIfPresent([Lossy<DeckSleepPart>].self, forKey: .parts)) ?? []).compactMap(\.value)
+        tiles = ((try? c.decodeIfPresent([Lossy<DeckSleepTile>].self, forKey: .tiles)) ?? []).compactMap(\.value)
+        coach = try? c.decodeIfPresent(DeckSleepCoach.self, forKey: .coach)
+        let band = (try? c.decodeIfPresent([Double].self, forKey: .hrvBand)) ?? []
+        hrvBand = band.count == 2 && band[0] < band[1] ? band[0]...band[1] : nil
+        hrvStatus = (try? c.decodeIfPresent(String.self, forKey: .hrvStatus)).flatMap { $0.isEmpty ? nil : $0 }
     }
 
-    private enum CodingKeys: String, CodingKey { case headline, lines, nights, insight, parts }
+    /// `hrv_band` and `hrv_status` on the wire: the deck decodes snake_case keys.
+    private enum CodingKeys: String, CodingKey { case headline, lines, nights, insight, tiles, coach, hrvBand, hrvStatus }
 }
 
-/// One part of last night's sleep, already written by the brief: "Wake-ups", "4", "+2 vs avg".
-struct DeckSleepPart: Decodable, Equatable {
+/// One of last night's stats, already written by the brief: "Wake-ups", "4", "usually 2 · 54 min awake".
+struct DeckSleepTile: Decodable, Equatable {
     let label: String
     let value: String
-    let vs: String?
+    let note: String?
+}
+
+/// The sleep coach's note on the card: who wrote it and what she said.
+struct DeckSleepCoach: Decodable, Equatable {
+    let name: String
+    let text: String
 }
 
 /// Something that might have shaped the night ("Late meal"); `id` is what gets filed.
@@ -259,20 +274,23 @@ struct DeckSleepTag: Decodable, Equatable, Identifiable {
     let label: String
 }
 
-/// One night on the strip: its weekday and hours slept against hours needed (nil when unknown).
+/// One night on the charts: its weekday, hours slept against hours needed, and overnight HRV
+/// (each nil when unknown).
 struct DeckNight: Decodable, Equatable {
     let day: String
     let hours: Double?
     let need: Double?
+    let hrv: Double?
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         day = (try? c.decode(String.self, forKey: .day)) ?? ""
         hours = try? c.decodeIfPresent(Double.self, forKey: .hours)
         need = try? c.decodeIfPresent(Double.self, forKey: .need)
+        hrv = try? c.decodeIfPresent(Double.self, forKey: .hrv)
     }
 
-    private enum CodingKeys: String, CodingKey { case day, hours, need }
+    private enum CodingKeys: String, CodingKey { case day, hours, need, hrv }
 }
 
 /// One item in a recap card. An entry that fails to decode is dropped, never the card.

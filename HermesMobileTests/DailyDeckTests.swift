@@ -778,9 +778,11 @@ final class DailyDeckTests: XCTestCase {
     {"date": "2026-10-04", "kind": "morning", "cards": [
       {"id": "sleep", "type": "sleep", "question": "How did you sleep?", "scale": ["Very poor", "Poor", "Fair", "Good", "Very good"],
        "sleep": {"headline": "8.5 h of 9 h needed", "lines": ["Asleep 10:31 pm · up 7:19 am"],
-                 "nights": [{"day": "Sun", "hours": 7.6, "need": 9}, {"day": "Mon", "hours": null}, {"day": 3, "hours": "x"}],
+                 "nights": [{"day": "Sun", "hours": 7.6, "need": 9, "hrv": 92}, {"day": "Mon", "hours": null}, {"day": 3, "hours": "x"}],
                  "insight": "4 wake-ups against 2 on a usual night: a broken night.",
-                 "parts": [{"label": "Wake-ups", "value": "4", "vs": "+2 vs avg"}, {"label": "Performance", "value": "90", "vs": null}, {"label": 5}]},
+                 "tiles": [{"label": "Wake-ups", "value": "4", "note": "usually 2 · 54 min awake"}, {"label": "Asleep", "value": "11:05 pm", "note": null}, {"label": 5}],
+                 "coach": {"name": "Dr. Mara Quinn", "text": "Finish dinner by 7:30 pm."},
+                 "hrv_band": [85, 104], "hrv_status": "balanced"},
        "tags": [{"id": "late_meal", "label": "Late meal"}, {"id": "ill"}, {"id": "ill", "label": "Ill"}],
        "fallback": "How did you sleep? Last night: 8.5 h of 9 h needed.", "reason": "From your Garmin"},
       {"id": "close", "type": "close"}
@@ -861,18 +863,24 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(model.answeredCount, 0)
     }
 
-    func testSleepCardDecodesItsTagsPartsAndInsight() throws {
+    func testSleepCardDecodesItsTagsTilesCoachAndHRV() throws {
         let card = try DailyDeck.decode(Self.sleepDeckJSON).cards[0]
         XCTAssertEqual(card.tags.map(\.id), ["late_meal", "ill"], "a tag without a label is dropped")
         let sleep = try XCTUnwrap(card.sleep)
         XCTAssertEqual(sleep.insight, "4 wake-ups against 2 on a usual night: a broken night.")
-        XCTAssertEqual(sleep.parts.map(\.label), ["Wake-ups", "Performance"], "a malformed part is dropped")
-        XCTAssertEqual(sleep.parts[0].vs, "+2 vs avg")
-        XCTAssertNil(sleep.parts[1].vs)
-        let bare = try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"sleep","type":"sleep","sleep":{}}]}"#).cards[0]
+        XCTAssertEqual(sleep.tiles.map(\.label), ["Wake-ups", "Asleep"], "a malformed tile is dropped")
+        XCTAssertEqual(sleep.tiles[0].note, "usually 2 · 54 min awake")
+        XCTAssertNil(sleep.tiles[1].note)
+        XCTAssertEqual(sleep.coach, DeckSleepCoach(name: "Dr. Mara Quinn", text: "Finish dinner by 7:30 pm."))
+        XCTAssertEqual(sleep.hrvBand, 85...104)
+        XCTAssertEqual(sleep.hrvStatus, "balanced")
+        XCTAssertEqual(sleep.nights.map(\.hrv), [92, nil, nil])
+        let bare = try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"sleep","type":"sleep","sleep":{"hrv_band":[104,85],"coach":{"name":"x"}}}]}"#).cards[0]
         XCTAssertEqual(bare.tags, [])
         XCTAssertNil(bare.sleep?.insight)
-        XCTAssertEqual(bare.sleep?.parts, [])
+        XCTAssertEqual(bare.sleep?.tiles, [])
+        XCTAssertNil(bare.sleep?.coach, "a note without text is dropped")
+        XCTAssertNil(bare.sleep?.hrvBand, "a backwards range is dropped")
     }
 
     @MainActor

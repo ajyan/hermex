@@ -729,6 +729,7 @@
 		2A8CB7ACCDBA9BBE34E57FDC /* DailyDeckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A997D807C262D12E5491E89 /* DailyDeckTests.swift */; };
 		AAAFB91D932E2ADD51ACD585 /* SleepHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B826C8CFB95FD5314B8A0E1 /* SleepHistoryTests.swift */; };
 		456FFBA86135A0D6C5707B5E /* DeckCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59FBDD2AD47605DA28200130 /* DeckCalendarView.swift */; };
+		5DFA5B4E21C6F51D34489C02 /* DeckSleepNumbers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B33604040E371DDEAAA3233 /* DeckSleepNumbers.swift */; };
 		6558EDEF58658253C946EE42 /* SleepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46BA9EE4C71E9E6A415257AE /* SleepView.swift */; };
 		13A7B5CF099A07910F14892D /* SleepTrendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A542BA8F004677106522A085 /* SleepTrendsView.swift */; };
 		FD4049B2B7AF5E31E4B777B6 /* SleepHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF12A25A8C2379C829072953 /* SleepHistory.swift */; };
@@ -1524,6 +1525,7 @@
 		3A997D807C262D12E5491E89 /* DailyDeckTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDeckTests.swift; sourceTree = "<group>"; };
 		6B826C8CFB95FD5314B8A0E1 /* SleepHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepHistoryTests.swift; sourceTree = "<group>"; };
 		59FBDD2AD47605DA28200130 /* DeckCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckCalendarView.swift; sourceTree = "<group>"; };
+		5B33604040E371DDEAAA3233 /* DeckSleepNumbers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckSleepNumbers.swift; sourceTree = "<group>"; };
 		46BA9EE4C71E9E6A415257AE /* SleepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepView.swift; sourceTree = "<group>"; };
 		A542BA8F004677106522A085 /* SleepTrendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepTrendsView.swift; sourceTree = "<group>"; };
 		EF12A25A8C2379C829072953 /* SleepHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepHistory.swift; sourceTree = "<group>"; };
@@ -2610,6 +2612,7 @@
 			isa = PBXGroup;
 			children = (
 				59FBDD2AD47605DA28200130 /* DeckCalendarView.swift */,
+				5B33604040E371DDEAAA3233 /* DeckSleepNumbers.swift */,
 				46BA9EE4C71E9E6A415257AE /* SleepView.swift */,
 				A542BA8F004677106522A085 /* SleepTrendsView.swift */,
 				EF12A25A8C2379C829072953 /* SleepHistory.swift */,
@@ -2909,6 +2912,7 @@
 				C0FFEE50000000000000000B /* MoneyMarketView.swift in Sources */,
 				C0FFEE50000000000000000D /* MoneySparkline.swift in Sources */,
 				456FFBA86135A0D6C5707B5E /* DeckCalendarView.swift in Sources */,
+				5DFA5B4E21C6F51D34489C02 /* DeckSleepNumbers.swift in Sources */,
 				6558EDEF58658253C946EE42 /* SleepView.swift in Sources */,
 				13A7B5CF099A07910F14892D /* SleepTrendsView.swift in Sources */,
 				FD4049B2B7AF5E31E4B777B6 /* SleepHistory.swift in Sources */,
