@@ -7,6 +7,8 @@ import SwiftUI
 struct DeckMandarinCard: View {
     let card: DeckCard
     let palette: DeckPalette
+    /// The question on display: the deck's, or his own from "Ask My Own Question".
+    let asked: String?
 
     @State private var speaker = MandarinSpeaker()
     @State private var revealed: Set<String> = []
@@ -29,16 +31,23 @@ struct DeckMandarinCard: View {
                 }
             }
             .padding(.top, 18)
-            if let question = card.question {
+            if let asked {
+                let line = Self.questionLine(card: card, asked: asked)
                 Text(verbatim: "Your turn")
                     .font(AppFont.footnote(weight: .semibold))
                     .foregroundStyle(palette.ink)
                     .padding(.top, 26)
-                row(hanzi: question, pinyin: card.questionPinyin, english: card.questionEn, isReview: false, isQuestion: true)
+                row(hanzi: line.hanzi, pinyin: line.pinyin, english: line.english, isReview: false, isQuestion: true)
                     .padding(.top, 6)
             }
         }
         .onDisappear { speaker.stop() }
+    }
+
+    /// The question line: the deck's pinyin and English only belong to the deck's own question.
+    static func questionLine(card: DeckCard, asked: String) -> (hanzi: String, pinyin: String?, english: String?) {
+        guard asked == card.question else { return (asked, nil, nil) }
+        return (asked, card.questionPinyin, card.questionEn)
     }
 
     private func feedback(_ yesterday: DeckMandarinFeedback) -> some View {
@@ -125,11 +134,17 @@ final class MandarinSpeaker {
     private(set) var speaking: String?
 
     @ObservationIgnored private let synthesizer: ChatSpeechSynthesizing
+    @ObservationIgnored private let audioSession: ListenAudioSessionControlling
     @ObservationIgnored private var proxy: MandarinSpeakerDelegate?
     @ObservationIgnored private var current: ObjectIdentifier?
 
-    init(synthesizer: ChatSpeechSynthesizing = AVSpeechSynthesizer()) {
+    /// `audioSession` is chat Listen's: playback on the speaker, left alone while dictation records.
+    init(
+        synthesizer: ChatSpeechSynthesizing = AVSpeechSynthesizer(),
+        audioSession: ListenAudioSessionControlling? = nil
+    ) {
         self.synthesizer = synthesizer
+        self.audioSession = audioSession ?? ListenAudioSessionController()
         let proxy = MandarinSpeakerDelegate { [weak self] id in self?.utteranceEnded(id) }
         self.proxy = proxy
         synthesizer.delegate = proxy
@@ -140,6 +155,7 @@ final class MandarinSpeaker {
         guard id == current else { return }
         current = nil
         speaking = nil
+        audioSession.deactivate()
     }
 
     func toggle(_ text: String) {
@@ -151,6 +167,7 @@ final class MandarinSpeaker {
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.85
         speaking = text
         current = ObjectIdentifier(utterance)
+        audioSession.activate()
         synthesizer.speak(utterance)
     }
 
@@ -159,6 +176,7 @@ final class MandarinSpeaker {
         speaking = nil
         current = nil
         synthesizer.stopSpeaking(at: .immediate)
+        audioSession.deactivate()
     }
 }
 
@@ -168,6 +186,15 @@ private final class MandarinSpeakerDelegate: NSObject, AVSpeechSynthesizerDelega
     init(onDone: @escaping @MainActor (ObjectIdentifier) -> Void) { self.onDone = onDone }
 
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        report(utterance)
+    }
+
+    /// An interruption cancels without a finish; clear the ▶ state the same way.
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        report(utterance)
+    }
+
+    private func report(_ utterance: AVSpeechUtterance) {
         let id = ObjectIdentifier(utterance)
         Task { @MainActor [onDone] in onDone(id) }
     }

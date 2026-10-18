@@ -141,7 +141,7 @@ private struct DeckCardView: View {
             .accessibilityElement(children: .combine)
         }
         if card.isMandarin {
-            DeckMandarinCard(card: card, palette: palette)
+            DeckMandarinCard(card: card, palette: palette, asked: viewModel.question(for: card))
         }
         if !card.isMandarin, let lead = text.lead {
             Text(inlineMarkdown(lead))
