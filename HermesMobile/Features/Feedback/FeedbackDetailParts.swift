@@ -25,17 +25,18 @@ struct FeedbackStage: Equatable {
         self.mark = mark
     }
 
-    /// Nil for a rejected entry, which left the track.
+    /// Nil for a rejected or undone entry, which left the track.
     init?(entry: FeedbackEntry) {
         switch entry.status {
         case .new, .planning: self.init(index: 1, mark: .working)
         case .planned: self.init(index: 1, mark: .waiting)
         case .approved, .building: self.init(index: 2, mark: .working)
         case .ready: self.init(index: 3, mark: .waiting)
-        case .merged: self.init(index: 3, mark: .finished)
+        case .merged, .shipped: self.init(index: 3, mark: .finished)
         // A plan's summary means planning finished, so the build is what failed.
         case .failed: self.init(index: entry.summary == nil ? 1 : 2, mark: .failed)
-        case .rejected, .unknown: return nil
+        // An undone fix left the track, like a rejected one.
+        case .rejected, .reverted, .unknown: return nil
         }
     }
 

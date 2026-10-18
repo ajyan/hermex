@@ -76,8 +76,9 @@ final class FeedbackInboxViewModel {
         }
     }
 
-    /// Posts a decision. On success the server's folded entry replaces the row; a 409
-    /// means the entry moved on, so the inbox reloads. A reply needs a note.
+    /// Posts a decision. On success the server's folded entry replaces the row. A 409 shows
+    /// the server's reason when it gives one ("Not on master yet. …"), else says the entry
+    /// moved on, and the inbox reloads. A reply needs a note.
     func decide(_ entry: FeedbackEntry, _ decision: FeedbackDecision) async {
         guard pendingID == nil else { return }
         var decision = decision
@@ -95,8 +96,8 @@ final class FeedbackInboxViewModel {
         do {
             let updated = try await client.decide(id: entry.id, decision)
             replace(entry.id, with: updated)
-        } catch let APIError.http(statusCode, _) where statusCode == 409 {
-            error = "This changed on the server. Showing the latest."
+        } catch let conflict as APIError where Self.isConflict(conflict) {
+            error = conflict.serverMessage ?? "This changed on the server. Showing the latest."
             await load()
         } catch {
             guard !Self.isCancellation(error) else { return }
@@ -137,6 +138,26 @@ final class FeedbackInboxViewModel {
         return false
     }
 
+    static func isConflict(_ error: Error) -> Bool {
+        if case APIError.http(let statusCode, _) = error { return statusCode == 409 }
+        return false
+    }
+
+    /// The entry's current status a 409 reports: the body's `status`, which the server sends
+    /// with every transition conflict, else read from its "cannot go from <status> to …" error.
+    static func conflictStatus(_ error: Error) -> FeedbackStatus? {
+        guard case APIError.http(409, let body) = error else { return nil }
+        if let data = body?.data(using: .utf8),
+           let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let status = object["status"] as? String {
+            return FeedbackStatus(wire: status)
+        }
+        guard let message = (error as? APIError)?.serverMessage,
+              let range = message.range(of: "cannot go from ") else { return nil }
+        let word = message[range.upperBound...].prefix { !$0.isWhitespace }
+        return FeedbackStatus(wire: String(word))
+    }
+
     private static func isCancellation(_ error: Error) -> Bool {
         error is CancellationError || (error as? URLError)?.code == .cancelled
     }
@@ -162,8 +183,25 @@ extension FeedbackStatus {
         self == .planned || self == .ready || self == .failed
     }
 
-    /// Whether Reject is one of those decisions; it is for every status that has any.
-    var canReject: Bool { hasDecisions }
+    /// Whether Drop (a `reject` decision) is offered in the detail's action bar: for every
+    /// status with decisions, and for a note still waiting for tonight.
+    var canReject: Bool { hasDecisions || self == .new }
+
+    /// Whether Undo is offered: a fix the nightly job shipped.
+    var canUndo: Bool { self == .shipped }
+
+    /// Whether the detail shows its action bar: the decisions, Drop on a new note, Undo on a
+    /// shipped fix, or Redo plan on an undone one.
+    var hasActions: Bool { canReject || self == .shipped || self == .reverted }
+
+    /// The Drop confirmation's title and message.
+    var rejectConfirmation: (title: String, message: String) {
+        switch self {
+        case .ready: ("Drop this branch?", "It moves to Done. The branch stays on your Mac until you delete it.")
+        case .new: ("Drop this note?", "It moves to Done and won't be planned.")
+        default: ("Drop this?", "It moves to Done and won't be built.")
+        }
+    }
 
     /// What the detail's Plan block says when there is no plan to show.
     var noPlanText: String {

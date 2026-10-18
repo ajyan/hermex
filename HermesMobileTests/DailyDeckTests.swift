@@ -98,6 +98,143 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertFalse(card.takesText)
     }
 
+    // MARK: - What changed
+
+    func testChangesCardDecodes() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"2026-10-18","kind":"weekly","cards":[
+          {"id":"changes","type":"changes","title":"What changed","rows":[
+            {"id":"fb-1","said":"The deck keeps asking the same question","change":"Rotate deck questions","state":"shipped","recurred":0,"undoable":true},
+            {"id":"fb-2","said":"Mandarin audio too fast","change":"Slow Mandarin playback","state":"recurred","recurred":2,"undoable":false,"extra":{"x":1}},
+            {"said":"No id, dropped"},
+            {"id":"fb-3","said":"x","change":"y","state":"teleported"},
+            {"id":"fb-4","state":"reverted"}]}]}
+        """#)
+        let card = try XCTUnwrap(deck.cards.first)
+        XCTAssertEqual(card.type, .changes)
+        XCTAssertEqual(card.title, "What changed")
+        XCTAssertEqual(card.rows.map(\.id), ["fb-1", "fb-2", "fb-3", "fb-4"], "a row without an id is dropped alone")
+        XCTAssertEqual(card.rows[0].said, "The deck keeps asking the same question")
+        XCTAssertEqual(card.rows[0].change, "Rotate deck questions")
+        XCTAssertEqual(card.rows[0].state, .shipped)
+        XCTAssertEqual(card.rows[0].undoable, true)
+        XCTAssertEqual(card.rows[1].state, .recurred)
+        XCTAssertEqual(card.rows[1].recurred, 2)
+        XCTAssertEqual(card.rows[2].state, .unknown("teleported"))
+        XCTAssertNil(card.rows[2].undoable)
+        XCTAssertEqual(card.rows[3].said, "")
+        XCTAssertFalse(card.takesFeedback)
+        XCTAssertFalse(card.takesText)
+        XCTAssertEqual(DeckPalette.of(card).name, "What changed")
+    }
+
+    func testChangeRowStateLabels() throws {
+        func row(_ state: String, recurred: Int? = nil) throws -> DeckChangeRow {
+            var object: [String: Any] = ["id": "fb", "said": "s", "change": "c", "state": state]
+            if let recurred { object["recurred"] = recurred }
+            return try JSONDecoder().decode(DeckChangeRow.self, from: JSONSerialization.data(withJSONObject: object))
+        }
+        XCTAssertEqual(try row("shipped").state.label(recurred: nil), "Shipped")
+        XCTAssertEqual(try row("merged").state.label(recurred: nil), "Merged")
+        XCTAssertEqual(try row("held").state.label(recurred: nil), "Held")
+        XCTAssertEqual(try row("recurred", recurred: 3).state.label(recurred: 3), "Recurred ×3")
+        XCTAssertEqual(try row("recurred").state.label(recurred: nil), "Recurred")
+        XCTAssertEqual(try row("reverted").state.label(recurred: nil), "Undone")
+    }
+
+    func testChangesCardMissingRowsDecodes() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"d","kind":"weekly","cards":[{"id":"changes","type":"changes","title":"What changed"},
+                                             {"id":"changes-2","type":"changes","rows":"nope"}]}
+        """#)
+        XCTAssertEqual(deck.cards.map(\.type), [.changes, .changes])
+        XCTAssertEqual(deck.cards[0].rows, [])
+        XCTAssertEqual(deck.cards[1].rows, [])
+    }
+
+    func testOlderTypeStaysUnknown() throws {
+        let deck = try DailyDeck.decode(#"{"date":"d","kind":"weekly","cards":[{"id":"c","type":"changes_v2","rows":[]}]}"#)
+        XCTAssertEqual(deck.cards[0].type, .unknown("changes_v2"))
+    }
+
+    @MainActor
+    func testUndoChangePostsUndoAndFlipsRow() async throws {
+        let feedback = DeckFeedbackStub()
+        let viewModel = makeViewModel(ScriptedDailyDeckClient(workspaces: [], names: [], deck: Self.deckJSON), feedback: feedback)
+        let row = try Self.changeRow(id: "fb-1", state: "shipped", undoable: true)
+        XCTAssertTrue(viewModel.canUndo(row))
+
+        await viewModel.undoChange(row)
+
+        let decisions = await feedback.decisions
+        XCTAssertEqual(decisions.map(\.id), ["fb-1"])
+        XCTAssertEqual(decisions.map(\.decision), [.undo])
+        XCTAssertEqual(viewModel.changeState(row), .reverted)
+        XCTAssertFalse(viewModel.canUndo(row), "an undone row offers no second Undo")
+        XCTAssertNil(viewModel.changeErrors[row.id])
+        XCTAssertNil(viewModel.undoingChangeID)
+    }
+
+    @MainActor
+    func testUndoChange409ShowsMessage() async throws {
+        let feedback = DeckFeedbackStub()
+        await feedback.fail(with: APIError.http(statusCode: 409, body: #"{"error": "The vault has uncommitted edits to tools/deck_pool.py.", "revert_sha": "abc123"}"#))
+        let viewModel = makeViewModel(ScriptedDailyDeckClient(workspaces: [], names: [], deck: Self.deckJSON), feedback: feedback)
+        let row = try Self.changeRow(id: "fb-1", state: "shipped", undoable: true)
+
+        await viewModel.undoChange(row)
+
+        XCTAssertEqual(viewModel.changeErrors["fb-1"], "The vault has uncommitted edits to tools/deck_pool.py.")
+        XCTAssertEqual(viewModel.changeState(row), .shipped, "nothing changes until the server says so")
+        XCTAssertTrue(viewModel.canUndo(row))
+    }
+
+    @MainActor
+    func testUndoChangeConflictSayingRevertedFlipsTheRowWithoutAStatusField() async throws {
+        let feedback = DeckFeedbackStub()
+        await feedback.fail(with: APIError.http(statusCode: 409, body: #"{"error": "cannot go from reverted to reverted"}"#))
+        let viewModel = makeViewModel(ScriptedDailyDeckClient(workspaces: [], names: [], deck: Self.deckJSON), feedback: feedback)
+        let row = try Self.changeRow(id: "fb-1", state: "shipped", undoable: true)
+
+        await viewModel.undoChange(row)
+
+        XCTAssertEqual(viewModel.changeState(row), .reverted)
+        XCTAssertEqual(viewModel.changeNotices["fb-1"], "Already undone")
+        XCTAssertNil(viewModel.changeErrors["fb-1"], "not shown as a failure")
+        XCTAssertFalse(viewModel.canUndo(row))
+    }
+
+    @MainActor
+    func testUndoChangeOtherFailureShowsGenericMessage() async throws {
+        let feedback = DeckFeedbackStub()
+        await feedback.fail(with: APIError.http(statusCode: 500, body: nil))
+        let viewModel = makeViewModel(ScriptedDailyDeckClient(workspaces: [], names: [], deck: Self.deckJSON), feedback: feedback)
+        let row = try Self.changeRow(id: "fb-1", state: "shipped", undoable: true)
+
+        await viewModel.undoChange(row)
+
+        XCTAssertEqual(viewModel.changeErrors["fb-1"], "Couldn't undo that. Try again.")
+        XCTAssertEqual(viewModel.changeState(row), .shipped)
+    }
+
+    @MainActor
+    func testRowThatIsNotUndoableIsNotSent() async throws {
+        let feedback = DeckFeedbackStub()
+        let viewModel = makeViewModel(ScriptedDailyDeckClient(workspaces: [], names: [], deck: Self.deckJSON), feedback: feedback)
+        let row = try Self.changeRow(id: "fb-2", state: "merged", undoable: false)
+
+        XCTAssertFalse(viewModel.canUndo(row))
+        await viewModel.undoChange(row)
+
+        let decisions = await feedback.decisions
+        XCTAssertTrue(decisions.isEmpty)
+    }
+
+    static func changeRow(id: String, state: String, undoable: Bool) throws -> DeckChangeRow {
+        let object: [String: Any] = ["id": id, "said": "Note", "change": "Change", "state": state, "recurred": 0, "undoable": undoable]
+        return try JSONDecoder().decode(DeckChangeRow.self, from: JSONSerialization.data(withJSONObject: object))
+    }
+
     func testCardWithWrongFieldTypesStillDecodes() throws {
         let deck = try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"x","type":"item","title":7,"lines":"no"}]}"#)
         XCTAssertNil(deck.cards[0].title)
@@ -1132,9 +1269,9 @@ final class DailyDeckTests: XCTestCase {
     // MARK: - Helpers
 
     @MainActor
-    private func makeViewModel(_ client: ScriptedDailyDeckClient) -> DailyDeckViewModel {
+    private func makeViewModel(_ client: ScriptedDailyDeckClient, feedback: (any FeedbackDataClient)? = nil) -> DailyDeckViewModel {
         let now = morning
-        return DailyDeckViewModel(server: server, client: client, store: store, now: { now })
+        return DailyDeckViewModel(server: server, client: client, store: store, feedback: feedback, now: { now })
     }
 
     static let deckJSON = """
@@ -1208,7 +1345,73 @@ final class BriefFileHTTPTests: APIClientTestCase {
     }
 }
 
+/// A stale What changed card's Undo against `URLProtocol` mocks: the server's transition 409.
+final class DeckUndoHTTPTests: APIClientTestCase {
+    @MainActor
+    private func undo(answering body: String) async throws -> (DailyDeckViewModel, DeckChangeRow) {
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.url?.path, "/api/feedback/fb-1/decision")
+            return apiTestJSONResponse(body, for: request, status: 409)
+        }
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "DeckUndoHTTPTests.\(UUID().uuidString)"))
+        let viewModel = DailyDeckViewModel(
+            server: URL(string: "https://example.test")!,
+            client: ScriptedDailyDeckClient(workspaces: [], names: [], deck: DailyDeckTests.deckJSON),
+            store: DailyDeckStore(defaults: defaults),
+            feedback: APIClientFeedbackAdapter(apiClient: client))
+        let row = try DailyDeckTests.changeRow(id: "fb-1", state: "shipped", undoable: true)
+        await viewModel.undoChange(row)
+        return (viewModel, row)
+    }
+
+    @MainActor
+    func testAlreadyUndoneSaysSoAndFlipsTheRow() async throws {
+        let (viewModel, row) = try await undo(answering: #"{"error": "cannot go from reverted to reverted", "status": "reverted"}"#)
+
+        XCTAssertEqual(viewModel.changeNotices["fb-1"], "Already undone")
+        XCTAssertNil(viewModel.changeErrors["fb-1"], "the raw transition error never shows")
+        XCTAssertEqual(viewModel.changeState(row), .reverted)
+        XCTAssertFalse(viewModel.canUndo(row))
+    }
+
+    @MainActor
+    func testAnotherConflictStillShowsTheServersReason() async throws {
+        let (viewModel, row) = try await undo(answering: #"{"error": "The vault has uncommitted edits to tools/deck_pool.py.", "status": "shipped"}"#)
+
+        XCTAssertEqual(viewModel.changeErrors["fb-1"], "The vault has uncommitted edits to tools/deck_pool.py.")
+        XCTAssertNil(viewModel.changeNotices["fb-1"])
+        XCTAssertEqual(viewModel.changeState(row), .shipped)
+        XCTAssertTrue(viewModel.canUndo(row))
+    }
+}
+
 /// A clock the test moves by hand.
+/// The feedback API as the What changed card uses it: decisions only.
+actor DeckFeedbackStub: FeedbackDataClient {
+    struct Decided: Sendable {
+        let id: String
+        let decision: FeedbackDecision
+    }
+
+    private(set) var decisions: [Decided] = []
+    private var decisionError: Error?
+
+    func fail(with error: Error) { decisionError = error }
+
+    func list() async throws -> [FeedbackEntry] { [] }
+    func plan(id: String) async throws -> FeedbackPlan { FeedbackPlan(markdown: "") }
+    func create(_ body: FeedbackCreate) async throws -> FeedbackEntry { throw APIError.http(statusCode: 500, body: nil) }
+
+    func decide(id: String, _ decision: FeedbackDecision) async throws -> FeedbackEntry {
+        decisions.append(Decided(id: id, decision: decision))
+        if let decisionError { throw decisionError }
+        return try FeedbackDecoding.decode(FeedbackEntry.self, from: Data(#"{"id":"\#(id)","status":"reverted"}"#.utf8))
+    }
+
+    func isAvailable() async -> Bool { true }
+}
+
 final class TestDeckClock: @unchecked Sendable {
     var now: Date
     init(_ now: Date) { self.now = now }
