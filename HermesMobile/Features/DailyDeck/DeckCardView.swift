@@ -67,6 +67,8 @@ private struct DeckCardView: View {
     @State private var showsNumbers = false
     /// The Sleep screen, opened from the sleep card's numbers.
     @State private var showsSleepHistory = false
+    /// The card's diagram, while its sheet is open.
+    @State private var openDiagram: BriefDiagramIndex.Entry?
 
     var body: some View {
         ScrollView {
@@ -105,6 +107,9 @@ private struct DeckCardView: View {
             SleepView(viewModel: SleepViewModel(today: SleepNight.dayFormatter.date(from: deck.date) ?? .now) {
                 try await deck.sleepHistory()
             })
+        }
+        .sheet(item: $openDiagram) { entry in
+            BriefDiagramSheet(entry: entry, viewModel: viewModel)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text(verbatim: palette.name))
@@ -148,6 +153,17 @@ private struct DeckCardView: View {
                 .font(AppFont.subheadline(weight: .medium))
                 .foregroundStyle(palette.ink)
                 .padding(.top, 12)
+        }
+        if let diagram = viewModel.diagram(for: card) {
+            Button { openDiagram = diagram } label: {
+                HXChip(paper: palette.colors, symbol: "point.3.connected.trianglepath.dotted", label: "Diagram")
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 6)
+            .accessibilityLabel(Text(verbatim: "Diagram: \(diagram.title ?? "interactive")"))
+            .accessibilityHint(Text(verbatim: "Opens an interactive diagram"))
         }
         if let detail = text.detail {
             Text(inlineMarkdown(detail))
