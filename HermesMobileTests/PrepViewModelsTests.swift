@@ -398,7 +398,7 @@ final class PrepViewModelsTests: XCTestCase {
 
     // MARK: Stories on home
 
-    private func storyList(candidates: String = "") -> PrepStoryList {
+    private func storyList(candidates: String = "", dismissed: String = "") -> PrepStoryList {
         decode(PrepStoryList.self, #"""
         {"stories": [
           {"id": "s1", "title": "The migration", "status": "active", "primary_signal": "ownership", "ready": true,
@@ -407,7 +407,7 @@ final class PrepViewModelsTests: XCTestCase {
            "marks": {"time": true, "score": false, "probes": null}, "last": null},
           {"id": "s4", "title": "The hire", "status": "bench", "primary_signal": null, "ready": false,
            "marks": {"time": null, "score": null, "probes": null}, "last": null}],
-         "ready_count": 1, "active_total": 8, "candidates": [\#(candidates)]}
+         "ready_count": 1, "active_total": 8, "candidates": [\#(candidates)], "dismissed": [\#(dismissed)]}
         """#)
     }
 
@@ -501,21 +501,41 @@ final class PrepViewModelsTests: XCTestCase {
     func testDismissRemovesCandidate() async {
         let client = FakePrepClient()
         client.storiesResults = [.success(storyList(candidates: candidateJSON("c1"))),
-                                 .success(storyList())]
+                                 .success(storyList(dismissed: candidateJSON("c1", status: "dismissed")))]
         let vm = await homeVM(client)
         await vm.act(on: try! XCTUnwrap(vm.stories?.candidates.first), action: .dismiss)
         XCTAssertEqual(client.log.last, "stories")
         XCTAssertTrue(client.log.contains("candidate:c1:dismiss"))
         XCTAssertEqual(vm.stories?.candidates, [])
+        XCTAssertEqual(vm.stories?.dismissed.map(\.id), ["c1"])
     }
 
-    func testDismissedCandidateStaysGoneWhenRefreshFails() async {
+    func testDismissedCandidateMovesUnderDismissedWhenRefreshFails() async {
         let client = FakePrepClient()
         client.storiesResults = [.success(storyList(candidates: candidateJSON("c1"))), .failure(http(500))]
         let vm = await homeVM(client)
         await vm.act(on: try! XCTUnwrap(vm.stories?.candidates.first), action: .dismiss)
         XCTAssertEqual(vm.stories?.candidates, [])
+        XCTAssertEqual(vm.stories?.dismissed.map(\.status), ["dismissed"], "Not now is never a one-way door")
         XCTAssertEqual(vm.stories?.activeTotal, 8, "the rest of the list stands")
+    }
+
+    func testDismissedCandidateCanBeAddedBack() async {
+        let client = FakePrepClient()
+        client.storiesResults = [.success(storyList(dismissed: candidateJSON("c1", status: "dismissed"))), .failure(http(500))]
+        let vm = await homeVM(client)
+        let candidate = try! XCTUnwrap(vm.stories?.dismissed.first)
+        await vm.act(on: candidate, action: .dismiss)
+        XCTAssertFalse(client.log.contains { $0.hasPrefix("candidate:") }, "a dismissed candidate only offers Add")
+        await vm.act(on: candidate, action: .add)
+        XCTAssertTrue(client.log.contains("candidate:c1:add"))
+        XCTAssertEqual(vm.stories?.dismissed, [])
+        XCTAssertEqual(vm.stories?.candidates.map(\.status), ["drafting"], "back on the cards, drafting")
+    }
+
+    func testStoriesFromAServerWithoutDismissedDecode() {
+        let list = decode(PrepStoryList.self, #"{"stories": [], "ready_count": 0, "active_total": 0, "candidates": []}"#)
+        XCTAssertEqual(list.dismissed, [])
     }
 
     func testCandidateActionFailureKeepsCard() async {

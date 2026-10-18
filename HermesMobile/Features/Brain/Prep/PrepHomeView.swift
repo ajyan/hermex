@@ -94,7 +94,7 @@ struct PrepHomeView: View {
 
     @ViewBuilder
     private var storiesSection: some View {
-        if let stories = viewModel.stories, !stories.stories.isEmpty || !stories.candidates.isEmpty {
+        if let stories = viewModel.stories, !stories.stories.isEmpty || !stories.candidates.isEmpty || !stories.dismissed.isEmpty {
             PrepStorySection(
                 list: stories, inFlight: viewModel.candidatesInFlight, errors: viewModel.candidateErrors,
                 onAct: { candidate, action in
