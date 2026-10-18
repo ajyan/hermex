@@ -245,13 +245,49 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(chat.sent, [tag + "[mock brief] Interview me for the role."])
         XCTAssertNil(controller.lastSentTurn)
 
-        // Muting and unmuting restarts the listener; the brief is not sent again.
-        controller.setMuted(false)
-        update(text: "Tell me about yourself.", streaming: false)
-        speaker.drain()
+        // A mute and unmute restarts the listener; the brief is not sent again.
+        XCTAssertEqual(listener.startCount, 1)
+        bridge.onMuteChanged?(true)
+        bridge.onMuteChanged?(false)
         await controller.lastListenerTask?.value
+        XCTAssertEqual(listener.startCount, 2)
         await controller.lastChatTask?.value
         XCTAssertEqual(chat.sent.count, 1)
+    }
+
+    func testOpeningTurnWaitsOutAHoldDuringConnecting() async {
+        controller = makeController(openingTurn: "[mock brief] go")
+        listener.holdsStart = true
+        let start = Task { await controller.start() }
+        for await _ in listener.startHeld { break }
+        bridge.onHoldChanged?(true)
+        listener.releaseStarts()
+        await start.value
+        await controller.lastChatTask?.value
+        XCTAssertTrue(chat.sent.isEmpty)
+        bridge.onHoldChanged?(false)
+        await controller.lastListenerTask?.value
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.sent, [tag + "[mock brief] go"])
+        XCTAssertEqual(controller.state, .thinking)
+    }
+
+    func testApprovalPauseDoesNotRecordASecondLatencySample() async {
+        controller = makeController(openingTurn: "[mock brief] go")
+        clock = 10
+        await controller.start()
+        await controller.lastChatTask?.value
+        clock = 11
+        update(text: "First sentence. Second", streaming: true)
+        XCTAssertEqual(controller.turnLatenciesMS, [1000])
+        update(text: "First sentence. Second", streaming: true, approval: approval())
+        XCTAssertEqual(controller.state, .awaitingApproval("send email to Sam"))
+        controller.approvalAnsweredOnScreen()
+        XCTAssertEqual(controller.state, .thinking)
+        clock = 40
+        update(text: "First sentence. Second sentence. Third", streaming: true)
+        XCTAssertEqual(controller.state, .speaking)
+        XCTAssertEqual(controller.turnLatenciesMS, [1000])
     }
 
     func testNoOpeningTurnSendsNothing() async {

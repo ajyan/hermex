@@ -88,7 +88,8 @@ struct VoiceCallChatSnapshot: Equatable {
 
 /// What a finished call hands back to whoever opened it.
 struct VoiceCallSummary: Equatable {
-    /// Milliseconds each turn waited for its first reply text.
+    /// Milliseconds each turn waited for its first reply text. A turn that never
+    /// got reply text records no sample.
     let turnMS: [Int]
 }
 
@@ -101,6 +102,8 @@ struct VoiceCallView: View {
 
     @State private var controller: VoiceCallController?
     @State private var startMessage: String?
+    /// The close paths overlap (a Close button, then its sheet's dismissal); report once.
+    @State private var didReport = false
     @State private var levels = VoiceCallAudioLevels()
     /// When the call first started listening, for the call timer.
     @State private var connectedAt: Date?
@@ -118,6 +121,8 @@ struct VoiceCallView: View {
 
     /// Closes the screen, reporting how long each turn took to answer.
     private func onClose() {
+        guard !didReport else { return }
+        didReport = true
         onDismiss(VoiceCallSummary(turnMS: controller?.turnLatenciesMS ?? []))
     }
 
