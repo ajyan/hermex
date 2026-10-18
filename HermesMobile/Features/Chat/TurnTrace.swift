@@ -32,6 +32,10 @@ struct TurnTrace: Sendable {
     let connection: Connection
     var reconnects: Int = 0
     var backgrounded: Bool = false
+    /// The chat dropped its stream before the turn ended because the user left it (navigated away or
+    /// the app's background time ran out). The marks after that point measure when the user came back
+    /// and the replay caught up, not the response's latency.
+    var detached: Bool = false
 
     private let startedAt: Date
     private let start: ContinuousClock.Instant
@@ -83,6 +87,7 @@ struct TurnTrace: Sendable {
             outcome: outcome,
             reconnects: reconnects,
             backgrounded: backgrounded,
+            detached: detached,
             marksMs: TurnTraceUpload.Marks(
                 headers: headers.map(milliseconds),
                 firstToken: firstToken.map(milliseconds),
@@ -134,5 +139,6 @@ struct TurnTraceUpload: Encodable, Equatable, Sendable {
     let outcome: TurnTrace.Outcome
     let reconnects: Int
     let backgrounded: Bool
+    let detached: Bool
     let marksMs: Marks
 }

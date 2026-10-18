@@ -333,6 +333,7 @@ final class ChatStreamCoordinator {
         hasInMemorySnapshotForActiveStream = true
         liveActivityManager.markStale()
         isConnectionSuspended = true
+        turnTrace?.detached = true
         streamClient.stop()
         delegate?.streamCoordinatorStopAuxiliaryMonitoring(clearPrompt: true)
     }
