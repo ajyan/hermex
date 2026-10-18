@@ -2,25 +2,25 @@ import SwiftUI
 
 /// Every Prep screen goes through this gate (`ChatShellView`'s `.prep` routes). On a weekday Prep
 /// opens only once today's Daily Ask is acted on or skipped with a reason; the Ask sits right here
-/// so it unlocks in place. A server without the job search, and failures, leave Prep open; the first
-/// load shows a spinner rather than starting a Prep screen the lock would then replace.
+/// so it unlocks in place. It reads the shell's one `DailyAskModel`: the first load shows a spinner
+/// (rather than starting a Prep screen the lock would then replace), later pushes refresh quietly,
+/// and a server without the job search, a failure or a timeout leaves Prep open.
 struct PrepGate<Content: View>: View {
-    @State private var model: DailyAskModel
+    @Environment(DailyAskModel.self) private var model: DailyAskModel?
     private let content: Content
 
-    init(server: URL, onAPIError: @escaping (Error) -> Void, @ViewBuilder content: () -> Content) {
-        _model = State(initialValue: DailyAskModel(
-            client: APIClientDailyAskAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
+    init(@ViewBuilder content: () -> Content) {
         self.content = content()
     }
 
     static func shouldGate(_ model: DailyAskModel) -> Bool { model.isLocked }
+    static func showsSpinner(_ model: DailyAskModel) -> Bool { model.state == .loading }
 
     var body: some View {
         Group {
-            if case .loading = model.state {
+            if let model, Self.showsSpinner(model) {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if Self.shouldGate(model), case .loaded(let ask) = model.state {
+            } else if let model, Self.shouldGate(model), case .loaded(let ask) = model.state {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         Label { Text(verbatim: "Prep opens after today's Ask") } icon: { Image(systemName: "lock.fill") }
@@ -37,6 +37,6 @@ struct PrepGate<Content: View>: View {
                 content
             }
         }
-        .task { await model.load() }
+        .task { await model?.load() }
     }
 }

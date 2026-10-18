@@ -61,6 +61,7 @@ final class DailyAskModel {
             onAPIError(error)
             if case .http(409, _)? = error as? APIError {
                 await load()  // the server's day moved on: show its today instead of saving to the wrong one
+                self.error = "The day changed. Nothing was saved; this is today's Ask."
                 return
             }
             self.error = "Couldn't save. Try again."

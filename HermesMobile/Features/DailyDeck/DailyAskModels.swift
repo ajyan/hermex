@@ -104,7 +104,8 @@ struct APIClientDailyAskAdapter: DailyAskDataClient {
     let apiClient: APIClient
 
     func ask() async throws -> DailyAsk {
-        try decode(try await apiClient.sendData(endpoint: .jobsAsk, method: "GET"))
+        // Short: the Prep gate waits on this, and a slow server must not hold Prep shut.
+        try decode(try await apiClient.sendData(endpoint: .jobsAsk, method: "GET", encodedBody: nil, timeout: 8))
     }
 
     func act(_ r: DailyAskRequest) async throws -> DailyAsk {

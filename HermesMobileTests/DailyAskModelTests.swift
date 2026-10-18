@@ -151,6 +151,7 @@ final class DailyAskModelTests: XCTestCase {
         await model.act(.skip(reason: "sick"))
         XCTAssertEqual(client.log, ["ask", "act", "ask"])
         if case .loaded(let ask) = model.state { XCTAssertEqual(ask.today, "2026-10-20") } else { XCTFail() }
+        XCTAssertEqual(model.error, "The day changed. Nothing was saved; this is today's Ask.")
     }
 
     func testActFailureKeepsStateAndShowsError() async throws {
@@ -224,5 +225,18 @@ final class DailyAskModelTests: XCTestCase {
         missing.askResults = [.failure(APIError.http(statusCode: 404, body: nil))]
         let unavailable = await loaded(missing)
         XCTAssertFalse(PrepGate<EmptyView>.shouldGate(unavailable))
+    }
+
+    func testGateSpinsOnlyOnFirstLoad() async throws {
+        let client = FakeDailyAskClient()
+        let model = DailyAskModel(client: client)
+        XCTAssertTrue(PrepGate<EmptyView>.showsSpinner(model))
+        client.askResults = [.success(try Self.ask { $0["locked"] = false })]
+        await model.load()
+        XCTAssertFalse(PrepGate<EmptyView>.showsSpinner(model))
+        client.askResults = [.failure(URLError(.timedOut))]
+        await model.load()  // a later push's refresh fails: Prep stays open, no spinner
+        XCTAssertFalse(PrepGate<EmptyView>.showsSpinner(model))
+        XCTAssertFalse(PrepGate<EmptyView>.shouldGate(model))
     }
 }
