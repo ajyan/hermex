@@ -106,4 +106,27 @@ final class APIClientTranscribeTests: APIClientTestCase {
         let response = try await client.transcribeAudio(data: Data("x".utf8), filename: "v.m4a")
         XCTAssertEqual(response.transcript, "hi")
     }
+
+    func testVoiceVocabularyReturnsTermsAndDropsEmptyOnes() async {
+        let client = makeClient { request in
+            XCTAssertEqual(request.url?.path, "/api/voice/vocabulary")
+            XCTAssertEqual(request.httpMethod, "GET")
+            return apiTestJSONResponse(#"{"terms": ["Saoirse Ronan", "", "oMLX"], "future": 1}"#, for: request)
+        }
+
+        let terms = await client.voiceVocabulary()
+
+        XCTAssertEqual(terms, ["Saoirse Ronan", "oMLX"])
+    }
+
+    func testVoiceVocabularyIsEmptyWhenTheServerLacksTheRoute() async {
+        let client = makeClient { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"error": "not found"}"#.utf8))
+        }
+
+        let terms = await client.voiceVocabulary()
+
+        XCTAssertEqual(terms, [])
+    }
 }

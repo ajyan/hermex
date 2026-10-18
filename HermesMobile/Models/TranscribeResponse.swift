@@ -11,3 +11,8 @@ struct TranscribeResponse: Codable {
     let transcript: String?
     let error: String?
 }
+
+/// `GET /api/voice/vocabulary`: contact names and dictionary terms for the call recognizer.
+struct VoiceVocabularyResponse: Decodable {
+    let terms: [String]?
+}

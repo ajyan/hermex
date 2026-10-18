@@ -2,7 +2,9 @@ import AVFoundation
 import Speech
 
 /// Mic capture and on-device English recognition for a call: `SpeechAnalyzer`
-/// on iOS 26+, on-device `SFSpeechRecognizer` below. Start it after the call's
+/// with `DictationTranscriber` on iOS 26+, on-device `SFSpeechRecognizer` below.
+/// Both are biased toward the server's vocabulary (contact names, dictionary
+/// words), which arrives while the call connects. Start it after the call's
 /// audio session is active.
 @MainActor
 final class AppleSpeechListener: SpeechListening {
@@ -15,12 +17,19 @@ final class AppleSpeechListener: SpeechListening {
     private let engine = AVAudioEngine()
     private var recognizer: CallRecognizer?
     private let levels: VoiceCallAudioLevels?
+    private let vocabulary: () async -> [String]
     private let log: (String) -> Void
     private var sessionObservers: [NSObjectProtocol] = []
 
-    /// `levels` receives mic loudness for the call visual.
-    init(levels: VoiceCallAudioLevels? = nil, log: @escaping (String) -> Void = { _ in }) {
+    /// `levels` receives mic loudness for the call visual. `vocabulary` loads the
+    /// names and words to expect; recognition starts without waiting for it.
+    init(
+        levels: VoiceCallAudioLevels? = nil,
+        vocabulary: @escaping () async -> [String] = { [] },
+        log: @escaping (String) -> Void = { _ in }
+    ) {
         self.levels = levels
+        self.vocabulary = vocabulary
         self.log = log
     }
 
@@ -31,6 +40,7 @@ final class AppleSpeechListener: SpeechListening {
             defer { phase = now }
             return String(format: "%.2fs", now - phase)
         }
+        let vocabulary = Task { await self.vocabulary() }
         guard await Self.requestPermissions() else {
             log("listener: permission denied")
             throw VoiceCallStartError.permissionDenied
@@ -39,7 +49,7 @@ final class AppleSpeechListener: SpeechListening {
 
         let recognizer: CallRecognizer
         do {
-            if #available(iOS 26, *), SpeechTranscriber.isAvailable {
+            if #available(iOS 26, *) {
                 recognizer = try await AnalyzerRecognizer.make(locale: Self.locale, log: log)
                 log("listener: SpeechAnalyzer ready \(elapsed())")
             } else {
@@ -61,6 +71,13 @@ final class AppleSpeechListener: SpeechListening {
             stop()
         }
         self.recognizer = recognizer
+        let log = log
+        Task { [weak recognizer] in
+            let terms = await vocabulary.value
+            log("listener: vocabulary \(terms.count) terms")
+            guard !terms.isEmpty else { return }
+            await recognizer?.setVocabulary(terms)
+        }
 
         let input = engine.inputNode
         // Echo cancellation, so Atlas's own voice doesn't read as the user barging in.
@@ -146,6 +163,8 @@ private protocol CallRecognizer: AnyObject {
     var onResult: ((String, Bool) -> Void)? { get set }
     /// Returns the closure the audio tap calls with each buffer.
     func makeBufferSink(inputFormat: AVAudioFormat) -> (AVAudioPCMBuffer) -> Void
+    /// Biases recognition toward these names and words from now on.
+    func setVocabulary(_ terms: [String]) async
     /// Finalizes the audio heard so far.
     func endTurn()
     func finish()
@@ -165,11 +184,14 @@ private final class AnalyzerRecognizer: CallRecognizer {
     private var finalizedThrough = CMTime.zero
 
     static func make(locale: Locale, log: @escaping (String) -> Void) async throws -> AnalyzerRecognizer {
-        guard let supported = await SpeechTranscriber.supportedLocale(equivalentTo: locale) else {
+        guard let supported = await DictationTranscriber.supportedLocale(equivalentTo: locale) else {
             throw VoiceCallStartError.recognitionUnavailable(language: locale.identifier)
         }
-        let transcriber = SpeechTranscriber(
-            locale: supported, transcriptionOptions: [], reportingOptions: [.volatileResults], attributeOptions: []
+        // DictationTranscriber, not SpeechTranscriber: only it honors the
+        // contextual strings that carry the vocabulary.
+        let transcriber = DictationTranscriber(
+            locale: supported, contentHints: [], transcriptionOptions: [.punctuation],
+            reportingOptions: [.volatileResults], attributeOptions: []
         )
         if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
             log("listener: downloading speech assets")
@@ -202,7 +224,7 @@ private final class AnalyzerRecognizer: CallRecognizer {
         self.continuation = continuation
     }
 
-    private func handle(_ result: SpeechTranscriber.Result) {
+    private func handle(_ result: DictationTranscriber.Result) {
         let text = String(result.text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
         if result.isFinal {
             finalizedThrough = CMTimeMaximum(finalizedThrough, result.range.end)
@@ -212,6 +234,16 @@ private final class AnalyzerRecognizer: CallRecognizer {
             return
         }
         onResult?(text, result.isFinal)
+    }
+
+    func setVocabulary(_ terms: [String]) async {
+        let context = AnalysisContext()
+        context.contextualStrings[.general] = terms
+        do {
+            try await analyzer.setContext(context)
+        } catch {
+            log("listener: setting vocabulary failed: \(error)")
+        }
     }
 
     func endTurn() {
@@ -266,6 +298,7 @@ private final class SFRecognizer: CallRecognizer {
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
     private let requestBox = RequestBox()
+    private var contextualStrings: [String] = []
     private let log: (String) -> Void
 
     init(locale: Locale, log: @escaping (String) -> Void) throws {
@@ -282,6 +315,7 @@ private final class SFRecognizer: CallRecognizer {
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.requiresOnDeviceRecognition = true
         request.shouldReportPartialResults = true
+        request.contextualStrings = contextualStrings
         self.request = request
         requestBox.set(request)
         task = recognizer.recognitionTask(with: request) { [weak self] result, error in
@@ -307,6 +341,11 @@ private final class SFRecognizer: CallRecognizer {
     func makeBufferSink(inputFormat: AVAudioFormat) -> (AVAudioPCMBuffer) -> Void {
         let box = requestBox
         return { buffer in box.append(buffer) }
+    }
+
+    /// Takes effect from the next segment, which starts at the next pause.
+    func setVocabulary(_ terms: [String]) async {
+        contextualStrings = terms
     }
 
     /// Ending the request's audio makes it deliver its final result, which starts the next segment.

@@ -185,7 +185,11 @@ struct VoiceCallView: View {
         }
         VoiceCallDiagnostics.beginCall()
         let controller = VoiceCallController(
-            listener: AppleSpeechListener(levels: levels, log: VoiceCallDiagnostics.write),
+            listener: AppleSpeechListener(
+                levels: levels,
+                vocabulary: { [client = chat.client] in await client.voiceVocabulary() },
+                log: VoiceCallDiagnostics.write
+            ),
             speaker: makeSpeaker(),
             chat: chat,
             bridge: CallSystemBridge(),
