@@ -682,6 +682,51 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(deck.cards.map { DeckPalette.of($0).name }, ["Book highlight", "From your wiki", "Quote", "Today"])
     }
 
+    // MARK: - Mandarin
+
+    private static let mandarinDeckJSON = """
+    {"date": "2026-10-19", "kind": "morning", "cards": [
+      {"id": "mandarin", "type": "prompt", "kind": "mandarin", "files_to": "mandarin",
+       "title": "Grandma asks how marathon training is going",
+       "yesterday": {"said": "我上个周末跑了二十英里，很累但是好。", "natural": "我上个周末跑了二十英里，虽然很累，但感觉很好。",
+                     "natural_pinyin": "Wǒ shàng ge zhōu mò pǎo le èr shí yīng lǐ.", "notes": ["虽然…但… joins it more naturally."]},
+       "phrases": [{"hanzi": "最近怎么样？", "pinyin": "Zuì jìn zěn me yàng?", "en": "How have you been lately?"},
+                   {"hanzi": "我在准备马拉松。", "pinyin": "Wǒ zài zhǔn bèi mǎ lā sōng.", "en": "I'm training for a marathon."},
+                   {"hanzi": "不用担心。", "pinyin": "Bú yòng dān xīn.", "en": "Don't worry.", "review": true},
+                   {"pinyin": "no characters, dropped"}],
+       "question": "你跑步跑得怎么样了？", "question_pinyin": "Nǐ pǎo bù pǎo de zěn me yàng le?",
+       "question_en": "How is your running going?", "reason": "Mandarin practice · 1 review due"}
+    ]}
+    """
+
+    func testMandarinCardDecodesPhrasesAndYesterday() throws {
+        let card = try DailyDeck.decode(Self.mandarinDeckJSON).cards[0]
+        XCTAssertTrue(card.isMandarin)
+        XCTAssertFalse(card.isLetter)
+        XCTAssertEqual(card.phrases.map(\.hanzi), ["最近怎么样？", "我在准备马拉松。", "不用担心。"], "a phrase without characters is dropped")
+        XCTAssertEqual(card.phrases.map(\.review), [false, false, true])
+        XCTAssertEqual(card.yesterday?.notes.count, 1)
+        XCTAssertEqual(card.yesterday?.naturalPinyin, "Wǒ shàng ge zhōu mò pǎo le èr shí yīng lǐ.")
+        XCTAssertEqual(card.questionPinyin, "Nǐ pǎo bù pǎo de zěn me yàng le?")
+        XCTAssertEqual(card.questionEn, "How is your running going?")
+    }
+
+    func testMandarinFieldsAreOptional() throws {
+        let card = try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"m","type":"prompt","kind":"mandarin","question":"你好吗？","yesterday":{"said":"x"}}]}"#).cards[0]
+        XCTAssertTrue(card.isMandarin)
+        XCTAssertEqual(card.phrases, [])
+        XCTAssertNil(card.yesterday, "feedback without a natural version isn't shown")
+        XCTAssertNil(card.questionPinyin)
+        XCTAssertTrue(card.takesText)
+    }
+
+    func testMandarinCardWearsItsPaper() throws {
+        let card = try DailyDeck.decode(Self.mandarinDeckJSON).cards[0]
+        XCTAssertEqual(DeckPalette.of(card).name, "Mandarin practice")
+        XCTAssertEqual(DeckPalette.of(card).colors, HermexPaper.mandarin)
+        XCTAssertTrue(HermexPaper.all.contains(HermexPaper.mandarin))
+    }
+
     // MARK: - Sleep
 
     private static let sleepDeckJSON = """

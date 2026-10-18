@@ -152,7 +152,8 @@ struct HermexPaper: Equatable {
     static let past = HermexPaper(paper: 0xFFEFC2, ink: 0x4E3A00, glowLight: 0x7A5C00, glowDark: 0xE8C55A, hue: 0xD9AE2E, warm: true)
     static let advisor = HermexPaper(paper: 0xE4EEF6, ink: 0x14324A, glowLight: 0x2E5878, glowDark: 0x9DBEDD, hue: 0x7FA6C9)
     static let plain = HermexPaper(paper: 0xF4F0E8, ink: 0x2A2A28, glowLight: 0x5E5646, glowDark: 0xD6CDBB, hue: 0xA09680, warm: true)
+    static let mandarin = HermexPaper(paper: 0xFFDDD6, ink: 0x5E1A0E, glowLight: 0xB03A22, glowDark: 0xFF9C85, hue: 0xF2694B)
     static let ledger = HermexPaper(paper: 0xEEF3D6, ink: 0x2F3A0A, glowLight: 0x4F6300, glowDark: 0xC2DA6E, hue: 0x9DB83A)
 
-    static let all: [HermexPaper] = [.opener, .quote, .book, .wiki, .reading, .notes, .video, .past, .advisor, .plain, .ledger]
+    static let all: [HermexPaper] = [.opener, .quote, .book, .wiki, .reading, .notes, .video, .past, .advisor, .plain, .mandarin, .ledger]
 }
