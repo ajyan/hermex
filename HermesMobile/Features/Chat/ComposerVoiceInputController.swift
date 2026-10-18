@@ -45,7 +45,7 @@ final class ComposerVoiceInputController {
     @ObservationIgnored private var transcriptionTask: Task<Void, Never>?
     @ObservationIgnored private var toggleTask: Task<Void, Never>?
     private var activeTranscriptionID: UUID?
-    @ObservationIgnored private let recordingLease = ComposerDictationLease.live()
+    @ObservationIgnored private let recordingLease: any ComposerRecordingLease
     private static weak var captureOwner: ComposerVoiceInputController?
     private var startID: UUID?
     private var recognitionID: UUID?
@@ -66,6 +66,7 @@ final class ComposerVoiceInputController {
         audioEngineFactory: @escaping () -> AVAudioEngine = { AVAudioEngine() },
         microphonePermission: @escaping () async -> Bool = { await ComposerVoiceMicrophonePermissionRequester.request() },
         serverRecorder: (any ComposerServerRecording)? = nil,
+        recordingLease: (any ComposerRecordingLease)? = nil,
         fixedLocale: Locale? = nil,
         mayRecord: @escaping @MainActor () -> Bool = {
             ComposerVoiceInputStartPolicy.canStart(
@@ -80,6 +81,7 @@ final class ComposerVoiceInputController {
         if fixedLocale != nil { providerPreference = .onDeviceOnly }
         self.mayRecord = mayRecord
         self.serverRecorder = serverRecorder ?? ComposerServerAudioRecorder()
+        self.recordingLease = recordingLease ?? ComposerDictationLease.live()
         interruptionObserver = NotificationCenter.default.addObserver(
             forName: AVAudioSession.interruptionNotification, object: nil, queue: .main
         ) { [weak self] notification in
@@ -1141,11 +1143,20 @@ private extension Logger {
     )
 }
 
+/// Held only while the microphone is capturing. Tests inject their own, because the live
+/// lease acts only when the host has a foreground-active scene, which a simulator whose
+/// display is asleep does not provide.
+@MainActor
+protocol ComposerRecordingLease: AnyObject {
+    func acquire()
+    func release()
+}
+
 /// A recording-only lease. Permission prompts, deferred clips and transcription never
 /// hold it. The UIKit adapter below is separate so restoration can be tested without
 /// changing the test host's orientation or idle timer.
 @MainActor
-final class ComposerDictationLease {
+final class ComposerDictationLease: ComposerRecordingLease {
     private let readIdle: () -> Bool
     private let writeIdle: (Bool) -> Void
     private let writeOrientation: (UIInterfaceOrientationMask?) -> Void
