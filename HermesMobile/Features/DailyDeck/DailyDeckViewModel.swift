@@ -373,6 +373,15 @@ final class DailyDeckViewModel {
         update(card) { $0.rating = $0.rating == rating ? nil : rating }
     }
 
+    /// Taps a sleep card's tag on or off.
+    func toggleTag(_ tag: String, for card: DeckCard) {
+        update(card) { answer in
+            var tags = answer.tags ?? []
+            if let index = tags.firstIndex(of: tag) { tags.remove(at: index) } else { tags.append(tag) }
+            answer.tags = tags.isEmpty ? nil : tags
+        }
+    }
+
     /// Chooses a decision action; choosing the chosen one again clears it.
     func choose(_ action: DeckAction, for card: DeckCard) {
         update(card) { answer in

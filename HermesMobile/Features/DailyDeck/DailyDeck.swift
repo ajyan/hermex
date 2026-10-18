@@ -86,6 +86,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let scale: [String]
     /// A sleep card's numbers from the user's watch.
     let sleep: DeckSleep?
+    /// A sleep card's tags: what might have shaped the night, tapped beside the rating.
+    let tags: [DeckSleepTag]
     /// A goal card's personal goals (slugs). The card checks in on them live through the Goals API;
     /// `fallback` is the brief's text for when the server can't serve them.
     let goals: [String]
@@ -148,7 +150,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case id, type, title, body, source, lines, question, context, voice, why, draft, actions, fallback
-        case reason, altQuestions, entries, recap, scale, sleep, points, meters, color, goals, ref
+        case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
         case goal, start, lastWeek
         case weekCommitments = "commitments"
         case itemKind = "kind"
@@ -193,6 +195,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         color = try? c.decodeIfPresent(String.self, forKey: .color)
         scale = (try? c.decodeIfPresent([String].self, forKey: .scale)) ?? []
         sleep = try? c.decodeIfPresent(DeckSleep.self, forKey: .sleep)
+        tags = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .tags)) ?? []).compactMap(\.value)
         goals = (try? c.decodeIfPresent([String].self, forKey: .goals)) ?? []
         goal = try? c.decodeIfPresent(String.self, forKey: .goal)
         start = try? c.decodeIfPresent(String.self, forKey: .start)
@@ -207,20 +210,38 @@ struct DeckCard: Decodable, Equatable, Identifiable {
 
 /// Last night from the user's watch, already written as lines by the brief: `headline` is hours
 /// against need ("8.5 h of 9 h needed", nil before the watch syncs), `lines` the timing and
-/// recovery, `nights` the last seven, oldest first, for the strip chart.
+/// recovery, `nights` the last seven, oldest first, for the strip chart. `insight` is the one thing
+/// that stood out and `parts` the WHOOP-style parts against the 30-night average.
 struct DeckSleep: Decodable, Equatable {
     let headline: String?
     let lines: [String]
     let nights: [DeckNight]
+    let insight: String?
+    let parts: [DeckSleepPart]
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         headline = try? c.decodeIfPresent(String.self, forKey: .headline)
         lines = (try? c.decodeIfPresent([String].self, forKey: .lines)) ?? []
         nights = (try? c.decodeIfPresent([DeckNight].self, forKey: .nights)) ?? []
+        insight = (try? c.decodeIfPresent(String.self, forKey: .insight)).flatMap { $0.isEmpty ? nil : $0 }
+        parts = ((try? c.decodeIfPresent([Lossy<DeckSleepPart>].self, forKey: .parts)) ?? []).compactMap(\.value)
     }
 
-    private enum CodingKeys: String, CodingKey { case headline, lines, nights }
+    private enum CodingKeys: String, CodingKey { case headline, lines, nights, insight, parts }
+}
+
+/// One part of last night's sleep, already written by the brief: "Wake-ups", "4", "+2 vs avg".
+struct DeckSleepPart: Decodable, Equatable {
+    let label: String
+    let value: String
+    let vs: String?
+}
+
+/// Something that might have shaped the night ("Late meal"); `id` is what gets filed.
+struct DeckSleepTag: Decodable, Equatable, Identifiable {
+    let id: String
+    let label: String
 }
 
 /// One night on the strip: its weekday and hours slept against hours needed (nil when unknown).
@@ -314,14 +335,19 @@ struct DeckAnswer: Codable, Equatable {
     var action: String?
     /// A sleep card's rating: a 1-based index into the card's `scale`.
     var rating: Int?
+    /// A sleep card's tapped tags (ids); nil for none. The vault reads a filed sleep answer without
+    /// tags as none, so untapping them all and filing again clears them.
+    var tags: [String]?
     /// The question answered, when it isn't the card's own (regenerated, or the user's).
     var question: String?
     /// "Not for Me" on this card; a card with feedback leaves the deck.
     var feedback: DeckFeedback?
 
     var isEmpty: Bool {
-        !hasText && action == nil && rating == nil && question == nil && feedback == nil
+        !hasText && action == nil && rating == nil && question == nil && feedback == nil && !hasTags
     }
+
+    private var hasTags: Bool { !(tags?.isEmpty ?? true) }
 
     private var hasText: Bool {
         !(text?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
@@ -335,7 +361,7 @@ struct DeckAnswer: Codable, Equatable {
     /// (Answer, Edit) answers nothing until the text is there.
     func isAnswer(for card: DeckCard) -> Bool {
         if let action, card.actions.first(where: { $0.id == action })?.takesText == true { return hasText }
-        return hasText || action != nil || rating != nil
+        return hasText || action != nil || rating != nil || hasTags
     }
 
     /// Whether this says something worth filing: an answer, or feedback on the card.

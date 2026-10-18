@@ -688,7 +688,10 @@ final class DailyDeckTests: XCTestCase {
     {"date": "2026-10-04", "kind": "morning", "cards": [
       {"id": "sleep", "type": "sleep", "question": "How did you sleep?", "scale": ["Very poor", "Poor", "Fair", "Good", "Very good"],
        "sleep": {"headline": "8.5 h of 9 h needed", "lines": ["Asleep 10:31 pm · up 7:19 am"],
-                 "nights": [{"day": "Sun", "hours": 7.6, "need": 9}, {"day": "Mon", "hours": null}, {"day": 3, "hours": "x"}]},
+                 "nights": [{"day": "Sun", "hours": 7.6, "need": 9}, {"day": "Mon", "hours": null}, {"day": 3, "hours": "x"}],
+                 "insight": "4 wake-ups against 2 on a usual night: a broken night.",
+                 "parts": [{"label": "Wake-ups", "value": "4", "vs": "+2 vs avg"}, {"label": "Performance", "value": "90", "vs": null}, {"label": 5}]},
+       "tags": [{"id": "late_meal", "label": "Late meal"}, {"id": "ill"}, {"id": "ill", "label": "Ill"}],
        "fallback": "How did you sleep? Last night: 8.5 h of 9 h needed.", "reason": "From your Garmin"},
       {"id": "close", "type": "close"}
     ]}
@@ -766,6 +769,44 @@ final class DailyDeckTests: XCTestCase {
         model.rate(4, for: card)
         XCTAssertNil(model.answer(for: card), "tapping the chosen rating clears it")
         XCTAssertEqual(model.answeredCount, 0)
+    }
+
+    func testSleepCardDecodesItsTagsPartsAndInsight() throws {
+        let card = try DailyDeck.decode(Self.sleepDeckJSON).cards[0]
+        XCTAssertEqual(card.tags.map(\.id), ["late_meal", "ill"], "a tag without a label is dropped")
+        let sleep = try XCTUnwrap(card.sleep)
+        XCTAssertEqual(sleep.insight, "4 wake-ups against 2 on a usual night: a broken night.")
+        XCTAssertEqual(sleep.parts.map(\.label), ["Wake-ups", "Performance"], "a malformed part is dropped")
+        XCTAssertEqual(sleep.parts[0].vs, "+2 vs avg")
+        XCTAssertNil(sleep.parts[1].vs)
+        let bare = try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"sleep","type":"sleep","sleep":{}}]}"#).cards[0]
+        XCTAssertEqual(bare.tags, [])
+        XCTAssertNil(bare.sleep?.insight)
+        XCTAssertEqual(bare.sleep?.parts, [])
+    }
+
+    @MainActor
+    func testTaggingTheSleepCardTogglesFilesAndClears() async throws {
+        store.setWorkspace("/vault", for: server)
+        let model = makeViewModel(ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.sleepDeckJSON))
+        await model.load()
+        let card = try XCTUnwrap(model.cards.first)
+        model.toggleTag("late_meal", for: card)
+        XCTAssertEqual(model.answer(for: card)?.tags, ["late_meal"])
+        XCTAssertEqual(model.answeredCount, 1, "a tag alone answers the card")
+        model.rate(1, for: card)
+        model.toggleTag("late_meal", for: card)
+        XCTAssertEqual(model.answer(for: card), DeckAnswer(card: "sleep", rating: 1),
+                       "untapping every tag leaves the answer as it was before, so it isn't an edit")
+        model.toggleTag("ill", for: card)
+        let deck = try DailyDeck.decode(Self.sleepDeckJSON)
+        let payload = DeckAnswersPayload(deck: deck, answers: ["sleep": try XCTUnwrap(model.answer(for: card))], completedAt: morning)
+        let json = try XCTUnwrap(try payload.message().components(separatedBy: "```json\n").last?.components(separatedBy: "\n```").first)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+        XCTAssertEqual((object["answers"] as? [[String: Any]])?.first?["tags"] as? [String], ["ill"])
+        model.toggleTag("ill", for: card)
+        model.rate(1, for: card)
+        XCTAssertNil(model.answer(for: card), "no rating and no tags: nothing to file")
     }
 
     // MARK: - Not for Me and questions
