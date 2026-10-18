@@ -3,6 +3,18 @@ import XCTest
 
 @MainActor
 final class FeedbackInboxViewModelTests: XCTestCase {
+    func test409WithServerMessageShowsIt() async throws {
+        let client = InboxStubClient(entries: [entry("r", status: "ready", ts: "2026-10-02T10:00:00Z")])
+        await client.failDecisions(with: APIError.http(statusCode: 409, body: #"{"error": "Not on master yet. Merge the branch first, then mark merged."}"#))
+        let viewModel = FeedbackInboxViewModel(client: client)
+        await viewModel.load()
+
+        await viewModel.decide(try XCTUnwrap(viewModel.entry(id: "r")), .merged)
+
+        XCTAssertEqual(viewModel.error, "Not on master yet. Merge the branch first, then mark merged.")
+        XCTAssertNil(viewModel.pendingID)
+    }
+
     func testGroupsByStatus() async throws {
         let client = InboxStubClient(entries: [
             entry("a", status: "merged", ts: "2026-10-01T10:00:00Z"),
@@ -119,10 +131,38 @@ final class FeedbackInboxViewModelTests: XCTestCase {
         XCTAssertEqual(withDecisions, [.planned, .ready, .failed])
     }
 
-    func testPlannedReadyAndFailedCanBeRejected() {
-        let rejectable = [FeedbackStatus.new, .planning, .planned, .approved, .building, .ready, .failed, .rejected, .merged, .unknown]
+    func testNewPlannedReadyAndFailedCanBeRejected() {
+        let rejectable = [FeedbackStatus.new, .planning, .planned, .approved, .building, .ready, .failed, .rejected, .merged,
+                          .shipped, .reverted, .unknown]
             .filter(\.canReject)
-        XCTAssertEqual(rejectable, [.planned, .ready, .failed])
+        XCTAssertEqual(rejectable, [.new, .planned, .ready, .failed])
+    }
+
+    func testRejectAvailableForNew() {
+        XCTAssertTrue(FeedbackStatus.new.canReject)
+        XCTAssertFalse(FeedbackStatus.new.hasDecisions, "a new note's Reject is in the menu, with no action bar")
+        XCTAssertEqual(FeedbackStatus.new.rejectConfirmation.title, "Reject this note?")
+    }
+
+    func testOnlyShippedCanBeUndone() {
+        let undoable = [FeedbackStatus.new, .planning, .planned, .approved, .building, .ready, .failed, .rejected, .merged,
+                        .shipped, .reverted, .unknown]
+            .filter(\.canUndo)
+        XCTAssertEqual(undoable, [.shipped])
+    }
+
+    func testUndoReplacesEntryWithTheServersUndone() async throws {
+        let client = InboxStubClient(entries: [entry("s", status: "shipped", ts: "2026-10-02T10:00:00Z")])
+        await client.setDecisionResult(entry("s", status: "reverted", ts: "2026-10-02T10:00:00Z"))
+        let viewModel = FeedbackInboxViewModel(client: client)
+        await viewModel.load()
+
+        await viewModel.decide(try XCTUnwrap(viewModel.entry(id: "s")), .undo)
+
+        let decisions = await client.decisions
+        XCTAssertEqual(decisions.map(\.decision), [.undo])
+        XCTAssertEqual(viewModel.entry(id: "s")?.status, .reverted)
+        XCTAssertNil(viewModel.error)
     }
 
     func testMissingPlanTextTellsAFailedEntryWhatToDo() {
@@ -376,4 +416,45 @@ private actor InboxStubClient: FeedbackDataClient {
     }
 
     func isAvailable() async -> Bool { true }
+}
+
+/// Decisions through the real `APIClient` against `URLProtocol` mocks.
+final class FeedbackDecisionHTTPTests: APIClientTestCase {
+    @MainActor
+    func testConflictShowsServerMessage() async throws {
+        let shipped = #"{"entries": [{"id": "fb-1", "status": "ready", "ts": "2026-10-02T10:00:00Z", "text": "Fix it"}]}"#
+        let client = makeClient { request in
+            if request.httpMethod == "POST" {
+                XCTAssertEqual(request.url?.path, "/api/feedback/fb-1/decision")
+                return apiTestJSONResponse(#"{"error": "Not on master yet. Merge the branch first, then mark merged."}"#, for: request, status: 409)
+            }
+            return apiTestJSONResponse(shipped, for: request)
+        }
+        let viewModel = FeedbackInboxViewModel(client: APIClientFeedbackAdapter(apiClient: client))
+        await viewModel.load()
+
+        await viewModel.decide(try XCTUnwrap(viewModel.entry(id: "fb-1")), .merged)
+
+        XCTAssertEqual(viewModel.error, "Not on master yet. Merge the branch first, then mark merged.")
+    }
+
+    @MainActor
+    func testUndoConflictShowsTheVaultReason() async throws {
+        let list = #"{"entries": [{"id": "fb-2", "status": "shipped", "ts": "2026-10-02T10:00:00Z", "text": "Fix it"}]}"#
+        let client = makeClient { request in
+            if request.httpMethod == "POST" {
+                let body = apiTestBodyData(from: request) ?? Data()
+                XCTAssertEqual(try? JSONSerialization.jsonObject(with: body) as? [String: String], ["decision": "undo"])
+                return apiTestJSONResponse(#"{"error": "The vault has uncommitted edits to tools/deck_pool.py.", "revert_sha": null}"#, for: request, status: 409)
+            }
+            return apiTestJSONResponse(list, for: request)
+        }
+        let viewModel = FeedbackInboxViewModel(client: APIClientFeedbackAdapter(apiClient: client))
+        await viewModel.load()
+
+        await viewModel.decide(try XCTUnwrap(viewModel.entry(id: "fb-2")), .undo)
+
+        XCTAssertEqual(viewModel.error, "The vault has uncommitted edits to tools/deck_pool.py.")
+        XCTAssertEqual(viewModel.entry(id: "fb-2")?.status, .shipped)
+    }
 }

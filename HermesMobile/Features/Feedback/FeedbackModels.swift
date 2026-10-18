@@ -16,6 +16,10 @@ enum FeedbackGroup: Hashable, Sendable {
 
 enum FeedbackStatus: String, Hashable, Sendable {
     case new, planning, planned, approved, building, ready, failed, rejected, merged
+    /// The nightly job merged the fix itself after its gate passed; Undo reverts it.
+    case shipped
+    /// A shipped fix the user undid. A reply plans it again.
+    case reverted
     case unknown
 
     init(wire: String?) {
@@ -34,6 +38,8 @@ enum FeedbackStatus: String, Hashable, Sendable {
         case .failed: "Failed"
         case .rejected: "Rejected"
         case .merged: "Merged"
+        case .shipped: "Shipped"
+        case .reverted: "Undone"
         case .unknown: "Unknown"
         }
     }
@@ -42,7 +48,7 @@ enum FeedbackStatus: String, Hashable, Sendable {
         switch self {
         case .planned, .ready, .failed: .needsReview
         case .new, .planning, .approved, .building, .unknown: .inProgress
-        case .merged, .rejected: .done
+        case .merged, .rejected, .shipped, .reverted: .done
         }
     }
 }
@@ -105,6 +111,11 @@ struct FeedbackEntry: Decodable, Identifiable, Hashable, Sendable {
     let mergedInto: String?
     /// How many questions the entry's plan asks; 0 without a plan or for an old-format plan.
     let questionCount: Int
+    /// How many times the recurrence watch reopened this fix, and what it saw the last time.
+    let recurred: Int?
+    let evidence: String?
+    /// The merge commit of a shipped fix; on an undone one, its revert commit.
+    let mergeSha: String?
 
     /// Whether the nightly job folded this entry into another entry's plan.
     var isMerged: Bool { status == .rejected && mergedInto != nil }
@@ -115,6 +126,8 @@ struct FeedbackEntry: Decodable, Identifiable, Hashable, Sendable {
         case planRepo = "plan_repo"
         case mergedInto = "merged_into"
         case questionCount = "question_count"
+        case recurred, evidence
+        case mergeSha = "merge_sha"
     }
 
     init(from decoder: Decoder) throws {
@@ -141,6 +154,9 @@ struct FeedbackEntry: Decodable, Identifiable, Hashable, Sendable {
         attachments = ((try? c.decodeIfPresent([FeedbackLossy<FeedbackAttachment>].self, forKey: .attachments)) ?? []).compactMap(\.value)
         mergedInto = str(.mergedInto)
         questionCount = max(0, (try? c.decodeIfPresent(Int.self, forKey: .questionCount)) ?? 0)
+        recurred = try? c.decodeIfPresent(Int.self, forKey: .recurred)
+        evidence = str(.evidence)
+        mergeSha = str(.mergeSha)
     }
 }
 
@@ -209,6 +225,8 @@ enum FeedbackDecision: Encodable, Hashable, Sendable {
     case merged
     /// Takes an entry the nightly job merged into another entry's plan back to `new`.
     case unmerge
+    /// Reverts a shipped fix on the vault's main branch.
+    case undo
 
     private enum CodingKeys: String, CodingKey { case decision, note }
 
@@ -226,6 +244,7 @@ enum FeedbackDecision: Encodable, Hashable, Sendable {
         case .retry: try c.encode("retry", forKey: .decision)
         case .merged: try c.encode("merged", forKey: .decision)
         case .unmerge: try c.encode("unmerge", forKey: .decision)
+        case .undo: try c.encode("undo", forKey: .decision)
         }
     }
 }

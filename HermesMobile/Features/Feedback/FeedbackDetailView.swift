@@ -3,8 +3,8 @@ import SwiftUI
 /// One feedback entry, laid out for steering from the phone: the plan's questions first, then
 /// what changes, what was sent, and the technical details folded away. A plan written before
 /// the steering format shows its Markdown whole. The decisions its status allows sit in a bar
-/// at the bottom; Reject is in the header menu. Reads the entry from the inbox, so a decision
-/// updates both screens.
+/// at the bottom (Undo on a shipped fix, Redo plan on an undone one); Reject is in the header
+/// menu. Reads the entry from the inbox, so a decision updates both screens.
 struct FeedbackDetailView: View {
     let entryID: String
     let viewModel: FeedbackInboxViewModel
@@ -12,6 +12,7 @@ struct FeedbackDetailView: View {
     @State private var answers = FeedbackAnswers()
     @State private var replyTarget: FeedbackEntry?
     @State private var isConfirmingReject = false
+    @State private var isConfirmingUndo = false
 
     var body: some View {
         Group {
@@ -21,15 +22,22 @@ struct FeedbackDetailView: View {
                     .task(id: entry.status) { await loadPlan(entry) }
                     .toolbar { menu(entry) }
                     .confirmationDialog(
-                        Text(verbatim: entry.status == .ready ? "Reject this branch?" : "Reject this plan?"),
+                        Text(verbatim: entry.status.rejectConfirmation.title),
                         isPresented: $isConfirmingReject,
                         titleVisibility: .visible
                     ) {
                         Button(role: .destructive) { decide(entry, .reject) } label: { Text(verbatim: "Reject") }
                     } message: {
-                        Text(verbatim: entry.status == .ready
-                             ? "It moves to Done. The branch stays on your Mac until you delete it."
-                             : "It moves to Done and won't be built.")
+                        Text(verbatim: entry.status.rejectConfirmation.message)
+                    }
+                    .confirmationDialog(
+                        Text(verbatim: "Undo this fix?"),
+                        isPresented: $isConfirmingUndo,
+                        titleVisibility: .visible
+                    ) {
+                        Button(role: .destructive) { decide(entry, .undo) } label: { Text(verbatim: "Undo") }
+                    } message: {
+                        Text(verbatim: "Reverts this change on the vault's main branch.")
                     }
             } else {
                 ContentUnavailableView {
@@ -71,6 +79,10 @@ struct FeedbackDetailView: View {
                             .font(AppFont.footnote())
                             .foregroundStyle(Color.hxTextSecondary)
                     }
+                }
+
+                if let recurred = entry.recurred, recurred > 0 {
+                    recurrence(recurred, evidence: entry.evidence)
                 }
 
                 if let steerable, entry.status == .planned, !steerable.questions.isEmpty {
@@ -191,6 +203,28 @@ struct FeedbackDetailView: View {
         .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
     }
 
+    /// A reopened fix: how many times the recurrence watch saw the problem again, and what it saw.
+    private func recurrence(_ count: Int, evidence: String?) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label {
+                Text(verbatim: "Recurred ×\(count)")
+            } icon: {
+                Image(systemName: "arrow.uturn.backward.circle")
+            }
+            .font(AppFont.subheadline(weight: .semibold))
+            .foregroundStyle(Color.hxWarning)
+            if let evidence, !evidence.isEmpty {
+                Text(verbatim: evidence)
+                    .font(AppFont.footnote())
+                    .foregroundStyle(Color.hxTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
     /// A note the nightly job folded into this entry's plan, with Unmerge to plan it on its own again.
     private func mergedNote(_ note: FeedbackEntry) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -230,7 +264,7 @@ struct FeedbackDetailView: View {
 
     @ViewBuilder
     private func actionBar(_ entry: FeedbackEntry) -> some View {
-        if entry.status.hasDecisions {
+        if entry.status.hasActions {
             VStack(alignment: .leading, spacing: 8) {
                 if viewModel.pendingID == entry.id {
                     HStack(spacing: 8) {
@@ -284,6 +318,16 @@ struct FeedbackDetailView: View {
         case .failed:
             Button { decide(entry, .retry) } label: { wide("Retry") }
                 .buttonStyle(.borderedProminent)
+        case .shipped:
+            Button(role: .destructive) { isConfirmingUndo = true } label: { wide("Undo") }
+                .buttonStyle(.bordered)
+                .accessibilityLabel(Text(verbatim: "Undo this fix"))
+                .accessibilityHint(Text(verbatim: "Reverts this change on the vault's main branch."))
+        case .reverted:
+            Button { replyTarget = entry } label: { wide("Redo plan") }
+                .buttonStyle(.bordered)
+                .tint(Color.hxTextPrimary)
+                .accessibilityHint(Text(verbatim: "Tell the planner what to change. It replans tonight."))
         default:
             EmptyView()
         }

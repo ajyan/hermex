@@ -42,6 +42,8 @@ final class FeedbackModelsTests: XCTestCase {
             (.failed, "Failed", .needsReview),
             (.rejected, "Rejected", .done),
             (.merged, "Merged", .done),
+            (.shipped, "Shipped", .done),
+            (.reverted, "Undone", .done),
         ]
         for (status, label, group) in expected {
             XCTAssertEqual(status.label, label)
@@ -61,6 +63,44 @@ final class FeedbackModelsTests: XCTestCase {
         XCTAssertEqual(try json(.retry), ["decision": "retry"])
         XCTAssertEqual(try json(.merged), ["decision": "merged"])
         XCTAssertEqual(try json(.unmerge), ["decision": "unmerge"])
+        XCTAssertEqual(try json(.undo), ["decision": "undo"])
+    }
+
+    // MARK: Fix lifecycle
+
+    func testShippedAndRevertedDecodeAndGroup() throws {
+        let shipped = try decode(FeedbackEntry.self, #"{"id": "f1", "status": "shipped"}"#)
+        let reverted = try decode(FeedbackEntry.self, #"{"id": "f2", "status": "reverted"}"#)
+        XCTAssertEqual(shipped.status, .shipped)
+        XCTAssertEqual(reverted.status, .reverted)
+        XCTAssertEqual(FeedbackStatus.shipped.label, "Shipped")
+        XCTAssertEqual(FeedbackStatus.reverted.label, "Undone")
+        XCTAssertEqual(FeedbackStatus.shipped.group, .done)
+        XCTAssertEqual(FeedbackStatus.reverted.group, .done)
+    }
+
+    func testUnknownStatusStillDecodes() throws {
+        let e = try decode(FeedbackEntry.self, #"{"id": "f1", "status": "held_v2", "text": "Still here", "recurred": 1}"#)
+        XCTAssertEqual(e.status, .unknown)
+        XCTAssertEqual(e.text, "Still here")
+        XCTAssertEqual(e.recurred, 1)
+    }
+
+    func testUndoEncodesDecision() throws {
+        let object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(FeedbackDecision.undo)) as? [String: String]
+        XCTAssertEqual(object, ["decision": "undo"])
+    }
+
+    func testRecurredEvidenceDecode() throws {
+        let e = try decode(FeedbackEntry.self, #"{"id": "f1", "status": "new", "recurred": 2, "evidence": "Asked the same question twice on Oct 17.", "merge_sha": "abc1234", "head": "def5678"}"#)
+        XCTAssertEqual(e.recurred, 2)
+        XCTAssertEqual(e.evidence, "Asked the same question twice on Oct 17.")
+        XCTAssertEqual(e.mergeSha, "abc1234")
+
+        let bare = try decode(FeedbackEntry.self, #"{"id": "f1", "recurred": "lots", "evidence": null, "merge_sha": 7}"#)
+        XCTAssertNil(bare.recurred)
+        XCTAssertNil(bare.evidence)
+        XCTAssertNil(bare.mergeSha)
     }
 
     func testAboutJoinsContext() {

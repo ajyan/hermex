@@ -76,8 +76,9 @@ final class FeedbackInboxViewModel {
         }
     }
 
-    /// Posts a decision. On success the server's folded entry replaces the row; a 409
-    /// means the entry moved on, so the inbox reloads. A reply needs a note.
+    /// Posts a decision. On success the server's folded entry replaces the row. A 409 shows
+    /// the server's reason when it gives one ("Not on master yet. …"), else says the entry
+    /// moved on, and the inbox reloads. A reply needs a note.
     func decide(_ entry: FeedbackEntry, _ decision: FeedbackDecision) async {
         guard pendingID == nil else { return }
         var decision = decision
@@ -95,8 +96,8 @@ final class FeedbackInboxViewModel {
         do {
             let updated = try await client.decide(id: entry.id, decision)
             replace(entry.id, with: updated)
-        } catch let APIError.http(statusCode, _) where statusCode == 409 {
-            error = "This changed on the server. Showing the latest."
+        } catch let conflict as APIError where Self.isConflict(conflict) {
+            error = conflict.serverMessage ?? "This changed on the server. Showing the latest."
             await load()
         } catch {
             guard !Self.isCancellation(error) else { return }
@@ -137,6 +138,11 @@ final class FeedbackInboxViewModel {
         return false
     }
 
+    static func isConflict(_ error: Error) -> Bool {
+        if case APIError.http(let statusCode, _) = error { return statusCode == 409 }
+        return false
+    }
+
     private static func isCancellation(_ error: Error) -> Bool {
         error is CancellationError || (error as? URLError)?.code == .cancelled
     }
@@ -160,8 +166,25 @@ extension FeedbackStatus {
         self == .planned || self == .ready || self == .failed
     }
 
-    /// Whether Reject is one of those decisions; it is for every status that has any.
-    var canReject: Bool { hasDecisions }
+    /// Whether Reject is offered (in the detail's menu): for every status with decisions, and
+    /// for a note still waiting for tonight.
+    var canReject: Bool { hasDecisions || self == .new }
+
+    /// Whether Undo is offered: a fix the nightly job shipped.
+    var canUndo: Bool { self == .shipped }
+
+    /// Whether the detail shows its action bar: the decisions, Undo on a shipped fix, or
+    /// Redo plan on an undone one.
+    var hasActions: Bool { hasDecisions || self == .shipped || self == .reverted }
+
+    /// The Reject confirmation's title and message.
+    var rejectConfirmation: (title: String, message: String) {
+        switch self {
+        case .ready: ("Reject this branch?", "It moves to Done. The branch stays on your Mac until you delete it.")
+        case .new: ("Reject this note?", "It moves to Done and won't be planned.")
+        default: ("Reject this plan?", "It moves to Done and won't be built.")
+        }
+    }
 
     /// What the detail's Plan block says when there is no plan to show.
     var noPlanText: String {
