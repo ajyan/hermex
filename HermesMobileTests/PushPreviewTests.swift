@@ -240,7 +240,6 @@ import XCTest
         XCTAssertNil(ResponseCompletionNotificationRequest.destination(userInfo: noSession.userInfo, servers: [server]))
         // It is never mistaken for a relay push, nor a relay push for it.
         XCTAssertNil(PushPayload(userInfo: info).installHash)
-        XCTAssertEqual(PushPresence.presentation(userInfo: info, viewer: nil, pairings: [:]), [])
         var relay = banner(sealed: nil).userInfo
         relay["source"] = "webui"
         relay["server_hash"] = info["server_hash"]
@@ -270,10 +269,26 @@ import XCTest
         var loud = pairing
         loud.preferences = PushPreferences(presenceSuppression: false)
         XCTAssertEqual(PushPresence.presentation(userInfo: reply, viewer: open, pairings: [server: loud]), shown)
-        // Local alerts and pushes from an install this phone no longer holds keep the
-        // system default of showing nothing in the foreground.
+        // Pushes from an install this phone no longer holds keep the system default of
+        // showing nothing in the foreground.
         XCTAssertEqual(PushPresence.presentation(userInfo: [:], viewer: nil, pairings: [server: pairing]), [])
         XCTAssertEqual(PushPresence.presentation(userInfo: reply, viewer: nil, pairings: [:]), [])
+    }
+
+    /// A local run alert reaches the foreground only for a chat a pushed screen covers,
+    /// so it shows, unless that very chat is back on screen by the time it arrives.
+    func testForegroundShowsLocalRunAlertsUnlessTheirChatIsOpen() {
+        let info: [AnyHashable: Any] = ResponseCompletionNotificationRequest(
+            sessionID: "s1", server: server, title: "Chat", outcome: .completed).userInfo
+        let shown: UNNotificationPresentationOptions = [.banner, .list, .sound]
+        XCTAssertEqual(PushPresence.presentation(userInfo: info, viewer: nil, pairings: [:]), shown)
+        XCTAssertEqual(PushPresence.presentation(
+            userInfo: info, viewer: .init(server: server, sessionID: "s2"), pairings: [:]), shown)
+        // The same session ID on another server is a different conversation.
+        XCTAssertEqual(PushPresence.presentation(
+            userInfo: info, viewer: .init(server: URL(string: "https://other.example")!, sessionID: "s1"), pairings: [:]), shown)
+        XCTAssertEqual(PushPresence.presentation(
+            userInfo: info, viewer: .init(server: server, sessionID: "s1"), pairings: [:]), [])
     }
 
     func testPresenceOnlyClearsForTheScreenThatEntered() {

@@ -265,6 +265,7 @@ struct ChatView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.coveredChatStream) private var coveredChatStream
     @AppStorage(AppHaptics.isEnabledKey) private var isHapticsEnabled = true
     @AppStorage(AppHaptics.streamingPulseIsEnabledKey) private var isStreamingPulseEnabled = false
     @AppStorage(SessionChatPreferences.dismissKeyboardKey) private var dismissKeyboardAfterSend = false
@@ -889,15 +890,30 @@ struct ChatView: View {
                 flushDraftsBestEffort()
                 appearanceTask?.cancel()
                 appearanceTask = nil
-                activeStreamStatusRefreshTask?.cancel()
-                activeStreamStatusRefreshTask = nil
                 viewModel.stopListening()
-                viewModel.suspendStreamForNavigation()
-                viewModel.cleanupPollingTasks()
+                // A screen pushed over this chat leaves the reply streaming (and the
+                // stale-stream check running) underneath; the shell suspends it if
+                // this chat never comes back.
+                let refreshTask = activeStreamStatusRefreshTask
+                let viewModel = viewModel
+                let suspend = {
+                    refreshTask?.cancel()
+                    viewModel.suspendStreamForNavigation()
+                    viewModel.cleanupPollingTasks()
+                }
+                if let coveredChatStream, coveredChatStream.isCovered {
+                    coveredChatStream.hold(suspend: suspend)
+                } else {
+                    activeStreamStatusRefreshTask = nil
+                    suspend()
+                }
             }
             .onAppear {
+                coveredChatStream?.release()
                 viewModel.protectDraftAttachments(for: draftKey)
                 isOnScreen = true
+                // A reply that finished under a pushed screen lands like one that finished in the background.
+                scrollToHydratedCompletionIfReady()
                 appearanceTask?.cancel()
                 appearanceTask = Task {
                     await viewModel.reconnectStreamIfNeeded(modelContext: modelContext)
@@ -3066,14 +3082,15 @@ struct ChatView: View {
         ChatHaptics.assistantResponseCompleted(isEnabled: isHapticsEnabled)
     }
 
-    /// Alerts once for a run that completed or failed while the scene was not active,
-    /// then releases the background task that kept the stream alive for it. A newer
-    /// run end in this chat supersedes one still waiting on its transcript load: the
-    /// newer alert stands, and the newer task releases the background task.
+    /// Alerts once for a run that completed or failed while the user was not watching
+    /// it (the scene not active, or a screen pushed over this chat), then releases the
+    /// background task that kept the stream alive for it. A newer run end in this chat
+    /// supersedes one still waiting on its transcript load: the newer alert stands, and
+    /// the newer task releases the background task.
     private func handleRunEnd() {
         guard let runEndContext = responseCompletionNotificationTracker.completionContext(
             runEndTrigger: viewModel.runEndTrigger,
-            sceneIsActive: scenePhase == .active
+            sceneIsActive: scenePhase == .active && isOnScreen
         ) else {
             return
         }
