@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// One feedback entry, laid out for steering from the phone: the plan's questions first, then
-/// what changes, what was sent, and the technical details folded away. A plan written before
-/// the steering format shows its Markdown whole. The decisions its status allows sit in a bar
-/// at the bottom; Reject is in the header menu. Reads the entry from the inbox, so a decision
-/// updates both screens.
+/// One feedback entry, laid out around the decision it waits on. A stage track shows where it
+/// is (You said → Plan → Build → Merge); then what changes as Now → After, the plan's
+/// questions or the build's checks, and what it touches. The full plan and build report open
+/// in a sheet. The decisions sit in a bar at the bottom, each naming what it starts. Reads
+/// the entry from the inbox, so a decision updates both screens.
 struct FeedbackDetailView: View {
     let entryID: String
     let viewModel: FeedbackInboxViewModel
@@ -12,6 +12,13 @@ struct FeedbackDetailView: View {
     @State private var answers = FeedbackAnswers()
     @State private var replyTarget: FeedbackEntry?
     @State private var isConfirmingReject = false
+    @State private var sheet: Sheet?
+    @State private var showsWholeQuote = false
+
+    private enum Sheet: String, Identifiable {
+        case plan, report
+        var id: String { rawValue }
+    }
 
     var body: some View {
         Group {
@@ -19,27 +26,29 @@ struct FeedbackDetailView: View {
                 content(entry)
                     .safeAreaInset(edge: .bottom, spacing: 0) { actionBar(entry) }
                     .task(id: entry.status) { await loadPlan(entry) }
-                    .toolbar { menu(entry) }
                     .confirmationDialog(
-                        Text(verbatim: entry.status == .ready ? "Reject this branch?" : "Reject this plan?"),
+                        Text(verbatim: entry.status == .ready ? "Drop this branch?" : "Drop this?"),
                         isPresented: $isConfirmingReject,
                         titleVisibility: .visible
                     ) {
-                        Button(role: .destructive) { decide(entry, .reject) } label: { Text(verbatim: "Reject") }
+                        Button(role: .destructive) { decide(entry, .reject) } label: { Text(verbatim: "Drop") }
                     } message: {
                         Text(verbatim: entry.status == .ready
                              ? "It moves to Done. The branch stays on your Mac until you delete it."
                              : "It moves to Done and won't be built.")
                     }
+                    .sheet(item: $sheet) { sheet in sheetContent(sheet, entry) }
+                    .hxNavigationTitle(entry.status.screenTitle)
+                    .feedbackReplyPrompt(for: $replyTarget, viewModel: viewModel,
+                                         prefix: steerable.flatMap { answers.note(for: $0.questions) })
             } else {
                 ContentUnavailableView {
                     Label { Text(verbatim: "This feedback is gone") } icon: { Image(systemName: "tray") }
                 }
+                .hxNavigationTitle("Feedback")
             }
         }
         .background(Color.hxCanvas.ignoresSafeArea())
-        .hxNavigationTitle("Plan")
-        .feedbackReplyPrompt(for: $replyTarget, viewModel: viewModel)
         .onDisappear { viewModel.clearError() }
     }
 
@@ -49,9 +58,14 @@ struct FeedbackDetailView: View {
         return nil
     }
 
+    private var loadedPlan: FeedbackPlan? {
+        if case .loaded(let plan) = plan { return plan }
+        return nil
+    }
+
     private func content(_ entry: FeedbackEntry) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 16) {
                 // Above everything: a 409 reload can move the entry past its action bar.
                 if let error = viewModel.error {
                     Label { Text(verbatim: error) } icon: { Image(systemName: "exclamationmark.triangle.fill") }
@@ -60,12 +74,16 @@ struct FeedbackDetailView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                VStack(alignment: .leading, spacing: 4) {
+                if let stage = FeedbackStage(entry: entry) {
+                    FeedbackStageTrack(stage: stage)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
                     Text(verbatim: entry.headline)
-                        .font(AppFont.display(style: .title3))
+                        .font(AppFont.display(style: .title2))
                         .foregroundStyle(Color.hxTextPrimary)
                         .accessibilityAddTraits(.isHeader)
-                    let meta = entry.isMerged ? viewModel.metaLine(for: entry) : entry.detailMetaLine
+                    let meta = entry.isMerged ? viewModel.metaLine(for: entry) : metaLine(entry)
                     if !meta.isEmpty {
                         Text(verbatim: meta)
                             .font(AppFont.footnote())
@@ -73,53 +91,43 @@ struct FeedbackDetailView: View {
                     }
                 }
 
-                if let steerable, entry.status == .planned, !steerable.questions.isEmpty {
-                    FeedbackQuestionsCard(questions: steerable.questions, answers: $answers)
-                }
+                youSaid(entry)
 
-                if let error = entry.status == .failed ? entry.error : nil, !error.isEmpty {
-                    block("Error") {
-                        Text(verbatim: error)
-                            .font(AppFont.mono(style: .footnote))
-                            .foregroundStyle(Color.hxDanger)
-                            .textSelection(.enabled)
-                    }
-                }
+                let hasNowAfter = entry.now != nil || entry.after != nil
+                // A plan without Now → After leads with its questions, ahead of the longer prose.
+                if !hasNowAfter { questions(entry) }
 
-                if entry.status == .ready {
-                    if let branch = entry.branch, !branch.isEmpty {
-                        block("Branch") {
-                            Text(verbatim: [entry.repo, branch].compactMap { $0 }.joined(separator: " · "))
-                                .font(AppFont.mono(style: .footnote))
-                                .foregroundStyle(Color.hxTextPrimary)
-                                .textSelection(.enabled)
-                        }
-                    }
-                    if let tests = entry.tests, !tests.isEmpty {
-                        block("Tests") { monospaced(tests) }
-                    }
-                }
-
-                if let changes = steerable?.changes {
+                if hasNowAfter {
+                    FeedbackNowAfterCard(entry: entry)
+                } else if let changes = steerable?.changes ?? entry.summary {
                     block("What changes") {
                         Text(verbatim: changes)
                             .font(AppFont.body())
                             .foregroundStyle(Color.hxTextPrimary)
                             .textSelection(.enabled)
                     }
+                } else if entry.status == .new || entry.status == .planning {
+                    Text(verbatim: FeedbackStatus.new.noPlanText)
+                        .font(AppFont.body())
+                        .foregroundStyle(Color.hxTextSecondary)
                 }
 
-                block("You said") {
-                    Text(verbatim: entry.text)
-                        .font(BrainStyle.quote)
-                        .foregroundStyle(Color.hxTextPrimary)
-                        .textSelection(.enabled)
-                    ForEach(Array(entry.notes.enumerated()), id: \.offset) { _, note in
-                        Text(verbatim: note.text)
-                            .font(AppFont.subheadline())
-                            .foregroundStyle(Color.hxTextSecondary)
+                if hasNowAfter { questions(entry) }
+
+                if entry.status == .failed {
+                    block("What went wrong") {
+                        Text(verbatim: entry.error?.isEmpty == false ? entry.error! : entry.status.noPlanText)
+                            .font(AppFont.mono(style: .footnote))
+                            .foregroundStyle(Color.hxDanger)
+                            .lineLimit(8)
                             .textSelection(.enabled)
                     }
+                }
+
+                if entry.status == .ready || entry.status == .merged {
+                    FeedbackChecksCard(entry: entry)
+                } else if entry.status != .failed {
+                    touches(entry)
                 }
 
                 let merged = viewModel.mergedNotes(into: entry.id)
@@ -129,13 +137,7 @@ struct FeedbackDetailView: View {
                     }
                 }
 
-                if let steerable {
-                    if let details = steerable.details {
-                        FeedbackDetailsDisclosure(markdown: details)
-                    }
-                } else {
-                    block("Plan") { planContent }
-                }
+                readMore(entry)
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -143,30 +145,141 @@ struct FeedbackDetailView: View {
         }
     }
 
-    /// The whole plan, for an entry without one yet or a plan written before the steering format.
     @ViewBuilder
-    private var planContent: some View {
-        switch plan {
-        case .loading:
-            ProgressView().frame(maxWidth: .infinity, alignment: .leading)
-        case .unavailable:
-            Text(verbatim: viewModel.entry(id: entryID)?.status.noPlanText ?? FeedbackStatus.new.noPlanText)
-                .font(AppFont.body())
-                .foregroundStyle(Color.hxTextSecondary)
-        case .failed(let message):
-            VStack(alignment: .leading, spacing: 8) {
-                Text(verbatim: message)
+    private func questions(_ entry: FeedbackEntry) -> some View {
+        if let steerable, entry.status == .planned, !steerable.questions.isEmpty {
+            FeedbackQuestionsCard(questions: steerable.questions, answers: $answers)
+        }
+    }
+
+    /// The line under the title: where it came from, or what the build made.
+    private func metaLine(_ entry: FeedbackEntry) -> String {
+        if entry.status == .ready || entry.status == .merged, !entry.commits.isEmpty {
+            let commits = entry.commits.count == 1 ? "1 commit" : "\(entry.commits.count) commits"
+            return [entry.feature, [commits, entry.repo].compactMap { $0 }.joined(separator: " on ")]
+                .filter { !$0.isEmpty }
+                .joined(separator: " · ")
+        }
+        return entry.detailMetaLine
+    }
+
+    /// What the user sent, in their words. Long text folds to four lines; a tap shows it whole.
+    private func youSaid(_ entry: FeedbackEntry) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(verbatim: entry.text)
+                .font(AppFont.serif(style: .callout))
+                .foregroundStyle(Color.hxTextPrimary)
+                .lineLimit(showsWholeQuote ? nil : 4)
+                .textSelection(.enabled)
+            ForEach(Array(entry.notes.enumerated()), id: \.offset) { _, note in
+                Text(verbatim: note.text)
                     .font(AppFont.footnote())
                     .foregroundStyle(Color.hxTextSecondary)
-                Button {
-                    guard let entry = viewModel.entry(id: entryID) else { return }
-                    Task { await loadPlan(entry) }
-                } label: {
-                    Text(verbatim: "Try again")
+                    .lineLimit(showsWholeQuote ? nil : 2)
+            }
+            Text(verbatim: "You said")
+                .font(AppFont.caption())
+                .foregroundStyle(Color.hxTextSecondary)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { showsWholeQuote.toggle() }
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(Text(verbatim: showsWholeQuote ? "Folds it." : "Shows it whole."))
+    }
+
+    /// Where the change lands: the repo, the files the plan names, and its size.
+    @ViewBuilder
+    private func touches(_ entry: FeedbackEntry) -> some View {
+        let repo = entry.planRepo ?? entry.repo
+        if repo != nil || !entry.files.isEmpty || entry.sizeWord != nil {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(verbatim: "Touches")
+                    .font(AppFont.caption())
+                    .foregroundStyle(Color.hxTextSecondary)
+                FlowRow(spacing: 6) {
+                    if let repo { HXChip(paper: .tool, label: repo) }
+                    ForEach(entry.files, id: \.self) { file in
+                        HXChip(paper: .file, symbol: "doc", label: (file as NSString).lastPathComponent)
+                            .accessibilityLabel(Text(verbatim: file))
+                    }
+                    if let size = entry.sizeWord { HXChip(paper: .tool, label: size) }
                 }
             }
-        case .loaded(let plan):
-            MarkdownRenderer(content: plan.body)
+        }
+    }
+
+    /// Rows opening the full plan and the build report.
+    @ViewBuilder
+    private func readMore(_ entry: FeedbackEntry) -> some View {
+        let hasPlan = loadedPlan != nil
+        let hasReport = entry.tests?.isEmpty == false
+        if hasPlan || hasReport {
+            VStack(spacing: 0) {
+                if hasPlan {
+                    sheetRow("Read the full plan") { sheet = .plan }
+                }
+                if hasPlan, hasReport {
+                    Divider().overlay(Color.hxSeparator).padding(.leading, 14)
+                }
+                if hasReport {
+                    sheetRow("Read the build report") { sheet = .report }
+                }
+            }
+            .hxCard()
+        }
+    }
+
+    private func sheetRow(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Text(verbatim: title)
+                    .font(AppFont.body())
+                    .foregroundStyle(Color.hxTextPrimary)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(AppFont.footnote(weight: .semibold))
+                    .foregroundStyle(Color.hxTextSecondary)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func sheetContent(_ sheet: Sheet, _ entry: FeedbackEntry) -> some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    switch sheet {
+                    case .plan:
+                        if let loadedPlan { MarkdownRenderer(content: loadedPlan.body) }
+                    case .report:
+                        if let branch = entry.branch, !branch.isEmpty {
+                            Text(verbatim: [entry.repo, branch].compactMap { $0 }.joined(separator: " · "))
+                                .font(AppFont.mono(style: .footnote))
+                                .foregroundStyle(Color.hxTextSecondary)
+                                .textSelection(.enabled)
+                        }
+                        Text(verbatim: entry.tests ?? "")
+                            .font(AppFont.mono(style: .footnote))
+                            .foregroundStyle(Color.hxTextPrimary)
+                            .textSelection(.enabled)
+                    }
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .navigationTitle(Text(verbatim: sheet == .plan ? "Plan" : "Build report"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button { self.sheet = nil } label: { Text(verbatim: "Done") }
+                }
+            }
         }
     }
 
@@ -180,23 +293,13 @@ struct FeedbackDetailView: View {
         }
     }
 
-    private func monospaced(_ text: String) -> some View {
-        ScrollView(.horizontal) {
-            Text(verbatim: text)
-                .font(AppFont.mono(style: .caption))
-                .foregroundStyle(Color.hxTextPrimary)
-                .textSelection(.enabled)
-                .padding(10)
-        }
-        .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
-    }
-
     /// A note the nightly job folded into this entry's plan, with Unmerge to plan it on its own again.
     private func mergedNote(_ note: FeedbackEntry) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(verbatim: note.text)
                 .font(AppFont.body())
                 .foregroundStyle(Color.hxTextPrimary)
+                .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if viewModel.pendingID == note.id {
                 ProgressView().accessibilityLabel(Text(verbatim: "Saving"))
@@ -212,26 +315,10 @@ struct FeedbackDetailView: View {
 
     // MARK: - Decisions
 
-    @ToolbarContentBuilder
-    private func menu(_ entry: FeedbackEntry) -> some ToolbarContent {
-        if entry.status.canReject {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button(role: .destructive) { isConfirmingReject = true } label: {
-                        Label { Text(verbatim: "Reject…") } icon: { Image(systemName: "xmark") }
-                    }
-                } label: {
-                    Label { Text(verbatim: "More") } icon: { Image(systemName: "ellipsis") }
-                }
-                .disabled(viewModel.pendingID != nil)
-            }
-        }
-    }
-
     @ViewBuilder
     private func actionBar(_ entry: FeedbackEntry) -> some View {
         if entry.status.hasDecisions {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(spacing: 8) {
                 if viewModel.pendingID == entry.id {
                     HStack(spacing: 8) {
                         ProgressView()
@@ -241,16 +328,15 @@ struct FeedbackDetailView: View {
                     }
                     .accessibilityElement(children: .combine)
                 }
-                HStack(spacing: 8) { actions(entry) }
-                    .font(AppFont.body(weight: .semibold))
-                    .controlSize(.large)
+                actions(entry)
                     .disabled(viewModel.pendingID != nil)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity)
             .background(Color.hxCanvas)
             .overlay(alignment: .top) { Divider().overlay(Color.hxSeparator) }
+            .environment(\.hxPaper, .request)
         }
     }
 
@@ -259,38 +345,54 @@ struct FeedbackDetailView: View {
         switch entry.status {
         case .planned:
             let note = steerable.flatMap { answers.note(for: $0.questions) }
-            Button {
-                if let note { decide(entry, .reply(note)) } else { replyTarget = entry }
-            } label: {
-                wide(note == nil ? "Redo plan" : "Send answers")
-            }
-            .buttonStyle(.bordered)
-            .tint(Color.hxTextPrimary)
-            .accessibilityHint(Text(verbatim: note == nil
-                                    ? "Tell the planner what to change. It replans tonight."
-                                    : "The planner replans tonight with your answers."))
-            Button {
+            primary("Build tonight", caption: "Branch ready by morning") {
                 decide(entry, note.map(FeedbackDecision.approveAnswering) ?? .approve)
-            } label: {
-                wide("Approve")
             }
-            .buttonStyle(.borderedProminent)
             .accessibilityHint(Text(verbatim: note == nil
                                     ? "Builds it tonight. Unanswered questions take the recommended answer."
                                     : "Builds it tonight with your answers."))
+            secondaryRow(("Change plan…", "Tell the planner what to change. It replans tonight.", { replyTarget = entry }),
+                         drop: "Drop it")
         case .ready:
-            Button { decide(entry, .merged) } label: { wide("Mark merged") }
-                .buttonStyle(.borderedProminent)
+            primary("I merged it", caption: "Records the merge. Merging happens on your Mac.") {
+                decide(entry, .merged)
+            }
+            .accessibilityHint(Text(verbatim: "Moves it to Done. It doesn't merge the branch."))
+            secondaryRow(("Send back…", "Replans it tonight with your note.", { replyTarget = entry }),
+                         drop: "Drop branch")
         case .failed:
-            Button { decide(entry, .retry) } label: { wide("Retry") }
-                .buttonStyle(.borderedProminent)
+            primary("Retry", caption: "Tries again tonight") { decide(entry, .retry) }
+            secondaryRow(nil, drop: "Drop it")
         default:
             EmptyView()
         }
     }
 
-    private func wide(_ title: String) -> some View {
-        Text(verbatim: title).frame(maxWidth: .infinity)
+    private func primary(_ title: String, caption: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 1) {
+                Text(verbatim: title)
+                    .font(AppFont.body(weight: .semibold))
+                Text(verbatim: caption)
+                    .font(AppFont.caption2(weight: .medium))
+                    .opacity(0.8)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
+    }
+
+    private func secondaryRow(_ other: (title: String, hint: String, action: () -> Void)?, drop: String) -> some View {
+        HStack(spacing: 8) {
+            if let other {
+                Button(action: other.action) { Text(verbatim: other.title) }
+                    .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
+                    .accessibilityHint(Text(verbatim: other.hint))
+            }
+            Button { isConfirmingReject = true } label: { Text(verbatim: drop) }
+                .buttonStyle(ChatDecisionButtonStyle(emphasis: .destructive))
+                .accessibilityHint(Text(verbatim: "Moves it to Done."))
+        }
     }
 
     private func decide(_ entry: FeedbackEntry, _ decision: FeedbackDecision) {
@@ -310,114 +412,14 @@ struct FeedbackDetailView: View {
     }
 }
 
-/// The plan's questions as a request card: each question with its answers as choice buttons
-/// and "Other…" for a typed answer. Nothing is preselected; the recommended answer is labeled.
-private struct FeedbackQuestionsCard: View {
-    let questions: [FeedbackQuestion]
-    @Binding var answers: FeedbackAnswers
-    @State private var otherTarget: Int?
-    @State private var otherText = ""
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Label {
-                Text(verbatim: questions.count == 1 ? "1 question" : "\(questions.count) questions")
-            } icon: {
-                Image(systemName: "questionmark.circle")
-            }
-            .font(AppFont.display(style: .subheadline))
-            .foregroundStyle(HermexPaper.request.glow)
-            .accessibilityAddTraits(.isHeader)
-
-            ForEach(Array(questions.enumerated()), id: \.offset) { index, question in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(verbatim: "\(index + 1). \(question.text)")
-                        .font(AppFont.subheadline(weight: .medium))
-                        .foregroundStyle(Color.hxTextPrimary)
-                    ForEach(Array(question.options.enumerated()), id: \.offset) { option, answer in
-                        choice(answer.text,
-                               note: answer.recommended ? "recommended" : nil,
-                               isPicked: answers.pick(for: index) == .option(option)) {
-                            answers.toggle(option, for: index)
-                        }
-                    }
-                    let typed: String? = if case .other(let text)? = answers.pick(for: index) { text } else { nil }
-                    choice(typed ?? "Other…", note: nil, isPicked: typed != nil, dashed: typed == nil) {
-                        otherText = typed ?? ""
-                        otherTarget = index
-                    }
-                }
-            }
+extension FeedbackStatus {
+    /// The detail screen's title.
+    var screenTitle: String {
+        switch self {
+        case .planned: "Plan"
+        case .ready: "Branch"
+        case .failed: "Failed"
+        default: "Feedback"
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glowSurface(.request, cornerRadius: HXRadius.lg)
-        .alert(
-            Text(verbatim: "Your answer"),
-            isPresented: Binding(get: { otherTarget != nil }, set: { if !$0 { otherTarget = nil } })
-        ) {
-            TextField(text: $otherText) { Text(verbatim: "Answer in your words") }
-            Button {
-                if let otherTarget { answers.setOther(otherText, for: otherTarget) }
-            } label: {
-                Text(verbatim: "Done")
-            }
-            Button(role: .cancel) {} label: { Text(verbatim: "Cancel") }
-        }
-    }
-
-    private func choice(_ title: String, note: String?, isPicked: Bool, dashed: Bool = false,
-                        action: @escaping () -> Void) -> some View {
-        let paper = HermexPaper.request
-        let shape = RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous)
-        return Button(action: action) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(verbatim: title)
-                    .font(AppFont.subheadline(weight: .medium))
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                if let note {
-                    Text(verbatim: note)
-                        .font(AppFont.caption())
-                }
-                if isPicked {
-                    Image(systemName: "checkmark")
-                        .font(AppFont.caption(weight: .bold))
-                        .accessibilityHidden(true)
-                }
-            }
-            .foregroundStyle(isPicked ? paper.onGlow : paper.glow)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
-            .frame(minHeight: 40)
-            .background(isPicked ? paper.glow : paper.wash, in: shape)
-            .overlay(shape.strokeBorder(isPicked ? paper.glow : paper.edge,
-                                        style: StrokeStyle(lineWidth: 0.5, dash: dashed ? [4, 3] : [])))
-            .contentShape(shape)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(verbatim: [title, note].compactMap { $0 }.joined(separator: ", ")))
-        .accessibilityAddTraits(isPicked ? .isSelected : [])
-    }
-}
-
-/// The plan's Details section, folded away in a neutral card.
-private struct FeedbackDetailsDisclosure: View {
-    let markdown: String
-    @State private var isExpanded = false
-
-    var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
-            MarkdownRenderer(content: markdown)
-                .padding(.top, 8)
-        } label: {
-            Text(verbatim: "Technical details")
-                .font(AppFont.subheadline(weight: .medium))
-                .foregroundStyle(Color.hxTextPrimary)
-        }
-        .tint(Color.hxTextSecondary)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .hxCard()
     }
 }
