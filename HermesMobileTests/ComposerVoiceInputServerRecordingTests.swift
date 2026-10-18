@@ -23,14 +23,12 @@ final class ComposerVoiceInputServerRecordingTests: APIClientTestCase {
     }
 
     func testInterruptedRecordingRetainsClipUntilUnlockedAndTranscribesOnce() async throws {
-        let previousIdlePolicy = UIApplication.shared.isIdleTimerDisabled
-        UIApplication.shared.isIdleTimerDisabled = false
-        defer { UIApplication.shared.isIdleTimerDisabled = previousIdlePolicy }
         let recorder = DictationTestRecorder()
+        let lease = TestRecordingLease()
         var unlocked = true
         let controller = ComposerVoiceInputController(
             speechRecognizerFactory: { _ in nil }, microphonePermission: { true },
-            serverRecorder: recorder, mayRecord: { unlocked }
+            serverRecorder: recorder, recordingLease: lease, mayRecord: { unlocked }
         )
         let updated = expectation(description: "Retained audio updates its draft")
         var drafts: [String] = []
@@ -47,13 +45,13 @@ final class ComposerVoiceInputServerRecordingTests: APIClientTestCase {
         }
         XCTAssertEqual(controller.state, .serverListening)
         XCTAssertTrue(recorder.isRecording)
-        XCTAssertTrue(UIApplication.shared.isIdleTimerDisabled)
+        XCTAssertTrue(lease.isHeld)
         unlocked = false
         controller.suspend()
         controller.suspend()
         XCTAssertFalse(recorder.isRecording)
         XCTAssertEqual(controller.state, .transcribing)
-        XCTAssertFalse(UIApplication.shared.isIdleTimerDisabled)
+        XCTAssertFalse(lease.isHeld)
         XCTAssertTrue(FileManager.default.fileExists(atPath: recorder.url.path))
         controller.resume()
         XCTAssertEqual(drafts, [])
@@ -90,10 +88,8 @@ final class ComposerVoiceInputServerRecordingTests: APIClientTestCase {
     }
 
     func testOldPermissionReplyCannotStartReplacementRecording() async {
-        let previousIdlePolicy = UIApplication.shared.isIdleTimerDisabled
-        UIApplication.shared.isIdleTimerDisabled = false
-        defer { UIApplication.shared.isIdleTimerDisabled = previousIdlePolicy }
         let recorder = DictationTestRecorder()
+        let lease = TestRecordingLease()
         let firstAsked = expectation(description: "Old permission request")
         let secondAsked = expectation(description: "Replacement permission request")
         var permissions: [CheckedContinuation<Bool, Never>] = []
@@ -104,7 +100,7 @@ final class ComposerVoiceInputServerRecordingTests: APIClientTestCase {
                     if permissions.count == 1 { firstAsked.fulfill() }
                     else { secondAsked.fulfill() }
                 }
-            }, serverRecorder: recorder, mayRecord: { true }
+            }, serverRecorder: recorder, recordingLease: lease, mayRecord: { true }
         )
         controller.apiClient = makeClient { _ in throw URLError(.cancelled) }
         let first = Task { await controller.toggle(currentDraft: "Old") { _ in XCTFail("Stale update") } }
@@ -113,7 +109,7 @@ final class ComposerVoiceInputServerRecordingTests: APIClientTestCase {
         let second = Task { await controller.toggle(currentDraft: "New") { _ in XCTFail("Not transcribed") } }
         await fulfillment(of: [secondAsked], timeout: 2)
         XCTAssertEqual(controller.state, .requestingPermission)
-        XCTAssertFalse(UIApplication.shared.isIdleTimerDisabled, "Permission must not hold an awake lease")
+        XCTAssertFalse(lease.isHeld, "Permission must not hold an awake lease")
         permissions[0].resume(returning: true)
         await first.value
         XCTAssertEqual(controller.state, .requestingPermission)
@@ -122,8 +118,9 @@ final class ComposerVoiceInputServerRecordingTests: APIClientTestCase {
         await second.value
         XCTAssertEqual(controller.state, .serverListening)
         XCTAssertEqual(recorder.starts, 1)
+        XCTAssertTrue(lease.isHeld)
         controller.stopBeforeSubmittingDraft()
-        XCTAssertFalse(UIApplication.shared.isIdleTimerDisabled)
+        XCTAssertFalse(lease.isHeld)
     }
 
     func testNewComposerRetiresPreviousOwnersRetainedClip() async {
@@ -281,6 +278,13 @@ final class ComposerVoiceInputServerRecordingTests: APIClientTestCase {
         let approxBytes = ComposerVoiceInputController.serverRecordingBitrate / 8 * thirtyMinutesInSeconds
         XCTAssertLessThan(approxBytes, PendingAttachment.maximumUploadBytes)
     }
+}
+
+@MainActor
+private final class TestRecordingLease: ComposerRecordingLease {
+    private(set) var isHeld = false
+    func acquire() { isHeld = true }
+    func release() { isHeld = false }
 }
 
 @MainActor
