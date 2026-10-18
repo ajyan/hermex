@@ -814,7 +814,7 @@ struct PrepJudgmentLessonCards: View {
                         withAnimation { checkDone = false }
                     }
                 } else {
-                    TextField(axis: .vertical) { Text(verbatim: "Answer with what you just learned") }
+                    TextField(text: $checkAnswer, axis: .vertical) { Text(verbatim: "Answer with what you just learned") }
                         .lineLimit(1...4)
                         .font(AppFont.body())
                         .foregroundStyle(Color.hxTextPrimary)

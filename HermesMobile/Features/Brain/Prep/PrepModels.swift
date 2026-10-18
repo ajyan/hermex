@@ -640,7 +640,7 @@ struct PrepJudgmentLesson: Hashable, Sendable, Codable {
                 fenceState.toggle()
             }
             if isHeading(index, fenceState: fenceState) {
-                current = normalizedHeading(line)
+                current = Self.normalizedHeading(line)
                 continue
             }
             if let current {
@@ -685,14 +685,15 @@ struct PrepJudgmentLesson: Hashable, Sendable, Codable {
 
     /// "the-idea" from a heading line: the text after the `## ` run, lowercased and reduced to
     /// letters and spaces, so "The idea", "**The idea**" and "## the-idea" all match.
-    private func normalizedHeading(_ line: String) -> String? {
+    private static func normalizedHeading(_ line: String) -> String? {
         var text = line.trimmingCharacters(in: .whitespaces)
         while text.hasPrefix("#") { text.removeFirst() }
         text = text.trimmingCharacters(in: .whitespaces)
         text = text.replacingOccurrences(of: "*", with: "")
-        let cleaned = text.lowercased().filter { $0.isLetter || $0.isSpace }
+        let letters: (String) -> String = { $0.lowercased().filter { $0.isLetter || $0 == " " } }
+        let cleaned = letters(text)
         for known in ["The idea", "How you'd say it", "Code", "Remember", "Check yourself"] {
-            if cleaned.hasPrefix(known.lowercased()) { return known }
+            if cleaned.hasPrefix(letters(known)) { return known }
         }
         return nil
     }
@@ -708,12 +709,12 @@ struct PrepJudgmentLesson: Hashable, Sendable, Codable {
         for part in parts {
             let tokens = part.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
             guard tokens.count >= 4,
-                  tokens.last == "miss",
-                  tokens[tokens.count - 2] == "on",
-                  let misses = ordinalNumber(tokens.first),
+                  tokens[1].lowercased() == "miss",
+                  tokens[2].lowercased() == "on",
+                  let misses = ordinalNumber(tokens[0]),
                   misses >= 2
             else { return nil }
-            let concept = tokens[1...(tokens.count - 3)].joined(separator: " ")
+            let concept = tokens[3...].joined(separator: " ")
             guard !concept.isEmpty else { return nil }
             result.append(PrepLessonRepeat(concept: concept, misses: misses))
         }
@@ -744,10 +745,11 @@ extension PrepJudgmentLesson {
         self = lesson
     }
 
-    /// There is no wire form; the sections only ever come back as Markdown, so encoding is a
-    /// no-op that never fails.
+    /// There is no wire form; the sections only ever come back as Markdown, so this encodes an
+    /// empty string.
     func encode(to encoder: Encoder) throws {
-        _ = try? encoder.singleValueContainer().encode("")
+        var container = encoder.singleValueContainer()
+        try container.encode("")
     }
 }
 
