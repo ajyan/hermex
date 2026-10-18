@@ -757,6 +757,7 @@
 		FEEDB0DE00000000000000B3 /* FeedbackInboxViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000B4 /* FeedbackInboxViewModel.swift */; };
 		FEEDB0DE00000000000000B5 /* FeedbackInboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000B6 /* FeedbackInboxView.swift */; };
 		FEEDB0DE00000000000000B7 /* FeedbackDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000B8 /* FeedbackDetailView.swift */; };
+		FEEDB0DE0000000000A1B2C1 /* FeedbackDetailParts.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE0000000000A1B2C2 /* FeedbackDetailParts.swift */; };
 		FEEDB0DE00000000000000AD /* FeedbackMenuItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000AE /* FeedbackMenuItem.swift */; };
 /* End PBXBuildFile section */
 
@@ -1553,6 +1554,7 @@
 		FEEDB0DE00000000000000B4 /* FeedbackInboxViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackInboxViewModel.swift; sourceTree = "<group>"; };
 		FEEDB0DE00000000000000B6 /* FeedbackInboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackInboxView.swift; sourceTree = "<group>"; };
 		FEEDB0DE00000000000000B8 /* FeedbackDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackDetailView.swift; sourceTree = "<group>"; };
+		FEEDB0DE0000000000A1B2C2 /* FeedbackDetailParts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackDetailParts.swift; sourceTree = "<group>"; };
 		FEEDB0DE00000000000000AE /* FeedbackMenuItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackMenuItem.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -2673,6 +2675,7 @@
 				1ABE1500000000000000000C /* LabelQueueView.swift */,
 				FEEDB0DE00000000000000AE /* FeedbackMenuItem.swift */,
 				FEEDB0DE00000000000000B8 /* FeedbackDetailView.swift */,
+				FEEDB0DE0000000000A1B2C2 /* FeedbackDetailParts.swift */,
 				FEEDB0DE00000000000000B6 /* FeedbackInboxView.swift */,
 				FEEDB0DE00000000000000B4 /* FeedbackInboxViewModel.swift */,
 				FEEDB0DE00000000000000AC /* FeedbackSheet.swift */,
@@ -2941,6 +2944,7 @@
 				1ABE1500000000000000000B /* LabelQueueView.swift in Sources */,
 				FEEDB0DE00000000000000AD /* FeedbackMenuItem.swift in Sources */,
 				FEEDB0DE00000000000000B7 /* FeedbackDetailView.swift in Sources */,
+				FEEDB0DE0000000000A1B2C1 /* FeedbackDetailParts.swift in Sources */,
 				FEEDB0DE00000000000000B5 /* FeedbackInboxView.swift in Sources */,
 				FEEDB0DE00000000000000B3 /* FeedbackInboxViewModel.swift in Sources */,
 				FEEDB0DE00000000000000AB /* FeedbackSheet.swift in Sources */,
