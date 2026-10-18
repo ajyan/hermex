@@ -65,6 +65,8 @@ private struct DeckCardView: View {
     @State private var isWriting = false
     /// The sleep card's numbers, shown before rating when asked for.
     @State private var showsNumbers = false
+    /// The card's diagram, while its sheet is open.
+    @State private var openDiagram: BriefDiagramIndex.Entry?
 
     var body: some View {
         ScrollView {
@@ -97,6 +99,9 @@ private struct DeckCardView: View {
         .tint(palette.ink)
         .sheet(isPresented: $isWriting) {
             ReflectionSheet(card: card, palette: palette, viewModel: viewModel)
+        }
+        .sheet(item: $openDiagram) { entry in
+            BriefDiagramSheet(entry: entry, viewModel: viewModel)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text(verbatim: palette.name))
@@ -140,6 +145,17 @@ private struct DeckCardView: View {
                 .font(AppFont.subheadline(weight: .medium))
                 .foregroundStyle(palette.ink)
                 .padding(.top, 12)
+        }
+        if let diagram = viewModel.diagram(for: card) {
+            Button { openDiagram = diagram } label: {
+                HXChip(paper: palette.colors, symbol: "point.3.connected.trianglepath.dotted", label: "Diagram")
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 6)
+            .accessibilityLabel(Text(verbatim: "Diagram: \(diagram.title ?? "interactive")"))
+            .accessibilityHint(Text(verbatim: "Opens an interactive diagram"))
         }
         if let detail = text.detail {
             Text(inlineMarkdown(detail))

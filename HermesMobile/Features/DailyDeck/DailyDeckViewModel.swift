@@ -163,6 +163,7 @@ final class DailyDeckViewModel {
             filedDates = Self.filedDates(in: names ?? [], kind: "morning")
             reviews = DeckReview.all(in: names ?? [])
             try await openDeck(names: names ?? [], sessionID: sessionID)
+            await loadDiagrams(sessionID: sessionID)
         } catch is CancellationError {
             // A newer load owns the state.
         } catch {
@@ -220,6 +221,35 @@ final class DailyDeckViewModel {
         index = min(index, max(visiblePages.count - 1, 0))
         lastDismissal = nil
         state = .ready
+    }
+
+    // MARK: Diagrams
+
+    /// The vault's diagram index; empty until loaded, and when the vault has none.
+    private(set) var diagrams: BriefDiagramIndex = .empty
+    private var hasDiagramIndex = false
+    private var diagramFragments: [String: String] = [:]
+
+    /// The interactive diagram for a technical card, when the vault has one.
+    func diagram(for card: DeckCard) -> BriefDiagramIndex.Entry? { diagrams.diagram(for: card) }
+
+    /// Reads the index once per screen, after the first deck is up. A missing index means no Diagram
+    /// chips; a failed read leaves none for now and tries again on the next load.
+    private func loadDiagrams(sessionID: String) async {
+        guard !hasDiagramIndex,
+              let content = try? await client.fileContent(sessionID: sessionID, path: BriefDiagramIndex.path)
+        else { return }
+        diagrams = BriefDiagramIndex.decode(content)
+        hasDiagramIndex = true
+    }
+
+    /// A diagram's `atlas-ui` fragment, read from the vault once per screen.
+    func diagramFragment(_ entry: BriefDiagramIndex.Entry) async throws -> String {
+        if let cached = diagramFragments[entry.topic] { return cached }
+        guard let sessionID else { throw CancellationError() }
+        let fragment = try await client.fileContent(sessionID: sessionID, path: entry.fragmentPath)
+        diagramFragments[entry.topic] = fragment
+        return fragment
     }
 
     /// Days with `<date>.<kind>.answers.json`, the file the agent saves when a deck is filed.

@@ -731,6 +731,7 @@
 		3F522DC0F0540A319E63AB5A /* DeckFeedbackSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85E374D76D0C399DE79819AE /* DeckFeedbackSheet.swift */; };
 		1FE8B00FD19A1F67ACF1CA6C /* DeckStackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4449578C9E4BFBE64D09B3C2 /* DeckStackView.swift */; };
 		0813B8B3C81380A4B30C0E48 /* CardStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCE49620E7F7E6D8CA37C796 /* CardStack.swift */; };
+		3AC4858985AC426AA49E6982 /* BriefDiagrams.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0886DAD7B190435986924E6F /* BriefDiagrams.swift */; };
 		39D0697E4167AB61D9640383 /* DeckPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = B87C4558BE2BEAAD59ECCE39 /* DeckPalette.swift */; };
 		FEEDB0DE00000000000000A1 /* FeedbackModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000A2 /* FeedbackModels.swift */; };
 		FEEDB0DE00000000000000A3 /* FeedbackDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDB0DE00000000000000A4 /* FeedbackDataClient.swift */; };
@@ -1520,6 +1521,7 @@
 		85E374D76D0C399DE79819AE /* DeckFeedbackSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckFeedbackSheet.swift; sourceTree = "<group>"; };
 		4449578C9E4BFBE64D09B3C2 /* DeckStackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckStackView.swift; sourceTree = "<group>"; };
 		CCE49620E7F7E6D8CA37C796 /* CardStack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardStack.swift; sourceTree = "<group>"; };
+		0886DAD7B190435986924E6F /* BriefDiagrams.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BriefDiagrams.swift; sourceTree = "<group>"; };
 		B87C4558BE2BEAAD59ECCE39 /* DeckPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckPalette.swift; sourceTree = "<group>"; };
 		FEEDB0DE00000000000000A2 /* FeedbackModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackModels.swift; sourceTree = "<group>"; };
 		FEEDB0DE00000000000000A4 /* FeedbackDataClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackDataClient.swift; sourceTree = "<group>"; };
@@ -2601,6 +2603,7 @@
 				85E374D76D0C399DE79819AE /* DeckFeedbackSheet.swift */,
 				4449578C9E4BFBE64D09B3C2 /* DeckStackView.swift */,
 				CCE49620E7F7E6D8CA37C796 /* CardStack.swift */,
+				0886DAD7B190435986924E6F /* BriefDiagrams.swift */,
 				B87C4558BE2BEAAD59ECCE39 /* DeckPalette.swift */,
 				7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */,
 				A0DE001C71B0EBD4FA4E885D /* DeckGoalCard.swift */,
@@ -2895,6 +2898,7 @@
 				3F522DC0F0540A319E63AB5A /* DeckFeedbackSheet.swift in Sources */,
 				1FE8B00FD19A1F67ACF1CA6C /* DeckStackView.swift in Sources */,
 				0813B8B3C81380A4B30C0E48 /* CardStack.swift in Sources */,
+				3AC4858985AC426AA49E6982 /* BriefDiagrams.swift in Sources */,
 				39D0697E4167AB61D9640383 /* DeckPalette.swift in Sources */,
 				1F2EF7D6C585EAF7E1C46CD2 /* DeckCardView.swift in Sources */,
 				A0DE001C71B0EBD4FA4E885E /* DeckGoalCard.swift in Sources */,
