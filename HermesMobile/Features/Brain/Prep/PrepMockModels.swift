@@ -1,6 +1,7 @@
 import Foundation
+import Observation
 
-// Models for the voice mock ladders of Prep on this user's `hermes-webui` fork (`api/tutor_mock.py`):
+// Models (and the screens' view model) for the voice mock ladders of Prep on this user's `hermes-webui` fork (`api/tutor_mock.py`):
 // `GET /api/tutor/mocks` and `POST /api/tutor/mock/{start,grade}`. A mock is a voice call with the
 // Hermes `interviewer` profile, graded after hang-up. Every field decodes tolerantly, like
 // `PrepModels`; decode with `PrepDecoding`.
@@ -234,6 +235,8 @@ enum PrepMockResultDisplay: Equatable {
     case tooShort
     /// The grade request never reached the server, so nothing will grade it.
     case notSent
+    /// The mocks loaded without this one.
+    case notFound
 }
 
 enum PrepMockCopy {
@@ -241,11 +244,14 @@ enum PrepMockCopy {
     static let ungraded = "Couldn't grade, saved for tonight"
     static let tooShort = "Too short to grade"
     static let notSent = "This call wasn't sent for grading."
+    static let notFound = "Couldn't find this mock"
     static let noInterviewer = "Interviewer isn't set up on this server."
 
+    /// What the result screen shows, once the mocks have loaded; nil is a mock they don't include.
     static func display(_ result: PrepMockResult?) -> PrepMockResultDisplay {
-        switch result?.status {
-        case "graded": result.map(PrepMockResultDisplay.graded) ?? .grading
+        guard let result else { return .notFound }
+        return switch result.status {
+        case "graded": .graded(result)
         case "ungraded": .ungraded
         case "too_short": .tooShort
         case "started": .notSent
@@ -298,7 +304,7 @@ enum PrepMockCopy {
         case .grading: "Grading"
         case .ungraded: "Saved for tonight"
         case .tooShort: "Too short"
-        case .notSent: "Not graded"
+        case .notSent, .notFound: "Not graded"
         }
     }
 
@@ -306,5 +312,107 @@ enum PrepMockCopy {
     static func dimTitle(_ dim: String) -> String {
         let words = dim.replacingOccurrences(of: "_", with: " ")
         return words.prefix(1).uppercased() + words.dropFirst()
+    }
+}
+
+// MARK: - View model
+
+/// The mock ladders and recent mocks for one screen (home's section, a brief, a result). Each
+/// screen owns its own, built for the active server, so nothing outlives a server switch.
+@MainActor
+@Observable
+final class PrepMockViewModel {
+    private(set) var state: BrainLoadState<PrepMocks> = .loading
+    /// True from Start call until the call's chat is open (or the start failed).
+    private(set) var isStarting = false
+    /// True while a result's Send for grading is on its way.
+    private(set) var isSendingGrade = false
+    /// Why the last start (or Send for grading) failed.
+    private(set) var errorMessage: String?
+    @ObservationIgnored private let client: PrepDataClient
+    @ObservationIgnored private let onAPIError: (Error) -> Void
+    @ObservationIgnored private var generation = 0
+
+    init(client: PrepDataClient, onAPIError: @escaping (Error) -> Void = { _ in }) {
+        self.client = client
+        self.onAPIError = onAPIError
+    }
+
+    var mocks: PrepMocks? {
+        if case .loaded(let mocks) = state { return mocks }
+        return nil
+    }
+
+    /// Loads (or refreshes) the ladders. A failed refresh keeps what is already showing.
+    func load() async {
+        generation += 1
+        let token = generation
+        do {
+            let mocks = try await client.mocks()
+            guard token == generation, !Task.isCancelled else { return }
+            state = .loaded(mocks)
+        } catch {
+            guard token == generation, !Self.isCancellation(error) else { return }
+            onAPIError(error)
+            guard mocks == nil else { return }
+            state = (error as? APIError)?.isNotFound == true ? .unavailable : .failed(error.localizedDescription)
+        }
+    }
+
+    /// Starts a mock at the kind's current level. A 409 means the server has no interviewer profile.
+    func start(kind: PrepMockKind) async -> PrepMockStart? {
+        errorMessage = nil
+        do {
+            return try await client.mockStart(kind: kind)
+        } catch {
+            guard !Self.isCancellation(error) else { return nil }
+            if case .http(409, _)? = error as? APIError {
+                errorMessage = PrepMockCopy.noInterviewer
+            } else {
+                onAPIError(error)
+                errorMessage = error.localizedDescription
+            }
+            return nil
+        }
+    }
+
+    /// Start call: starts the mock and hands its brief to the shell, which opens the call.
+    func startCall(kind: PrepMockKind, open: OpenMockCallAction) async {
+        guard !isStarting else { return }
+        isStarting = true
+        defer { isStarting = false }
+        guard let start = await start(kind: kind) else { return }
+        do {
+            try await open(start)
+        } catch {
+            guard !Self.isCancellation(error) else { return }
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Asks again for the grade of a call whose request never got through, then reloads.
+    func sendForGrading(_ grade: MockCallGrade) async {
+        guard !isSendingGrade else { return }
+        isSendingGrade = true
+        errorMessage = nil
+        defer { isSendingGrade = false }
+        do {
+            try await grade.post(to: client)
+        } catch {
+            guard !Self.isCancellation(error) else { return }
+            onAPIError(error)
+            errorMessage = error.localizedDescription
+            return
+        }
+        await load()
+    }
+
+    /// One mock among the recent ones, as last loaded.
+    func result(mockID: String) -> PrepMockResult? {
+        mocks?.recent.first { $0.mockID == mockID }
+    }
+
+    private static func isCancellation(_ error: Error) -> Bool {
+        error is CancellationError || (error as? URLError)?.code == .cancelled || Task.isCancelled
     }
 }

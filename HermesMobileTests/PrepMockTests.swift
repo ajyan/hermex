@@ -185,12 +185,13 @@ final class PrepMockTests: APIClientTestCase {
         let first = call.callEnded(sessionID: "sess-1", turnMS: [900, 300])
         let second = call.callEnded(sessionID: "sess-1", turnMS: [500])
 
-        XCTAssertEqual(first, MockCallGrade(mockID: "m1", sessionID: "sess-1", turnMS: [900, 300]))
+        let grade = MockCallGrade(mockID: "m1", sessionID: "sess-1", turnMS: [900, 300])
+        XCTAssertEqual(first, MockCallEnd(mockID: "m1", grade: grade))
         XCTAssertNil(second, "a second call on the same chat is an ordinary call")
         XCTAssertNil(call.openingTurn, "the brief opens only the mock's own call")
 
         let client = FakeMockClient()
-        if let first { try? await first.post(to: client) }
+        try? await grade.post(to: client)
         XCTAssertEqual(client.log, ["grade:m1"])
         XCTAssertEqual(client.grades.first?.sessionID, "sess-1")
         XCTAssertEqual(client.grades.first?.turnMS, [900, 300])
@@ -201,8 +202,13 @@ final class PrepMockTests: APIClientTestCase {
         XCTAssertNil(plain.callEnded(sessionID: "sess-1", turnMS: [900]))
 
         var noSession = MockCallState(mockID: "m1", openingTurn: "brief")
-        XCTAssertNil(noSession.callEnded(sessionID: nil, turnMS: [900]))
-        XCTAssertNil(noSession.callEnded(sessionID: "  ", turnMS: [900]))
+        XCTAssertEqual(noSession.callEnded(sessionID: "  ", turnMS: [900]), MockCallEnd(mockID: "m1", grade: nil))
+    }
+
+    func testNoGradeWhenTheInterviewerNeverAnswered() {
+        var call = MockCallState(mockID: "m1", openingTurn: "brief")
+        XCTAssertEqual(call.callEnded(sessionID: "sess-1", turnMS: []), MockCallEnd(mockID: "m1", grade: nil),
+                       "the end still reports, so the profile switches back, but nothing is graded")
     }
 
     func testGradeRequestBody() async throws {
@@ -241,7 +247,8 @@ final class PrepMockTests: APIClientTestCase {
         XCTAssertEqual(PrepMockCopy.display(try mocks(status: "ungraded").recent.first), .ungraded)
         XCTAssertEqual(PrepMockCopy.display(try mocks(status: "too_short").recent.first), .tooShort)
         XCTAssertEqual(PrepMockCopy.display(try mocks(status: "started").recent.first), .notSent)
-        XCTAssertEqual(PrepMockCopy.display(nil), .grading)
+        XCTAssertEqual(PrepMockCopy.display(nil), .notFound)
+        XCTAssertEqual(PrepMockCopy.notFound, "Couldn't find this mock")
         XCTAssertEqual(PrepMockCopy.ungraded, "Couldn't grade, saved for tonight")
         XCTAssertEqual(PrepMockCopy.tooShort, "Too short to grade")
     }
@@ -257,9 +264,48 @@ final class PrepMockTests: APIClientTestCase {
         XCTAssertEqual(PrepMockCopy.firstWord(900), "First word in 0.9 s (median)")
     }
 
+    // MARK: The brief's start
+
+    func testStartCallShowsWhyTheProfileSwitchFailed() async {
+        let client = FakeMockClient()
+        client.startResult = .success(designStart)
+        let viewModel = PrepMockViewModel(client: client)
+        let opener = OpenMockCallAction()
+        opener.handler = { _ in throw PrepMockProfileError(detail: "unknown profile") }
+
+        await viewModel.startCall(kind: .design, open: opener)
+
+        XCTAssertEqual(viewModel.errorMessage, "Couldn't switch to the interviewer profile: unknown profile")
+        XCTAssertFalse(viewModel.isStarting)
+    }
+
+    func testSendForGradingPostsAndReloads() async throws {
+        let client = FakeMockClient()
+        client.mocksResults = [.success(try mocks(status: "grading"))]
+        let viewModel = PrepMockViewModel(client: client)
+
+        await viewModel.sendForGrading(MockCallGrade(mockID: "m1", sessionID: "sess-1", turnMS: [700]))
+
+        XCTAssertEqual(client.log, ["grade:m1", "mocks"])
+        XCTAssertEqual(PrepMockCopy.display(viewModel.result(mockID: "m1")), .grading)
+    }
+
+    func testSectionShowsOnlyWithLadders() throws {
+        XCTAssertFalse(PrepMockSection.isShown(nil))
+        XCTAssertFalse(PrepMockSection.isShown(try decodeMocks(#"{"ladders": {}, "recent": []}"#)))
+        XCTAssertTrue(PrepMockSection.isShown(try decodeMocks(mocksJSON)))
+    }
+
     // MARK: The interviewer profile
 
-    func testEnterSwitchesToInterviewerAndReturnsPrevious() async {
+    private func makeStore() -> PrepMockReturnStore {
+        let name = "PrepMockTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        addTeardownBlock { defaults.removePersistentDomain(forName: name) }
+        return PrepMockReturnStore(serverID: "https://example.test", defaults: defaults)
+    }
+
+    func testEnterSavesThePreviousProfileAndSwitches() async throws {
         let paths = MockRequestLog()
         let client = makeClient { request in
             paths.append(request.url?.path ?? "")
@@ -275,45 +321,66 @@ final class PrepMockTests: APIClientTestCase {
                 throw URLError(.badURL)
             }
         }
+        let store = makeStore()
 
-        let previous = await PrepMockProfile.enter("interviewer", client: client)
+        try await PrepMockProfile(client: client, store: store).enter("interviewer")
 
-        XCTAssertEqual(previous, "default")
+        XCTAssertEqual(store.profile, "default")
         XCTAssertEqual(paths.values, ["/api/profiles", "/api/profile/switch"])
     }
 
-    func testEnterWhenAlreadyActiveSwitchesNothing() async {
+    func testReturnProfileIsKeyedByServerNotURL() {
+        let store = makeStore()
+        store.save("default")
+        let other = PrepMockReturnStore(serverID: "https://other.test", defaults: store.defaults)
+        XCTAssertNil(other.profile)
+        XCTAssertFalse(store.defaults.dictionaryRepresentation().keys.contains { $0.contains("example.test") },
+                       "the server's address never lands in UserDefaults")
+    }
+
+    func testEnterWhenAlreadyActiveSwitchesNothing() async throws {
         let paths = MockRequestLog()
         let client = makeClient { request in
             paths.append(request.url?.path ?? "")
             return apiTestJSONResponse(#"{"active": "interviewer"}"#, for: request)
         }
+        let store = makeStore()
 
-        let previous = await PrepMockProfile.enter("interviewer", client: client)
-
-        XCTAssertNil(previous)
-        XCTAssertEqual(paths.values, ["/api/profiles"])
-    }
-
-    func testEnterFallsBackToTheDrawerProfile() async {
-        let paths = MockRequestLog()
-        let alreadyActive = makeClient { request in
-            paths.append(request.url?.path ?? "")
-            return apiTestJSONResponse(#"{"active": "interviewer"}"#, for: request)
-        }
-        let stuck = await PrepMockProfile.enter("interviewer", fallback: "default", client: alreadyActive)
-        XCTAssertEqual(stuck, "default", "a server left on the interviewer still goes back to the drawer's profile")
+        try await PrepMockProfile(client: client, store: store).enter("interviewer")
+        XCTAssertNil(store.profile)
         XCTAssertEqual(paths.values, ["/api/profiles"])
 
-        let unreadable = makeClient { request in
-            if request.url?.path == "/api/profiles" { throw URLError(.timedOut) }
-            return apiTestJSONResponse(#"{"active": "interviewer"}"#, for: request)
-        }
-        let previous = await PrepMockProfile.enter("interviewer", fallback: "work", client: unreadable)
-        XCTAssertEqual(previous, "work")
+        try await PrepMockProfile(client: client, store: store).enter("interviewer", fallback: "default")
+        XCTAssertEqual(store.profile, "default", "a server left on the interviewer still goes back to the drawer's profile")
     }
 
-    func testLeaveSwitchesBack() async {
+    func testEnterKeepsAnEarlierSavedProfile() async throws {
+        let client = makeClient { request in apiTestJSONResponse(#"{"active": "interviewer"}"#, for: request) }
+        let store = makeStore()
+        store.save("work")
+
+        try await PrepMockProfile(client: client, store: store).enter("interviewer", fallback: "default")
+
+        XCTAssertEqual(store.profile, "work")
+    }
+
+    func testEnterThrowsOnASwitchErrorAndSavesNothing() async {
+        let client = makeClient { request in
+            if request.url?.path == "/api/profiles" { return apiTestJSONResponse(#"{"active": "default"}"#, for: request) }
+            return apiTestJSONResponse(#"{"error": "Profile not found"}"#, for: request)
+        }
+        let store = makeStore()
+
+        do {
+            try await PrepMockProfile(client: client, store: store).enter("interviewer")
+            XCTFail("a refused switch must not open the call")
+        } catch {
+            XCTAssertEqual(error as? PrepMockProfileError, PrepMockProfileError(detail: "Profile not found"))
+        }
+        XCTAssertNil(store.profile)
+    }
+
+    func testLeaveSwitchesBackAndForgets() async {
         let paths = MockRequestLog()
         let client = makeClient { request in
             paths.append(request.url?.path ?? "")
@@ -321,12 +388,127 @@ final class PrepMockTests: APIClientTestCase {
             XCTAssertEqual(body["name"] as? String, "default")
             return apiTestJSONResponse(#"{"active": "default"}"#, for: request)
         }
+        let store = makeStore()
+        let profile = PrepMockProfile(client: client, store: store)
+        store.save("default")
 
-        await PrepMockProfile.leave(to: "default", client: client)
-        await PrepMockProfile.leave(to: nil, client: client)
+        let first = await profile.leave()
+        let second = await profile.leave()
 
-        XCTAssertEqual(paths.values, ["/api/profile/switch"], "nothing to restore makes no request")
+        XCTAssertTrue(first)
+        XCTAssertFalse(second, "nothing saved, nothing to switch")
+        XCTAssertNil(store.profile)
+        XCTAssertEqual(paths.values, ["/api/profile/switch"])
     }
+
+    func testFailedLeaveIsRetriedLater() async {
+        let offline = MockRequestLog()
+        offline.append("offline")
+        let client = makeClient { request in
+            if !offline.values.isEmpty { throw URLError(.notConnectedToInternet) }
+            return apiTestJSONResponse(#"{"active": "default"}"#, for: request)
+        }
+        let store = makeStore()
+        let profile = PrepMockProfile(client: client, store: store)
+        store.save("default")
+
+        let failed = await profile.leave()
+        XCTAssertFalse(failed)
+        XCTAssertEqual(store.profile, "default", "kept for the next launch or foreground")
+
+        offline.clear()
+        let recovered = await profile.leave()
+        XCTAssertTrue(recovered)
+        XCTAssertNil(store.profile)
+    }
+
+    func testRefusedLeaveForgets() async {
+        let client = makeClient { request in apiTestJSONResponse(#"{"error": "gone"}"#, for: request, status: 404) }
+        let store = makeStore()
+        store.save("deleted")
+
+        let switched = await PrepMockProfile(client: client, store: store).leave()
+
+        XCTAssertFalse(switched)
+        XCTAssertNil(store.profile, "a profile the server refuses is never retried")
+    }
+
+    // MARK: Finishing the call
+
+    private func finisher(log: FinishLog, gradeFailures: Int = 0, stillOnMockChat: Bool = true) -> PrepMockCallFinisher {
+        var failures = gradeFailures
+        return PrepMockCallFinisher(
+            leave: { log.append("leave") },
+            postGrade: { grade in
+                log.append("grade:\(grade.mockID)")
+                if failures > 0 {
+                    failures -= 1
+                    throw URLError(.timedOut)
+                }
+            },
+            isStillOnMockChat: { stillOnMockChat },
+            replaceRoot: { log.append("root") },
+            show: { log.shown = $0; log.append("show") },
+            pause: { log.append("pause:\($0)") }
+        )
+    }
+
+    func testFinishSwitchesBackThenReplacesTheChatThenShowsTheResult() async {
+        let log = FinishLog()
+        let grade = MockCallGrade(mockID: "m1", sessionID: "sess-1", turnMS: [900])
+
+        await finisher(log: log).finish(MockCallEnd(mockID: "m1", grade: grade))
+
+        XCTAssertEqual(log.events, ["leave", "grade:m1", "root", "show"])
+        XCTAssertEqual(log.shown, [.home, .mockResult("m1", unsent: nil)])
+    }
+
+    func testFinishRetriesTheGradeTwice() async {
+        let log = FinishLog()
+        let grade = MockCallGrade(mockID: "m1", sessionID: "sess-1", turnMS: [900])
+
+        await finisher(log: log, gradeFailures: 2).finish(MockCallEnd(mockID: "m1", grade: grade))
+
+        XCTAssertEqual(log.events, ["leave", "grade:m1", "pause:1", "grade:m1", "pause:2", "grade:m1", "root", "show"])
+        XCTAssertEqual(log.shown, [.home, .mockResult("m1", unsent: nil)])
+    }
+
+    func testFinishCarriesAGradeThatNeverGotThrough() async {
+        let log = FinishLog()
+        let grade = MockCallGrade(mockID: "m1", sessionID: "sess-1", turnMS: [900])
+
+        await finisher(log: log, gradeFailures: 3).finish(MockCallEnd(mockID: "m1", grade: grade))
+
+        XCTAssertEqual(log.events.filter { $0 == "grade:m1" }.count, 3)
+        XCTAssertEqual(log.shown, [.home, .mockResult("m1", unsent: grade)])
+    }
+
+    func testFinishWithNothingToGradeShowsPrepHome() async {
+        let log = FinishLog()
+
+        await finisher(log: log).finish(MockCallEnd(mockID: "m1", grade: nil))
+
+        XCTAssertEqual(log.events, ["leave", "root", "show"])
+        XCTAssertEqual(log.shown, [.home])
+    }
+
+    func testFinishAfterLeavingTheChatOnlySwitchesBack() async {
+        let log = FinishLog()
+        let grade = MockCallGrade(mockID: "m1", sessionID: "sess-1", turnMS: [900])
+
+        await finisher(log: log, stillOnMockChat: false).finish(MockCallEnd(mockID: "m1", grade: grade))
+
+        XCTAssertEqual(log.events, ["leave", "grade:m1"])
+        XCTAssertNil(log.shown)
+    }
+}
+
+@MainActor
+private final class FinishLog {
+    var events: [String] = []
+    var shown: [PrepRoute]?
+
+    func append(_ event: String) { events.append(event) }
 }
 
 private final class MockRequestLog: @unchecked Sendable {
@@ -334,5 +516,6 @@ private final class MockRequestLog: @unchecked Sendable {
     private var paths: [String] = []
 
     func append(_ path: String) { lock.withLock { paths.append(path) } }
+    func clear() { lock.withLock { paths.removeAll() } }
     var values: [String] { lock.withLock { paths } }
 }

@@ -290,9 +290,9 @@ struct ChatView: View {
     let startsCall: Bool
     /// Bumped by the shell's call button to call on this chat.
     let callRequest: Int
-    /// A voice mock's chat: its first call opens with the brief and asks for the grade once it ends
+    /// A voice mock's chat: its first call opens with the brief and reports its end once
     /// (`onMockCallEnded`, after the call screen is gone).
-    let onMockCallEnded: ((MockCallGrade) -> Void)?
+    let onMockCallEnded: ((MockCallEnd) -> Void)?
     let draftStore: ChatDraftStore
     /// Store holding the durable app-owned copies of staged attachments.
     let draftAttachmentStore: any ChatDraftAttachmentStoring
@@ -317,8 +317,8 @@ struct ChatView: View {
     @State private var isFileBrowserPresented = false
     @State private var didAutoStartCall = false
     @State private var mockCall: MockCallState
-    /// The mock's grade, from hang-up until the call screen has gone.
-    @State private var endedMockCall: MockCallGrade?
+    /// The mock call's end, from hang-up until the call screen has gone.
+    @State private var endedMockCall: MockCallEnd?
     /// Rename sheet opened by tapping the chat title.
     @State private var isTitleRenamePresented = false
     @State private var titleRenameIsSubmitting = false
@@ -430,7 +430,7 @@ struct ChatView: View {
         startsCall: Bool = false,
         openingTurn: String? = nil,
         mockID: String? = nil,
-        onMockCallEnded: ((MockCallGrade) -> Void)? = nil,
+        onMockCallEnded: ((MockCallEnd) -> Void)? = nil,
         callRequest: Int = 0,
         draftStore: ChatDraftStore? = nil,
         draftAttachmentStore: (any ChatDraftAttachmentStoring)? = nil,
@@ -1026,15 +1026,15 @@ struct ChatView: View {
             .fullScreenCover(isPresented: $isVoiceCallPresented, onDismiss: {
                 // Call turns don't go through the composer's send path.
                 if !viewModel.messages.isEmpty { onConversationStarted() }
-                if let grade = endedMockCall {
+                if let end = endedMockCall {
                     endedMockCall = nil
-                    onMockCallEnded?(grade)
+                    onMockCallEnded?(end)
                 }
             }) {
                 VoiceCallView(chat: viewModel, openingTurn: mockCall.openingTurn) { summary in
                     isVoiceCallPresented = false
-                    if let grade = mockCall.callEnded(sessionID: session.sessionId, turnMS: summary.turnMS) {
-                        endedMockCall = grade
+                    if let end = mockCall.callEnded(sessionID: session.sessionId, turnMS: summary.turnMS) {
+                        endedMockCall = end
                     }
                 }
             }

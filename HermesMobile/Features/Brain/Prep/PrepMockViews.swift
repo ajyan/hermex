@@ -6,89 +6,16 @@ import SwiftUI
 // graded result after hang-up. Cards are `.knowledge` wash cards like every Prep card; Start call is
 // a control, so it alone wears Nous blue. Only the candidate's own quoted words are serif.
 
-// MARK: - View model
-
-/// The mock ladders and recent mocks for one screen (home's section, a brief, a result). Each
-/// screen owns its own, built for the active server, so nothing outlives a server switch.
-@MainActor
-@Observable
-final class PrepMockViewModel {
-    private(set) var state: BrainLoadState<PrepMocks> = .loading
-    /// True from Start call until the call's chat is open (or the start failed).
-    private(set) var isStarting = false
-    /// Why the last start failed.
-    private(set) var errorMessage: String?
-    @ObservationIgnored private let client: PrepDataClient
-    @ObservationIgnored private let onAPIError: (Error) -> Void
-    @ObservationIgnored private var generation = 0
-
-    init(client: PrepDataClient, onAPIError: @escaping (Error) -> Void = { _ in }) {
-        self.client = client
-        self.onAPIError = onAPIError
-    }
-
-    var mocks: PrepMocks? {
-        if case .loaded(let mocks) = state { return mocks }
-        return nil
-    }
-
-    /// Loads (or refreshes) the ladders. A failed refresh keeps what is already showing.
-    func load() async {
-        generation += 1
-        let token = generation
-        do {
-            let mocks = try await client.mocks()
-            guard token == generation, !Task.isCancelled else { return }
-            state = .loaded(mocks)
-        } catch {
-            guard token == generation, !Self.isCancellation(error) else { return }
-            onAPIError(error)
-            guard mocks == nil else { return }
-            state = (error as? APIError)?.isNotFound == true ? .unavailable : .failed(error.localizedDescription)
-        }
-    }
-
-    /// Starts a mock at the kind's current level. A 409 means the server has no interviewer profile.
-    func start(kind: PrepMockKind) async -> PrepMockStart? {
-        errorMessage = nil
-        do {
-            return try await client.mockStart(kind: kind)
-        } catch {
-            guard !Self.isCancellation(error) else { return nil }
-            if case .http(409, _)? = error as? APIError {
-                errorMessage = PrepMockCopy.noInterviewer
-            } else {
-                onAPIError(error)
-                errorMessage = error.localizedDescription
-            }
-            return nil
-        }
-    }
-
-    /// Start call: starts the mock and hands its brief to the shell, which opens the call.
-    func startCall(kind: PrepMockKind, open: OpenMockCallAction) async {
-        guard !isStarting else { return }
-        isStarting = true
-        defer { isStarting = false }
-        guard let start = await start(kind: kind) else { return }
-        await open(start)
-    }
-
-    /// One mock among the recent ones, as last loaded.
-    func result(mockID: String) -> PrepMockResult? {
-        mocks?.recent.first { $0.mockID == mockID }
-    }
-
-    private static func isCancellation(_ error: Error) -> Bool {
-        error is CancellationError || (error as? URLError)?.code == .cancelled || Task.isCancelled
-    }
-}
-
 // MARK: - Home section
 
 /// Prep home's two ladder rows, each opening its brief, with the last graded score.
 struct PrepMockSection: View {
     let mocks: PrepMocks
+
+    /// Whether the section shows: once the ladders load with at least one kind.
+    static func isShown(_ mocks: PrepMocks?) -> Bool {
+        PrepMockKind.allCases.contains { mocks?.ladder($0) != nil }
+    }
 
     private var rows: [(kind: PrepMockKind, ladder: PrepLadder)] {
         PrepMockKind.allCases.compactMap { kind in mocks.ladder(kind).map { (kind, $0) } }
@@ -277,10 +204,13 @@ private struct PrepStartCallButton: View {
 /// Pushed as `.prep(.mockResult(id))`.
 struct PrepMockResultView: View {
     let mockID: String
+    /// The grade request when it never got through, for Send for grading.
+    let unsent: MockCallGrade?
     @State private var viewModel: PrepMockViewModel
 
-    init(mockID: String, server: URL, onAPIError: @escaping (Error) -> Void) {
+    init(mockID: String, unsent: MockCallGrade? = nil, server: URL, onAPIError: @escaping (Error) -> Void) {
         self.mockID = mockID
+        self.unsent = unsent
         _viewModel = State(initialValue: PrepMockViewModel(
             client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
     }
@@ -315,7 +245,9 @@ struct PrepMockResultView: View {
                     case .tooShort:
                         statusCard(PrepMockCopy.tooShort, symbol: "phone.down")
                     case .notSent:
-                        statusCard(PrepMockCopy.notSent, symbol: "exclamationmark.triangle")
+                        notSentCard
+                    case .notFound:
+                        statusCard(PrepMockCopy.notFound, symbol: "questionmark.circle")
                     case .graded(let result):
                         PrepMockGradedView(result: result, ladder: PrepMockKind(rawValue: result.kind).flatMap(mocks.ladder))
                     }
@@ -327,16 +259,49 @@ struct PrepMockResultView: View {
         }
     }
 
+    /// The grade request never got through: say so, and offer to send it when this screen has it.
+    private var notSentCard: some View {
+        PrepRunCard {
+            statusTitle(PrepMockCopy.notSent, symbol: "exclamationmark.triangle")
+            if let message = viewModel.errorMessage {
+                Text(verbatim: message)
+                    .font(BrainStyle.meta)
+                    .foregroundStyle(Color.hxDanger)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let unsent {
+                Button {
+                    Task { await viewModel.sendForGrading(unsent) }
+                } label: {
+                    Text(verbatim: viewModel.isSendingGrade ? "Sending…" : "Send for grading")
+                        .font(AppFont.body(weight: .semibold))
+                        .foregroundStyle(viewModel.isSendingGrade ? Color.hxTextSecondary : Color.hxOnAccent)
+                        .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
+                        .background(viewModel.isSendingGrade ? Color.hxSeparator.opacity(0.6) : Color.accentColor,
+                                    in: Capsule())
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(viewModel.isSendingGrade)
+            }
+        }
+    }
+
+    private func statusTitle(_ title: String, symbol: String) -> some View {
+        Label {
+            Text(verbatim: title)
+        } icon: {
+            Image(systemName: symbol).foregroundStyle(HermexPaper.knowledge.glow)
+        }
+        .font(AppFont.display(style: .headline))
+        .foregroundStyle(Color.hxTextPrimary)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityAddTraits(.isHeader)
+    }
+
     private func statusCard(_ title: String, symbol: String, detail: String? = nil) -> some View {
         PrepRunCard {
-            Label {
-                Text(verbatim: title)
-            } icon: {
-                Image(systemName: symbol).foregroundStyle(HermexPaper.knowledge.glow)
-            }
-            .font(AppFont.display(style: .headline))
-            .foregroundStyle(Color.hxTextPrimary)
-            .accessibilityAddTraits(.isHeader)
+            statusTitle(title, symbol: symbol)
             if let detail {
                 Text(verbatim: detail)
                     .font(BrainStyle.meta)

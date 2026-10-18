@@ -61,6 +61,12 @@ struct ShellNavigationState: Equatable {
         return !newChatHasStarted
     }
 
+    /// The root is a voice mock's chat, whose call may still be live.
+    var isOnMockChat: Bool {
+        guard case .newChat(let route) = root else { return false }
+        return route.mockID != nil
+    }
+
     mutating func select(_ session: SessionSummary) {
         setRoot(.session(session))
     }

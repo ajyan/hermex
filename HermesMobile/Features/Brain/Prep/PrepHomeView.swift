@@ -51,7 +51,7 @@ struct PrepHomeView: View {
                         // gaps (fed by mocks) follow below.
                         PrepTodayRingCard(course: course, streak: home.streak,
                                           action: PrepCopy.runAction(reps: home.run.reps, remaining: home.run.remaining))
-                        PrepUnitPath(course: course) {
+                        PrepUnitPath(course: course, showsTextMockRow: showsTextMockRow) {
                             storiesSection
                             mockSection
                         }
@@ -76,6 +76,12 @@ struct PrepHomeView: View {
     }
 
     // MARK: Mocks
+
+    /// The old text critique row stays on home whenever the ladders aren't there to carry it
+    /// (a server without them); hidden while they load, so it doesn't flash.
+    private var showsTextMockRow: Bool {
+        mockViewModel.state != .loading && !PrepMockSection.isShown(mockViewModel.mocks)
+    }
 
     @ViewBuilder
     private var mockSection: some View {

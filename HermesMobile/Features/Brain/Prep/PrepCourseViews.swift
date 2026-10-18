@@ -80,6 +80,9 @@ struct PrepTodayRingCard: View {
 /// quiet "Coming up" list.
 struct PrepUnitPath<Between: View>: View {
     let course: PrepCourse
+    /// The text critique run's row, for servers without the voice mock ladders (whose brief
+    /// screens carry it otherwise).
+    var showsTextMockRow = true
     /// Shown under the units (the story bank and the mock ladders).
     @ViewBuilder let between: Between
 
@@ -110,6 +113,14 @@ struct PrepUnitPath<Between: View>: View {
                 }
             }
             between
+            if showsTextMockRow, course.units.contains(where: { $0.mock }) {
+                NavigationLink(value: ShellPushDestination.brainRoute(.prep(.mock))) {
+                    BrainRow(title: "Mock interview", subtitle: "Full critique on what you've passed")
+                        .padding(.horizontal, BrainStyle.cardHorizontalPadding)
+                        .hxCard()
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 }
