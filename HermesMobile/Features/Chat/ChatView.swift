@@ -1016,7 +1016,7 @@ struct ChatView: View {
                 // Call turns don't go through the composer's send path.
                 if !viewModel.messages.isEmpty { onConversationStarted() }
             }) {
-                VoiceCallView(chat: viewModel) { isVoiceCallPresented = false }
+                VoiceCallView(chat: viewModel) { _ in isVoiceCallPresented = false }
             }
             .onAppear {
                 guard startsCall, !didAutoStartCall else { return }
