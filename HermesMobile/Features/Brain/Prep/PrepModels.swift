@@ -571,6 +571,190 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
     }
 }
 
+/// One concept from a lesson's repeat-miss line: the concept's id and how many total
+/// misses this one is.
+struct PrepLessonRepeat: Hashable, Sendable {
+    let concept: String
+    let misses: Int
+
+    init(concept: String, misses: Int) {
+        self.concept = concept
+        self.misses = misses
+    }
+}
+
+/// The sections of a judgment card's lesson (`grade.lesson_md`), split by the server's fixed
+/// `## ` headings so the app can show them as cards. "How you'd say it" is dropped: the grade
+/// view already shows that text verbatim in the strong-answer card. Parsed from `lesson_md` in
+/// `PrepJudgmentGrade.lesson`.
+struct PrepJudgmentLesson: Hashable, Sendable, Codable {
+    /// The repeat-miss line parsed into its concepts; nil when it has no repeats.
+    let repeats: [PrepLessonRepeat]?
+    /// The repeat-miss line, shown as plain text when it doesn't parse into concepts.
+    let repeatText: String?
+    /// "The idea"; when the lesson has no recognised headings, the whole lesson's text.
+    let idea: String
+    /// The "Code" section's body, including any code fences; nil when absent.
+    let code: String?
+    /// "Remember", one entry per bullet (leading markers stripped).
+    let remember: [String]
+    /// "Check yourself"; nil when absent.
+    let check: String?
+
+    init(repeats: [PrepLessonRepeat]?, repeatText: String?, idea: String, code: String?,
+         remember: [String], check: String?) {
+        self.repeats = repeats
+        self.repeatText = repeatText
+        self.idea = idea
+        self.code = code
+        self.remember = remember
+        self.check = check
+    }
+
+    init?(markdown: String) {
+        let lines = markdown.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        // A `## ` heading only counts outside a ``` fence.
+        func isHeading(_ index: Int, fenceState: Bool) -> Bool {
+            !fenceState && lines[index].trimmingCharacters(in: .whitespaces).hasPrefix("## ")
+        }
+        // Pass one: where the fenced sections start, and the preamble before them.
+        var preamble: [String] = []
+        var firstHeading: Int? = nil
+        var fenceState = false
+        for (index, line) in lines.enumerated() {
+            if isHeading(index, fenceState: fenceState) {
+                firstHeading = index
+                break
+            }
+            if line.trimmingCharacters(in: .whitespaces).hasPrefix("```") {
+                fenceState.toggle()
+            }
+            preamble.append(line)
+        }
+        // Pass two: the bodies, keyed by the known heading each section is under.
+        var sections: [String: [String]] = [:]
+        var current: String? = nil
+        fenceState = false
+        for (index, line) in lines.enumerated() {
+            if line.trimmingCharacters(in: .whitespaces).hasPrefix("```") {
+                fenceState.toggle()
+            }
+            if isHeading(index, fenceState: fenceState) {
+                current = Self.normalizedHeading(line)
+                continue
+            }
+            if let current {
+                sections[current, default: []].append(line)
+            }
+        }
+
+        func body(_ key: String) -> String? {
+            let text = (sections[key] ?? []).joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            return text.isEmpty ? nil : text
+        }
+
+        let hasHeading = firstHeading != nil
+        var repeats: [PrepLessonRepeat]?
+        var repeatText: String?
+        if hasHeading {
+            let preambleText = preamble.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !preambleText.isEmpty {
+                repeats = Self.parseRepeatLine(preambleText)
+                repeatText = repeats == nil ? preambleText : nil
+            }
+        }
+
+        let remember = (body("Remember") ?? "")
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .compactMap { line -> String? in
+                let stripped = line.trimmingCharacters(in: .whitespaces)
+                guard stripped.hasPrefix("- ") || stripped.hasPrefix("* ") else { return nil }
+                return stripped.dropFirst(2).trimmingCharacters(in: .whitespaces)
+            }
+            .filter { !$0.isEmpty }
+
+        self.init(
+            repeats: repeats,
+            repeatText: repeatText,
+            idea: hasHeading ? (body("The idea") ?? "")
+                : markdown.trimmingCharacters(in: .whitespacesAndNewlines),  // no headings: show it all
+            code: hasHeading ? body("Code") : nil,
+            remember: hasHeading ? remember : [],
+            check: hasHeading ? body("Check yourself") : nil)
+    }
+
+    /// "the-idea" from a heading line: the text after the `## ` run, lowercased and reduced to
+    /// letters and spaces, so "The idea", "**The idea**" and "## the-idea" all match.
+    private static func normalizedHeading(_ line: String) -> String? {
+        var text = line.trimmingCharacters(in: .whitespaces)
+        while text.hasPrefix("#") { text.removeFirst() }
+        text = text.trimmingCharacters(in: .whitespaces)
+        text = text.replacingOccurrences(of: "*", with: "")
+        let letters: (String) -> String = { $0.lowercased().filter { $0.isLetter || $0 == " " } }
+        let cleaned = letters(text)
+        for known in ["The idea", "How you'd say it", "Code", "Remember", "Check yourself"] {
+            if cleaned.hasPrefix(letters(known)) { return known }
+        }
+        return nil
+    }
+
+    /// Parses a repeat-miss line ("Third miss on a, second miss on b.") into its concepts and
+    /// miss counts. Returns nil when the line doesn't have that shape.
+    static func parseRepeatLine(_ line: String) -> [PrepLessonRepeat]? {
+        var text = line.trimmingCharacters(in: .whitespaces)
+        if text.hasSuffix(".") { text.removeLast() }
+        let parts = text.split(separator: ",", omittingEmptySubsequences: true)
+        guard !parts.isEmpty else { return nil }
+        var result: [PrepLessonRepeat] = []
+        for part in parts {
+            let tokens = part.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+            guard tokens.count >= 4,
+                  tokens[1].lowercased() == "miss",
+                  tokens[2].lowercased() == "on",
+                  let misses = ordinalNumber(tokens[0]),
+                  misses >= 2
+            else { return nil }
+            let concept = tokens[3...].joined(separator: " ")
+            guard !concept.isEmpty else { return nil }
+            result.append(PrepLessonRepeat(concept: concept, misses: misses))
+        }
+        return result
+    }
+
+    /// "third" → 3, "11th" → 11; nil for anything else.
+    static func ordinalNumber(_ word: String) -> Int? {
+        let lower = word.lowercased()
+        let spelled: [(String, Int)] = [
+            ("second", 2), ("third", 3), ("fourth", 4), ("fifth", 5), ("sixth", 6),
+            ("seventh", 7), ("eighth", 8), ("ninth", 9), ("tenth", 10)
+        ]
+        if let hit = spelled.first(where: { $0.0 == lower }) { return hit.1 }
+        var digits = lower
+        while let suffix = ["th", "st", "nd", "rd"].first(where: { digits.hasSuffix($0) }) {
+            digits.removeLast(suffix.count)
+        }
+        return Int(digits)
+    }
+}
+
+extension PrepJudgmentLesson {
+    /// Decodes a lesson straight from its Markdown (as `lesson_md`'s single string value).
+    init(from decoder: Decoder) throws {
+        let text = try decoder.singleValueContainer().decode(String.self)
+        guard let lesson = PrepJudgmentLesson(markdown: text) else { throw PrepLessonUnparseable() }
+        self = lesson
+    }
+
+    /// There is no wire form; the sections only ever come back as Markdown, so this encodes an
+    /// empty string.
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode("")
+    }
+}
+
+private struct PrepLessonUnparseable: Error {}
+
 struct PrepPointHit: Decodable, Hashable, Sendable {
     let pointID: String
     let quote: String
@@ -627,6 +811,15 @@ struct PrepJudgmentGrade: Decodable, Hashable, Sendable {
         strongAnswer = c.string(.strongAnswer)
         let lesson = c.optional(String.self, .lessonMD)?.trimmingCharacters(in: .whitespacesAndNewlines)
         lessonMD = lesson?.isEmpty == false ? lesson : nil
+    }
+
+    /// The lesson's sections; nil with `lessonMD`. A lesson with no headings falls back to
+    /// showing its whole text as the idea, so this is only nil when there is no lesson at all.
+    var lesson: PrepJudgmentLesson? {
+        guard let lessonMD else { return nil }
+        return PrepJudgmentLesson(markdown: lessonMD)
+            ?? PrepJudgmentLesson(repeats: nil, repeatText: nil,
+                                  idea: lessonMD, code: nil, remember: [], check: nil)
     }
 }
 
