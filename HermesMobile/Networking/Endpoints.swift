@@ -153,6 +153,8 @@ enum Endpoint {
     case toggleSkill
     case upload
     case transcribe
+    /// Names and words the voice call's recognizer should expect (fork route `api/voice_vocabulary.py`).
+    case voiceVocabulary
     case tts
     /// The Brain module library (`api/brain_catalog.py`): module counts, item lists, one page (optionally
     /// placed in a given hub), search, the home's daily deck of bites, and the People screen's sections.
@@ -457,6 +459,8 @@ enum Endpoint {
             return "/api/upload"
         case .transcribe:
             return "/api/transcribe"
+        case .voiceVocabulary:
+            return "/api/voice/vocabulary"
         case .tts:
             return "/api/tts"
         case .brainModules:

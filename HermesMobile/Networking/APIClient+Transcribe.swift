@@ -36,4 +36,15 @@ extension APIClient {
         }
         return try decode(TranscribeResponse.self, from: responseData)
     }
+
+    /// The names and words a voice call's recognizer should expect, from the server's vault.
+    /// Empty on any failure, including a server without the route: the call works without it.
+    func voiceVocabulary() async -> [String] {
+        do {
+            let response: VoiceVocabularyResponse = try await send(endpoint: .voiceVocabulary, method: "GET")
+            return (response.terms ?? []).filter { !$0.isEmpty }
+        } catch {
+            return []
+        }
+    }
 }
