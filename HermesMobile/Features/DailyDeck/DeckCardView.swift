@@ -787,6 +787,7 @@ private struct FollowUpsPage: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollIndicators(.hidden)
+        .scrollDismissesKeyboard(.interactively)
         .swipeUpForFeedback(mark: DeckPalette.followUps.ink, action: feedback)
         .foregroundStyle(DeckPalette.followUps.ink)
     }
