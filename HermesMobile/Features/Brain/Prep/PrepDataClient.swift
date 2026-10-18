@@ -1,7 +1,7 @@
 import Foundation
 
 /// The Prep (interview tutor) API on this user's `hermes-webui` fork (`api/tutor.py`):
-/// `GET /api/tutor/{home,today,map,gaps,gap,course,lesson,stories}` and `POST /api/tutor/{attempt,flag}`. Stock upstream
+/// `GET /api/tutor/{home,today,map,gaps,gap,course,lesson,stories}` and `POST /api/tutor/{attempt,flag,stories/candidate}`. Stock upstream
 /// servers answer 404, which screens treat as "no Prep on this server".
 protocol PrepDataClient: Sendable {
     func home() async throws -> PrepHome
@@ -15,6 +15,9 @@ protocol PrepDataClient: Sendable {
     func lesson(id: String) async throws -> PrepLesson
     /// The story bank: each story's readiness marks, plus candidates waiting for a verdict.
     func stories() async throws -> PrepStoryList
+    /// "add" drafts a candidate into a bench story (the server answers 202 and writes it in the
+    /// background); "dismiss" sets it aside.
+    func storyCandidate(id: String, action: String) async throws
     /// "I had that": count one missed key point of a graded recall or boss answer as hit.
     func override(attempt: String, point: String) async throws -> PrepAttemptResult
 }
@@ -71,6 +74,11 @@ struct APIClientPrepAdapter: PrepDataClient {
 
     func stories() async throws -> PrepStoryList {
         try await get(.tutorStories)
+    }
+
+    func storyCandidate(id: String, action: String) async throws {
+        _ = try await apiClient.sendData(endpoint: .tutorStoryCandidate, method: "POST",
+                                         body: PrepStoryCandidateRequest(id: id, action: action))
     }
 
     func override(attempt: String, point: String) async throws -> PrepAttemptResult {

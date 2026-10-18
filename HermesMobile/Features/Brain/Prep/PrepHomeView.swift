@@ -41,7 +41,7 @@ struct PrepHomeView: View {
                         // gaps (fed by mocks) follow below.
                         PrepTodayRingCard(course: course, streak: home.streak,
                                           action: PrepCopy.runAction(reps: home.run.reps, remaining: home.run.remaining))
-                        PrepUnitPath(course: course, stories: viewModel.stories)
+                        PrepUnitPath(course: course) { storiesSection }
                     } else {
                         todaySection(home)
                     }
@@ -58,6 +58,19 @@ struct PrepHomeView: View {
                 .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
             }
             .refreshable { await viewModel.load() }
+        }
+    }
+
+    // MARK: Stories
+
+    @ViewBuilder
+    private var storiesSection: some View {
+        if let stories = viewModel.stories, !stories.stories.isEmpty || !stories.candidates.isEmpty {
+            PrepStorySection(
+                list: stories, inFlight: viewModel.candidatesInFlight, errors: viewModel.candidateErrors,
+                onAct: { candidate, action in
+                    Task { await viewModel.act(on: candidate, action: action) }
+                })
         }
     }
 

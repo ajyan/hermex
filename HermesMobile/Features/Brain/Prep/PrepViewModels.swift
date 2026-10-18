@@ -33,6 +33,10 @@ final class PrepHomeViewModel {
     /// The story bank with each story's readiness marks; nil when the server has no stories route
     /// or it failed, in which case the Stories section hides.
     private(set) var stories: PrepStoryList?
+    /// Candidate ids with a verdict in flight, so a card's buttons go off and a tap can't repeat.
+    private(set) var candidatesInFlight: Set<String> = []
+    /// Why the last verdict on a candidate failed, by candidate id; cleared on the next try.
+    private(set) var candidateErrors: [String: String] = [:]
     @ObservationIgnored private let client: PrepDataClient
     @ObservationIgnored private var generation = 0
 
@@ -66,6 +70,35 @@ final class PrepHomeViewModel {
             onAPIError(error)
             state = prepFailureState(error)
         }
+    }
+
+    func isActing(on candidateID: String) -> Bool {
+        candidatesInFlight.contains(candidateID)
+    }
+
+    /// Sends a verdict on a story candidate, then refreshes the stories once (an added candidate
+    /// reads "drafting" from there; nothing polls). A dismissed card goes at once, so a failed
+    /// refresh never brings it back. A failed verdict keeps the card and records why.
+    func act(on candidate: PrepStoryCandidate, action: PrepStoryCandidateAction) async {
+        guard candidate.status == "new", !candidatesInFlight.contains(candidate.id) else { return }
+        candidatesInFlight.insert(candidate.id)
+        candidateErrors[candidate.id] = nil
+        defer { candidatesInFlight.remove(candidate.id) }
+        do {
+            try await client.storyCandidate(id: candidate.id, action: action.rawValue)
+        } catch {
+            guard !prepIsCancellation(error) else { return }
+            onAPIError(error)
+            candidateErrors[candidate.id] = error.localizedDescription
+            return
+        }
+        if action == .dismiss { removeCandidate(candidate.id) }
+        if let refreshed = try? await client.stories() { stories = refreshed }
+    }
+
+    private func removeCandidate(_ id: String) {
+        guard let list = stories else { return }
+        stories = list.removingCandidate(id)
     }
 }
 

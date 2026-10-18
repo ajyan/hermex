@@ -161,17 +161,32 @@ struct PrepStorySummary: Decodable, Identifiable, Hashable, Sendable {
     }
 }
 
+/// A verdict on a candidate: draft it into a bench story, or set it aside.
+enum PrepStoryCandidateAction: String, Sendable {
+    case add, dismiss
+}
+
+/// `POST /api/tutor/stories/candidate`.
+struct PrepStoryCandidateRequest: Encodable, Hashable, Sendable {
+    let id: String
+    let action: String
+}
+
 /// A story the nightly coach proposed, waiting for a verdict.
 struct PrepStoryCandidate: Decodable, Identifiable, Hashable, Sendable {
     let id: String
     let title: String
+    let summary: String?
     let forPrompt: String?
     let why: String?
     let verdict: String?
+    /// "new" waits for a verdict; "drafting" is being written into a story.
     let status: String
+    /// Why the last draft failed, when it did; the candidate is back to "new".
+    let error: String?
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, why, verdict, status
+        case id, title, summary, why, verdict, status, error
         case forPrompt = "for_prompt"
     }
 
@@ -179,10 +194,12 @@ struct PrepStoryCandidate: Decodable, Identifiable, Hashable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.requiredID(.id)
         title = c.string(.title)
+        summary = c.optional(String.self, .summary)
         forPrompt = c.optional(String.self, .forPrompt)
         why = c.optional(String.self, .why)
         verdict = c.optional(String.self, .verdict)
         status = c.string(.status)
+        error = c.optional(String.self, .error)
     }
 }
 
@@ -197,6 +214,19 @@ struct PrepStoryList: Decodable, Hashable, Sendable {
         case stories, candidates
         case readyCount = "ready_count"
         case activeTotal = "active_total"
+    }
+
+    private init(stories: [PrepStorySummary], readyCount: Int, activeTotal: Int, candidates: [PrepStoryCandidate]) {
+        self.stories = stories
+        self.readyCount = readyCount
+        self.activeTotal = activeTotal
+        self.candidates = candidates
+    }
+
+    /// The list without one candidate, for a dismissed card.
+    func removingCandidate(_ id: String) -> PrepStoryList {
+        PrepStoryList(stories: stories, readyCount: readyCount, activeTotal: activeTotal,
+                      candidates: candidates.filter { $0.id != id })
     }
 
     init(from decoder: Decoder) throws {

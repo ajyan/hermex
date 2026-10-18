@@ -20,6 +20,7 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
     var lessonResults: [Result<PrepLesson, Error>] = []
     var overrideResults: [Result<PrepAttemptResult, Error>] = []
     var storiesResults: [Result<PrepStoryList, Error>] = []
+    var candidateResults: [Result<Void, Error>] = [.success(())]
 
     /// When set, `attempt` signals `started` and then waits on `release`.
     var gate: (started: AsyncStream<Void>.Continuation, release: AsyncStream<Void>)?
@@ -68,6 +69,9 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
     func course() async throws -> PrepCourse { try next("course", &courseResults) }
     func lesson(id: String) async throws -> PrepLesson { try next("lesson:\(id)", &lessonResults) }
     func stories() async throws -> PrepStoryList { try next("stories", &storiesResults) }
+    func storyCandidate(id: String, action: String) async throws {
+        try next("candidate:\(id):\(action)", &candidateResults)
+    }
     func override(attempt: String, point: String) async throws -> PrepAttemptResult {
         if let overrideGate {
             overrideGate.started.yield()
@@ -409,6 +413,79 @@ final class PrepViewModelsTests: XCTestCase {
         let vm = PrepRunViewModel(client: client, run: .story, unit: "s3")
         await vm.load()
         XCTAssertEqual(client.log.first, "today:story:s3")
+    }
+
+    private func candidateJSON(_ id: String, status: String = "new", error: String? = nil) -> String {
+        let err = error.map { #", "error": "\#($0)""# } ?? ""
+        return #"{"id": "\#(id)", "title": "Cutting the eval loop", "source": {"ref": "AI-20", "path": "star-stories.md"}, "summary": "Shipped a thing.", "signals": ["ownership"], "verdict": "backup", "for_prompt": "Time you disagreed with someone", "why": "A second angle.", "status": "\#(status)", "found": "2026-10-20"\#(err)}"#
+    }
+
+    private func homeVM(_ client: FakePrepClient) async -> PrepHomeViewModel {
+        client.homeResults = [.success(decode(PrepHome.self, #"{"streak": {"days": 1, "freezes": 0}}"#))]
+        let vm = PrepHomeViewModel(client: client)
+        await vm.load()
+        return vm
+    }
+
+    func testCandidateDecodesSummaryAndError() {
+        let list = storyList(candidates: candidateJSON("c1", error: "the draft didn't pass the story checks"))
+        XCTAssertEqual(list.candidates.first?.summary, "Shipped a thing.")
+        XCTAssertEqual(list.candidates.first?.error, "the draft didn't pass the story checks")
+        XCTAssertNil(storyList(candidates: candidateJSON("c1")).candidates.first?.error)
+    }
+
+    func testAddCandidateRefreshesStories() async {
+        let client = FakePrepClient()
+        client.storiesResults = [.success(storyList(candidates: candidateJSON("c1"))),
+                                 .success(storyList(candidates: candidateJSON("c1", status: "drafting")))]
+        let vm = await homeVM(client)
+        let candidate = try! XCTUnwrap(vm.stories?.candidates.first)
+        XCTAssertEqual(candidate.status, "new")
+        await vm.act(on: candidate, action: .add)
+        XCTAssertEqual(client.log.filter { $0 == "candidate:c1:add" }.count, 1)
+        XCTAssertEqual(client.log.filter { $0 == "stories" }.count, 2, "one refresh after the add, never a poll")
+        XCTAssertEqual(vm.stories?.candidates.first?.status, "drafting")
+        XCTAssertFalse(vm.isActing(on: "c1"))
+    }
+
+    func testDismissRemovesCandidate() async {
+        let client = FakePrepClient()
+        client.storiesResults = [.success(storyList(candidates: candidateJSON("c1"))),
+                                 .success(storyList())]
+        let vm = await homeVM(client)
+        await vm.act(on: try! XCTUnwrap(vm.stories?.candidates.first), action: .dismiss)
+        XCTAssertEqual(client.log.last, "stories")
+        XCTAssertTrue(client.log.contains("candidate:c1:dismiss"))
+        XCTAssertEqual(vm.stories?.candidates, [])
+    }
+
+    func testDismissedCandidateStaysGoneWhenRefreshFails() async {
+        let client = FakePrepClient()
+        client.storiesResults = [.success(storyList(candidates: candidateJSON("c1"))), .failure(http(500))]
+        let vm = await homeVM(client)
+        await vm.act(on: try! XCTUnwrap(vm.stories?.candidates.first), action: .dismiss)
+        XCTAssertEqual(vm.stories?.candidates, [])
+        XCTAssertEqual(vm.stories?.activeTotal, 8, "the rest of the list stands")
+    }
+
+    func testCandidateActionFailureKeepsCard() async {
+        let client = FakePrepClient()
+        client.storiesResults = [.success(storyList(candidates: candidateJSON("c1")))]
+        client.candidateResults = [.failure(http(409))]
+        let vm = await homeVM(client)
+        await vm.act(on: try! XCTUnwrap(vm.stories?.candidates.first), action: .add)
+        XCTAssertEqual(vm.stories?.candidates.map(\.id), ["c1"])
+        XCTAssertNotNil(vm.candidateErrors["c1"])
+        XCTAssertEqual(client.log.filter { $0 == "stories" }.count, 1, "no refresh after a failed action")
+        XCTAssertFalse(vm.isActing(on: "c1"))
+    }
+
+    func testCandidateActionIgnoresDraftingCandidate() async {
+        let client = FakePrepClient()
+        client.storiesResults = [.success(storyList(candidates: candidateJSON("c1", status: "drafting")))]
+        let vm = await homeVM(client)
+        await vm.act(on: try! XCTUnwrap(vm.stories?.candidates.first), action: .add)
+        XCTAssertFalse(client.log.contains { $0.hasPrefix("candidate:") }, "a drafting card has both buttons off")
     }
 
     func testStoryMarkCopy() {

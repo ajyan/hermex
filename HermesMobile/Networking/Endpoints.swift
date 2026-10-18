@@ -181,6 +181,7 @@ enum Endpoint {
     case tutorGap(id: String)
     case tutorFlag
     case tutorStories
+    case tutorStoryCandidate
     /// The feedback loop (`api/feedback.py`): list or create entries, read a plan, decide on an entry.
     case feedbackList
     case feedbackPlan(id: String)
@@ -501,6 +502,8 @@ enum Endpoint {
             return "/api/tutor/flag"
         case .tutorStories:
             return "/api/tutor/stories"
+        case .tutorStoryCandidate:
+            return "/api/tutor/stories/candidate"
         case .feedbackList:
             return "/api/feedback"
         case let .feedbackPlan(id):

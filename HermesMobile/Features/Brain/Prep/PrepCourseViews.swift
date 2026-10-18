@@ -78,10 +78,10 @@ struct PrepTodayRingCard: View {
 /// The course: passed units as rows with stars, each current unit (the one being taught, and any whose
 /// boss is still to beat) as a banner over a winding path, the next unit with Test out, and the rest as a
 /// quiet "Coming up" list.
-struct PrepUnitPath: View {
+struct PrepUnitPath<Between: View>: View {
     let course: PrepCourse
-    /// The story bank, shown between the units and the mock row; nil hides it.
-    var stories: PrepStoryList?
+    /// Shown between the units and the mock row (the story bank).
+    @ViewBuilder let between: Between
 
     var body: some View {
         let lastCurrent = course.units.lastIndex { $0.state == .current }
@@ -109,9 +109,7 @@ struct PrepUnitPath: View {
                     }
                 }
             }
-            if let stories, !stories.stories.isEmpty {
-                PrepStorySection(list: stories)
-            }
+            between
             if course.units.contains(where: { $0.mock }) {
                 NavigationLink(value: ShellPushDestination.brainRoute(.prep(.mock))) {
                     BrainRow(title: "Mock interview", subtitle: "Full critique on what you've passed")
