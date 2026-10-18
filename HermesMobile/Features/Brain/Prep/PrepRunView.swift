@@ -560,12 +560,17 @@ struct PrepRunView: View {
                 isSubmitting: viewModel.isSubmitting,
                 startClock: { viewModel.markStoryStarted() })
         case .told(let result):
-            PrepStoryResultView(result: result, titles: viewModel.storyTitles)
+            PrepStoryResultView(result: result, titles: viewModel.storyTitles,
+                                overridingPoint: viewModel.overridingPoint) { point in
+                Task { await viewModel.overridePoint(point) }
+            }
         case .probing(let probe, let number):
             PrepProbeCard(prompt: rep.item.prompt, probe: probe, number: number, draft: draft,
                           isSubmitting: viewModel.isSubmitting)
         case .probed(let result, let number):
-            PrepProbeResultView(result: result, number: number)
+            PrepProbeResultView(result: result, number: number, overridingPoint: viewModel.overridingPoint) { point in
+                Task { await viewModel.overridePoint(point) }
+            }
         }
     }
 

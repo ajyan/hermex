@@ -99,7 +99,7 @@ private struct PrepStoryClock: View {
 /// the transcript to correct, and the mic. Submit is the run's pinned button.
 struct PrepStoryTellCard: View {
     let prompt: String
-    /// When the clock started; nil shows 0:00 without ticking.
+    /// When the clock started; nil shows 0:00 without ticking. While submitting it stops ticking.
     let startedAt: Date?
     let elapsedMS: () -> Int
     @Binding var draft: String
@@ -113,12 +113,13 @@ struct PrepStoryTellCard: View {
                     .font(BrainStyle.meta)
                     .foregroundStyle(HermexPaper.knowledge.glow)
                 Spacer(minLength: BrainStyle.s)
-                if startedAt != nil {
+                if startedAt != nil && !isSubmitting {
                     TimelineView(.periodic(from: .now, by: 1)) { _ in
                         PrepStoryClock(elapsedMS: elapsedMS())
                     }
                 } else {
-                    PrepStoryClock(elapsedMS: 0)
+                    // Not started (0:00), or held at the moment the story was sent while it is graded.
+                    PrepStoryClock(elapsedMS: elapsedMS())
                 }
             }
             Text(verbatim: prompt)
@@ -162,12 +163,15 @@ struct PrepProbeCard: View {
     }
 }
 
-/// A graded telling: the score out of 5 and the time, the story's beats hit and missed, then the
-/// serif sample telling. An ungraded one says it was saved for tonight and shows no score.
+/// A graded telling: the score out of 5 and the time, the story's beats hit and missed (with "I had
+/// that" on a miss), then the serif sample telling. An ungraded one says it was saved for tonight and shows no score.
 struct PrepStoryResultView: View {
     let result: PrepAttemptResult
     /// Story titles by id, to name the story told on a wrong-story result.
     let titles: [String: String]
+    /// The missed beat whose "I had that" is saving; every claim waits until it lands.
+    var overridingPoint: String?
+    let overrideMissed: (String) -> Void
 
     private var rows: [(id: String, hit: Bool)] {
         (result.judgment?.pointsHit.map { ($0.pointID, true) } ?? [])
@@ -198,7 +202,8 @@ struct PrepStoryResultView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 ForEach(rows, id: \.id) { row in
-                    PrepKeyPointRow(result: result, id: row.id, hit: row.hit, canOverride: false) { _ in }
+                    PrepKeyPointRow(result: result, id: row.id, hit: row.hit, canOverride: result.attemptID != nil,
+                                    overridingPoint: overridingPoint, overrideMissed: overrideMissed)
                 }
             }
         }
@@ -228,6 +233,8 @@ struct PrepStoryResultView: View {
 struct PrepProbeResultView: View {
     let result: PrepAttemptResult
     let number: Int
+    var overridingPoint: String?
+    let overrideMissed: (String) -> Void
 
     var body: some View {
         Text(verbatim: PrepCopy.probeLabel(number))
@@ -240,7 +247,8 @@ struct PrepProbeResultView: View {
                     .foregroundStyle(Color.hxTextPrimary)
             }
         } else {
-            PrepRecallResultView(result: result, xp: nil, canOverride: false) { _ in }
+            PrepRecallResultView(result: result, xp: nil, canOverride: result.attemptID != nil,
+                                 overridingPoint: overridingPoint, overrideMissed: overrideMissed)
         }
     }
 }

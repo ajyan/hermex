@@ -282,6 +282,20 @@ final class PrepRunViewModel {
     /// The story attempt the probes answer to, and when the probe on screen was asked.
     @ObservationIgnored private var storyParent: String?
     @ObservationIgnored private var probeShownAt: Date?
+    /// When the telling was sent; the clock holds there while it is graded, and runs on if the send fails.
+    private(set) var storySubmittedAt: Date?
+    /// The answer out for grading, so a conflict reload that shows the same story or probe again
+    /// brings the words (and the story clock) back instead of an empty field.
+    @ObservationIgnored private var storyDraftStash: StoryDraftStash?
+
+    private struct StoryDraftStash {
+        let item: String
+        let prompt: String
+        /// nil for the telling, else the probe being answered.
+        let probe: String?
+        let text: String
+        let startedAt: Date?
+    }
 
     @ObservationIgnored private let onAPIError: (Error) -> Void
 
@@ -376,6 +390,10 @@ final class PrepRunViewModel {
 
     /// "I had that": count one missed key point as hit, keeping the rest of the result.
     func overridePoint(_ point: String) async {
+        if case let .rep(rep, _) = phase, rep.drill == .story {
+            await overrideStoryPoint(point)
+            return
+        }
         guard case let .result(rep, result, index) = phase, let attempt = result.attemptID,
               !answeredDontKnow, overridingPoint == nil else { return }
         let token = generation
@@ -400,9 +418,39 @@ final class PrepRunViewModel {
 
     // MARK: Story reps
 
-    /// The telling so far, in ms; 0 until the clock starts.
+    /// The telling so far, in ms; 0 until the clock starts, and held at the moment it was sent while
+    /// it is graded.
     var storyElapsedMS: Int {
-        storyStartedAt.map { Self.milliseconds(from: $0, to: now()) } ?? 0
+        storyStartedAt.map { Self.milliseconds(from: $0, to: storySubmittedAt ?? now()) } ?? 0
+    }
+
+    /// "I had that" on a told story's missed beat or a probe's missed point: re-scored by the server,
+    /// laid over the result on screen. The probe that result leads to is kept, so the rep goes on.
+    private func overrideStoryPoint(_ point: String) async {
+        let shown: PrepAttemptResult
+        switch storyStage {
+        case let .told(result), let .probed(result, _): shown = result
+        case .telling, .probing: return
+        }
+        guard let attempt = shown.attemptID, !shown.isUngraded, overridingPoint == nil else { return }
+        let token = generation
+        let stage = storyStage
+        overridingPoint = point
+        defer { if token == generation { overridingPoint = nil } }
+        do {
+            let updated = try await client.override(attempt: attempt, point: point)
+            guard token == generation, storyStage == stage else { return }
+            let merged = PrepAttemptResult(merging: shown, override: updated)
+            switch stage {
+            case .told: storyStage = .told(merged)
+            case let .probed(_, number): storyStage = .probed(merged, number: number)
+            case .telling, .probing: break
+            }
+        } catch {
+            guard token == generation, !prepIsCancellation(error) else { return }
+            onAPIError(error)
+            submitError = "Couldn't save that. Try again."
+        }
     }
 
     /// Starts the story clock once: on the first mic tap or the first non-empty edit.
@@ -447,13 +495,21 @@ final class PrepRunViewModel {
         guard canSubmitStoryAnswer, storyStage == .telling, case let .rep(rep, _) = phase, rep.drill == .story,
               let run else { return }
         let text = recallDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let sentAt = now()
+        storySubmittedAt = sentAt
+        storyDraftStash = StoryDraftStash(item: rep.item.id, prompt: rep.item.prompt, probe: nil,
+                                          text: recallDraft, startedAt: storyStartedAt)
         let request = PrepAttemptRequest(
             date: run.date, index: rep.index, item: rep.item.id, drill: .story,
             answer: .choice(PrepCopy.capped(text, to: PrepCopy.storyMaxLength)),
-            elapsedMS: storyStartedAt.map { Self.milliseconds(from: $0, to: now()) } ?? 0, hintsUsed: 0,
+            elapsedMS: storyStartedAt.map { Self.milliseconds(from: $0, to: sentAt) } ?? 0, hintsUsed: 0,
             run: runKind, unit: runKind == .testout ? unit : nil)
         let token = generation
-        guard let result = await post(request, token: token) else { return }
+        guard let result = await post(request, token: token) else {
+            if token == generation, storySubmittedAt == sentAt { storySubmittedAt = nil }
+            return
+        }
+        storyDraftStash = nil
         isSubmitting = false
         storyParent = result.attemptID
         storyStage = .told(result)
@@ -479,7 +535,10 @@ final class PrepRunViewModel {
             run: runKind, unit: runKind == .testout ? unit : nil)
         request.parent = parent
         request.probe = probe.id
+        storyDraftStash = StoryDraftStash(item: rep.item.id, prompt: rep.item.prompt, probe: probe.id,
+                                          text: recallDraft, startedAt: nil)
         guard let result = await post(request, token: generation) else { return }
+        storyDraftStash = nil
         isSubmitting = false
         storyStage = .probed(result, number: number)
     }
@@ -646,6 +705,7 @@ final class PrepRunViewModel {
         flagError = nil
         shownAt = now()
         storyStartedAt = nil
+        storySubmittedAt = nil
         storyTitles = [:]
         if rep.drill == .story, let pending = rep.pending {
             // Told earlier with probes still open: resume at the next one.
@@ -657,7 +717,24 @@ final class PrepRunViewModel {
             probeShownAt = nil
             storyStage = .telling
         }
+        restoreStoryDraft(for: rep)
         phase = .rep(rep, index: rep.index)
+    }
+
+    /// After a reload, the same story or probe comes back with the words that were out for grading.
+    private func restoreStoryDraft(for rep: PrepRep) {
+        defer { storyDraftStash = nil }
+        guard let stash = storyDraftStash, rep.drill == .story, stash.item == rep.item.id,
+              stash.prompt == rep.item.prompt else { return }
+        switch (storyStage, stash.probe) {
+        case (.telling, nil):
+            recallDraft = stash.text
+            storyStartedAt = stash.startedAt
+        case let (.probing(probe, _), id?) where probe.id == id:
+            recallDraft = stash.text
+        default:
+            break
+        }
     }
 
     private func submit(_ answer: PrepAnswer, confidence: PrepConfidence? = nil, dontKnow: Bool = false) async {

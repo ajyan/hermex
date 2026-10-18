@@ -1472,6 +1472,114 @@ final class PrepViewModelsTests: XCTestCase {
         await vm.submitStory()
         XCTAssertEqual(client.attempts.count, 1, "a told story can't be posted again")
     }
+
+    func testStoryBeatOverrideRescoresAndKeepsTheProbe() async {
+        let client = FakePrepClient()
+        client.attemptResults = [.success(storyResult(next: 0)),
+                                 .success(probeResult(next: 0, attempt: "probe-1", probe: nil))]
+        client.overrideResults = [
+            .success(decode(PrepAttemptResult.self, #"""
+            {"verdict": "pass", "attempt": "story-att-2", "score": 5, "overridden": ["b.number"],
+             "grade": {"points_hit": [{"point_id": "b.situation", "quote": ""}, {"point_id": "b.number", "quote": ""}], "points_missed": []}}
+            """#)),
+            .success(decode(PrepAttemptResult.self, #"""
+            {"verdict": "pass", "attempt": "probe-1b", "overridden": ["s1.p1.2"],
+             "grade": {"points_hit": [{"point_id": "s1.p1.1", "quote": ""}, {"point_id": "s1.p1.2", "quote": ""}], "points_missed": []}}
+            """#)),
+        ]
+        let vm = storyVM(client, reps: [storyRep(0)])
+        await vm.load()
+        vm.editStory("A story")
+        await vm.submitStory()
+        await vm.overridePoint("b.number")
+        guard case let .told(told) = vm.storyStage else { return XCTFail("stage \(vm.storyStage)") }
+        XCTAssertEqual(told.score, 5, "the override re-scores the telling")
+        XCTAssertEqual(told.overridden, ["b.number"])
+        XCTAssertEqual(told.probe?.id, "s1.p1", "a re-scored story still goes on to its probes")
+        XCTAssertNil(vm.overridingPoint)
+        XCTAssertEqual(client.log.last, "override:story-att:b.number")
+
+        vm.beginProbe()
+        vm.editStory("The number")
+        await vm.submitProbe()
+        XCTAssertEqual(client.attempts.last?.parent, "story-att", "probes still answer to the story attempt")
+        await vm.overridePoint("s1.p1.2")
+        guard case let .probed(probed, number) = vm.storyStage else { return XCTFail("stage \(vm.storyStage)") }
+        XCTAssertEqual(number, 1)
+        XCTAssertEqual(probed.overridden, ["s1.p1.2"])
+        XCTAssertEqual(client.log.last, "override:probe-1:s1.p1.2")
+    }
+
+    func testStoryClockFreezesWhileGrading() async {
+        let client = FakePrepClient()
+        client.attemptResults = [.success(storyResult(next: 0))]
+        let (started, startedCont) = AsyncStream<Void>.makeStream()
+        let (release, releaseCont) = AsyncStream<Void>.makeStream()
+        client.gate = (startedCont, release)
+        var t = Date(timeIntervalSince1970: 1_000)
+        let vm = storyVM(client, reps: [storyRep(0)], clock: { t })
+        await vm.load()
+        vm.editStory("A story")
+        t = t.addingTimeInterval(235)
+        let submit = Task { await vm.submitStory() }
+        for await _ in started { break }
+        t = t.addingTimeInterval(20)
+        XCTAssertEqual(vm.storyElapsedMS, 235_000, "the clock stops at the moment the story was sent")
+        XCTAssertNotEqual(PrepCopy.storyClockState(vm.storyElapsedMS), .over)
+        releaseCont.yield()
+        await submit.value
+        XCTAssertEqual(client.attempts.first?.elapsedMS, 235_000)
+    }
+
+    func testStoryDraftSurvivesAFailedSubmit() async {
+        let client = FakePrepClient()
+        client.attemptResults = [.failure(URLError(.timedOut))]
+        var t = Date(timeIntervalSince1970: 1_000)
+        let vm = storyVM(client, reps: [storyRep(0)], clock: { t })
+        await vm.load()
+        vm.editStory("Three minutes of dictation")
+        t = t.addingTimeInterval(180)
+        await vm.submitStory()
+        XCTAssertEqual(vm.recallDraft, "Three minutes of dictation")
+        XCTAssertEqual(vm.storyStage, .telling)
+        XCTAssertNotNil(vm.submitError)
+        t = t.addingTimeInterval(10)
+        XCTAssertEqual(vm.storyElapsedMS, 190_000, "after a failed send the clock runs on")
+    }
+
+    func testStoryDraftSurvivesAReloadOfTheSameRep() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([storyRep(0)])), .success(courseRun([storyRep(0)]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.failure(http(409))]
+        var t = Date(timeIntervalSince1970: 1_000)
+        let vm = makeVM(client, clock: { t })
+        await vm.load()
+        t = t.addingTimeInterval(5)
+        vm.editStory("Three minutes of dictation")
+        t = t.addingTimeInterval(180)
+        await vm.submitStory()
+        XCTAssertEqual(client.log.filter { $0 == "today" }.count, 2, "the conflict reloaded the run")
+        XCTAssertEqual(vm.storyStage, .telling)
+        XCTAssertEqual(vm.recallDraft, "Three minutes of dictation", "the reload keeps the unsent telling")
+        XCTAssertEqual(vm.storyStartedAt, Date(timeIntervalSince1970: 1_005), "and its clock")
+    }
+
+    func testProbeDraftSurvivesAReloadOfTheSameProbe() async {
+        let client = FakePrepClient()
+        let pending = #", "pending": {"attempt": "att-latest", "number": 1, "probe": {"id": "s1.p1", "attack": "What was the number?"}}"#
+        client.todayResults = [.success(courseRun([storyRep(0, pending: pending)])),
+                               .success(courseRun([storyRep(0, pending: pending)]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.failure(http(400))]
+        let vm = makeVM(client)
+        await vm.load()
+        vm.editStory("It cut p99 by 40%")
+        await vm.submitProbe()
+        XCTAssertEqual(client.log.filter { $0 == "today" }.count, 2)
+        XCTAssertEqual(vm.storyStage, .probing(PrepProbe(id: "s1.p1", attack: "What was the number?"), number: 1))
+        XCTAssertEqual(vm.recallDraft, "It cut p99 by 40%")
+    }
 }
 
 /// The run player hosted for real: drives SwiftUI controls through their
