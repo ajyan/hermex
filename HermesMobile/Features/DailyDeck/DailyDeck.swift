@@ -97,6 +97,13 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     /// A Week ahead card's proposal for next week, and last week's plan (for Ease off).
     let weekCommitments: [DeckWeekCommitment]
     let lastWeek: [DeckWeekCommitment]
+    /// A Mandarin card's phrases to hear and say, the review one last.
+    let phrases: [DeckPhrase]
+    /// A Mandarin card's feedback on the last answer filed.
+    let yesterday: DeckMandarinFeedback?
+    /// A Mandarin card's question (in `question`, as characters) in pinyin and in English.
+    let questionPinyin: String?
+    let questionEn: String?
 
     /// The vault file the card came from (`ref.link`, "wiki/nyc-marathon"); nil for pooled
     /// material with no page of its own (books, quotes, videos).
@@ -137,6 +144,10 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     /// (then her age) in `lines`. Its answer is filed as a letter to her, not into the journal.
     var isLetter: Bool { type == .prompt && itemKind == "letter" }
 
+    /// The Mandarin practice card: phrases to hear and a question to answer out loud. Its answer is
+    /// filed to the vault's Mandarin log, which writes the feedback shown on the next one.
+    var isMandarin: Bool { type == .prompt && itemKind == "mandarin" }
+
     /// Whether answering this card means typing (prompt and reflect cards, and a sleep or goal card's note).
     var takesText: Bool { type == .prompt || type == .reflect || type == .sleep || type == .goal }
 
@@ -151,7 +162,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     private enum CodingKeys: String, CodingKey {
         case id, type, title, body, source, lines, question, context, voice, why, draft, actions, fallback
         case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
-        case goal, start, lastWeek
+        case goal, start, lastWeek, phrases, yesterday, questionPinyin, questionEn
         case weekCommitments = "commitments"
         case itemKind = "kind"
     }
@@ -202,6 +213,10 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         weekCommitments = ((try? c.decodeIfPresent([Lossy<DeckWeekCommitment>].self, forKey: .weekCommitments)) ?? [])
             .compactMap(\.value)
         lastWeek = ((try? c.decodeIfPresent([Lossy<DeckWeekCommitment>].self, forKey: .lastWeek)) ?? []).compactMap(\.value)
+        phrases = ((try? c.decodeIfPresent([Lossy<DeckPhrase>].self, forKey: .phrases)) ?? []).compactMap(\.value)
+        yesterday = try? c.decodeIfPresent(DeckMandarinFeedback.self, forKey: .yesterday)
+        questionPinyin = try? c.decodeIfPresent(String.self, forKey: .questionPinyin)
+        questionEn = try? c.decodeIfPresent(String.self, forKey: .questionEn)
         let ref = try? c.decodeIfPresent(Ref.self, forKey: .ref)
         link = ref?.link.flatMap { $0.isEmpty ? nil : $0 }
         pool = ref?.pool.flatMap { $0.isEmpty ? nil : $0 }
@@ -297,6 +312,44 @@ struct DeckMeter: Decodable, Equatable, Hashable {
 }
 
 /// Decodes one item, or nothing when it is malformed, so a bad item never costs the list.
+/// A Mandarin phrase: characters, pinyin over them, English on tap. `review` marks the one the
+/// phrasebook brought back today.
+struct DeckPhrase: Decodable, Equatable, Hashable {
+    let hanzi: String
+    let pinyin: String?
+    let en: String?
+    let review: Bool
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        hanzi = try c.decode(String.self, forKey: .hanzi)
+        pinyin = try? c.decodeIfPresent(String.self, forKey: .pinyin)
+        en = try? c.decodeIfPresent(String.self, forKey: .en)
+        review = (try? c.decodeIfPresent(Bool.self, forKey: .review)) ?? false
+    }
+
+    private enum CodingKeys: String, CodingKey { case hanzi, pinyin, en, review }
+}
+
+/// The local model's feedback on the last Mandarin answer: what he said, a more natural way to
+/// say it, and a few notes. A block without `natural` doesn't decode, so nothing half-shows.
+struct DeckMandarinFeedback: Decodable, Equatable {
+    let said: String?
+    let natural: String
+    let naturalPinyin: String?
+    let notes: [String]
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        said = try? c.decodeIfPresent(String.self, forKey: .said)
+        natural = try c.decode(String.self, forKey: .natural)
+        naturalPinyin = try? c.decodeIfPresent(String.self, forKey: .naturalPinyin)
+        notes = (try? c.decodeIfPresent([String].self, forKey: .notes)) ?? []
+    }
+
+    private enum CodingKeys: String, CodingKey { case said, natural, naturalPinyin, notes }
+}
+
 private struct Lossy<Value: Decodable>: Decodable {
     let value: Value?
     init(from decoder: Decoder) throws { value = try? Value(from: decoder) }

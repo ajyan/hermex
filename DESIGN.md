@@ -50,6 +50,7 @@ Each paper is one hue rendered as a glow that adapts to the appearance:
 | `past` | `#FFEFC2` / `#4E3A00` | `#7A5C00` / `#E8C55A` | On this day |
 | `advisor` | `#E4EEF6` / `#14324A` | `#2E5878` / `#9DBEDD` | Check-in |
 | `plain` | `#F4F0E8` / `#2A2A28` | `#5E5646` / `#D6CDBB` | Library, follow-ups |
+| `mandarin` | `#FFDDD6` / `#5E1A0E` | `#B03A22` / `#FF9C85` | Mandarin practice |
 | `ledger` | `#EEF3D6` / `#2F3A0A` | `#4F6300` / `#C2DA6E` | (Money, not a Brief card) |
 
 ### The object key
@@ -70,6 +71,7 @@ Named in `Config/HermexStyle.swift`; `HermexPaper.forTool(_:)` maps tool kinds.
 | Shell, code, delegation, everything else; chat source badges | `.tool` | `plain` |
 | Goal | the goal's own paper (`GoalPaper`) | any |
 | The Daily Brief's Dad card (a letter to his daughter: the countdown, then her age, over the prompt) | `DeckPalette.letter` | `advisor` (the Dad advisor's paper, with a heart mark instead of the check-in's bubble) |
+| The Daily Brief's Mandarin practice card (phrases to hear, a question to answer out loud, yesterday's feedback) | `DeckPalette.mandarin` | `mandarin` |
 | Money: net worth, accounts, the market card | `.money` | `ledger` |
 | Feedback inbox | `.feedback` | `notes` |
 | Drawer sections: Daily Brief, Brain, People, Goals, Money, Feedback | `opener`, `.knowledge`, `BrainModuleID.people.paper`, `book`, `.money`, `.feedback` | |
