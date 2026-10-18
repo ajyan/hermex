@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// The behavioral stories on Prep home: each active story with its three readiness marks (told
-/// in time, scored 4 or better, probes held), tapping a row to drill that story on its own, and
-/// a Bench row for stories waiting their turn. Hidden by the home when the server has no stories.
+/// in time, scored 4 or better, probes held), tapping a row to drill that story on its own, then
+/// the bench stories under a Bench label, drillable the same way (spec §3.1). Hidden by the home
+/// when the server has no stories.
 struct PrepStorySection: View {
     let list: PrepStoryList
     /// Candidate ids with a verdict in flight, and why the last verdict on one failed.
@@ -23,23 +24,40 @@ struct PrepStorySection: View {
             if !list.stories.isEmpty {
                 SectionCard {
                     VStack(spacing: 0) {
-                        ForEach(Array(list.activeStories.enumerated()), id: \.element.id) { offset, story in
-                            if offset > 0 { PrepRowDivider() }
-                            NavigationLink(value: ShellPushDestination.brainRoute(.prep(.story(story.id)))) {
-                                PrepStoryRow(story: story)
-                            }
-                            .buttonStyle(.plain)
-                        }
+                        rows(list.activeStories)
                         if !list.benchStories.isEmpty {
                             if !list.activeStories.isEmpty { PrepRowDivider() }
-                            BrainRow(
-                                title: "Bench",
-                                subtitle: list.benchStories.map(\.title).joined(separator: " \u{00B7} "),
-                                trailing: "\(list.benchStories.count)")
+                            HStack {
+                                Text(verbatim: "Bench")
+                                    .font(BrainStyle.meta.weight(.semibold))
+                                    .foregroundStyle(Color.hxTextSecondary)
+                                Spacer(minLength: BrainStyle.s)
+                                Text(verbatim: "\(list.benchStories.count)")
+                                    .font(BrainStyle.meta)
+                                    .foregroundStyle(Color.hxTextSecondary)
+                                    .monospacedDigit()
+                            }
+                            .padding(.top, BrainStyle.s)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityAddTraits(.isHeader)
+                            rows(list.benchStories)
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+private extension PrepStorySection {
+    /// One row per story, each drilling that story on its own.
+    func rows(_ stories: [PrepStorySummary]) -> some View {
+        ForEach(Array(stories.enumerated()), id: \.element.id) { offset, story in
+            if offset > 0 { PrepRowDivider() }
+            NavigationLink(value: ShellPushDestination.brainRoute(.prep(.story(story.id)))) {
+                PrepStoryRow(story: story)
+            }
+            .buttonStyle(.plain)
         }
     }
 }
@@ -128,7 +146,7 @@ private struct PrepCandidateButton: View {
     }
 }
 
-/// One active story: its title, when it was last told, and the three marks.
+/// One story: its title, when it was last told, and the three marks.
 private struct PrepStoryRow: View {
     let story: PrepStorySummary
 

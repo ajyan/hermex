@@ -24,9 +24,9 @@ protocol PrepDataClient: Sendable {
     func override(attempt: String, point: String) async throws -> PrepAttemptResult
     /// Both voice mock ladders and the newest mocks.
     func mocks() async throws -> PrepMocks
-    /// Starts a mock at the kind's current level: its brief and the profile to call in. 409 when the
-    /// server has no interviewer profile.
-    func mockStart(kind: PrepMockKind) async throws -> PrepMockStart
+    /// Starts a mock at `level` (an unlocked one, to replay it), else the kind's current level: its
+    /// brief and the profile to call in. 409 when the server has no interviewer profile.
+    func mockStart(kind: PrepMockKind, level: String?) async throws -> PrepMockStart
     /// Hands a finished call to the grader (202 while it grades in the background).
     func mockGrade(mockID: String, sessionID: String, turnMS: [Int]) async throws
 }
@@ -100,9 +100,9 @@ struct APIClientPrepAdapter: PrepDataClient {
         try await get(.tutorMocks)
     }
 
-    func mockStart(kind: PrepMockKind) async throws -> PrepMockStart {
+    func mockStart(kind: PrepMockKind, level: String?) async throws -> PrepMockStart {
         let data = try await apiClient.sendData(endpoint: .tutorMockStart, method: "POST",
-                                                body: PrepMockStartRequest(kind: kind.rawValue))
+                                                body: PrepMockStartRequest(kind: kind.rawValue, level: level))
         return try decode(data)
     }
 

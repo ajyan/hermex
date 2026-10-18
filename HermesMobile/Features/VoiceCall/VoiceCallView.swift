@@ -98,6 +98,8 @@ struct VoiceCallSummary: Equatable {
 struct VoiceCallView: View {
     let chat: ChatViewModel
     let openingTurn: String?
+    /// The turn times so far, each time a turn is timed (a voice mock saves them as it goes).
+    let onTurnTimed: (([Int]) -> Void)?
     let onDismiss: (VoiceCallSummary) -> Void
 
     @State private var controller: VoiceCallController?
@@ -113,9 +115,11 @@ struct VoiceCallView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(chat: ChatViewModel, openingTurn: String? = nil, onDismiss: @escaping (VoiceCallSummary) -> Void) {
+    init(chat: ChatViewModel, openingTurn: String? = nil, onTurnTimed: (([Int]) -> Void)? = nil,
+         onDismiss: @escaping (VoiceCallSummary) -> Void) {
         self.chat = chat
         self.openingTurn = openingTurn
+        self.onTurnTimed = onTurnTimed
         self.onDismiss = onDismiss
     }
 
@@ -160,6 +164,7 @@ struct VoiceCallView: View {
         // A call is an immersive, dark surface in either appearance, like the Phone app.
         .preferredColorScheme(.dark)
         .task { await startCall() }
+        .onChange(of: controller?.turnLatenciesMS ?? []) { _, turnMS in onTurnTimed?(turnMS) }
         // However the screen goes away, its system call goes with it; a call left
         // live blocks the next one from connecting.
         .onDisappear {

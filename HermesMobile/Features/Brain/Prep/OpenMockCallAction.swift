@@ -3,16 +3,19 @@ import SwiftUI
 
 /// Opens a voice mock from Prep: a new chat in the mock's profile, already in a call, with the brief
 /// as its opening turn. A reference, like `OpenDraftChatAction`: the shell keeps one instance and
-/// refreshes `handler`, so readers never see a new value. The handler returns once the chat is open,
-/// and throws (opening nothing) when the mock's profile couldn't be made active.
+/// refreshes `handler`, so readers never see a new value. The handler gets the mock's start (nil when
+/// it failed) and calls it only once the profile is active (`PrepMockCallOpener`); it returns once the
+/// chat is open, and throws, having started nothing, when the profile couldn't be made active.
 final class OpenMockCallAction {
-    var handler: (@MainActor (PrepMockStart) async throws -> Void)?
+    typealias Start = @MainActor () async -> PrepMockStart?
+
+    var handler: (@MainActor (@escaping Start) async throws -> Void)?
 
     /// True when a shell is listening; without one, Start call hides.
     var isAvailable: Bool { handler != nil }
 
     @MainActor
-    func callAsFunction(_ start: PrepMockStart) async throws { try await handler?(start) }
+    func callAsFunction(_ start: @escaping Start) async throws { try await handler?(start) }
 }
 
 struct OpenMockCallKey: EnvironmentKey {
@@ -31,6 +34,13 @@ struct MockCallGrade: Hashable, Sendable {
     let mockID: String
     let sessionID: String
     let turnMS: [Int]
+
+    /// The grade request for a call, asked for only with a session and at least one timed reply: a
+    /// call the interviewer never answered has nothing to grade.
+    static func of(mockID: String, sessionID: String?, turnMS: [Int]) -> MockCallGrade? {
+        let sessionID = sessionID?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return sessionID.isEmpty || turnMS.isEmpty ? nil : MockCallGrade(mockID: mockID, sessionID: sessionID, turnMS: turnMS)
+    }
 
     func post(to client: PrepDataClient) async throws {
         try await client.mockGrade(mockID: mockID, sessionID: sessionID, turnMS: turnMS)
@@ -57,38 +67,93 @@ struct MockCallState: Equatable {
         self.openingTurn = openingTurn
     }
 
-    /// Ends the mock's call, once. The grade is asked for only with a session and at least one
-    /// timed reply: a call the interviewer never answered has nothing to grade.
+    /// Ends the mock's call, once, with its grade request (`MockCallGrade.of`).
     mutating func callEnded(sessionID: String?, turnMS: [Int]) -> MockCallEnd? {
         defer {
             mockID = nil
             openingTurn = nil
         }
         guard let mockID else { return nil }
-        let sessionID = sessionID?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let grade = sessionID.isEmpty || turnMS.isEmpty
-            ? nil : MockCallGrade(mockID: mockID, sessionID: sessionID, turnMS: turnMS)
-        return MockCallEnd(mockID: mockID, grade: grade)
+        return MockCallEnd(mockID: mockID, grade: MockCallGrade.of(mockID: mockID, sessionID: sessionID, turnMS: turnMS))
     }
+}
+
+/// UserDefaults keys for a voice mock's per-server state: the prefix and a SHA-256 of the server's
+/// registry id (the id is the normalized URL, which stays out of `UserDefaults`).
+private func prepMockKey(_ prefix: String, serverID: String) -> String {
+    prefix + SHA256.hash(data: Data(serverID.utf8)).map { String(format: "%02x", $0) }.joined()
 }
 
 /// The profile to switch back to after a voice mock, saved per configured server so a mock cut
 /// short (the app killed mid-call, a failed switch back) still finds its way back on the next
-/// launch or foreground. A profile name isn't a credential; the server is named by a SHA-256 of
-/// its registry id (the id is the normalized URL, which stays out of `UserDefaults`).
+/// launch or foreground. A profile name isn't a credential; the server is named by a hash.
 struct PrepMockReturnStore {
     let serverID: String
     var defaults: UserDefaults = .standard
 
-    private var key: String {
-        "prep-mock.return-profile." + SHA256.hash(data: Data(serverID.utf8)).map { String(format: "%02x", $0) }.joined()
-    }
+    private var key: String { prepMockKey("prep-mock.return-profile.", serverID: serverID) }
 
     var profile: String? { defaults.string(forKey: key).flatMap { $0.isEmpty ? nil : $0 } }
 
     func save(_ profile: String) { defaults.set(profile, forKey: key) }
 
     func clear() { defaults.removeObject(forKey: key) }
+}
+
+/// A voice mock whose call is under way: its id, then its session and the interviewer's turn times as
+/// the call goes. Kept per server until the grade is sent, so a mock cut short (the app killed
+/// mid-call) is still graded on the next launch or foreground.
+struct PrepMockInFlight: Codable, Equatable, Sendable {
+    let mockID: String
+    var sessionID: String?
+    var turnMS: [Int]
+
+    init(mockID: String, sessionID: String? = nil, turnMS: [Int] = []) {
+        self.mockID = mockID
+        self.sessionID = sessionID
+        self.turnMS = turnMS
+    }
+}
+
+/// The in-flight voice mock, saved per configured server next to `PrepMockReturnStore` and keyed the
+/// same way. A mock id, session id and timings aren't credentials.
+struct PrepMockInFlightStore {
+    let serverID: String
+    var defaults: UserDefaults = .standard
+
+    private var key: String { prepMockKey("prep-mock.in-flight.", serverID: serverID) }
+
+    var mock: PrepMockInFlight? {
+        defaults.data(forKey: key).flatMap { try? JSONDecoder().decode(PrepMockInFlight.self, from: $0) }
+    }
+
+    func save(_ mock: PrepMockInFlight) {
+        if let data = try? JSONEncoder().encode(mock) { defaults.set(data, forKey: key) }
+    }
+
+    /// Forgets the saved mock when it is `mockID` (or unreadable), never a newer one.
+    func clear(mockID: String) {
+        let saved = mock
+        if saved == nil || saved?.mockID == mockID { defaults.removeObject(forKey: key) }
+    }
+
+    /// Recovery for a mock cut short (spec R31): posts the grade of the saved mock, then forgets it.
+    /// A mock with nothing to grade (no session, or the interviewer never answered) or one the
+    /// server refuses (4xx) is forgotten; a network failure or a server error keeps it for the next
+    /// launch or foreground.
+    @MainActor
+    func recover(post: @MainActor (MockCallGrade) async throws -> Void) async {
+        guard let mock else { return }
+        guard let grade = MockCallGrade.of(mockID: mock.mockID, sessionID: mock.sessionID, turnMS: mock.turnMS) else {
+            return clear(mockID: mock.mockID)
+        }
+        do {
+            try await post(grade)
+            clear(mockID: mock.mockID)
+        } catch {
+            if case .http(let status, _)? = error as? APIError, (400..<500).contains(status) { clear(mockID: mock.mockID) }
+        }
+    }
 }
 
 /// Why a voice mock couldn't make its profile active.
@@ -150,6 +215,32 @@ struct PrepMockProfile {
     }
 }
 
+/// What the shell does on Start call, in order: make the interviewer profile active, then start the
+/// mock (`POST /api/tutor/mock/start`), so a failed switch leaves no started mock behind; switch back
+/// when the mock can't start; remember the mock in flight; open its chat.
+@MainActor
+struct PrepMockCallOpener {
+    var enter: @MainActor (String) async throws -> Void
+    var leave: @MainActor () async -> Void
+    var remember: @MainActor (PrepMockInFlight) -> Void
+    var openChat: @MainActor (PrepMockStart) -> Void
+
+    func open(_ start: OpenMockCallAction.Start) async throws {
+        try await enter(PrepMockStart.interviewerProfile)
+        guard let mock = await start() else { return await leave() }
+        if mock.profile != PrepMockStart.interviewerProfile {
+            do {
+                try await enter(mock.profile)
+            } catch {
+                await leave()
+                throw error
+            }
+        }
+        remember(PrepMockInFlight(mockID: mock.mockID))
+        openChat(mock)
+    }
+}
+
 /// What the shell does when a voice mock's call ends, in order: switch back to the previous profile,
 /// ask for the grade (retrying twice), then, if the mock's chat is still on screen, replace it with a
 /// fresh chat and show Prep with the mock's result on top, so Back lands in Prep and no interviewer
@@ -169,6 +260,9 @@ struct PrepMockCallFinisher {
     var push: @MainActor (PrepRoute) -> Void
     /// Waits before retry `n` (1, 2).
     var pause: @MainActor (Int) async -> Void = { try? await Task.sleep(for: .seconds($0)) }
+    /// Forgets the in-flight mock once its grade is sent, or when there is nothing to grade. A grade
+    /// that never got through stays in flight for the next launch or foreground.
+    var forget: @MainActor (String) -> Void = { _ in }
 
     static let gradeAttempts = 3
 
@@ -176,6 +270,7 @@ struct PrepMockCallFinisher {
         await leave()
         var unsent: MockCallGrade?
         if let grade = end.grade, !(await post(grade)) { unsent = grade }
+        if unsent == nil { forget(end.mockID) }
         guard isStillOnMockChat() else {
             if let unsent { push(.mockResult(end.mockID, unsent: unsent)) }
             return

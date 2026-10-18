@@ -571,6 +571,7 @@ struct ChatShellView: View {
                 startsCall: route.startsCall,
                 openingTurn: route.openingTurn,
                 mockID: route.mockID,
+                onMockCallProgress: { mockInFlight.save($0) },
                 onMockCallEnded: finishMockCall,
                 callRequest: callRequest,
                 server: server,
@@ -1477,17 +1478,36 @@ struct ChatShellView: View {
                         store: PrepMockReturnStore(serverID: authManager.activeServerID ?? server.absoluteString))
     }
 
-    /// A voice mock: the mock's profile goes active first, so the opening turn (sent as soon as the
-    /// call connects) reaches the server under it, then a new chat in that profile opens straight into
-    /// the call. A failed switch throws to the brief, which shows why, and opens nothing.
-    private func openMockCall(_ start: PrepMockStart) async throws {
-        try await mockProfile.enter(start.profile, fallback: viewModel.activeProfileName)
-        selectDestination(PendingNewChatRoute(
-            profileName: start.profile,
-            startsCall: true,
-            openingTurn: start.brief,
-            mockID: start.mockID
-        ))
+    /// The voice mock under way on this server, kept until its grade is sent.
+    private var mockInFlight: PrepMockInFlightStore {
+        PrepMockInFlightStore(serverID: authManager.activeServerID ?? server.absoluteString)
+    }
+
+    /// A voice mock (`PrepMockCallOpener`): the interviewer profile goes active first, so the opening
+    /// turn (sent as soon as the call connects) reaches the server under it, and only then is the mock
+    /// started; a new chat in that profile opens straight into the call. A failed switch throws to the
+    /// brief, which shows why, and starts and opens nothing. An earlier mock still waiting to send its
+    /// grade sends it first, before the new mock takes its place.
+    private func openMockCall(_ start: @escaping OpenMockCallAction.Start) async throws {
+        let profile = mockProfile
+        let inFlight = mockInFlight
+        let client = APIClientPrepAdapter(apiClient: APIClient(baseURL: server))
+        await inFlight.recover { try await $0.post(to: client) }
+        let fallback = viewModel.activeProfileName
+        let opener = PrepMockCallOpener(
+            enter: { try await profile.enter($0, fallback: fallback) },
+            leave: { _ = await profile.leave() },
+            remember: { inFlight.save($0) },
+            openChat: { mock in
+                selectDestination(PendingNewChatRoute(
+                    profileName: mock.profile,
+                    startsCall: true,
+                    openingTurn: mock.brief,
+                    mockID: mock.mockID
+                ))
+            }
+        )
+        try await opener.open(start)
     }
 
     /// The voice mock's call ended: `PrepMockCallFinisher` switches back, asks for the grade, and
@@ -1496,23 +1516,28 @@ struct ChatShellView: View {
         let revision = navigation.rootRevision
         let apiClient = APIClient(baseURL: server)
         let profile = mockProfile
+        let inFlight = mockInFlight
         let finisher = PrepMockCallFinisher(
             leave: { await profile.leave() },
             postGrade: { try await $0.post(to: APIClientPrepAdapter(apiClient: apiClient)) },
             isStillOnMockChat: { navigation.rootRevision == revision },
             replaceRoot: { selectDestination(PendingNewChatRoute()) },
             show: { routes in navigation.path = routes.map { .brainRoute(.prep($0)) } },
-            push: { navigation.push(.brainRoute(.prep($0))) }
+            push: { navigation.push(.brainRoute(.prep($0))) },
+            forget: { inFlight.clear(mockID: $0) }
         )
         Task { await finisher.finish(end) }
     }
 
-    /// A voice mock that never switched back (the app was killed mid-call, or the switch back
-    /// failed): switch back now, on launch and on each return to the foreground, unless a mock's
-    /// chat is still open. The drawer's profile is reloaded, and a bare new chat (one that carries
-    /// nothing) is replaced so it isn't left in the interviewer profile. A new chat carrying a draft,
-    /// attachments, a profile, a project or a call stays: the cookie is already back.
+    /// A voice mock cut short (the app was killed mid-call, or the switch back or the grade failed):
+    /// on launch and on each return to the foreground, unless a mock's chat is still open, send the
+    /// grade it never got, then switch back. The drawer's profile is reloaded, and a bare new chat
+    /// (one that carries nothing) is replaced so it isn't left in the interviewer profile. A new chat
+    /// carrying a draft, attachments, a profile, a project or a call stays: the cookie is already back.
     private func recoverMockProfileIfNeeded() async {
+        guard !navigation.isOnMockChat else { return }
+        let client = APIClientPrepAdapter(apiClient: APIClient(baseURL: server))
+        await mockInFlight.recover { try await $0.post(to: client) }
         let profile = mockProfile
         guard profile.store.profile != nil, !navigation.isOnMockChat, await profile.leave() else { return }
         await viewModel.loadActiveProfile()

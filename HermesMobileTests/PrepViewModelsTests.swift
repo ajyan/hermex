@@ -100,7 +100,7 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
         return try next("override:\(attempt):\(point)", &overrideResults)
     }
     func mocks() async throws -> PrepMocks { try next("mocks", &mocksResults) }
-    func mockStart(kind: PrepMockKind) async throws -> PrepMockStart {
+    func mockStart(kind: PrepMockKind, level: String?) async throws -> PrepMockStart {
         try next("mockStart:\(kind.rawValue)", &mockStartResults)
     }
     func mockGrade(mockID: String, sessionID: String, turnMS: [Int]) async throws {

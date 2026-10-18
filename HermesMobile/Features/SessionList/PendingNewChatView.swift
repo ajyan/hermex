@@ -23,6 +23,7 @@ struct PendingNewChatView: View {
     /// A voice mock: the call's opening turn (the brief), its id, and what to do with its grade.
     let openingTurn: String?
     let mockID: String?
+    let onMockCallProgress: ((PrepMockInFlight) -> Void)?
     let onMockCallEnded: ((MockCallEnd) -> Void)?
     let callRequest: Int
     let draftStore: ChatDraftStore
@@ -49,6 +50,7 @@ struct PendingNewChatView: View {
         startsCall: Bool = false,
         openingTurn: String? = nil,
         mockID: String? = nil,
+        onMockCallProgress: ((PrepMockInFlight) -> Void)? = nil,
         onMockCallEnded: ((MockCallEnd) -> Void)? = nil,
         callRequest: Int = 0,
         server: URL,
@@ -71,6 +73,7 @@ struct PendingNewChatView: View {
         self.startsCall = startsCall
         self.openingTurn = openingTurn
         self.mockID = mockID
+        self.onMockCallProgress = onMockCallProgress
         self.onMockCallEnded = onMockCallEnded
         self.callRequest = callRequest
         self.draftStore = draftStore ?? .shared
@@ -93,6 +96,7 @@ struct PendingNewChatView: View {
                     startsCall: startsCall,
                     openingTurn: openingTurn,
                     mockID: mockID,
+                    onMockCallProgress: onMockCallProgress,
                     onMockCallEnded: onMockCallEnded,
                     callRequest: callRequest,
                     draftStore: draftStore,

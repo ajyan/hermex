@@ -63,8 +63,9 @@ private struct PrepMockIcon: View {
 
 // MARK: - Brief
 
-/// One ladder: the level a call takes next, how long it runs and what is scored, Start call, the
-/// recent mocks of this kind, and the older text critique run. Pushed as `.prep(.mockLadder(kind))`.
+/// One ladder: the level a call takes (the current one, or any unlocked level picked to replay it),
+/// how long it runs and what is scored, Start call, the recent mocks of this kind, and the older text
+/// critique run. Pushed as `.prep(.mockLadder(kind))`.
 struct PrepMockBriefView: View {
     let kind: PrepMockKind
     @State private var viewModel: PrepMockViewModel
@@ -119,11 +120,13 @@ struct PrepMockBriefView: View {
 
     private func briefCard(_ ladder: PrepLadder?) -> some View {
         let paper = HermexPaper.knowledge
-        let level = ladder?.current
+        let chosen = viewModel.level(for: kind)
+        let level = ladder?.levels.first { $0.level == chosen } ?? ladder?.current
         return HXCard(.wash(paper), title: level.map { "\($0.level) \u{00B7} \($0.title)" } ?? kind.title,
                       titleStyle: .title3, spacing: BrainStyle.m, kicker: {
             HXChip(paper: paper, symbol: "phone.fill", label: "Voice mock with the interviewer")
         }, content: {
+            levelPicker
             if let minutes = level.flatMap({ PrepMockCopy.minutes($0.minutes) }) {
                 Text(verbatim: minutes)
                     .font(BrainStyle.meta)
@@ -146,6 +149,26 @@ struct PrepMockBriefView: View {
                 }
             }
         })
+    }
+
+    /// A compact menu of the unlocked levels, on the current one until another is picked. Hidden
+    /// while only one level is unlocked.
+    @ViewBuilder
+    private var levelPicker: some View {
+        let levels = viewModel.replayableLevels(kind)
+        if levels.count > 1 {
+            Picker(selection: Binding(get: { viewModel.level(for: kind) ?? "" },
+                                      set: { viewModel.chosenLevel = $0 })) {
+                ForEach(levels, id: \.level) { level in
+                    Text(verbatim: "\(level.level) \(level.title)").tag(level.level)
+                }
+            } label: {
+                Text(verbatim: "Level")
+            }
+            .pickerStyle(.menu)
+            .font(BrainStyle.rowSubtitle)
+            .disabled(viewModel.isStarting)
+        }
     }
 
     @ViewBuilder

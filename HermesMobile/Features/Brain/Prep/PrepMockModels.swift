@@ -179,6 +179,9 @@ struct PrepMocks: Decodable, Hashable, Sendable {
 
 /// `POST /api/tutor/mock/start`: the brief the interviewer opens with, and the profile to call in.
 struct PrepMockStart: Decodable, Hashable, Sendable {
+    /// The Hermes profile every mock is called in (the server's `tutor_mock.PROFILE`).
+    static let interviewerProfile = "interviewer"
+
     let mockID: String
     let level: String
     let brief: String
@@ -204,13 +207,15 @@ struct PrepMockStart: Decodable, Hashable, Sendable {
         level = c.string(.level)
         brief = c.string(.brief)
         let profile = c.string(.profile)
-        self.profile = profile.isEmpty ? "interviewer" : profile
+        self.profile = profile.isEmpty ? Self.interviewerProfile : profile
         title = c.string(.title)
     }
 }
 
+/// `level` is left out when nil, and the server takes the ladder's current level.
 struct PrepMockStartRequest: Encodable, Hashable, Sendable {
     let kind: String
+    let level: String?
 }
 
 struct PrepMockGradeRequest: Encodable, Hashable, Sendable {
@@ -325,6 +330,8 @@ final class PrepMockViewModel {
     private(set) var state: BrainLoadState<PrepMocks> = .loading
     /// True from Start call until the call's chat is open (or the start failed).
     private(set) var isStarting = false
+    /// The level the brief's picker is on; nil (or one not unlocked) means the ladder's current level.
+    var chosenLevel: String?
     /// True while a result's Send for grading is on its way.
     private(set) var isSendingGrade = false
     /// Why the last start (or Send for grading) failed.
@@ -359,11 +366,25 @@ final class PrepMockViewModel {
         }
     }
 
-    /// Starts a mock at the kind's current level. A 409 means the server has no interviewer profile.
-    func start(kind: PrepMockKind) async -> PrepMockStart? {
+    /// The unlocked levels of a ladder, in ladder order: the ones a call can take (spec §6.3).
+    func replayableLevels(_ kind: PrepMockKind) -> [PrepMockLevel] {
+        guard let ladder = mocks?.ladder(kind) else { return [] }
+        return ladder.levels.filter { ladder.unlocked.contains($0.level) }
+    }
+
+    /// The level Start call takes: the one picked when it is unlocked, else the ladder's current.
+    func level(for kind: PrepMockKind) -> String? {
+        guard let ladder = mocks?.ladder(kind) else { return nil }
+        if let chosenLevel, ladder.unlocked.contains(chosenLevel) { return chosenLevel }
+        return ladder.level.isEmpty ? nil : ladder.level
+    }
+
+    /// Starts a mock at `level`, else the kind's current level. A 409 means the server has no
+    /// interviewer profile.
+    func start(kind: PrepMockKind, level: String? = nil) async -> PrepMockStart? {
         errorMessage = nil
         do {
-            return try await client.mockStart(kind: kind)
+            return try await client.mockStart(kind: kind, level: level)
         } catch {
             guard !Self.isCancellation(error) else { return nil }
             if case .http(409, _)? = error as? APIError {
@@ -376,14 +397,16 @@ final class PrepMockViewModel {
         }
     }
 
-    /// Start call: starts the mock and hands its brief to the shell, which opens the call.
+    /// Start call, at the picked level: the shell makes the interviewer profile active, then starts
+    /// the mock through this view model and opens its call. A failed switch starts nothing.
     func startCall(kind: PrepMockKind, open: OpenMockCallAction) async {
         guard !isStarting else { return }
         isStarting = true
+        errorMessage = nil
         defer { isStarting = false }
-        guard let start = await start(kind: kind) else { return }
+        let level = level(for: kind)
         do {
-            try await open(start)
+            try await open { await self.start(kind: kind, level: level) }
         } catch {
             guard !Self.isCancellation(error) else { return }
             errorMessage = error.localizedDescription

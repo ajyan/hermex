@@ -21,8 +21,8 @@ private final class FakeMockClient: PrepDataClient, @unchecked Sendable {
         }
     }
 
-    func mockStart(kind: PrepMockKind) async throws -> PrepMockStart {
-        lock.withLock { _log.append("start:\(kind.rawValue)") }
+    func mockStart(kind: PrepMockKind, level: String?) async throws -> PrepMockStart {
+        lock.withLock { _log.append(["start", kind.rawValue, level].compactMap { $0 }.joined(separator: ":")) }
         return try startResult.get()
     }
 
@@ -153,7 +153,7 @@ final class PrepMockTests: APIClientTestCase {
         let viewModel = PrepMockViewModel(client: client)
         let opener = OpenMockCallAction()
         var opened: [PrepMockStart] = []
-        opener.handler = { opened.append($0) }
+        opener.handler = { start in if let mock = await start() { opened.append(mock) } }
 
         await viewModel.startCall(kind: .design, open: opener)
 
@@ -168,12 +168,121 @@ final class PrepMockTests: APIClientTestCase {
         let viewModel = PrepMockViewModel(client: client)
         let opener = OpenMockCallAction()
         var opened: [PrepMockStart] = []
-        opener.handler = { opened.append($0) }
+        opener.handler = { start in if let mock = await start() { opened.append(mock) } }
 
         await viewModel.startCall(kind: .behavioral, open: opener)
 
         XCTAssertTrue(opened.isEmpty)
         XCTAssertNotNil(viewModel.errorMessage)
+    }
+
+    func testStartRequestCarriesTheChosenLevel() async throws {
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.url?.path, "/api/tutor/mock/start")
+            let body = try apiTestJSONBody(from: request)
+            XCTAssertEqual(body["kind"] as? String, "design")
+            XCTAssertEqual(body["level"] as? String, "D1")
+            return apiTestJSONResponse(#"{"mock_id": "m1", "level": "D1", "brief": "b", "profile": "interviewer"}"#,
+                                       for: request)
+        }
+        let start = try await APIClientPrepAdapter(apiClient: client).mockStart(kind: .design, level: "D1")
+        XCTAssertEqual(start.level, "D1")
+    }
+
+    func testStartRequestWithoutALevelLeavesItOut() async throws {
+        let client = makeClient { request in
+            let body = try apiTestJSONBody(from: request)
+            XCTAssertNil(body["level"], "the server takes the ladder's current level")
+            return apiTestJSONResponse(#"{"mock_id": "m1", "level": "D2"}"#, for: request)
+        }
+        _ = try await APIClientPrepAdapter(apiClient: client).mockStart(kind: .design, level: nil)
+    }
+
+    func testBriefReplaysAnUnlockedLevel() async throws {
+        let client = FakeMockClient()
+        client.mocksResults = [.success(try decodeMocks(mocksJSON))]
+        client.startResult = .success(designStart)
+        let viewModel = PrepMockViewModel(client: client)
+        let opener = OpenMockCallAction()
+        opener.handler = { start in _ = await start() }
+        await viewModel.load()
+
+        XCTAssertEqual(viewModel.level(for: .design), "D2", "defaults to the current level")
+        XCTAssertEqual(viewModel.replayableLevels(.design).map(\.level), ["D1", "D2"])
+        XCTAssertEqual(viewModel.replayableLevels(.behavioral).map(\.level), ["B1"])
+        viewModel.chosenLevel = "D1"
+        XCTAssertEqual(viewModel.level(for: .design), "D1")
+        XCTAssertEqual(viewModel.level(for: .behavioral), "B1", "a level not unlocked here falls back to the current")
+
+        await viewModel.startCall(kind: .design, open: opener)
+
+        XCTAssertEqual(client.log, ["mocks", "start:design:D1"])
+    }
+
+    // MARK: Opening the call
+
+    private func opener(log: FinishLog, enterFails: Bool = false) -> PrepMockCallOpener {
+        PrepMockCallOpener(
+            enter: { profile in
+                log.append("enter:\(profile)")
+                if enterFails { throw PrepMockProfileError(detail: "nope") }
+            },
+            leave: { log.append("leave") },
+            remember: { log.append("remember:\($0.mockID)") },
+            openChat: { log.append("chat:\($0.mockID):\($0.profile)") }
+        )
+    }
+
+    func testOpenerSwitchesProfileBeforeStartingTheMock() async throws {
+        let log = FinishLog()
+
+        try await opener(log: log).open {
+            log.append("start")
+            return designStart
+        }
+
+        XCTAssertEqual(log.events, ["enter:interviewer", "start", "remember:m1", "chat:m1:interviewer"])
+    }
+
+    func testOpenerStartsNoMockWhenTheSwitchFails() async {
+        let log = FinishLog()
+
+        do {
+            try await opener(log: log, enterFails: true).open {
+                log.append("start")
+                return designStart
+            }
+            XCTFail("a failed switch must throw to the brief")
+        } catch {
+            XCTAssertEqual(error as? PrepMockProfileError, PrepMockProfileError(detail: "nope"))
+        }
+        XCTAssertEqual(log.events, ["enter:interviewer"], "no orphan started mock on the server")
+    }
+
+    func testOpenerSwitchesBackWhenTheMockCantStart() async throws {
+        let log = FinishLog()
+
+        try await opener(log: log).open {
+            log.append("start")
+            return nil
+        }
+
+        XCTAssertEqual(log.events, ["enter:interviewer", "start", "leave"])
+    }
+
+    func testStartCallStartsTheMockInsideTheOpener() async {
+        let client = FakeMockClient()
+        client.startResult = .success(designStart)
+        let viewModel = PrepMockViewModel(client: client)
+        let log = FinishLog()
+        let action = OpenMockCallAction()
+        action.handler = { start in try await self.opener(log: log, enterFails: true).open(start) }
+
+        await viewModel.startCall(kind: .design, open: action)
+
+        XCTAssertEqual(client.log, [], "mock/start is never called when the profile switch fails")
+        XCTAssertEqual(viewModel.errorMessage, "Couldn't switch to the interviewer profile: nope")
     }
 
     // MARK: The call's end
@@ -513,6 +622,84 @@ final class PrepMockTests: APIClientTestCase {
         XCTAssertFalse(log.events.contains("root"), "the chat the user went to stays")
         XCTAssertNil(log.shown)
         XCTAssertEqual(log.pushed, [.mockResult("m1", unsent: grade)], "Send for grading stays reachable")
+    }
+
+    // MARK: An interrupted mock's grade
+
+    private func makeInFlightStore() -> PrepMockInFlightStore {
+        let name = "PrepMockTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        addTeardownBlock { defaults.removePersistentDomain(forName: name) }
+        return PrepMockInFlightStore(serverID: "https://example.test", defaults: defaults)
+    }
+
+    func testInFlightMockIsKeptPerServer() {
+        let store = makeInFlightStore()
+        XCTAssertNil(store.mock)
+        store.save(PrepMockInFlight(mockID: "m1", sessionID: "sess-1", turnMS: [900]))
+        XCTAssertEqual(store.mock, PrepMockInFlight(mockID: "m1", sessionID: "sess-1", turnMS: [900]))
+        let other = PrepMockInFlightStore(serverID: "https://other.test", defaults: store.defaults)
+        XCTAssertNil(other.mock)
+        XCTAssertFalse(store.defaults.dictionaryRepresentation().keys.contains { $0.contains("example.test") })
+        store.clear(mockID: "other")
+        XCTAssertNotNil(store.mock, "clearing another mock leaves this one")
+        store.clear(mockID: "m1")
+        XCTAssertNil(store.mock)
+    }
+
+    func testRecoveryPostsTheGradeOfAnInterruptedMockThenForgetsIt() async {
+        let store = makeInFlightStore()
+        store.save(PrepMockInFlight(mockID: "m1", sessionID: "sess-1", turnMS: [900, 400]))
+        var posted: [MockCallGrade] = []
+
+        await store.recover { posted.append($0) }
+        await store.recover { posted.append($0) }
+
+        XCTAssertEqual(posted, [MockCallGrade(mockID: "m1", sessionID: "sess-1", turnMS: [900, 400])], "posted once")
+        XCTAssertNil(store.mock)
+    }
+
+    func testRecoveryKeepsTheMockWhenTheGradeCantBeSent() async {
+        let store = makeInFlightStore()
+        store.save(PrepMockInFlight(mockID: "m1", sessionID: "sess-1", turnMS: [900]))
+
+        await store.recover { _ in throw URLError(.notConnectedToInternet) }
+        XCTAssertNotNil(store.mock, "tried again on the next launch or foreground")
+
+        await store.recover { _ in throw APIError.http(statusCode: 404, body: #"{"error": "no such mock"}"#) }
+        XCTAssertNil(store.mock, "a mock the server refuses is never retried")
+    }
+
+    func testRecoveryForgetsAMockWithNothingToGrade() async {
+        let store = makeInFlightStore()
+        var posted = 0
+        for mock in [PrepMockInFlight(mockID: "m1"), PrepMockInFlight(mockID: "m2", sessionID: "sess-1", turnMS: [])] {
+            store.save(mock)
+            await store.recover { _ in posted += 1 }
+            XCTAssertNil(store.mock)
+        }
+        XCTAssertEqual(posted, 0, "no session, or the interviewer never answered")
+    }
+
+    func testFinishForgetsTheInFlightMockOnceTheGradeIsSent() async {
+        let log = FinishLog()
+        let grade = MockCallGrade(mockID: "m1", sessionID: "sess-1", turnMS: [900])
+        var sent = finisher(log: log)
+        sent.forget = { log.append("forget:\($0)") }
+        await sent.finish(MockCallEnd(mockID: "m1", grade: grade))
+        XCTAssertEqual(log.events, ["leave", "grade:m1", "forget:m1", "root", "show"])
+
+        let nothing = FinishLog()
+        var empty = finisher(log: nothing)
+        empty.forget = { nothing.append("forget:\($0)") }
+        await empty.finish(MockCallEnd(mockID: "m2", grade: nil))
+        XCTAssertEqual(nothing.events, ["leave", "forget:m2", "root", "show"])
+
+        let unsent = FinishLog()
+        var failing = finisher(log: unsent, gradeFailures: 3)
+        failing.forget = { unsent.append("forget:\($0)") }
+        await failing.finish(MockCallEnd(mockID: "m3", grade: grade))
+        XCTAssertFalse(unsent.events.contains { $0.hasPrefix("forget") }, "kept, so the next foreground sends it")
     }
 
     // MARK: Recovering the profile
