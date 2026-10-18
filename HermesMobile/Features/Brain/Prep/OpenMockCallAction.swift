@@ -159,9 +159,15 @@ struct PrepMockInFlightStore {
 /// Why a voice mock couldn't make its profile active.
 struct PrepMockProfileError: LocalizedError, Equatable {
     let detail: String
+    /// True when the server has no such profile (the switch answered 404).
+    var isMissing = false
+
+    /// A server with no interviewer profile.
+    static let missing = PrepMockProfileError(detail: "", isMissing: true)
 
     var errorDescription: String? {
-        detail.isEmpty
+        if isMissing { return PrepMockCopy.noInterviewer }
+        return detail.isEmpty
             ? "Couldn't switch to the interviewer profile."
             : "Couldn't switch to the interviewer profile: \(detail)"
     }
@@ -179,7 +185,8 @@ struct PrepMockProfile {
     /// Makes `profile` active, first saving the profile to switch back to: one already saved (a mock
     /// that never got back), else the server's active profile, else `fallback` (the drawer's profile)
     /// when the server can't say or is somehow already on `profile`. Throws when the switch fails or
-    /// the server refuses it; nothing is then left saved that wasn't before.
+    /// the server refuses it (`PrepMockProfileError.missing` when it has no such profile); nothing is
+    /// then left saved that wasn't before.
     func enter(_ profile: String, fallback: String? = nil) async throws {
         let saved = store.profile
         let current = (try? await client.profiles().effectiveDefaultProfileName) ?? fallback
@@ -194,6 +201,7 @@ struct PrepMockProfile {
             }
         } catch {
             if saved == nil { store.clear() }
+            if (error as? APIError)?.isNotFound == true { throw PrepMockProfileError.missing }
             throw error as? PrepMockProfileError ?? PrepMockProfileError(detail: error.localizedDescription)
         }
     }

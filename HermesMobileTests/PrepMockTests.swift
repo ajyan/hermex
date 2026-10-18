@@ -489,6 +489,23 @@ final class PrepMockTests: APIClientTestCase {
         XCTAssertNil(store.profile)
     }
 
+    func testEnterOnAServerWithoutTheProfileSaysInterviewerIsNotSetUp() async {
+        let client = makeClient { request in
+            if request.url?.path == "/api/profiles" { return apiTestJSONResponse(#"{"active": "default"}"#, for: request) }
+            return apiTestJSONResponse(#"{"error": "Profile 'interviewer' does not exist."}"#, for: request, status: 404)
+        }
+        let store = makeStore()
+
+        do {
+            try await PrepMockProfile(client: client, store: store).enter("interviewer")
+            XCTFail("a missing profile must not open the call")
+        } catch {
+            XCTAssertEqual(error as? PrepMockProfileError, .missing)
+            XCTAssertEqual(error.localizedDescription, PrepMockCopy.noInterviewer)
+        }
+        XCTAssertNil(store.profile)
+    }
+
     func testLeaveSwitchesBackAndForgets() async {
         let paths = MockRequestLog()
         let client = makeClient { request in

@@ -84,11 +84,12 @@ final class PrepHomeViewModel {
     }
 
     /// Sends a verdict on a story candidate, then refreshes the stories once (nothing polls). The
-    /// card changes at once: a dismissed one goes, an added one reads "drafting", so a failed
+    /// card changes at once: a dismissed one moves under Dismissed, an added one (a dismissed one
+    /// too) reads "drafting", so a failed
     /// refresh never brings back a card whose buttons would repeat the verdict. A failed verdict
     /// keeps the card and records why.
     func act(on candidate: PrepStoryCandidate, action: PrepStoryCandidateAction) async {
-        guard candidate.status == "new", !candidatesInFlight.contains(candidate.id) else { return }
+        guard candidate.allows(action), !candidatesInFlight.contains(candidate.id) else { return }
         candidatesInFlight.insert(candidate.id)
         candidateErrors[candidate.id] = nil
         defer { candidatesInFlight.remove(candidate.id) }
@@ -101,7 +102,7 @@ final class PrepHomeViewModel {
             return
         }
         if let list = stories {
-            stories = action == .dismiss ? list.removingCandidate(candidate.id) : list.markingCandidateDrafting(candidate.id)
+            stories = action == .dismiss ? list.dismissingCandidate(candidate.id) : list.markingCandidateDrafting(candidate.id)
         }
         storiesGeneration += 1
         let storiesToken = storiesGeneration
