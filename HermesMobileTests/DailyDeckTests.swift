@@ -930,6 +930,52 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(entry, "# 2026-10-04\n- Ran.")
     }
 
+    // MARK: - Diagrams
+
+    static let diagramDeckJSON = """
+    {"date": "2026-10-04", "kind": "morning", "cards": [
+      {"id": "email", "type": "item", "kind": "email", "title": "api gateway", "ref": {"link": "email_ingest/summaries/api-gateway-summary.md"}},
+      {"id": "pick-2", "type": "reflect", "kind": "media", "title": "Elasticsearch", "ref": {"link": "wiki/sources/elastic-search", "pool": "media:elastic-search"}},
+      {"id": "quote", "type": "reflect", "kind": "quote", "title": "Marcus Aurelius", "ref": {"pool": "quote:abc"}}
+    ]}
+    """
+
+    static let diagramIndexJSON = """
+    {"version": 1, "diagrams": [
+      {"topic": "api-gateway", "title": "API gateway", "keys": ["email_ingest/summaries/api-gateway-summary", "media:api-gateway"]},
+      {"topic": "elasticsearch", "title": "Elasticsearch", "keys": ["media:elastic-search"]}
+    ]}
+    """
+
+    @MainActor
+    func testDiagramChipsComeFromTheVaultIndexAndFragmentsAreReadOnce() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.diagramDeckJSON)
+        client.files[BriefDiagramIndex.path] = Self.diagramIndexJSON
+        client.files["diagrams/api-gateway.html"] = "<title>API gateway</title><p>Router</p>"
+        let viewModel = makeViewModel(client)
+
+        await viewModel.load()
+
+        let cards = viewModel.cards
+        XCTAssertEqual(viewModel.diagram(for: cards[0])?.topic, "api-gateway", "an email card matches by its link")
+        XCTAssertEqual(viewModel.diagram(for: cards[1])?.topic, "elasticsearch", "a pool card matches by its pool key")
+        XCTAssertNil(viewModel.diagram(for: cards[2]))
+
+        let entry = try XCTUnwrap(viewModel.diagram(for: cards[0]))
+        let first = try await viewModel.diagramFragment(entry)
+        let second = try await viewModel.diagramFragment(entry)
+        XCTAssertEqual(first, "<title>API gateway</title><p>Router</p>")
+        XCTAssertEqual(second, first)
+        XCTAssertEqual(client.readPaths.filter { $0 == "diagrams/api-gateway.html" }.count, 1)
+    }
+
+    @MainActor
+    func testAVaultWithoutDiagramsShowsNoChips() async throws {
+        let viewModel = try await loadedViewModel(Self.diagramDeckJSON)
+        XCTAssertTrue(viewModel.cards.allSatisfy { viewModel.diagram(for: $0) == nil })
+    }
+
     // MARK: - Helpers
 
     @MainActor
@@ -1249,5 +1295,28 @@ final class DeckCardSourceTests: XCTestCase {
         XCTAssertNil(followUp.sourceRoute)
         let bare = try card(#"{"id": "c", "type": "close"}"#)
         XCTAssertNil(bare.link)
+    }
+
+    func testADiagramMatchesALinkOrPoolKeyAndIgnoresUnsafeTopics() throws {
+        let index = BriefDiagramIndex.decode(#"""
+        {"diagrams": [
+          {"topic": "kafka", "title": "Kafka", "keys": ["wiki/sources/kafka", "media:kafka"]},
+          {"topic": "../secrets", "keys": ["media:redis"]},
+          {"title": "no topic", "keys": ["media:x"]}
+        ]}
+        """#)
+        XCTAssertEqual(index.diagrams.map(\.topic), ["kafka"], "a topic that isn't a plain file name is dropped")
+        XCTAssertEqual(index.diagrams.first?.fragmentPath, "diagrams/kafka.html")
+
+        let byLink = try card(#"{"id": "a", "type": "reflect", "ref": {"link": "/wiki/sources/kafka.md"}}"#)
+        let byPool = try card(#"{"id": "b", "type": "reflect", "ref": {"link": null, "pool": "MEDIA:kafka"}}"#)
+        let unsafe = try card(#"{"id": "c", "type": "reflect", "ref": {"pool": "media:redis"}}"#)
+        let bare = try card(#"{"id": "d", "type": "close"}"#)
+        XCTAssertEqual(byPool.pool, "MEDIA:kafka")
+        XCTAssertEqual(index.diagram(for: byLink)?.topic, "kafka")
+        XCTAssertEqual(index.diagram(for: byPool)?.topic, "kafka")
+        XCTAssertNil(index.diagram(for: unsafe))
+        XCTAssertNil(index.diagram(for: bare))
+        XCTAssertEqual(BriefDiagramIndex.decode("not json"), .empty)
     }
 }

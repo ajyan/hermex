@@ -99,6 +99,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     /// The vault file the card came from (`ref.link`, "wiki/nyc-marathon"); nil for pooled
     /// material with no page of its own (books, quotes, videos).
     let link: String?
+    /// The pool item the brief picked (`ref.pool`, "media:kafka", "video:<id>"); nil for cards it didn't pick from a pool.
+    let pool: String?
 
     /// The Brain page the card's source opens, by the vault folder its link lives in.
     var sourceRoute: BrainRoute? { link.flatMap(Self.brainRoute(forLink:)) }
@@ -152,7 +154,18 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         case itemKind = "kind"
     }
 
-    private struct Ref: Decodable { let link: String? }
+    private struct Ref: Decodable {
+        let link: String?
+        let pool: String?
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            link = try? c.decodeIfPresent(String.self, forKey: .link)
+            pool = try? c.decodeIfPresent(String.self, forKey: .pool)
+        }
+
+        private enum CodingKeys: String, CodingKey { case link, pool }
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -186,7 +199,9 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         weekCommitments = ((try? c.decodeIfPresent([Lossy<DeckWeekCommitment>].self, forKey: .weekCommitments)) ?? [])
             .compactMap(\.value)
         lastWeek = ((try? c.decodeIfPresent([Lossy<DeckWeekCommitment>].self, forKey: .lastWeek)) ?? []).compactMap(\.value)
-        link = (try? c.decodeIfPresent(Ref.self, forKey: .ref))?.link.flatMap { $0.isEmpty ? nil : $0 }
+        let ref = try? c.decodeIfPresent(Ref.self, forKey: .ref)
+        link = ref?.link.flatMap { $0.isEmpty ? nil : $0 }
+        pool = ref?.pool.flatMap { $0.isEmpty ? nil : $0 }
     }
 }
 
