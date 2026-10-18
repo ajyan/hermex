@@ -726,7 +726,11 @@
 		B1A1C0DE00000000000000A3 /* BrainModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000103 /* BrainModels.swift */; };
 		A0DEA60AD5799313DB0B6EDF /* OpenDraftChatAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE7EC6B4625B0CC63C3E3A /* OpenDraftChatAction.swift */; };
 		2A8CB7ACCDBA9BBE34E57FDC /* DailyDeckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A997D807C262D12E5491E89 /* DailyDeckTests.swift */; };
+		AAAFB91D932E2ADD51ACD585 /* SleepHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B826C8CFB95FD5314B8A0E1 /* SleepHistoryTests.swift */; };
 		456FFBA86135A0D6C5707B5E /* DeckCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59FBDD2AD47605DA28200130 /* DeckCalendarView.swift */; };
+		6558EDEF58658253C946EE42 /* SleepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46BA9EE4C71E9E6A415257AE /* SleepView.swift */; };
+		13A7B5CF099A07910F14892D /* SleepTrendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A542BA8F004677106522A085 /* SleepTrendsView.swift */; };
+		FD4049B2B7AF5E31E4B777B6 /* SleepHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF12A25A8C2379C829072953 /* SleepHistory.swift */; };
 		BBEB574715121587294478C7 /* DailyBriefReminder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A01557B2FAEFDDD7C94E6A /* DailyBriefReminder.swift */; };
 		3F522DC0F0540A319E63AB5A /* DeckFeedbackSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85E374D76D0C399DE79819AE /* DeckFeedbackSheet.swift */; };
 		1FE8B00FD19A1F67ACF1CA6C /* DeckStackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4449578C9E4BFBE64D09B3C2 /* DeckStackView.swift */; };
@@ -1516,7 +1520,11 @@
 		A0DE7EC6B4625B0CC63C3E3A /* OpenDraftChatAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenDraftChatAction.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainViewModelTests.swift; sourceTree = "<group>"; };
 		3A997D807C262D12E5491E89 /* DailyDeckTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDeckTests.swift; sourceTree = "<group>"; };
+		6B826C8CFB95FD5314B8A0E1 /* SleepHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepHistoryTests.swift; sourceTree = "<group>"; };
 		59FBDD2AD47605DA28200130 /* DeckCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckCalendarView.swift; sourceTree = "<group>"; };
+		46BA9EE4C71E9E6A415257AE /* SleepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepView.swift; sourceTree = "<group>"; };
+		A542BA8F004677106522A085 /* SleepTrendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepTrendsView.swift; sourceTree = "<group>"; };
+		EF12A25A8C2379C829072953 /* SleepHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepHistory.swift; sourceTree = "<group>"; };
 		E4A01557B2FAEFDDD7C94E6A /* DailyBriefReminder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyBriefReminder.swift; sourceTree = "<group>"; };
 		85E374D76D0C399DE79819AE /* DeckFeedbackSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckFeedbackSheet.swift; sourceTree = "<group>"; };
 		4449578C9E4BFBE64D09B3C2 /* DeckStackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckStackView.swift; sourceTree = "<group>"; };
@@ -1728,6 +1736,7 @@
 				C0FFEE50000000000000000E /* MoneyModelsTests.swift */,
 				C0FFEE500000000000000010 /* MoneyViewModelTests.swift */,
 				3A997D807C262D12E5491E89 /* DailyDeckTests.swift */,
+				6B826C8CFB95FD5314B8A0E1 /* SleepHistoryTests.swift */,
 				B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */,
 				B1A1C0DE0000000000000204 /* BrainModelsTests.swift */,
 				B1A1C0DE0000000000000E06 /* PrepModelsTests.swift */,
@@ -2599,6 +2608,9 @@
 			isa = PBXGroup;
 			children = (
 				59FBDD2AD47605DA28200130 /* DeckCalendarView.swift */,
+				46BA9EE4C71E9E6A415257AE /* SleepView.swift */,
+				A542BA8F004677106522A085 /* SleepTrendsView.swift */,
+				EF12A25A8C2379C829072953 /* SleepHistory.swift */,
 				E4A01557B2FAEFDDD7C94E6A /* DailyBriefReminder.swift */,
 				85E374D76D0C399DE79819AE /* DeckFeedbackSheet.swift */,
 				4449578C9E4BFBE64D09B3C2 /* DeckStackView.swift */,
@@ -2894,6 +2906,9 @@
 				C0FFEE50000000000000000B /* MoneyMarketView.swift in Sources */,
 				C0FFEE50000000000000000D /* MoneySparkline.swift in Sources */,
 				456FFBA86135A0D6C5707B5E /* DeckCalendarView.swift in Sources */,
+				6558EDEF58658253C946EE42 /* SleepView.swift in Sources */,
+				13A7B5CF099A07910F14892D /* SleepTrendsView.swift in Sources */,
+				FD4049B2B7AF5E31E4B777B6 /* SleepHistory.swift in Sources */,
 				BBEB574715121587294478C7 /* DailyBriefReminder.swift in Sources */,
 				3F522DC0F0540A319E63AB5A /* DeckFeedbackSheet.swift in Sources */,
 				1FE8B00FD19A1F67ACF1CA6C /* DeckStackView.swift in Sources */,
@@ -3375,6 +3390,7 @@
 				C0FFEE50000000000000000F /* MoneyModelsTests.swift in Sources */,
 				C0FFEE500000000000000011 /* MoneyViewModelTests.swift in Sources */,
 				2A8CB7ACCDBA9BBE34E57FDC /* DailyDeckTests.swift in Sources */,
+				AAAFB91D932E2ADD51ACD585 /* SleepHistoryTests.swift in Sources */,
 				B1A1C0DE0000000000000201 /* BrainViewModelTests.swift in Sources */,
 				B1A1C0DE0000000000000203 /* BrainModelsTests.swift in Sources */,
 				B1A1C0DE0000000000000E05 /* PrepModelsTests.swift in Sources */,
