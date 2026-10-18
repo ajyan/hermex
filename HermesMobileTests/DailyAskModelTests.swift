@@ -1,5 +1,6 @@
 import XCTest
 import Foundation
+import SwiftUI
 @testable import HermesMobile
 
 /// A scripted Daily Ask API: queued GET and POST results, the requests it saw, and an optional
@@ -185,5 +186,43 @@ final class DailyAskModelTests: XCTestCase {
         let model = await loaded(client)
         XCTAssertTrue(model.isLive(for: "2026-10-19"))
         XCTAssertFalse(model.isLive(for: "2026-10-18"))
+    }
+
+    func testDoneLineCopy() {
+        XCTAssertEqual(DailyAskBody.doneLine(DailyAskOutcome(event: "applied", role: "r", company: "Harvey", title: "T",
+                                                             reason: nil, name: nil)),
+                       "Applied to Harvey — Prep is open")
+        XCTAssertEqual(DailyAskBody.doneLine(DailyAskOutcome(event: "sent", role: "r", company: "Ramp", title: "T",
+                                                             reason: nil, name: "Jane")),
+                       "Reached out to Jane at Ramp — Prep is open")
+        XCTAssertEqual(DailyAskBody.doneLine(DailyAskOutcome(event: "skip", role: nil, company: nil, title: nil,
+                                                             reason: "sick", name: nil)),
+                       "Skipped: sick")
+    }
+
+    func testNeverMissTwiceLine() throws {
+        XCTAssertEqual(DailyAskBody.neverMissTwiceLine(try Self.ask()), "Yesterday's Ask was missed — never miss twice.")
+        XCTAssertEqual(DailyAskBody.neverMissTwiceLine(try Self.ask { $0["previous"] = "skipped" }),
+                       "Yesterday's Ask was skipped — never miss twice.")
+        XCTAssertNil(DailyAskBody.neverMissTwiceLine(try Self.ask { $0["previous"] = "done" }))
+    }
+
+    func testWeekLine() throws {
+        XCTAssertEqual(DailyAskBody.weekLine(try Self.ask()), "Applications 1/2 · Outreach 0/5")
+        XCTAssertNil(DailyAskBody.weekLine(try Self.ask { $0.removeValue(forKey: "week") }))
+    }
+
+    func testGateFollowsModel() async throws {
+        let client = FakeDailyAskClient()
+        client.askResults = [.success(try Self.ask())]
+        client.actResults = [.success(try Self.ask { $0["locked"] = false })]
+        let model = await loaded(client)
+        XCTAssertTrue(PrepGate<EmptyView>.shouldGate(model))
+        await model.act(.skip(reason: "sick"))
+        XCTAssertFalse(PrepGate<EmptyView>.shouldGate(model))
+        let missing = FakeDailyAskClient()
+        missing.askResults = [.failure(APIError.http(statusCode: 404, body: nil))]
+        let unavailable = await loaded(missing)
+        XCTAssertFalse(PrepGate<EmptyView>.shouldGate(unavailable))
     }
 }

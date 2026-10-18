@@ -724,25 +724,41 @@ struct ChatShellView: View {
             BrainSearchView(module: module, query: query, server: server, onAPIError: authManager.handleAPIError)
                 .adaptiveSecondaryNavigationTitle()
         case .prep(.home):
-            PrepHomeView(server: server, onAPIError: authManager.handleAPIError)
-                .adaptiveSecondaryNavigationTitle()
+            PrepGate(server: server, onAPIError: authManager.handleAPIError) {
+                PrepHomeView(server: server, onAPIError: authManager.handleAPIError)
+                    .adaptiveSecondaryNavigationTitle()
+            }
         case .prep(.track(let track)):
-            PrepTrackView(track: track, server: server, onAPIError: authManager.handleAPIError)
-                .adaptiveSecondaryNavigationTitle()
+            PrepGate(server: server, onAPIError: authManager.handleAPIError) {
+                PrepTrackView(track: track, server: server, onAPIError: authManager.handleAPIError)
+                    .adaptiveSecondaryNavigationTitle()
+            }
         case .prep(.run):
-            PrepRunView(server: server, onAPIError: authManager.handleAPIError)
+            PrepGate(server: server, onAPIError: authManager.handleAPIError) {
+                PrepRunView(server: server, onAPIError: authManager.handleAPIError)
+            }
         case .prep(.gap(let id)):
-            PrepGapView(id: id, server: server, onAPIError: authManager.handleAPIError)
-                .adaptiveSecondaryNavigationTitle()
+            PrepGate(server: server, onAPIError: authManager.handleAPIError) {
+                PrepGapView(id: id, server: server, onAPIError: authManager.handleAPIError)
+                    .adaptiveSecondaryNavigationTitle()
+            }
         case .prep(.lesson(let id)):
-            PrepLessonView(id: id, server: server, onAPIError: authManager.handleAPIError)
-                .adaptiveSecondaryNavigationTitle()
+            PrepGate(server: server, onAPIError: authManager.handleAPIError) {
+                PrepLessonView(id: id, server: server, onAPIError: authManager.handleAPIError)
+                    .adaptiveSecondaryNavigationTitle()
+            }
         case .prep(.testout(let unit)):
-            PrepRunView(server: server, run: .testout, unit: unit, onAPIError: authManager.handleAPIError)
+            PrepGate(server: server, onAPIError: authManager.handleAPIError) {
+                PrepRunView(server: server, run: .testout, unit: unit, onAPIError: authManager.handleAPIError)
+            }
         case .prep(.mock):
-            PrepRunView(server: server, run: .mock, onAPIError: authManager.handleAPIError)
+            PrepGate(server: server, onAPIError: authManager.handleAPIError) {
+                PrepRunView(server: server, run: .mock, onAPIError: authManager.handleAPIError)
+            }
         case .prep(.bonus):
-            PrepRunView(server: server, run: .bonus, onAPIError: authManager.handleAPIError)
+            PrepGate(server: server, onAPIError: authManager.handleAPIError) {
+                PrepRunView(server: server, run: .bonus, onAPIError: authManager.handleAPIError)
+            }
         }
     }
 

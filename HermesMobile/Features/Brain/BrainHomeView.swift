@@ -60,6 +60,8 @@ struct BrainHomeView: View {
     @State private var peopleHome: BrainPeopleHomeViewModel
     /// Prep's summary; its Browse row shows only once it loads.
     @State private var prepViewModel: PrepHomeViewModel
+    /// Today's Daily Ask: while it locks Prep, Prep's row says so.
+    @State private var dailyAsk: DailyAskModel
     /// Starts a new chat with Atlas, the question in its composer.
     private let ask: (String) -> Void
 
@@ -76,6 +78,8 @@ struct BrainHomeView: View {
         _peopleHome = State(initialValue: BrainPeopleHomeViewModel(client: client, cache: cache))
         _prepViewModel = State(initialValue: PrepHomeViewModel(
             client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
+        _dailyAsk = State(initialValue: DailyAskModel(
+            client: APIClientDailyAskAdapter(apiClient: APIClient(baseURL: server))))
         self.ask = ask
     }
 
@@ -91,10 +95,12 @@ struct BrainHomeView: View {
             }
             // Alongside the modules; a server without Prep or People just never shows those rows.
             .task { await prepViewModel.load() }
+            .task { await dailyAsk.load() }
             .task { await peopleHome.load() }
             .onChange(of: scenePhase) { _, phase in
                 // Left open overnight, the review row moves on to the new day's ten.
                 if phase == .active, viewModel.needsNewDay { Task { await viewModel.load() } }
+                if phase == .active { Task { await dailyAsk.load() } }  // a new day's Ask, or one acted on elsewhere
             }
             .onDisappear { searchViewModel.cancel() }
     }
@@ -277,9 +283,9 @@ struct BrainHomeView: View {
                     if !modules.isEmpty { BrainHomeDivider() }
                     link(.prep(.home)) {
                         BrainRow(
-                            leading: { BrainModuleIcon(systemName: "target", paper: .knowledge) },
+                            leading: { BrainModuleIcon(systemName: dailyAsk.isLocked ? "lock.fill" : "target", paper: .knowledge) },
                             title: "Interview prep",
-                            subtitle: "Today's run and your tracks",
+                            subtitle: dailyAsk.isLocked ? "After today's Ask" : "Today's run and your tracks",
                             subtitleLineLimit: 1
                         )
                     }

@@ -79,6 +79,7 @@ private struct DeckCardView: View {
                 case .sleep: sleep
                 case .goal: goal
                 case .weekAhead: DeckWeekAheadCard(card: card, palette: palette)
+                case .ask: ask
                 default: reading
                 }
             }
@@ -289,6 +290,18 @@ private struct DeckCardView: View {
             }
         }
         reflection("Add a note").padding(.top, 24)
+        if let reason = card.reason {
+            Text(verbatim: reason)
+                .font(AppFont.footnote())
+                .foregroundStyle(palette.ink)
+                .padding(.top, 20)
+        }
+    }
+
+    /// The Daily Ask: today's three roles, live.
+    @ViewBuilder
+    private var ask: some View {
+        DeckAskCard(card: card, palette: palette, deckDate: viewModel.date)
         if let reason = card.reason {
             Text(verbatim: reason)
                 .font(AppFont.footnote())
@@ -891,7 +904,8 @@ private func inlineMarkdown(_ text: String) -> AttributedString {
 }
 
 /// A capsule toggle for follow-up choices.
-private struct ChoiceButton: View {
+/// A pill choice: the decision card's buttons, also the Daily Ask's.
+struct ChoiceButton: View {
     let title: String
     let isSelected: Bool
     let action: () -> Void
