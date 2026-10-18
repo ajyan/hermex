@@ -48,8 +48,10 @@ final class DailyAskModel {
         }
     }
 
-    func act(_ action: DailyAskAction) async {
-        guard case .loaded(let current) = state, !pending else { return }
+    /// Whether the server saved it: the Pass sheet stays open (keeping its reason) when not.
+    @discardableResult
+    func act(_ action: DailyAskAction) async -> Bool {
+        guard case .loaded(let current) = state, !pending else { return false }
         pending = true
         error = nil
         defer { pending = false }
@@ -57,14 +59,16 @@ final class DailyAskModel {
             let next = try await client.act(action.request(asOf: current.today))
             generation += 1  // a load that started earlier must not overwrite this answer
             state = .loaded(next)
+            return true
         } catch {
             onAPIError(error)
             if case .http(409, _)? = error as? APIError {
                 await load()  // the server's day moved on: show its today instead of saving to the wrong one
                 self.error = "The day changed. Nothing was saved; this is today's Ask."
-                return
+                return false
             }
             self.error = "Couldn't save. Try again."
+            return false
         }
     }
 

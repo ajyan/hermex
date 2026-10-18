@@ -6,7 +6,6 @@ import UIKit
 /// older deck, or when the server has no job search.
 struct DeckAskCard: View {
     let card: DeckCard
-    let palette: DeckPalette
     /// The deck's day ("2026-10-19"): the card is live only when it is the server's today.
     let deckDate: String
 
@@ -15,7 +14,7 @@ struct DeckAskCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let model, model.isLive(for: deckDate), case .loaded(let ask) = model.state {
-                DailyAskBody(model: model, ask: ask, palette: palette)
+                DailyAskBody(model: model, ask: ask)
             } else {
                 Text(verbatim: card.title ?? "Today's Ask").font(AppFont.display(style: .title2, weight: .semibold))
                 if let fallback = card.fallback {
@@ -34,21 +33,15 @@ struct DeckAskCard: View {
 
 /// The Ask itself, shared by the Deck card and the Prep gate: the week's counts, three role rows
 /// (one open at a time) with the drafted note or opener and the decision card's buttons, Skip today
-/// with a reason, and a Pass sheet whose Company and Title choices become filter rules.
+/// with a reason, and a Pass sheet whose Company and Title choices become filter rules. Keyed by
+/// the Ask's day, so what was typed or opened yesterday never carries into today's Ask.
 struct DailyAskBody: View {
     let model: DailyAskModel
     let ask: DailyAsk
-    let palette: DeckPalette
 
-    @State private var expandedID: String?
-    /// Rows switched to the other way in ("Reach out instead" / "Apply instead").
-    @State private var flipped: Set<String> = []
-    @State private var names: [String: String] = [:]
-    @State private var isSkipping = false
-    @State private var skipReason = ""
-    @State private var passing: DailyAskRole?
-    @Environment(\.openURL) private var openURL
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var body: some View {
+        DailyAskForm(model: model, ask: ask).id(ask.today)
+    }
 
     static func doneLine(_ outcome: DailyAskOutcome) -> String {
         switch outcome.event {
@@ -66,20 +59,41 @@ struct DailyAskBody: View {
     }
 
     static func weekLine(_ ask: DailyAsk) -> String? {
-        guard let a = ask.week?.applications, let o = ask.week?.outreach else { return nil }
-        return "Applications \(a.done)/\(a.target) · Outreach \(o.done)/\(o.target)"
+        guard let a = ask.week?.applications, let o = ask.week?.outreach,
+              let aDone = a.done, let aTarget = a.target, let oDone = o.done, let oTarget = o.target else { return nil }
+        return "Applications \(aDone)/\(aTarget) · Outreach \(oDone)/\(oTarget)"
     }
+}
+
+private struct DailyAskForm: View {
+    let model: DailyAskModel
+    let ask: DailyAsk
+
+    @State private var expandedID: String?
+    /// Rows switched to the other way in ("Reach out instead" / "Apply instead").
+    @State private var flipped: Set<String> = []
+    @State private var names: [String: String] = [:]
+    @State private var isSkipping = false
+    @State private var skipReason = ""
+    @State private var passing: DailyAskRole?
+    @Environment(\.openURL) private var openURL
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(verbatim: "Today's Ask").font(AppFont.display(style: .title2, weight: .semibold))
-            if let week = Self.weekLine(ask) {
+            HStack(spacing: 8) {
+                Text(verbatim: "Today's Ask").font(AppFont.display(style: .title2, weight: .semibold))
+                if model.pending {
+                    ProgressView().accessibilityLabel(Text(verbatim: "Saving"))
+                }
+            }
+            if let week = DailyAskBody.weekLine(ask) {
                 Text(verbatim: week).font(AppFont.subheadline()).foregroundStyle(.secondary).padding(.top, 4)
             }
             if let outcome = ask.outcome {
-                Text(verbatim: Self.doneLine(outcome)).font(AppFont.body()).padding(.top, 16)
+                Text(verbatim: DailyAskBody.doneLine(outcome)).font(AppFont.body()).padding(.top, 16)
             } else {
-                if let line = Self.neverMissTwiceLine(ask) {
+                if let line = DailyAskBody.neverMissTwiceLine(ask) {
                     Text(verbatim: line).font(AppFont.subheadline(weight: .semibold)).padding(.top, 12)
                 }
                 ForEach(Array((ask.roles ?? []).enumerated()), id: \.element.id) { index, role in
@@ -94,9 +108,9 @@ struct DailyAskBody: View {
         }
         .disabled(model.pending)
         .sheet(item: $passing) { role in
-            DailyAskPassSheet(role: role) { reason, rule in
-                passing = nil
-                Task { await model.act(.pass(role: role.id, reason: reason, rule: rule)) }
+            // Closes only once the server saved the Pass, so a failure keeps the typed reason.
+            DailyAskPassSheet(role: role, model: model) { reason, rule in
+                if await model.act(.pass(role: role.id, reason: reason, rule: rule)) { passing = nil }
             }
         }
     }
@@ -223,7 +237,8 @@ struct DailyAskBody: View {
 /// Pass on one role: a reason and what was wrong. Company and Title become filter rules on the server.
 private struct DailyAskPassSheet: View {
     let role: DailyAskRole
-    let pass: (String, String) -> Void
+    let model: DailyAskModel
+    let pass: (String, String) async -> Void
     @State private var reason = ""
     @State private var rule: String?
     @Environment(\.dismiss) private var dismiss
@@ -250,6 +265,9 @@ private struct DailyAskPassSheet: View {
                 }
                 Text(verbatim: "Company and Title stop roles like this from coming back.")
                     .font(AppFont.footnote()).foregroundStyle(.secondary)
+                if let error = model.error {
+                    Text(verbatim: error).font(AppFont.footnote()).foregroundStyle(Color.hxDanger)
+                }
                 Spacer()
             }
             .padding(24)
@@ -257,8 +275,12 @@ private struct DailyAskPassSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Pass") { if let rule { pass(trimmed, rule) } }
-                        .disabled(trimmed.isEmpty || rule == nil)
+                    if model.pending {
+                        ProgressView().accessibilityLabel(Text(verbatim: "Saving"))
+                    } else {
+                        Button("Pass") { if let rule { Task { await pass(trimmed, rule) } } }
+                            .disabled(trimmed.isEmpty || rule == nil)
+                    }
                 }
             }
         }

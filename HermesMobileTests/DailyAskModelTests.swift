@@ -77,6 +77,23 @@ final class DailyAskModelTests: XCTestCase {
         XCTAssertFalse(sparse.needsNeverMissTwice)
     }
 
+    func testOneBadRoleIsDroppedNotTheWholeAsk() throws {
+        let ask = try Self.ask {
+            var roles = $0["roles"] as! [[String: Any]]
+            roles[1].removeValue(forKey: "company")
+            $0["roles"] = roles
+        }
+        XCTAssertEqual(ask.roles?.map(\.id), ["ashby:harvey:1", "greenhouse:anthropic:3"])
+        XCTAssertEqual(ask.locked, true, "a bad role must not fail the decode and open Prep")
+    }
+
+    func testCountsTolerateMissingFields() throws {
+        let ask = try Self.ask { $0["week"] = ["applications": ["done": 1], "outreach": ["target": 5]] }
+        XCTAssertEqual(ask.week?.applications?.done, 1)
+        XCTAssertNil(ask.week?.applications?.target)
+        XCTAssertNil(DailyAskBody.weekLine(ask), "half a count is no line")
+    }
+
     func testLockedOnlyWhenLoadedAndLocked() async throws {
         let client = FakeDailyAskClient()
         client.askResults = [.success(try Self.ask())]
@@ -163,6 +180,22 @@ final class DailyAskModelTests: XCTestCase {
         XCTAssertTrue(model.isLocked)
         XCTAssertEqual(model.error, "Couldn't save. Try again.")
         XCTAssertFalse(model.pending)
+    }
+
+    /// The Pass sheet closes only on `true`, so a failed save keeps the typed reason.
+    func testActReportsWhetherItSaved() async throws {
+        let client = FakeDailyAskClient()
+        client.askResults = [.success(try Self.ask())]
+        client.actResults = [.failure(URLError(.timedOut))]
+        let model = await loaded(client)
+        let failed = await model.act(.pass(role: "ashby:harvey:1", reason: "Not agents", rule: "title"))
+        XCTAssertFalse(failed)
+        client.actResults = [.failure(APIError.http(statusCode: 409, body: nil))]
+        let conflicted = await model.act(.pass(role: "ashby:harvey:1", reason: "Not agents", rule: "title"))
+        XCTAssertFalse(conflicted)
+        client.actResults = [.success(try Self.ask())]
+        let saved = await model.act(.pass(role: "ashby:harvey:1", reason: "Not agents", rule: "title"))
+        XCTAssertTrue(saved)
     }
 
     func testPendingBlocksDoubleTap() async throws {
