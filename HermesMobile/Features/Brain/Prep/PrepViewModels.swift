@@ -30,8 +30,18 @@ final class PrepHomeViewModel {
     /// The course path with the current unit's lessons; nil on servers without a course. When the full
     /// path fails to load, home's summary (units without lessons) stands in.
     private(set) var course: PrepCourse?
+    /// The story bank with each story's readiness marks; nil when the server has no stories route
+    /// or it failed, in which case the Stories section hides.
+    private(set) var stories: PrepStoryList?
+    /// Candidate ids with a verdict in flight, so a card's buttons go off and a tap can't repeat.
+    private(set) var candidatesInFlight: Set<String> = []
+    /// Why the last verdict on a candidate failed, by candidate id; cleared on the next try.
+    private(set) var candidateErrors: [String: String] = [:]
     @ObservationIgnored private let client: PrepDataClient
     @ObservationIgnored private var generation = 0
+    /// Bumped by every stories request (a load's or a verdict's refresh); only the newest may
+    /// assign `stories`, so a stale response never overwrites a newer list.
+    @ObservationIgnored private var storiesGeneration = 0
 
     @ObservationIgnored private let onAPIError: (Error) -> Void
 
@@ -59,6 +69,44 @@ final class PrepHomeViewModel {
             guard token == generation, !prepIsCancellation(error) else { return }
             onAPIError(error)
             state = prepFailureState(error)
+            return
+        }
+        // Stories trail home's first paint: a slow or failed call never delays or fails it.
+        storiesGeneration += 1
+        let storiesToken = storiesGeneration
+        let loaded = try? await client.stories()
+        guard token == generation, storiesToken == storiesGeneration, !Task.isCancelled else { return }
+        stories = loaded
+    }
+
+    func isActing(on candidateID: String) -> Bool {
+        candidatesInFlight.contains(candidateID)
+    }
+
+    /// Sends a verdict on a story candidate, then refreshes the stories once (nothing polls). The
+    /// card changes at once: a dismissed one goes, an added one reads "drafting", so a failed
+    /// refresh never brings back a card whose buttons would repeat the verdict. A failed verdict
+    /// keeps the card and records why.
+    func act(on candidate: PrepStoryCandidate, action: PrepStoryCandidateAction) async {
+        guard candidate.status == "new", !candidatesInFlight.contains(candidate.id) else { return }
+        candidatesInFlight.insert(candidate.id)
+        candidateErrors[candidate.id] = nil
+        defer { candidatesInFlight.remove(candidate.id) }
+        do {
+            try await client.storyCandidate(id: candidate.id, action: action.rawValue)
+        } catch {
+            guard !prepIsCancellation(error) else { return }
+            onAPIError(error)
+            candidateErrors[candidate.id] = error.localizedDescription
+            return
+        }
+        if let list = stories {
+            stories = action == .dismiss ? list.removingCandidate(candidate.id) : list.markingCandidateDrafting(candidate.id)
+        }
+        storiesGeneration += 1
+        let storiesToken = storiesGeneration
+        if let refreshed = try? await client.stories(), storiesToken == storiesGeneration, !Task.isCancelled {
+            stories = refreshed
         }
     }
 }
@@ -252,6 +300,19 @@ final class PrepRunViewModel {
     private(set) var answeredDontKnow = false
     /// The missed point whose "I had that" is in flight; a second tap waits for it.
     private(set) var overridingPoint: String?
+    /// A story rep: told against the clock, graded, then up to two spoken follow-up probes. The
+    /// phase stays `.rep` throughout; "Next" leaves once `canFinishStory`.
+    enum StoryStage: Equatable {
+        case telling
+        case told(PrepAttemptResult)
+        case probing(PrepProbe, number: Int)
+        case probed(PrepAttemptResult, number: Int)
+    }
+    private(set) var storyStage: StoryStage = .telling
+    /// When the telling began (the first mic tap or first non-empty edit); nil until then.
+    private(set) var storyStartedAt: Date?
+    /// Story titles by id, loaded only to name the story told on a wrong-story result.
+    private(set) var storyTitles: [String: String] = [:]
     let runKind: PrepRunKind
     /// The unit a test out quizzes.
     let unit: String?
@@ -266,6 +327,23 @@ final class PrepRunViewModel {
     @ObservationIgnored private var homeBefore: PrepHome?
     @ObservationIgnored private var readyBefore: Set<String>?
     @ObservationIgnored private var tally = PrepDaySummary()
+    /// The story attempt the probes answer to, and when the probe on screen was asked.
+    @ObservationIgnored private var storyParent: String?
+    @ObservationIgnored private var probeShownAt: Date?
+    /// When the telling was sent; the clock holds there while it is graded, and runs on if the send fails.
+    private(set) var storySubmittedAt: Date?
+    /// The answer out for grading, so a conflict reload that shows the same story or probe again
+    /// brings the words (and the story clock) back instead of an empty field.
+    @ObservationIgnored private var storyDraftStash: StoryDraftStash?
+
+    private struct StoryDraftStash {
+        let item: String
+        let prompt: String
+        /// nil for the telling, else the probe being answered.
+        let probe: String?
+        let text: String
+        let startedAt: Date?
+    }
 
     @ObservationIgnored private let onAPIError: (Error) -> Void
 
@@ -360,6 +438,10 @@ final class PrepRunViewModel {
 
     /// "I had that": count one missed key point as hit, keeping the rest of the result.
     func overridePoint(_ point: String) async {
+        if case let .rep(rep, _) = phase, rep.drill == .story {
+            await overrideStoryPoint(point)
+            return
+        }
         guard case let .result(rep, result, index) = phase, let attempt = result.attemptID,
               !answeredDontKnow, overridingPoint == nil else { return }
         let token = generation
@@ -380,6 +462,142 @@ final class PrepRunViewModel {
 
     func showIdea() {
         revealedLesson = true
+    }
+
+    // MARK: Story reps
+
+    /// The telling so far, in ms; 0 until the clock starts, and held at the moment it was sent while
+    /// it is graded.
+    var storyElapsedMS: Int {
+        storyStartedAt.map { Self.milliseconds(from: $0, to: storySubmittedAt ?? now()) } ?? 0
+    }
+
+    /// "I had that" on a told story's missed beat or a probe's missed point: re-scored by the server,
+    /// laid over the result on screen. The probe that result leads to is kept, so the rep goes on.
+    private func overrideStoryPoint(_ point: String) async {
+        let shown: PrepAttemptResult
+        switch storyStage {
+        case let .told(result), let .probed(result, _): shown = result
+        case .telling, .probing: return
+        }
+        guard let attempt = shown.attemptID, !shown.isUngraded, overridingPoint == nil else { return }
+        let token = generation
+        let stage = storyStage
+        overridingPoint = point
+        defer { if token == generation { overridingPoint = nil } }
+        do {
+            let updated = try await client.override(attempt: attempt, point: point)
+            guard token == generation, storyStage == stage else { return }
+            let merged = PrepAttemptResult(merging: shown, override: updated)
+            switch stage {
+            case .told: storyStage = .told(merged)
+            case let .probed(_, number): storyStage = .probed(merged, number: number)
+            case .telling, .probing: break
+            }
+        } catch {
+            guard token == generation, !prepIsCancellation(error) else { return }
+            onAPIError(error)
+            submitError = "Couldn't save that. Try again."
+        }
+    }
+
+    /// Starts the story clock once: on the first mic tap or the first non-empty edit.
+    func markStoryStarted() {
+        guard storyStartedAt == nil, storyStage == .telling, case let .rep(rep, _) = phase, rep.drill == .story
+        else { return }
+        storyStartedAt = now()
+    }
+
+    /// A story or probe answer as dictated or typed; non-empty words start the story clock.
+    func editStory(_ text: String) {
+        guard !isSubmitting else { return }
+        recallDraft = text
+        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { markStoryStarted() }
+    }
+
+    var canSubmitStoryAnswer: Bool {
+        !recallDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSubmitting
+    }
+
+    /// The probe the result on screen leads to and its number; nil once the rep is done (two probes
+    /// answered, or a result with no next probe, which an ungraded story never has).
+    var nextProbe: (probe: PrepProbe, number: Int)? {
+        guard storyParent != nil else { return nil }
+        switch storyStage {
+        case let .told(result): return result.probe.map { ($0, 1) }
+        case let .probed(result, number) where number < 2: return result.probe.map { ($0, number + 1) }
+        default: return nil
+        }
+    }
+
+    /// The story rep has nothing left to answer: "Next" moves the run on.
+    var canFinishStory: Bool {
+        switch storyStage {
+        case .told, .probed: nextProbe == nil
+        case .telling, .probing: false
+        }
+    }
+
+    /// Posts the telling with the time since the clock started (0 if it never did).
+    func submitStory() async {
+        guard canSubmitStoryAnswer, storyStage == .telling, case let .rep(rep, _) = phase, rep.drill == .story,
+              let run else { return }
+        let text = recallDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let sentAt = now()
+        storySubmittedAt = sentAt
+        storyDraftStash = StoryDraftStash(item: rep.item.id, prompt: rep.item.prompt, probe: nil,
+                                          text: recallDraft, startedAt: storyStartedAt)
+        let request = PrepAttemptRequest(
+            date: run.date, index: rep.index, item: rep.item.id, drill: .story,
+            answer: .choice(PrepCopy.capped(text, to: PrepCopy.storyMaxLength)),
+            elapsedMS: storyStartedAt.map { Self.milliseconds(from: $0, to: sentAt) } ?? 0, hintsUsed: 0,
+            run: runKind, unit: runKind == .testout ? unit : nil)
+        let token = generation
+        guard let result = await post(request, token: token) else {
+            if token == generation, storySubmittedAt == sentAt { storySubmittedAt = nil }
+            return
+        }
+        storyDraftStash = nil
+        isSubmitting = false
+        storyParent = result.attemptID
+        storyStage = .told(result)
+        if result.role == "wrong" { await loadStoryTitles(token: token) }
+    }
+
+    /// Asks the next follow-up probe, timed from now.
+    func beginProbe() {
+        guard !isSubmitting, let next = nextProbe else { return }
+        recallDraft = ""
+        probeShownAt = now()
+        storyStage = .probing(next.probe, number: next.number)
+    }
+
+    /// Posts the probe answer against the story attempt it follows.
+    func submitProbe() async {
+        guard canSubmitStoryAnswer, case let .probing(probe, number) = storyStage, case let .rep(rep, _) = phase,
+              let parent = storyParent, let run else { return }
+        var request = PrepAttemptRequest(
+            date: run.date, index: rep.index, item: rep.item.id, drill: .probe,
+            answer: .choice(PrepCopy.cappedApproach(recallDraft.trimmingCharacters(in: .whitespacesAndNewlines))),
+            elapsedMS: probeShownAt.map { Self.milliseconds(from: $0, to: now()) } ?? 0, hintsUsed: 0,
+            run: runKind, unit: runKind == .testout ? unit : nil)
+        request.parent = parent
+        request.probe = probe.id
+        storyDraftStash = StoryDraftStash(item: rep.item.id, prompt: rep.item.prompt, probe: probe.id,
+                                          text: recallDraft, startedAt: nil)
+        guard let result = await post(request, token: generation) else { return }
+        storyDraftStash = nil
+        isSubmitting = false
+        storyStage = .probed(result, number: number)
+    }
+
+    private func loadStoryTitles(token: Int) async {
+        guard let list = try? await client.stories(), token == generation else { return }
+        storyTitles = Dictionary(list.stories.map { ($0.id, $0.title) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    private static func milliseconds(from start: Date, to end: Date) -> Int {
+        max(0, Int(end.timeIntervalSince(start) * 1000))
     }
 
     /// A course run teaches lessons, quizzes a boss or runs a mock; the rest are the older DSA and warm-up runs.
@@ -457,10 +675,21 @@ final class PrepRunViewModel {
     }
 
     func `continue`() async {
-        guard !isAdvancing, case let .result(_, result, answered) = phase, let run else { return }
+        guard !isAdvancing, let run else { return }
+        let target: Int
+        let answered: Int
+        switch (phase, storyStage) {
+        case let (.result(_, result, index), _):
+            (target, answered) = (result.nextIndex, index)
+        case let (.rep(rep, index), .told(result)) where rep.drill == .story && canFinishStory,
+             let (.rep(rep, index), .probed(result, _)) where rep.drill == .story && canFinishStory:
+            (target, answered) = (result.nextIndex, index)
+        default:
+            return
+        }
         isAdvancing = true
         defer { isAdvancing = false }
-        await advance(in: run, to: result.nextIndex, after: answered, token: generation)
+        await advance(in: run, to: target, after: answered, token: generation)
     }
 
     // MARK: - Private
@@ -523,38 +752,76 @@ final class PrepRunViewModel {
         submitError = nil
         flagError = nil
         shownAt = now()
+        storyStartedAt = nil
+        storySubmittedAt = nil
+        storyTitles = [:]
+        if rep.drill == .story, let pending = rep.pending {
+            // Told earlier with probes still open: resume at the next one.
+            storyParent = pending.attempt
+            probeShownAt = shownAt
+            storyStage = .probing(pending.probe, number: max(1, pending.number))
+        } else {
+            storyParent = nil
+            probeShownAt = nil
+            storyStage = .telling
+        }
+        restoreStoryDraft(for: rep)
         phase = .rep(rep, index: rep.index)
+    }
+
+    /// After a reload, the same story or probe comes back with the words that were out for grading.
+    private func restoreStoryDraft(for rep: PrepRep) {
+        defer { storyDraftStash = nil }
+        guard let stash = storyDraftStash, rep.drill == .story, stash.item == rep.item.id,
+              stash.prompt == rep.item.prompt else { return }
+        switch (storyStage, stash.probe) {
+        case (.telling, nil):
+            recallDraft = stash.text
+            storyStartedAt = stash.startedAt
+        case let (.probing(probe, _), id?) where probe.id == id:
+            recallDraft = stash.text
+        default:
+            break
+        }
     }
 
     private func submit(_ answer: PrepAnswer, confidence: PrepConfidence? = nil, dontKnow: Bool = false) async {
         guard !isSubmitting, case let .rep(rep, _) = phase, let run else { return }
         let token = generation
-        isSubmitting = true
-        submitError = nil
-        let elapsed = max(0, Int(now().timeIntervalSince(shownAt) * 1000))
+        let elapsed = Self.milliseconds(from: shownAt, to: now())
         let request = PrepAttemptRequest(
             date: run.date, index: rep.index, item: rep.item.id, drill: rep.drill,
             answer: answer, elapsedMS: elapsed, hintsUsed: hintsShown,
             run: runKind, unit: runKind == .testout ? unit : nil, confidence: confidence, dontKnow: dontKnow)
+        guard let result = await post(request, token: token) else { return }
+        if rep.drill == .primer {
+            // A primer has nothing to grade: advance as `continue()` would, staying
+            // locked until the next rep is in place so "Got it" can't post twice.
+            await advance(in: run, to: result.nextIndex, after: rep.index, token: token)
+            isSubmitting = false
+        } else {
+            isSubmitting = false
+            answeredDontKnow = dontKnow
+            lastXP = Self.xp(for: rep, result: result)
+            count(rep, result)
+            phase = .result(rep, result, index: rep.index)
+        }
+    }
+
+    /// Posts one answer under the submit lock. On success the lock is still held, so the caller can
+    /// put the next screen in place first; a failure, a dropped response or a reload releases it and
+    /// returns nil.
+    private func post(_ request: PrepAttemptRequest, token: Int) async -> PrepAttemptResult? {
+        isSubmitting = true
+        submitError = nil
         do {
             let result = try await client.attempt(request)
             guard token == generation, !Task.isCancelled else {
                 isSubmitting = false
-                return
+                return nil
             }
             if let streak = result.streak { lastStreak = streak }
-            if rep.drill == .primer {
-                // A primer has nothing to grade: advance as `continue()` would, staying
-                // locked until the next rep is in place so "Got it" can't post twice.
-                await advance(in: run, to: result.nextIndex, after: rep.index, token: token)
-                isSubmitting = false
-            } else {
-                isSubmitting = false
-                answeredDontKnow = dontKnow
-                lastXP = Self.xp(for: rep, result: result)
-                count(rep, result)
-                phase = .result(rep, result, index: rep.index)
-            }
+            return result
         } catch {
             if token != generation || prepIsCancellation(error) {
                 isSubmitting = false
@@ -567,6 +834,7 @@ final class PrepRunViewModel {
                 onAPIError(error)
                 submitError = "Couldn't save. Try again."
             }
+            return nil
         }
     }
 
@@ -914,9 +1182,82 @@ enum PrepCopy {
 
     /// An approach draft cut to `approachMaxLength` scalars, so a submit is never rejected as too long.
     static func cappedApproach(_ text: String) -> String {
-        guard text.unicodeScalars.count > approachMaxLength else { return text }
-        return String(String.UnicodeScalarView(text.unicodeScalars.prefix(approachMaxLength)))
+        capped(text, to: approachMaxLength)
     }
+
+    /// Text cut to `limit` Unicode scalars (the server counts with Python `len`).
+    static func capped(_ text: String, to limit: Int) -> String {
+        guard text.unicodeScalars.count > limit else { return text }
+        return String(String.UnicodeScalarView(text.unicodeScalars.prefix(limit)))
+    }
+
+    // MARK: Story reps
+
+    /// A story's time limit and the point its clock turns to a warning.
+    static let storyLimitMS = 240_000
+    static let storyWarnMS = 210_000
+    /// The longest telling the server accepts.
+    static let storyMaxLength = 8000
+    static let storyUngraded = "Couldn't grade, saved for tonight"
+
+    enum StoryClockState: Equatable {
+        case normal, warning, over
+
+        /// Shown beside the clock once the telling runs past the limit.
+        var text: String? { self == .over ? "Over 4:00" : nil }
+    }
+
+    /// Elapsed time as "m:ss".
+    static func storyClock(_ ms: Int) -> String {
+        let seconds = max(0, ms) / 1000
+        return String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+
+    static func storyClockState(_ ms: Int) -> StoryClockState {
+        if ms > storyLimitMS { return .over }
+        return ms >= storyWarnMS ? .warning : .normal
+    }
+
+    /// The Stories section's subtitle: "3 of 8 ready".
+    static func storiesSubtitle(ready: Int, total: Int) -> String {
+        "\(ready) of \(total) ready"
+    }
+
+    /// A readiness mark as one glyph: done, not yet, or no rep yet.
+    static func storyMarkSymbol(_ mark: Bool?) -> String {
+        switch mark {
+        case true: "\u{2713}"
+        case false: "\u{25CC}"
+        default: "\u{2013}"
+        }
+    }
+
+    /// A readiness mark as VoiceOver reads it: "Time: under 4 minutes", "Probes: no rep yet".
+    static func storyMarkLabel(_ kind: PrepStoryMarkKind, _ mark: Bool?) -> String {
+        switch kind {
+        case .time: "Time: " + (mark.map { $0 ? "under 4 minutes" : "not yet" } ?? "no rep yet")
+        case .score: "Score: " + (mark.map { $0 ? "4 or better" : "not yet" } ?? "no rep yet")
+        case .probes: "Probes: " + (mark.map { $0 ? "held" : "not yet" } ?? "no rep yet")
+        }
+    }
+
+    /// A told story's headline: "4/5 · 3:20", or the saved-for-tonight line when it wasn't graded.
+    static func storyHeadline(_ result: PrepAttemptResult) -> String {
+        if result.isUngraded { return storyUngraded }
+        return "\(result.score ?? 0)/5 · \(storyClock(result.elapsedMS ?? 0))"
+    }
+
+    /// After telling a story that doesn't fit the prompt: which one was told and which to lead with.
+    /// `titles` names stories by id; nil unless the role is "wrong".
+    static func wrongStoryLine(_ result: PrepAttemptResult, titles: [String: String]) -> String? {
+        guard result.role == "wrong" else { return nil }
+        let told = result.storyTold.flatMap { titles[$0] }.flatMap { $0.isEmpty ? nil : $0 } ?? "another story"
+        let right = [result.lead, result.backup].compactMap { $0?.title }.filter { !$0.isEmpty }
+        guard !right.isEmpty else { return "You told \(told)." }
+        return "You told \(told). For this prompt, lead with \(right.joined(separator: " or "))."
+    }
+
+    static func probeLabel(_ number: Int) -> String { "Follow-up \(number) of 2" }
 
     /// Whether the draft has reached the cap, to show the "4000 characters max" note.
     static func isAtApproachLimit(_ text: String) -> Bool {

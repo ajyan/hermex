@@ -48,8 +48,15 @@
 		B1A1C0DE0000000000000E27 /* PrepDrillViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E28 /* PrepDrillViews.swift */; };
 		B1A1C0DE0000000000000E01 /* PrepModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E02 /* PrepModels.swift */; };
 		C0F5E5470000000000000000 /* PrepCourseModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F5E5460000000000000000 /* PrepCourseModels.swift */; };
+		C0F5E5A10000000000000000 /* PrepStoryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F5E5A20000000000000000 /* PrepStoryModels.swift */; };
+		C0F5E5B10000000000000000 /* PrepStoryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F5E5B20000000000000000 /* PrepStoryViews.swift */; };
+		C0F5E5C10000000000000000 /* PrepStorySection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F5E5C20000000000000000 /* PrepStorySection.swift */; };
+		C0F5E5D10000000000000000 /* PrepMockModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F5E5D20000000000000000 /* PrepMockModels.swift */; };
+		C0F5E5E10000000000000000 /* PrepMockViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F5E5E20000000000000000 /* PrepMockViews.swift */; };
+		C0F5E5F10000000000000000 /* OpenMockCallAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F5E5F20000000000000000 /* OpenMockCallAction.swift */; };
 		B1A1C0DE0000000000000E03 /* PrepDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E04 /* PrepDataClient.swift */; };
 		B1A1C0DE0000000000000E15 /* PrepViewModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E16 /* PrepViewModelsTests.swift */; };
+		C0F5E5F30000000000000000 /* PrepMockTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F5E5F40000000000000000 /* PrepMockTests.swift */; };
 		B1A1C0DE0000000000000E05 /* PrepModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E06 /* PrepModelsTests.swift */; };
 		B15C1E3E39CB8EAC55E8BD67 /* VoiceCallFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F42EE649B1547E6CBDC22A5A /* VoiceCallFlowTests.swift */; };
 		A1C0FFEE0000000000000B02 /* VoiceCallAudioLevelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE0000000000000F02 /* VoiceCallAudioLevelsTests.swift */; };
@@ -855,8 +862,15 @@
 		B1A1C0DE0000000000000E28 /* PrepDrillViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepDrillViews.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E02 /* PrepModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepModels.swift; sourceTree = "<group>"; };
 		C0F5E5460000000000000000 /* PrepCourseModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepCourseModels.swift; sourceTree = "<group>"; };
+		C0F5E5A20000000000000000 /* PrepStoryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepStoryModels.swift; sourceTree = "<group>"; };
+		C0F5E5B20000000000000000 /* PrepStoryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepStoryViews.swift; sourceTree = "<group>"; };
+		C0F5E5C20000000000000000 /* PrepStorySection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepStorySection.swift; sourceTree = "<group>"; };
+		C0F5E5D20000000000000000 /* PrepMockModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepMockModels.swift; sourceTree = "<group>"; };
+		C0F5E5E20000000000000000 /* PrepMockViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepMockViews.swift; sourceTree = "<group>"; };
+		C0F5E5F20000000000000000 /* OpenMockCallAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenMockCallAction.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E04 /* PrepDataClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepDataClient.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E16 /* PrepViewModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepViewModelsTests.swift; sourceTree = "<group>"; };
+		C0F5E5F40000000000000000 /* PrepMockTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepMockTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E06 /* PrepModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepModelsTests.swift; sourceTree = "<group>"; };
 		F42EE649B1547E6CBDC22A5A /* VoiceCallFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallFlowTests.swift; sourceTree = "<group>"; };
 		A1C0FFEE0000000000000F02 /* VoiceCallAudioLevelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallAudioLevelsTests.swift; sourceTree = "<group>"; };
@@ -1652,6 +1666,12 @@
 			children = (
 				B1A1C0DE0000000000000E02 /* PrepModels.swift */,
 				C0F5E5460000000000000000 /* PrepCourseModels.swift */,
+				C0F5E5A20000000000000000 /* PrepStoryModels.swift */,
+				C0F5E5B20000000000000000 /* PrepStoryViews.swift */,
+				C0F5E5C20000000000000000 /* PrepStorySection.swift */,
+				C0F5E5D20000000000000000 /* PrepMockModels.swift */,
+				C0F5E5E20000000000000000 /* PrepMockViews.swift */,
+				C0F5E5F20000000000000000 /* OpenMockCallAction.swift */,
 				B1A1C0DE0000000000000E04 /* PrepDataClient.swift */,
 				B1A1C0DE0000000000000E18 /* PrepViewModels.swift */,
 				B1A1C0DE0000000000000E22 /* PrepHomeView.swift */,
@@ -1769,6 +1789,7 @@
 				A0DE9E759868615CA68657FC /* WeekAheadViewModelTests.swift */,
 				B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */,
 				B1A1C0DE0000000000000E16 /* PrepViewModelsTests.swift */,
+				C0F5E5F40000000000000000 /* PrepMockTests.swift */,
 				B1A1C0DE0000000000000908 /* BrainVisualsTests.swift */,
 				B1A1C0DE0000000000001004 /* BrainPersonLayoutTests.swift */,
 				B1A1C0DE000000000000100A /* BrainPeopleListTests.swift */,
@@ -2952,6 +2973,12 @@
 				A0DEA60AD5799313DB0B6EDF /* OpenDraftChatAction.swift in Sources */,
 				B1A1C0DE0000000000000E01 /* PrepModels.swift in Sources */,
 				C0F5E5470000000000000000 /* PrepCourseModels.swift in Sources */,
+				C0F5E5A10000000000000000 /* PrepStoryModels.swift in Sources */,
+				C0F5E5B10000000000000000 /* PrepStoryViews.swift in Sources */,
+				C0F5E5C10000000000000000 /* PrepStorySection.swift in Sources */,
+				C0F5E5D10000000000000000 /* PrepMockModels.swift in Sources */,
+				C0F5E5E10000000000000000 /* PrepMockViews.swift in Sources */,
+				C0F5E5F10000000000000000 /* OpenMockCallAction.swift in Sources */,
 				FEEDB0DE00000000000000A1 /* FeedbackModels.swift in Sources */,
 				FEEDB0DE00000000000000A3 /* FeedbackDataClient.swift in Sources */,
 				1ABE15000000000000000001 /* LabelsModels.swift in Sources */,
@@ -3437,6 +3464,7 @@
 				A0DE32DA8AE24542AF68361E /* WeekAheadViewModelTests.swift in Sources */,
 				B1A1C0DE00000000000F0007 /* GoalsModelsTests.swift in Sources */,
 				B1A1C0DE0000000000000E15 /* PrepViewModelsTests.swift in Sources */,
+				C0F5E5F30000000000000000 /* PrepMockTests.swift in Sources */,
 				B1A1C0DE0000000000000907 /* BrainVisualsTests.swift in Sources */,
 				B1A1C0DE0000000000001003 /* BrainPersonLayoutTests.swift in Sources */,
 				B1A1C0DE0000000000001009 /* BrainPeopleListTests.swift in Sources */,

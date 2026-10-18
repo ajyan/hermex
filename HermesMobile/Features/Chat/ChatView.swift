@@ -290,6 +290,11 @@ struct ChatView: View {
     let startsCall: Bool
     /// Bumped by the shell's call button to call on this chat.
     let callRequest: Int
+    /// A voice mock's chat: its first call opens with the brief, saves its session and turn times
+    /// as it goes (`onMockCallProgress`), and reports its end once (`onMockCallEnded`, after the
+    /// call screen is gone).
+    let onMockCallProgress: ((PrepMockInFlight) -> Void)?
+    let onMockCallEnded: ((MockCallEnd) -> Void)?
     let draftStore: ChatDraftStore
     /// Store holding the durable app-owned copies of staged attachments.
     let draftAttachmentStore: any ChatDraftAttachmentStoring
@@ -313,6 +318,9 @@ struct ChatView: View {
     @State private var isVoiceCallPresented = false
     @State private var isFileBrowserPresented = false
     @State private var didAutoStartCall = false
+    @State private var mockCall: MockCallState
+    /// The mock call's end, from hang-up until the call screen has gone.
+    @State private var endedMockCall: MockCallEnd?
     /// Rename sheet opened by tapping the chat title.
     @State private var isTitleRenamePresented = false
     @State private var titleRenameIsSubmitting = false
@@ -422,6 +430,10 @@ struct ChatView: View {
         loadsInitialMessages: Bool = true,
         autoStartsVoiceInput: Bool = false,
         startsCall: Bool = false,
+        openingTurn: String? = nil,
+        mockID: String? = nil,
+        onMockCallProgress: ((PrepMockInFlight) -> Void)? = nil,
+        onMockCallEnded: ((MockCallEnd) -> Void)? = nil,
         callRequest: Int = 0,
         draftStore: ChatDraftStore? = nil,
         draftAttachmentStore: (any ChatDraftAttachmentStoring)? = nil,
@@ -435,6 +447,9 @@ struct ChatView: View {
         self.loadsInitialMessages = loadsInitialMessages
         self.autoStartsVoiceInput = autoStartsVoiceInput
         self.startsCall = startsCall
+        self.onMockCallProgress = onMockCallProgress
+        self.onMockCallEnded = onMockCallEnded
+        _mockCall = State(initialValue: MockCallState(mockID: mockID, openingTurn: openingTurn))
         self.callRequest = callRequest
         self.draftStore = draftStore ?? .shared
         let resolvedDraftAttachmentStore = draftAttachmentStore ?? ChatDraftAttachmentStore.shared
@@ -663,6 +678,13 @@ struct ChatView: View {
             return String(localized: "Read-only")
         }
         return nil
+    }
+
+    /// Saves a voice mock's session and turn times so far while its call runs, so a call cut short
+    /// is still graded later. Ordinary calls report nothing.
+    private func reportMockProgress(_ turnMS: [Int]) {
+        guard let mockID = mockCall.mockID else { return }
+        onMockCallProgress?(PrepMockInFlight(mockID: mockID, sessionID: session.sessionId, turnMS: turnMS))
     }
 
     /// An image is known to be an image before it is fetched, so it opens in the
@@ -1015,8 +1037,18 @@ struct ChatView: View {
             .fullScreenCover(isPresented: $isVoiceCallPresented, onDismiss: {
                 // Call turns don't go through the composer's send path.
                 if !viewModel.messages.isEmpty { onConversationStarted() }
+                if let end = endedMockCall {
+                    endedMockCall = nil
+                    onMockCallEnded?(end)
+                }
             }) {
-                VoiceCallView(chat: viewModel) { isVoiceCallPresented = false }
+                VoiceCallView(chat: viewModel, openingTurn: mockCall.openingTurn, onTurnTimed: reportMockProgress) { summary in
+                    isVoiceCallPresented = false
+                    if let end = mockCall.callEnded(sessionID: session.sessionId, turnMS: summary.turnMS) {
+                        endedMockCall = end
+                    }
+                }
+                .onAppear { reportMockProgress([]) }
             }
             .onAppear {
                 guard startsCall, !didAutoStartCall else { return }

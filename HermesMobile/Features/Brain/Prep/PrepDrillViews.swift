@@ -546,7 +546,7 @@ struct PrepResultView: View {
                     PrepJudgmentGradeView(grade: grade, pointTexts: result.pointTexts)
                 }
             }
-        case .primer, .unknown, .lesson, .boss, .recall, .warmup:  // course cards have their own result views
+        case .primer, .unknown, .lesson, .boss, .recall, .warmup, .story, .probe:  // course cards and story reps have their own result views
             EmptyView()
         }
 
