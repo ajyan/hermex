@@ -143,6 +143,21 @@ final class FeedbackInboxViewModel {
         return false
     }
 
+    /// The entry's current status a 409 reports: the body's `status`, which the server sends
+    /// with every transition conflict, else read from its "cannot go from <status> to …" error.
+    static func conflictStatus(_ error: Error) -> FeedbackStatus? {
+        guard case APIError.http(409, let body) = error else { return nil }
+        if let data = body?.data(using: .utf8),
+           let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let status = object["status"] as? String {
+            return FeedbackStatus(wire: status)
+        }
+        guard let message = (error as? APIError)?.serverMessage,
+              let range = message.range(of: "cannot go from ") else { return nil }
+        let word = message[range.upperBound...].prefix { !$0.isWhitespace }
+        return FeedbackStatus(wire: String(word))
+    }
+
     private static func isCancellation(_ error: Error) -> Bool {
         error is CancellationError || (error as? URLError)?.code == .cancelled
     }

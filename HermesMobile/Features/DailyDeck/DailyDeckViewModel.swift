@@ -162,6 +162,9 @@ final class DailyDeckViewModel {
     private(set) var undoneChanges: Set<String> = []
     /// Each row's last Undo failure: the server's reason on a 409 ("The vault has uncommitted edits…").
     private(set) var changeErrors: [String: String] = [:]
+    /// A row's note that isn't a failure: "Already undone" when a stale card's Undo finds the
+    /// entry undone elsewhere.
+    private(set) var changeNotices: [String: String] = [:]
     /// The row whose Undo is in flight. One at a time.
     private(set) var undoingChangeID: String?
 
@@ -175,8 +178,8 @@ final class DailyDeckViewModel {
         feedback != nil && row.undoable == true && changeState(row) != .reverted
     }
 
-    /// Posts the row's `undo` decision. The row shows Undone only once the server says so; a
-    /// failure stays under the row.
+    /// Posts the row's `undo` decision. The row shows Undone only once the server says so,
+    /// including a 409 that finds it undone already (a stale card); a failure stays under the row.
     func undoChange(_ row: DeckChangeRow) async {
         guard let feedback, canUndo(row), undoingChangeID == nil else { return }
         undoingChangeID = row.id
@@ -185,6 +188,9 @@ final class DailyDeckViewModel {
         do {
             _ = try await feedback.decide(id: row.id, .undo)
             undoneChanges.insert(row.id)
+        } catch let conflict as APIError where FeedbackInboxViewModel.conflictStatus(conflict) == .reverted {
+            undoneChanges.insert(row.id)
+            changeNotices[row.id] = "Already undone"
         } catch let conflict as APIError where FeedbackInboxViewModel.isConflict(conflict) {
             changeErrors[row.id] = conflict.serverMessage ?? "This changed on the server. Check Feedback."
         } catch {

@@ -92,6 +92,11 @@ struct DeckChangesCard: View {
                     .foregroundStyle(Color.hxDanger)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            if let notice = viewModel.changeNotices[row.id] {
+                Text(verbatim: notice)
+                    .font(AppFont.footnote(weight: .medium))
+                    .foregroundStyle(Color.hxTextSecondary)
+            }
         }
         .padding(.vertical, 12)
     }

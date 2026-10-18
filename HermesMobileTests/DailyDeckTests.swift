@@ -190,6 +190,21 @@ final class DailyDeckTests: XCTestCase {
     }
 
     @MainActor
+    func testUndoChangeConflictSayingRevertedFlipsTheRowWithoutAStatusField() async throws {
+        let feedback = DeckFeedbackStub()
+        await feedback.fail(with: APIError.http(statusCode: 409, body: #"{"error": "cannot go from reverted to reverted"}"#))
+        let viewModel = makeViewModel(ScriptedDailyDeckClient(workspaces: [], names: [], deck: Self.deckJSON), feedback: feedback)
+        let row = try Self.changeRow(id: "fb-1", state: "shipped", undoable: true)
+
+        await viewModel.undoChange(row)
+
+        XCTAssertEqual(viewModel.changeState(row), .reverted)
+        XCTAssertEqual(viewModel.changeNotices["fb-1"], "Already undone")
+        XCTAssertNil(viewModel.changeErrors["fb-1"], "not shown as a failure")
+        XCTAssertFalse(viewModel.canUndo(row))
+    }
+
+    @MainActor
     func testUndoChangeOtherFailureShowsGenericMessage() async throws {
         let feedback = DeckFeedbackStub()
         await feedback.fail(with: APIError.http(statusCode: 500, body: nil))
@@ -1327,6 +1342,47 @@ final class BriefFileHTTPTests: APIClientTestCase {
         } catch {
             XCTAssertEqual(error as? BriefFileError, BriefFileError(message: "Filing failed: brain CLI exited 2"))
         }
+    }
+}
+
+/// A stale What changed card's Undo against `URLProtocol` mocks: the server's transition 409.
+final class DeckUndoHTTPTests: APIClientTestCase {
+    @MainActor
+    private func undo(answering body: String) async throws -> (DailyDeckViewModel, DeckChangeRow) {
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.url?.path, "/api/feedback/fb-1/decision")
+            return apiTestJSONResponse(body, for: request, status: 409)
+        }
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "DeckUndoHTTPTests.\(UUID().uuidString)"))
+        let viewModel = DailyDeckViewModel(
+            server: URL(string: "https://example.test")!,
+            client: ScriptedDailyDeckClient(workspaces: [], names: [], deck: DailyDeckTests.deckJSON),
+            store: DailyDeckStore(defaults: defaults),
+            feedback: APIClientFeedbackAdapter(apiClient: client))
+        let row = try DailyDeckTests.changeRow(id: "fb-1", state: "shipped", undoable: true)
+        await viewModel.undoChange(row)
+        return (viewModel, row)
+    }
+
+    @MainActor
+    func testAlreadyUndoneSaysSoAndFlipsTheRow() async throws {
+        let (viewModel, row) = try await undo(answering: #"{"error": "cannot go from reverted to reverted", "status": "reverted"}"#)
+
+        XCTAssertEqual(viewModel.changeNotices["fb-1"], "Already undone")
+        XCTAssertNil(viewModel.changeErrors["fb-1"], "the raw transition error never shows")
+        XCTAssertEqual(viewModel.changeState(row), .reverted)
+        XCTAssertFalse(viewModel.canUndo(row))
+    }
+
+    @MainActor
+    func testAnotherConflictStillShowsTheServersReason() async throws {
+        let (viewModel, row) = try await undo(answering: #"{"error": "The vault has uncommitted edits to tools/deck_pool.py.", "status": "shipped"}"#)
+
+        XCTAssertEqual(viewModel.changeErrors["fb-1"], "The vault has uncommitted edits to tools/deck_pool.py.")
+        XCTAssertNil(viewModel.changeNotices["fb-1"])
+        XCTAssertEqual(viewModel.changeState(row), .shipped)
+        XCTAssertTrue(viewModel.canUndo(row))
     }
 }
 
