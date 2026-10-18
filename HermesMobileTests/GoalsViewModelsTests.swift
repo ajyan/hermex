@@ -118,6 +118,20 @@ final class GoalsViewModelsTests: XCTestCase {
         let vm = GoalsHomeViewModel(client: client)
         await vm.load()
         XCTAssertEqual(vm.state, .unavailable)
+        XCTAssertFalse(vm.offersNewGoal)
+    }
+
+    func testNewGoalIsOfferedOnceGoalsLoadEvenWithNone() async throws {
+        let client = FakeGoalsClient()
+        client.homeResults = [.success(try PrepDecoding.decode(GoalsHome.self, from: Data(#"{"today":"2026-10-15"}"#.utf8)))]
+        let vm = GoalsHomeViewModel(client: client)
+        XCTAssertFalse(vm.offersNewGoal)
+        await vm.load()
+        XCTAssertTrue(vm.offersNewGoal)
+    }
+
+    func testNewGoalDraftNamesTheInterviewSkill() {
+        XCTAssertTrue(GoalsCopy.newGoalDraft.contains("goal-interview"))
     }
 
     func testCheckInSendsServerDates() async throws {
