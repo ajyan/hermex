@@ -135,7 +135,12 @@ struct PrepRunView: View {
         case .spotBug:
             let draft = draft(for: rep)
             return draft.line.map { .bugFix(line: $0, fix: draft.fix ?? "") }
-        case .primer, .unknown, .story, .probe:  // story reps have no view yet; the player skips them
+        case .story:
+            switch viewModel.storyStage {
+            case .telling, .probing: return .choice(viewModel.recallDraft)
+            case .told, .probed: return nil
+            }
+        case .primer, .unknown, .probe:  // a probe only comes inside a story rep
             return nil
         }
     }
@@ -297,7 +302,7 @@ struct PrepRunView: View {
                 if let progress {
                     PrepSegmentBar(position: progress.position, count: progress.count)
                 }
-                if ![.lesson, .recall, .warmup].contains(rep.drill) {  // course cards carry their own content
+                if ![.lesson, .recall, .warmup, .story].contains(rep.drill) {  // these cards carry their own content
                     PrepProblemCard(rep: rep, maxHeight: availableHeight * 0.45)
                 }
             }
@@ -378,7 +383,9 @@ struct PrepRunView: View {
                 title: "Submit",
                 enabled: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !viewModel.isSubmitting
             ) { Task { await viewModel.submitCloze(text) } }
-        case .unknown, .story, .probe:  // story reps have no view yet
+        case .story:
+            storyAction
+        case .unknown, .probe:  // a probe only comes inside a story rep
             PrepPrimaryButton(title: "Skip") { Task { await viewModel.skip() } }
         case .complexity, .trace:
             EmptyView()
@@ -526,11 +533,57 @@ struct PrepRunView: View {
                 prompt: "Your answer",
                 showsClock: false
             )
-        case .unknown, .story, .probe:  // story reps have no view yet
+        case .story:
+            storyContent(rep)
+        case .unknown, .probe:  // a probe only comes inside a story rep
             PrepNoteCard {
                 Text(verbatim: "Update Atlas to do this rep")
                     .font(BrainStyle.rowTitle)
                     .foregroundStyle(Color.hxTextPrimary)
+            }
+        }
+    }
+
+    // MARK: Story reps
+
+    /// The story rep's screen for its stage: the telling, its result, a probe, or a probe's result.
+    @ViewBuilder
+    private func storyContent(_ rep: PrepRep) -> some View {
+        let draft = Binding(get: { viewModel.recallDraft }, set: { viewModel.editStory($0) })
+        switch viewModel.storyStage {
+        case .telling:
+            PrepStoryTellCard(
+                prompt: rep.item.prompt,
+                startedAt: viewModel.storyStartedAt,
+                elapsedMS: { viewModel.storyElapsedMS },
+                draft: draft,
+                isSubmitting: viewModel.isSubmitting,
+                startClock: { viewModel.markStoryStarted() })
+        case .told(let result):
+            PrepStoryResultView(result: result, titles: viewModel.storyTitles)
+        case .probing(let probe, let number):
+            PrepProbeCard(prompt: rep.item.prompt, probe: probe, number: number, draft: draft,
+                          isSubmitting: viewModel.isSubmitting)
+        case .probed(let result, let number):
+            PrepProbeResultView(result: result, number: number)
+        }
+    }
+
+    /// Submit while telling or answering a probe; then the next probe, or Next once the rep is done.
+    @ViewBuilder
+    private var storyAction: some View {
+        switch viewModel.storyStage {
+        case .telling:
+            PrepPrimaryButton(title: "Submit", enabled: viewModel.canSubmitStoryAnswer,
+                              isGrading: viewModel.isSubmitting) { Task { await viewModel.submitStory() } }
+        case .probing:
+            PrepPrimaryButton(title: "Submit", enabled: viewModel.canSubmitStoryAnswer,
+                              isGrading: viewModel.isSubmitting) { Task { await viewModel.submitProbe() } }
+        case .told, .probed:
+            if let next = viewModel.nextProbe {
+                PrepPrimaryButton(title: PrepCopy.probeLabel(next.number)) { viewModel.beginProbe() }
+            } else {
+                PrepPrimaryButton(title: "Next") { Task { await viewModel.continue() } }
             }
         }
     }
