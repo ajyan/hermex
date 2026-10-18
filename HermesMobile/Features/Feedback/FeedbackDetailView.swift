@@ -93,7 +93,11 @@ struct FeedbackDetailView: View {
 
                 youSaid(entry)
 
-                if entry.now != nil || entry.after != nil {
+                let hasNowAfter = entry.now != nil || entry.after != nil
+                // A plan without Now → After leads with its questions, ahead of the longer prose.
+                if !hasNowAfter { questions(entry) }
+
+                if hasNowAfter {
                     FeedbackNowAfterCard(entry: entry)
                 } else if let changes = steerable?.changes ?? entry.summary {
                     block("What changes") {
@@ -108,9 +112,7 @@ struct FeedbackDetailView: View {
                         .foregroundStyle(Color.hxTextSecondary)
                 }
 
-                if let steerable, entry.status == .planned, !steerable.questions.isEmpty {
-                    FeedbackQuestionsCard(questions: steerable.questions, answers: $answers)
-                }
+                if hasNowAfter { questions(entry) }
 
                 if entry.status == .failed {
                     block("What went wrong") {
@@ -140,6 +142,13 @@ struct FeedbackDetailView: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
+        }
+    }
+
+    @ViewBuilder
+    private func questions(_ entry: FeedbackEntry) -> some View {
+        if let steerable, entry.status == .planned, !steerable.questions.isEmpty {
+            FeedbackQuestionsCard(questions: steerable.questions, answers: $answers)
         }
     }
 
