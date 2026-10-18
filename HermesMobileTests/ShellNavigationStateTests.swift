@@ -198,4 +198,26 @@ final class ShellNavigationStateTests: XCTestCase {
         let citation = BrainCitation.citations(in: "See [Prompt caching](brain://wiki/prompt-caching).").first
         XCTAssertEqual(citation?.destination, .brainRoute(.page(.wiki, "prompt-caching")))
     }
+
+    // MARK: - Covered chat stream
+
+    @MainActor
+    func testAChatThatComesBackKeepsItsStream() {
+        let covered = CoveredChatStream()
+        var suspended = 0
+        covered.hold { suspended += 1 }
+        covered.release()
+        covered.suspendHeld()
+        XCTAssertEqual(suspended, 0)
+    }
+
+    @MainActor
+    func testAHeldChatThatGoesAwaySuspendsOnce() {
+        let covered = CoveredChatStream()
+        var suspended = 0
+        covered.hold { suspended += 1 }
+        covered.suspendHeld()
+        covered.suspendHeld()
+        XCTAssertEqual(suspended, 1)
+    }
 }

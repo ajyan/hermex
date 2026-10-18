@@ -79,6 +79,7 @@ struct ChatShellView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var viewModel: SessionListViewModel
     @State private var navigation = ShellNavigationState()
+    @State private var coveredChat = CoveredChatStream()
     /// Lets chat replies open Brain pages (`brain://` links) on this stack.
     @State private var brainRouteOpener = OpenBrainRouteAction()
     /// Lets pushed screens (a Week ahead card's Edit in chat) start a new chat with a draft.
@@ -363,6 +364,7 @@ struct ChatShellView: View {
                 refreshAfterReturningIfNeeded()
             }
             .onDisappear {
+                coveredChat.suspendHeld()
                 sessionOpenTask?.cancel()
                 autoArchiveTask?.cancel()
                 viewModel.invalidateSessionOpening()
@@ -519,6 +521,10 @@ struct ChatShellView: View {
                 }
         }
         .environment(\.shellZoomNamespace, zoomNamespace)
+        .environment(\.coveredChatStream, coveredChat)
+        .onChange(of: navigation.path) { coveredChat.isCovered = !navigation.path.isEmpty }
+        // A new root rebuilds the stack, so a chat kept live under a pushed screen is gone.
+        .onChange(of: navigation.rootRevision) { coveredChat.suspendHeld() }
         // Pushed screens (the Daily Brief's open cards) open Brain pages too.
         .environment(\.openBrainRoute, brainRouteOpener)
         .environment(\.openDraftChat, draftChatOpener)

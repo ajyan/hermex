@@ -136,12 +136,21 @@ struct WebuiPushDestination: Hashable {
     }
 
     /// A relay push shows as a banner unless it is about `viewer`'s conversation,
-    /// asks nothing of the user, and that server has presence suppression on.
-    /// Anything else, such as a local completion alert or a push from an install
-    /// no longer paired, keeps the system default of showing nothing in the foreground.
+    /// asks nothing of the user, and that server has presence suppression on. A local
+    /// run alert in the foreground was scheduled for a chat a pushed screen covers,
+    /// so it shows unless that chat is back on screen. Anything else, such as a push
+    /// from an install no longer paired, keeps the system default of showing nothing.
     static func presentation(
         userInfo: [AnyHashable: Any], viewer: Viewer?, pairings: [URL: PushPairing]
     ) -> UNNotificationPresentationOptions {
+        if userInfo["source"] as? String == ResponseCompletionNotificationRequest.source {
+            if let viewer,
+               userInfo["session_id"] as? String == viewer.sessionID,
+               userInfo["server_hash"] as? String == ResponseCompletionNotificationRequest.serverHash(viewer.server) {
+                return []
+            }
+            return [.banner, .list, .sound]
+        }
         let payload = PushPayload(userInfo: userInfo)
         guard let hash = payload.installHash else { return [] }
         let servers = pairings.filter {

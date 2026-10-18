@@ -146,6 +146,48 @@ struct ShellNavigationState: Equatable {
     }
 }
 
+/// Keeps the shell's chat streaming while a screen is pushed over it, so a reply
+/// still arrives (and alerts) while the user is in the Deck, the Brain or Goals.
+/// The shell keeps `isCovered` in step with its push path; a covered chat that
+/// disappears hands over its suspension here instead of running it, and the shell
+/// runs it when that chat goes away for good (a new root, or the shell closing).
+@MainActor
+final class CoveredChatStream {
+    /// A screen is pushed over the chat root.
+    var isCovered = false
+    private var suspendHeldChat: (@MainActor () -> Void)?
+
+    /// Called by a covered chat as it disappears: `suspend` runs if it never comes back.
+    func hold(suspend: @escaping @MainActor () -> Void) {
+        suspendHeldChat = suspend
+    }
+
+    /// Called by the chat when it is back on screen.
+    func release() {
+        suspendHeldChat = nil
+    }
+
+    /// The held chat is gone for good: suspend its stream now.
+    func suspendHeld() {
+        let suspend = suspendHeldChat
+        suspendHeldChat = nil
+        suspend?()
+    }
+}
+
+private struct CoveredChatStreamKey: EnvironmentKey {
+    static let defaultValue: CoveredChatStream? = nil
+}
+
+extension EnvironmentValues {
+    /// The shell's covered-chat holder; nil outside the shell, where a chat that
+    /// disappears always suspends its stream.
+    var coveredChatStream: CoveredChatStream? {
+        get { self[CoveredChatStreamKey.self] }
+        set { self[CoveredChatStreamKey.self] = newValue }
+    }
+}
+
 /// Resolves the hardware-keyboard chat shortcuts (⌘1–⌘9, Next and Previous
 /// Chat) against the ordinary chat rows in on-screen order.
 enum ChatShortcutNavigation {
