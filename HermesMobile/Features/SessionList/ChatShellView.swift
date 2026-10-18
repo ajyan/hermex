@@ -743,6 +743,8 @@ struct ChatShellView: View {
             PrepRunView(server: server, run: .mock, onAPIError: authManager.handleAPIError)
         case .prep(.bonus):
             PrepRunView(server: server, run: .bonus, onAPIError: authManager.handleAPIError)
+        case .prep(.story(let id)):
+            PrepRunView(server: server, run: .story, unit: id, onAPIError: authManager.handleAPIError)
         }
     }
 

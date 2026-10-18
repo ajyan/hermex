@@ -128,6 +128,11 @@ struct PrepStoryMarks: Decodable, Hashable, Sendable {
     }
 }
 
+/// The three marks a story earns toward ready.
+enum PrepStoryMarkKind: String, CaseIterable, Sendable {
+    case time, score, probes
+}
+
 struct PrepStorySummary: Decodable, Identifiable, Hashable, Sendable {
     let id: String
     let title: String
@@ -201,4 +206,9 @@ struct PrepStoryList: Decodable, Hashable, Sendable {
         activeTotal = c.int(.activeTotal)
         candidates = c.lossy(PrepStoryCandidate.self, .candidates)
     }
+
+    /// The stories being drilled.
+    var activeStories: [PrepStorySummary] { stories.filter { $0.status == "active" } }
+    /// The stories waiting their turn.
+    var benchStories: [PrepStorySummary] { stories.filter { $0.status == "bench" } }
 }

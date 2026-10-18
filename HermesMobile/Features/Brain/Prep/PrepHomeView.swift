@@ -41,7 +41,7 @@ struct PrepHomeView: View {
                         // gaps (fed by mocks) follow below.
                         PrepTodayRingCard(course: course, streak: home.streak,
                                           action: PrepCopy.runAction(reps: home.run.reps, remaining: home.run.remaining))
-                        PrepUnitPath(course: course)
+                        PrepUnitPath(course: course, stories: viewModel.stories)
                     } else {
                         todaySection(home)
                     }

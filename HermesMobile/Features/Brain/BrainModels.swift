@@ -723,6 +723,8 @@ enum PrepRoute: Hashable, Sendable {
     case mock
     /// "One more round": up to five more recalls after the day's run.
     case bonus
+    /// One behavioral story, drilled on its own.
+    case story(String)
 }
 
 /// Opens a Brain page on the shell's stack from outside Brain (a `brain://` link in a

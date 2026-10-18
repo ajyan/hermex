@@ -80,6 +80,8 @@ struct PrepTodayRingCard: View {
 /// quiet "Coming up" list.
 struct PrepUnitPath: View {
     let course: PrepCourse
+    /// The story bank, shown between the units and the mock row; nil hides it.
+    var stories: PrepStoryList?
 
     var body: some View {
         let lastCurrent = course.units.lastIndex { $0.state == .current }
@@ -106,6 +108,9 @@ struct PrepUnitPath: View {
                         PrepLockedUnitRow(index: i, unit: course.units[i], prominent: false)
                     }
                 }
+            }
+            if let stories, !stories.stories.isEmpty {
+                PrepStorySection(list: stories)
             }
             if course.units.contains(where: { $0.mock }) {
                 NavigationLink(value: ShellPushDestination.brainRoute(.prep(.mock))) {

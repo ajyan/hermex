@@ -30,6 +30,9 @@ final class PrepHomeViewModel {
     /// The course path with the current unit's lessons; nil on servers without a course. When the full
     /// path fails to load, home's summary (units without lessons) stands in.
     private(set) var course: PrepCourse?
+    /// The story bank with each story's readiness marks; nil when the server has no stories route
+    /// or it failed, in which case the Stories section hides.
+    private(set) var stories: PrepStoryList?
     @ObservationIgnored private let client: PrepDataClient
     @ObservationIgnored private var generation = 0
 
@@ -44,6 +47,7 @@ final class PrepHomeViewModel {
         generation += 1
         let token = generation
         async let gapsLoad = try? await client.gaps()
+        async let storiesLoad = try? await client.stories()
         do {
             let home = try await client.home()
             var course: PrepCourse?
@@ -51,8 +55,10 @@ final class PrepHomeViewModel {
                 course = (try? await client.course()) ?? summary
             }
             let gaps = await gapsLoad
+            let stories = await storiesLoad
             guard token == generation, !Task.isCancelled else { return }
             self.gaps = gaps
+            self.stories = stories
             self.course = course
             state = .loaded(home)
         } catch {
@@ -1168,6 +1174,29 @@ enum PrepCopy {
     static func storyClockState(_ ms: Int) -> StoryClockState {
         if ms > storyLimitMS { return .over }
         return ms >= storyWarnMS ? .warning : .normal
+    }
+
+    /// The Stories section's subtitle: "3 of 8 ready".
+    static func storiesSubtitle(ready: Int, total: Int) -> String {
+        "\(ready) of \(total) ready"
+    }
+
+    /// A readiness mark as one glyph: done, not yet, or no rep yet.
+    static func storyMarkSymbol(_ mark: Bool?) -> String {
+        switch mark {
+        case true: "\u{2713}"
+        case false: "\u{25CC}"
+        default: "\u{2013}"
+        }
+    }
+
+    /// A readiness mark as VoiceOver reads it: "Time: under 4 minutes", "Probes: no rep yet".
+    static func storyMarkLabel(_ kind: PrepStoryMarkKind, _ mark: Bool?) -> String {
+        switch kind {
+        case .time: "Time: " + (mark.map { $0 ? "under 4 minutes" : "not yet" } ?? "no rep yet")
+        case .score: "Score: " + (mark.map { $0 ? "4 or better" : "not yet" } ?? "no rep yet")
+        case .probes: "Probes: " + (mark.map { $0 ? "held" : "not yet" } ?? "no rep yet")
+        }
     }
 
     /// A told story's headline: "4/5 · 3:20", or the saved-for-tonight line when it wasn't graded.

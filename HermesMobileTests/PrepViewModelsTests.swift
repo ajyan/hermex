@@ -365,6 +365,65 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(vm.course?.units.first?.lessons, [])
     }
 
+    // MARK: Stories on home
+
+    private func storyList(candidates: String = "") -> PrepStoryList {
+        decode(PrepStoryList.self, #"""
+        {"stories": [
+          {"id": "s1", "title": "The migration", "status": "active", "primary_signal": "ownership", "ready": true,
+           "marks": {"time": true, "score": true, "probes": true}, "last": "2026-10-17"},
+          {"id": "s2", "title": "The outage", "status": "active", "primary_signal": "conflict", "ready": false,
+           "marks": {"time": true, "score": false, "probes": null}, "last": null},
+          {"id": "s4", "title": "The hire", "status": "bench", "primary_signal": null, "ready": false,
+           "marks": {"time": null, "score": null, "probes": null}, "last": null}],
+         "ready_count": 1, "active_total": 8, "candidates": [\#(candidates)]}
+        """#)
+    }
+
+    func testHomeLoadsStories() async {
+        let client = FakePrepClient()
+        client.homeResults = [.success(decode(PrepHome.self, #"{"streak": {"days": 1, "freezes": 0}}"#))]
+        client.storiesResults = [.success(storyList())]
+        let vm = PrepHomeViewModel(client: client)
+        await vm.load()
+        XCTAssertEqual(vm.stories?.readyCount, 1)
+        XCTAssertEqual(vm.stories?.activeTotal, 8)
+        XCTAssertEqual(vm.stories?.activeStories.map(\.id), ["s1", "s2"])
+        XCTAssertEqual(vm.stories?.benchStories.map(\.id), ["s4"])
+        XCTAssertTrue(client.log.contains("stories"))
+    }
+
+    func testHomeHidesStoriesWhenEndpointFails() async {
+        let client = FakePrepClient()
+        client.homeResults = [.success(decode(PrepHome.self, #"{"streak": {"days": 1, "freezes": 0}}"#))]
+        client.storiesResults = [.failure(http(404))]
+        let vm = PrepHomeViewModel(client: client)
+        await vm.load()
+        XCTAssertNil(vm.stories)
+        guard case .loaded = vm.state else { return XCTFail("a stories failure never fails home: \(vm.state)") }
+    }
+
+    func testStoryRunRequestsStoryRunWithUnit() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([storyRep(0)], run: "story"))]
+        let vm = PrepRunViewModel(client: client, run: .story, unit: "s3")
+        await vm.load()
+        XCTAssertEqual(client.log.first, "today:story:s3")
+    }
+
+    func testStoryMarkCopy() {
+        XCTAssertEqual(PrepCopy.storiesSubtitle(ready: 3, total: 8), "3 of 8 ready")
+        XCTAssertEqual(PrepCopy.storyMarkSymbol(true), "\u{2713}")
+        XCTAssertEqual(PrepCopy.storyMarkSymbol(false), "\u{25CC}")
+        XCTAssertEqual(PrepCopy.storyMarkSymbol(nil), "\u{2013}")
+        XCTAssertEqual(PrepCopy.storyMarkLabel(.time, true), "Time: under 4 minutes")
+        XCTAssertEqual(PrepCopy.storyMarkLabel(.time, false), "Time: not yet")
+        XCTAssertEqual(PrepCopy.storyMarkLabel(.score, true), "Score: 4 or better")
+        XCTAssertEqual(PrepCopy.storyMarkLabel(.score, false), "Score: not yet")
+        XCTAssertEqual(PrepCopy.storyMarkLabel(.probes, true), "Probes: held")
+        XCTAssertEqual(PrepCopy.storyMarkLabel(.probes, nil), "Probes: no rep yet")
+    }
+
     func testPathCopy() {
         XCTAssertEqual(PrepCopy.unitHeader(index: 1, title: "Prompt engineering"), "Unit 2 · Prompt engineering")
         XCTAssertEqual(PrepCopy.todayLine(days: 6, xp: 340), "6-day streak · 340 XP")
@@ -1168,7 +1227,7 @@ final class PrepViewModelsTests: XCTestCase {
         let vm = PrepHomeViewModel(client: client)
         await vm.load()
         XCTAssertEqual(vm.gaps?.map(\.id), ["gap.a", "gap.b"])
-        XCTAssertEqual(Set(client.log), ["home", "gaps"])
+        XCTAssertEqual(Set(client.log), ["home", "gaps", "stories"])
     }
 
     func testGapsFailureDoesNotFailHome() async {
