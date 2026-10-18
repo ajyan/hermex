@@ -65,6 +65,8 @@ private struct DeckCardView: View {
     @State private var isWriting = false
     /// The sleep card's numbers, shown before rating when asked for.
     @State private var showsNumbers = false
+    /// The Sleep screen, opened from the sleep card's numbers.
+    @State private var showsSleepHistory = false
 
     var body: some View {
         ScrollView {
@@ -97,6 +99,12 @@ private struct DeckCardView: View {
         .tint(palette.ink)
         .sheet(isPresented: $isWriting) {
             ReflectionSheet(card: card, palette: palette, viewModel: viewModel)
+        }
+        .sheet(isPresented: $showsSleepHistory) {
+            let deck = viewModel
+            SleepView(viewModel: SleepViewModel(today: SleepNight.dayFormatter.date(from: deck.date) ?? .now) {
+                try await deck.sleepHistory()
+            })
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text(verbatim: palette.name))
@@ -229,7 +237,7 @@ private struct DeckCardView: View {
         .padding(.top, 18)
         if let numbers = card.sleep {
             if rating != nil || showsNumbers {
-                SleepNumbers(sleep: numbers, palette: palette)
+                SleepNumbers(sleep: numbers, palette: palette) { showsSleepHistory = true }
                     .padding(.top, 26)
                     .transition(.opacity)
             } else {
@@ -370,6 +378,8 @@ private struct DeckCardView: View {
 private struct SleepNumbers: View {
     let sleep: DeckSleep
     let palette: DeckPalette
+    /// Opens the Sleep screen: every night, trends, and the table.
+    let openHistory: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -388,6 +398,14 @@ private struct SleepNumbers: View {
             if sleep.nights.contains(where: { $0.hours != nil }) {
                 SleepStrip(nights: sleep.nights, palette: palette).padding(.top, 20)
             }
+            Button(action: openHistory) {
+                Label { Text(verbatim: "Sleep trends") } icon: { Image(systemName: "chart.xyaxis.line") }
+                    .font(AppFont.subheadline(weight: .semibold))
+                    .foregroundStyle(palette.ink)
+                    .frame(minHeight: 44)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 12)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

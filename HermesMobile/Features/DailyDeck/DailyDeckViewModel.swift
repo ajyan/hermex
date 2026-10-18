@@ -313,6 +313,17 @@ final class DailyDeckViewModel {
         return DailyDeckJournal.readable(text)
     }
 
+    /// Every night's sleep numbers (`data/sleep/history.json`), or nil before the vault has written it.
+    func sleepHistory() async throws -> SleepHistory? {
+        guard let sessionID else { return nil }
+        do {
+            let text = try await client.fileContent(sessionID: sessionID, path: SleepHistoryPaths.history)
+            return try SleepHistory.decode(Data(text.utf8))
+        } catch let error as APIError where error.isNotFound {
+            return nil
+        }
+    }
+
     private func monthFolder(year: Int, month: Int, sessionID: String) async -> String? {
         let base = "journal/\(year)"
         guard let names = try? await client.entryNames(sessionID: sessionID, path: base),
