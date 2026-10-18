@@ -6,7 +6,7 @@ final class LabelsModelsTests: XCTestCase {
         let data = Data(#"""
         {"labels": [
           {"ts": "2026-10-13T08:00:00", "feature": "daily_deck", "item": "2026-10-12|morning|quote-3",
-           "part": "card", "verdict": "bad", "note": "Too long", "title": "Seneca", "extra": 1},
+           "part": "card", "verdict": "bad", "note": "Too long", "title": "Seneca", "source": "feedback", "extra": 1},
           {"feature": "daily_deck", "item": "2026-10-12|morning|quote-3", "part": "question", "verdict": "good"},
           {"feature": "brain", "item": "wiki/stoicism", "part": "page", "verdict": "clear"},
           {"feature": "brain", "item": "wiki/x", "part": "page", "verdict": "meh"},
@@ -21,6 +21,8 @@ final class LabelsModelsTests: XCTestCase {
         XCTAssertEqual(records[0].verdict, .bad)
         XCTAssertEqual(records[0].note, "Too long")
         XCTAssertEqual(records[0].title, "Seneca")
+        XCTAssertEqual(records[0].source, "feedback")
+        XCTAssertNil(records[1].source, "a tapped label has no source")
         XCTAssertEqual(records[0].key, LabelKey(feature: "daily_deck", item: "2026-10-12|morning|quote-3", part: "card"))
         XCTAssertEqual(records[1].verdict, .good)
         XCTAssertNil(records[1].ts)
@@ -338,7 +340,7 @@ final class LabelQueueViewModelTests: XCTestCase {
                        "today and the 13 days before it; nothing older or in the future")
     }
 
-    func testQueueKeepsReflectCardsInOrderAndSkipsFullyLabeledOnes() throws {
+    func testQueueKeepsReflectCardsInOrderAndSkipsLabeledOnes() throws {
         let newer = try DailyDeck.decode(Self.deck(date: "2026-10-13", cards: [
             #"{"id":"head","type":"headline"}"#,
             #"{"id":"q1","type":"reflect","kind":"quote","body":"A","question":"Why?"}"#,
@@ -360,8 +362,67 @@ final class LabelQueueViewModelTests: XCTestCase {
             decks: [(date: "2026-10-13", kind: "morning", deck: newer), (date: "2026-10-12", kind: "morning", deck: older)],
             isLabeled: { labeled.contains($0) })
 
-        XCTAssertEqual(items.map(\.id), ["2026-10-13|morning|b1", "2026-10-12|morning|q1"],
-                       "b1 still needs its question; w1 has no question so its card label is enough")
+        XCTAssertEqual(items.map(\.id), ["2026-10-12|morning|q1"],
+                       "a label on the card or the question is enough: b1 is done though its question isn't labeled")
+    }
+
+    func testQueueSkipsCardsThatLandedAndHoldsAtMostABatch() throws {
+        let cards = (1...8).map { #"{"id":"r\#($0)","type":"reflect","kind":"wiki","body":"B"}"# }
+        let deck = try DailyDeck.decode(Self.deck(date: "2026-10-13", cards: cards))
+
+        let items = LabelQueueViewModel.items(
+            decks: [(date: "2026-10-13", kind: "morning", deck: deck)], limit: 5,
+            isLabeled: { _ in false },
+            landed: { date, id in date == "2026-10-13" && ["r1", "r3"].contains(id) })
+
+        XCTAssertEqual(items.map(\.card.id), ["r2", "r4", "r5", "r6", "r7"], "answered cards skipped; five at most")
+    }
+
+    func testAnswersAndNotForMeSayHowACardLanded() throws {
+        let filed = DeckAnswersFile.decodeAnswers(#"""
+        {"answers":[{"card":"a","text":"  "},{"card":"b","text":"It stuck."},
+                    {"card":"c","feedback":{"verdict":"skip","reasons":[]}},{"card":"d","action":"save"}]}
+        """#)
+        XCTAssertEqual(["a", "b", "c", "d"].map { filed[$0]?.saysHowItLanded == true }, [false, true, true, false],
+                       "words or Not for Me count; a blank answer or an action alone doesn't")
+    }
+
+    func testBuildSkipsFiledAndUnsentAnswers() async throws {
+        openedBrief()
+        let client = ScriptedDailyDeckClient(workspaces: ["/brain"], names: Self.names, deck: "{}")
+        client.files = Self.files.merging([
+            DailyDeckPaths.answers(date: "2026-10-13", kind: "morning"): #"{"answers":[{"card":"q1","text":"Because."}]}"#
+        ]) { $1 }
+        store.setAnswers(["w2": DeckAnswer(card: "w2", text: "Unsent, still counts.")], for: server, date: "2026-10-10", kind: "morning")
+        let queue = makeQueue(client)
+
+        await queue.build()
+
+        XCTAssertEqual(queue.items.map(\.id), ["2026-10-10|morning|w1"])
+        XCTAssertFalse(client.readPaths.contains(DailyDeckPaths.answers(date: "2026-10-10", kind: "morning")),
+                       "only days with a filed answers file are read")
+    }
+
+    func testTheEvalsWantTappedLabelsNotNoteLabels() async throws {
+        openedBrief()
+        let client = ScriptedDailyDeckClient(workspaces: ["/brain"], names: [], deck: "{}")
+        let labelsClient = StubLabelsClient()
+        func record(_ i: Int, _ part: String, source: String? = nil) throws -> LabelRecord {
+            let src = source.map { #","source":"\#($0)""# } ?? ""
+            let json = #"{"feature":"daily_deck","item":"2026-10-10|morning|r\#(i)","part":"\#(part)","verdict":"bad"\#(src)}"#
+            return try FeedbackDecoding.decode(LabelRecord.self, from: Data(json.utf8))
+        }
+        var records = try (0..<20).map { try record($0, "card") }
+        records += try (0..<19).map { try record($0, "question") }
+        records.append(try record(19, "question", source: "feedback"))
+        await labelsClient.setRecords(records)
+        let queue = makeQueue(client, labels: labelsClient)
+
+        await queue.build()
+        XCTAssertTrue(queue.evalsWantLabels, "19 tapped question labels; the note label doesn't count")
+
+        await queue.labels.tap(.good, for: LabelKey(feature: "daily_deck", item: "2026-10-10|morning|r19", part: "question"))
+        XCTAssertFalse(queue.evalsWantLabels, "tapping over a note label makes it a tapped one")
     }
 
     func testBuildReadsTheWindowsDecksAndCountsDownAsCardsAreLabeled() async throws {
@@ -376,15 +437,16 @@ final class LabelQueueViewModelTests: XCTestCase {
         await queue.build()
 
         XCTAssertEqual(queue.state, .ready)
-        XCTAssertEqual(queue.items.map(\.id), ["2026-10-13|morning|q1", "2026-10-10|morning|w1", "2026-10-10|morning|w2"])
+        XCTAssertEqual(queue.items.map(\.id), ["2026-10-13|morning|q1", "2026-10-10|morning|w1"],
+                       "w2's card label covers it, though its question isn't labeled")
         XCTAssertEqual(client.listedSessions, ["s-today"], "reads through the Daily Deck's stored session")
         XCTAssertFalse(client.readPaths.contains(DailyDeckPaths.deck(date: "2026-09-20", kind: "morning")),
                        "decks outside the window are never read")
-        XCTAssertEqual(queue.unlabeledCount, 3)
+        XCTAssertEqual(queue.unlabeledCount, 2)
 
         await queue.labels.tap(.good, for: .deckCard(date: "2026-10-10", kind: "morning", cardID: "w1"))
-        XCTAssertEqual(queue.unlabeledCount, 2, "a card with no question is done once its card is labeled")
-        XCTAssertEqual(queue.items.count, 3, "the queue holds still while you label, so N of M stays put")
+        XCTAssertEqual(queue.unlabeledCount, 1, "a card is done once it has a label")
+        XCTAssertEqual(queue.items.count, 2, "the queue holds still while you label, so N of M stays put")
 
         XCTAssertEqual(queue.current?.id, "2026-10-13|morning|q1")
         queue.next()
@@ -403,7 +465,7 @@ final class LabelQueueViewModelTests: XCTestCase {
         XCTAssertEqual(client.createdWorkspaces, [], "never creates a session")
         XCTAssertTrue(client.renamed.isEmpty, "never renames one")
         XCTAssertTrue(client.sent.isEmpty)
-        XCTAssertFalse(client.readPaths.contains { $0.hasSuffix(".answers.json") }, "never reads answers")
+        XCTAssertTrue(client.sent.isEmpty, "never files answers")
         XCTAssertEqual(store.workspace(for: server), "/brain")
         XCTAssertEqual(store.session(for: server, date: "2026-10-13"), "s-today")
     }

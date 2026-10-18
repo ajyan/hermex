@@ -1,7 +1,7 @@
 import SwiftUI
 
 // The recall-first run's cards (spec 2026-10-14 prep-recall §7): every card in a run is a `.knowledge`
-// glow card, the mic and primary buttons are Nous blue, missed key points are `hxWarning` with ◌, hits
+// glow card, the primary buttons are Nous blue, missed key points are `hxWarning` with ◌, hits
 // are `hxSuccess` with ✓, and only sample answers are serif.
 
 /// A run card: an `HXCard` in the Prep paper's wash, which floats its controls in the paper's tint.
@@ -44,19 +44,16 @@ struct PrepConfidenceChips: View {
     }
 }
 
-/// The recall prompt with tap-to-talk dictation into an editable answer, the confidence chips, and
-/// "I don't know, show me". Submit is the run's pinned button.
+/// The recall prompt with an answer field (speak with the keyboard's dictation key, or type), the
+/// confidence chips, and "I don't know, show me". Submit is the run's pinned button.
 struct PrepRecallCard: View {
     let prompt: String
     let label: String
     @Binding var draft: String
     @Binding var confidence: PrepConfidence?
     let isSubmitting: Bool
-    let voiceInput: ComposerVoiceInputController
-    let toggleVoice: () -> Void
     let dontKnow: () -> Void
     @FocusState private var typing: Bool
-    @ScaledMetric(relativeTo: .title) private var mic: CGFloat = 76
 
     var body: some View {
         PrepRunCard {
@@ -68,29 +65,7 @@ struct PrepRecallCard: View {
                 .foregroundStyle(Color.hxTextPrimary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
-            VStack(spacing: BrainStyle.s) {
-                let transcribing = voiceInput.state == .transcribing
-                Button(action: toggleVoice) {
-                    Image(systemName: voiceInput.isListening ? "stop.fill" : "mic.fill")
-                        .font(.system(size: mic * 0.36, weight: .semibold))
-                        .foregroundStyle(Color.hxOnAccent)
-                        .frame(width: mic, height: mic)
-                        .background(Color.accentColor, in: Circle())
-                }
-                .buttonStyle(.plain)
-                .disabled(isSubmitting || transcribing)
-                .accessibilityLabel(Text(verbatim: voiceInput.isListening ? "Stop dictating" : "Answer out loud"))
-                Text(verbatim: transcribing ? "Transcribing…"
-                     : voiceInput.isListening ? "Listening… tap to stop" : "Tap to answer out loud")
-                    .font(BrainStyle.meta)
-                    .foregroundStyle(Color.hxTextSecondary)
-                if let error = voiceInput.errorMessage {
-                    Text(verbatim: error).font(BrainStyle.meta).foregroundStyle(Color.hxWarning)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, BrainStyle.s)
-            TextField(text: $draft, axis: .vertical) { Text(verbatim: "Or type your answer") }
+            TextField(text: $draft, axis: .vertical) { Text(verbatim: "Your answer") }
                 .font(AppFont.body())
                 .lineLimit(3...10)
                 .focused($typing)
@@ -189,8 +164,22 @@ struct PrepRecallResultView: View {
         }
     }
 
-    @ViewBuilder
     private func pointRow(_ id: String, hit: Bool) -> some View {
+        PrepKeyPointRow(result: result, id: id, hit: hit, canOverride: canOverride,
+                        overridingPoint: overridingPoint, overrideMissed: overrideMissed)
+    }
+}
+
+/// One key point of a graded answer: ✓ when hit, ◌ with "I had that" when missed.
+struct PrepKeyPointRow: View {
+    let result: PrepAttemptResult
+    let id: String
+    let hit: Bool
+    var canOverride = true
+    var overridingPoint: String?
+    let overrideMissed: (String) -> Void
+
+    var body: some View {
         let text = result.pointTexts[id] ?? PrepCopy.pointTitle(id)
         HStack(alignment: .firstTextBaseline, spacing: BrainStyle.s) {
             Image(systemName: hit ? "checkmark.circle.fill" : "circle.dashed")

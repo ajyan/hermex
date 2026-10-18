@@ -13,13 +13,7 @@ struct PrepRunView: View {
     @State private var draft = Draft(rep: -1)
     @Environment(\.dismiss) private var dismiss
     @State private var screenHeight: CGFloat = 800
-    /// Tap-to-talk for recall answers, the same dictation the chat composer uses.
-    @State private var voiceInput = ComposerVoiceInputController()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.scenePhase) private var scenePhase
-    @AppStorage(ComposerSTTProviderPreference.storageKey)
-    private var sttProviderPreferenceRawValue = ComposerSTTProviderPreference.defaultValue.rawValue
-    private let apiClient: APIClient?
 
     private struct ChosenOption: Equatable {
         let rep: Int
@@ -35,15 +29,13 @@ struct PrepRunView: View {
     }
 
     init(server: URL, run: PrepRunKind = .daily, unit: String? = nil, onAPIError: @escaping (Error) -> Void) {
-        let client = APIClient(baseURL: server)
         self.init(viewModel: PrepRunViewModel(
-            client: APIClientPrepAdapter(apiClient: client), run: run, unit: unit,
-            onAPIError: onAPIError), apiClient: client)
+            client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server)), run: run, unit: unit,
+            onAPIError: onAPIError))
     }
 
-    init(viewModel: PrepRunViewModel, apiClient: APIClient? = nil) {
+    init(viewModel: PrepRunViewModel) {
         _viewModel = State(initialValue: viewModel)
-        self.apiClient = apiClient
     }
 
     var body: some View {
@@ -86,12 +78,6 @@ struct PrepRunView: View {
             }
             .sensoryFeedback(.success, trigger: passCount)
             .sensoryFeedback(.impact(weight: .light), trigger: warmupCount)
-            // A transcript still in flight belongs to the rep it was spoken on, never the next one.
-            .onChange(of: currentRep?.index) { _, _ in voiceInput.stopBeforeSubmittingDraft() }
-            .onChange(of: scenePhase) { _, phase in
-                if phase == .active { voiceInput.resume() } else { voiceInput.suspend() }
-            }
-            .onDisappear { voiceInput.stopBeforeSubmittingDraft() }
     }
 
     /// Changes when a recall passes, for the success haptic; misses get none.
@@ -108,12 +94,6 @@ struct PrepRunView: View {
             return "\(rep.index)"
         }
         return ""
-    }
-
-    private func toggleVoice() {
-        voiceInput.apiClient = apiClient
-        voiceInput.providerPreference = ComposerSTTProviderPreference.storedValue(sttProviderPreferenceRawValue)
-        voiceInput.scheduleToggle(currentDraft: viewModel.recallDraft) { text in viewModel.recallDraft = text }
     }
 
     private static func usesRecall(_ rep: PrepRep) -> Bool {
@@ -261,7 +241,11 @@ struct PrepRunView: View {
             .id(rep.index)
         case .result(let rep, let result, _) where rep.drill == .boss:
             scaffold(rep, hasAction: true) {
-                PrepBossResultView(result: result, xp: viewModel.lastXP, isTestOut: viewModel.runKind == .testout)
+                PrepBossResultView(result: result, xp: viewModel.lastXP, isTestOut: viewModel.runKind == .testout,
+                                   overridingPoint: viewModel.overridingPoint) { point in
+                    Task { await viewModel.overridePoint(point) }
+                }
+                if let error = viewModel.submitError { PrepSubmitError(message: error) }
             } bottom: {
                 PrepPrimaryButton(title: "Continue") { Task { await viewModel.continue() } }
             }
@@ -378,14 +362,12 @@ struct PrepRunView: View {
             ) { Task { await viewModel.submitJudgment(text) } }
         case .lesson where Self.usesRecall(rep) && viewModel.lessonStage == .reading:
             PrepPrimaryButton(title: "I'm ready") {
-                if voiceInput.isListening { voiceInput.stopKeepingTranscript() }
                 withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { viewModel.beginRecall() }
             }
         case .lesson where Self.usesRecall(rep), .recall where Self.usesRecall(rep):
-            // Submit waits for dictation to stop and its transcript to land in the answer.
             PrepPrimaryButton(
                 title: "Submit",
-                enabled: viewModel.canSubmitRecall && !voiceInput.isListening,
+                enabled: viewModel.canSubmitRecall,
                 isGrading: viewModel.isSubmitting
             ) { Task { await viewModel.submitRecall() } }
         case .fact, .lesson, .warmup, .recall:
@@ -469,12 +451,7 @@ struct PrepRunView: View {
                         draft: Binding(get: { viewModel.recallDraft }, set: { viewModel.recallDraft = $0 }),
                         confidence: Binding(get: { viewModel.confidence }, set: { viewModel.confidence = $0 }),
                         isSubmitting: viewModel.isSubmitting,
-                        voiceInput: voiceInput,
-                        toggleVoice: toggleVoice,
-                        dontKnow: {
-                            voiceInput.stopBeforeSubmittingDraft()
-                            Task { await viewModel.dontKnow() }
-                        }
+                        dontKnow: { Task { await viewModel.dontKnow() } }
                     )
                     .transition(.opacity)
                 }

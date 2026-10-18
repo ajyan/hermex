@@ -165,12 +165,18 @@ struct PrepStars: View {
     }
 }
 
-/// A boss answer's result: the sitting (once complete), what the answer got right, the sample
-/// answer, and the lessons to revisit. No list of what was missed.
+/// A boss answer's result: the sitting (once complete), each key point hit or missed with
+/// "I had that" on the misses, the sample answer, and the lessons that teach the misses.
 struct PrepBossResultView: View {
     let result: PrepAttemptResult
     let xp: Int?
     var isTestOut = false
+    /// The point whose claim is saving; every "I had that" waits until it lands.
+    var overridingPoint: String?
+    let overrideMissed: (String) -> Void
+
+    private var hits: [String] { result.judgment?.pointsHit.map(\.pointID) ?? [] }
+    private var misses: [String] { result.judgment?.pointsMissed.map(\.pointID) ?? [] }
 
     var body: some View {
         if let sitting = result.sitting {
@@ -207,24 +213,17 @@ struct PrepBossResultView: View {
                     .foregroundStyle(Color.hxTextPrimary)
             }
         }
-        if let hits = result.judgment?.pointsHit, !hits.isEmpty {
+        if !hits.isEmpty || !misses.isEmpty {
             VStack(alignment: .leading, spacing: BrainStyle.s) {
-                BrainSectionHeader(title: "What you nailed")
+                BrainSectionHeader(title: PrepCopy.keyPointsLine(hit: hits.count, total: hits.count + misses.count))
                 SectionCard {
                     VStack(spacing: 0) {
-                        ForEach(Array(hits.enumerated()), id: \.offset) { offset, hit in
+                        ForEach(Array((hits.map { ($0, true) } + misses.map { ($0, false) }).enumerated()),
+                                id: \.element.0) { offset, row in
                             if offset > 0 { PrepRowDivider() }
-                            let point = result.pointTexts[hit.pointID] ?? PrepCopy.pointTitle(hit.pointID)
-                            Label {
-                                Text(verbatim: point)
-                                    .font(BrainStyle.rowTitle)
-                                    .foregroundStyle(Color.hxTextPrimary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            } icon: {
-                                Image(systemName: "checkmark").foregroundStyle(Color.hxSuccess)
-                            }
-                            .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
-                            .accessibilityElement(children: .combine)
+                            PrepKeyPointRow(result: result, id: row.0, hit: row.1,
+                                            overridingPoint: overridingPoint, overrideMissed: overrideMissed)
+                                .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
                         }
                     }
                 }
@@ -244,7 +243,7 @@ struct PrepBossResultView: View {
         }
         if !result.revisit.isEmpty {
             VStack(alignment: .leading, spacing: BrainStyle.s) {
-                BrainSectionHeader(title: "Revisit")
+                BrainSectionHeader(title: "Where these are taught")
                 FlowRow(spacing: BrainStyle.s) {
                     ForEach(result.revisit) { lesson in
                         NavigationLink(value: ShellPushDestination.brainRoute(.prep(.lesson(lesson.lessonID)))) {

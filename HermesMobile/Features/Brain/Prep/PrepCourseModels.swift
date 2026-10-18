@@ -88,7 +88,8 @@ enum PrepUnitState: String, Decodable, Hashable, Sendable {
 }
 
 enum PrepBossState: String, Decodable, Hashable, Sendable {
-    case locked, ready, passed, unknown
+    /// `resting`: lessons learned but the boss isn't passed; it comes back a few days after a failed sitting.
+    case locked, ready, resting, passed, unknown
 
     init(from decoder: Decoder) throws {
         let raw = try? decoder.singleValueContainer().decode(String.self)
@@ -201,8 +202,9 @@ struct PrepCourse: Decodable, Hashable, Sendable {
     let lessonTotal: Int
     let calibration: PrepCalibration?
 
-    /// The unit whose lessons are being taught now.
-    var currentUnit: PrepUnit? { units.first { $0.state == .current } }
+    /// The unit whose lessons are being taught now: the last current one, since earlier current units
+    /// have only their boss left.
+    var currentUnit: PrepUnit? { units.last { $0.state == .current } }
 
     private enum CodingKeys: String, CodingKey {
         case units, xp, today, reteach, calibration

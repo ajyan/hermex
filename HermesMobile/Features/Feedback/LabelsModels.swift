@@ -48,13 +48,15 @@ struct LabelRecord: Decodable, Hashable, Sendable {
     let verdict: LabelVerdict?
     let note: String?
     let title: String?
+    /// `feedback` for a ✗ the server made from a feedback note on the item; nil for a tapped label.
+    let source: String?
 
     var key: LabelKey { LabelKey(feature: feature, item: item, part: part) }
 
     /// The label as it stands: good or bad, or nil when cleared.
     var currentVerdict: LabelVerdict? { verdict == .clear ? nil : verdict }
 
-    private enum CodingKeys: String, CodingKey { case ts, feature, item, part, verdict, note, title }
+    private enum CodingKeys: String, CodingKey { case ts, feature, item, part, verdict, note, title, source }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -66,6 +68,7 @@ struct LabelRecord: Decodable, Hashable, Sendable {
         verdict = str(.verdict).flatMap(LabelVerdict.init(rawValue:))
         note = str(.note)
         title = str(.title)
+        source = str(.source)
     }
 }
 
