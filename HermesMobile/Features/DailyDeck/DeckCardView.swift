@@ -726,6 +726,8 @@ private struct ReflectionSheet: View {
     @Environment(\.dismiss) private var dismiss
     @FocusState private var isFocused: Bool
     @State private var text = ""
+    /// The Mandarin card's mic: on-device zh-CN dictation into the answer.
+    @State private var voiceInput = ComposerVoiceInputController(fixedLocale: MandarinDictation.locale)
 
     var body: some View {
         NavigationStack {
@@ -741,7 +743,7 @@ private struct ReflectionSheet: View {
                     .focused($isFocused)
                     .overlay(alignment: .topLeading) {
                         if text.isEmpty {
-                            Text(verbatim: "Write as much or as little as you like")
+                            Text(verbatim: card.isMandarin ? "Answer out loud in Mandarin, or type" : "Write as much or as little as you like")
                                 .font(AppFont.body())
                                 .foregroundStyle(Color.hxTextSecondary)
                                 .padding(.top, 8)
@@ -753,9 +755,34 @@ private struct ReflectionSheet: View {
             .padding(20)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .background(palette.paper.ignoresSafeArea())
+            .safeAreaInset(edge: .bottom) {
+                if card.isMandarin, let message = MandarinDictation.isAvailable
+                    ? voiceInput.errorMessage
+                    : "To answer by voice, add Chinese (Simplified) dictation in Settings › General › Keyboard." {
+                    Text(verbatim: message)
+                        .font(AppFont.footnote())
+                        .foregroundStyle(Color.hxTextSecondary)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
             .toolbar {
+                if card.isMandarin && MandarinDictation.isAvailable {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            _ = voiceInput.scheduleToggle(currentDraft: text) { text = $0 }
+                        } label: {
+                            Image(systemName: voiceInput.state == .idle ? "mic" : "stop.circle.fill")
+                        }
+                        .accessibilityLabel(Text(verbatim: voiceInput.state == .idle ? "Speak in Mandarin" : "Stop dictation"))
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button { dismiss() } label: { Text(verbatim: "Done") }
+                    Button {
+                        voiceInput.stopKeepingTranscript()
+                        dismiss()
+                    } label: { Text(verbatim: "Done") }
                 }
             }
             .toolbarBackground(palette.paper, for: .navigationBar)
@@ -766,6 +793,7 @@ private struct ReflectionSheet: View {
             isFocused = true
         }
         .onChange(of: text) { _, new in viewModel.setText(new, for: card) }
+        .onDisappear { voiceInput.stopKeepingTranscript() }
         .presentationDragIndicator(.visible)
     }
 }

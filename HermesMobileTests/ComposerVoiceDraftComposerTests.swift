@@ -225,6 +225,34 @@ final class ComposerVoiceDraftComposerTests: XCTestCase {
         )
     }
 
+    func testFixedLocaleIsTheOnlyCandidate() {
+        let candidates = ComposerSpeechLocalePolicy.candidates(
+            fixed: Locale(identifier: "zh-CN"),
+            current: Locale(identifier: "en_US"),
+            preferredLanguages: ["en-US"]
+        )
+
+        XCTAssertEqual(candidates.map(\.normalizedSpeechIdentifier), ["zh-cn"], "the Mandarin card never falls back to English")
+    }
+
+    func testNoFixedLocaleKeepsTheUsualCandidates() {
+        XCTAssertEqual(
+            ComposerSpeechLocalePolicy.candidates(fixed: nil, current: Locale(identifier: "en_US"), preferredLanguages: []),
+            ComposerSpeechLocalePolicy.candidates(current: Locale(identifier: "en_US"), preferredLanguages: [])
+        )
+    }
+
+    func testFixedLocaleWithoutModelHasNoRecognizer() {
+        let selected = ComposerSpeechLocalePolicy.firstAvailable(
+            in: ComposerSpeechLocalePolicy.candidates(
+                fixed: Locale(identifier: "zh-CN"), current: Locale(identifier: "en_US"), preferredLanguages: []),
+            supportedLocales: [Locale(identifier: "en-US")],
+            recognizer: { $0.normalizedSpeechIdentifier }
+        )
+
+        XCTAssertNil(selected, "no zh-CN model means no mic, not English dictation")
+    }
+
     func testSpeechLocaleCandidatesDedupeEnglishUSAcrossSeparators() {
         let candidates = ComposerSpeechLocalePolicy.candidates(
             current: Locale(identifier: "en_US"),

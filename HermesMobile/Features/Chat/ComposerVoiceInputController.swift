@@ -53,6 +53,8 @@ final class ComposerVoiceInputController {
     @ObservationIgnored private var interruptionObserver: NSObjectProtocol?
     private var resumeWaiter: CheckedContinuation<Void, Never>?
     private let microphonePermission: () async -> Bool
+    /// The one language to dictate in (the Mandarin card's zh-CN); nil follows the user's languages.
+    private let fixedLocale: Locale?
     private let mayRecord: @MainActor () -> Bool
     private let logger = Logger.hermesVoiceInput
 
@@ -64,6 +66,7 @@ final class ComposerVoiceInputController {
         audioEngineFactory: @escaping () -> AVAudioEngine = { AVAudioEngine() },
         microphonePermission: @escaping () async -> Bool = { await ComposerVoiceMicrophonePermissionRequester.request() },
         serverRecorder: (any ComposerServerRecording)? = nil,
+        fixedLocale: Locale? = nil,
         mayRecord: @escaping @MainActor () -> Bool = {
             ComposerVoiceInputStartPolicy.canStart(
                 appIsActive: UIApplication.shared.applicationState == .active,
@@ -73,6 +76,8 @@ final class ComposerVoiceInputController {
         self.speechRecognizerFactory = speechRecognizerFactory
         self.audioEngineFactory = audioEngineFactory
         self.microphonePermission = microphonePermission
+        self.fixedLocale = fixedLocale
+        if fixedLocale != nil { providerPreference = .onDeviceOnly }
         self.mayRecord = mayRecord
         self.serverRecorder = serverRecorder ?? ComposerServerAudioRecorder()
         interruptionObserver = NotificationCenter.default.addObserver(
@@ -824,6 +829,7 @@ final class ComposerVoiceInputController {
 
         let speechRecognizer = ComposerSpeechLocalePolicy.firstAvailable(
             in: ComposerSpeechLocalePolicy.candidates(
+                fixed: fixedLocale,
                 current: .current,
                 preferredLanguages: Locale.preferredLanguages
             ),
@@ -974,6 +980,12 @@ enum ComposerSpeechLocalePolicy {
     /// `current`, then the first few distinct preferred languages, then `en-US`,
     /// deduplicated by normalized identifier. Duplicates of `current` (usually
     /// the first preferred language) do not use up a preferred-language slot.
+    /// Only `fixed` when there is one, so a language-specific mic never falls back to another language.
+    static func candidates(fixed: Locale?, current: Locale, preferredLanguages: [String]) -> [Locale] {
+        if let fixed { return [fixed] }
+        return candidates(current: current, preferredLanguages: preferredLanguages)
+    }
+
     static func candidates(current: Locale, preferredLanguages: [String]) -> [Locale] {
         let leading = distinct([current.identifier] + preferredLanguages).prefix(1 + preferredLanguageLimit)
         return distinct(leading + [lastResortIdentifier]).map(Locale.init(identifier:))

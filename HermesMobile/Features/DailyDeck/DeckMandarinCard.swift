@@ -176,4 +176,7 @@ private final class MandarinSpeakerDelegate: NSObject, AVSpeechSynthesizerDelega
 /// The Mandarin card's dictation: on-device zh-CN only, so the answer arrives as characters.
 enum MandarinDictation {
     static let locale = Locale(identifier: "zh-CN")
+
+    /// Whether this phone has the on-device Mandarin model; without it the card hides its mic.
+    static var isAvailable: Bool { SFSpeechRecognizer(locale: locale)?.supportsOnDeviceRecognition == true }
 }
