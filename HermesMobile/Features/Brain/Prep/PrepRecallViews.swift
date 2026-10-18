@@ -164,8 +164,22 @@ struct PrepRecallResultView: View {
         }
     }
 
-    @ViewBuilder
     private func pointRow(_ id: String, hit: Bool) -> some View {
+        PrepKeyPointRow(result: result, id: id, hit: hit, canOverride: canOverride,
+                        overridingPoint: overridingPoint, overrideMissed: overrideMissed)
+    }
+}
+
+/// One key point of a graded answer: ✓ when hit, ◌ with "I had that" when missed.
+struct PrepKeyPointRow: View {
+    let result: PrepAttemptResult
+    let id: String
+    let hit: Bool
+    var canOverride = true
+    var overridingPoint: String?
+    let overrideMissed: (String) -> Void
+
+    var body: some View {
         let text = result.pointTexts[id] ?? PrepCopy.pointTitle(id)
         HStack(alignment: .firstTextBaseline, spacing: BrainStyle.s) {
             Image(systemName: hit ? "checkmark.circle.fill" : "circle.dashed")

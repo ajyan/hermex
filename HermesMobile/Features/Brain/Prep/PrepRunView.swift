@@ -241,7 +241,11 @@ struct PrepRunView: View {
             .id(rep.index)
         case .result(let rep, let result, _) where rep.drill == .boss:
             scaffold(rep, hasAction: true) {
-                PrepBossResultView(result: result, xp: viewModel.lastXP, isTestOut: viewModel.runKind == .testout)
+                PrepBossResultView(result: result, xp: viewModel.lastXP, isTestOut: viewModel.runKind == .testout,
+                                   overridingPoint: viewModel.overridingPoint) { point in
+                    Task { await viewModel.overridePoint(point) }
+                }
+                if let error = viewModel.submitError { PrepSubmitError(message: error) }
             } bottom: {
                 PrepPrimaryButton(title: "Continue") { Task { await viewModel.continue() } }
             }

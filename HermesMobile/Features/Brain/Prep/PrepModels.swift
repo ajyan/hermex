@@ -503,7 +503,7 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
     /// Key points the user overruled the grader on.
     let overridden: [String]
 
-    /// The original result with an override's grade, verdict, XP and overridden points laid over it.
+    /// The original result with an override's grade, verdict, XP, overridden points and boss sitting laid over it.
     init(merging base: PrepAttemptResult, override: PrepAttemptResult) {
         verdict = override.verdict.isEmpty ? base.verdict : override.verdict
         correct = base.correct
@@ -518,8 +518,9 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
         gapMatch = base.gapMatch
         logged = base.logged
         pointTexts = base.pointTexts
-        revisit = base.revisit
-        sitting = base.sitting
+        // A boss override re-sends the revisit list and, once complete, the rescored sitting.
+        revisit = base.revisit.isEmpty ? base.revisit : override.revisit
+        sitting = override.sitting ?? base.sitting
         why = base.why
         // A surprise is a confident miss; claiming points back can turn it into a pass.
         surprise = base.surprise && verdict != "pass"
