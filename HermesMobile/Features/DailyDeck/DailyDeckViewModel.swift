@@ -91,12 +91,16 @@ final class DailyDeckViewModel {
     }
     private let client: any DailyDeckDataClient
     private let store: DailyDeckStore
+    /// The feedback API, for Undo on the What changed card; nil leaves the card read-only.
+    private let feedback: (any FeedbackDataClient)?
     private let now: () -> Date
 
-    init(server: URL, client: any DailyDeckDataClient, store: DailyDeckStore = DailyDeckStore(), now: @escaping () -> Date = Date.init) {
+    init(server: URL, client: any DailyDeckDataClient, store: DailyDeckStore = DailyDeckStore(),
+         feedback: (any FeedbackDataClient)? = nil, now: @escaping () -> Date = Date.init) {
         self.server = server
         self.client = client
         self.store = store
+        self.feedback = feedback
         self.now = now
         let today = DailyDeckPaths.day(now())
         self.today = today
@@ -104,7 +108,9 @@ final class DailyDeckViewModel {
     }
 
     convenience init(server: URL) {
-        self.init(server: server, client: APIClientDailyDeckAdapter(apiClient: APIClient(baseURL: server)))
+        let apiClient = APIClient(baseURL: server)
+        self.init(server: server, client: APIClientDailyDeckAdapter(apiClient: apiClient),
+                  feedback: APIClientFeedbackAdapter(apiClient: apiClient))
     }
 
     var cards: [DeckCard] { deck?.cards ?? [] }
@@ -147,6 +153,44 @@ final class DailyDeckViewModel {
             answer.text = answer.text?.trimmingCharacters(in: .whitespacesAndNewlines)
             return (card.id, answer)
         })
+    }
+
+    // MARK: What changed
+
+    /// Feedback entries undone from a What changed card on this screen. Entry ids are the
+    /// server's, so an undone row stays undone on any deck that lists it.
+    private(set) var undoneChanges: Set<String> = []
+    /// Each row's last Undo failure: the server's reason on a 409 ("The vault has uncommitted edits…").
+    private(set) var changeErrors: [String: String] = [:]
+    /// The row whose Undo is in flight. One at a time.
+    private(set) var undoingChangeID: String?
+
+    /// The row's state, with an Undo from this screen applied.
+    func changeState(_ row: DeckChangeRow) -> DeckChangeRow.State {
+        undoneChanges.contains(row.id) ? .reverted : row.state
+    }
+
+    /// Whether the row offers Undo: the server marked it undoable and it isn't undone yet.
+    func canUndo(_ row: DeckChangeRow) -> Bool {
+        feedback != nil && row.undoable == true && changeState(row) != .reverted
+    }
+
+    /// Posts the row's `undo` decision. The row shows Undone only once the server says so; a
+    /// failure stays under the row.
+    func undoChange(_ row: DeckChangeRow) async {
+        guard let feedback, canUndo(row), undoingChangeID == nil else { return }
+        undoingChangeID = row.id
+        changeErrors[row.id] = nil
+        defer { undoingChangeID = nil }
+        do {
+            _ = try await feedback.decide(id: row.id, .undo)
+            undoneChanges.insert(row.id)
+        } catch let conflict as APIError where FeedbackInboxViewModel.isConflict(conflict) {
+            changeErrors[row.id] = conflict.serverMessage ?? "This changed on the server. Check Feedback."
+        } catch {
+            guard !(error is CancellationError), (error as? URLError)?.code != .cancelled else { return }
+            changeErrors[row.id] = "Couldn't undo that. Try again."
+        }
     }
 
     // MARK: Loading

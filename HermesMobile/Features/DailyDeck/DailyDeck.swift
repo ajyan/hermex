@@ -33,7 +33,7 @@ struct DailyDeck: Decodable, Equatable {
 /// fails to decode; an unknown `type` renders its `fallback` text as a plain card.
 struct DeckCard: Decodable, Equatable, Identifiable {
     enum CardType: Equatable {
-        case headline, prompt, decision, reflect, item, sleep, goal, weekAhead, close
+        case headline, prompt, decision, reflect, item, sleep, goal, weekAhead, changes, close
         case unknown(String)
 
         init(_ raw: String) {
@@ -46,6 +46,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case "sleep": self = .sleep
             case "goal": self = .goal
             case "week_ahead": self = .weekAhead
+            case "changes": self = .changes
             case "close": self = .close
             default: self = .unknown(raw)
             }
@@ -104,6 +105,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     /// A Mandarin card's question (in `question`, as characters) in pinyin and in English.
     let questionPinyin: String?
     let questionEn: String?
+    /// A weekly review's What changed card: the fixes whose status moved this week, newest first.
+    let rows: [DeckChangeRow]
 
     /// The vault file the card came from (`ref.link`, "wiki/nyc-marathon"); nil for pooled
     /// material with no page of its own (books, quotes, videos).
@@ -155,14 +158,14 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     var takesFeedback: Bool {
         switch type {
         case .prompt, .reflect, .item, .unknown: true
-        case .headline, .decision, .sleep, .goal, .weekAhead, .close: false
+        case .headline, .decision, .sleep, .goal, .weekAhead, .changes, .close: false
         }
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, type, title, body, source, lines, question, context, voice, why, draft, actions, fallback
         case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
-        case goal, start, lastWeek, phrases, yesterday, questionPinyin, questionEn
+        case goal, start, lastWeek, phrases, yesterday, questionPinyin, questionEn, rows
         case weekCommitments = "commitments"
         case itemKind = "kind"
     }
@@ -217,6 +220,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         yesterday = try? c.decodeIfPresent(DeckMandarinFeedback.self, forKey: .yesterday)
         questionPinyin = try? c.decodeIfPresent(String.self, forKey: .questionPinyin)
         questionEn = try? c.decodeIfPresent(String.self, forKey: .questionEn)
+        rows = ((try? c.decodeIfPresent([Lossy<DeckChangeRow>].self, forKey: .rows)) ?? []).compactMap(\.value)
         let ref = try? c.decodeIfPresent(Ref.self, forKey: .ref)
         link = ref?.link.flatMap { $0.isEmpty ? nil : $0 }
         pool = ref?.pool.flatMap { $0.isEmpty ? nil : $0 }
@@ -327,6 +331,58 @@ struct DeckMeter: Decodable, Equatable, Hashable {
 
     /// How full the meter is, 0–1.
     var fraction: Double { target > 0 ? min(1, Double(done) / Double(target)) : 0 }
+}
+
+/// One row of a weekly review's What changed card: a fix from the feedback loop whose status
+/// moved this week. `id` is the feedback entry's, `said` the user's note (clipped), `change` the
+/// plan's title. `undoable` is set while the fix is shipped; Undo posts the entry's `undo` decision.
+struct DeckChangeRow: Decodable, Equatable, Identifiable {
+    enum State: Equatable {
+        case shipped, merged, held, recurred, reverted
+        case unknown(String)
+
+        init(_ raw: String) {
+            switch raw {
+            case "shipped": self = .shipped
+            case "merged": self = .merged
+            case "held": self = .held
+            case "recurred": self = .recurred
+            case "reverted": self = .reverted
+            default: self = .unknown(raw)
+            }
+        }
+
+        /// The state chip's words: "Shipped", "Recurred ×2", "Undone".
+        func label(recurred: Int?) -> String {
+            switch self {
+            case .shipped: "Shipped"
+            case .merged: "Merged"
+            case .held: "Held"
+            case .recurred: (recurred ?? 0) > 0 ? "Recurred ×\(recurred ?? 0)" : "Recurred"
+            case .reverted: "Undone"
+            case .unknown(let raw): raw.prefix(1).uppercased() + raw.dropFirst()
+            }
+        }
+    }
+
+    let id: String
+    let said: String
+    let change: String
+    let state: State
+    let recurred: Int?
+    let undoable: Bool?
+
+    private enum CodingKeys: String, CodingKey { case id, said, change, state, recurred, undoable }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        said = (try? c.decodeIfPresent(String.self, forKey: .said)) ?? ""
+        change = (try? c.decodeIfPresent(String.self, forKey: .change)) ?? ""
+        state = State((try? c.decodeIfPresent(String.self, forKey: .state)) ?? "")
+        recurred = try? c.decodeIfPresent(Int.self, forKey: .recurred)
+        undoable = try? c.decodeIfPresent(Bool.self, forKey: .undoable)
+    }
 }
 
 /// Decodes one item, or nothing when it is malformed, so a bad item never costs the list.
@@ -697,8 +753,9 @@ struct DeckCardText: Equatable {
             // The question leads; the numbers show after the rating so they don't decide it.
             lead = card.question
             leadIsQuestion = true
-        case .goal, .weekAhead:
-            // The check-ins and the week's plan are drawn (`DeckGoalCard`, `DeckWeekAheadCard`).
+        case .goal, .weekAhead, .changes:
+            // The check-ins, the week's plan and the week's fixes are drawn (`DeckGoalCard`,
+            // `DeckWeekAheadCard`, `DeckChangesCard`).
             lead = card.title ?? card.fallback
         case .headline, .decision, .close:
             lead = card.title

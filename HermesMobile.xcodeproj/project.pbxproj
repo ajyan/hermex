@@ -701,6 +701,7 @@
 		A0DE001C71B0EBD4FA4E885E /* DeckGoalCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE001C71B0EBD4FA4E885D /* DeckGoalCard.swift */; };
 		2D040393A5D1598FA7E58E97 /* DeckMandarinCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E500908D2992BBA8212DC303 /* DeckMandarinCard.swift */; };
 		A0DE1106959C69CCBD66C799 /* DeckWeekAheadCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DEFBDBFEC0F250EDED2408 /* DeckWeekAheadCard.swift */; };
+		BA321437F2A99AC600DC41E2 /* DeckChangesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3EDD2AB568C4E3F30F3D18 /* DeckChangesCard.swift */; };
 		B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000102 /* BrainViewModel.swift */; };
 		B1A1C0DE0000000000000201 /* BrainViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */; };
 		B1A1C0DE0000000000000203 /* BrainModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000204 /* BrainModelsTests.swift */; };
@@ -1498,6 +1499,7 @@
 		A0DE001C71B0EBD4FA4E885D /* DeckGoalCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckGoalCard.swift; sourceTree = "<group>"; };
 		E500908D2992BBA8212DC303 /* DeckMandarinCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckMandarinCard.swift; sourceTree = "<group>"; };
 		A0DEFBDBFEC0F250EDED2408 /* DeckWeekAheadCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckWeekAheadCard.swift; sourceTree = "<group>"; };
+		5C3EDD2AB568C4E3F30F3D18 /* DeckChangesCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckChangesCard.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000204 /* BrainModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainModelsTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000902 /* BrainStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainStyle.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000A02 /* BrainHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainHomeView.swift; sourceTree = "<group>"; };
@@ -2626,6 +2628,7 @@
 				A0DE001C71B0EBD4FA4E885D /* DeckGoalCard.swift */,
 				E500908D2992BBA8212DC303 /* DeckMandarinCard.swift */,
 				A0DEFBDBFEC0F250EDED2408 /* DeckWeekAheadCard.swift */,
+				5C3EDD2AB568C4E3F30F3D18 /* DeckChangesCard.swift */,
 				AD79724DF6D6FD92B594BBC5 /* DailyDeckView.swift */,
 				D71D8CEEBE37C8E43E46A2B4 /* DailyDeckViewModel.swift */,
 				22112FC4500BC48A8D86A376 /* DailyDeck.swift */,
@@ -2926,6 +2929,7 @@
 				A0DE001C71B0EBD4FA4E885E /* DeckGoalCard.swift in Sources */,
 				2D040393A5D1598FA7E58E97 /* DeckMandarinCard.swift in Sources */,
 				A0DE1106959C69CCBD66C799 /* DeckWeekAheadCard.swift in Sources */,
+				BA321437F2A99AC600DC41E2 /* DeckChangesCard.swift in Sources */,
 				B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */,
 				B1A1C0DE00000000000000A3 /* BrainModels.swift in Sources */,
 				A0DEA60AD5799313DB0B6EDF /* OpenDraftChatAction.swift in Sources */,
