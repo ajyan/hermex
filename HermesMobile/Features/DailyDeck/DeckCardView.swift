@@ -89,6 +89,7 @@ private struct DeckCardView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollIndicators(.hidden)
+        .scrollDismissesKeyboard(.interactively)
         .moreBelowHint(fill: palette.paper, mark: palette.ink)
         .swipeUpForFeedback(mark: palette.ink, action: feedback)
         .overlay(alignment: .topTrailing) {
@@ -301,7 +302,7 @@ private struct DeckCardView: View {
     /// The Daily Ask: today's three roles, live.
     @ViewBuilder
     private var ask: some View {
-        DeckAskCard(card: card, palette: palette, deckDate: viewModel.date)
+        DeckAskCard(card: card, deckDate: viewModel.date)
         if let reason = card.reason {
             Text(verbatim: reason)
                 .font(AppFont.footnote())

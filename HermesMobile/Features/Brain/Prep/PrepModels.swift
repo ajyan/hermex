@@ -16,7 +16,7 @@ enum PrepDecoding {
 }
 
 /// Decodes an element or yields nil, so one bad element never fails its array.
-private struct PrepLossy<Value: Decodable>: Decodable {
+struct PrepLossy<Value: Decodable>: Decodable {
     let value: Value?
     init(from decoder: Decoder) throws {
         value = try? Value(from: decoder)

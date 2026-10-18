@@ -19,6 +19,24 @@ struct DailyAsk: Decodable, Equatable, Sendable {
 
     var isReachFirst: Bool { lead == "reach" }
     var needsNeverMissTwice: Bool { previous == "skipped" || previous == "missed" }
+
+    private enum CodingKeys: String, CodingKey {
+        case today, weekday, roles, lead, outcome, previous, locked, week
+    }
+
+    /// `roles` drops a role that fails to decode, so one bad role never fails the Ask (which
+    /// would leave Prep open).
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        today = try c.decode(String.self, forKey: .today)
+        weekday = try c.decodeIfPresent(Bool.self, forKey: .weekday)
+        roles = try c.decodeIfPresent([PrepLossy<DailyAskRole>].self, forKey: .roles)?.compactMap(\.value)
+        lead = try c.decodeIfPresent(String.self, forKey: .lead)
+        outcome = try c.decodeIfPresent(DailyAskOutcome.self, forKey: .outcome)
+        previous = try c.decodeIfPresent(String.self, forKey: .previous)
+        locked = try c.decodeIfPresent(Bool.self, forKey: .locked)
+        week = try c.decodeIfPresent(DailyAskWeek.self, forKey: .week)
+    }
 }
 
 struct DailyAskRole: Decodable, Equatable, Identifiable, Sendable {
@@ -58,8 +76,8 @@ struct DailyAskWeek: Decodable, Equatable, Sendable {
 }
 
 struct DailyAskCount: Decodable, Equatable, Sendable {
-    let done: Int
-    let target: Int
+    let done: Int?
+    let target: Int?
 }
 
 /// The POST body. `asOf` is the server's today from the last load; the server answers 409 when its
