@@ -1,5 +1,6 @@
 import XCTest
 import Foundation
+import AVFoundation
 @testable import HermesMobile
 
 final class DailyDeckTests: XCTestCase {
@@ -727,6 +728,34 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertTrue(HermexPaper.all.contains(HermexPaper.mandarin))
     }
 
+    @MainActor
+    func testMandarinSpeakerPlaysAndStopsOnASecondTap() {
+        let synth = MandarinSpySynthesizer()
+        let speaker = MandarinSpeaker(synthesizer: synth)
+        speaker.toggle("你好")
+        XCTAssertEqual(synth.spoken.map(\.speechString), ["你好"])
+        XCTAssertEqual(synth.spoken.first?.rate, AVSpeechUtteranceDefaultSpeechRate * 0.85)
+        XCTAssertEqual(speaker.speaking, "你好")
+        speaker.toggle("你好")
+        XCTAssertEqual(synth.stops, 1)
+        XCTAssertNil(speaker.speaking, "a second tap stops it")
+        XCTAssertEqual(synth.spoken.count, 1)
+    }
+
+    @MainActor
+    func testMandarinSpeakerSwitchesPhrasesAndClearsWhenDone() {
+        let synth = MandarinSpySynthesizer()
+        let speaker = MandarinSpeaker(synthesizer: synth)
+        speaker.toggle("你好")
+        speaker.toggle("谢谢")
+        XCTAssertEqual(synth.stops, 1, "the first phrase stops before the next plays")
+        XCTAssertEqual(speaker.speaking, "谢谢")
+        speaker.utteranceEnded(ObjectIdentifier(synth.spoken[0]))
+        XCTAssertEqual(speaker.speaking, "谢谢", "a stale finish leaves the playing phrase alone")
+        speaker.utteranceEnded(ObjectIdentifier(synth.spoken[1]))
+        XCTAssertNil(speaker.speaking)
+    }
+
     // MARK: - Sleep
 
     private static let sleepDeckJSON = """
@@ -1404,5 +1433,25 @@ final class DeckCardSourceTests: XCTestCase {
         XCTAssertNil(index.diagram(for: unsafe))
         XCTAssertNil(index.diagram(for: bare))
         XCTAssertEqual(BriefDiagramIndex.decode("not json"), .empty)
+    }
+}
+
+private final class MandarinSpySynthesizer: ChatSpeechSynthesizing {
+    weak var delegate: (any AVSpeechSynthesizerDelegate)?
+    var isSpeaking = false
+    var isPaused = false
+    private(set) var spoken: [AVSpeechUtterance] = []
+    private(set) var stops = 0
+
+    func speak(_ utterance: AVSpeechUtterance) {
+        spoken.append(utterance)
+        isSpeaking = true
+    }
+
+    @discardableResult
+    func stopSpeaking(at boundary: AVSpeechBoundary) -> Bool {
+        stops += 1
+        isSpeaking = false
+        return true
     }
 }

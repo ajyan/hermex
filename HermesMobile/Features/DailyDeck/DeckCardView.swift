@@ -140,7 +140,10 @@ private struct DeckCardView: View {
             .padding(.bottom, 18)
             .accessibilityElement(children: .combine)
         }
-        if let lead = text.lead {
+        if card.isMandarin {
+            DeckMandarinCard(card: card, palette: palette)
+        }
+        if !card.isMandarin, let lead = text.lead {
             Text(inlineMarkdown(lead))
                 .font(DeckCardText.leadFont(for: card, lead: lead))
                 .lineSpacing(3)
@@ -165,7 +168,7 @@ private struct DeckCardView: View {
             .accessibilityLabel(Text(verbatim: "Diagram: \(diagram.title ?? "interactive")"))
             .accessibilityHint(Text(verbatim: "Opens an interactive diagram"))
         }
-        if let detail = text.detail {
+        if !card.isMandarin, let detail = text.detail {
             Text(inlineMarkdown(detail))
                 .font(AppFont.body())
                 .lineSpacing(4)
@@ -183,7 +186,7 @@ private struct DeckCardView: View {
         if !card.entries.isEmpty {
             RecapList(entries: card.entries, palette: palette).padding(.top, 22)
         }
-        if !text.leadIsQuestion, let question = viewModel.question(for: card) {
+        if !card.isMandarin, !text.leadIsQuestion, let question = viewModel.question(for: card) {
             Text(verbatim: question)
                 .font(AppFont.display(style: .title3, weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
@@ -191,7 +194,10 @@ private struct DeckCardView: View {
                 .id(question)
                 .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
         }
-        if card.takesText { reflection(card.isLetter ? "Write to her" : "Write a reflection").padding(.top, 16) }
+        if card.takesText {
+            reflection(card.isLetter ? "Write to her" : card.isMandarin ? "Answer in Mandarin" : "Write a reflection")
+                .padding(.top, 16)
+        }
         if let reason = card.reason {
             Text(verbatim: reason)
                 .font(AppFont.footnote())
