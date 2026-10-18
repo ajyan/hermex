@@ -33,7 +33,7 @@ struct DailyDeck: Decodable, Equatable {
 /// fails to decode; an unknown `type` renders its `fallback` text as a plain card.
 struct DeckCard: Decodable, Equatable, Identifiable {
     enum CardType: Equatable {
-        case headline, prompt, decision, reflect, item, sleep, goal, weekAhead, close
+        case headline, prompt, decision, reflect, item, sleep, goal, weekAhead, ask, close
         case unknown(String)
 
         init(_ raw: String) {
@@ -46,6 +46,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case "sleep": self = .sleep
             case "goal": self = .goal
             case "week_ahead": self = .weekAhead
+            case "ask": self = .ask
             case "close": self = .close
             default: self = .unknown(raw)
             }
@@ -155,7 +156,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     var takesFeedback: Bool {
         switch type {
         case .prompt, .reflect, .item, .unknown: true
-        case .headline, .decision, .sleep, .goal, .weekAhead, .close: false
+        case .headline, .decision, .sleep, .goal, .weekAhead, .ask, .close: false
         }
     }
 
@@ -697,8 +698,8 @@ struct DeckCardText: Equatable {
             // The question leads; the numbers show after the rating so they don't decide it.
             lead = card.question
             leadIsQuestion = true
-        case .goal, .weekAhead:
-            // The check-ins and the week's plan are drawn (`DeckGoalCard`, `DeckWeekAheadCard`).
+        case .goal, .weekAhead, .ask:
+            // The check-ins, the week's plan and the Ask are drawn (`DeckGoalCard`, `DeckWeekAheadCard`, `DeckAskCard`).
             lead = card.title ?? card.fallback
         case .headline, .decision, .close:
             lead = card.title
