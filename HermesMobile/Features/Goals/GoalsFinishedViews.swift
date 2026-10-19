@@ -27,6 +27,7 @@ struct GoalsFinishedShelf: View {
                 .padding(.vertical, BrainStyle.s)
             }
             .scrollClipDisabled()
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

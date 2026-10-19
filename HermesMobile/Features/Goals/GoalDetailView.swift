@@ -379,7 +379,9 @@ private struct GoalCalendarCell: View {
             }
             if day.isToday { shape.strokeBorder(tint.fill, lineWidth: 2) }
             if day.isDeadline {
-                Image(systemName: "flag.checkered").font(AppFont.caption2(weight: .semibold)).foregroundStyle(tint.fill)
+                Image(systemName: "flag.checkered")
+                    .font(AppFont.caption2(weight: .semibold))
+                    .foregroundStyle(!day.isFuture && day.status.isShown ? tint.on : tint.fill)
             } else {
                 Text(verbatim: "\(day.dayOfMonth)")
                     .font(AppFont.caption2().monospacedDigit())
