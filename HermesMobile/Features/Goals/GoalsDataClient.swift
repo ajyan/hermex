@@ -1,8 +1,9 @@
 import Foundation
 
 /// The Goals API on this user's `hermes-webui` fork (`api/vault_goals.py`):
-/// `GET /api/goals`, `GET /api/goals/detail?slug=`, `POST /api/goals/checkin` and
-/// `POST /api/goals/week`. Stock
+/// `GET /api/goals`, `GET /api/goals/detail?slug=`, `POST /api/goals/checkin`,
+/// `POST /api/goals/week`, and for a finished goal `POST /api/goals/finish`,
+/// `GET /api/goals/record?slug=` and `POST /api/goals/reflection`. Stock
 /// upstream servers answer 404, which screens treat as "no Goals on this server".
 protocol GoalsDataClient: Sendable {
     func home() async throws -> GoalsHome
@@ -10,6 +11,11 @@ protocol GoalsDataClient: Sendable {
     func checkIn(_ r: GoalCheckInRequest) async throws -> GoalCheckInResult
     /// Confirms a goal's commitments for the week starting `r.start`; answers like a check-in.
     func confirmWeek(_ r: GoalWeekRequest) async throws -> GoalCheckInResult
+    /// Closes the goal as achieved and returns its record.
+    func finish(_ r: GoalFinishRequest) async throws -> GoalRecord
+    func record(slug: String) async throws -> GoalRecord
+    /// Saves his reflection on a finished goal and returns the record.
+    func saveReflection(_ r: GoalReflectionRequest) async throws -> GoalRecord
 }
 
 /// Wraps the `APIClient` actor in a `Sendable` value for the protocol, decoding with
@@ -31,6 +37,18 @@ struct APIClientGoalsAdapter: GoalsDataClient {
 
     func confirmWeek(_ r: GoalWeekRequest) async throws -> GoalCheckInResult {
         try decode(try await apiClient.sendData(endpoint: .goalWeek, method: "POST", body: r))
+    }
+
+    func finish(_ r: GoalFinishRequest) async throws -> GoalRecord {
+        try decode(try await apiClient.sendData(endpoint: .goalFinish, method: "POST", body: r))
+    }
+
+    func record(slug: String) async throws -> GoalRecord {
+        try decode(try await apiClient.sendData(endpoint: .goalRecord(slug: slug), method: "GET"))
+    }
+
+    func saveReflection(_ r: GoalReflectionRequest) async throws -> GoalRecord {
+        try decode(try await apiClient.sendData(endpoint: .goalReflection, method: "POST", body: r))
     }
 
     private func decode<Value: Decodable>(_ data: Data) throws -> Value {

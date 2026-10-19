@@ -57,6 +57,7 @@ struct GoalsHomeView: View {
                 VStack(alignment: .leading, spacing: BrainStyle.l) {
                     if !home.goals.isEmpty || !home.errors.isEmpty { activeSection(home) }
                     streakLine(home.streak)
+                    if !home.finished.isEmpty { GoalsFinishedShelf(goals: home.finished) }
                     if !home.agentGoals.isEmpty { agentSection(home.agentGoals) }
                 }
                 .padding(BrainStyle.l)
@@ -86,7 +87,12 @@ struct GoalsHomeView: View {
                     VStack(alignment: .leading, spacing: BrainStyle.s) {
                         GoalHeroCard(goal: goal, isCompact: true, today: home.today)
                             .zoomSource(for: .goal(goal.slug), cornerRadius: HXRadius.xl)
-                        if GoalsCopy.needsAttention(goal) {
+                        if goal.finishDue {
+                            Text(verbatim: "Did you finish? Open to close it")
+                                .font(BrainStyle.meta)
+                                .foregroundStyle(GoalPaper.palette(for: goal).ink)
+                                .padding(.horizontal, BrainStyle.xs)
+                        } else if GoalsCopy.needsAttention(goal) {
                             Text(verbatim: "Needs attention: open to check in")
                                 .font(BrainStyle.meta)
                                 .foregroundStyle(Color.hxWarning)

@@ -68,6 +68,18 @@ final class GoalDetailViewModel {
     private(set) var pending: Set<String> = []
     private(set) var error: String?
     static let refreshFailed = "Couldn't refresh. Pull to try again."
+    /// "I finished" is in flight.
+    private(set) var isFinishing = false
+    /// "Not yet" hides the finish prompt until the screen is opened again.
+    var finishDeferred = false
+    /// The record once the server has closed the goal; the screen then shows it.
+    private(set) var finished: GoalRecord?
+
+    /// Ask "I finished?" while the last milestone is due and he hasn't answered.
+    var asksToFinish: Bool {
+        guard case .loaded(let detail) = state else { return false }
+        return detail.summary.finishDue && !finishDeferred && finished == nil
+    }
 
     let slug: String
     @ObservationIgnored private let client: GoalsDataClient
@@ -96,6 +108,26 @@ final class GoalDetailViewModel {
                 return
             }
             state = goalsFailureState(error)
+        }
+    }
+
+    /// Closes the goal as achieved. Nothing changes on screen until the server says it's done.
+    func finish() async {
+        guard case .loaded(let detail) = state, !isFinishing, finished == nil else { return }
+        isFinishing = true
+        error = nil
+        defer { isFinishing = false }
+        do {
+            finished = try await client.finish(GoalFinishRequest(slug: slug, asOf: detail.today))
+        } catch {
+            guard !goalsIsCancellation(error) else { return }
+            if case .http(409, _)? = error as? APIError {
+                await load()
+                self.error = "The day changed. Try again."
+                return
+            }
+            onAPIError(error)
+            self.error = "Couldn't finish this goal. Try again."
         }
     }
 
@@ -164,6 +196,64 @@ final class GoalDetailViewModel {
                 state = .loaded(current)
             }
             self.error = "Couldn't save. Try again."
+        }
+    }
+}
+
+/// A finished goal's record, and his reflection on it.
+@MainActor
+@Observable
+final class GoalRecordViewModel {
+    private(set) var state: BrainLoadState<GoalRecord>
+    private(set) var isSaving = false
+    private(set) var error: String?
+
+    let slug: String
+    @ObservationIgnored private let client: GoalsDataClient
+    @ObservationIgnored private let onAPIError: (Error) -> Void
+
+    /// `record` is the one the finish just returned, so the screen needs no load.
+    init(slug: String, record: GoalRecord? = nil, client: GoalsDataClient,
+         onAPIError: @escaping (Error) -> Void = { _ in }) {
+        self.slug = slug
+        self.client = client
+        self.onAPIError = onAPIError
+        state = record.map { .loaded($0) } ?? .loading
+    }
+
+    var reflection: String {
+        if case .loaded(let record) = state { return record.reflection }
+        return ""
+    }
+
+    func load() async {
+        do {
+            let record = try await client.record(slug: slug)
+            guard !Task.isCancelled else { return }
+            state = .loaded(record)
+        } catch {
+            guard !goalsIsCancellation(error) else { return }
+            onAPIError(error)
+            if goalsKeepsContent(state, after: error) { return }
+            state = goalsFailureState(error)
+        }
+    }
+
+    /// Saves `text` as his reflection (empty clears it); true once the server has it.
+    @discardableResult
+    func saveReflection(_ text: String) async -> Bool {
+        guard case .loaded = state, !isSaving else { return false }
+        isSaving = true
+        error = nil
+        defer { isSaving = false }
+        do {
+            state = .loaded(try await client.saveReflection(GoalReflectionRequest(slug: slug, text: text)))
+            return true
+        } catch {
+            guard !goalsIsCancellation(error) else { return false }
+            onAPIError(error)
+            self.error = "Couldn't save your reflection. Try again."
+            return false
         }
     }
 }

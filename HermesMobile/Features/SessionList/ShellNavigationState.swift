@@ -21,6 +21,10 @@ enum ShellPushDestination: Hashable {
     case goals
     /// One personal goal, by slug.
     case goal(String)
+    /// A finished goal's record, by slug.
+    case finishedGoal(String)
+    /// Every finished goal, by year.
+    case finishedGoals
     /// Money: net worth and the market card, from the drawer.
     case money
     /// The in-app feedback inbox, from the drawer.
@@ -258,7 +262,8 @@ extension ShellPushDestination {
     var isBrain: Bool {
         switch self {
         case .brain, .brainRoute: true
-        case .projects, .project, .tasks, .kanban, .dailyDeck, .goals, .goal, .money, .feedback, .settings: false
+        case .projects, .project, .tasks, .kanban, .dailyDeck, .goals, .goal, .finishedGoal, .finishedGoals, .money,
+             .feedback, .settings: false
         }
     }
 
@@ -267,8 +272,9 @@ extension ShellPushDestination {
     /// (an inline link) falls back to the system's zoom from the middle of the screen.
     var zoomsFromSource: Bool {
         switch self {
-        case .goal, .brainRoute: true
-        case .projects, .project, .tasks, .kanban, .dailyDeck, .brain, .goals, .money, .feedback, .settings: false
+        case .goal, .finishedGoal, .brainRoute: true
+        case .projects, .project, .tasks, .kanban, .dailyDeck, .brain, .goals, .finishedGoals, .money, .feedback,
+             .settings: false
         }
     }
 }

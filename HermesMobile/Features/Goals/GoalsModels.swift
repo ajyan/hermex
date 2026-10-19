@@ -280,12 +280,15 @@ struct GoalSummary: Decodable, Hashable, Sendable, Identifiable {
     var confirmedStarts: [String]
     /// Why a source such as Prep could not be read, shown instead of a silent zero.
     var sourceErrors: [String]
+    /// The last milestone (else the deadline) is due: time to ask "I finished?".
+    var finishDue: Bool
 
     var id: String { slug }
 
     private enum CodingKeys: String, CodingKey {
         case slug, title, status, deadline, identity, week, flags, color, icon
         case weekPending = "week_pending", confirmedStarts = "confirmed_starts", sourceErrors = "source_errors"
+        case finishDue = "finish_due"
         case daysLeft = "days_left", nextMilestone = "next_milestone", dailyChecks = "daily_checks"
     }
 
@@ -306,6 +309,7 @@ struct GoalSummary: Decodable, Hashable, Sendable, Identifiable {
         weekPending = c.optional(String.self, .weekPending)
         confirmedStarts = c.optional([String].self, .confirmedStarts) ?? []
         sourceErrors = c.optional([String].self, .sourceErrors) ?? []
+        finishDue = c.bool(.finishDue)
     }
 }
 
@@ -350,9 +354,11 @@ struct GoalsHome: Decodable, Hashable, Sendable {
     var goals: [GoalSummary]
     let agentGoals: [AgentGoalSummary]
     let errors: [GoalLoadError]
+    /// Achieved goals, newest finish first.
+    let finished: [GoalFinishedSummary]
 
     private enum CodingKeys: String, CodingKey {
-        case today, yesterday, streak, goals, errors, agentGoals = "agent_goals"
+        case today, yesterday, streak, goals, errors, finished, agentGoals = "agent_goals"
     }
 
     init(from decoder: Decoder) throws {
@@ -363,6 +369,7 @@ struct GoalsHome: Decodable, Hashable, Sendable {
         goals = c.lossy(GoalSummary.self, .goals)
         agentGoals = c.lossy(AgentGoalSummary.self, .agentGoals)
         errors = c.lossy(GoalLoadError.self, .errors)
+        finished = c.lossy(GoalFinishedSummary.self, .finished)
     }
 }
 
