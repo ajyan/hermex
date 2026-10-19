@@ -685,6 +685,11 @@ struct ChatShellView: View {
         }
     }
 
+    /// Starts a new chat with these words in the composer, as the Brain home's Ask Atlas does.
+    private func askAtlas(_ words: String) {
+        selectDestination(PendingNewChatRoute(initialDraft: words))
+    }
+
     @ViewBuilder
     private func brainDestination(_ route: BrainRoute) -> some View {
         switch route {
@@ -752,7 +757,7 @@ struct ChatShellView: View {
             }
         case .prep(.run):
             PrepGate {
-                PrepRunView(server: server, onAPIError: authManager.handleAPIError)
+                PrepRunView(server: server, onAPIError: authManager.handleAPIError, ask: askAtlas)
             }
         case .prep(.gap(let id)):
             PrepGate {
@@ -766,19 +771,19 @@ struct ChatShellView: View {
             }
         case .prep(.testout(let unit)):
             PrepGate {
-                PrepRunView(server: server, run: .testout, unit: unit, onAPIError: authManager.handleAPIError)
+                PrepRunView(server: server, run: .testout, unit: unit, onAPIError: authManager.handleAPIError, ask: askAtlas)
             }
         case .prep(.mock):
             PrepGate {
-                PrepRunView(server: server, run: .mock, onAPIError: authManager.handleAPIError)
+                PrepRunView(server: server, run: .mock, onAPIError: authManager.handleAPIError, ask: askAtlas)
             }
         case .prep(.bonus):
             PrepGate {
-                PrepRunView(server: server, run: .bonus, onAPIError: authManager.handleAPIError)
+                PrepRunView(server: server, run: .bonus, onAPIError: authManager.handleAPIError, ask: askAtlas)
             }
         case .prep(.story(let id)):
             PrepGate {
-                PrepRunView(server: server, run: .story, unit: id, onAPIError: authManager.handleAPIError)
+                PrepRunView(server: server, run: .story, unit: id, onAPIError: authManager.handleAPIError, ask: askAtlas)
             }
         case .prep(.mockLadder(let kind)):
             PrepGate {

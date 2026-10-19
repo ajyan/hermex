@@ -14,6 +14,8 @@ struct PrepRunView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var screenHeight: CGFloat = 800
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Starts a new Atlas chat with these words in the composer ("Go deeper in Atlas").
+    private let ask: (String) -> Void
 
     private struct ChosenOption: Equatable {
         let rep: Int
@@ -28,14 +30,16 @@ struct PrepRunView: View {
         var fix: String?
     }
 
-    init(server: URL, run: PrepRunKind = .daily, unit: String? = nil, onAPIError: @escaping (Error) -> Void) {
+    init(server: URL, run: PrepRunKind = .daily, unit: String? = nil, onAPIError: @escaping (Error) -> Void,
+         ask: @escaping (String) -> Void = { _ in }) {
         self.init(viewModel: PrepRunViewModel(
             client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server)), run: run, unit: unit,
-            onAPIError: onAPIError))
+            onAPIError: onAPIError), ask: ask)
     }
 
-    init(viewModel: PrepRunViewModel) {
+    init(viewModel: PrepRunViewModel, ask: @escaping (String) -> Void = { _ in }) {
         _viewModel = State(initialValue: viewModel)
+        self.ask = ask
     }
 
     var body: some View {
@@ -194,9 +198,27 @@ struct PrepRunView: View {
             scaffold(rep, hasAction: hasAction(rep)) { repContent(rep) } bottom: { repAction(rep) }
                 // Fresh view state (timer start, example toggle) for every rep.
                 .id(rep.index)
+        case .result(let rep, let result, _) where Self.usesRecall(rep) && viewModel.inDialogue:
+            scaffold(rep, hasAction: true) {
+                PrepTutorDialogueView(
+                    prompt: rep.item.lesson?.recall?.prompt ?? "",
+                    kicker: PrepCopy.followupLine(result.dialogue, type: rep.item.lesson?.recall?.type ?? ""),
+                    firstAnswer: viewModel.firstAnswer, state: result.dialogue,
+                    streaming: viewModel.tutorStreaming, pendingReply: viewModel.pendingReply,
+                    error: viewModel.tutorError) { Task { await viewModel.retryTutor() } }
+            } bottom: {
+                PrepTutorReplyBar(
+                    draft: Binding(get: { viewModel.tutorDraft }, set: { viewModel.tutorDraft = $0 }),
+                    canReply: result.dialogue?.awaitingReply == true && viewModel.pendingReply == nil,
+                    canSend: viewModel.canSendTutorReply, isBusy: viewModel.tutorBusy,
+                    send: { Task { await viewModel.sendTutorReply() } },
+                    showMe: { Task { await viewModel.showMe() } })
+            }
+            .id(rep.index)
         case .result(let rep, let result, _) where Self.usesRecall(rep):
             scaffold(rep, hasAction: true) {
-                PrepRecallResultView(result: result, xp: viewModel.lastXP, canOverride: viewModel.canOverride,
+                PrepRecallResultView(result: result, xp: viewModel.lastXP, goDeeper: ask,
+                                     canOverride: viewModel.canOverride,
                                      overridingPoint: viewModel.overridingPoint) { point in
                     Task { await viewModel.overridePoint(point) }
                 }
@@ -368,7 +390,7 @@ struct PrepRunView: View {
                 isGrading: viewModel.isSubmitting
             ) { Task { await viewModel.submitJudgment(text) } }
         case .lesson where Self.usesRecall(rep) && viewModel.lessonStage == .reading:
-            PrepPrimaryButton(title: "I'm ready") {
+            PrepPrimaryButton(title: rep.item.lesson?.recall?.isQuestion == true ? "Try a question" : "I'm ready") {
                 withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { viewModel.beginRecall() }
             }
         case .lesson where Self.usesRecall(rep), .recall where Self.usesRecall(rep):
@@ -455,12 +477,18 @@ struct PrepRunView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 if viewModel.lessonStage == .reading {
-                    PrepRunCard { PrepLessonBody(lesson: lesson) }
-                        .transition(.opacity)
+                    Group {
+                        if lesson.cards != nil {
+                            PrepLessonBody(lesson: lesson)
+                        } else {
+                            PrepRunCard { PrepLessonBody(lesson: lesson) }
+                        }
+                    }
+                    .transition(.opacity)
                 } else {
                     PrepRecallCard(
                         prompt: recall.prompt,
-                        label: rep.drill == .recall ? "Recall · \(lesson.title)" : "Recall",
+                        label: PrepCopy.recallKicker(recall, lessonTitle: lesson.title, isReview: rep.drill == .recall),
                         draft: Binding(get: { viewModel.recallDraft }, set: { viewModel.recallDraft = $0 }),
                         confidence: Binding(get: { viewModel.confidence }, set: { viewModel.confidence = $0 }),
                         isSubmitting: viewModel.isSubmitting,
@@ -558,6 +586,10 @@ struct PrepRunView: View {
         case .telling:
             PrepStoryTellCard(
                 prompt: rep.item.prompt,
+                title: rep.item.title,
+                signal: rep.item.signal,
+                cues: rep.item.cues,
+                script: rep.item.scriptMD,
                 startedAt: viewModel.storyStartedAt,
                 elapsedMS: { viewModel.storyElapsedMS },
                 draft: draft,
