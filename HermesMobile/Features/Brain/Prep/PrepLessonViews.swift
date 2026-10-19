@@ -1,6 +1,6 @@
 import SwiftUI
 
-// The learn-first course's screens inside a run: a lesson (the idea, how you'd say it, one
+// The learn-first course's screens inside a run: a lesson (its example-first cards, or the idea, and one
 // check), its graded check, a boss result without critique, and the end-of-day summary.
 // Prep wears the `.knowledge` paper; reward marks (flame, crown, stars) use the opener glow as a
 // symbol color only (DESIGN.md, "Reward gold").
@@ -20,8 +20,8 @@ private struct PrepLessonLabel: View {
     }
 }
 
-/// A lesson's teaching: the idea in Markdown, how you'd say it in the serif (the sample answers
-/// are built from the user's own stories), and where it comes from.
+/// A lesson's teaching: its example-first cards when it has them, else the idea in Markdown (a coach re-teach),
+/// and where it comes from. Never a script to say back.
 struct PrepLessonBody: View {
     let lesson: PrepLesson
 
@@ -36,20 +36,12 @@ struct PrepLessonBody: View {
                     EmptyView()
                 }
             }
-            VStack(alignment: .leading, spacing: BrainStyle.s) {
-                PrepLessonLabel(title: "The idea")
-                MarkdownRenderer(content: lesson.ideaMD)
-            }
-            if !lesson.sayItMD.isEmpty {
+            if let cards = lesson.cards {
+                PrepLessonCardsView(title: lesson.title, cards: cards)
+            } else {
                 VStack(alignment: .leading, spacing: BrainStyle.s) {
-                    PrepLessonLabel(title: "How you'd say it")
-                    Text(verbatim: lesson.sayItMD)
-                        .brainText(.quote)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, BrainStyle.cardHorizontalPadding)
-                        .padding(.vertical, BrainStyle.cardVerticalPadding)
-                        .hxCard()
+                    PrepLessonLabel(title: "The idea")
+                    MarkdownRenderer(content: lesson.ideaMD)
                 }
             }
             if let line = PrepCopy.sourceLine(lesson.sources) {

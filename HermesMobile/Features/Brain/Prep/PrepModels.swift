@@ -272,13 +272,19 @@ struct PrepItemExcerpt: Decodable, Identifiable, Hashable, Sendable {
     let prompt: String
     let limitMS: Int?
     let warnMS: Int?
+    /// A story rep's signal (the kind of question, "Most technically challenging thing"), its beats as cues
+    /// to tell it from, and the full script, shown only behind a tap. Empty on other drills.
+    let signal: String
+    let cues: [PrepStoryCue]
+    let scriptMD: String
 
     /// A card the nightly coach wrote for a gap; only these can be flagged.
     var isCoachWritten: Bool { origin == "coach" }
 
     private enum CodingKeys: String, CodingKey {
         case id, title, summary, example, difficulty, hints, links, primer, options, code, fixes, input
-        case stage, format, origin, prompt
+        case stage, format, origin, prompt, signal, cues
+        case scriptMD = "script_md"
         case limitMS = "limit_ms"
         case warnMS = "warn_ms"
         case skillTitle = "skill_title"
@@ -309,8 +315,30 @@ struct PrepItemExcerpt: Decodable, Identifiable, Hashable, Sendable {
         prompt = c.string(.prompt)
         limitMS = c.optional(Int.self, .limitMS)
         warnMS = c.optional(Int.self, .warnMS)
+        signal = c.string(.signal)
+        cues = c.lossy(PrepStoryCue.self, .cues)
+        scriptMD = c.string(.scriptMD)
     }
 }
+
+/// One beat of a story as a cue: a one-word label and a few words to tell it from.
+struct PrepStoryCue: Decodable, Hashable, Sendable, Identifiable {
+    let id: String
+    let label: String
+    let cue: String
+
+    private enum CodingKeys: String, CodingKey { case id, label, cue }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.string(.id)
+        label = c.string(.label)
+        cue = c.string(.cue)
+        guard !id.isEmpty, !cue.isEmpty else { throw PrepStoryCueEmpty() }
+    }
+}
+
+private struct PrepStoryCueEmpty: Error {}
 
 /// One step of today's run. `index` is the server's stable position, which the attempt
 /// POST sends back; it is not the rep's position in `PrepRun.reps`.
@@ -540,6 +568,10 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
     let probe: PrepProbe?
     let repVerdict: String?
     let sayItMD: String?
+    /// A question rep's tutor dialogue: open while lines are still missed and follow-ups remain. Nil elsewhere.
+    let dialogue: PrepDialogueState?
+    /// "Go deeper in Atlas": the first message of a new chat about this rep. The chat never changes the score.
+    let deeperMD: String?
 
     /// The original result with an override's grade, verdict, XP, overridden points and boss sitting laid over it.
     init(merging base: PrepAttemptResult, override: PrepAttemptResult) {
@@ -575,6 +607,8 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
         probe = base.probe
         repVerdict = override.repVerdict ?? base.repVerdict
         sayItMD = base.sayItMD
+        dialogue = override.dialogue ?? base.dialogue
+        deeperMD = override.deeperMD ?? base.deeperMD
     }
 
     /// The sample answer, from whichever grade shape the answer came back with.
@@ -590,6 +624,8 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
         case storyTold = "story_told"
         case repVerdict = "rep_verdict"
         case sayItMD = "say_it_md"
+        case dialogue
+        case deeperMD = "deeper_md"
         case attemptID = "attempt"
         case referenceMD = "reference_md"
         case nextIndex = "next_index"
@@ -630,6 +666,8 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
         probe = c.optional(PrepProbe.self, .probe)
         repVerdict = c.optional(String.self, .repVerdict)
         sayItMD = c.optional(String.self, .sayItMD)
+        dialogue = c.optional(PrepDialogueState.self, .dialogue)
+        deeperMD = c.optional(String.self, .deeperMD).flatMap { $0.isEmpty ? nil : $0 }
     }
 }
 

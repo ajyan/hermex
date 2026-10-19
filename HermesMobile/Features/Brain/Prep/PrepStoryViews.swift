@@ -95,21 +95,28 @@ private struct PrepStoryClock: View {
     }
 }
 
-/// Telling the story: the interview prompt, the running clock (from the first mic tap or word),
-/// the transcript to correct, and the mic. Submit is the run's pinned button.
+/// Telling the story: the signal and the running clock (from the first mic tap or word), the story to tell and the
+/// interview prompt, its beats as cues (a label in the glow, a few words beside it), the transcript to correct and
+/// the mic. The full script waits behind "Show script". Submit is the run's pinned button.
 struct PrepStoryTellCard: View {
     let prompt: String
+    var title: String = ""
+    var signal: String = ""
+    var cues: [PrepStoryCue] = []
+    var script: String = ""
     /// When the clock started; nil shows 0:00 without ticking. While submitting it stops ticking.
     let startedAt: Date?
     let elapsedMS: () -> Int
     @Binding var draft: String
     let isSubmitting: Bool
     let startClock: () -> Void
+    @State private var showsScript = false
+    @ScaledMetric(relativeTo: .subheadline) private var labelWidth: CGFloat = 76
 
     var body: some View {
         PrepRunCard {
             HStack(alignment: .firstTextBaseline) {
-                Text(verbatim: "Tell a story")
+                Text(verbatim: signal.isEmpty ? "Tell a story" : signal)
                     .font(BrainStyle.meta)
                     .foregroundStyle(HermexPaper.knowledge.glow)
                 Spacer(minLength: BrainStyle.s)
@@ -122,13 +129,53 @@ struct PrepStoryTellCard: View {
                     PrepStoryClock(elapsedMS: elapsedMS())
                 }
             }
-            Text(verbatim: prompt)
+            Text(verbatim: title.isEmpty ? prompt : title)
                 .font(AppFont.display(style: .title3))
-                .foregroundStyle(Color.hxTextPrimary)
+                .foregroundStyle(title.isEmpty ? Color.hxTextPrimary : HermexPaper.knowledge.glow)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
+            if !title.isEmpty {
+                Text(verbatim: prompt)
+                    .font(BrainStyle.rowTitle)
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !cues.isEmpty {
+                VStack(alignment: .leading, spacing: BrainStyle.s) {
+                    ForEach(cues) { cue in
+                        HStack(alignment: .firstTextBaseline, spacing: BrainStyle.m) {
+                            Text(verbatim: cue.label)
+                                .font(AppFont.body(weight: .semibold))
+                                .foregroundStyle(HermexPaper.knowledge.glow)
+                                .frame(width: labelWidth, alignment: .leading)
+                            Text(verbatim: cue.cue)
+                                .font(BrainStyle.rowTitle)
+                                .foregroundStyle(Color.hxTextPrimary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+            }
+            if showsScript && !script.isEmpty {
+                Text(verbatim: script)
+                    .brainText(.quote)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .transition(.opacity)
+            }
             PrepStoryAnswerField(placeholder: "Tell it out loud, or type", text: $draft, isSubmitting: isSubmitting)
             PrepStoryMicButton(draft: draft, isSubmitting: isSubmitting, onStart: startClock) { draft = $0 }
+            if !script.isEmpty {
+                Button {
+                    showsScript.toggle()
+                } label: {
+                    Text(verbatim: showsScript ? "Hide script" : "Show script")
+                        .font(AppFont.body(weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 }

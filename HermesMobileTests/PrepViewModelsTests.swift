@@ -106,6 +106,28 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
     func mockGrade(mockID: String, sessionID: String, turnMS: [Int]) async throws {
         try next("mockGrade:\(mockID)", &mockGradeResults)
     }
+
+    /// Each dialogue step plays the next script; the calls record (attempt, answer).
+    var dialogueScripts: [[PrepDialogueEvent]] = []
+    var endResults: [Result<PrepAttemptResult, Error>] = []
+    private var _dialogueCalls: [(String, String?)] = []
+    var dialogueCalls: [(String, String?)] { lock.withLock { _dialogueCalls } }
+
+    func dialogue(attempt: String, answer: String?) -> AsyncThrowingStream<PrepDialogueEvent, Error> {
+        let script = lock.withLock { () -> [PrepDialogueEvent] in
+            _dialogueCalls.append((attempt, answer))
+            _log.append("dialogue")
+            return dialogueScripts.isEmpty ? [] : dialogueScripts.removeFirst()
+        }
+        return AsyncThrowingStream { continuation in
+            for event in script { continuation.yield(event) }
+            continuation.finish()
+        }
+    }
+
+    func endDialogue(attempt: String) async throws -> PrepAttemptResult {
+        try next("endDialogue:\(attempt)", &endResults)
+    }
 }
 
 @MainActor
@@ -657,6 +679,130 @@ final class PrepViewModelsTests: XCTestCase {
          "grade": {"points_hit": [{"point_id": "p.a", "quote": ""}], "points_missed": [\#(missedJSON)], "strong_answer": "S"},
          "points": [{"id": "p.a", "text": "A"}, {"id": "p.b", "text": "B"}]}
         """#)
+    }
+
+    // MARK: Tutor dialogue (spec 2026-10-19 Track A, slice 2)
+
+    private func questionRep(_ index: Int) -> String {
+        #"{"index": \#(index), "block": "new", "drill": "lesson", "item": {"id": "u1.l\#(index)", "title": "Lesson \#(index)", "idea_md": "Idea", "say_it_md": "", "check": {"prompt": "Q?", "options": ["A", "B", "C", "D"]}, "recall": {"prompt": "Doc hit 0.98, chunk hit 0.81. Why?", "question": "u1.l\#(index).q2", "type": "diagnose"}}}"#
+    }
+
+    private func dialogueResult(_ verdict: String, attempt: String, hit: [String], missed: [String], followups: Int,
+                                open: Bool, turns: [(String, String)] = [], closed: Bool = false) -> PrepAttemptResult {
+        let hits = hit.map { #"{"point_id": "\#($0)", "quote": ""}"# }.joined(separator: ",")
+        let misses = missed.map { #"{"point_id": "\#($0)", "why": "No \#($0)"}"# }.joined(separator: ",")
+        let talk = turns.map { #"{"role": "\#($0.0)", "text": "\#($0.1)"}"# }.joined(separator: ",")
+        return decode(PrepAttemptResult.self, #"""
+        {"verdict": "\#(verdict)", "next_index": 1, "attempt": "\#(attempt)", "xp": 10,
+         "grade": {"points_hit": [\#(hits)], "points_missed": [\#(misses)], "strong_answer": "Worked answer."},
+         "points": [{"id": "r1", "text": "Recall"}, {"id": "r2", "text": "Ranking"}],
+         "dialogue": {"open": \#(open), "followups": \#(followups), "max": 3, "turns": [\#(talk)], "closed": \#(closed)},
+         "deeper_md": "Be my tutor."}
+        """#)
+    }
+
+    func testAnOpenDialogueStreamsTheFirstFollowUp() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([questionRep(0)]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.success(dialogueResult("partial", attempt: "a1", hit: ["r1"], missed: ["r2"], followups: 0, open: true))]
+        client.dialogueScripts = [[.delta("You split it. "), .delta("What about rank?"), .turn("You split it. What about rank?"),
+                                   .done(dialogueResult("partial", attempt: "a2", hit: ["r1"], missed: ["r2"], followups: 0, open: true,
+                                                        turns: [("tutor", "You split it. What about rank?")]))]]
+        let vm = makeVM(client)
+        await vm.load()
+        vm.beginRecall()
+        vm.recallDraft = "Recall is fine"
+        vm.confidence = .fairly
+        await vm.submitRecall()
+        XCTAssertTrue(vm.inDialogue)
+        XCTAssertEqual(vm.firstAnswer, "Recall is fine")
+        XCTAssertEqual(client.dialogueCalls.first?.0, "a1")
+        XCTAssertNil(client.dialogueCalls.first?.1)
+        XCTAssertNil(vm.tutorStreaming)
+        guard case let .result(_, result, _) = vm.phase else { return XCTFail("expected a result") }
+        XCTAssertEqual(result.dialogue?.turns.last?.text, "You split it. What about rank?")
+        XCTAssertEqual(result.attemptID, "a2", "later steps follow the latest copy")
+        XCTAssertFalse(vm.canSendTutorReply)
+        vm.tutorDraft = "Ranking buries it"
+        XCTAssertTrue(vm.canSendTutorReply)
+    }
+
+    func testAReplyThatHitsEverythingEndsTheDialogue() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([questionRep(0)]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.success(dialogueResult("miss", attempt: "a1", hit: [], missed: ["r1", "r2"], followups: 0, open: true))]
+        let asked = [("tutor", "Where is the loss?")]
+        client.dialogueScripts = [
+            [.turn("Where is the loss?"),
+             .done(dialogueResult("miss", attempt: "a2", hit: [], missed: ["r1", "r2"], followups: 0, open: true, turns: asked))],
+            [.graded(dialogueResult("partial", attempt: "a3", hit: ["r1", "r2"], missed: [], followups: 1, open: false,
+                                    turns: asked + [("you", "Ranking")])),
+             .done(dialogueResult("partial", attempt: "a3", hit: ["r1", "r2"], missed: [], followups: 1, open: false,
+                                  turns: asked + [("you", "Ranking")]))],
+        ]
+        let vm = makeVM(client)
+        await vm.load()
+        vm.beginRecall()
+        vm.recallDraft = "Not sure"
+        vm.confidence = .guess
+        await vm.submitRecall()
+        vm.tutorDraft = "Ranking"
+        await vm.sendTutorReply()
+        XCTAssertEqual(client.dialogueCalls.last?.1, "Ranking")
+        XCTAssertEqual(client.dialogueCalls.last?.0, "a2")
+        XCTAssertFalse(vm.inDialogue, "every line hit: the end screen")
+        XCTAssertNil(vm.pendingReply)
+        guard case let .result(_, result, _) = vm.phase else { return XCTFail("expected a result") }
+        XCTAssertEqual(result.verdict, "partial")
+        XCTAssertEqual(PrepCopy.endHeadline(hit: 2, total: 2, followups: result.dialogue?.followups), "Got it in 1 follow-up")
+    }
+
+    func testShowMeEndsTheDialogue() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([questionRep(0)]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.success(dialogueResult("miss", attempt: "a1", hit: [], missed: ["r1", "r2"], followups: 0, open: true))]
+        client.dialogueScripts = [[.failed(status: 503, message: "the tutor couldn't reply; try again")]]
+        client.endResults = [.success(dialogueResult("miss", attempt: "a2", hit: [], missed: ["r1", "r2"], followups: 0,
+                                                     open: false, closed: true))]
+        let vm = makeVM(client)
+        await vm.load()
+        vm.beginRecall()
+        vm.recallDraft = "Hm"
+        vm.confidence = .guess
+        await vm.submitRecall()
+        XCTAssertTrue(vm.inDialogue, "a failed turn keeps the dialogue up to retry")
+        XCTAssertEqual(vm.tutorError, "the tutor couldn't reply; try again")
+        await vm.showMe()
+        XCTAssertFalse(vm.inDialogue)
+        XCTAssertTrue(client.log.contains("endDialogue:a1"))
+        guard case let .result(_, result, _) = vm.phase else { return XCTFail("expected a result") }
+        XCTAssertEqual(result.dialogue?.closed, true)
+        XCTAssertEqual(result.strongAnswer, "Worked answer.")
+    }
+
+    func testAnOldRecallRepNeverOpensADialogue() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([recallLessonRep(0)]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.success(recallResult("partial", next: 1))]
+        let vm = makeVM(client)
+        await vm.load()
+        vm.beginRecall()
+        vm.recallDraft = "An answer"
+        vm.confidence = .fairly
+        await vm.submitRecall()
+        XCTAssertFalse(vm.inDialogue)
+        XCTAssertTrue(client.dialogueCalls.isEmpty)
+    }
+
+    func testEndHeadlineCountsFollowUps() {
+        XCTAssertEqual(PrepCopy.endHeadline(hit: 2, total: 2, followups: 0), "Got it first time")
+        XCTAssertEqual(PrepCopy.endHeadline(hit: 2, total: 2, followups: 2), "Got it in 2 follow-ups")
+        XCTAssertEqual(PrepCopy.endHeadline(hit: 1, total: 3, followups: 3), "1 of 3 after 3 follow-ups")
+        XCTAssertEqual(PrepCopy.endHeadline(hit: 1, total: 3, followups: nil), "1 of 3 key points")
     }
 
     func testLessonGoesReadingThenRecalling() async {

@@ -310,6 +310,17 @@ final class PrepRunViewModel {
         case probed(PrepAttemptResult, number: Int)
     }
     private(set) var storyStage: StoryStage = .telling
+    /// A question rep's tutor dialogue: up while the server keeps it open and "Show me" hasn't been tapped.
+    /// The phase stays `.result` throughout; its result is replaced as each step lands.
+    private(set) var inDialogue = false
+    /// The rep's first answer, the dialogue's opening bubble.
+    private(set) var firstAnswer = ""
+    /// The tutor's turn as it streams in, nil when none is in flight, and the reply waiting for its grade.
+    private(set) var tutorStreaming: String?
+    private(set) var pendingReply: String?
+    private(set) var tutorBusy = false
+    private(set) var tutorError: String?
+    var tutorDraft = ""
     /// When the telling began (the first mic tap or first non-empty edit); nil until then.
     private(set) var storyStartedAt: Date?
     /// Story titles by id, loaded only to name the story told on a wrong-story result.
@@ -463,6 +474,103 @@ final class PrepRunViewModel {
 
     func showIdea() {
         revealedLesson = true
+    }
+
+    // MARK: Tutor dialogue
+
+    var canSendTutorReply: Bool {
+        inDialogue && !tutorBusy && result?.dialogue?.awaitingReply == true
+            && !tutorDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// The reply to the tutor's last question: graded against the lines still missed, then the next turn streams.
+    func sendTutorReply() async {
+        guard canSendTutorReply else { return }
+        let reply = PrepCopy.cappedApproach(tutorDraft.trimmingCharacters(in: .whitespacesAndNewlines))
+        pendingReply = reply
+        tutorDraft = ""
+        await runTutor(answer: reply, token: generation)
+    }
+
+    /// The tutor's turn again after a failure: the reply is re-sent when it never got graded.
+    func retryTutor() async {
+        guard inDialogue, !tutorBusy else { return }
+        if let reply = pendingReply {
+            await runTutor(answer: reply, token: generation)
+        } else {
+            await runTutor(answer: nil, token: generation)
+        }
+    }
+
+    /// "Show me": end the dialogue where it stands and go to the end screen.
+    func showMe() async {
+        guard inDialogue, case let .result(_, result, _) = phase, let attempt = result.attemptID else { return }
+        let token = generation
+        tutorBusy = true
+        defer { if token == generation { tutorBusy = false } }
+        do {
+            let ended = try await client.endDialogue(attempt: attempt)
+            guard token == generation else { return }
+            apply(ended)
+        } catch {
+            guard token == generation, !prepIsCancellation(error) else { return }
+            onAPIError(error)
+        }
+        // Even when the close didn't save, the end screen shows the rep as graded so far.
+        inDialogue = false
+        tutorStreaming = nil
+        pendingReply = nil
+    }
+
+    private var result: PrepAttemptResult? {
+        if case let .result(_, result, _) = phase { return result }
+        return nil
+    }
+
+    private func runTutor(answer: String?, token: Int) async {
+        guard token == generation, case let .result(_, result, _) = phase, let attempt = result.attemptID else { return }
+        tutorBusy = true
+        tutorError = nil
+        tutorStreaming = answer == nil ? "" : nil
+        defer {
+            if token == generation {
+                tutorBusy = false
+                tutorStreaming = nil
+            }
+        }
+        do {
+            for try await event in client.dialogue(attempt: attempt, answer: answer) {
+                guard token == generation, case .result = phase else { return }
+                switch event {
+                case .graded(let graded):
+                    apply(graded)
+                    pendingReply = nil
+                    tutorStreaming = graded.dialogue?.open == true ? "" : nil
+                case .delta(let text):
+                    tutorStreaming = (tutorStreaming ?? "") + text
+                case .turn:
+                    tutorStreaming = nil
+                case .done(let done):
+                    apply(done)
+                case let .failed(_, message):
+                    tutorError = message.isEmpty ? "The tutor couldn't reply. Try again." : message
+                }
+            }
+        } catch {
+            guard token == generation, !prepIsCancellation(error) else { return }
+            onAPIError(error)
+            tutorError = "Couldn't reach the tutor. Try again."
+        }
+        guard token == generation else { return }
+        if tutorError == nil, self.result?.dialogue?.open != true { inDialogue = false }
+    }
+
+    /// Lays a dialogue step's result over the one on screen.
+    private func apply(_ step: PrepAttemptResult) {
+        guard case let .result(rep, result, index) = phase else { return }
+        let merged = PrepAttemptResult(merging: result, override: step)
+        phase = .result(rep, merged, index: index)
+        lastXP = Self.xp(for: rep, result: merged)
     }
 
     // MARK: Story reps
@@ -742,6 +850,13 @@ final class PrepRunViewModel {
     }
 
     private func show(_ rep: PrepRep) {
+        inDialogue = false
+        firstAnswer = ""
+        tutorStreaming = nil
+        pendingReply = nil
+        tutorBusy = false
+        tutorError = nil
+        tutorDraft = ""
         revealedLesson = false
         lessonStage = rep.drill == .recall ? .recalling : .reading
         recallDraft = ""
@@ -806,6 +921,11 @@ final class PrepRunViewModel {
             lastXP = Self.xp(for: rep, result: result)
             count(rep, result)
             phase = .result(rep, result, index: rep.index)
+            if result.dialogue?.open == true {
+                firstAnswer = recallDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                inDialogue = true
+                await runTutor(answer: nil, token: token)
+            }
         }
     }
 
@@ -970,6 +1090,58 @@ enum PrepCopy {
     static func readyLine(ready: Int, total: Int) -> String { "\(ready) of \(total) ready" }
 
     static func keyPointsLine(hit: Int, total: Int) -> String { "\(hit) of \(total) key points" }
+
+    /// A question rep's end-screen headline: how many follow-ups it took, or how far it got.
+    static func endHeadline(hit: Int, total: Int, followups: Int?) -> String {
+        guard let followups else { return keyPointsLine(hit: hit, total: total) }
+        let all = total > 0 && hit == total
+        switch (all, followups) {
+        case (true, 0): return "Got it first time"
+        case (true, 1): return "Got it in 1 follow-up"
+        case (true, _): return "Got it in \(followups) follow-ups"
+        case (false, 0): return keyPointsLine(hit: hit, total: total)
+        case (false, 1): return "\(hit) of \(total) after 1 follow-up"
+        case (false, _): return "\(hit) of \(total) after \(followups) follow-ups"
+        }
+    }
+
+    /// The tutor screen's kicker: "Follow-up 1 of 3", or the question's type before the first one.
+    static func followupLine(_ state: PrepDialogueState?, type: String) -> String {
+        guard let state, state.followups > 0 || state.awaitingReply else { return questionKicker(type) }
+        return "Follow-up \(min(state.max, state.followups + (state.awaitingReply ? 1 : 0))) of \(state.max)"
+    }
+
+    /// VoiceOver's "Card 2 of 4, The idea" for the lesson cards' page dots.
+    static func cardPageLabel(page: PrepLessonCardKind, in kinds: [PrepLessonCardKind]) -> String {
+        let n = (kinds.firstIndex(of: page) ?? 0) + 1
+        return "Card \(n) of \(kinds.count), \(page.title)"
+    }
+
+    /// A flow picture read aloud: "query, then embed, then rerank. Start: recall lives here."
+    static func pictureLabel(_ picture: PrepLessonCards.Picture) -> String {
+        var parts = [picture.steps.joined(separator: ", then ")]
+        if let start = picture.startLabel { parts.append("Start: \(start)") }
+        if let end = picture.endLabel { parts.append("End: \(end)") }
+        return parts.joined(separator: ". ")
+    }
+
+    /// The recall card's kicker: the question's type for a pool question ("Diagnose", "Diagnose · Tokens" on a
+    /// review), else "Recall" as before.
+    static func recallKicker(_ recall: PrepRecall, lessonTitle: String, isReview: Bool) -> String {
+        let base = recall.isQuestion ? questionKicker(recall.type) : "Recall"
+        return isReview ? "\(base) · \(lessonTitle)" : base
+    }
+
+    /// A question's type as a kicker ("Diagnose"); "Question" when the server sends none.
+    static func questionKicker(_ type: String) -> String {
+        switch type {
+        case "apply": "Apply"
+        case "tradeoff": "Tradeoff"
+        case "diagnose": "Diagnose"
+        case "open": "Open question"
+        default: "Question"
+        }
+    }
 
     static func calibrationLine(_ c: PrepCalibration) -> String {
         let percent = c.certainTotal > 0 ? Int((Double(c.certainRight) / Double(c.certainTotal) * 100).rounded()) : 0

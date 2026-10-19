@@ -44,8 +44,8 @@ struct PrepConfidenceChips: View {
     }
 }
 
-/// The recall prompt with an answer field (speak with the keyboard's dictation key, or type), the
-/// confidence chips, and "I don't know, show me". Submit is the run's pinned button.
+/// The question with an answer field (tap to talk, or type), the confidence chips, and "I don't know, show me".
+/// Submit is the run's pinned button.
 struct PrepRecallCard: View {
     let prompt: String
     let label: String
@@ -65,7 +65,7 @@ struct PrepRecallCard: View {
                 .foregroundStyle(Color.hxTextPrimary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
-            TextField(text: $draft, axis: .vertical) { Text(verbatim: "Your answer") }
+            TextField(text: $draft, axis: .vertical) { Text(verbatim: "Answer out loud or type…") }
                 .font(AppFont.body())
                 .lineLimit(3...10)
                 .focused($typing)
@@ -75,6 +75,7 @@ struct PrepRecallCard: View {
                 .overlay(RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous)
                     .strokeBorder(Color.hxSeparator, lineWidth: 0.5))
                 .accessibilityLabel(Text(verbatim: "Your answer"))
+            PrepStoryMicButton(draft: draft, isSubmitting: isSubmitting) { draft = $0 }
             PrepConfidenceChips(selection: $confidence)
         }
         Button(action: dontKnow) {
@@ -89,10 +90,14 @@ struct PrepRecallCard: View {
 }
 
 /// A graded recall: "3 of 4 key points", each point revealed in turn (all at once under Reduce
-/// Motion), "I had that" on misses, the surprise banner on a confident miss, then the serif sample answer.
+/// Motion), "I had that" on misses, the surprise banner on a confident miss. After a question rep the headline
+/// counts the tutor's follow-ups, each miss says why, and the worked answer for this question waits behind a tap;
+/// "Go deeper in Atlas" opens a chat about it, which never changes the score.
 struct PrepRecallResultView: View {
     let result: PrepAttemptResult
     let xp: Int?
+    /// Starts a new Atlas chat with these words in the composer; nil hides the button.
+    var goDeeper: ((String) -> Void)?
     /// False after "I don't know": there are no points to claim back.
     var canOverride = true
     /// The point whose claim is saving; every "I had that" waits until it lands.
@@ -100,10 +105,13 @@ struct PrepRecallResultView: View {
     let overrideMissed: (String) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shown = 0
+    @State private var showsWorked = false
 
     private var hits: [String] { result.judgment?.pointsHit.map(\.pointID) ?? [] }
     private var misses: [String] { result.judgment?.pointsMissed.map(\.pointID) ?? [] }
     private var rows: [(id: String, hit: Bool)] { hits.map { ($0, true) } + misses.map { ($0, false) } }
+    /// A pool question's rep, which carries the dialogue and a worked answer.
+    private var isQuestion: Bool { result.dialogue != nil }
 
     var body: some View {
         if result.surprise {
@@ -125,10 +133,16 @@ struct PrepRecallResultView: View {
                     .font(AppFont.display(style: .headline))
                     .foregroundStyle(Color.hxTextPrimary)
             } else {
-                Text(verbatim: PrepCopy.keyPointsLine(hit: hits.count, total: rows.count))
+                Text(verbatim: PrepCopy.endHeadline(hit: hits.count, total: rows.count,
+                                                    followups: result.dialogue?.followups))
                     .font(AppFont.display(style: .title3))
                     .foregroundStyle(HermexPaper.knowledge.glow)
                     .accessibilityAddTraits(.isHeader)
+                if isQuestion {
+                    Text(verbatim: "What you reasoned through")
+                        .font(BrainStyle.meta)
+                        .foregroundStyle(Color.hxTextSecondary)
+                }
                 ForEach(Array(rows.enumerated()), id: \.element.id) { offset, row in
                     if offset < shown {
                         pointRow(row.id, hit: row.hit)
@@ -150,23 +164,59 @@ struct PrepRecallResultView: View {
                 withAnimation(.easeOut(duration: 0.2)) { shown += 1 }
             }
         }
-        if !result.strongAnswer.isEmpty {
+        if isQuestion && !result.strongAnswer.isEmpty {
             VStack(alignment: .leading, spacing: BrainStyle.s) {
-                BrainSectionHeader(title: "How you'd say it")
-                Text(verbatim: result.strongAnswer)
-                    .brainText(.quote)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { showsWorked.toggle() }
+                } label: {
+                    HStack {
+                        Text(verbatim: "Worked answer for this question")
+                            .font(BrainStyle.rowTitle)
+                            .foregroundStyle(Color.hxTextPrimary)
+                        Spacer(minLength: BrainStyle.s)
+                        Image(systemName: showsWorked ? "chevron.up" : "chevron.down")
+                            .foregroundStyle(Color.hxTextSecondary)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
                     .padding(.horizontal, BrainStyle.cardHorizontalPadding)
-                    .padding(.vertical, BrainStyle.cardVerticalPadding)
-                    .hxCard()
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .hxCard()
+                .accessibilityAddTraits(showsWorked ? .isSelected : [])
+                .accessibilityHint(Text(verbatim: showsWorked ? "Hides the worked answer" : "Shows a worked answer"))
+                if showsWorked {
+                    Text(verbatim: result.strongAnswer)
+                        .font(AppFont.body())
+                        .foregroundStyle(Color.hxTextPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, BrainStyle.cardHorizontalPadding)
+                        .padding(.vertical, BrainStyle.cardVerticalPadding)
+                        .hxCard()
+                        .transition(.opacity)
+                }
             }
+        }
+        if let goDeeper, let seed = result.deeperMD {
+            Button { goDeeper(seed) } label: {
+                Label {
+                    Text(verbatim: "Go deeper in Atlas")
+                } icon: {
+                    Image(systemName: "bubble.left.and.text.bubble.right")
+                }
+                .font(AppFont.body(weight: .semibold))
+                .foregroundStyle(Color.accentColor)
+                .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(Text(verbatim: "Starts a chat with Atlas about this question. It doesn't change your score."))
         }
     }
 
     private func pointRow(_ id: String, hit: Bool) -> some View {
         PrepKeyPointRow(result: result, id: id, hit: hit, canOverride: canOverride,
-                        overridingPoint: overridingPoint, overrideMissed: overrideMissed)
+                        overridingPoint: overridingPoint, overrideMissed: overrideMissed, showsWhy: isQuestion)
     }
 }
 
@@ -178,6 +228,14 @@ struct PrepKeyPointRow: View {
     var canOverride = true
     var overridingPoint: String?
     let overrideMissed: (String) -> Void
+    /// Under a miss, the grader's one line on what was missing.
+    var showsWhy = false
+
+    private var why: String? {
+        guard showsWhy, !hit else { return nil }
+        let line = result.judgment?.pointsMissed.first { $0.pointID == id }?.why ?? ""
+        return line.isEmpty ? nil : line
+    }
 
     var body: some View {
         let text = result.pointTexts[id] ?? PrepCopy.pointTitle(id)
@@ -190,6 +248,12 @@ struct PrepKeyPointRow: View {
                     .font(BrainStyle.rowTitle)
                     .foregroundStyle(Color.hxTextPrimary)
                     .fixedSize(horizontal: false, vertical: true)
+                if let why {
+                    Text(verbatim: why)
+                        .font(BrainStyle.meta)
+                        .foregroundStyle(Color.hxTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if result.overridden.contains(id) {
                     Text(verbatim: "You had this").font(BrainStyle.meta).foregroundStyle(Color.hxTextSecondary)
                 }
