@@ -5,27 +5,47 @@ import SwiftUI
 /// Pushed as `.goal(slug)`.
 struct GoalDetailView: View {
     @State private var viewModel: GoalDetailViewModel
+    /// The finished goal's record: the celebration sheet, then this screen, show it.
+    @State private var record: GoalRecordViewModel?
+    @State private var celebrating = false
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
+    private let client: GoalsDataClient
+    private let onAPIError: (Error) -> Void
 
     init(slug: String, server: URL, onAPIError: @escaping (Error) -> Void) {
-        _viewModel = State(initialValue: GoalDetailViewModel(
-            slug: slug, client: APIClientGoalsAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
+        let client = APIClientGoalsAdapter(apiClient: APIClient(baseURL: server))
+        self.client = client
+        self.onAPIError = onAPIError
+        _viewModel = State(initialValue: GoalDetailViewModel(slug: slug, client: client, onAPIError: onAPIError))
     }
 
     var body: some View {
-        content
-            .hxNavigationTitle(navigationTitle)
-            .background(Color.hxCanvas.ignoresSafeArea())
-            .task { await viewModel.load() }
-            // Back from the background, the server's today may have moved on.
-            .onChange(of: scenePhase) { _, phase in
-                if phase == .active { Task { await viewModel.load() } }
+        Group {
+            if let record {
+                GoalRecordContent(viewModel: record)
+            } else {
+                content
             }
+        }
+        .hxNavigationTitle(record == nil ? "Goal" : "Finished", subtitle: record?.subtitle)
+        .background(Color.hxCanvas.ignoresSafeArea())
+        .task { if record == nil { await viewModel.load() } }
+        // Back from the background, the server's today may have moved on.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active, record == nil { Task { await viewModel.load() } }
+        }
+        .onChange(of: viewModel.finished) { _, finished in
+            guard let finished, record == nil else { return }
+            record = GoalRecordViewModel(slug: viewModel.slug, record: finished, client: client, onAPIError: onAPIError)
+            celebrating = true
+        }
+        .sheet(isPresented: $celebrating) {
+            if let record {
+                GoalCelebrationView(viewModel: record) { celebrating = false }
+            }
+        }
     }
-
-    /// The hero card carries the goal's title; the bar just says where you are.
-    private var navigationTitle: String { "Goal" }
 
     @ViewBuilder
     private var content: some View {
@@ -46,6 +66,15 @@ struct GoalDetailView: View {
             let tint = GoalTint(GoalPaper.palette(for: detail.summary), scheme: colorScheme)
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
+                    if viewModel.asksToFinish {
+                        GoalFinishPrompt(
+                            milestone: detail.milestones.last?.title ?? "",
+                            paper: tint.paper,
+                            isFinishing: viewModel.isFinishing,
+                            onFinish: { Task { await viewModel.finish() } },
+                            onNotYet: { viewModel.finishDeferred = true }
+                        )
+                    }
                     VStack(alignment: .leading, spacing: BrainStyle.m) {
                         GoalHeroCard(
                             goal: detail.summary,
@@ -312,7 +341,7 @@ private struct GoalMilestoneRow: View {
 }
 
 /// Every day from the goal's start to its deadline, Monday first, in the goal's tint.
-private struct GoalCalendarGrid: View {
+struct GoalCalendarGrid: View {
     let weeks: [[GoalCalendarDay?]]
     let tint: GoalTint
 
@@ -350,7 +379,9 @@ private struct GoalCalendarCell: View {
             }
             if day.isToday { shape.strokeBorder(tint.fill, lineWidth: 2) }
             if day.isDeadline {
-                Image(systemName: "flag.checkered").font(AppFont.caption2(weight: .semibold)).foregroundStyle(tint.fill)
+                Image(systemName: "flag.checkered")
+                    .font(AppFont.caption2(weight: .semibold))
+                    .foregroundStyle(!day.isFuture && day.status.isShown ? tint.on : tint.fill)
             } else {
                 Text(verbatim: "\(day.dayOfMonth)")
                     .font(AppFont.caption2().monospacedDigit())

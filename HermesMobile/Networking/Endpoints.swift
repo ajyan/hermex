@@ -203,6 +203,9 @@ enum Endpoint {
     case goalDetail(slug: String)
     case goalCheckIn
     case goalWeek
+    case goalFinish
+    case goalRecord(slug: String)
+    case goalReflection
     /// Today's job-search Ask (`api/vault_jobs.py`): GET today's three roles and lock state, POST an action.
     case jobsAsk
     /// Files a Daily Deck's answers without the model (this user's webui fork):
@@ -541,6 +544,12 @@ enum Endpoint {
             return "/api/goals/checkin"
         case .goalWeek:
             return "/api/goals/week"
+        case .goalFinish:
+            return "/api/goals/finish"
+        case .goalRecord:
+            return "/api/goals/record"
+        case .goalReflection:
+            return "/api/goals/reflection"
         case .jobsAsk:
             return "/api/jobs/ask"
         case .briefFile:
@@ -765,7 +774,7 @@ enum Endpoint {
             var items = [URLQueryItem(name: "run", value: run)]
             if let unit { items.append(URLQueryItem(name: "unit", value: unit)) }
             return items
-        case let .goalDetail(slug):
+        case let .goalDetail(slug), let .goalRecord(slug):
             return [URLQueryItem(name: "slug", value: slug)]
         case let .labels(feature, item):
             var items: [URLQueryItem] = []

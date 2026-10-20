@@ -23,6 +23,7 @@
 		B1A1C0DE00000000000F000F /* GoalDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F000E /* GoalDetailView.swift */; };
 		B1A1C0DE00000000000F000D /* GoalsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F000C /* GoalsHomeView.swift */; };
 		B1A1C0DE00000000000F000B /* GoalsViewModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */; };
+		26F2837D3F563CA15D120502 /* GoalFinishTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65E7E4A0AFF2834CF2D496ED /* GoalFinishTests.swift */; };
 		A0DE000292B90F697F77D29E /* GoalCheckInCardViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE000292B90F697F77D29D /* GoalCheckInCardViewModelTests.swift */; };
 		8E79A3B222BF417A727CCE9D /* DailyAskModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B423448EC09D605C3DA3D609 /* DailyAskModelTests.swift */; };
 		A0DE0003F6338217394AF92B /* GoalCheckInEditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE0003300540C2C75C9B4A /* GoalCheckInEditTests.swift */; };
@@ -37,6 +38,10 @@
 		B1A1C0DE00000000000F0005 /* GoalsDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0004 /* GoalsDataClient.swift */; };
 		A045000000000000000000A1 /* GoalsWidgetSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = A045000000000000000000A0 /* GoalsWidgetSync.swift */; };
 		B1A1C0DE00000000000F0003 /* GoalsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0002 /* GoalsModels.swift */; };
+		303E42EDA2222CA27B98081D /* GoalsFinishedViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807B715A01B7FE2620F83BA5 /* GoalsFinishedViews.swift */; };
+		A4D61EBF6CE08C7714BD33A9 /* GoalRecordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */; };
+		7A40CF00E2EA2D4DD88F9C04 /* GoalFinishViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 218536469F3D6EDE344DCA34 /* GoalFinishViews.swift */; };
+		74B99BA4B6FE97FEBF4D5F9C /* GoalFinishModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15FE62C5023031221FB2AEF5 /* GoalFinishModels.swift */; };
 		B1A1C0DE0000000000000E17 /* PrepViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E18 /* PrepViewModels.swift */; };
 		B1A1C0DE0000000000000E21 /* PrepHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E22 /* PrepHomeView.swift */; };
 		3C0B73F47257718F46862DFB /* PrepGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 004ECAAB770CF240AFC8EE3C /* PrepGate.swift */; };
@@ -841,6 +846,7 @@
 		B1A1C0DE00000000000F000E /* GoalDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalDetailView.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F000C /* GoalsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsHomeView.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsViewModelsTests.swift; sourceTree = "<group>"; };
+65E7E4A0AFF2834CF2D496ED /* GoalFinishTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalFinishTests.swift; sourceTree = "<group>"; };
 		A0DE000292B90F697F77D29D /* GoalCheckInCardViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCheckInCardViewModelTests.swift; sourceTree = "<group>"; };
 		B423448EC09D605C3DA3D609 /* DailyAskModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyAskModelTests.swift; sourceTree = "<group>"; };
 		A0DE0003300540C2C75C9B4A /* GoalCheckInEditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCheckInEditTests.swift; sourceTree = "<group>"; };
@@ -855,6 +861,10 @@
 		B1A1C0DE00000000000F0004 /* GoalsDataClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsDataClient.swift; sourceTree = "<group>"; };
 		A045000000000000000000A0 /* GoalsWidgetSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsWidgetSync.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0002 /* GoalsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsModels.swift; sourceTree = "<group>"; };
+807B715A01B7FE2620F83BA5 /* GoalsFinishedViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsFinishedViews.swift; sourceTree = "<group>"; };
+AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalRecordView.swift; sourceTree = "<group>"; };
+218536469F3D6EDE344DCA34 /* GoalFinishViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalFinishViews.swift; sourceTree = "<group>"; };
+15FE62C5023031221FB2AEF5 /* GoalFinishModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalFinishModels.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E18 /* PrepViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepViewModels.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E22 /* PrepHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepHomeView.swift; sourceTree = "<group>"; };
 		004ECAAB770CF240AFC8EE3C /* PrepGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepGate.swift; sourceTree = "<group>"; };
@@ -1665,6 +1675,10 @@
 				B1A1C0DE00000000000F0004 /* GoalsDataClient.swift */,
 				A045000000000000000000A0 /* GoalsWidgetSync.swift */,
 				B1A1C0DE00000000000F0002 /* GoalsModels.swift */,
+				807B715A01B7FE2620F83BA5 /* GoalsFinishedViews.swift */,
+				AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */,
+				218536469F3D6EDE344DCA34 /* GoalFinishViews.swift */,
+				15FE62C5023031221FB2AEF5 /* GoalFinishModels.swift */,
 			);
 			path = Goals;
 			sourceTree = "<group>";
@@ -1794,6 +1808,7 @@
 				FEEDB0DE00000000000000B2 /* FeedbackInboxViewModelTests.swift */,
 				B1A1C0DE00000000000F0012 /* GoalsDesignTests.swift */,
 				B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */,
+				65E7E4A0AFF2834CF2D496ED /* GoalFinishTests.swift */,
 				A0DE000292B90F697F77D29D /* GoalCheckInCardViewModelTests.swift */,
 				B423448EC09D605C3DA3D609 /* DailyAskModelTests.swift */,
 				A0DE0003300540C2C75C9B4A /* GoalCheckInEditTests.swift */,
@@ -3021,6 +3036,10 @@
 				B1A1C0DE00000000000F0005 /* GoalsDataClient.swift in Sources */,
 				A045000000000000000000A1 /* GoalsWidgetSync.swift in Sources */,
 				B1A1C0DE00000000000F0003 /* GoalsModels.swift in Sources */,
+				303E42EDA2222CA27B98081D /* GoalsFinishedViews.swift in Sources */,
+				A4D61EBF6CE08C7714BD33A9 /* GoalRecordView.swift in Sources */,
+				7A40CF00E2EA2D4DD88F9C04 /* GoalFinishViews.swift in Sources */,
+				74B99BA4B6FE97FEBF4D5F9C /* GoalFinishModels.swift in Sources */,
 				B1A1C0DE0000000000000E03 /* PrepDataClient.swift in Sources */,
 				B1A1C0DE0000000000000E17 /* PrepViewModels.swift in Sources */,
 				B1A1C0DE0000000000000E21 /* PrepHomeView.swift in Sources */,
@@ -3474,6 +3493,7 @@
 				FEEDB0DE00000000000000B1 /* FeedbackInboxViewModelTests.swift in Sources */,
 				B1A1C0DE00000000000F0013 /* GoalsDesignTests.swift in Sources */,
 				B1A1C0DE00000000000F000B /* GoalsViewModelsTests.swift in Sources */,
+				26F2837D3F563CA15D120502 /* GoalFinishTests.swift in Sources */,
 				A0DE000292B90F697F77D29E /* GoalCheckInCardViewModelTests.swift in Sources */,
 				8E79A3B222BF417A727CCE9D /* DailyAskModelTests.swift in Sources */,
 				A0DE0003F6338217394AF92B /* GoalCheckInEditTests.swift in Sources */,

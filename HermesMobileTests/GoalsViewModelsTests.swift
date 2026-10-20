@@ -31,6 +31,9 @@ private final class FakeGoalsClient: GoalsDataClient, @unchecked Sendable {
     func home() async throws -> GoalsHome { try next("home", &homeResults) }
     func detail(slug: String) async throws -> GoalDetail { try next("detail:\(slug)", &detailResults) }
     func confirmWeek(_ r: GoalWeekRequest) async throws -> GoalCheckInResult { throw URLError(.unsupportedURL) }
+    func finish(_ r: GoalFinishRequest) async throws -> GoalRecord { throw URLError(.unsupportedURL) }
+    func record(slug: String) async throws -> GoalRecord { throw URLError(.unsupportedURL) }
+    func saveReflection(_ r: GoalReflectionRequest) async throws -> GoalRecord { throw URLError(.unsupportedURL) }
 
     func checkIn(_ r: GoalCheckInRequest) async throws -> GoalCheckInResult {
         lock.withLock { _checkIns.append(r) }

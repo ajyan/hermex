@@ -652,6 +652,11 @@ struct ChatShellView: View {
         case .goal(let slug):
             GoalDetailView(slug: slug, server: server, onAPIError: authManager.handleAPIError)
                 .id(slug)
+        case .finishedGoal(let slug):
+            GoalRecordView(slug: slug, server: server, onAPIError: authManager.handleAPIError)
+                .id(slug)
+        case .finishedGoals:
+            GoalsFinishedListView(server: server, onAPIError: authManager.handleAPIError)
         case .money:
             MoneyView(server: server)
         case .feedback:
