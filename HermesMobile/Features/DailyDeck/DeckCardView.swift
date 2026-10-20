@@ -204,7 +204,9 @@ private struct DeckCardView: View {
                 .id(question)
                 .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
         }
-        if card.takesText {
+        if let traits = card.selfRatings {
+            selfRatings(traits).padding(.top, 18)
+        } else if card.takesText {
             reflection(card.isLetter ? "Write to her" : card.isMandarin ? "Answer in Mandarin" : "Write a reflection")
                 .padding(.top, 16)
         }
@@ -245,6 +247,27 @@ private struct DeckCardView: View {
                     .background(palette.ink, in: Capsule())
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    /// Each trait over a 1–10 row of the sleep card's chips; tapping the chosen score clears it.
+    private func selfRatings(_ traits: [String]) -> some View {
+        let scores = viewModel.traitScores(for: card)
+        return VStack(alignment: .leading, spacing: 18) {
+            ForEach(traits, id: \.self) { trait in
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(verbatim: trait)
+                        .font(AppFont.subheadline(weight: .semibold))
+                    FlowRow(spacing: 4) {
+                        ForEach(1...10, id: \.self) { score in
+                            ChoiceButton(title: "\(score)", isSelected: scores[trait] == score, compact: true) {
+                                viewModel.rateTrait(trait, score, for: card)
+                            }
+                            .accessibilityLabel(Text(verbatim: "\(trait) \(score) of 10"))
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -917,6 +940,8 @@ private func inlineMarkdown(_ text: String) -> AttributedString {
 struct ChoiceButton: View {
     let title: String
     let isSelected: Bool
+    /// A narrow chip for a row of numbers, so ten fit on one line.
+    var compact = false
     let action: () -> Void
 
     var body: some View {
@@ -924,8 +949,9 @@ struct ChoiceButton: View {
             Text(verbatim: title)
                 .lineLimit(1)
                 .font(AppFont.subheadline(weight: .medium))
-                .padding(.horizontal, 12)
-                .frame(minHeight: 36)
+                .monospacedDigit()
+                .padding(.horizontal, compact ? 4 : 12)
+                .frame(minWidth: compact ? 30 : nil, minHeight: 36)
                 .foregroundStyle(isSelected ? Color.hxOnAccent : Color.primary)
                 .background(isSelected ? Color.accentColor : Color.hxSurface, in: Capsule())
         }

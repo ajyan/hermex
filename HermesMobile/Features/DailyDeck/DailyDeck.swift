@@ -152,8 +152,14 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     /// filed to the vault's Mandarin log, which writes the feedback shown on the next one.
     var isMandarin: Bool { type == .prompt && itemKind == "mandarin" }
 
+    /// The weekly work-ethic card's traits, each rated 1–10 by tapping instead of typed. Keyed off
+    /// the card's stable id, so decks already written get the picker too; the answer stays text.
+    var selfRatings: [String]? {
+        type == .prompt && id == "q-hormozi" ? ["Consistency", "Intensity", "Focus", "Boredom tolerance", "Sacrifice"] : nil
+    }
+
     /// Whether answering this card means typing (prompt and reflect cards, and a sleep or goal card's note).
-    var takesText: Bool { type == .prompt || type == .reflect || type == .sleep || type == .goal }
+    var takesText: Bool { (type == .prompt && selfRatings == nil) || type == .reflect || type == .sleep || type == .goal }
 
     /// Whether "Not for Me" applies: material the brief chose, not the deck's own pages.
     var takesFeedback: Bool {
@@ -561,6 +567,32 @@ enum DeckPage: Identifiable, Equatable {
 }
 
 /// The answers file the agent saves verbatim and files with `brain brief file`.
+/// A self-rating card's scores as its answer text, "Consistency: 8, intensity: 6, …": the same
+/// line the vault files under the question, and read back from text typed before the picker.
+enum DeckSelfRatings {
+    /// Each trait's score in `text`, case-insensitive, with or without the colon or space ("Consistency8").
+    static func scores(in text: String?, traits: [String]) -> [String: Int] {
+        guard let text else { return [:] }
+        var scores: [String: Int] = [:]
+        for trait in traits {
+            let pattern = "(?i)\\b" + NSRegularExpression.escapedPattern(for: trait) + "\\s*:?\\s*(10|[1-9])\\b"
+            guard let regex = try? NSRegularExpression(pattern: pattern),
+                  let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+                  let range = Range(match.range(at: 1), in: text) else { continue }
+            scores[trait] = Int(text[range])
+        }
+        return scores
+    }
+
+    /// The scores in trait order, unscored traits left out; nil when none is scored.
+    static func text(_ scores: [String: Int], traits: [String]) -> String? {
+        let parts = traits.enumerated().compactMap { index, trait in
+            scores[trait].map { "\(index == 0 ? trait : trait.lowercased()): \($0)" }
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
+    }
+}
+
 struct DeckAnswersPayload: Encodable, Equatable, Sendable {
     let version = 1
     let date: String

@@ -423,6 +423,22 @@ final class DailyDeckViewModel {
         update(card) { $0.rating = $0.rating == rating ? nil : rating }
     }
 
+    /// Scores one trait on a self-rating card (1–10); tapping its chosen score again clears it.
+    /// The answer is rebuilt as text, so filing reads it like a typed one.
+    func rateTrait(_ trait: String, _ score: Int, for card: DeckCard) {
+        guard let traits = card.selfRatings else { return }
+        update(card) { answer in
+            var scores = DeckSelfRatings.scores(in: answer.text, traits: traits)
+            scores[trait] = scores[trait] == score ? nil : score
+            answer.text = DeckSelfRatings.text(scores, traits: traits)
+        }
+    }
+
+    /// A self-rating card's scores so far, read from its answer text.
+    func traitScores(for card: DeckCard) -> [String: Int] {
+        DeckSelfRatings.scores(in: answers[card.id]?.text, traits: card.selfRatings ?? [])
+    }
+
     /// Taps a sleep card's tag on or off.
     func toggleTag(_ tag: String, for card: DeckCard) {
         update(card) { answer in
