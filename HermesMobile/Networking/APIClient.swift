@@ -221,6 +221,49 @@ actor APIClient {
         return try Self.mappedHTTPResponse(data: buffer.data, response: response, requireSuccess: true).0
     }
 
+    /// A JSON POST whose response is read line by line as it arrives (an SSE stream), with `sendData`'s custom
+    /// headers, redirect guard and `APIError` mapping. A non-2xx response throws after its body is read; cancelling
+    /// the consuming task stops the read.
+    func sendStreamingLines<Body: Encodable>(endpoint: Endpoint, body: Body) -> AsyncThrowingStream<String, Error> {
+        let encoded: Data
+        do { encoded = try encoder.encode(body) } catch {
+            return AsyncThrowingStream { $0.finish(throwing: error) }
+        }
+        var request = URLRequest(url: endpoint.url(relativeTo: baseURL))
+        request.httpMethod = "POST"
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = 120
+        customHeaderProvider().apply(to: &request)
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = encoded
+        let session = session
+        let stripper = redirectHeaderStripper
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    let (bytes, response) = try await session.bytes(for: request, delegate: stripper)
+                    if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                        var data = Data()
+                        for try await byte in bytes { data.append(byte) }
+                        _ = try Self.mappedHTTPResponse(data: data, response: response, requireSuccess: true)
+                    }
+                    for try await line in bytes.lines {
+                        continuation.yield(line)
+                    }
+                    continuation.finish()
+                } catch let error as APIError {
+                    continuation.finish(throwing: error)
+                } catch is CancellationError {
+                    continuation.finish(throwing: CancellationError())
+                } catch {
+                    continuation.finish(throwing: APIError.network(underlying: error))
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
     /// Multipart POST using the same URLSession + `APIError` mapping as `sendData`.
     /// Custom headers first, then the multipart Content-Type so it always wins
     /// over a caller-supplied `Content-Type` (#61).

@@ -50,6 +50,9 @@
 		B1A1C0DE0000000000000E25 /* PrepRunView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E26 /* PrepRunView.swift */; };
 		C0F5EE310000000000000000 /* PrepLessonViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F5EE300000000000000000 /* PrepLessonViews.swift */; };
 		C0F5EA050000000000000000 /* PrepRecallViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F5EA040000000000000000 /* PrepRecallViews.swift */; };
+		182E5234EFC610D5C1A1351C /* PrepLessonCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB2CCD3BB09E7DE289EE996C /* PrepLessonCards.swift */; };
+		BD5A8F0C6E0B013BD7A54E2A /* PrepTutorViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9714521ECD191E02C71FEE41 /* PrepTutorViews.swift */; };
+		C7E8181E0E311EA217CF03E8 /* PrepDialogueModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8C800E34DF47E8E1AB6BCB5 /* PrepDialogueModels.swift */; };
 		B1A1C0DE0000000000000E27 /* PrepDrillViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E28 /* PrepDrillViews.swift */; };
 		B1A1C0DE0000000000000E01 /* PrepModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E02 /* PrepModels.swift */; };
 		C0F5E5470000000000000000 /* PrepCourseModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F5E5460000000000000000 /* PrepCourseModels.swift */; };
@@ -870,6 +873,9 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		B1A1C0DE0000000000000E26 /* PrepRunView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepRunView.swift; sourceTree = "<group>"; };
 		C0F5EE300000000000000000 /* PrepLessonViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepLessonViews.swift; sourceTree = "<group>"; };
 		C0F5EA040000000000000000 /* PrepRecallViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepRecallViews.swift; sourceTree = "<group>"; };
+		FB2CCD3BB09E7DE289EE996C /* PrepLessonCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepLessonCards.swift; sourceTree = "<group>"; };
+		9714521ECD191E02C71FEE41 /* PrepTutorViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepTutorViews.swift; sourceTree = "<group>"; };
+		A8C800E34DF47E8E1AB6BCB5 /* PrepDialogueModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepDialogueModels.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E28 /* PrepDrillViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepDrillViews.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E02 /* PrepModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepModels.swift; sourceTree = "<group>"; };
 		C0F5E5460000000000000000 /* PrepCourseModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepCourseModels.swift; sourceTree = "<group>"; };
@@ -1697,6 +1703,9 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				B1A1C0DE0000000000000E26 /* PrepRunView.swift */,
 				C0F5EE300000000000000000 /* PrepLessonViews.swift */,
 				C0F5EA040000000000000000 /* PrepRecallViews.swift */,
+				FB2CCD3BB09E7DE289EE996C /* PrepLessonCards.swift */,
+				9714521ECD191E02C71FEE41 /* PrepTutorViews.swift */,
+				A8C800E34DF47E8E1AB6BCB5 /* PrepDialogueModels.swift */,
 				B1A1C0DE0000000000000E28 /* PrepDrillViews.swift */,
 			);
 			path = Prep;
@@ -3040,6 +3049,9 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				B1A1C0DE0000000000000E25 /* PrepRunView.swift in Sources */,
 				C0F5EE310000000000000000 /* PrepLessonViews.swift in Sources */,
 				C0F5EA050000000000000000 /* PrepRecallViews.swift in Sources */,
+				182E5234EFC610D5C1A1351C /* PrepLessonCards.swift in Sources */,
+				BD5A8F0C6E0B013BD7A54E2A /* PrepTutorViews.swift in Sources */,
+				C7E8181E0E311EA217CF03E8 /* PrepDialogueModels.swift in Sources */,
 				B1A1C0DE0000000000000E27 /* PrepDrillViews.swift in Sources */,
 				B1A1C0DE0000000000000801 /* BrainLibraryViewModels.swift in Sources */,
 				B1A1C0DE0000000000001A01 /* BrainReview.swift in Sources */,

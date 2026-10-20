@@ -173,6 +173,10 @@ enum Endpoint {
     case tutorRun(run: String, unit: String?)
     case tutorCourse
     case tutorOverride
+    /// One tutor dialogue step after a question rep, streamed as SSE (`graded`, `delta`, `turn`, `done`, `error`).
+    case tutorDialogue
+    /// "Show me": closes a rep's tutor dialogue.
+    case tutorDialogueEnd
     case tutorLesson(id: String)
     case tutorMap(track: String)
     case tutorItem(id: String)
@@ -496,6 +500,10 @@ enum Endpoint {
             return "/api/tutor/course"
         case .tutorOverride:
             return "/api/tutor/override"
+        case .tutorDialogue:
+            return "/api/tutor/dialogue"
+        case .tutorDialogueEnd:
+            return "/api/tutor/dialogue/end"
         case .tutorLesson:
             return "/api/tutor/lesson"
         case .tutorMap:

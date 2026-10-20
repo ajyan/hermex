@@ -161,14 +161,21 @@ private struct DeckCardView: View {
                 .padding(.top, 12)
         }
         if let diagram = viewModel.diagram(for: card) {
+            // A secondary button in the card's paper, so "Write a reflection" stays the one filled button.
             Button { openDiagram = diagram } label: {
-                HXChip(paper: palette.colors, symbol: "point.3.connected.trianglepath.dotted", label: "Diagram")
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
+                Label { Text(verbatim: "Open the diagram") } icon: {
+                    Image(systemName: "point.3.connected.trianglepath.dotted")
+                }
+                .font(AppFont.body(weight: .semibold))
+                .foregroundStyle(palette.ink)
+                .frame(maxWidth: .infinity, minHeight: 50)
+                .background(palette.colors.wash, in: Capsule())
+                .overlay(Capsule().strokeBorder(palette.colors.edge, lineWidth: 1))
+                .contentShape(Capsule())
             }
             .buttonStyle(.plain)
-            .padding(.top, 6)
-            .accessibilityLabel(Text(verbatim: "Diagram: \(diagram.title ?? "interactive")"))
+            .padding(.top, 18)
+            .accessibilityLabel(Text(verbatim: "Open the diagram: \(diagram.title ?? "interactive")"))
             .accessibilityHint(Text(verbatim: "Opens an interactive diagram"))
         }
         if !card.isMandarin, let detail = text.detail {

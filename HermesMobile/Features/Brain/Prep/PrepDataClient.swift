@@ -2,7 +2,7 @@ import Foundation
 
 /// The Prep (interview tutor) API on this user's `hermes-webui` fork (`api/tutor.py`):
 /// `GET /api/tutor/{home,today,map,gaps,gap,course,lesson,stories,mocks}` and
-/// `POST /api/tutor/{attempt,flag,stories/candidate,mock/start,mock/grade}`. None of them is scoped to a Hermes
+/// `POST /api/tutor/{attempt,flag,stories/candidate,mock/start,mock/grade,dialogue,dialogue/end}`. None of them is scoped to a Hermes
 /// profile, so they answer the same whichever profile the client has active. Stock upstream
 /// servers answer 404, which screens treat as "no Prep on this server".
 protocol PrepDataClient: Sendable {
@@ -29,9 +29,23 @@ protocol PrepDataClient: Sendable {
     func mockStart(kind: PrepMockKind, level: String?) async throws -> PrepMockStart
     /// Hands a finished call to the grader (202 while it grades in the background).
     func mockGrade(mockID: String, sessionID: String, turnMS: [Int]) async throws
+    /// One tutor dialogue step on a graded question rep: grades `answer` (a reply to the tutor's last question),
+    /// then streams the tutor's next turn. Without an answer it (re)sends the tutor's turn.
+    func dialogue(attempt: String, answer: String?) -> AsyncThrowingStream<PrepDialogueEvent, Error>
+    /// "Show me": closes the dialogue where it stands and returns the end screen.
+    func endDialogue(attempt: String) async throws -> PrepAttemptResult
 }
 
 extension PrepDataClient {
+    /// A server without the dialogue answers nothing; the run shows the result straight away.
+    func dialogue(attempt: String, answer: String?) -> AsyncThrowingStream<PrepDialogueEvent, Error> {
+        AsyncThrowingStream { $0.finish() }
+    }
+
+    func endDialogue(attempt: String) async throws -> PrepAttemptResult {
+        throw APIError.http(statusCode: 404, body: nil)
+    }
+
     /// Today's daily run.
     func today() async throws -> PrepRun {
         try await today(run: .daily, unit: nil)
@@ -109,6 +123,37 @@ struct APIClientPrepAdapter: PrepDataClient {
     func mockGrade(mockID: String, sessionID: String, turnMS: [Int]) async throws {
         _ = try await apiClient.sendData(endpoint: .tutorMockGrade, method: "POST",
                                          body: PrepMockGradeRequest(mockID: mockID, sessionID: sessionID, turnMS: turnMS))
+    }
+
+    func dialogue(attempt: String, answer: String?) -> AsyncThrowingStream<PrepDialogueEvent, Error> {
+        let apiClient = apiClient
+        let request = PrepDialogueRequest(attempt: attempt, answer: answer)
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    var parser = PrepSSEParser()
+                    let lines = await apiClient.sendStreamingLines(endpoint: .tutorDialogue, body: request)
+                    for try await line in lines {
+                        if let (event, data) = parser.feed(line), let decoded = PrepDialogueEvent.decode(event: event, data: data) {
+                            continuation.yield(decoded)
+                        }
+                    }
+                    if let (event, data) = parser.finish(), let decoded = PrepDialogueEvent.decode(event: event, data: data) {
+                        continuation.yield(decoded)
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    func endDialogue(attempt: String) async throws -> PrepAttemptResult {
+        let data = try await apiClient.sendData(endpoint: .tutorDialogueEnd, method: "POST",
+                                                body: PrepDialogueEndRequest(attempt: attempt))
+        return try decode(data)
     }
 
     private func get<Value: Decodable>(_ endpoint: Endpoint) async throws -> Value {

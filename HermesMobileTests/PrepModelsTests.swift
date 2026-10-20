@@ -831,3 +831,60 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertNil(body["dont_know"])
     }
 }
+
+// MARK: - Tutor dialogue and lesson cards (spec 2026-10-19 Track A)
+
+final class PrepDialogueModelTests: XCTestCase {
+    func testSSEParserFoldsEventsAndSkipsComments() {
+        var parser = PrepSSEParser()
+        let lines = [": keepalive", "", "event: delta", "data: {\"text\": \"Hi\"}", "", "event: turn",
+                     "data: {\"text\": \"Hi there\"}"]
+        let events = lines.compactMap { parser.feed($0) } + [parser.finish()].compactMap { $0 }
+        XCTAssertEqual(events.map(\.event), ["delta", "turn"])
+        XCTAssertEqual(PrepDialogueEvent.decode(event: events[0].event, data: events[0].data), .delta("Hi"))
+        XCTAssertEqual(PrepDialogueEvent.decode(event: events[1].event, data: events[1].data), .turn("Hi there"))
+    }
+
+    func testUnknownAndErrorEvents() {
+        XCTAssertNil(PrepDialogueEvent.decode(event: "ping", data: "{}"))
+        XCTAssertEqual(PrepDialogueEvent.decode(event: "error", data: #"{"status": 409, "error": "moved on"}"#),
+                       .failed(status: 409, message: "moved on"))
+    }
+
+    func testDialogueStateDecodesTolerantly() throws {
+        let state = try PrepDecoding.decode(PrepDialogueState.self, from: Data(#"""
+        {"open": true, "followups": 1, "turns": [{"role": "tutor", "text": "Why?"}, {"bad": 1}]}
+        """#.utf8))
+        XCTAssertTrue(state.open)
+        XCTAssertEqual(state.max, 3)
+        XCTAssertEqual(state.turns.count, 2, "a turn missing fields decodes empty, never crashes")
+        XCTAssertFalse(state.awaitingReply)
+        XCTAssertEqual(PrepCopy.followupLine(state, type: "diagnose"), "Follow-up 1 of 3")
+    }
+
+    func testLessonCardsDecodeAndSkipMissingPictureAndWork() throws {
+        let lesson = try PrepDecoding.decode(PrepLesson.self, from: Data(#"""
+        {"id": "u1.l1", "title": "Tokens", "idea_md": "Idea", "check": {"prompt": "Q?"},
+         "recall": {"prompt": "Why?", "question": "u1.l1.q2", "type": "apply"},
+         "cards": {"case": {"headline": "H", "body": "B", "ask": "A?"}, "idea": [{"lead": "Budget", "text": "the window."}],
+                   "picture": {"steps": ["a"]}, "in_your_work": {"text": ""}}}
+        """#.utf8))
+        let cards = try XCTUnwrap(lesson.cards)
+        XCTAssertNil(cards.picture, "one step is not a flow")
+        XCTAssertNil(cards.inYourWork)
+        XCTAssertEqual(PrepLessonCardKind.cards(for: cards), [.theCase, .idea])
+        XCTAssertEqual(lesson.recall?.questionID, "u1.l1.q2")
+        XCTAssertEqual(lesson.recall?.isQuestion, true)
+    }
+
+    func testStoryCuesDecodeFromTheExcerpt() throws {
+        let item = try PrepDecoding.decode(PrepItemExcerpt.self, from: Data(#"""
+        {"id": "s9", "title": "Retrieval quality", "prompt": "Hardest problem?", "signal": "Most technically challenging thing",
+         "cues": [{"id": "b.situation", "label": "Scope", "cue": "No retrieval metric"}, {"id": "b.task", "label": "Owned"}],
+         "script_md": "The script."}
+        """#.utf8))
+        XCTAssertEqual(item.cues.map(\.label), ["Scope"], "a cue with no words is dropped")
+        XCTAssertEqual(item.signal, "Most technically challenging thing")
+        XCTAssertEqual(item.scriptMD, "The script.")
+    }
+}

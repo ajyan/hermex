@@ -291,16 +291,87 @@ enum PrepConfidence: String, Codable, Hashable, Sendable, CaseIterable {
     case guess, fairly, certain
 }
 
-/// A lesson's recall: the prompt the user answers from memory. Key points arrive with the graded result.
+/// A lesson's recall: the question the user answers from memory, picked from the lesson's pool, with its id and
+/// type (apply, tradeoff, diagnose or open); an older lesson sends only a prompt. Key points arrive with the
+/// graded result.
 struct PrepRecall: Decodable, Hashable, Sendable {
     let prompt: String
+    let questionID: String?
+    let type: String
 
-    private enum CodingKeys: String, CodingKey { case prompt }
+    /// A pool question, which gets the tutor dialogue after grading.
+    var isQuestion: Bool { questionID != nil }
+
+    private enum CodingKeys: String, CodingKey {
+        case prompt, type
+        case questionID = "question"
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         prompt = c.string(.prompt)
         guard !prompt.isEmpty else { throw PrepCourseMissingID() }
+        questionID = c.text(.questionID)
+        type = c.string(.type)
+    }
+}
+
+/// A lesson's example-first cards: the case, the idea in up to three bullets, an optional flow of boxes, and an
+/// optional line on where it showed up in the user's own work.
+struct PrepLessonCards: Decodable, Hashable, Sendable {
+    struct Case: Decodable, Hashable, Sendable {
+        let headline: String
+        let body: String
+        let ask: String
+    }
+
+    struct Bullet: Decodable, Hashable, Sendable {
+        let lead: String
+        let text: String
+    }
+
+    struct Picture: Decodable, Hashable, Sendable {
+        let steps: [String]
+        let startLabel: String?
+        let endLabel: String?
+
+        private enum CodingKeys: String, CodingKey {
+            case steps
+            case startLabel = "start_label"
+            case endLabel = "end_label"
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            steps = (c.optional([String].self, .steps) ?? []).filter { !$0.isEmpty }
+            guard steps.count >= 2 else { throw PrepCourseMissingID() }
+            startLabel = c.text(.startLabel)
+            endLabel = c.text(.endLabel)
+        }
+    }
+
+    let theCase: Case
+    let idea: [Bullet]
+    let picture: Picture?
+    let inYourWork: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case idea, picture
+        case theCase = "case"
+        case inYourWork = "in_your_work"
+    }
+
+    private struct Work: Decodable {
+        let text: String
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        theCase = try c.decode(Case.self, forKey: .theCase)
+        idea = c.lossy(Bullet.self, .idea)
+        guard !theCase.headline.isEmpty, !idea.isEmpty else { throw PrepCourseMissingID() }
+        picture = c.optional(Picture.self, .picture)
+        inYourWork = c.optional(Work.self, .inYourWork).map(\.text).flatMap { $0.isEmpty ? nil : $0 }
     }
 }
 
@@ -318,6 +389,8 @@ struct PrepLesson: Decodable, Identifiable, Hashable, Sendable {
     let reteachOf: String?
     /// The recall prompt; nil for older lessons that only have a multiple-choice check.
     let recall: PrepRecall?
+    /// The example-first cards; nil for a coach re-teach, which reads as the idea in Markdown.
+    let cards: PrepLessonCards?
 
     var hasRecall: Bool { recall != nil }
 
@@ -325,7 +398,7 @@ struct PrepLesson: Decodable, Identifiable, Hashable, Sendable {
     var isReteach: Bool { reteachOf != nil }
 
     private enum CodingKeys: String, CodingKey {
-        case id, unit, title, check, sources, origin, recall
+        case id, unit, title, check, sources, origin, recall, cards
         case ideaMD = "idea_md"
         case sayItMD = "say_it_md"
         case reteachOf = "reteach_of"
@@ -344,6 +417,7 @@ struct PrepLesson: Decodable, Identifiable, Hashable, Sendable {
         origin = c.text(.origin) ?? "course"
         reteachOf = c.text(.reteachOf)
         recall = c.optional(PrepRecall.self, .recall)
+        cards = c.optional(PrepLessonCards.self, .cards)
     }
 }
 
