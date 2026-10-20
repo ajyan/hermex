@@ -37,7 +37,7 @@ struct PrepLessonBody: View {
                 }
             }
             if let cards = lesson.cards {
-                PrepLessonCardsView(title: lesson.title, cards: cards)
+                PrepLessonCardsView(title: lesson.title, cards: cards, ideaMD: lesson.ideaMD)
             } else {
                 VStack(alignment: .leading, spacing: BrainStyle.s) {
                     PrepLessonLabel(title: "The idea")

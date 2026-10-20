@@ -101,7 +101,8 @@ private struct PrepDialogueError: Decodable {
 }
 
 /// Folds SSE lines into (event, data) pairs: `event:` names the next event, `data:` lines accumulate, and a
-/// blank line ends it. Comments (`:`) are skipped.
+/// blank line ends it. `URLSession.AsyncBytes.lines` never yields blank lines, so an `event:` line also ends the
+/// pending event. Comments (`:`) are skipped.
 struct PrepSSEParser {
     private var event = "message"
     private var data: [String] = []
@@ -113,7 +114,10 @@ struct PrepSSEParser {
         }
         if line.hasPrefix(":") { return nil }
         if line.hasPrefix("event:") {
+            let pending = data.isEmpty ? nil : (event, data.joined(separator: "\n"))
+            data = []
             event = line.dropFirst(6).trimmingCharacters(in: .whitespaces)
+            return pending
         } else if line.hasPrefix("data:") {
             var value = line.dropFirst(5)
             if value.first == " " { value = value.dropFirst() }
