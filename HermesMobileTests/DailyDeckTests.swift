@@ -1014,6 +1014,48 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(model.answeredCount, 0)
     }
 
+    func testTheWorkEthicCardIsRatedByTraitNotTyped() throws {
+        let deck = try DailyDeck.decode(Self.selfRatingDeckJSON)
+        let rating = deck.cards[0], other = deck.cards[1]
+        XCTAssertEqual(rating.selfRatings, ["Consistency", "Intensity", "Focus", "Boredom tolerance", "Sacrifice"])
+        XCTAssertFalse(rating.takesText, "the picker replaces the reflection box")
+        XCTAssertNil(other.selfRatings)
+        XCTAssertTrue(other.takesText)
+    }
+
+    func testSelfRatingTextReadsTypedScoresAndWritesThemInTraitOrder() {
+        let traits = ["Consistency", "Intensity", "Focus", "Boredom tolerance", "Sacrifice"]
+        let typed = DeckSelfRatings.scores(in: "Consistency8, intensity 6, focus 5, boredom tolerance 3, sacrifice 4", traits: traits)
+        XCTAssertEqual(typed, ["Consistency": 8, "Intensity": 6, "Focus": 5, "Boredom tolerance": 3, "Sacrifice": 4])
+        XCTAssertEqual(DeckSelfRatings.scores(in: "Consistency: 10, focus: 1", traits: traits), ["Consistency": 10, "Focus": 1])
+        XCTAssertEqual(DeckSelfRatings.text(typed, traits: traits),
+                       "Consistency: 8, intensity: 6, focus: 5, boredom tolerance: 3, sacrifice: 4")
+        XCTAssertEqual(DeckSelfRatings.text(["Focus": 7], traits: traits), "focus: 7")
+        XCTAssertNil(DeckSelfRatings.text([:], traits: traits))
+    }
+
+    @MainActor
+    func testRatingTraitsBuildsTheAnswerAndClearingThemAllDropsIt() async throws {
+        store.setWorkspace("/vault", for: server)
+        let model = makeViewModel(ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.selfRatingDeckJSON))
+        await model.load()
+        let card = try XCTUnwrap(model.cards.first { $0.id == "q-hormozi" })
+        model.rateTrait("Intensity", 6, for: card)
+        model.rateTrait("Consistency", 8, for: card)
+        XCTAssertEqual(model.answer(for: card)?.text, "Consistency: 8, intensity: 6")
+        XCTAssertEqual(model.traitScores(for: card), ["Consistency": 8, "Intensity": 6])
+        model.rateTrait("Consistency", 9, for: card)
+        XCTAssertEqual(model.answer(for: card)?.text, "Consistency: 9, intensity: 6", "another score replaces it")
+        model.rateTrait("Consistency", 9, for: card)
+        XCTAssertEqual(model.answer(for: card)?.text, "intensity: 6", "tapping the chosen score clears it")
+        model.rateTrait("Intensity", 6, for: card)
+        XCTAssertNil(model.answer(for: card), "no scores, no answer")
+        model.rateTrait("Focus", 5, for: card)
+        let deck = try DailyDeck.decode(Self.selfRatingDeckJSON)
+        let payload = DeckAnswersPayload(deck: deck, answers: ["q-hormozi": try XCTUnwrap(model.answer(for: card))], completedAt: morning)
+        XCTAssertEqual(payload.answers.first?.text, "focus: 5", "filed as text, like a typed answer")
+    }
+
     func testSleepCardDecodesItsTagsTilesCoachAndHRV() throws {
         let card = try DailyDeck.decode(Self.sleepDeckJSON).cards[0]
         XCTAssertEqual(card.tags.map(\.id), ["late_meal", "ill"], "a tag without a label is dropped")
@@ -1273,6 +1315,13 @@ final class DailyDeckTests: XCTestCase {
         let now = morning
         return DailyDeckViewModel(server: server, client: client, store: store, feedback: feedback, now: { now })
     }
+
+    static let selfRatingDeckJSON = """
+    {"version": 1, "date": "2026-10-04", "kind": "morning", "cards": [
+      {"id": "q-hormozi", "type": "prompt", "question": "Rate yourself 1–10 on consistency, intensity, focus, boredom tolerance, and sacrifice."},
+      {"id": "q-week", "type": "prompt", "question": "What went well this week?"}
+    ]}
+    """
 
     static let deckJSON = """
     {"version": 1, "date": "2026-10-04", "kind": "morning", "generated_at": "2026-10-04T08:00:00-04:00",

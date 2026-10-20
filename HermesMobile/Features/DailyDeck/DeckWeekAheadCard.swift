@@ -190,8 +190,8 @@ private struct WeekAheadRowView: View {
                 }
                 if let reason = row.commitment.reason {
                     Text(verbatim: reason)
-                        .font(AppFont.serif(style: .caption))
-                        .foregroundStyle(Color.hxTextPrimary)
+                        .font(AppFont.footnote())
+                        .foregroundStyle(Color.hxTextSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
