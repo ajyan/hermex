@@ -562,6 +562,10 @@ final class PrepRunViewModel {
             tutorError = "Couldn't reach the tutor. Try again."
         }
         guard token == generation else { return }
+        if tutorError == nil, let dialogue = self.result?.dialogue, dialogue.open, !dialogue.awaitingReply {
+            // The stream ended without the tutor's turn: offer Try again rather than a blank screen.
+            tutorError = "The tutor couldn't reply. Try again."
+        }
         if tutorError == nil, self.result?.dialogue?.open != true { inDialogue = false }
     }
 
@@ -1117,12 +1121,12 @@ enum PrepCopy {
         return "Card \(n) of \(kinds.count), \(page.title)"
     }
 
-    /// A flow picture read aloud: "query, then embed, then rerank. Start: recall lives here."
-    static func pictureLabel(_ picture: PrepLessonCards.Picture) -> String {
-        var parts = [picture.steps.joined(separator: ", then ")]
-        if let start = picture.startLabel { parts.append("Start: \(start)") }
-        if let end = picture.endLabel { parts.append("End: \(end)") }
-        return parts.joined(separator: ". ")
+    /// A case card's body as one flowing paragraph: authored single line breaks become spaces, blank lines stay
+    /// paragraph breaks.
+    static func caseBody(_ body: String) -> String {
+        body.components(separatedBy: "\n\n")
+            .map { $0.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.joined(separator: " ") }
+            .joined(separator: "\n\n")
     }
 
     /// The recall card's kicker: the question's type for a pool question ("Diagnose", "Diagnose · Tokens" on a

@@ -835,6 +835,20 @@ final class PrepModelsTests: XCTestCase {
 // MARK: - Tutor dialogue and lesson cards (spec 2026-10-19 Track A)
 
 final class PrepDialogueModelTests: XCTestCase {
+    func testSSEParserSplitsEventsWithoutBlankLines() {
+        // URLSession's line reader drops blank lines, so the server's framing arrives like this.
+        var parser = PrepSSEParser()
+        let lines = ["event: delta", #"data: {"text": "Hi"}"#, "event: turn", #"data: {"text": "Hi"}"#,
+                     "event: done", #"data: {"verdict": "miss", "dialogue": {"open": true, "followups": 0, "turns": [{"role": "tutor", "text": "Hi"}]}}"#]
+        let events = lines.compactMap { parser.feed($0) } + [parser.finish()].compactMap { $0 }
+        XCTAssertEqual(events.map(\.event), ["delta", "turn", "done"])
+        XCTAssertEqual(PrepDialogueEvent.decode(event: events[0].event, data: events[0].data), .delta("Hi"))
+        guard case .done(let done)? = PrepDialogueEvent.decode(event: events[2].event, data: events[2].data) else {
+            return XCTFail("done decodes")
+        }
+        XCTAssertEqual(done.dialogue?.awaitingReply, true)
+    }
+
     func testSSEParserFoldsEventsAndSkipsComments() {
         var parser = PrepSSEParser()
         let lines = [": keepalive", "", "event: delta", "data: {\"text\": \"Hi\"}", "", "event: turn",
@@ -875,6 +889,22 @@ final class PrepDialogueModelTests: XCTestCase {
         XCTAssertEqual(PrepLessonCardKind.cards(for: cards), [.theCase, .idea])
         XCTAssertEqual(lesson.recall?.questionID, "u1.l1.q2")
         XCTAssertEqual(lesson.recall?.isQuestion, true)
+    }
+
+    func testAFlowPictureNoLongerGetsACard() throws {
+        let lesson = try PrepDecoding.decode(PrepLesson.self, from: Data(#"""
+        {"id": "u2.l12", "title": "Multi-step", "idea_md": "Idea",
+         "cards": {"case": {"headline": "H", "body": "B", "ask": "A?"}, "idea": [{"lead": "Keep", "text": "both."}],
+                   "picture": {"steps": ["read", "think", "answer"]}, "in_your_work": {"text": "At work."}}}
+        """#.utf8))
+        let cards = try XCTUnwrap(lesson.cards)
+        XCTAssertEqual(PrepLessonCardKind.cards(for: cards), [.theCase, .idea, .work])
+    }
+
+    func testCaseBodyJoinsAuthoredLineBreaks() {
+        XCTAssertEqual(PrepCopy.caseBody("Asked about a leave type,\nthe model says yes."),
+                       "Asked about a leave type, the model says yes.")
+        XCTAssertEqual(PrepCopy.caseBody("One.\n\nTwo,\nthree."), "One.\n\nTwo, three.")
     }
 
     func testStoryCuesDecodeFromTheExcerpt() throws {

@@ -728,6 +728,23 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertTrue(vm.canSendTutorReply)
     }
 
+    func testAStreamThatEndsWithoutATutorTurnOffersTryAgain() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([questionRep(0)]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.success(dialogueResult("miss", attempt: "a1", hit: [], missed: ["r1", "r2"], followups: 0, open: true))]
+        client.dialogueScripts = [[]]  // the stream ends with no events
+        let vm = makeVM(client)
+        await vm.load()
+        vm.beginRecall()
+        vm.recallDraft = "Q&A over contracts"
+        vm.confidence = .fairly
+        await vm.submitRecall()
+        XCTAssertTrue(vm.inDialogue)
+        XCTAssertNil(vm.tutorStreaming)
+        XCTAssertEqual(vm.tutorError, "The tutor couldn't reply. Try again.", "never a blank tutor screen")
+    }
+
     func testAReplyThatHitsEverythingEndsTheDialogue() async {
         let client = FakePrepClient()
         client.todayResults = [.success(courseRun([questionRep(0)]))]
