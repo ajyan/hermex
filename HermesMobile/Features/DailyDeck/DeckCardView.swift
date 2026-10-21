@@ -112,7 +112,7 @@ private struct DeckCardView: View {
             })
         }
         .sheet(item: $openDiagram) { entry in
-            BriefDiagramSheet(entry: entry, viewModel: viewModel)
+            DiagramSheet(title: entry.title ?? "Diagram") { [viewModel] in try await viewModel.diagramFragment(entry) }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text(verbatim: palette.name))

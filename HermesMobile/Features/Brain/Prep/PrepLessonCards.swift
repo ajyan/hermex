@@ -3,16 +3,19 @@ import SwiftUI
 // A lesson as example-first cards (spec 2026-10-19 Track A, slice 3), swiped sideways: the case (a concrete
 // situation and a question, with the full lesson behind "Show what went wrong"), the idea in up to three bullets
 // and "In your work" when the lesson has it. Every card is a `.knowledge` run card; page dots sit below.
-// "Picture it" was dropped on 2026-10-20: its word chips only repeated the bullets.
+// "Picture it" was dropped on 2026-10-20: its word chips only repeated the bullets. "In code" (a prompt, Python
+// or SQL that makes the idea concrete) sits after the idea when the lesson has one, and a lesson's vault diagram
+// opens from "Open the diagram" under the cards (`PrepLessonDiagramButton`).
 
 /// One card of a lesson, in swipe order.
 enum PrepLessonCardKind: Hashable, CaseIterable {
-    case theCase, idea, work
+    case theCase, idea, code, work
 
     var title: String {
         switch self {
         case .theCase: "The case"
         case .idea: "The idea"
+        case .code: "In code"
         case .work: "In your work"
         }
     }
@@ -22,6 +25,7 @@ enum PrepLessonCardKind: Hashable, CaseIterable {
         allCases.filter {
             switch $0 {
             case .theCase, .idea: true
+            case .code: cards.code != nil
             case .work: cards.inYourWork != nil
             }
         }
@@ -43,7 +47,8 @@ struct PrepLessonCardsView: View {
     var body: some View {
         VStack(spacing: BrainStyle.m) {
             ScrollView(.horizontal) {
-                LazyHStack(alignment: .top, spacing: BrainStyle.m) {
+                // Eager, so the pager is as tall as its tallest card (at most four, so cheap).
+                HStack(alignment: .top, spacing: BrainStyle.m) {
                     ForEach(Array(kinds.enumerated()), id: \.element) { offset, kind in
                         PrepRunCard {
                             Text(verbatim: "\(offset + 1) of \(kinds.count) · \(kind.title)")
@@ -58,7 +63,7 @@ struct PrepLessonCardsView: View {
                 }
                 .scrollTargetLayout()
             }
-            .scrollTargetBehavior(.paging)
+            .scrollTargetBehavior(.viewAligned)  // .paging pages by the view width and drifts by the spacing
             .scrollPosition(id: $page)
             .scrollIndicators(.hidden)
             .scrollClipDisabled()
@@ -125,6 +130,16 @@ struct PrepLessonCardsView: View {
                     }
                 }
             }
+        case .code:
+            if let code = cards.code {
+                PrepCodeBlock(code: code)
+                if let caption = code.caption {
+                    Text(verbatim: caption)
+                        .font(BrainStyle.rowTitle)
+                        .foregroundStyle(Color.hxTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         case .work:
             if let work = cards.inYourWork {
                 Text(verbatim: work)
@@ -133,5 +148,82 @@ struct PrepLessonCardsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+}
+
+
+/// Reads a lesson diagram's `atlas-ui` fragment from the screen's server. Prep screens put it in the environment,
+/// so every `PrepLessonBody` can open its diagram without threading a client through.
+struct PrepDiagramLoader: Sendable {
+    let client: PrepDataClient?
+
+    func callAsFunction(_ topic: String) async throws -> String {
+        guard let client else { throw CancellationError() }
+        return try await client.diagram(topic: topic).html
+    }
+}
+
+private struct PrepDiagramLoaderKey: EnvironmentKey {
+    static let defaultValue = PrepDiagramLoader(client: nil)
+}
+
+extension EnvironmentValues {
+    var prepDiagramLoader: PrepDiagramLoader {
+        get { self[PrepDiagramLoaderKey.self] }
+        set { self[PrepDiagramLoaderKey.self] = newValue }
+    }
+}
+
+/// "Open the diagram" under a lesson's cards: the Brief's secondary button in the knowledge paper, opening the
+/// diagram in the shared `DiagramSheet`.
+struct PrepLessonDiagramButton: View {
+    let diagram: PrepDiagramRef
+    @Environment(\.prepDiagramLoader) private var loader
+    @State private var isOpen = false
+
+    var body: some View {
+        if loader.client != nil {
+            Button { isOpen = true } label: {
+                Label { Text(verbatim: "Open the diagram") } icon: {
+                    Image(systemName: "point.3.connected.trianglepath.dotted")
+                }
+                .font(AppFont.body(weight: .semibold))
+                .foregroundStyle(HermexPaper.knowledge.glow)
+                .frame(maxWidth: .infinity, minHeight: 50)
+                .background(HermexPaper.knowledge.wash, in: Capsule())
+                .overlay(Capsule().strokeBorder(HermexPaper.knowledge.edge, lineWidth: 1))
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(verbatim: "Open the diagram: \(diagram.title)"))
+            .accessibilityHint(Text(verbatim: "Opens an interactive diagram"))
+            .sheet(isPresented: $isOpen) {
+                DiagramSheet(title: diagram.title) { [loader, topic = diagram.topic] in try await loader(topic) }
+            }
+        }
+    }
+}
+
+/// The "In code" artifact: monospaced on an inset, small enough that an authored 46-column line fits a phone card;
+/// anything wider scrolls sideways inside the block, never the card.
+struct PrepCodeBlock: View {
+    let code: PrepLessonCards.Code
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            Text(verbatim: code.body)
+                .font(AppFont.mono(style: .caption))
+                .foregroundStyle(Color.hxTextPrimary)
+                .fixedSize(horizontal: true, vertical: true)
+                .textSelection(.enabled)
+                .padding(BrainStyle.m)
+        }
+        .scrollIndicators(.hidden)
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.hxCanvas, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
+            .strokeBorder(HermexPaper.knowledge.edge, lineWidth: 1))
+        .accessibilityLabel(Text(verbatim: "Code, \(code.lang): \(code.body)"))
     }
 }

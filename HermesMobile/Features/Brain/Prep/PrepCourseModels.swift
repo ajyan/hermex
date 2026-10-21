@@ -350,13 +350,31 @@ struct PrepLessonCards: Decodable, Hashable, Sendable {
         }
     }
 
+    /// The "In code" card: one short artifact (a prompt, Python, SQL) that makes the idea concrete.
+    struct Code: Decodable, Hashable, Sendable {
+        let lang: String
+        let body: String
+        let caption: String?
+
+        private enum CodingKeys: String, CodingKey { case lang, body, caption }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            lang = c.text(.lang) ?? "text"
+            body = c.string(.body)
+            guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw PrepCourseMissingID() }
+            caption = c.text(.caption)
+        }
+    }
+
     let theCase: Case
     let idea: [Bullet]
     let picture: Picture?
+    let code: Code?
     let inYourWork: String?
 
     private enum CodingKeys: String, CodingKey {
-        case idea, picture
+        case idea, picture, code
         case theCase = "case"
         case inYourWork = "in_your_work"
     }
@@ -371,6 +389,7 @@ struct PrepLessonCards: Decodable, Hashable, Sendable {
         idea = c.lossy(Bullet.self, .idea)
         guard !theCase.headline.isEmpty, !idea.isEmpty else { throw PrepCourseMissingID() }
         picture = c.optional(Picture.self, .picture)
+        code = c.optional(Code.self, .code)
         inYourWork = c.optional(Work.self, .inYourWork).map(\.text).flatMap { $0.isEmpty ? nil : $0 }
     }
 }
@@ -391,6 +410,8 @@ struct PrepLesson: Decodable, Identifiable, Hashable, Sendable {
     let recall: PrepRecall?
     /// The example-first cards; nil for a coach re-teach, which reads as the idea in Markdown.
     let cards: PrepLessonCards?
+    /// A vault diagram that teaches this lesson, opened from "Open the diagram".
+    let diagram: PrepDiagramRef?
 
     var hasRecall: Bool { recall != nil }
 
@@ -398,7 +419,7 @@ struct PrepLesson: Decodable, Identifiable, Hashable, Sendable {
     var isReteach: Bool { reteachOf != nil }
 
     private enum CodingKeys: String, CodingKey {
-        case id, unit, title, check, sources, origin, recall, cards
+        case id, unit, title, check, sources, origin, recall, cards, diagram
         case ideaMD = "idea_md"
         case sayItMD = "say_it_md"
         case reteachOf = "reteach_of"
@@ -418,7 +439,28 @@ struct PrepLesson: Decodable, Identifiable, Hashable, Sendable {
         reteachOf = c.text(.reteachOf)
         recall = c.optional(PrepRecall.self, .recall)
         cards = c.optional(PrepLessonCards.self, .cards)
+        diagram = c.optional(PrepDiagramRef.self, .diagram)
     }
+}
+
+/// A lesson's diagram as the lesson names it: the vault topic and its title.
+struct PrepDiagramRef: Decodable, Hashable, Sendable {
+    let topic: String
+    let title: String
+
+    private enum CodingKeys: String, CodingKey { case topic, title }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        topic = c.string(.topic)
+        guard !topic.isEmpty else { throw PrepCourseMissingID() }
+        title = c.text(.title) ?? "Diagram"
+    }
+}
+
+/// `GET /api/tutor/diagram?topic=`: the diagram's `atlas-ui` fragment.
+struct PrepDiagram: Decodable, Sendable {
+    let html: String
 }
 
 // MARK: - Boss

@@ -38,6 +38,9 @@ struct PrepLessonBody: View {
             }
             if let cards = lesson.cards {
                 PrepLessonCardsView(title: lesson.title, cards: cards, ideaMD: lesson.ideaMD)
+                if let diagram = lesson.diagram {
+                    PrepLessonDiagramButton(diagram: diagram)
+                }
             } else {
                 VStack(alignment: .leading, spacing: BrainStyle.s) {
                     PrepLessonLabel(title: "The idea")
@@ -411,6 +414,7 @@ struct PrepLessonView: View {
 
     var body: some View {
         content
+            .environment(\.prepDiagramLoader, viewModel.diagramLoader)
             .hxNavigationTitle(title)
             .background(Color.hxCanvas.ignoresSafeArea())
             .task {
