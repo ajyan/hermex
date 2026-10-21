@@ -9,6 +9,12 @@ private final class FakeMockClient: PrepDataClient, @unchecked Sendable {
 
     var mocksResults: [Result<PrepMocks, Error>] = []
     var startResult: Result<PrepMockStart, Error> = .failure(URLError(.badServerResponse))
+    var storyResult: Result<PrepStoryPage, Error> = .failure(URLError(.badServerResponse))
+
+    func story(id: String) async throws -> PrepStoryPage {
+        lock.withLock { _log.append("story:\(id)") }
+        return try storyResult.get()
+    }
 
     var log: [String] { lock.withLock { _log } }
     var grades: [(mockID: String, sessionID: String, turnMS: [Int])] { lock.withLock { _grades } }
@@ -21,8 +27,8 @@ private final class FakeMockClient: PrepDataClient, @unchecked Sendable {
         }
     }
 
-    func mockStart(kind: PrepMockKind, level: String?) async throws -> PrepMockStart {
-        lock.withLock { _log.append(["start", kind.rawValue, level].compactMap { $0 }.joined(separator: ":")) }
+    func mockStart(kind: PrepMockKind, level: String?, story: String?) async throws -> PrepMockStart {
+        lock.withLock { _log.append(["start", kind.rawValue, level, story.map { "story=\($0)" }].compactMap { $0 }.joined(separator: ":")) }
         return try startResult.get()
     }
 
@@ -186,8 +192,20 @@ final class PrepMockTests: APIClientTestCase {
             return apiTestJSONResponse(#"{"mock_id": "m1", "level": "D1", "brief": "b", "profile": "interviewer"}"#,
                                        for: request)
         }
-        let start = try await APIClientPrepAdapter(apiClient: client).mockStart(kind: .design, level: "D1")
+        let start = try await APIClientPrepAdapter(apiClient: client).mockStart(kind: .design, level: "D1", story: nil)
         XCTAssertEqual(start.level, "D1")
+    }
+
+    func testStartRequestCarriesAStoryToPractice() async throws {
+        let client = makeClient { request in
+            let body = try apiTestJSONBody(from: request)
+            XCTAssertEqual(body["kind"] as? String, "behavioral")
+            XCTAssertEqual(body["story"] as? String, "s9")
+            XCTAssertNil(body["level"], "a story mock takes the ladder's current level")
+            return apiTestJSONResponse(#"{"mock_id": "m1", "level": "B1", "brief": "b", "profile": "interviewer"}"#,
+                                       for: request)
+        }
+        _ = try await APIClientPrepAdapter(apiClient: client).mockStart(kind: .behavioral, level: nil, story: "s9")
     }
 
     func testStartRequestWithoutALevelLeavesItOut() async throws {
@@ -196,7 +214,7 @@ final class PrepMockTests: APIClientTestCase {
             XCTAssertNil(body["level"], "the server takes the ladder's current level")
             return apiTestJSONResponse(#"{"mock_id": "m1", "level": "D2"}"#, for: request)
         }
-        _ = try await APIClientPrepAdapter(apiClient: client).mockStart(kind: .design, level: nil)
+        _ = try await APIClientPrepAdapter(apiClient: client).mockStart(kind: .design, level: nil, story: nil)
     }
 
     func testBriefReplaysAnUnlockedLevel() async throws {
@@ -218,6 +236,50 @@ final class PrepMockTests: APIClientTestCase {
         await viewModel.startCall(kind: .design, open: opener)
 
         XCTAssertEqual(client.log, ["mocks", "start:design:D1"])
+    }
+
+    // MARK: A story's page
+
+    private let storyJSON = #"""
+    {"id": "s9", "title": "Owning retrieval quality", "status": "active", "primary_signal": "ownership",
+     "prompts": [{"text": "What's the most technically challenging thing you've done?", "signal": "Hardest thing"},
+                 {"text": ""}],
+     "cues": [{"id": "b.situation", "label": "Scope", "cue": "RAG unmeasured"}, {"id": "b.task"}],
+     "say_it_md": "**S:** Retrieval had no measurement.",
+     "probes": [{"id": "p1", "attack": "Why not raise top-k?", "points": ["Raising k spends context", ""]},
+                {"id": "p2"}],
+     "path": "ai-engineer-career/prep/stories/s9.json", "ready": false,
+     "marks": {"time": true, "score": false, "probes": null}, "last": "2026-10-19", "extra": 1}
+    """#
+
+    func testStoryPageDecodesAndDropsEmptyParts() throws {
+        let page = try PrepDecoding.decode(PrepStoryPage.self, from: Data(storyJSON.utf8))
+        XCTAssertEqual(page.prompts.map(\.text), ["What's the most technically challenging thing you've done?"])
+        XCTAssertEqual(page.cues.map(\.label), ["Scope"], "a cue without text is dropped")
+        XCTAssertEqual(page.probes.map(\.attack), ["Why not raise top-k?"])
+        XCTAssertEqual(page.probes.first?.points, ["Raising k spends context"])
+        XCTAssertEqual(page.marks, PrepStoryMarks(time: true, score: false, probes: nil))
+        XCTAssertEqual(page.path, "ai-engineer-career/prep/stories/s9.json")
+    }
+
+    func testAtlasPromptNamesTheStoryAndItsFile() throws {
+        let page = try PrepDecoding.decode(PrepStoryPage.self, from: Data(storyJSON.utf8))
+        let prompt = PrepCopy.storyAtlasPrompt(page)
+        XCTAssertTrue(prompt.contains("\u{201C}Owning retrieval quality\u{201D} (ai-engineer-career/prep/stories/s9.json)"))
+        XCTAssertTrue(prompt.contains("update that file in place"))
+    }
+
+    func testStoryPageStartsAMockOnThatStory() async throws {
+        let client = FakeMockClient()
+        client.storyResult = .success(try PrepDecoding.decode(PrepStoryPage.self, from: Data(storyJSON.utf8)))
+        client.startResult = .success(designStart)
+        let viewModel = PrepStoryPageViewModel(id: "s9", client: client)
+        let opener = OpenMockCallAction()
+        opener.handler = { start in _ = await start() }
+        await viewModel.load()
+        await viewModel.startMock(open: opener)
+
+        XCTAssertEqual(client.log, ["story:s9", "start:behavioral:story=s9"], "no level: the server takes the current one")
     }
 
     // MARK: Opening the call

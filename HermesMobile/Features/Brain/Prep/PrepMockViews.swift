@@ -196,7 +196,7 @@ struct PrepMockBriefView: View {
 }
 
 /// Start call: a full-width Nous blue capsule, "Starting…" and off while the mock starts.
-private struct PrepStartCallButton: View {
+struct PrepStartCallButton: View {
     let isStarting: Bool
     let action: () -> Void
 

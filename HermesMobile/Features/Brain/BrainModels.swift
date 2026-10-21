@@ -725,6 +725,8 @@ enum PrepRoute: Hashable, Sendable {
     case bonus
     /// One behavioral story, drilled on its own.
     case story(String)
+    /// One behavioral story's page: review it, drill it, practice it in a mock or work on it with Atlas.
+    case storyPage(String)
     /// A voice mock ladder's brief, with Start call.
     case mockLadder(PrepMockKind)
     /// One voice mock's result, by mock id. `unsent` is the grade request when it never got

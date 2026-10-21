@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 // Models for the behavioral story reps of Prep on this user's `hermes-webui` fork
 // (`api/tutor_stories.py`): `GET /api/tutor/stories`, and the probe and pending-probe objects
@@ -279,4 +280,126 @@ struct PrepStoryList: Decodable, Hashable, Sendable {
     var activeStories: [PrepStorySummary] { stories.filter { $0.status == "active" } }
     /// The stories waiting their turn.
     var benchStories: [PrepStorySummary] { stories.filter { $0.status == "bench" } }
+}
+
+/// One behavioral story's page (`GET /api/tutor/story?id=`): the questions it answers, its beats as cues,
+/// the full telling, the follow-ups an interviewer is likely to press with (and what a strong answer covers),
+/// where the story lives in the vault, and its readiness.
+struct PrepStoryPage: Decodable, Hashable, Sendable {
+    struct Prompt: Decodable, Hashable, Sendable {
+        let text: String
+        let signal: String?
+
+        private enum CodingKeys: String, CodingKey { case text, signal }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            text = c.string(.text)
+            signal = c.optional(String.self, .signal)
+            guard !text.isEmpty else { throw PrepStoryMissingID() }
+        }
+    }
+
+    struct Probe: Decodable, Hashable, Sendable {
+        let attack: String
+        let points: [String]
+
+        private enum CodingKeys: String, CodingKey { case attack, points }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            attack = c.string(.attack)
+            points = c.lossy(String.self, .points).filter { !$0.isEmpty }
+            guard !attack.isEmpty else { throw PrepStoryMissingID() }
+        }
+    }
+
+    let id: String
+    let title: String
+    let status: String
+    let primarySignal: String?
+    let prompts: [Prompt]
+    let cues: [PrepStoryCue]
+    let sayItMD: String
+    let probes: [Probe]
+    /// The story file in the vault, relative to its root, for Atlas to read and update.
+    let path: String?
+    let ready: Bool
+    let marks: PrepStoryMarks
+    let last: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, title, status, prompts, cues, probes, path, ready, marks, last
+        case primarySignal = "primary_signal"
+        case sayItMD = "say_it_md"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.requiredID(.id)
+        title = c.string(.title)
+        status = c.string(.status)
+        primarySignal = c.optional(String.self, .primarySignal)
+        prompts = c.lossy(Prompt.self, .prompts)
+        cues = c.lossy(PrepStoryCue.self, .cues)
+        sayItMD = c.string(.sayItMD)
+        probes = c.lossy(Probe.self, .probes)
+        path = c.optional(String.self, .path)
+        ready = c.bool(.ready)
+        marks = c.optional(PrepStoryMarks.self, .marks) ?? PrepStoryMarks()
+        last = c.optional(String.self, .last)
+    }
+}
+
+extension PrepCopy {
+    /// The first message of "Work on it with Atlas": Atlas reads the story file, coaches it like a hiring manager,
+    /// and updates the file in place when the story changes. It lands in a new chat's composer, unsent.
+    static func storyAtlasPrompt(_ page: PrepStoryPage) -> String {
+        let file = page.path.map { " (\($0))" } ?? ""
+        return "Let's work on my interview story \u{201C}\(page.title)\u{201D}\(file). Read it, then coach me on it "
+            + "like a hiring manager: ask one question at a time, push on the weakest beats, and tell me what a "
+            + "stronger version would say. When we change what the story says, update that file in place, keep "
+            + "its JSON shape, and run tools/prep_course.py verify."
+    }
+}
+
+/// A story's page: loads the story and starts a mock interview that practices it.
+@MainActor
+@Observable
+final class PrepStoryPageViewModel {
+    let id: String
+    private(set) var state: BrainLoadState<PrepStoryPage> = .loading
+    /// Starts the one-story mock (the shell switches to the interviewer and opens the call).
+    let mock: PrepMockViewModel
+    @ObservationIgnored private let client: PrepDataClient
+    @ObservationIgnored private let onAPIError: (Error) -> Void
+    @ObservationIgnored private var generation = 0
+
+    init(id: String, client: PrepDataClient, onAPIError: @escaping (Error) -> Void = { _ in }) {
+        self.id = id
+        self.client = client
+        self.onAPIError = onAPIError
+        mock = PrepMockViewModel(client: client, onAPIError: onAPIError)
+    }
+
+    func load() async {
+        generation += 1
+        let token = generation
+        do {
+            let page = try await client.story(id: id)
+            guard token == generation, !Task.isCancelled else { return }
+            state = .loaded(page)
+        } catch {
+            guard token == generation else { return }
+            if error is CancellationError || (error as? URLError)?.code == .cancelled || Task.isCancelled { return }
+            onAPIError(error)
+            guard case .loading = state else { return }  // a failed refresh keeps the page
+            state = .failed((error as? APIError)?.isNotFound == true
+                            ? "This story is no longer in the bank." : error.localizedDescription)
+        }
+    }
+
+    func startMock(open: OpenMockCallAction) async {
+        await mock.startCall(kind: .behavioral, story: id, open: open)
+    }
 }

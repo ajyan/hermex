@@ -216,6 +216,8 @@ struct PrepMockStart: Decodable, Hashable, Sendable {
 struct PrepMockStartRequest: Encodable, Hashable, Sendable {
     let kind: String
     let level: String?
+    /// A behavioral story to practice on its own; omitted for a ladder mock.
+    var story: String?
 }
 
 struct PrepMockGradeRequest: Encodable, Hashable, Sendable {
@@ -381,10 +383,10 @@ final class PrepMockViewModel {
 
     /// Starts a mock at `level`, else the kind's current level. A 409 means the server has no
     /// interviewer profile.
-    func start(kind: PrepMockKind, level: String? = nil) async -> PrepMockStart? {
+    func start(kind: PrepMockKind, level: String? = nil, story: String? = nil) async -> PrepMockStart? {
         errorMessage = nil
         do {
-            return try await client.mockStart(kind: kind, level: level)
+            return try await client.mockStart(kind: kind, level: level, story: story)
         } catch {
             guard !Self.isCancellation(error) else { return nil }
             if case .http(409, _)? = error as? APIError {
@@ -399,14 +401,14 @@ final class PrepMockViewModel {
 
     /// Start call, at the picked level: the shell makes the interviewer profile active, then starts
     /// the mock through this view model and opens its call. A failed switch starts nothing.
-    func startCall(kind: PrepMockKind, open: OpenMockCallAction) async {
+    func startCall(kind: PrepMockKind, story: String? = nil, open: OpenMockCallAction) async {
         guard !isStarting else { return }
         isStarting = true
         errorMessage = nil
         defer { isStarting = false }
-        let level = level(for: kind)
+        let level = story == nil ? level(for: kind) : nil
         do {
-            try await open { await self.start(kind: kind, level: level) }
+            try await open { await self.start(kind: kind, level: level, story: story) }
         } catch {
             guard !Self.isCancellation(error) else { return }
             errorMessage = error.localizedDescription
