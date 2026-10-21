@@ -223,6 +223,9 @@ struct PrepRunView: View {
                                      overridingPoint: viewModel.overridingPoint) { point in
                     Task { await viewModel.overridePoint(point) }
                 }
+                if let cards = rep.item.lesson?.cards, !result.isUngraded {
+                    PrepTakeaway(idea: cards.idea)
+                }
                 if let error = viewModel.submitError { PrepSubmitError(message: error) }
                 if rep.item.lesson?.isReteach == true {
                     PrepFlagCardButton(
