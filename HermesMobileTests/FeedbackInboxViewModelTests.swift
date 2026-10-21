@@ -266,6 +266,16 @@ final class FeedbackInboxViewModelTests: XCTestCase {
         XCTAssertEqual(try make(#"{"id":"a","feature":"Prep","size":"huge"}"#).detailMetaLine, "Prep")
     }
 
+    func testReadyButtonMergesUnlessTheFixIsAnAppPROrAlreadyOnMain() throws {
+        func title(_ json: String) throws -> String {
+            try FeedbackDecoding.decode(FeedbackEntry.self, from: Data(json.utf8)).mergeAction.title
+        }
+        XCTAssertEqual(try title(#"{"id":"a","status":"ready","repo":"second-brain","branch":"feedback/a-1"}"#), "Merge it")
+        XCTAssertEqual(try title(#"{"id":"a","status":"ready","repo":"hermes-webui","branch":"feedback/a-1"}"#), "Merge it")
+        XCTAssertEqual(try title(#"{"id":"a","status":"ready","repo":"hermex","branch":"feedback/a-1"}"#), "I merged it")
+        XCTAssertEqual(try title(#"{"id":"a","status":"ready","repo":"second-brain"}"#), "Mark done")
+    }
+
     func testPlanLoadsFromClient() async throws {
         let client = InboxStubClient(entries: [entry("b", status: "planned", ts: "2026-10-02T10:00:00Z")])
         await client.setPlan("# Plan\n\nDo the thing.")

@@ -389,10 +389,9 @@ struct FeedbackDetailView: View {
             secondaryRow(("Change plan…", "Tell the planner what to change. It replans tonight.", { replyTarget = entry }),
                          drop: "Drop it")
         case .ready:
-            primary("I merged it", caption: "Records the merge. Merging happens on your Mac.") {
-                decide(entry, .merged)
-            }
-            .accessibilityHint(Text(verbatim: "Moves it to Done. It doesn't merge the branch."))
+            let merge = entry.mergeAction
+            primary(merge.title, caption: merge.caption) { decide(entry, .merged) }
+                .accessibilityHint(Text(verbatim: merge.caption))
             secondaryRow(("Send back…", "Replans it tonight with your note.", { replyTarget = entry }),
                          drop: "Drop branch")
         case .failed:

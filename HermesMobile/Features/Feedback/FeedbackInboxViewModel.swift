@@ -239,6 +239,14 @@ extension FeedbackEntry {
         }
     }
 
+    /// The ready entry's main button. The server merges a vault or webui branch that isn't on its base
+    /// yet; an app fix lands as a PR first; a build with no branch found its fix already on the base.
+    var mergeAction: (title: String, caption: String) {
+        if branch == nil { return ("Mark done", "Already on main. Moves it to Done.") }
+        if repo == "hermex" { return ("I merged it", "Merge the PR and pull master on the Mac first.") }
+        return ("Merge it", "Merges the branch on the Mac and moves it to Done.")
+    }
+
     /// A failure's first line, for its card.
     var errorLine: String {
         error?.split(whereSeparator: \.isNewline)
