@@ -19,6 +19,8 @@ protocol PrepDataClient: Sendable {
     func diagram(topic: String) async throws -> PrepDiagram
     /// The story bank: each story's readiness marks, plus candidates waiting for a verdict.
     func stories() async throws -> PrepStoryList
+    /// One story to review: its questions, beat cues, full telling and follow-ups.
+    func story(id: String) async throws -> PrepStoryPage
     /// "add" drafts a candidate into a bench story (the server answers 202 and writes it in the
     /// background); "dismiss" sets it aside.
     func storyCandidate(id: String, action: String) async throws
@@ -28,7 +30,8 @@ protocol PrepDataClient: Sendable {
     func mocks() async throws -> PrepMocks
     /// Starts a mock at `level` (an unlocked one, to replay it), else the kind's current level: its
     /// brief and the profile to call in. 409 when the server has no interviewer profile.
-    func mockStart(kind: PrepMockKind, level: String?) async throws -> PrepMockStart
+    /// With a `story`, a behavioral mock that practices that one story (it never moves the ladder).
+    func mockStart(kind: PrepMockKind, level: String?, story: String?) async throws -> PrepMockStart
     /// Hands a finished call to the grader (202 while it grades in the background).
     func mockGrade(mockID: String, sessionID: String, turnMS: [Int]) async throws
     /// One tutor dialogue step on a graded question rep: grades `answer` (a reply to the tutor's last question),
@@ -39,6 +42,9 @@ protocol PrepDataClient: Sendable {
 }
 
 extension PrepDataClient {
+    /// Test fakes that never open a story page.
+    func story(id: String) async throws -> PrepStoryPage { throw CancellationError() }
+
     /// Test fakes that never open a diagram.
     func diagram(topic: String) async throws -> PrepDiagram { throw CancellationError() }
 
@@ -108,6 +114,10 @@ struct APIClientPrepAdapter: PrepDataClient {
         try await get(.tutorStories)
     }
 
+    func story(id: String) async throws -> PrepStoryPage {
+        try await get(.tutorStory(id: id))
+    }
+
     func storyCandidate(id: String, action: String) async throws {
         _ = try await apiClient.sendData(endpoint: .tutorStoryCandidate, method: "POST",
                                          body: PrepStoryCandidateRequest(id: id, action: action))
@@ -123,9 +133,9 @@ struct APIClientPrepAdapter: PrepDataClient {
         try await get(.tutorMocks)
     }
 
-    func mockStart(kind: PrepMockKind, level: String?) async throws -> PrepMockStart {
+    func mockStart(kind: PrepMockKind, level: String?, story: String?) async throws -> PrepMockStart {
         let data = try await apiClient.sendData(endpoint: .tutorMockStart, method: "POST",
-                                                body: PrepMockStartRequest(kind: kind.rawValue, level: level))
+                                                body: PrepMockStartRequest(kind: kind.rawValue, level: level, story: story))
         return try decode(data)
     }
 

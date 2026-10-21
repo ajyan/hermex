@@ -790,6 +790,11 @@ struct ChatShellView: View {
             PrepGate {
                 PrepRunView(server: server, run: .story, unit: id, onAPIError: authManager.handleAPIError, ask: askAtlas)
             }
+        case .prep(.storyPage(let id)):
+            PrepGate {
+                PrepStoryPageView(id: id, server: server, onAPIError: authManager.handleAPIError, ask: askAtlas)
+                    .adaptiveSecondaryNavigationTitle()
+            }
         case .prep(.mockLadder(let kind)):
             PrepGate {
                 PrepMockBriefView(kind: kind, server: server, onAPIError: authManager.handleAPIError)

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The behavioral stories on Prep home: each active story with its three readiness marks (told
-/// in time, scored 4 or better, probes held), tapping a row to drill that story on its own, then
+/// in time, scored 4 or better, probes held), tapping a row to open that story's page, then
 /// the bench stories under a Bench label, drillable the same way (spec §3.1), and last a
 /// Dismissed (N) row that reveals the candidates set aside with Not now, each with Add to bench.
 /// Hidden by the home when the server has no stories or candidates.
@@ -90,11 +90,11 @@ private extension PrepStorySection {
         }
     }
 
-    /// One row per story, each drilling that story on its own.
+    /// One row per story, each opening that story's page.
     func rows(_ stories: [PrepStorySummary]) -> some View {
         ForEach(Array(stories.enumerated()), id: \.element.id) { offset, story in
             if offset > 0 { PrepRowDivider() }
-            NavigationLink(value: ShellPushDestination.brainRoute(.prep(.story(story.id)))) {
+            NavigationLink(value: ShellPushDestination.brainRoute(.prep(.storyPage(story.id)))) {
                 PrepStoryRow(story: story)
             }
             .buttonStyle(.plain)
@@ -271,5 +271,252 @@ private struct PrepStoryMark: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: PrepCopy.storyMarkLabel(kind, value)))
+    }
+}
+
+// MARK: - A story's page
+
+/// One story to review and practice, opened from its row on Prep home: practice actions first (drill it, a voice
+/// mock interview on just this story, or work on it with Atlas, who can update the story file), then its
+/// readiness, the questions it answers, its beats as cues, the full telling behind a tap so the user tells it
+/// first, and the follow-ups to expect with what a strong answer covers.
+struct PrepStoryPageView: View {
+    @State private var viewModel: PrepStoryPageViewModel
+    @State private var showsTelling = false
+    @State private var openProbes: Set<Int> = []
+    @Environment(\.openMockCall) private var openMockCall
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private let ask: (String) -> Void
+
+    init(id: String, server: URL, onAPIError: @escaping (Error) -> Void, ask: @escaping (String) -> Void) {
+        _viewModel = State(initialValue: PrepStoryPageViewModel(
+            id: id, client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
+        self.ask = ask
+    }
+
+    var body: some View {
+        content
+            .hxNavigationTitle("Story")
+            .feedbackContext(FeedbackContext(feature: "Prep", screen: "Story"))
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .task { await viewModel.load() }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch viewModel.state {
+        case .loading:
+            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .unavailable:
+            PrepUnavailableView()
+        case .failed(let message):
+            // A server without the story page can still drill the story.
+            ContentUnavailableView {
+                Label { Text(verbatim: "Couldn't load this story") } icon: { Image(systemName: "exclamationmark.triangle") }
+            } description: {
+                Text(verbatim: message)
+            } actions: {
+                Button { Task { await viewModel.load() } } label: { Text(verbatim: "Try again") }
+                NavigationLink(value: ShellPushDestination.brainRoute(.prep(.story(viewModel.id)))) {
+                    Text(verbatim: "Drill it")
+                }
+            }
+        case .loaded(let page):
+            ScrollView {
+                VStack(alignment: .leading, spacing: BrainStyle.xl) {
+                    header(page)
+                    practice(page)
+                    if !page.prompts.isEmpty { prompts(page) }
+                    if !page.cues.isEmpty { beats(page) }
+                    if !page.sayItMD.isEmpty { telling(page) }
+                    if !page.probes.isEmpty { probes(page) }
+                }
+                .padding(BrainStyle.l)
+                .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
+            }
+            .refreshable { await viewModel.load() }
+        }
+    }
+
+    private func header(_ page: PrepStoryPage) -> some View {
+        VStack(alignment: .leading, spacing: BrainStyle.s) {
+            Text(verbatim: page.title)
+                .font(AppFont.display(style: .title3, weight: .semibold))
+                .foregroundStyle(Color.hxTextPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            if let signal = page.primarySignal {
+                HXChip(paper: .knowledge, symbol: "person.wave.2", label: page.status == "bench" ? "\(signal) · Bench" : signal)
+            }
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: BrainStyle.m) { marks(page) }
+                VStack(alignment: .leading, spacing: BrainStyle.xs) { marks(page) }
+            }
+            Text(verbatim: page.last.map { "Last told \($0)" } ?? "Not told yet")
+                .font(BrainStyle.meta)
+                .foregroundStyle(Color.hxTextSecondary)
+        }
+    }
+
+    @ViewBuilder
+    private func marks(_ page: PrepStoryPage) -> some View {
+        PrepStoryMark(kind: .time, value: page.marks.time)
+        PrepStoryMark(kind: .score, value: page.marks.score)
+        PrepStoryMark(kind: .probes, value: page.marks.probes)
+    }
+
+    private func practice(_ page: PrepStoryPage) -> some View {
+        VStack(alignment: .leading, spacing: BrainStyle.s) {
+            BrainSectionHeader(title: "Practice")
+            SectionCard {
+                VStack(spacing: 0) {
+                    NavigationLink(value: ShellPushDestination.brainRoute(.prep(.story(page.id)))) {
+                        actionRow(symbol: "timer", title: "Drill it",
+                                  subtitle: "Tell it against the clock, then answer two follow-ups")
+                    }
+                    .buttonStyle(.plain)
+                    if openMockCall.isAvailable {
+                        PrepRowDivider()
+                        Button {
+                            Task { await viewModel.startMock(open: openMockCall) }
+                        } label: {
+                            actionRow(symbol: "phone.fill",
+                                      title: viewModel.mock.isStarting ? "Starting the call…" : "Mock interview",
+                                      subtitle: "A voice interviewer asks for this story and presses on it")
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(viewModel.mock.isStarting)
+                    }
+                    PrepRowDivider()
+                    Button {
+                        ask(PrepCopy.storyAtlasPrompt(page))
+                    } label: {
+                        actionRow(symbol: "bubble.left.and.text.bubble.right", title: "Work on it with Atlas",
+                                  subtitle: "Talk it through, sharpen it, and update the story")
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            if let message = viewModel.mock.errorMessage {
+                Text(verbatim: message)
+                    .font(BrainStyle.meta)
+                    .foregroundStyle(Color.hxDanger)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func actionRow(symbol: String, title: String, subtitle: String) -> some View {
+        BrainRow(leading: {
+            Image(systemName: symbol)
+                .font(AppFont.body())
+                .foregroundStyle(HermexPaper.knowledge.glow)
+                .frame(width: 28)
+                .accessibilityHidden(true)
+        }, title: title, subtitle: subtitle)
+        .padding(.vertical, BrainStyle.xs)
+        .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
+    private func prompts(_ page: PrepStoryPage) -> some View {
+        VStack(alignment: .leading, spacing: BrainStyle.s) {
+            BrainSectionHeader(title: "Questions it answers")
+            SectionCard {
+                VStack(spacing: 0) {
+                    ForEach(Array(page.prompts.enumerated()), id: \.offset) { offset, prompt in
+                        if offset > 0 { PrepRowDivider() }
+                        BrainRow(title: prompt.text, subtitle: prompt.signal, titleLineLimit: nil)
+                            .padding(.vertical, BrainStyle.xs)
+                    }
+                }
+            }
+        }
+    }
+
+    private func beats(_ page: PrepStoryPage) -> some View {
+        VStack(alignment: .leading, spacing: BrainStyle.s) {
+            BrainSectionHeader(title: "The beats")
+            PrepRunCard {
+                ForEach(page.cues) { cue in
+                    HStack(alignment: .firstTextBaseline, spacing: BrainStyle.m) {
+                        Text(verbatim: cue.label)
+                            .font(AppFont.body(weight: .semibold))
+                            .foregroundStyle(HermexPaper.knowledge.glow)
+                            .frame(minWidth: 72, alignment: .leading)
+                        Text(verbatim: cue.cue)
+                            .font(AppFont.body())
+                            .foregroundStyle(Color.hxTextPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
+    }
+
+    private func telling(_ page: PrepStoryPage) -> some View {
+        VStack(alignment: .leading, spacing: BrainStyle.s) {
+            BrainSectionHeader(title: "The full telling")
+            PrepRunCard {
+                if showsTelling {
+                    MarkdownRenderer(content: page.sayItMD)
+                        .transition(.opacity)
+                } else {
+                    Text(verbatim: "Tell it out loud from the beats first, then compare.")
+                        .font(BrainStyle.rowTitle)
+                        .foregroundStyle(Color.hxTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { showsTelling = true }
+                    } label: {
+                        Text(verbatim: "Show the full telling")
+                            .font(BrainStyle.rowTitle)
+                            .frame(minHeight: BrainStyle.minTapTarget)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.accentColor)
+                }
+            }
+        }
+    }
+
+    private func probes(_ page: PrepStoryPage) -> some View {
+        VStack(alignment: .leading, spacing: BrainStyle.s) {
+            BrainSectionHeader(title: "Follow-ups to expect")
+            PrepRunCard {
+                ForEach(Array(page.probes.enumerated()), id: \.offset) { index, probe in
+                    VStack(alignment: .leading, spacing: BrainStyle.xs) {
+                        Text(verbatim: probe.attack)
+                            .font(AppFont.body(weight: .semibold))
+                            .foregroundStyle(Color.hxTextPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if openProbes.contains(index) {
+                            ForEach(probe.points, id: \.self) { point in
+                                Label {
+                                    Text(verbatim: point)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                } icon: {
+                                    Image(systemName: "checkmark").foregroundStyle(HermexPaper.knowledge.glow)
+                                }
+                                .font(BrainStyle.rowTitle)
+                                .foregroundStyle(Color.hxTextPrimary)
+                            }
+                            .transition(.opacity)
+                        } else if !probe.points.isEmpty {
+                            Button {
+                                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { _ = openProbes.insert(index) }
+                            } label: {
+                                Text(verbatim: "What a strong answer covers")
+                                    .font(BrainStyle.rowTitle)
+                                    .frame(minHeight: BrainStyle.minTapTarget)
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(Color.accentColor)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
