@@ -909,8 +909,8 @@ final class PrepDialogueModelTests: XCTestCase {
     }
 
     func testLockInPromptCountsThePoints() {
-        XCTAssertEqual(PrepCopy.lockInPrompt(3), "Before the question, say what each of these 3 means in your own words.")
-        XCTAssertEqual(PrepCopy.lockInPrompt(1), "Before the question, say what this means in your own words.")
+        XCTAssertEqual(PrepCopy.lockInPrompt(3), "Say what each of these 3 means in your own words, then check it.")
+        XCTAssertEqual(PrepCopy.lockInPrompt(1), "Say what this means in your own words, then check it.")
     }
 
     func testCaseBodyJoinsAuthoredLineBreaks() {

@@ -1130,8 +1130,8 @@ enum PrepCopy {
 
     /// The "Lock it in" card's instruction.
     static func lockInPrompt(_ points: Int) -> String {
-        points == 1 ? "Before the question, say what this means in your own words."
-            : "Before the question, say what each of these \(points) means in your own words."
+        points == 1 ? "Say what this means in your own words, then check it."
+            : "Say what each of these \(points) means in your own words, then check it."
     }
 
     /// A case card's body as one flowing paragraph: authored single line breaks become spaces, blank lines stay

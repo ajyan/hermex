@@ -30,7 +30,8 @@ enum PrepLessonCardKind: Hashable, CaseIterable {
     }
 }
 
-/// The lesson's cards, paged sideways, with page dots. Reduce Motion keeps the swipe (a gesture the user drives).
+/// The lesson's cards, paged sideways, with page dots. The pager takes the current card's height, so a long card
+/// never spills over what follows. Reduce Motion keeps the swipe (a gesture the user drives).
 struct PrepLessonCardsView: View {
     let title: String
     let cards: PrepLessonCards
@@ -40,6 +41,8 @@ struct PrepLessonCardsView: View {
     @State private var revealed = false
     /// The idea bullets recalled on "Lock it in", by index.
     @State private var recalled: Set<Int> = []
+    /// Each card's natural height, measured as it lays out.
+    @State private var heights: [PrepLessonCardKind: CGFloat] = [:]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var kinds: [PrepLessonCardKind] { PrepLessonCardKind.cards(for: cards) }
@@ -47,22 +50,26 @@ struct PrepLessonCardsView: View {
     var body: some View {
         VStack(spacing: BrainStyle.m) {
             ScrollView(.horizontal) {
-                LazyHStack(alignment: .top, spacing: BrainStyle.m) {
+                // Not lazy: a lesson has at most five cards, and each must be measured before it is shown.
+                HStack(alignment: .top, spacing: BrainStyle.m) {
                     ForEach(Array(kinds.enumerated()), id: \.element) { offset, kind in
                         PrepRunCard {
                             Text(verbatim: "\(offset + 1) of \(kinds.count) · \(kind.title)")
                                 .font(BrainStyle.meta)
                                 .foregroundStyle(HermexPaper.knowledge.glow)
                             card(kind)
-                            Spacer(minLength: 0)
                         }
+                        .fixedSize(horizontal: false, vertical: true)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { heights[kind] = $0 }
                         .containerRelativeFrame(.horizontal)
                         .id(kind)
                     }
                 }
                 .scrollTargetLayout()
             }
-            .scrollTargetBehavior(.paging)
+            .frame(height: heights[page ?? .theCase], alignment: .top)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: page)
+            .scrollTargetBehavior(.viewAligned)
             .scrollPosition(id: $page)
             .scrollIndicators(.hidden)
             .scrollClipDisabled()
@@ -157,7 +164,7 @@ struct PrepLessonCardsView: View {
                                     .fixedSize(horizontal: false, vertical: true)
                                     .transition(.opacity)
                             } else {
-                                Text(verbatim: "Say it, then tap to check")
+                                Text(verbatim: "Tap to check")
                                     .font(BrainStyle.rowTitle)
                                     .foregroundStyle(Color.accentColor)
                             }
@@ -171,7 +178,7 @@ struct PrepLessonCardsView: View {
                 }
             }
             if recalled.count == cards.idea.count {
-                Text(verbatim: "Now try the question.")
+                Text(verbatim: "Locked in.")
                     .font(BrainStyle.meta)
                     .foregroundStyle(HermexPaper.knowledge.glow)
                     .transition(.opacity)
