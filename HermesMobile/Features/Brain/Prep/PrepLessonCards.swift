@@ -47,7 +47,8 @@ struct PrepLessonCardsView: View {
     var body: some View {
         VStack(spacing: BrainStyle.m) {
             ScrollView(.horizontal) {
-                LazyHStack(alignment: .top, spacing: BrainStyle.m) {
+                // Eager, so the pager is as tall as its tallest card (at most four, so cheap).
+                HStack(alignment: .top, spacing: BrainStyle.m) {
                     ForEach(Array(kinds.enumerated()), id: \.element) { offset, kind in
                         PrepRunCard {
                             Text(verbatim: "\(offset + 1) of \(kinds.count) · \(kind.title)")
@@ -62,7 +63,7 @@ struct PrepLessonCardsView: View {
                 }
                 .scrollTargetLayout()
             }
-            .scrollTargetBehavior(.paging)
+            .scrollTargetBehavior(.viewAligned)  // .paging pages by the view width and drifts by the spacing
             .scrollPosition(id: $page)
             .scrollIndicators(.hidden)
             .scrollClipDisabled()
@@ -131,7 +132,7 @@ struct PrepLessonCardsView: View {
             }
         case .code:
             if let code = cards.code {
-                MarkdownRenderer(content: code.markdown)
+                PrepCodeBlock(code: code)
                 if let caption = code.caption {
                     Text(verbatim: caption)
                         .font(BrainStyle.rowTitle)
@@ -200,5 +201,29 @@ struct PrepLessonDiagramButton: View {
                 DiagramSheet(title: diagram.title) { [loader, topic = diagram.topic] in try await loader(topic) }
             }
         }
+    }
+}
+
+/// The "In code" artifact: monospaced on an inset, small enough that an authored 46-column line fits a phone card;
+/// anything wider scrolls sideways inside the block, never the card.
+struct PrepCodeBlock: View {
+    let code: PrepLessonCards.Code
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            Text(verbatim: code.body)
+                .font(AppFont.mono(style: .caption))
+                .foregroundStyle(Color.hxTextPrimary)
+                .fixedSize(horizontal: true, vertical: true)
+                .textSelection(.enabled)
+                .padding(BrainStyle.m)
+        }
+        .scrollIndicators(.hidden)
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.hxCanvas, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
+            .strokeBorder(HermexPaper.knowledge.edge, lineWidth: 1))
+        .accessibilityLabel(Text(verbatim: "Code, \(code.lang): \(code.body)"))
     }
 }

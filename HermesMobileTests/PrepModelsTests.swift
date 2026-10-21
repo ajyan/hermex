@@ -910,7 +910,7 @@ final class PrepDialogueModelTests: XCTestCase {
         """#.utf8))
         let cards = try XCTUnwrap(lesson.cards)
         XCTAssertEqual(PrepLessonCardKind.cards(for: cards), [.theCase, .idea, .code])
-        XCTAssertEqual(cards.code?.markdown, "```python\ndef hit(r, k):\n    return r < k\n```")
+        XCTAssertEqual(cards.code?.body, "def hit(r, k):\n    return r < k")
         XCTAssertEqual(cards.code?.caption, "Two questions.")
         XCTAssertEqual(lesson.diagram?.topic, "recall-vs-rank-miss")
     }

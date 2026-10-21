@@ -365,9 +365,6 @@ struct PrepLessonCards: Decodable, Hashable, Sendable {
             guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw PrepCourseMissingID() }
             caption = c.text(.caption)
         }
-
-        /// The body as a fenced block, so the chat's code view draws it.
-        var markdown: String { "```\(lang)\n\(body)\n```" }
     }
 
     let theCase: Case
