@@ -886,7 +886,7 @@ final class PrepDialogueModelTests: XCTestCase {
         let cards = try XCTUnwrap(lesson.cards)
         XCTAssertNil(cards.picture, "one step is not a flow")
         XCTAssertNil(cards.inYourWork)
-        XCTAssertEqual(PrepLessonCardKind.cards(for: cards), [.theCase, .idea])
+        XCTAssertEqual(PrepLessonCardKind.cards(for: cards), [.theCase, .idea, .lockIn])
         XCTAssertEqual(lesson.recall?.questionID, "u1.l1.q2")
         XCTAssertEqual(lesson.recall?.isQuestion, true)
     }
@@ -898,7 +898,19 @@ final class PrepDialogueModelTests: XCTestCase {
                    "picture": {"steps": ["read", "think", "answer"]}, "in_your_work": {"text": "At work."}}}
         """#.utf8))
         let cards = try XCTUnwrap(lesson.cards)
-        XCTAssertEqual(PrepLessonCardKind.cards(for: cards), [.theCase, .idea, .work])
+        XCTAssertEqual(PrepLessonCardKind.cards(for: cards), [.theCase, .idea, .work, .lockIn],
+                       "Lock it in closes every lesson, after In your work")
+    }
+
+    func testIdeaLeadDropsTheAuthoredColon() {
+        XCTAssertEqual(PrepCopy.ideaLead("Quote first:"), "Quote first")
+        XCTAssertEqual(PrepCopy.ideaLead(" Split when work fans out: "), "Split when work fans out")
+        XCTAssertEqual(PrepCopy.ideaLead("Budget"), "Budget", "an older lead without a colon is unchanged")
+    }
+
+    func testLockInPromptCountsThePoints() {
+        XCTAssertEqual(PrepCopy.lockInPrompt(3), "Before the question, say what each of these 3 means in your own words.")
+        XCTAssertEqual(PrepCopy.lockInPrompt(1), "Before the question, say what this means in your own words.")
     }
 
     func testCaseBodyJoinsAuthoredLineBreaks() {

@@ -1121,6 +1121,19 @@ enum PrepCopy {
         return "Card \(n) of \(kinds.count), \(page.title)"
     }
 
+    /// An idea bullet's lead as a heading: the authored trailing colon dropped ("Quote first:" → "Quote first").
+    static func ideaLead(_ lead: String) -> String {
+        var text = lead.trimmingCharacters(in: .whitespaces)
+        while let last = text.last, last == ":" || last == "." { text.removeLast() }
+        return text.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// The "Lock it in" card's instruction.
+    static func lockInPrompt(_ points: Int) -> String {
+        points == 1 ? "Before the question, say what this means in your own words."
+            : "Before the question, say what each of these \(points) means in your own words."
+    }
+
     /// A case card's body as one flowing paragraph: authored single line breaks become spaces, blank lines stay
     /// paragraph breaks.
     static func caseBody(_ body: String) -> String {
