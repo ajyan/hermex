@@ -310,8 +310,16 @@ struct PrepStoryPageView: View {
         case .unavailable:
             PrepUnavailableView()
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load this story", message: message) {
-                Task { await viewModel.load() }
+            // A server without the story page can still drill the story.
+            ContentUnavailableView {
+                Label { Text(verbatim: "Couldn't load this story") } icon: { Image(systemName: "exclamationmark.triangle") }
+            } description: {
+                Text(verbatim: message)
+            } actions: {
+                Button { Task { await viewModel.load() } } label: { Text(verbatim: "Try again") }
+                NavigationLink(value: ShellPushDestination.brainRoute(.prep(.story(viewModel.id)))) {
+                    Text(verbatim: "Drill it")
+                }
             }
         case .loaded(let page):
             ScrollView {
