@@ -150,6 +150,8 @@ final class PrepLessonViewModel {
     let id: String
     private(set) var state: BrainLoadState<PrepLesson> = .loading
     @ObservationIgnored private let client: PrepDataClient
+    /// Opens a lesson's diagram from this screen's server.
+    var diagramLoader: PrepDiagramLoader { PrepDiagramLoader(client: client) }
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private let onAPIError: (Error) -> Void
 
@@ -330,6 +332,8 @@ final class PrepRunViewModel {
     let unit: String?
 
     @ObservationIgnored private let client: PrepDataClient
+    /// Opens a lesson's diagram from this screen's server.
+    var diagramLoader: PrepDiagramLoader { PrepDiagramLoader(client: client) }
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private var mapBefore: PrepTrackMap?
     @ObservationIgnored private var lastStreak: PrepStreak?

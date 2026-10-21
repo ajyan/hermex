@@ -178,6 +178,7 @@ enum Endpoint {
     /// "Show me": closes a rep's tutor dialogue.
     case tutorDialogueEnd
     case tutorLesson(id: String)
+    case tutorDiagram(topic: String)
     case tutorMap(track: String)
     case tutorItem(id: String)
     case tutorAttempt
@@ -506,6 +507,8 @@ enum Endpoint {
             return "/api/tutor/dialogue/end"
         case .tutorLesson:
             return "/api/tutor/lesson"
+        case .tutorDiagram:
+            return "/api/tutor/diagram"
         case .tutorMap:
             return "/api/tutor/map"
         case .tutorItem:
@@ -770,6 +773,8 @@ enum Endpoint {
             return [URLQueryItem(name: "track", value: track)]
         case let .tutorItem(id), let .tutorGap(id), let .tutorLesson(id):
             return [URLQueryItem(name: "id", value: id)]
+        case let .tutorDiagram(topic):
+            return [URLQueryItem(name: "topic", value: topic)]
         case let .tutorRun(run, unit):
             var items = [URLQueryItem(name: "run", value: run)]
             if let unit { items.append(URLQueryItem(name: "unit", value: unit)) }

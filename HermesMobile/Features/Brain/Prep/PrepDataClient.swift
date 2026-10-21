@@ -15,6 +15,8 @@ protocol PrepDataClient: Sendable {
     func flag(item: String) async throws
     func course() async throws -> PrepCourse
     func lesson(id: String) async throws -> PrepLesson
+    /// A lesson diagram's `atlas-ui` fragment, by its vault topic.
+    func diagram(topic: String) async throws -> PrepDiagram
     /// The story bank: each story's readiness marks, plus candidates waiting for a verdict.
     func stories() async throws -> PrepStoryList
     /// "add" drafts a candidate into a bench story (the server answers 202 and writes it in the
@@ -37,6 +39,9 @@ protocol PrepDataClient: Sendable {
 }
 
 extension PrepDataClient {
+    /// Test fakes that never open a diagram.
+    func diagram(topic: String) async throws -> PrepDiagram { throw CancellationError() }
+
     /// A server without the dialogue answers nothing; the run shows the result straight away.
     func dialogue(attempt: String, answer: String?) -> AsyncThrowingStream<PrepDialogueEvent, Error> {
         AsyncThrowingStream { $0.finish() }
@@ -93,6 +98,10 @@ struct APIClientPrepAdapter: PrepDataClient {
 
     func lesson(id: String) async throws -> PrepLesson {
         try await get(.tutorLesson(id: id))
+    }
+
+    func diagram(topic: String) async throws -> PrepDiagram {
+        try await get(.tutorDiagram(topic: topic))
     }
 
     func stories() async throws -> PrepStoryList {

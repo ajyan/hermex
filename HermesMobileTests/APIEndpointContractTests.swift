@@ -341,6 +341,13 @@ final class ContractReadinessTests: XCTestCase {
                 path: "/api/tutor/lesson",
                 query: ["id": "u2.l3"]
             ),
+            .init(
+                name: "tutor diagram",
+                method: "GET",
+                endpoint: .tutorDiagram(topic: "recall-vs-rank-miss"),
+                path: "/api/tutor/diagram",
+                query: ["topic": "recall-vs-rank-miss"]
+            ),
             .init(name: "goals home", method: "GET", endpoint: .goalsHome, path: "/api/goals"),
             .init(
                 name: "goal detail",

@@ -913,6 +913,31 @@ final class PrepDialogueModelTests: XCTestCase {
         XCTAssertEqual(PrepCopy.lockInPrompt(1), "Say what this means in your own words, then check it.")
     }
 
+    func testCodeCardAndDiagramDecode() throws {
+        let lesson = try PrepDecoding.decode(PrepLesson.self, from: Data(#"""
+        {"id": "u10.l2", "title": "Recall vs rank", "idea_md": "Idea",
+         "cards": {"case": {"headline": "H", "body": "B", "ask": "A?"}, "idea": [{"lead": "Split", "text": "the metric."}],
+                   "code": {"lang": "python", "body": "def hit(r, k):\n    return r < k", "caption": "Two questions."}},
+         "diagram": {"topic": "recall-vs-rank-miss", "title": "Recall vs rank miss"}}
+        """#.utf8))
+        let cards = try XCTUnwrap(lesson.cards)
+        XCTAssertEqual(PrepLessonCardKind.cards(for: cards), [.theCase, .idea, .code, .lockIn])
+        XCTAssertEqual(cards.code?.body, "def hit(r, k):\n    return r < k")
+        XCTAssertEqual(cards.code?.caption, "Two questions.")
+        XCTAssertEqual(lesson.diagram?.topic, "recall-vs-rank-miss")
+    }
+
+    func testAnEmptyCodeCardOrDiagramIsDropped() throws {
+        let lesson = try PrepDecoding.decode(PrepLesson.self, from: Data(#"""
+        {"id": "u1.l1", "title": "T", "idea_md": "Idea",
+         "cards": {"case": {"headline": "H", "body": "B", "ask": "A?"}, "idea": [{"lead": "L", "text": "t."}],
+                   "code": {"lang": "python", "body": "  "}},
+         "diagram": {"title": "No topic"}}
+        """#.utf8))
+        XCTAssertNil(lesson.cards?.code)
+        XCTAssertNil(lesson.diagram)
+    }
+
     func testCaseBodyJoinsAuthoredLineBreaks() {
         XCTAssertEqual(PrepCopy.caseBody("Asked about a leave type,\nthe model says yes."),
                        "Asked about a leave type, the model says yes.")

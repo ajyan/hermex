@@ -60,18 +60,17 @@ struct BriefDiagramIndex: Decodable, Equatable {
     }
 }
 
-/// A card's diagram, opened from its Diagram chip: the live `atlas-ui` tool in an interactive answer card.
-/// The Brief has no composer, so the tool's "Ask Atlas" does nothing here.
-struct BriefDiagramSheet: View {
-    let entry: BriefDiagramIndex.Entry
-    let viewModel: DailyDeckViewModel
+/// A vault diagram, opened from "Open the diagram" on a Brief card or a Prep lesson: the live `atlas-ui` tool in
+/// an interactive answer card. Neither screen has a composer, so the tool's "Ask Atlas" does nothing here.
+struct DiagramSheet: View {
+    let title: String
+    /// Reads the diagram's `atlas-ui` fragment.
+    let load: @MainActor () async throws -> String
 
     @Environment(\.dismiss) private var dismiss
     @State private var fragment: String?
     @State private var failed = false
     @State private var attempt = 0
-
-    private var title: String { entry.title ?? "Diagram" }
 
     var body: some View {
         NavigationStack {
@@ -120,7 +119,7 @@ struct BriefDiagramSheet: View {
     private func load() async {
         failed = false
         do {
-            fragment = try await viewModel.diagramFragment(entry)
+            fragment = try await load()
         } catch is CancellationError {
             // The sheet closed.
         } catch {

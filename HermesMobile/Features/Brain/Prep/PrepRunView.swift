@@ -44,6 +44,7 @@ struct PrepRunView: View {
 
     var body: some View {
         content
+            .environment(\.prepDiagramLoader, viewModel.diagramLoader)
             .hxNavigationTitle(title)
             .navigationBarBackButtonHidden(true)
             .toolbar {
