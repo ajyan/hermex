@@ -117,6 +117,36 @@ final class ComposerVoiceDraftComposerTests: XCTestCase {
         )
     }
 
+    func testDraftUpdateSessionDoesNotRepeatASegmentWhenTheTranscriptKeepsIt() {
+        var session = ComposerVoiceDraftUpdateSession()
+
+        session.begin(baseDraft: "")
+        session.composedDraft(for: "we can use pinned models", endsSegment: true)
+
+        // A recognizer that keeps the whole transcript across the pause.
+        XCTAssertEqual(
+            session.composedDraft(for: "We can use pinned models until", endsSegment: false),
+            "we can use pinned models until"
+        )
+        XCTAssertEqual(
+            session.composedDraft(for: "We can use pinned models until we're ready.", endsSegment: true),
+            "we can use pinned models until we're ready."
+        )
+    }
+
+    func testDraftUpdateSessionIgnoresAFinalResultRepeatingTheLastSegment() {
+        var session = ComposerVoiceDraftUpdateSession()
+
+        session.begin(baseDraft: "")
+        session.composedDraft(for: "we can use pinned models", endsSegment: true)
+        session.composedDraft(for: "until we're ready", endsSegment: true)
+
+        XCTAssertEqual(
+            session.composedDraft(for: "until we're ready", endsSegment: true),
+            "we can use pinned models until we're ready"
+        )
+    }
+
     func testDraftUpdateSessionStillBlocksLateUpdatesAfterACommit() {
         var session = ComposerVoiceDraftUpdateSession()
 

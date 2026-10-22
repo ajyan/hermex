@@ -1127,12 +1127,15 @@ struct ComposerVoiceDraftUpdateSession {
     private var committed = ""
     /// The words still in the open segment, for the fallback below.
     private var lastTranscript = ""
+    /// The segment `committed` ended with, so a final result repeating it is not added twice.
+    private var lastSegment = ""
     private var acceptsUpdates = false
 
     mutating func begin(baseDraft: String) {
         self.baseDraft = baseDraft
         committed = ""
         lastTranscript = ""
+        lastSegment = ""
         acceptsUpdates = true
     }
 
@@ -1143,21 +1146,25 @@ struct ComposerVoiceDraftUpdateSession {
     /// The full draft for one recognition result. `endsSegment` comes from
     /// `SFSpeechRecognitionResult.speechRecognitionMetadata` (iOS 17+ sets it when
     /// an utterance segment finishes) or `isFinal`.
+    @discardableResult
     mutating func composedDraft(for transcript: String, endsSegment: Bool = false) -> String? {
         guard acceptsUpdates else {
             return nil
         }
 
+        let segment = openPart(of: transcript)
         if endsSegment {
-            commit(transcript)
+            // The final result can repeat the segment that already ended.
+            let repeatsLast = lastTranscript.isEmpty && Self.words(segment) == Self.words(lastSegment)
+            if !repeatsLast { commit(segment) }
             lastTranscript = ""
         } else {
-            if !lastTranscript.isEmpty, !continues(transcript, previous: lastTranscript) {
+            if !lastTranscript.isEmpty, !continues(segment, previous: lastTranscript) {
                 // No segment-end signal, but the transcript clearly belongs to a new
                 // segment: commit the previous one before composing.
                 commit(lastTranscript)
             }
-            lastTranscript = transcript
+            lastTranscript = segment
         }
 
         return compose()
@@ -1167,6 +1174,18 @@ struct ComposerVoiceDraftUpdateSession {
         let trimmed = segment.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         committed = committed.isEmpty ? trimmed : committed + " " + trimmed
+        lastSegment = trimmed
+    }
+
+    /// The part of `transcript` not yet committed. Some recognizers keep every
+    /// segment in `bestTranscription` instead of starting fresh after a pause.
+    private func openPart(of transcript: String) -> String {
+        let done = Self.words(committed)
+        let tokens = transcript.split(whereSeparator: \.isWhitespace)
+        guard !done.isEmpty, tokens.count >= done.count,
+              Self.words(tokens.prefix(done.count).joined(separator: " ")) == done
+        else { return transcript }
+        return tokens.dropFirst(done.count).joined(separator: " ")
     }
 
     private func compose() -> String {
@@ -1187,14 +1206,14 @@ struct ComposerVoiceDraftUpdateSession {
     /// a leading word, or the new one is at least half the words the previous
     /// held (a heavy in-segment revision is longer, a fresh segment starts short).
     private func continues(_ transcript: String, previous: String) -> Bool {
-        let currentWords = lastTranscriptWords(transcript)
-        let previousWords = lastTranscriptWords(previous)
+        let currentWords = Self.words(transcript)
+        let previousWords = Self.words(previous)
         guard !currentWords.isEmpty, !previousWords.isEmpty else { return true }
         if currentWords.first == previousWords.first { return true }
         return currentWords.count * 2 >= previousWords.count
     }
 
-    private static func lastTranscriptWords(_ transcript: String) -> [String] {
+    private static func words(_ transcript: String) -> [String] {
         transcript.trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
             .split(whereSeparator: { $0.isWhitespace || $0.isPunctuation })
