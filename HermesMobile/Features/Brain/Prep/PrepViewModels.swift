@@ -296,9 +296,8 @@ final class PrepRunViewModel {
     /// A lesson rep starts on its teaching, then "I'm ready" hides it and asks for recall.
     enum LessonStage: Equatable { case reading, recalling }
     private(set) var lessonStage: LessonStage = .reading
-    /// The recall answer being dictated or typed, and how sure the user is.
+    /// The recall answer being dictated or typed.
     var recallDraft = ""
-    var confidence: PrepConfidence?
     /// The result on screen came from "I don't know", which has no points to claim.
     private(set) var answeredDontKnow = false
     /// The missed point whose "I had that" is in flight; a second tap waits for it.
@@ -434,19 +433,18 @@ final class PrepRunViewModel {
     }
 
     var canSubmitRecall: Bool {
-        !recallDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && confidence != nil && !isSubmitting
+        !recallDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSubmitting
     }
 
-    /// Sends the dictated or typed recall with the confidence picked before grading.
+    /// Sends the dictated or typed recall.
     func submitRecall() async {
-        guard canSubmitRecall, let confidence else { return }
-        await submit(.choice(PrepCopy.cappedApproach(recallDraft.trimmingCharacters(in: .whitespacesAndNewlines))),
-                     confidence: confidence)
+        guard canSubmitRecall else { return }
+        await submit(.choice(PrepCopy.cappedApproach(recallDraft.trimmingCharacters(in: .whitespacesAndNewlines))))
     }
 
     /// "I don't know, show me": a recall with no answer, graded as a miss without the model.
     func dontKnow() async {
-        await submit(.choice(""), confidence: .guess, dontKnow: true)
+        await submit(.choice(""), dontKnow: true)
     }
 
     /// "I had that" is offered on a graded recall's or boss answer's misses, never on "I don't know".
@@ -868,7 +866,6 @@ final class PrepRunViewModel {
         revealedLesson = false
         lessonStage = rep.drill == .recall ? .recalling : .reading
         recallDraft = ""
-        confidence = nil
         answeredDontKnow = false
         overridingPoint = nil
         lastXP = nil
@@ -909,14 +906,14 @@ final class PrepRunViewModel {
         }
     }
 
-    private func submit(_ answer: PrepAnswer, confidence: PrepConfidence? = nil, dontKnow: Bool = false) async {
+    private func submit(_ answer: PrepAnswer, dontKnow: Bool = false) async {
         guard !isSubmitting, case let .rep(rep, _) = phase, let run else { return }
         let token = generation
         let elapsed = Self.milliseconds(from: shownAt, to: now())
         let request = PrepAttemptRequest(
             date: run.date, index: rep.index, item: rep.item.id, drill: rep.drill,
             answer: answer, elapsedMS: elapsed, hintsUsed: hintsShown,
-            run: runKind, unit: runKind == .testout ? unit : nil, confidence: confidence, dontKnow: dontKnow)
+            run: runKind, unit: runKind == .testout ? unit : nil, dontKnow: dontKnow)
         guard let result = await post(request, token: token) else { return }
         if rep.drill == .primer {
             // A primer has nothing to grade: advance as `continue()` would, staying
@@ -1077,14 +1074,6 @@ enum PrepCopy {
     }
 
     static func starsLabel(_ stars: Int) -> String { "\(stars) of 3 stars" }
-    static func confidenceLabel(_ c: PrepConfidence) -> String {
-        switch c {
-        case .guess: "Guess"
-        case .fairly: "Fairly sure"
-        case .certain: "Certain"
-        }
-    }
-
     static func lessonStateWord(_ state: PrepLessonState) -> String {
         switch state {
         case .ready: "interview-ready"
@@ -1162,11 +1151,6 @@ enum PrepCopy {
         case "open": "Open question"
         default: "Question"
         }
-    }
-
-    static func calibrationLine(_ c: PrepCalibration) -> String {
-        let percent = c.certainTotal > 0 ? Int((Double(c.certainRight) / Double(c.certainTotal) * 100).rounded()) : 0
-        return "When you say certain, you're right \(percent)% of the time"
     }
 
     static func milestoneTitle(_ m: PrepMilestone) -> String {
