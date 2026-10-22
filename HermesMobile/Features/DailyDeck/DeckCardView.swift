@@ -413,7 +413,10 @@ private struct DeckCardView: View {
              ? viewModel.filedNote?.summary ?? (seal ? "Sealed in your journal. Edit any card and seal again to update it."
                                                 : "In your journal. Edit any card and file again to update it.")
              : viewModel.isFiled
-             ? "Filing again updates the journal: changed answers replace what was filed, new ones are added, nothing is deleted."
+             ? (seal ? "Sealing again replaces this week's page with these answers."
+                     : "Filing again updates the journal: changed answers replace what was filed, new ones are added, nothing is deleted.")
+             : seal
+             ? "Sealing writes this week's page from your answers."
              : count == 0
              ? "Nothing written yet. Swipe back to any card, or file the follow-ups you chose."
              : "Atlas writes them into today's journal and runs the follow-ups you chose.")

@@ -103,6 +103,19 @@ final class WeeksModelTests: XCTestCase {
         XCTAssertEqual(model.years, [2025, 2026])
     }
 
+    func testAWeekWhoseSealFailedStillWaits() async {
+        let client = ScriptedDailyDeckClient(workspaces: ["/vault"], names: [
+            "2026-10-11.weekly.json", "2026-10-11.weekly.answers.json", "2026-10-11.weekly.filed.json",
+            "2026-10-18.weekly.json", "2026-10-18.weekly.answers.json",
+            "2026-10-25.weekly.json", "2026-10-25.weekly.answers.json"
+        ], deck: "")
+        client.listings = ["weekly-checkins": ["2026-10-18-week-ending.json"], "weekly-checkins/photos": []]
+        let model = makeModel(client)
+        await model.load()
+        XCTAssertEqual(model.unfiledDecks, ["2026-10-25"],
+                       "saved answers without a record (or a v1 filing) are a seal that failed, so the deck still waits")
+    }
+
     func testMissingFoldersLoadAsEmpty() async {
         let model = makeModel(ScriptedDailyDeckClient(workspaces: ["/vault"], names: nil, deck: ""))
         await model.load()

@@ -42,7 +42,7 @@ struct DuePrediction: Identifiable, Equatable {
     private(set) var recordDates: Set<String> = []
     /// Sundays with a photo of the week.
     private(set) var photoDates: Set<String> = []
-    /// Sundays whose weekly deck is in `briefs/` and not filed yet.
+    /// Sundays whose weekly deck is in `briefs/` and neither sealed (no record) nor filed by the v1 filer.
     private(set) var unfiledDecks: Set<String> = []
     /// Every listing has succeeded at least once since this model was made.
     private(set) var isLoaded = false
@@ -96,8 +96,10 @@ struct DuePrediction: Identifiable, Equatable {
             photosListed = true
         }
         if let briefs {
-            let filed = DailyDeckViewModel.filedDates(in: briefs, kind: "weekly")
-            unfiledDecks = Set(DailyDeckViewModel.deckDates(in: briefs, kind: "weekly")).subtracting(filed)
+            // A seal leaves a record and a v1 filing a `.weekly.filed.json`; saved answers alone are a
+            // seal whose filer failed, so that deck still waits.
+            let filedV1 = briefs.filter { $0.hasSuffix(".weekly.filed.json") }.map { String($0.dropLast(".weekly.filed.json".count)) }
+            unfiledDecks = Set(DailyDeckViewModel.deckDates(in: briefs, kind: "weekly")).subtracting(recordDates).subtracting(filedV1)
         }
         let complete = records != nil && photos != nil && briefs != nil
         loadError = complete ? nil : "Some weeks couldn't be read just now."

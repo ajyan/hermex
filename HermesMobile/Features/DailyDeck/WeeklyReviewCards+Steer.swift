@@ -2,7 +2,7 @@ import SwiftUI
 
 // The weekly review's Steer chapter: the one thing to carry, who to see, and the keepsakes.
 
-/// On the one-thing card: last week's missed commitments, each a tap away from being this week's.
+/// On the one-thing card: last week's missed commitments (not people), each a tap away from being this week's.
 /// Offered only while the answer is empty or is one of them, so a tap never overwrites his words.
 struct WeekCarryChips: View {
     let card: DeckCard
@@ -10,7 +10,7 @@ struct WeekCarryChips: View {
     let viewModel: DailyDeckViewModel
 
     var body: some View {
-        let missed = viewModel.missedCommitments
+        let missed = Self.carryable(viewModel.missedCommitments)
         let current = viewModel.answer(for: card)?.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if Self.offers(missed, current: current) {
             VStack(alignment: .leading, spacing: 8) {
@@ -29,6 +29,11 @@ struct WeekCarryChips: View {
             }
             .padding(.top, 18)
         }
+    }
+
+    /// The missed commitments a one thing can carry: everything but people, who carry on the who card.
+    static func carryable(_ missed: [DeckReviewItem]) -> [DeckReviewItem] {
+        missed.filter { !$0.id.hasPrefix("who-") }
     }
 
     /// Whether to offer `missed`: there are some, and the answer is empty or already one of them.

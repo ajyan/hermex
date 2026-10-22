@@ -423,6 +423,14 @@ final class WeeklyReviewModelTests: XCTestCase {
         XCTAssertFalse(WeekCarryChips.offers([], current: ""))
     }
 
+    func testCarryChipsLeavePeopleToTheWhoCard() {
+        let missed = [DeckReviewItem(id: "one-thing", text: "Ship the deck"), DeckReviewItem(id: "who-ana", text: "Ana"),
+                      DeckReviewItem(id: "plan-1", text: "Sleep by 11")]
+        XCTAssertEqual(WeekCarryChips.carryable(missed).map(\.id), ["one-thing", "plan-1"],
+                       "a missed person carries on the who card, not into the one thing")
+        XCTAssertEqual(WeekCarryChips.carryable([DeckReviewItem(id: "who-ana", text: "Ana")]), [])
+    }
+
     func testAddingAPersonDedupesByCase() {
         let suggested = ["Ana Ruiz", "Priya"]
         XCTAssertEqual(WeekWhoCard.adding("ana ruiz", to: [], suggested: suggested), ["Ana Ruiz"], "picks the suggestion")
@@ -465,6 +473,35 @@ final class WeeklyReviewModelTests: XCTestCase {
         let byCard = Dictionary(uniqueKeysWithValues: request.answers.answers.map { ($0.card, $0) })
         XCTAssertEqual(byCard["values"]?.scores, ["present": 7])
         XCTAssertEqual(byCard["energy"]?.lists, ["gave": ["Running"]])
+    }
+
+    @MainActor
+    func testAV2WeekIsSealedOnlyWhenItsRecordExists() async throws {
+        let store = DailyDeckStore(defaults: try XCTUnwrap(UserDefaults(suiteName: suiteName)))
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-25.weekly.json", "2026-10-25.weekly.answers.json"],
+                                             deck: Self.v2DeckJSON)
+        client.files["briefs/2026-10-25.weekly.answers.json"] = """
+        {"version": 1, "date": "2026-10-25", "kind": "weekly", "completed_at": "x",
+         "answers": [{"card": "story", "text": "You raced."}]}
+        """
+        // The server saved the answers, then its filer failed: no record.
+        let failed = DailyDeckViewModel(server: server, client: client, store: store)
+        await failed.show(date: "2026-10-25", kind: "weekly")
+        XCTAssertEqual(failed.answer(for: try card("story", in: failed))?.text, "You raced.", "the answers come back to seal again")
+        XCTAssertFalse(failed.isFiled, "answers alone don't make a sealed week")
+        XCTAssertTrue(failed.hasChanges, "so Seal the week stays enabled")
+
+        client.filer = .success(BriefFileResponse(ok: true, summary: "Sealed week 43."))
+        _ = await failed.file()
+        XCTAssertTrue(failed.isFiled, "the server confirmed the seal")
+        XCTAssertFalse(failed.hasChanges)
+
+        client.listings = ["weekly-checkins": ["2026-10-25-week-ending.json", "2026-10-25-week-ending.md"]]
+        let sealed = DailyDeckViewModel(server: server, client: client, store: store)
+        await sealed.show(date: "2026-10-25", kind: "weekly")
+        XCTAssertTrue(sealed.isFiled)
+        XCTAssertFalse(sealed.hasChanges)
     }
 
     @MainActor

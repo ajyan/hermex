@@ -159,11 +159,17 @@ final class DailyDeckViewModel {
 
     func answer(for card: DeckCard) -> DeckAnswer? { answers[card.id] }
 
-    var isFiled: Bool { filedAnswers != nil }
+    /// For a v2 weekly: whether the week's record exists, as listed when the deck opened or as the
+    /// server confirmed by sealing it here. The server saves the answers before its filer runs, so
+    /// answers alone can be a seal that failed.
+    private(set) var hasWeekRecord = false
+
+    /// Filed, or for a v2 weekly sealed: answers on file and, for a seal, the week's record.
+    var isFiled: Bool { filedAnswers != nil && (!isV2Weekly || hasWeekRecord) }
 
     /// Whether the answers differ from what was filed (always true before the first filing).
     var hasChanges: Bool {
-        guard let filedAnswers else { return true }
+        guard isFiled, let filedAnswers else { return true }
         return meaningful(answers) != meaningful(filedAnswers)
     }
 
@@ -275,6 +281,7 @@ final class DailyDeckViewModel {
         pages = []
         filedAnswers = nil
         filedNote = nil
+        hasWeekRecord = false
         guard names.contains(fileName(DailyDeckPaths.deck(date: date, kind: kind))) else {
             state = .noDeck
             return
@@ -284,6 +291,11 @@ final class DailyDeckViewModel {
         if names.contains(fileName(DailyDeckPaths.answers(date: date, kind: kind))) {
             let filed = try await client.fileContent(sessionID: sessionID, path: DailyDeckPaths.answers(date: date, kind: kind))
             filedAnswers = DeckAnswersFile.decodeAnswers(filed)
+            if kind == "weekly", decoded.version == 2 {
+                // An unreadable folder reads as unsealed: sealing again replaces the week whole.
+                let records = try? await client.entryNames(sessionID: sessionID, path: WeeksModel.directory)
+                hasWeekRecord = records?.contains(fileName(WeeksModel.recordPath(date))) ?? false
+            }
         }
         deck = decoded
         pages = DeckPage.pages(for: decoded.cards)
@@ -667,7 +679,7 @@ final class DailyDeckViewModel {
             do {
                 let sessionID = try await startSession(
                     message: try payload.message(refiling: refiling), title: Self.sessionTitle(for: date, kind: kind), workspace: workspace)
-                markFiled(sent, date: date, kind: kind, note: nil)
+                markFiled(sent, date: date, kind: kind, confirmed: false, note: nil)
                 return .openSession(sessionID)
             } catch {
                 filing = .failed(error.localizedDescription)
@@ -678,8 +690,8 @@ final class DailyDeckViewModel {
             filing = .failed(filed.error ?? filed.summary ?? "The server couldn't file the brief.")
             return nil
         }
-        // The answers are filed now; a failure below only loses the follow-ups.
-        markFiled(sent, date: date, kind: kind, note: DailyDeckFiledNote(
+        // The answers are filed now (a seal's record written); a failure below only loses the follow-ups.
+        markFiled(sent, date: date, kind: kind, confirmed: true, note: DailyDeckFiledNote(
             summary: Self.trimmed(filed.summary),
             failures: (filed.ran ?? []).filter { $0.ok == false }.map { step in
                 [step.step, step.error].compactMap { $0 }.joined(separator: ": ")
@@ -700,9 +712,10 @@ final class DailyDeckViewModel {
         return text
     }
 
-    /// Records `sent` as filed for its deck. The draft is cleared only if it still matches what
-    /// was sent, so edits made while filing stay unsent; another deck on screen is left alone.
-    private func markFiled(_ sent: [String: DeckAnswer], date: String, kind: String, note: DailyDeckFiledNote?) {
+    /// Records `sent` as filed for its deck; `confirmed` when the server's filer did it (a seal's
+    /// record now exists). The draft is cleared only if it still matches what was sent, so edits
+    /// made while filing stay unsent; another deck on screen is left alone.
+    private func markFiled(_ sent: [String: DeckAnswer], date: String, kind: String, confirmed: Bool, note: DailyDeckFiledNote?) {
         if store.answers(for: server, date: date, kind: kind) == sent {
             store.setAnswers([:], for: server, date: date, kind: kind)
         }
@@ -710,6 +723,7 @@ final class DailyDeckViewModel {
         guard date == self.date, kind == self.kind else { return }
         filedAnswers = sent
         filedNote = note
+        if confirmed { hasWeekRecord = true }
     }
 
     /// A fresh session (so the chat holds only this filing, never an earlier stopped attempt)

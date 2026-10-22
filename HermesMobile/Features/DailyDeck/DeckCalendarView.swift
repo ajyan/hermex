@@ -204,9 +204,11 @@ struct DeckCalendarView: View {
                 ForEach(here) { review in
                     let route = DeckCalendarRoute.for(review: review, records: weeks?.recordDates ?? [])
                     let sealed = route == .weekPage(review.date)
+                    // A weekly whose answers were saved but never sealed still waits.
+                    let filed = review.isFiled && !(review.kind == "weekly" && weeks?.unfiledDecks.contains(review.date) == true)
                     Button { go(route) } label: {
                         row(symbol: review.kind == "weekly" ? "calendar.badge.clock" : "calendar", title: review.label,
-                            status: sealed ? ("Sealed", "checkmark.seal") : review.isFiled ? ("Filed", "checkmark") : nil)
+                            status: sealed ? ("Sealed", "checkmark.seal") : filed ? ("Filed", "checkmark") : nil)
                     }
                     .buttonStyle(.plain)
                 }

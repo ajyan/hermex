@@ -137,7 +137,7 @@ struct DailyDeckView: View {
                     var transaction = Transaction()
                     transaction.disablesAnimations = true
                     withTransaction(transaction) { sealedWeek = nil }
-                    if reopen { Task { await viewModel.show(date: week.id, kind: "weekly") } }
+                    if let reopen { Task { await viewModel.show(date: reopen, kind: "weekly") } }
                 }
             }
     }
@@ -277,19 +277,42 @@ struct SealedWeek: Identifiable {
 }
 
 /// The page of the week just sealed, over the deck: it fades in, and out again on Done or Edit,
-/// with no motion under Reduce Motion. `close(reopen)` removes it; `reopen` asks for the deck again.
+/// with no motion under Reduce Motion. "Your year in weeks" pushes the year grid, where a sealed
+/// week opens its page and an unsealed one its deck. `close(reopen)` removes it; `reopen` is the
+/// Sunday whose weekly deck to open next, or nil.
 private struct SealedWeekCover: View {
     let week: SealedWeek
-    let close: (_ reopen: Bool) -> Void
+    let close: (_ reopen: String?) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isShown = false
+    @State private var path: [WeekRoute] = []
 
     var body: some View {
-        NavigationStack {
-            WeekPageView(model: week.model, weekEnding: week.id) { fade(reopen: true) }
+        NavigationStack(path: $path) {
+            WeekPageView(model: week.model, weekEnding: week.id) { fade(reopen: week.id) }
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button { fade(reopen: false) } label: { Text(verbatim: "Done") }
+                        Button { fade(reopen: nil) } label: { Text(verbatim: "Done") }
+                    }
+                    ToolbarItem(placement: .bottomBar) {
+                        NavigationLink(value: WeekRoute.year) {
+                            Label { Text(verbatim: "Your year in weeks") } icon: { Image(systemName: "square.grid.3x3") }
+                                .labelStyle(.titleAndIcon)
+                        }
+                    }
+                }
+                .navigationDestination(for: WeekRoute.self) { route in
+                    switch route {
+                    case .year:
+                        YearOfWeeksView(model: week.model) { tapped in
+                            switch DeckCalendarRoute.for(review: DeckReview(date: tapped, kind: "weekly", isFiled: false),
+                                                         records: week.model.recordDates) {
+                            case .weekPage(let sealed): path.append(.page(sealed))
+                            case .deck(let date, _): fade(reopen: date)
+                            }
+                        }
+                    case .page(let other):
+                        WeekPageView(model: week.model, weekEnding: other) { fade(reopen: other) }
                     }
                 }
         }
@@ -300,7 +323,7 @@ private struct SealedWeekCover: View {
         }
     }
 
-    private func fade(reopen: Bool) {
+    private func fade(reopen: String?) {
         if reduceMotion {
             close(reopen)
         } else {

@@ -4,7 +4,8 @@ import SwiftUI
 /// One sealed week, to reread for years: the photo, the week and its days, the title, the story,
 /// then what he kept of it (energy, the deep answer, the values, the one thing, who, the note to the
 /// future, the prediction and its grade). Empty sections are left out, so a backfilled week is its
-/// photo, title, and story. Edit reopens the filed deck; the photo can be added, replaced, or removed.
+/// photo, title, and story. Edit reopens the filed deck (also when the record can't be read); the
+/// photo can be added, replaced, or removed.
 struct WeekPageView: View {
     let model: WeeksModel
     let weekEnding: String
@@ -32,6 +33,8 @@ struct WeekPageView: View {
         model.photosListed ? model.photoDates.contains(weekEnding) : showsLoadedPhoto
     }
 
+    private var isLoading: Bool { if case .loading = phase { true } else { false } }
+
     /// Try the photo itself when the listing has it or couldn't be read.
     private var loadsPhoto: Bool { !model.photosListed || model.photoDates.contains(weekEnding) }
 
@@ -55,9 +58,10 @@ struct WeekPageView: View {
         .background(Color.hxCanvas.ignoresSafeArea())
         .hxNavigationTitle("Your week")
         .toolbar {
-            if case .ready = phase {
+            // Edit stays when the record can't be read, so the week can be sealed again.
+            if !isLoading {
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    photoMenu
+                    if case .ready = phase { photoMenu }
                     Button("Edit", action: edit)
                         .accessibilityHint(Text(verbatim: "Reopens the week's review to change and seal again"))
                 }
