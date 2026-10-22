@@ -41,7 +41,7 @@ final class ComposerVoiceDraftComposerTests: XCTestCase {
 
         session.begin(baseDraft: "Please")
 
-        XCTAssertEqual(session.composedDraft(for: "summarize this file"), "Please summarize this file")
+        XCTAssertEqual(session.composedDraft(for: "summarize this file", endsSegment: true), "Please summarize this file")
     }
 
     func testDraftUpdateSessionIgnoresLateTranscriptAfterStop() {
@@ -50,7 +50,7 @@ final class ComposerVoiceDraftComposerTests: XCTestCase {
         session.begin(baseDraft: "Send this")
         session.stopAcceptingUpdates()
 
-        XCTAssertNil(session.composedDraft(for: "late final transcript"))
+        XCTAssertNil(session.composedDraft(for: "late final transcript", endsSegment: true))
     }
 
     func testDraftUpdateSessionUsesNewBaseDraftAfterRestart() {
@@ -60,7 +60,101 @@ final class ComposerVoiceDraftComposerTests: XCTestCase {
         session.stopAcceptingUpdates()
         session.begin(baseDraft: "New")
 
-        XCTAssertEqual(session.composedDraft(for: "transcript"), "New transcript")
+        XCTAssertEqual(session.composedDraft(for: "transcript", endsSegment: true), "New transcript")
+    }
+
+    func testDraftUpdateSessionGrowsPartialsWithinASegment() {
+        var session = ComposerVoiceDraftUpdateSession()
+
+        session.begin(baseDraft: "")
+
+        XCTAssertEqual(session.composedDraft(for: "we can", endsSegment: false), "we can")
+        XCTAssertEqual(session.composedDraft(for: "we can use pinned", endsSegment: false), "we can use pinned")
+    }
+
+    func testDraftUpdateSessionKeepsFinishedSegmentWhenANewOneStarts() {
+        var session = ComposerVoiceDraftUpdateSession()
+
+        session.begin(baseDraft: "")
+        session.composedDraft(for: "we can use pinned models", endsSegment: true)
+
+        XCTAssertEqual(
+            session.composedDraft(for: "until we're ready", endsSegment: false),
+            "we can use pinned models until we're ready"
+        )
+    }
+
+    func testDraftUpdateSessionKeepsPreviousSegmentWithoutAnEndSignal() {
+        var session = ComposerVoiceDraftUpdateSession()
+
+        session.begin(baseDraft: "")
+        session.composedDraft(for: "we can use pinned models", endsSegment: false)
+
+        // No metadata flag: the new transcript shares no leading word and is
+        // under half the length, so the previous segment is committed anyway.
+        XCTAssertEqual(session.composedDraft(for: "until", endsSegment: false), "we can use pinned models until")
+    }
+
+    func testDraftUpdateSessionRevisesTheOpenSegmentInPlace() {
+        var session = ComposerVoiceDraftUpdateSession()
+
+        session.begin(baseDraft: "")
+        session.composedDraft(for: "we can use pin", endsSegment: false)
+
+        // A revision of the same segment replaces it instead of duplicating it.
+        XCTAssertEqual(session.composedDraft(for: "we can use pinned", endsSegment: false), "we can use pinned")
+    }
+
+    func testDraftUpdateSessionKeepsABaseDraftTypedBeforeDictation() {
+        var session = ComposerVoiceDraftUpdateSession()
+
+        session.begin(baseDraft: "Please")
+        session.composedDraft(for: "we can use pinned models", endsSegment: true)
+
+        XCTAssertEqual(
+            session.composedDraft(for: "until we're ready", endsSegment: false),
+            "Please we can use pinned models until we're ready"
+        )
+    }
+
+    func testDraftUpdateSessionDoesNotRepeatASegmentWhenTheTranscriptKeepsIt() {
+        var session = ComposerVoiceDraftUpdateSession()
+
+        session.begin(baseDraft: "")
+        session.composedDraft(for: "we can use pinned models", endsSegment: true)
+
+        // A recognizer that keeps the whole transcript across the pause.
+        XCTAssertEqual(
+            session.composedDraft(for: "We can use pinned models until", endsSegment: false),
+            "we can use pinned models until"
+        )
+        XCTAssertEqual(
+            session.composedDraft(for: "We can use pinned models until we're ready.", endsSegment: true),
+            "we can use pinned models until we're ready."
+        )
+    }
+
+    func testDraftUpdateSessionIgnoresAFinalResultRepeatingTheLastSegment() {
+        var session = ComposerVoiceDraftUpdateSession()
+
+        session.begin(baseDraft: "")
+        session.composedDraft(for: "we can use pinned models", endsSegment: true)
+        session.composedDraft(for: "until we're ready", endsSegment: true)
+
+        XCTAssertEqual(
+            session.composedDraft(for: "until we're ready", endsSegment: true),
+            "we can use pinned models until we're ready"
+        )
+    }
+
+    func testDraftUpdateSessionStillBlocksLateUpdatesAfterACommit() {
+        var session = ComposerVoiceDraftUpdateSession()
+
+        session.begin(baseDraft: "Send this")
+        session.composedDraft(for: "the file", endsSegment: true)
+        session.stopAcceptingUpdates()
+
+        XCTAssertNil(session.composedDraft(for: "late", endsSegment: false))
     }
 
     func testVoiceInputPreflightAcceptsValidInputFormatValues() {
