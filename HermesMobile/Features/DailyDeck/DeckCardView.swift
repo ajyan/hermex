@@ -78,9 +78,20 @@ private struct DeckCardView: View {
                 case .close: close
                 case .sleep: sleep
                 case .goal: goal
-                case .weekAhead: DeckWeekAheadCard(card: card, palette: palette)
+                case .weekAhead:
+                    DeckWeekAheadCard(card: card, palette: palette)
+                    DeckFootnote(card: card, palette: palette)
                 case .changes: DeckChangesCard(card: card, palette: palette, viewModel: viewModel)
                 case .ask: ask
+                case .cover: WeekCoverCard(card: card, palette: palette, viewModel: viewModel)
+                case .filmstrip: WeekFilmstripCard(card: card, palette: palette)
+                case .story: WeekStoryCard(card: card, palette: palette, viewModel: viewModel)
+                case .energy: WeekEnergyCard(card: card, palette: palette, viewModel: viewModel)
+                case .commitments: WeekCommitmentsCard(card: card, palette: palette, viewModel: viewModel)
+                case .values: WeekValuesCard(card: card, palette: palette, viewModel: viewModel)
+                case .predictions: WeekPredictionsCard(card: card, palette: palette, viewModel: viewModel)
+                case .who: WeekWhoCard(card: card, palette: palette, viewModel: viewModel)
+                case .keepsakes: WeekKeepsakesCard(card: card, palette: palette, viewModel: viewModel)
                 default: reading
                 }
             }
@@ -143,6 +154,9 @@ private struct DeckCardView: View {
             .padding(.bottom, 18)
             .accessibilityElement(children: .combine)
         }
+        if let rotation = card.rotation {
+            WeekQuestionHeader(rotation: rotation, palette: palette)
+        }
         if card.isMandarin {
             DeckMandarinCard(card: card, palette: palette, asked: viewModel.question(for: card))
         }
@@ -204,18 +218,16 @@ private struct DeckCardView: View {
                 .id(question)
                 .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
         }
+        if card.id == "one-thing", card.chapter != nil {
+            WeekCarryChips(card: card, palette: palette, viewModel: viewModel)
+        }
         if let traits = card.selfRatings {
             selfRatings(traits).padding(.top, 18)
         } else if card.takesText {
             reflection(card.isLetter ? "Write to her" : card.isMandarin ? "Answer in Mandarin" : "Write a reflection")
                 .padding(.top, 16)
         }
-        if let reason = card.reason {
-            Text(verbatim: reason)
-                .font(AppFont.footnote())
-                .foregroundStyle(palette.ink)
-                .padding(.top, 20)
-        }
+        DeckFootnote(card: card, palette: palette)
     }
 
     /// Your words once written; until then, the way in.
@@ -225,7 +237,8 @@ private struct DeckCardView: View {
             Button { isWriting = true } label: {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(verbatim: text)
-                        .font(AppFont.body())
+                        // A weekly review's answers are words he keeps (the deep answer, the one thing).
+                        .font(card.chapter == nil ? AppFont.body() : AppFont.serif(style: .body))
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                     Label { Text(verbatim: "Edit") } icon: { Image(systemName: "pencil") }
@@ -322,24 +335,14 @@ private struct DeckCardView: View {
             }
         }
         reflection("Add a note").padding(.top, 24)
-        if let reason = card.reason {
-            Text(verbatim: reason)
-                .font(AppFont.footnote())
-                .foregroundStyle(palette.ink)
-                .padding(.top, 20)
-        }
+        DeckFootnote(card: card, palette: palette)
     }
 
     /// The Daily Ask: today's three roles, live.
     @ViewBuilder
     private var ask: some View {
         DeckAskCard(card: card, deckDate: viewModel.date)
-        if let reason = card.reason {
-            Text(verbatim: reason)
-                .font(AppFont.footnote())
-                .foregroundStyle(palette.ink)
-                .padding(.top, 20)
-        }
+        DeckFootnote(card: card, palette: palette)
     }
 
     /// The goal card: live check-ins, then a note on how yesterday went.
@@ -347,12 +350,7 @@ private struct DeckCardView: View {
     private var goal: some View {
         DeckGoalCard(card: card, palette: palette, deckDate: viewModel.date)
         reflection("Add a note").padding(.top, 24)
-        if let reason = card.reason {
-            Text(verbatim: reason)
-                .font(AppFont.footnote())
-                .foregroundStyle(palette.ink)
-                .padding(.top, 20)
-        }
+        DeckFootnote(card: card, palette: palette)
     }
 
     // MARK: Opener and close

@@ -131,6 +131,53 @@ struct DeckPrediction: Codable, Equatable {
     var due: String
 }
 
+extension DeckPrediction {
+    static let defaultProbability = 70
+
+    /// A new prediction's due day, `yyyy-MM-dd`: four weeks after the deck's day.
+    static func defaultDue(deckDate: String, calendar: Calendar = .current) -> String {
+        let start = date(day: deckDate, calendar: calendar) ?? Date()
+        return DailyDeckPaths.day(calendar.date(byAdding: .day, value: 28, to: start) ?? start, calendar: calendar)
+    }
+
+    /// A `yyyy-MM-dd` day as a date in `calendar`, nil when it doesn't read as one.
+    static func date(day: String, calendar: Calendar = .current) -> Date? {
+        let parts = day.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3 else { return nil }
+        return calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2], hour: 12))
+    }
+}
+
+/// A commitment's grade on the commitments card. Tapping a row steps through the cycle.
+enum CommitmentStatus {
+    static let kept = "kept"
+    static let missed = "missed"
+    static let dropped = "dropped"
+
+    /// None, kept, missed, dropped, and back to none.
+    static let cycle: [String?] = [nil, kept, missed, dropped]
+
+    /// The status after `status`; an unknown one starts over at kept.
+    static func next(after status: String?) -> String? {
+        let index = cycle.firstIndex(of: status) ?? 0
+        return cycle[(index + 1) % cycle.count]
+    }
+}
+
+extension DeckCard {
+    /// The v2 weekly chapters, in the order the review walks them.
+    static let weeklyChapters = ["remember", "understand", "account", "steer"]
+
+    /// The card's chapter as it shows in place of the reason line: "1 · Remember". Nil on the
+    /// cover, the close, and any card off the v2 weekly deck.
+    var chapterLabel: String? {
+        guard let chapter, !chapter.isEmpty else { return nil }
+        let name = chapter.prefix(1).uppercased() + chapter.dropFirst()
+        guard let index = Self.weeklyChapters.firstIndex(of: chapter) else { return name }
+        return "\(index + 1) · \(name)"
+    }
+}
+
 /// The five values, scored 1–10 each week, and which two the week is remembered by.
 enum WeeklyValues {
     /// The fixed order the vault uses; a tie goes to the earlier value.

@@ -434,6 +434,63 @@ final class DailyDeckViewModel {
         }
     }
 
+    // The v2 weekly review's answers, each keyed by the card's item ids (`DeckAnswer`).
+
+    /// Sets one of a card's lists: the energy card's "gave" and "drained", the who card's "who".
+    /// An emptied list stays (as none), so filing doesn't fall back to the drafted chips.
+    func setList(_ key: String, _ values: [String], for card: DeckCard) {
+        update(card) { answer in
+            var lists = answer.lists ?? [:]
+            lists[key] = values
+            answer.lists = lists
+        }
+    }
+
+    /// Scores a value 1–10; tapping its chosen score again clears it. Other scores are ignored.
+    func setScore(_ id: String, _ score: Int, for card: DeckCard) {
+        guard (1...10).contains(score) else { return }
+        update(card) { answer in
+            var scores = answer.scores ?? [:]
+            scores[id] = scores[id] == score ? nil : score
+            answer.scores = scores.isEmpty ? nil : scores
+        }
+    }
+
+    /// Grades an item: a commitment kept, missed, or dropped, a prediction hit, partly, or miss.
+    /// Nil clears it.
+    func setStatus(_ id: String, _ status: String?, for card: DeckCard) {
+        update(card) { answer in
+            var statuses = answer.statuses ?? [:]
+            statuses[id] = status
+            answer.statuses = statuses.isEmpty ? nil : statuses
+        }
+    }
+
+    /// A line for an item, as typed: a value's evidence, a prediction's "what happened".
+    func setNote(_ id: String, _ text: String, for card: DeckCard) {
+        update(card) { answer in
+            var notes = answer.notes ?? [:]
+            notes[id] = text
+            answer.notes = notes
+        }
+    }
+
+    /// The keepsakes card's prediction; one without words is none.
+    func setPrediction(_ prediction: DeckPrediction?, for card: DeckCard) {
+        update(card) { answer in
+            let hasText = !(prediction?.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+            answer.prediction = hasText ? prediction : nil
+        }
+    }
+
+    /// Last week's commitments marked missed on this deck, in the card's order: what the one-thing
+    /// and who cards offer to carry.
+    var missedCommitments: [DeckReviewItem] {
+        guard let card = cards.first(where: { $0.type == .commitments }) else { return [] }
+        let statuses = answers[card.id]?.statuses ?? [:]
+        return card.items.filter { statuses[$0.id] == CommitmentStatus.missed }
+    }
+
     /// A self-rating card's scores so far, read from its answer text.
     func traitScores(for card: DeckCard) -> [String: Int] {
         DeckSelfRatings.scores(in: answers[card.id]?.text, traits: card.selfRatings ?? [])

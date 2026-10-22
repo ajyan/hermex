@@ -267,7 +267,163 @@ final class WeeklyReviewModelTests: XCTestCase {
         XCTAssertEqual(record.graded.map(\.note), ["Early.", nil])
     }
 
+    // MARK: - Answering (view model)
+
+    @MainActor
+    func testSetScoreAndNoteStoreOnTheValuesAnswer() async throws {
+        let viewModel = try await weeklyViewModel()
+        let values = try card("values", in: viewModel)
+        viewModel.setScore("present", 7, for: values)
+        viewModel.setScore("people", 9, for: values)
+        viewModel.setNote("present", "Phone down at dinner, twice.", for: values)
+        let answer = try XCTUnwrap(viewModel.answer(for: values))
+        XCTAssertEqual(answer.scores, ["present": 7, "people": 9])
+        XCTAssertEqual(answer.notes, ["present": "Phone down at dinner, twice."])
+        XCTAssertNil(answer.text)
+
+        viewModel.setScore("people", 9, for: values)
+        XCTAssertEqual(viewModel.answer(for: values)?.scores, ["present": 7], "tapping the chosen score again clears it")
+        viewModel.setScore("present", 11, for: values)
+        viewModel.setScore("present", 0, for: values)
+        XCTAssertEqual(viewModel.answer(for: values)?.scores, ["present": 7], "scores outside 1–10 are ignored")
+        viewModel.setScore("present", 4, for: values)
+        XCTAssertEqual(viewModel.answer(for: values)?.scores, ["present": 4])
+
+        // A prediction's grade and note sit under its id on the predictions answer.
+        let predictions = try card("predictions", in: viewModel)
+        viewModel.setStatus("2026-10-04-p", "hit", for: predictions)
+        viewModel.setNote("2026-10-04-p", "Came early.", for: predictions)
+        XCTAssertEqual(viewModel.answer(for: predictions)?.statuses, ["2026-10-04-p": "hit"])
+        XCTAssertEqual(viewModel.answer(for: predictions)?.notes, ["2026-10-04-p": "Came early."])
+    }
+
+    @MainActor
+    func testStatusCycleClearsAtNone() async throws {
+        var status: String?
+        var cycle: [String?] = []
+        for _ in 0..<4 {
+            status = CommitmentStatus.next(after: status)
+            cycle.append(status)
+        }
+        XCTAssertEqual(cycle, ["kept", "missed", "dropped", nil])
+        XCTAssertEqual(CommitmentStatus.next(after: "someday"), "kept", "an unknown status starts the cycle over")
+
+        let viewModel = try await weeklyViewModel()
+        let commitments = try card("commitments", in: viewModel)
+        viewModel.setStatus("one-thing", "kept", for: commitments)
+        viewModel.setStatus("who-jon-chan", "missed", for: commitments)
+        XCTAssertEqual(viewModel.answer(for: commitments)?.statuses, ["one-thing": "kept", "who-jon-chan": "missed"])
+        viewModel.setStatus("one-thing", nil, for: commitments)
+        XCTAssertEqual(viewModel.answer(for: commitments)?.statuses, ["who-jon-chan": "missed"])
+        viewModel.setStatus("who-jon-chan", nil, for: commitments)
+        XCTAssertNil(viewModel.answer(for: commitments), "no statuses left leaves no answer")
+    }
+
+    @MainActor
+    func testMissedCommitmentsFollowCurrentStatuses() async throws {
+        let viewModel = try await weeklyViewModel()
+        let commitments = try card("commitments", in: viewModel)
+        XCTAssertEqual(viewModel.missedCommitments, [])
+        viewModel.setStatus("one-thing", "missed", for: commitments)
+        viewModel.setStatus("who-jon-chan", "kept", for: commitments)
+        XCTAssertEqual(viewModel.missedCommitments.map(\.id), ["one-thing"])
+        viewModel.setStatus("who-jon-chan", "missed", for: commitments)
+        XCTAssertEqual(viewModel.missedCommitments.map(\.id), ["one-thing", "who-jon-chan"], "in the card's order")
+        viewModel.setStatus("one-thing", "dropped", for: commitments)
+        XCTAssertEqual(viewModel.missedCommitments.map(\.text), ["See Jon Chan"])
+    }
+
+    @MainActor
+    func testPredictionClearsWhenTextEmpty() async throws {
+        let viewModel = try await weeklyViewModel()
+        let keepsakes = try card("keepsakes", in: viewModel)
+        let offer = DeckPrediction(text: "Offer by November", probability: 60, due: "2026-11-22")
+        viewModel.setPrediction(offer, for: keepsakes)
+        XCTAssertEqual(viewModel.answer(for: keepsakes)?.prediction, offer)
+
+        viewModel.setPrediction(DeckPrediction(text: "  \n ", probability: 60, due: "2026-11-22"), for: keepsakes)
+        XCTAssertNil(viewModel.answer(for: keepsakes), "a prediction without words is no prediction")
+
+        viewModel.setText("Be kind to October.", for: keepsakes)
+        viewModel.setPrediction(offer, for: keepsakes)
+        viewModel.setPrediction(nil, for: keepsakes)
+        XCTAssertNil(viewModel.answer(for: keepsakes)?.prediction)
+        XCTAssertEqual(viewModel.answer(for: keepsakes)?.text, "Be kind to October.", "the note stays")
+
+        XCTAssertEqual(DeckPrediction.defaultDue(deckDate: "2026-10-25"), "2026-11-22", "four weeks after the deck")
+        XCTAssertEqual(DeckPrediction.defaultProbability, 70)
+    }
+
+    @MainActor
+    func testPayloadCarriesV2AnswersInSnakeCase() async throws {
+        let viewModel = try await weeklyViewModel()
+        let deck = try XCTUnwrap(viewModel.deck)
+        viewModel.setScore("present", 7, for: try card("values", in: viewModel))
+        viewModel.setList("gave", ["Running"], for: try card("energy", in: viewModel))
+        viewModel.setList("drained", [], for: try card("energy", in: viewModel))
+        viewModel.setStatus("who-jon-chan", "missed", for: try card("commitments", in: viewModel))
+        viewModel.setList("who", ["Ana"], for: try card("who", in: viewModel))
+        viewModel.setPrediction(DeckPrediction(text: "Offer", probability: 70, due: "2026-11-22"),
+                                for: try card("keepsakes", in: viewModel))
+
+        let payload = DeckAnswersPayload(deck: deck, answers: viewModel.answers, completedAt: Date(timeIntervalSince1970: 0))
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: encoder.encode(payload)) as? [String: Any])
+        XCTAssertEqual(json["version"] as? Int, 1)
+        XCTAssertNotNil(json["completed_at"])
+        let answers = try XCTUnwrap(json["answers"] as? [[String: Any]])
+        XCTAssertEqual(answers.compactMap { $0["card"] as? String }, ["energy", "commitments", "values", "who", "keepsakes"])
+        let byCard = Dictionary(uniqueKeysWithValues: answers.map { ($0["card"] as? String ?? "", $0) })
+        XCTAssertEqual(byCard["values"]?["scores"] as? [String: Int], ["present": 7])
+        XCTAssertEqual(byCard["energy"]?["lists"] as? [String: [String]], ["gave": ["Running"], "drained": []],
+                       "an emptied list is sent, so the filer doesn't fall back to the drafted chips")
+        XCTAssertEqual(byCard["commitments"]?["statuses"] as? [String: String], ["who-jon-chan": "missed"])
+        XCTAssertEqual(byCard["who"]?["lists"] as? [String: [String]], ["who": ["Ana"]])
+        XCTAssertEqual((byCard["keepsakes"]?["prediction"] as? [String: Any])?["probability"] as? Int, 70)
+        for answer in answers {
+            XCTAssertNil(answer["text"], "no text key on answers without text")
+        }
+    }
+
+    func testChapterLabelNumbersTheChapters() throws {
+        let deck = try DailyDeck.decode(Self.v2DeckJSON)
+        let labels = Dictionary(uniqueKeysWithValues: deck.cards.map { ($0.id, $0.chapterLabel) })
+        XCTAssertEqual(labels["filmstrip"], "1 · Remember")
+        XCTAssertEqual(labels["deep"], "2 · Understand")
+        XCTAssertEqual(labels["values"], "3 · Account")
+        XCTAssertEqual(labels["who"], "4 · Steer")
+        XCTAssertNil(deck.cards[0].chapterLabel, "the cover has no chapter")
+        XCTAssertNil(deck.cards[13].chapterLabel, "nor the close")
+    }
+
     // MARK: - Helpers
+
+    private let server = URL(string: "https://brain.example.test")!
+    private var suiteName = "WeeklyReviewModelTests.\(UUID().uuidString)"
+
+    override func tearDown() {
+        UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName)
+        super.tearDown()
+    }
+
+    /// The v2 fixture deck, open on a view model as the 2026-10-25 weekly review.
+    @MainActor
+    private func weeklyViewModel() async throws -> DailyDeckViewModel {
+        let store = DailyDeckStore(defaults: try XCTUnwrap(UserDefaults(suiteName: suiteName)))
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-25.weekly.json"], deck: Self.v2DeckJSON)
+        let viewModel = DailyDeckViewModel(server: server, client: client, store: store)
+        await viewModel.show(date: "2026-10-25", kind: "weekly")
+        XCTAssertEqual(viewModel.state, .ready)
+        return viewModel
+    }
+
+    @MainActor
+    private func card(_ id: String, in viewModel: DailyDeckViewModel) throws -> DeckCard {
+        try XCTUnwrap(viewModel.cards.first { $0.id == id })
+    }
+
 
     private static func card(_ id: String) -> DeckCard {
         // swiftlint:disable:next force_try
