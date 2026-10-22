@@ -16,6 +16,15 @@ Most AI apps are a chat box. This one starts from the other end: an agent (calle
 
 Nothing runs on a hosted backend. Models, memory, and personal data stay on the home machine, and the phone reaches it over Tailscale.
 
+<div align="center">
+<table>
+  <tr>
+    <td align="center"><img src="docs/assets/readme/atlas-brief.png" alt="A Daily Brief card on system-design caching, with an Open the diagram button" width="260" /><br /><sub><b>A card from the Daily Brief</b></sub></td>
+    <td align="center"><img src="docs/assets/readme/atlas-diagram.png" alt="An interactive Elasticsearch architecture diagram with a tapped node explained below it" width="260" /><br /><sub><b>Its interactive diagram</b></sub></td>
+  </tr>
+</table>
+</div>
+
 ```mermaid
 flowchart LR
     phone["iPhone<br/>Hermex · Atlas<br/>(SwiftUI, widgets, Siri, CallKit)"]
