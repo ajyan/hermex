@@ -35,6 +35,8 @@ struct DeckPalette: Equatable {
     // Bright paper in both appearances: index cards on a dark desk. Cards draw in light mode
     // (`DeckPageView`) so system text and controls stay legible on them.
     static let opener = DeckPalette(.opener, symbol: "sun.horizon", name: "Today", shortName: "Today", isNeutralCard: true)
+    /// The "This week" divider: the opener's neutral paper, named for what it opens.
+    static let section = DeckPalette(.opener, symbol: "calendar", name: "This week", shortName: "This week", isNeutralCard: true)
     static let quote = DeckPalette(.quote, symbol: "quote.opening", name: "Quote", shortName: "Quote")
     static let book = DeckPalette(.book, symbol: "book.closed", name: "Book highlight", shortName: "Book")
     static let wiki = DeckPalette(.wiki, symbol: "leaf", name: "From your wiki", shortName: "Wiki")
@@ -71,6 +73,7 @@ struct DeckPalette: Equatable {
     static func of(_ card: DeckCard) -> DeckPalette {
         switch card.type {
         case .headline: return .opener
+        case .section: return .section
         case .close: return .quote
         case .prompt: return card.isMandarin ? .mandarin : card.isLetter ? .letter : .advisor
         case .sleep: return .sleep
@@ -102,7 +105,8 @@ struct DeckPalette: Equatable {
             case "media": return .reading
             case "insight": return .notes
             case "video": return .video
-            case "on_this_day": return .past
+            case "on_this_day", "journal": return .past
+            case "crm": return .followUps
             default: return .plain
             }
         }

@@ -52,7 +52,7 @@ struct DeckPageView: View {
 }
 
 /// A single card: lead, attribution, detail, question, reflection.
-private struct DeckCardView: View {
+struct DeckCardView: View {
     let card: DeckCard
     let palette: DeckPalette
     let viewModel: DailyDeckViewModel
@@ -75,6 +75,7 @@ private struct DeckCardView: View {
             VStack(alignment: .leading, spacing: 0) {
                 switch card.type {
                 case .headline: opener
+                case .section: section
                 case .close: close
                 case .sleep: sleep
                 case .goal: goal
@@ -378,23 +379,48 @@ private struct DeckCardView: View {
         ForEach(Array(card.entries.enumerated()), id: \.offset) { _, entry in
             recapLine(entry.label, entry.text).padding(.top, 10)
         }
-        let ahead = viewModel.visiblePages.dropFirst().filter {
-            if case .card(let c) = $0, c.type == .close { return false }
-            return true
-        }
-        Text("Today · \(ahead.count) cards")
-            .font(AppFont.display(style: .subheadline, weight: .semibold))
-            .padding(.top, 26)
-            .padding(.bottom, 6)
-        VStack(spacing: 0) {
-            ForEach(Array(ahead.enumerated()), id: \.element.id) { _, page in
-                DeckAheadRow(page)
-            }
-        }
+        let acts = Self.acts(viewModel.visiblePages)
+        act("Today", acts.today).padding(.top, 26)
+        if !acts.week.isEmpty { act("This week", acts.week).padding(.top, 18) }
         Text(verbatim: "Swipe to begin")
             .font(AppFont.footnote())
             .foregroundStyle(palette.ink)
             .padding(.top, 16)
+    }
+
+    /// One act of the opener's list: "Today · 3 cards" over a row per card.
+    private func act(_ name: String, _ pages: [DeckPage]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(verbatim: "\(name) · \(pages.count) \(pages.count == 1 ? "card" : "cards")")
+                .font(AppFont.display(style: .subheadline, weight: .semibold))
+                .padding(.bottom, 6)
+                .accessibilityAddTraits(.isHeader)
+            ForEach(pages) { page in
+                DeckAheadRow(page)
+            }
+        }
+    }
+
+    /// The cards ahead of the opener in two acts: those before the deck's first `section`
+    /// divider (Today) and those after it (This week). The opener, the divider and the close
+    /// card are not listed; a deck with no divider is all Today.
+    static func acts(_ pages: [DeckPage]) -> (today: [DeckPage], week: [DeckPage]) {
+        var today: [DeckPage] = []
+        var week: [DeckPage] = []
+        var inWeek = false
+        for page in pages {
+            if case .card(let card) = page {
+                switch card.type {
+                case .headline, .close: continue
+                case .section:
+                    inWeek = true
+                    continue
+                default: break
+                }
+            }
+            if inWeek { week.append(page) } else { today.append(page) }
+        }
+        return (today, week)
     }
 
     /// "Yesterday · …" on the opener: the label bold in the ink, the line in body text.
@@ -402,6 +428,31 @@ private struct DeckCardView: View {
         (Text(verbatim: label.map { "\($0) · " } ?? "").font(AppFont.display(style: .subheadline, weight: .semibold))
             + Text(verbatim: text).font(AppFont.subheadline()).foregroundStyle(Color.hxTextPrimary.opacity(0.85)))
             .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// The divider between Today and the week's question: its kicker and the question, the last
+    /// time's answer, and (on the open card's foot) "Open the page" for the view it comes from.
+    @ViewBuilder
+    private var section: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(card.lines, id: \.self) { line in
+                    Text(verbatim: line).font(AppFont.footnote())
+                }
+            }
+            .padding(.trailing, 24)
+            Text(verbatim: card.title ?? "This week")
+                .font(AppFont.display(style: .title, weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 10)
+                .textSelection(.enabled)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: card.sectionSpokenLabel))
+        .accessibilityAddTraits(.isHeader)
+        if let recap = card.recap {
+            recapLine("Last time", recap).padding(.top, 14)
+        }
     }
 
     @ViewBuilder
@@ -767,9 +818,20 @@ private struct FollowUpRow: View {
     var body: some View {
         let chosen = viewModel.answer(for: card)?.action
         VStack(alignment: .leading, spacing: 8) {
+            // The Sunday view-take card: its kicker, the week's answers, and what you said last time.
+            ForEach(card.lines, id: \.self) { line in
+                Text(verbatim: line).font(AppFont.footnote()).foregroundStyle(.secondary)
+            }
             Text(verbatim: card.title ?? "Follow-up").font(AppFont.headline())
             if let body = card.body, body != card.title {
                 Text(verbatim: body).font(AppFont.subheadline()).foregroundStyle(.secondary)
+            }
+            if !card.entries.isEmpty {
+                RecapList(entries: card.entries, palette: .followUps).padding(.vertical, 6)
+            }
+            if let context = card.context {
+                Text(verbatim: context).font(AppFont.subheadline()).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if let preview = draftPreview {
                 VStack(alignment: .leading, spacing: 4) {

@@ -33,7 +33,7 @@ struct DailyDeck: Decodable, Equatable {
 /// fails to decode; an unknown `type` renders its `fallback` text as a plain card.
 struct DeckCard: Decodable, Equatable, Identifiable {
     enum CardType: Equatable {
-        case headline, prompt, decision, reflect, item, sleep, goal, weekAhead, changes, ask, close
+        case headline, prompt, decision, reflect, item, sleep, goal, weekAhead, changes, ask, section, close
         case unknown(String)
 
         init(_ raw: String) {
@@ -48,6 +48,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case "week_ahead": self = .weekAhead
             case "changes": self = .changes
             case "ask": self = .ask
+            case "section": self = .section
             case "close": self = .close
             default: self = .unknown(raw)
             }
@@ -144,6 +145,13 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         }
     }
 
+    /// What VoiceOver reads for a `section` divider: "This week, Being a father, <the question>".
+    /// `lines[0]` is "This week · <area>"; the question is the title.
+    var sectionSpokenLabel: String {
+        let kicker = (lines.first ?? "This week").replacingOccurrences(of: " · ", with: ", ")
+        return [kicker, title].compactMap { $0 }.joined(separator: ", ")
+    }
+
     /// The Dad card: a prompt to say something to his daughter, with the countdown to her birth
     /// (then her age) in `lines`. Its answer is filed as a letter to her, not into the journal.
     var isLetter: Bool { type == .prompt && itemKind == "letter" }
@@ -165,7 +173,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     var takesFeedback: Bool {
         switch type {
         case .prompt, .reflect, .item, .unknown: true
-        case .headline, .decision, .sleep, .goal, .weekAhead, .changes, .ask, .close: false
+        case .headline, .decision, .sleep, .goal, .weekAhead, .changes, .ask, .section, .close: false
         }
     }
 
@@ -790,7 +798,7 @@ struct DeckCardText: Equatable {
             // The check-ins, the week's plan, the week's fixes and the Ask are drawn (`DeckGoalCard`,
             // `DeckWeekAheadCard`, `DeckChangesCard`, `DeckAskCard`).
             lead = card.title ?? card.fallback
-        case .headline, .decision, .close:
+        case .headline, .decision, .section, .close:
             lead = card.title
             detail = card.body
         }

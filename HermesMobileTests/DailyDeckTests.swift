@@ -487,6 +487,106 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertNil(actions[1].message)
     }
 
+    // MARK: - The week's question
+
+    func testSectionCardDecodesAndIsNotAnswerable() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"2026-11-25","kind":"morning","cards":[
+          {"id":"week","type":"section","title":"What does being a father ask of you?",
+           "lines":["This week · Being a father","Day 3 · 4 answers so far"],
+           "recap":"Oct 31: “Work hard on things you chose.”",
+           "ref":{"link":"wiki/views/fatherhood"},
+           "week":{"area":"fatherhood","question":"What does being a father ask of you?","monday":"2026-11-23"}}]}
+        """#)
+        let card = try XCTUnwrap(deck.cards.first)
+        XCTAssertEqual(card.type, .section)
+        XCTAssertEqual(card.title, "What does being a father ask of you?")
+        XCTAssertEqual(card.lines, ["This week · Being a father", "Day 3 · 4 answers so far"])
+        XCTAssertEqual(card.recap, "Oct 31: “Work hard on things you chose.”")
+        XCTAssertEqual(card.link, "wiki/views/fatherhood")
+        XCTAssertEqual(card.sourceRoute, .page(.wiki, "wiki/views/fatherhood.md"))
+        XCTAssertEqual(DeckCard.openTitle(for: try XCTUnwrap(card.sourceRoute)), "Open the page")
+        XCTAssertFalse(card.takesText)
+        XCTAssertFalse(card.takesFeedback)
+        XCTAssertEqual(card.sectionSpokenLabel, "This week, Being a father, What does being a father ask of you?")
+        XCTAssertEqual(DeckPalette.of(card).colors, DeckPalette.opener.colors, "the divider wears the opener's paper")
+        XCTAssertEqual(DeckPalette.of(card).name, "This week")
+    }
+
+    func testSectionCardWithNoLinkOrRecapDecodes() throws {
+        let card = try XCTUnwrap(DailyDeck.decode(#"""
+        {"date":"d","kind":"morning","cards":[{"id":"week","type":"section","title":"Q","lines":["This week · Money","No sources fit today"]}]}
+        """#).cards.first)
+        XCTAssertEqual(card.type, .section)
+        XCTAssertNil(card.recap)
+        XCTAssertNil(card.sourceRoute)
+        XCTAssertEqual(card.lines.last, "No sources fit today")
+    }
+
+    func testOpenerSplitsTodayAndThisWeek() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"d","kind":"morning","cards":[
+          {"id":"open","type":"headline","title":"Today"},
+          {"id":"t1","type":"prompt"},{"id":"f1","type":"decision"},{"id":"t2","type":"reflect"},{"id":"f2","type":"decision"},
+          {"id":"week","type":"section","title":"Q"},
+          {"id":"w1","type":"reflect","kind":"journal"},{"id":"w2","type":"reflect","kind":"crm"},
+          {"id":"close","type":"close"}]}
+        """#)
+        let acts = DeckCardView.acts(DeckPage.pages(for: deck.cards))
+        XCTAssertEqual(acts.today.map(\.id), ["t1", "followups-f1", "t2"], "follow-ups are one page; the opener is not listed")
+        XCTAssertEqual(acts.week.map(\.id), ["w1", "w2"], "the divider and close are not listed")
+        // The opener is never listed, and a deck with no section is all one act.
+        let plain = DeckCardView.acts(DeckPage.pages(for: try DailyDeck.decode(Self.deckJSON).cards))
+        XCTAssertEqual(plain.today.count, 5)
+        XCTAssertTrue(plain.week.isEmpty)
+    }
+
+    func testOpenerCountsThreeTodayAndTwoThisWeek() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"d","kind":"morning","cards":[
+          {"id":"a","type":"prompt"},{"id":"b","type":"reflect"},{"id":"c","type":"reflect"},
+          {"id":"week","type":"section"},
+          {"id":"d","type":"reflect"},{"id":"e","type":"reflect"},{"id":"close","type":"close"}]}
+        """#)
+        let acts = DeckCardView.acts(DeckPage.pages(for: deck.cards))
+        XCTAssertEqual(acts.today.count, 3)
+        XCTAssertEqual(acts.week.count, 2)
+    }
+
+    func testViewTakeDecisionKeepsEntriesContextAndTextActions() throws {
+        let card = try XCTUnwrap(DailyDeck.decode(#"""
+        {"date":"2026-11-29","kind":"weekly","cards":[
+          {"id":"view-take","type":"decision","kind":"view_take","title":"What does being a father ask of you?",
+           "lines":["This week · Being a father"],
+           "entries":[{"label":"Tue · Dr K","text":"Be present."},{"label":"Thu · Notes","text":"Slow down."}],
+           "body":"Four answers.","context":"Last time (Oct 31): “Work hard on things you chose.”",
+           "question":"Your take, in a sentence",
+           "actions":[{"id":"open","label":"Still open","input":"text"},{"id":"settled","label":"Settled","input":"text"}],
+           "week":{"area":"fatherhood","question":"Q","monday":"2026-11-23"}}]}
+        """#).cards.first)
+        XCTAssertEqual(card.type, .decision)
+        XCTAssertEqual(card.lines, ["This week · Being a father"])
+        XCTAssertEqual(card.entries.map(\.label), ["Tue · Dr K", "Thu · Notes"])
+        XCTAssertEqual(card.context, "Last time (Oct 31): “Work hard on things you chose.”")
+        XCTAssertEqual(card.question, "Your take, in a sentence")
+        XCTAssertEqual(card.actions.map(\.label), ["Still open", "Settled"])
+        XCTAssertTrue(card.actions.allSatisfy(\.takesText))
+    }
+
+    func testWeekSourceKindsWearExistingPapers() throws {
+        func palette(_ kind: String) throws -> DeckPalette {
+            DeckPalette.of(try XCTUnwrap(DailyDeck.decode(
+                #"{"date":"d","kind":"morning","cards":[{"id":"x","type":"reflect","kind":"\#(kind)","title":"T"}]}"#).cards.first))
+        }
+        let journal = try palette("journal")
+        XCTAssertEqual(journal, try palette("on_this_day"))
+        XCTAssertEqual(journal.colors, HermexPaper.past)
+        XCTAssertEqual(try palette("crm"), DeckPalette.followUps)
+        let email = try palette("email")
+        XCTAssertEqual(email, DeckPalette.plain)
+        XCTAssertEqual(email.colors, try palette("nonsense").colors, "email reads like the inbox item card: the plain paper")
+    }
+
     func testFollowUpsShareOnePageWhereTheFirstOneSat() throws {
         let deck = try DailyDeck.decode(Self.deckJSON)
         let extra = try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"a","type":"prompt"},{"id":"f1","type":"decision"},{"id":"b","type":"reflect"},{"id":"f2","type":"decision"},{"id":"close","type":"close"}]}"#)
