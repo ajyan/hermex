@@ -437,12 +437,12 @@ private struct DeckCardView: View {
         }
         Button(action: file) {
             HStack {
-                if viewModel.filing == .filing { ProgressView().tint(palette.onInk) }
+                if viewModel.filing == .filing { ProgressView().tint(seal ? Color.hxOnAccent : palette.onInk) }
                 Text(verbatim: seal ? (viewModel.isFiled ? "Seal your edits" : "Seal the week")
                      : viewModel.isFiled ? "File Changes" : "File It")
             }
             .font(AppFont.body(weight: .semibold))
-            .foregroundStyle(seal ? Color.white : palette.onInk)
+            .foregroundStyle(seal ? Color.hxOnAccent : palette.onInk)
             .frame(maxWidth: .infinity, minHeight: 50)
             .background(seal ? Color.accentColor.opacity(filed ? 0.35 : 1) : palette.ink.opacity(filed ? 0.35 : 1), in: Capsule())
         }
