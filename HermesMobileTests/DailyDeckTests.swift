@@ -1680,6 +1680,20 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(index.diagram(for: pick)?.topic, "map-rag")
     }
 
+    func testAPieceCardShowsItsMapThenItsTopicDiagram() throws {
+        let index = BriefDiagramIndex.decode("""
+        {"version": 1, "diagrams": [
+          {"topic": "rag-pipeline", "title": "RAG pipeline", "keys": ["video:rag", "media:other"]},
+          {"topic": "rag-2", "title": "Another", "keys": ["video:rag"]},
+          {"topic": "map-rag", "title": "The map: RAG", "kind": "map", "keys": ["video:rag"]}
+        ]}
+        """)
+        let pick = try pieceCard(#"{"id": "pick-1", "type": "reflect", "ref": {"pool": "video:rag"}}"#)
+        XCTAssertEqual(index.diagrams(for: pick).map(\.topic), ["map-rag", "rag-pipeline"], "the map, then one diagram")
+        let other = try pieceCard(#"{"id": "pick-2", "type": "reflect", "ref": {"pool": "media:other"}}"#)
+        XCTAssertEqual(index.diagrams(for: other).map(\.topic), ["rag-pipeline"])
+    }
+
     @MainActor
     func testAVaultWithoutDiagramsShowsNoChips() async throws {
         let viewModel = try await loadedViewModel(Self.diagramDeckJSON)

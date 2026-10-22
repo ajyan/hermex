@@ -181,11 +181,12 @@ struct DeckCardView: View {
                 .foregroundStyle(palette.ink)
                 .padding(.top, 12)
         }
-        if let diagram = viewModel.diagram(for: card) {
-            // A secondary button in the card's paper, so "Write a reflection" stays the one filled button.
+        // Secondary buttons in the card's paper, so "Write a reflection" stays the one filled button: a Piece
+        // card's map first, then a diagram of its topic when there is one.
+        ForEach(Array(viewModel.diagrams(for: card).enumerated()), id: \.element.id) { index, diagram in
             Button { openDiagram = diagram } label: { OpenDiagramLabel(paper: palette.colors, isMap: diagram.isMap) }
             .buttonStyle(.plain)
-            .padding(.top, 18)
+            .padding(.top, index == 0 ? 18 : 10)
             .accessibilityLabel(Text(verbatim: diagram.isMap ? "Open the map" : "Open the diagram: \(diagram.title ?? "interactive")"))
             .accessibilityHint(Text(verbatim: diagram.isMap ? "Opens the piece's parts and argument, step by step"
                                     : "Opens an interactive diagram"))

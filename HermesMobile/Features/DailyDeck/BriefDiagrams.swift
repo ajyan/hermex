@@ -44,11 +44,16 @@ struct BriefDiagramIndex: Decodable, Equatable {
         (try? JSONDecoder().decode(BriefDiagramIndex.self, from: Data(content.utf8))) ?? .empty
     }
 
-    /// The diagram for a card: the first entry naming the card's link or pool key.
-    func diagram(for card: DeckCard) -> Entry? {
+    /// The diagram for a card: its map when it has one, else the first entry naming the card's link or pool key.
+    func diagram(for card: DeckCard) -> Entry? { diagrams(for: card).first }
+
+    /// A card's map and its diagram, at most one of each, map first: a long piece can have both its own map
+    /// and a hand-drawn diagram of its topic.
+    func diagrams(for card: DeckCard) -> [Entry] {
         let cardKeys = [card.link, card.pool].compactMap { $0.map(Self.normalized) }
-        guard !cardKeys.isEmpty else { return nil }
-        return diagrams.first { entry in entry.keys.contains { cardKeys.contains(Self.normalized($0)) } }
+        guard !cardKeys.isEmpty else { return [] }
+        let matching = diagrams.filter { entry in entry.keys.contains { cardKeys.contains(Self.normalized($0)) } }
+        return [matching.first(where: \.isMap), matching.first(where: { !$0.isMap })].compactMap { $0 }
     }
 
     /// `/wiki/sources/kafka.md` and `wiki/sources/kafka` are the same key.
