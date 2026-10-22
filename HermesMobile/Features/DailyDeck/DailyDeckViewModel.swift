@@ -121,6 +121,12 @@ final class DailyDeckViewModel {
                   feedback: APIClientFeedbackAdapter(apiClient: apiClient))
     }
 
+    /// A fresh look back over the sealed weeks of this deck's workspace, reading through the deck's
+    /// session so its photos share the cover's cache entries; nil until there is a session.
+    func makeWeeksModel() -> WeeksModel? {
+        sessionID.map { WeeksModel(server: server, client: client, sessionID: $0) }
+    }
+
     var cards: [DeckCard] { deck?.cards ?? [] }
 
     /// Cards answered (the headline and close cards never count, nor feedback alone).

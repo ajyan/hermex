@@ -542,6 +542,16 @@ final class WeeklyReviewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testWeeksModelReadsThroughTheDeckSession() async throws {
+        let (viewModel, _) = try await weeklyViewModelAndClient()
+        let weeks = try XCTUnwrap(viewModel.makeWeeksModel())
+        XCTAssertEqual(weeks.server, viewModel.server)
+        XCTAssertEqual(weeks.sessionID, viewModel.sessionID, "photo cache keys must match the deck's cover")
+        let fresh = try XCTUnwrap(viewModel.makeWeeksModel())
+        XCTAssertFalse(fresh === weeks, "a re-seal builds a model that reads records afresh")
+    }
+
+    @MainActor
     func testShowingAnotherDeckClearsTheUploadError() async throws {
         let (viewModel, client) = try await weeklyViewModelAndClient()
         client.photoUpload = .failure(APIError.http(statusCode: 500, body: nil))

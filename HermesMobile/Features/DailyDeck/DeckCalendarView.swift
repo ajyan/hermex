@@ -34,11 +34,32 @@ enum DailyDeckJournal {
     }
 }
 
+/// Where a review in the calendar opens: a week with a record opens its week page, every other
+/// review its deck.
+enum DeckCalendarRoute: Equatable {
+    case weekPage(String)
+    /// (date, kind)
+    case deck(String, String)
+
+    static func `for`(review: DeckReview, records: Set<String>) -> DeckCalendarRoute {
+        review.kind == "weekly" && records.contains(review.date) ? .weekPage(review.date) : .deck(review.date, review.kind)
+    }
+}
+
+/// The calendar's pushes into the look back over sealed weeks.
+enum WeekRoute: Hashable {
+    case year
+    case page(String)
+}
+
 /// A month at a time: days with a journal entry are tappable and open that day's
 /// entry; a dot marks days with a brief deck (filled once it was filed). Below the
-/// month, its weekly reviews and the month's own review open as decks.
+/// month, its weekly reviews and the month's own review open as decks, and a sealed week as its
+/// page. "Your year in weeks" opens the year grid.
 struct DeckCalendarView: View {
     let viewModel: DailyDeckViewModel
+    /// The sealed weeks, shared with the deck screen; nil until the deck has a session.
+    let weeks: WeeksModel?
     /// Opens a deck (date, kind) behind this sheet: a day's brief, or a review.
     let openDeck: (String, String) -> Void
     @Environment(\.dismiss) private var dismiss
@@ -46,9 +67,11 @@ struct DeckCalendarView: View {
     @State private var month: Int
     @State private var journalDays: Set<String> = []
     @State private var isLoading = false
+    @State private var path = NavigationPath()
 
-    init(viewModel: DailyDeckViewModel, openDeck: @escaping (String, String) -> Void) {
+    init(viewModel: DailyDeckViewModel, weeks: WeeksModel?, openDeck: @escaping (String, String) -> Void) {
         self.viewModel = viewModel
+        self.weeks = weeks
         self.openDeck = openDeck
         let parts = viewModel.date.split(separator: "-").compactMap { Int($0) }
         _year = State(initialValue: parts.first ?? 2026)
@@ -56,9 +79,15 @@ struct DeckCalendarView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 VStack(spacing: 16) {
+                    if weeks != nil {
+                        NavigationLink(value: WeekRoute.year) {
+                            row(symbol: "square.grid.3x3", title: "Your year in weeks")
+                        }
+                        .buttonStyle(.plain)
+                    }
                     monthHeader
                     weekdayHeader
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 6) {
@@ -85,6 +114,20 @@ struct DeckCalendarView: View {
                     openDeck(day, "morning")
                 }
             }
+            .navigationDestination(for: WeekRoute.self) { route in
+                if let weeks {
+                    switch route {
+                    case .year:
+                        YearOfWeeksView(model: weeks) { week in
+                            go(.for(review: DeckReview(date: week, kind: "weekly", isFiled: false), records: weeks.recordDates))
+                        }
+                    case .page(let week):
+                        WeekPageView(model: weeks, weekEnding: week) { go(.deck(week, "weekly")) }
+                    }
+                }
+            }
+            // Which weekly reviews have a record, so a sealed week opens as its page.
+            .task { await weeks?.load() }
             .task(id: "\(year)-\(month)") {
                 isLoading = true
                 journalDays = await viewModel.journalDays(year: year, month: month)
@@ -159,32 +202,48 @@ struct DeckCalendarView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(verbatim: "Reviews").font(AppFont.headline())
                 ForEach(here) { review in
-                    Button {
-                        dismiss()
-                        openDeck(review.date, review.kind)
-                    } label: {
-                        HStack {
-                            Image(systemName: review.kind == "weekly" ? "calendar.badge.clock" : "calendar")
-                                .foregroundStyle(Color.accentColor)
-                            Text(verbatim: review.label).foregroundStyle(.primary)
-                            Spacer()
-                            if review.isFiled {
-                                Label { Text(verbatim: "Filed") } icon: { Image(systemName: "checkmark") }
-                                    .font(AppFont.footnote())
-                                    .foregroundStyle(.secondary)
-                            }
-                            Image(systemName: "chevron.forward").font(AppFont.footnote(weight: .semibold)).foregroundStyle(.tertiary)
-                        }
-                        .font(AppFont.body())
-                        .padding(.horizontal, 14)
-                        .frame(minHeight: 48)
-                        .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    let route = DeckCalendarRoute.for(review: review, records: weeks?.recordDates ?? [])
+                    let sealed = route == .weekPage(review.date)
+                    Button { go(route) } label: {
+                        row(symbol: review.kind == "weekly" ? "calendar.badge.clock" : "calendar", title: review.label,
+                            status: sealed ? ("Sealed", "checkmark.seal") : review.isFiled ? ("Filed", "checkmark") : nil)
                     }
                     .buttonStyle(.plain)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 8)
+        }
+    }
+
+    /// A tappable row: a review, or the way into the year of weeks.
+    private func row(symbol: String, title: String, status: (label: String, symbol: String)? = nil) -> some View {
+        HStack {
+            Image(systemName: symbol)
+                .foregroundStyle(Color.accentColor)
+            Text(verbatim: title).foregroundStyle(.primary)
+            Spacer()
+            if let status {
+                Label { Text(verbatim: status.label) } icon: { Image(systemName: status.symbol) }
+                    .font(AppFont.footnote())
+                    .foregroundStyle(.secondary)
+            }
+            Image(systemName: "chevron.forward").font(AppFont.footnote(weight: .semibold)).foregroundStyle(.tertiary)
+        }
+        .font(AppFont.body())
+        .padding(.horizontal, 14)
+        .frame(minHeight: 48)
+        .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    /// A sealed week pushes its page; anything else closes the calendar and opens the deck.
+    private func go(_ route: DeckCalendarRoute) {
+        switch route {
+        case .weekPage(let week):
+            path.append(WeekRoute.page(week))
+        case .deck(let date, let kind):
+            dismiss()
+            openDeck(date, kind)
         }
     }
 

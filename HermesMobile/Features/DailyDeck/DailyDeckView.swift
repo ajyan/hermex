@@ -10,6 +10,11 @@ struct DailyDeckView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var isShowingCalendar = false
     @State private var feedbackCard: DeckCard?
+    /// The sealed weeks, shared by the calendar and the page shown after a seal; rebuilt per session
+    /// and after each seal, since a model keeps the records it has read.
+    @State private var weeks: WeeksModel?
+    /// The week just sealed, shown as its page over the deck.
+    @State private var sealedWeek: SealedWeek?
     @AppStorage(DailyBriefReminder.enabledKey) private var notifies = false
     /// Good/not-good labels on reflect cards; shown only where the server has labels.
     @State private var labels: LabelsViewModel
@@ -118,9 +123,21 @@ struct DailyDeckView: View {
                     Task { await DailyBriefReminder.noteOpened() }
                 }
             }
+            .onChange(of: viewModel.sessionID, initial: true) {
+                weeks = viewModel.makeWeeksModel()
+            }
             .sheet(isPresented: $isShowingCalendar) {
-                DeckCalendarView(viewModel: viewModel) { day, kind in
+                DeckCalendarView(viewModel: viewModel, weeks: weeks) { day, kind in
                     Task { await viewModel.show(date: day, kind: kind) }
+                }
+            }
+            // Presented without the slide: the cover fades itself in over the deck.
+            .fullScreenCover(item: $sealedWeek) { week in
+                SealedWeekCover(week: week) { reopen in
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) { sealedWeek = nil }
+                    if reopen { Task { await viewModel.show(date: week.id, kind: "weekly") } }
                 }
             }
     }
@@ -229,9 +246,65 @@ struct DailyDeckView: View {
     }
 
     private func file() {
+        // What is being filed: the user can open another deck while it's in flight.
+        let (date, seals) = (viewModel.date, viewModel.isV2Weekly)
         Task {
-            // A filing the server finished stays here: the close card shows it as filed.
-            if case .openSession(let sessionID) = await viewModel.file() { openSession(sessionID) }
+            let result = await viewModel.file()
+            // A seal rewrites the record, and a model keeps the records it has read: start afresh.
+            if seals, result != nil { weeks = viewModel.makeWeeksModel() }
+            switch result {
+            case .openSession(let sessionID):
+                openSession(sessionID)
+            case .filed where seals:
+                // A sealed week lands on its page.
+                guard let weeks else { return }
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) { sealedWeek = SealedWeek(id: date, model: weeks) }
+            default:
+                // A filing the server finished stays here: the close card shows it as filed.
+                break
+            }
+        }
+    }
+}
+
+/// A week just sealed, and the model its page reads from.
+struct SealedWeek: Identifiable {
+    /// The week's Sunday.
+    let id: String
+    let model: WeeksModel
+}
+
+/// The page of the week just sealed, over the deck: it fades in, and out again on Done or Edit,
+/// with no motion under Reduce Motion. `close(reopen)` removes it; `reopen` asks for the deck again.
+private struct SealedWeekCover: View {
+    let week: SealedWeek
+    let close: (_ reopen: Bool) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isShown = false
+
+    var body: some View {
+        NavigationStack {
+            WeekPageView(model: week.model, weekEnding: week.id) { fade(reopen: true) }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button { fade(reopen: false) } label: { Text(verbatim: "Done") }
+                    }
+                }
+        }
+        .opacity(isShown ? 1 : 0)
+        .presentationBackground(.clear)
+        .onAppear {
+            if reduceMotion { isShown = true } else { withAnimation(.easeInOut(duration: 0.35)) { isShown = true } }
+        }
+    }
+
+    private func fade(reopen: Bool) {
+        if reduceMotion {
+            close(reopen)
+        } else {
+            withAnimation(.easeInOut(duration: 0.25)) { isShown = false } completion: { close(reopen) }
         }
     }
 }

@@ -259,6 +259,18 @@ final class WeeksModelTests: XCTestCase {
         XCTAssertTrue(weeks.allSatisfy { model.cachedRecord($0) != nil })
     }
 
+    // MARK: Calendar routing
+
+    func testWeeklyReviewOpensPageWhenRecordExists() {
+        let records: Set<String> = ["2026-10-18"]
+        XCTAssertEqual(DeckCalendarRoute.for(review: DeckReview(date: "2026-10-18", kind: "weekly", isFiled: true), records: records),
+                       .weekPage("2026-10-18"))
+        XCTAssertEqual(DeckCalendarRoute.for(review: DeckReview(date: "2026-10-11", kind: "weekly", isFiled: true), records: records),
+                       .deck("2026-10-11", "weekly"), "a filed week without a record opens its deck")
+        XCTAssertEqual(DeckCalendarRoute.for(review: DeckReview(date: "2026-10-18", kind: "monthly", isFiled: false), records: records),
+                       .deck("2026-10-18", "monthly"), "only weekly reviews have a week page")
+    }
+
     // MARK: Helpers
 
     private func makeModel(_ client: ScriptedDailyDeckClient) -> WeeksModel {

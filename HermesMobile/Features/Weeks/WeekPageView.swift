@@ -210,7 +210,8 @@ struct WeekPageView: View {
                                    load: { await model.photoData(path: $0) }) { photoPlaceholder }
                         .frame(height: 200)
                         .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
-                        .contextMenu { photoMenuItems }
+                        // `.disabled` doesn't reach a context menu; an empty one doesn't open.
+                        .contextMenu { if !isBusyWithPhoto { photoMenuItems } }
                         .accessibilityElement()
                         .accessibilityLabel(Text(verbatim: "Photo of the week"))
                         .accessibilityAddTraits(.isImage)
