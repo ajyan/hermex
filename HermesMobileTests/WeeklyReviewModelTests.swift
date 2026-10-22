@@ -439,6 +439,50 @@ final class WeeklyReviewModelTests: XCTestCase {
         XCTAssertNil(deck.cards[13].chapterLabel, "nor the close")
     }
 
+    // MARK: - Seal
+
+    @MainActor
+    func testV2WeeklyFilesThroughBriefFileWithV2Answers() async throws {
+        let store = DailyDeckStore(defaults: try XCTUnwrap(UserDefaults(suiteName: suiteName)))
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-25.weekly.json"], deck: Self.v2DeckJSON)
+        client.filer = .success(BriefFileResponse(ok: true, summary: "Sealed."))
+        let viewModel = DailyDeckViewModel(server: server, client: client, store: store)
+        await viewModel.show(date: "2026-10-25", kind: "weekly")
+        XCTAssertTrue(viewModel.isV2Weekly)
+
+        viewModel.setScore("present", 7, for: try card("values", in: viewModel))
+        viewModel.setList("gave", ["Running"], for: try card("energy", in: viewModel))
+        _ = await viewModel.file()
+
+        let request = try XCTUnwrap(client.fileRequests.first)
+        XCTAssertEqual(client.fileRequests.count, 1)
+        XCTAssertEqual(request.kind, "weekly")
+        XCTAssertEqual(request.date, "2026-10-25")
+        let byCard = Dictionary(uniqueKeysWithValues: request.answers.answers.map { ($0.card, $0) })
+        XCTAssertEqual(byCard["values"]?.scores, ["present": 7])
+        XCTAssertEqual(byCard["energy"]?.lists, ["gave": ["Running"]])
+    }
+
+    @MainActor
+    func testOnlyAV2WeeklyDeckIsV2Weekly() async throws {
+        let store = DailyDeckStore(defaults: try XCTUnwrap(UserDefaults(suiteName: suiteName)))
+        store.setWorkspace("/vault", for: server)
+        let v1 = #"{"date":"2026-10-18","kind":"weekly","cards":[{"id":"close","type":"close"}]}"#
+        let v1Client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-18.weekly.json"], deck: v1)
+        let v1Model = DailyDeckViewModel(server: server, client: v1Client, store: store)
+        await v1Model.show(date: "2026-10-18", kind: "weekly")
+        XCTAssertEqual(v1Model.state, .ready)
+        XCTAssertFalse(v1Model.isV2Weekly, "a v1 weekly keeps its filing copy")
+
+        let morning = #"{"version":2,"date":"2026-10-25","kind":"morning","cards":[{"id":"close","type":"close"}]}"#
+        let morningClient = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-25.morning.json"], deck: morning)
+        let morningModel = DailyDeckViewModel(server: server, client: morningClient, store: store)
+        await morningModel.show(date: "2026-10-25", kind: "morning")
+        XCTAssertEqual(morningModel.state, .ready)
+        XCTAssertFalse(morningModel.isV2Weekly)
+    }
+
     // MARK: - Helpers
 
     private let server = URL(string: "https://brain.example.test")!

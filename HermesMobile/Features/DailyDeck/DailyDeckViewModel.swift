@@ -82,6 +82,10 @@ final class DailyDeckViewModel {
 
     var isReview: Bool { kind != "morning" }
 
+    /// The v2 weekly review, whose close card reads "Seal the week"; older weekly decks and
+    /// the other kinds keep the filing copy.
+    var isV2Weekly: Bool { kind == "weekly" && deck?.version == 2 }
+
     var title: String {
         switch kind {
         case "weekly": "Weekly Review"

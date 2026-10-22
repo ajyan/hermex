@@ -406,10 +406,12 @@ private struct DeckCardView: View {
     private var close: some View {
         let count = viewModel.answeredCount
         let filed = viewModel.isFiled && !viewModel.hasChanges
-        Text(verbatim: filed ? "Filed" : count == 1 ? "1 reflection" : "\(count) reflections")
+        let seal = viewModel.isV2Weekly
+        Text(verbatim: filed ? (seal ? "Sealed" : "Filed") : count == 1 ? "1 reflection" : "\(count) reflections")
             .font(AppFont.display(style: .largeTitle, weight: .semibold))
         Text(verbatim: filed
-             ? viewModel.filedNote?.summary ?? "In your journal. Edit any card and file again to update it."
+             ? viewModel.filedNote?.summary ?? (seal ? "Sealed in your journal. Edit any card and seal again to update it."
+                                                : "In your journal. Edit any card and file again to update it.")
              : viewModel.isFiled
              ? "Filing again updates the journal: changed answers replace what was filed, new ones are added, nothing is deleted."
              : count == 0
@@ -436,12 +438,13 @@ private struct DeckCardView: View {
         Button(action: file) {
             HStack {
                 if viewModel.filing == .filing { ProgressView().tint(palette.onInk) }
-                Text(verbatim: viewModel.isFiled ? "File Changes" : "File It")
+                Text(verbatim: seal ? (viewModel.isFiled ? "Seal your edits" : "Seal the week")
+                     : viewModel.isFiled ? "File Changes" : "File It")
             }
             .font(AppFont.body(weight: .semibold))
-            .foregroundStyle(palette.onInk)
+            .foregroundStyle(seal ? Color.white : palette.onInk)
             .frame(maxWidth: .infinity, minHeight: 50)
-            .background(palette.ink.opacity(filed ? 0.35 : 1), in: Capsule())
+            .background(seal ? Color.accentColor.opacity(filed ? 0.35 : 1) : palette.ink.opacity(filed ? 0.35 : 1), in: Capsule())
         }
         .buttonStyle(.plain)
         .disabled(viewModel.filing == .filing || !viewModel.hasChanges)
