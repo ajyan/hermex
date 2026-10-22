@@ -162,17 +162,7 @@ private struct DeckCardView: View {
         }
         if let diagram = viewModel.diagram(for: card) {
             // A secondary button in the card's paper, so "Write a reflection" stays the one filled button.
-            Button { openDiagram = diagram } label: {
-                Label { Text(verbatim: "Open the diagram") } icon: {
-                    Image(systemName: "point.3.connected.trianglepath.dotted")
-                }
-                .font(AppFont.body(weight: .semibold))
-                .foregroundStyle(palette.ink)
-                .frame(maxWidth: .infinity, minHeight: 50)
-                .background(palette.colors.wash, in: Capsule())
-                .overlay(Capsule().strokeBorder(palette.colors.edge, lineWidth: 1))
-                .contentShape(Capsule())
-            }
+            Button { openDiagram = diagram } label: { OpenDiagramLabel(paper: palette.colors) }
             .buttonStyle(.plain)
             .padding(.top, 18)
             .accessibilityLabel(Text(verbatim: "Open the diagram: \(diagram.title ?? "interactive")"))
