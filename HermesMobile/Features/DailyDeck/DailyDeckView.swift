@@ -218,7 +218,7 @@ struct DailyDeckView: View {
     private func progress(count: Int) -> some View {
         VStack(spacing: 6) {
             ProgressView(value: Double(viewModel.index + 1), total: Double(max(count, 1)))
-                .tint(viewModel.currentPage.map { DeckPalette.of($0).ink } ?? .secondary)
+                .tint(viewModel.currentPage.map { DeckPalette.of($0, inV2Weekly: viewModel.isV2Weekly).ink } ?? .secondary)
                 .accessibilityValue(Text(verbatim: progressSubtitle))
         }
         .padding(.horizontal, 20)
@@ -290,15 +290,21 @@ private struct SealedWeekCover: View {
     var body: some View {
         NavigationStack(path: $path) {
             WeekPageView(model: week.model, weekEnding: week.id) { fade(reopen: week.id) }
+                // The year button floats over the page's foot: the last chips scroll clear of it.
+                .contentMargins(.bottom, 72, for: .scrollContent)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button { fade(reopen: nil) } label: { Text(verbatim: "Done") }
                     }
                     ToolbarItem(placement: .bottomBar) {
                         NavigationLink(value: WeekRoute.year) {
-                            Label { Text(verbatim: "Your year in weeks") } icon: { Image(systemName: "square.grid.3x3") }
-                                .labelStyle(.titleAndIcon)
+                            HStack(spacing: 6) {
+                                Image(systemName: "square.grid.3x3")
+                                Text(verbatim: "Your year")
+                            }
+                            .padding(.horizontal, 6)
                         }
+                        .accessibilityLabel(Text(verbatim: "Your year in weeks"))
                     }
                 }
                 .navigationDestination(for: WeekRoute.self) { route in

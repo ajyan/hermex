@@ -70,6 +70,13 @@ struct DeckPalette: Equatable {
         }
     }
 
+    /// A page's palette within its deck: a v2 weekly review closes on the week's dusk paper, not
+    /// the quote paper other decks close on.
+    static func of(_ page: DeckPage, inV2Weekly: Bool) -> DeckPalette {
+        if inV2Weekly, case .card(let card) = page, card.type == .close { return .week }
+        return of(page)
+    }
+
     static func of(_ card: DeckCard) -> DeckPalette {
         switch card.type {
         case .headline: return .opener

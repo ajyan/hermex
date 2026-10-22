@@ -334,7 +334,7 @@ struct WeekPageView: View {
                     .font(AppFont.subheadline(weight: .semibold))
                     .foregroundStyle(Color.hxTextPrimary)
                 FlowRow(spacing: 6) {
-                    ForEach(items, id: \.self) { HXChip(paper: palette.colors, label: $0) }
+                    ForEach(items, id: \.self) { HXChip(paper: palette.colors, label: $0, lines: 2) }
                 }
             }
             .accessibilityElement(children: .combine)

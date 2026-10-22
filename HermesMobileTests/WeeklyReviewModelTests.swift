@@ -523,6 +523,33 @@ final class WeeklyReviewModelTests: XCTestCase {
         XCTAssertFalse(morningModel.isV2Weekly)
     }
 
+    // MARK: - Close card and prompt copy
+
+    func testAV2WeeklyClosesOnTheWeeksPaper() throws {
+        let close = DeckPage.card(Self.card("close"))
+        XCTAssertEqual(DeckPalette.of(close, inV2Weekly: true), .week)
+        XCTAssertEqual(DeckPalette.of(close, inV2Weekly: false), .quote, "v1 weekly and morning closes keep their paper")
+        let story = DeckPage.card(try XCTUnwrap(try DailyDeck.decode(Self.v2DeckJSON).cards.first { $0.id == "story" }))
+        XCTAssertEqual(DeckPalette.of(story, inV2Weekly: true), DeckPalette.of(story))
+    }
+
+    func testCloseHeadingSealsAV2WeekAndCountsReflectionsOtherwise() {
+        XCTAssertEqual(DeckCopy.closeHeading(seal: true, filed: false, count: 6), "Seal the week")
+        XCTAssertEqual(DeckCopy.closeHeading(seal: true, filed: true, count: 6), "Sealed")
+        XCTAssertEqual(DeckCopy.closeHeading(seal: false, filed: false, count: 6), "6 reflections")
+        XCTAssertEqual(DeckCopy.closeHeading(seal: false, filed: false, count: 1), "1 reflection")
+        XCTAssertEqual(DeckCopy.closeHeading(seal: false, filed: true, count: 6), "Filed")
+        XCTAssertEqual(DeckCopy.answered(1), "1 card answered")
+        XCTAssertEqual(DeckCopy.answered(0), "0 cards answered")
+        XCTAssertEqual(DeckCopy.answered(7), "7 cards answered")
+    }
+
+    func testTheOneThingAsksForTheOneThing() throws {
+        let cards = try DailyDeck.decode(Self.v2DeckJSON).cards
+        XCTAssertEqual(DeckCopy.invitation(for: try XCTUnwrap(cards.first { $0.id == "one-thing" })), "Write the one thing")
+        XCTAssertEqual(DeckCopy.invitation(for: try XCTUnwrap(cards.first { $0.id == "deep" })), "Write a reflection")
+    }
+
     // MARK: - Photo of the week
 
     func testJPEGDownscalesToLongEdge() throws {

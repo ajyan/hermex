@@ -309,6 +309,9 @@ struct HXChip<Trailing: View>: View {
     let paper: HermexPaper
     var symbol: String?
     let label: String
+    /// Lines the label may wrap to before it truncates. One line truncates in the middle; more
+    /// wrap at word boundaries, for chips that hold a phrase.
+    var lines = 1
     @ViewBuilder var trailing: () -> Trailing
 
     var body: some View {
@@ -320,8 +323,9 @@ struct HXChip<Trailing: View>: View {
             }
             Text(verbatim: label)
                 .font(AppFont.caption(weight: .medium))
-                .lineLimit(1)
-                .truncationMode(.middle)
+                .lineLimit(lines)
+                .truncationMode(lines == 1 ? .middle : .tail)
+                .multilineTextAlignment(.leading)
             trailing()
         }
         .foregroundStyle(paper.glow)
@@ -333,8 +337,8 @@ struct HXChip<Trailing: View>: View {
 }
 
 extension HXChip where Trailing == EmptyView {
-    init(paper: HermexPaper, symbol: String? = nil, label: String) {
-        self.init(paper: paper, symbol: symbol, label: label) { EmptyView() }
+    init(paper: HermexPaper, symbol: String? = nil, label: String, lines: Int = 1) {
+        self.init(paper: paper, symbol: symbol, label: label, lines: lines) { EmptyView() }
     }
 }
 

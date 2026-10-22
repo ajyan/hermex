@@ -20,7 +20,7 @@ struct DeckPageView: View {
     @Environment(\.openBrainRoute) private var openBrainRoute
 
     var body: some View {
-        let palette = DeckPalette.of(page)
+        let palette = DeckPalette.of(page, inV2Weekly: viewModel.isV2Weekly)
         let words = Group {
             switch page {
             case .card(let card):
@@ -224,7 +224,7 @@ private struct DeckCardView: View {
         if let traits = card.selfRatings {
             selfRatings(traits).padding(.top, 18)
         } else if card.takesText {
-            reflection(card.isLetter ? "Write to her" : card.isMandarin ? "Answer in Mandarin" : "Write a reflection")
+            reflection(DeckCopy.invitation(for: card))
                 .padding(.top, 16)
         }
         DeckFootnote(card: card, palette: palette)
@@ -407,8 +407,14 @@ private struct DeckCardView: View {
         let count = viewModel.answeredCount
         let filed = viewModel.isFiled && !viewModel.hasChanges
         let seal = viewModel.isV2Weekly
-        Text(verbatim: filed ? (seal ? "Sealed" : "Filed") : count == 1 ? "1 reflection" : "\(count) reflections")
+        Text(verbatim: DeckCopy.closeHeading(seal: seal, filed: filed, count: count))
             .font(AppFont.display(style: .largeTitle, weight: .semibold))
+        if seal {
+            Text(verbatim: DeckCopy.answered(count))
+                .font(AppFont.subheadline(weight: .semibold))
+                .foregroundStyle(palette.ink)
+                .padding(.top, 4)
+        }
         Text(verbatim: filed
              ? viewModel.filedNote?.summary ?? (seal ? "Sealed in your journal. Edit any card and seal again to update it."
                                                 : "In your journal. Edit any card and file again to update it.")

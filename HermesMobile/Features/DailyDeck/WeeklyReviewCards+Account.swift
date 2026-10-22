@@ -133,7 +133,7 @@ struct WeekValuesCard: View {
             DeckFootnote(card: card, palette: palette)
         }
         .sheet(item: $editing) { value in
-            WeekEditorSheet(title: "Where \(value.name.lowercased()) showed", placeholder: "A line about the week",
+            WeekEditorSheet(title: value.name, subtitle: "What showed it this week", placeholder: "A line about the week",
                             serif: true, palette: palette, initial: evidenceText(value)) {
                 viewModel.setNote(value.id, $0, for: card)
             }

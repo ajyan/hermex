@@ -142,6 +142,8 @@ private struct WeekAddAlert: ViewModifier {
 /// closing it any way keeps them. `serif` for words he keeps (the story, evidence, the note).
 struct WeekEditorSheet: View {
     let title: String
+    /// A small line under the title saying what to write.
+    var subtitle: String?
     let placeholder: String
     var serif = false
     let palette: DeckPalette
@@ -155,10 +157,19 @@ struct WeekEditorSheet: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
-                Text(verbatim: title)
-                    .font(AppFont.display(style: .title3, weight: .semibold))
-                    .foregroundStyle(palette.ink)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(verbatim: title)
+                        .font(AppFont.display(style: .title3, weight: .semibold))
+                        .foregroundStyle(palette.ink)
+                    if let subtitle {
+                        Text(verbatim: subtitle)
+                            .font(AppFont.subheadline())
+                            .foregroundStyle(Color.hxTextSecondary)
+                    }
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isHeader)
                 TextEditor(text: $text)
                     .font(serif ? AppFont.serif(style: .body) : AppFont.body())
                     .foregroundStyle(Color.hxTextPrimary)
@@ -196,5 +207,26 @@ struct WeekEditorSheet: View {
             save(new)
         }
         .presentationDragIndicator(.visible)
+    }
+}
+
+/// Deck copy that depends on the card or the deck: the way into writing, and the close card's heading.
+enum DeckCopy {
+    /// The button that opens a card's writing sheet.
+    static func invitation(for card: DeckCard) -> String {
+        if card.isLetter { return "Write to her" }
+        if card.isMandarin { return "Answer in Mandarin" }
+        return card.id == "one-thing" ? "Write the one thing" : "Write a reflection"
+    }
+
+    /// The close card's heading: a v2 weekly review is sealed, other decks count their reflections.
+    static func closeHeading(seal: Bool, filed: Bool, count: Int) -> String {
+        if seal { return filed ? "Sealed" : "Seal the week" }
+        return filed ? "Filed" : count == 1 ? "1 reflection" : "\(count) reflections"
+    }
+
+    /// Under a weekly review's close heading.
+    static func answered(_ count: Int) -> String {
+        count == 1 ? "1 card answered" : "\(count) cards answered"
     }
 }

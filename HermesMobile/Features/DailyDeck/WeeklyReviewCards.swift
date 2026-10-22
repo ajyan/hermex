@@ -394,7 +394,7 @@ struct WeekEnergyCard: View {
                     Button {
                         viewModel.setList(key, items.filter { $0 != item }, for: card)
                     } label: {
-                        HXChip(paper: palette.colors, label: item) {
+                        HXChip(paper: palette.colors, label: item, lines: 2) {
                             Image(systemName: "xmark").font(AppFont.caption2(weight: .bold))
                         }
                         .frame(minHeight: 36)
