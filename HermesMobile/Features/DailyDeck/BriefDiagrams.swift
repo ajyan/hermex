@@ -8,8 +8,11 @@ struct BriefDiagramIndex: Decodable, Equatable {
         let topic: String
         let title: String?
         let keys: [String]
+        /// "map" for a long piece's map (a Piece card's), drawn from its piece map; nil for a diagram.
+        let kind: String?
 
         var id: String { topic }
+        var isMap: Bool { kind == "map" }
         var fragmentPath: String { "\(BriefDiagramIndex.directory)/\(topic).html" }
     }
 
@@ -41,11 +44,16 @@ struct BriefDiagramIndex: Decodable, Equatable {
         (try? JSONDecoder().decode(BriefDiagramIndex.self, from: Data(content.utf8))) ?? .empty
     }
 
-    /// The diagram for a card: the first entry naming the card's link or pool key.
-    func diagram(for card: DeckCard) -> Entry? {
+    /// The diagram for a card: its map when it has one, else the first entry naming the card's link or pool key.
+    func diagram(for card: DeckCard) -> Entry? { diagrams(for: card).first }
+
+    /// A card's map and its diagram, at most one of each, map first: a long piece can have both its own map
+    /// and a hand-drawn diagram of its topic.
+    func diagrams(for card: DeckCard) -> [Entry] {
         let cardKeys = [card.link, card.pool].compactMap { $0.map(Self.normalized) }
-        guard !cardKeys.isEmpty else { return nil }
-        return diagrams.first { entry in entry.keys.contains { cardKeys.contains(Self.normalized($0)) } }
+        guard !cardKeys.isEmpty else { return [] }
+        let matching = diagrams.filter { entry in entry.keys.contains { cardKeys.contains(Self.normalized($0)) } }
+        return [matching.first(where: \.isMap), matching.first(where: { !$0.isMap })].compactMap { $0 }
     }
 
     /// `/wiki/sources/kafka.md` and `wiki/sources/kafka` are the same key.
@@ -61,12 +69,14 @@ struct BriefDiagramIndex: Decodable, Equatable {
 }
 
 /// "Open the diagram": a full-width secondary button in the object's paper (`wash` fill, `edge` hairline, `glow`
-/// label), so a screen's own filled button stays the one primary. Brief cards, Prep lessons and Brain pages share it.
+/// label), so a screen's own filled button stays the one primary. Brief cards, Prep lessons and Brain pages share it;
+/// a Piece card's says "Open the map".
 struct OpenDiagramLabel: View {
     let paper: HermexPaper
+    var isMap = false
 
     var body: some View {
-        Label { Text(verbatim: "Open the diagram") } icon: {
+        Label { Text(verbatim: isMap ? "Open the map" : "Open the diagram") } icon: {
             Image(systemName: "point.3.connected.trianglepath.dotted")
         }
         .font(AppFont.body(weight: .semibold))

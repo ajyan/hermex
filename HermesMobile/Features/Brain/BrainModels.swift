@@ -447,17 +447,22 @@ struct BrainPage: Codable, Hashable, Sendable {
 
 /// A page's interactive diagram: an `atlas-ui` fragment the server reads from the vault's
 /// `diagrams/` (the same one the Daily Brief's "Open the diagram" shows). One without HTML is dropped.
+/// `kind` is "map" for a long piece's map, which the button calls "Open the map".
 struct BrainDiagram: Codable, Hashable, Sendable {
     let topic: String
     let title: String?
     let html: String
+    let kind: String?
 
-    private enum CodingKeys: String, CodingKey { case topic, title, html }
+    var isMap: Bool { kind == "map" }
 
-    init(topic: String, title: String? = nil, html: String) {
+    private enum CodingKeys: String, CodingKey { case topic, title, html, kind }
+
+    init(topic: String, title: String? = nil, html: String, kind: String? = nil) {
         self.topic = topic
         self.title = title
         self.html = html
+        self.kind = kind
     }
 
     init(from decoder: Decoder) throws {
@@ -465,6 +470,7 @@ struct BrainDiagram: Codable, Hashable, Sendable {
         topic = c.string(.topic)
         title = c.optional(String.self, .title).flatMap { $0.isEmpty ? nil : $0 }
         html = c.string(.html)
+        kind = c.optional(String.self, .kind)
         guard !html.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw DecodingError.dataCorruptedError(forKey: .html, in: c, debugDescription: "empty diagram")
         }

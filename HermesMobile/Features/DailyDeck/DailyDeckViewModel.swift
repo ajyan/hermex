@@ -373,6 +373,7 @@ final class DailyDeckViewModel {
 
     /// The interactive diagram for a technical card, when the vault has one.
     func diagram(for card: DeckCard) -> BriefDiagramIndex.Entry? { diagrams.diagram(for: card) }
+    func diagrams(for card: DeckCard) -> [BriefDiagramIndex.Entry] { diagrams.diagrams(for: card) }
 
     /// Reads the index once per screen, after the first deck is up. A missing index means no Diagram
     /// chips; a failed read leaves none for now and tries again on the next load.

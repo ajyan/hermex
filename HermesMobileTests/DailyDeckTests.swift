@@ -1641,6 +1641,59 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(client.readPaths.filter { $0 == "diagrams/api-gateway.html" }.count, 1)
     }
 
+    private func pieceCard(_ json: String) throws -> DeckCard {
+        try JSONDecoder().decode(DeckCard.self, from: Data(json.utf8))
+    }
+
+    func testAPieceCardDecodesItsArgumentAndLeadsWithTheHeadline() throws {
+        let item = try pieceCard("""
+        {"id": "youtube", "type": "item", "kind": "youtube", "title": "RAG isn't dead.", "source": "Learn RAG · 3 hours · 15 parts",
+         "context": "How it gets there.", "body": null,
+         "piece": {"map": "rag", "meta": "3 hours · 15 parts",
+                   "steps": [{"name": "Basics", "claim": "Index, fetch, prompt.", "span": "Parts 1–2 · from 0:00"},
+                             {"claim": "  "}, {"claim": "Grade what came back."}, {"nope": 1}],
+                   "quotes": [{"text": "RAG is not dead but it will change", "at": "Part 14 · ~2:36"}, {"text": ""}]}}
+        """)
+        let piece = try XCTUnwrap(item.piece)
+        XCTAssertEqual(piece.steps.map(\.claim), ["Index, fetch, prompt.", "Grade what came back."], "blank and broken steps drop")
+        XCTAssertEqual(piece.steps[0].span, "Parts 1–2 · from 0:00")
+        XCTAssertNil(piece.steps[1].span)
+        XCTAssertEqual(piece.quotes.map(\.text), ["RAG is not dead but it will change"])
+        let text = DeckCardText(item)
+        XCTAssertEqual(text.lead, "RAG isn't dead.")
+        XCTAssertEqual(text.attribution, "Learn RAG · 3 hours · 15 parts")
+        XCTAssertEqual(text.detail, "How it gets there.")
+
+        let noSteps = try pieceCard(#"{"id": "x", "type": "item", "piece": {"steps": [], "quotes": [{"text": "q"}]}}"#)
+        XCTAssertNil(noSteps.piece, "a piece with no argument isn't drawn")
+    }
+
+    func testAMapEntryIsLabelledAsAMap() throws {
+        let index = BriefDiagramIndex.decode("""
+        {"version": 1, "diagrams": [
+          {"topic": "map-rag", "title": "The map: RAG", "kind": "map", "keys": ["video:rag"]},
+          {"topic": "kafka", "title": "Kafka", "keys": ["media:kafka"]}
+        ]}
+        """)
+        XCTAssertEqual(index.diagrams.map(\.isMap), [true, false])
+        let pick = try pieceCard(#"{"id": "pick-1", "type": "reflect", "ref": {"pool": "video:rag"}}"#)
+        XCTAssertEqual(index.diagram(for: pick)?.topic, "map-rag")
+    }
+
+    func testAPieceCardShowsItsMapThenItsTopicDiagram() throws {
+        let index = BriefDiagramIndex.decode("""
+        {"version": 1, "diagrams": [
+          {"topic": "rag-pipeline", "title": "RAG pipeline", "keys": ["video:rag", "media:other"]},
+          {"topic": "rag-2", "title": "Another", "keys": ["video:rag"]},
+          {"topic": "map-rag", "title": "The map: RAG", "kind": "map", "keys": ["video:rag"]}
+        ]}
+        """)
+        let pick = try pieceCard(#"{"id": "pick-1", "type": "reflect", "ref": {"pool": "video:rag"}}"#)
+        XCTAssertEqual(index.diagrams(for: pick).map(\.topic), ["map-rag", "rag-pipeline"], "the map, then one diagram")
+        let other = try pieceCard(#"{"id": "pick-2", "type": "reflect", "ref": {"pool": "media:other"}}"#)
+        XCTAssertEqual(index.diagrams(for: other).map(\.topic), ["rag-pipeline"])
+    }
+
     @MainActor
     func testAVaultWithoutDiagramsShowsNoChips() async throws {
         let viewModel = try await loadedViewModel(Self.diagramDeckJSON)
