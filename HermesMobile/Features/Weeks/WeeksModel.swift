@@ -27,6 +27,7 @@ struct DuePrediction: Identifiable, Equatable {
 /// server's brief workspace, and nothing is kept across servers.
 @MainActor @Observable final class WeeksModel {
     nonisolated static let directory = "weekly-checkins"
+    nonisolated static let recordReadsAtOnce = 6
     nonisolated static let photosDirectory = "weekly-checkins/photos"
     nonisolated static func recordPath(_ weekEnding: String) -> String { "\(directory)/\(weekEnding)-week-ending.json" }
     nonisolated static func photoPath(_ weekEnding: String) -> String { "\(photosDirectory)/\(weekEnding).jpg" }
@@ -43,7 +44,12 @@ struct DuePrediction: Identifiable, Equatable {
     private(set) var photoDates: Set<String> = []
     /// Sundays whose weekly deck is in `briefs/` and not filed yet.
     private(set) var unfiledDecks: Set<String> = []
+    /// Every listing has succeeded at least once since this model was made.
     private(set) var isLoaded = false
+    /// Whether `photoDates` comes from a successful listing; until then a week's photo is unknown.
+    private(set) var photosListed = false
+    /// Set when the last `load()` couldn't read a folder; the sets keep what the last good read found.
+    private(set) var loadError: String?
     /// Open predictions past their due day, soonest due first; filled by `loadDuePredictions()`.
     private(set) var duePredictions: [DuePrediction] = []
     /// Bumped on each photo change of a week, so its image reloads.
@@ -75,21 +81,38 @@ struct DuePrediction: Identifiable, Equatable {
 
     func photoVersion(for weekEnding: String) -> Int { photoVersions[weekEnding] ?? 0 }
 
-    /// Lists the records, the photos, and the briefs. A missing folder reads as empty.
+    /// Lists the records, the photos, and the briefs. A missing folder reads as empty; any other
+    /// failure keeps that folder's last listing and sets `loadError`.
     func load() async {
         async let recordNames = names(in: Self.directory)
         async let photoNames = names(in: Self.photosDirectory)
         async let briefNames = names(in: DailyDeckPaths.directory)
         let (records, photos, briefs) = await (recordNames, photoNames, briefNames)
-        recordDates = Set(records.compactMap { Self.sunday(in: $0, suffix: "-week-ending.json") })
-        photoDates = Set(photos.compactMap { Self.sunday(in: $0, suffix: ".jpg") })
-        let filed = DailyDeckViewModel.filedDates(in: briefs, kind: "weekly")
-        unfiledDecks = Set(DailyDeckViewModel.deckDates(in: briefs, kind: "weekly")).subtracting(filed)
-        isLoaded = true
+        if let records {
+            recordDates = Set(records.compactMap { Self.sunday(in: $0, suffix: "-week-ending.json") })
+        }
+        if let photos {
+            photoDates = Set(photos.compactMap { Self.sunday(in: $0, suffix: ".jpg") })
+            photosListed = true
+        }
+        if let briefs {
+            let filed = DailyDeckViewModel.filedDates(in: briefs, kind: "weekly")
+            unfiledDecks = Set(DailyDeckViewModel.deckDates(in: briefs, kind: "weekly")).subtracting(filed)
+        }
+        let complete = records != nil && photos != nil && briefs != nil
+        loadError = complete ? nil : "Some weeks couldn't be read just now."
+        if complete { isLoaded = true }
     }
 
-    private func names(in path: String) async -> [String] {
-        (try? await client.entryNames(sessionID: sessionID, path: path)) ?? []
+    /// A folder's names, `[]` when it doesn't exist, nil when it couldn't be read.
+    private func names(in path: String) async -> [String]? {
+        do {
+            return try await client.entryNames(sessionID: sessionID, path: path)
+        } catch let error as APIError where error.isNotFound && !error.isVanishedSession {
+            return []
+        } catch {
+            return nil
+        }
     }
 
     /// The week's record, read once and kept for this model; nil when it is missing or unreadable.
@@ -127,11 +150,18 @@ struct DuePrediction: Identifiable, Equatable {
         let client = client, sessionID = sessionID
         let task = Task { @MainActor in
             let contents = await withTaskGroup(of: (String, String?).self) { group in
-                for week in missing {
+                // A few at a time, so a year of records doesn't flood the server.
+                var pending = missing.makeIterator()
+                func addNext() {
+                    guard let week = pending.next() else { return }
                     group.addTask { (week, try? await client.fileContent(sessionID: sessionID, path: Self.recordPath(week))) }
                 }
+                for _ in 0..<Self.recordReadsAtOnce { addNext() }
                 var contents: [(String, String?)] = []
-                for await item in group { contents.append(item) }
+                for await item in group {
+                    contents.append(item)
+                    addNext()
+                }
                 return contents
             }
             for case let (week, content?) in contents {
@@ -174,22 +204,14 @@ struct DuePrediction: Identifiable, Equatable {
         photoVersions[weekEnding, default: 0] += 1
     }
 
-    /// What a failed photo change tells him.
-    nonisolated static func photoErrorMessage(_ error: Error, removing: Bool) -> String {
-        if case let APIError.http(statusCode, _) = error, statusCode == 404 {
-            return "This server can't keep a photo of the week."
-        }
-        return removing ? "The photo wasn't removed. Try again." : "The photo didn't upload. Try again."
-    }
-
     // MARK: Weeks
 
     /// ISO weeks, Monday to Sunday, as the vault numbers them, in the device's time zone.
-    nonisolated static var calendar: Calendar {
+    nonisolated static let calendar: Calendar = {
         var calendar = Calendar(identifier: .iso8601)
-        calendar.timeZone = .current
+        calendar.timeZone = .autoupdatingCurrent
         return calendar
-    }
+    }()
 
     /// The tiles of ISO year `year`: one per Sunday whose ISO week-based year is `year` (52 or 53).
     nonisolated static func tiles(year: Int, today: Date, records: Set<String>, photos: Set<String>,

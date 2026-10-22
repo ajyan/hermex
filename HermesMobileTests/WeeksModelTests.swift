@@ -113,6 +113,47 @@ final class WeeksModelTests: XCTestCase {
         XCTAssertEqual(model.years, [2026], "the current year is always there")
     }
 
+    func testATransientListingErrorKeepsTheLastListing() async {
+        let client = ScriptedDailyDeckClient(workspaces: ["/vault"], names: ["2026-10-25.weekly.json"], deck: "")
+        client.listings = ["weekly-checkins": ["2026-10-18-week-ending.json"], "weekly-checkins/photos": ["2026-10-18.jpg"]]
+        let model = makeModel(client)
+        await model.load()
+        XCTAssertNil(model.loadError)
+
+        let offline = URLError(.notConnectedToInternet)
+        client.listingErrors = ["weekly-checkins": offline, "weekly-checkins/photos": APIError.http(statusCode: 502, body: nil)]
+        await model.load()
+        XCTAssertEqual(model.recordDates, ["2026-10-18"])
+        XCTAssertEqual(model.photoDates, ["2026-10-18"])
+        XCTAssertEqual(model.unfiledDecks, ["2026-10-25"])
+        XCTAssertNotNil(model.loadError)
+        XCTAssertTrue(model.photosListed)
+    }
+
+    func testAFailedFirstLoadIsNotComplete() async {
+        let client = ScriptedDailyDeckClient(workspaces: ["/vault"], names: [], deck: "")
+        client.listings = ["weekly-checkins": ["2026-10-18-week-ending.json"]]
+        client.listingErrors = ["weekly-checkins/photos": URLError(.timedOut)]
+        let model = makeModel(client)
+        await model.load()
+        XCTAssertFalse(model.isLoaded)
+        XCTAssertFalse(model.photosListed, "the week's photo is unknown, not absent")
+        XCTAssertEqual(model.recordDates, ["2026-10-18"])
+        XCTAssertNotNil(model.loadError)
+    }
+
+    func testAMissingPhotosFolderIsNoPhotos() async {
+        let client = ScriptedDailyDeckClient(workspaces: ["/vault"], names: [], deck: "")
+        client.listings = ["weekly-checkins": ["2026-10-18-week-ending.json"]]
+        client.listingErrors = ["weekly-checkins/photos": APIError.http(statusCode: 404, body: #"{"error": "Not a directory"}"#)]
+        let model = makeModel(client)
+        await model.load()
+        XCTAssertTrue(model.isLoaded)
+        XCTAssertTrue(model.photosListed)
+        XCTAssertEqual(model.photoDates, [])
+        XCTAssertNil(model.loadError)
+    }
+
     func testRecordIsReadOnceAndKept() async {
         let client = ScriptedDailyDeckClient(workspaces: ["/vault"], names: [], deck: "")
         client.files = [WeeksModel.recordPath("2026-10-18"): Self.record("2026-10-18", title: "Quiet week")]
@@ -204,6 +245,18 @@ final class WeeksModelTests: XCTestCase {
         XCTAssertEqual(model.duePredictions.map(\.id), ["p-open", "p-today"])
         XCTAssertEqual(model.duePredictions.first?.text, "Run a 10k")
         XCTAssertEqual(model.duePredictions.first?.due, "2026-10-11")
+    }
+
+    func testEveryRecordIsReadWhenThereAreMoreThanAtOnce() async {
+        let client = ScriptedDailyDeckClient(workspaces: ["/vault"], names: [], deck: "")
+        let weeks = (0..<(WeeksModel.recordReadsAtOnce * 2 + 1)).map { DailyDeckPaths.day(iso.date(byAdding: .day, value: -7 * $0, to: day("2026-10-18"))!, calendar: iso) }
+        client.listings = ["weekly-checkins": weeks.map { "\($0)-week-ending.json" }]
+        client.files = Dictionary(uniqueKeysWithValues: weeks.map { (WeeksModel.recordPath($0), Self.record($0)) })
+        let model = makeModel(client)
+        await model.load()
+        _ = await model.grade(for: "none")
+        XCTAssertEqual(Set(client.readPaths), Set(weeks.map(WeeksModel.recordPath)))
+        XCTAssertTrue(weeks.allSatisfy { model.cachedRecord($0) != nil })
     }
 
     // MARK: Helpers

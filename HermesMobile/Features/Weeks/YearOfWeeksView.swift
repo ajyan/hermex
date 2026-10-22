@@ -28,6 +28,12 @@ struct YearOfWeeksView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header(reviewed: tiles.filter { if case .reviewed = $0.state { true } else { false } }.count, total: tiles.count)
+                if let loadError = model.loadError {
+                    Text(verbatim: loadError)
+                        .font(AppFont.footnote())
+                        .foregroundStyle(Color.hxTextSecondary)
+                        .padding(.top, 8)
+                }
                 LazyVGrid(columns: columns, spacing: 4) {
                     ForEach(tiles, id: \.weekEnding) { tile in
                         tileView(tile)

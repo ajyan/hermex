@@ -20,9 +20,20 @@ struct WeekPageView: View {
     /// A photo is being read, uploaded, or removed.
     @State private var isBusyWithPhoto = false
     @State private var photoError: String?
+    /// The week whose record, grade, and photo state are on screen.
+    @State private var shownWeek: String
+    /// Whether the photo loader found an image, for when the photo listing couldn't be read.
+    @State private var showsLoadedPhoto = false
 
     private let palette = DeckPalette.week
-    private var hasPhoto: Bool { model.photoDates.contains(weekEnding) }
+
+    /// Whether the week has a photo: the listing's answer, else what the loader found.
+    private var hasPhoto: Bool {
+        model.photosListed ? model.photoDates.contains(weekEnding) : showsLoadedPhoto
+    }
+
+    /// Try the photo itself when the listing has it or couldn't be read.
+    private var loadsPhoto: Bool { !model.photosListed || model.photoDates.contains(weekEnding) }
 
     init(model: WeeksModel, weekEnding: String, edit: @escaping () -> Void) {
         self.model = model
@@ -30,6 +41,7 @@ struct WeekPageView: View {
         self.edit = edit
         // A record this model already read shows at once, without a spinner.
         _phase = State(initialValue: model.cachedRecord(weekEnding).map(Phase.ready) ?? .loading)
+        _shownWeek = State(initialValue: weekEnding)
     }
 
     var body: some View {
@@ -86,15 +98,25 @@ struct WeekPageView: View {
     }
 
     private func load() async {
+        let week = weekEnding
+        if shownWeek != week {
+            shownWeek = week
+            phase = model.cachedRecord(week).map(Phase.ready) ?? .loading
+            grade = nil
+            photoError = nil
+        }
         if case .ready = phase {} else { phase = .loading }
         if !model.isLoaded { await model.load() }
-        guard let record = await model.record(weekEnding) else {
+        let record = await model.record(week)
+        guard week == weekEnding else { return }
+        guard let record else {
             phase = .missing
             return
         }
         phase = .ready(record)
         if let id = record.prediction?.id {
-            grade = await model.grade(for: id)
+            let found = await model.grade(for: id)
+            if week == weekEnding { grade = found }
         }
     }
 
@@ -182,14 +204,17 @@ struct WeekPageView: View {
     @ViewBuilder private var photo: some View {
         VStack(alignment: .leading, spacing: 6) {
             Group {
-                if hasPhoto {
+                if loadsPhoto {
                     WeekPhotoImage(server: model.server, sessionID: model.sessionID, path: WeeksModel.photoPath(weekEnding),
-                                   version: model.photoVersion(for: weekEnding),
+                                   version: model.photoVersion(for: weekEnding), hasPhoto: $showsLoadedPhoto,
                                    load: { await model.photoData(path: $0) }) { photoPlaceholder }
                         .frame(height: 200)
+                        .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
+                        .contextMenu { photoMenuItems }
                         .accessibilityElement()
                         .accessibilityLabel(Text(verbatim: "Photo of the week"))
                         .accessibilityAddTraits(.isImage)
+                        .accessibilityHint(Text(verbatim: "Touch and hold to replace or remove it"))
                 } else {
                     Button { showsPhotoPicker = true } label: { photoPlaceholder.frame(height: 110) }
                         .buttonStyle(.plain)
@@ -224,16 +249,21 @@ struct WeekPageView: View {
             }
     }
 
+    /// Replace (or add) and remove: on the photo as a context menu, and in the toolbar.
+    @ViewBuilder private var photoMenuItems: some View {
+        Button { showsPhotoPicker = true } label: {
+            Label(hasPhoto ? "Replace Photo" : "Add a Photo", systemImage: "photo.on.rectangle")
+        }
+        if hasPhoto {
+            Button(role: .destructive) { confirmsRemoval = true } label: {
+                Label("Remove Photo", systemImage: "trash")
+            }
+        }
+    }
+
     private var photoMenu: some View {
         Menu {
-            Button { showsPhotoPicker = true } label: {
-                Label(hasPhoto ? "Replace Photo" : "Add a Photo", systemImage: "photo.on.rectangle")
-            }
-            if hasPhoto {
-                Button(role: .destructive) { confirmsRemoval = true } label: {
-                    Label("Remove Photo", systemImage: "trash")
-                }
-            }
+            photoMenuItems
         } label: {
             Image(systemName: "photo")
         }
@@ -254,7 +284,7 @@ struct WeekPageView: View {
         do {
             try await model.setPhoto(jpeg, for: weekEnding)
         } catch {
-            photoError = WeeksModel.photoErrorMessage(error, removing: false)
+            photoError = WeekPhoto.errorMessage(error, removing: false)
         }
     }
 
@@ -265,7 +295,7 @@ struct WeekPageView: View {
         do {
             try await model.removePhoto(for: weekEnding)
         } catch {
-            photoError = WeeksModel.photoErrorMessage(error, removing: true)
+            photoError = WeekPhoto.errorMessage(error, removing: true)
         }
     }
 

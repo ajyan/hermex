@@ -1493,6 +1493,8 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     var files: [String: String] = [:]
     /// Folder listings other than `briefs/`.
     var listings: [String: [String]] = [:]
+    /// Errors a listing throws instead, by path.
+    var listingErrors: [String: Error] = [:]
     private(set) var createdWorkspaces: [String] = []
     private(set) var renamed: [(String, String)] = []
     private(set) var listedSessions: [String] = []
@@ -1516,6 +1518,7 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     func renameSession(id: String, title: String) async throws { renamed.append((id, title)) }
 
     func entryNames(sessionID: String, path: String) async throws -> [String] {
+        if let error = listingErrors[path] { throw error }
         if let listing = listings[path] { return listing }
         if path != DailyDeckPaths.directory { throw APIError.http(statusCode: 404, body: #"{"error": "Not a directory"}"#) }
         listedSessions.append(sessionID)

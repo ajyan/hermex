@@ -631,10 +631,8 @@ final class DailyDeckViewModel {
             // so a reopened cover reads the new one.
             WeekPhotoCache.invalidate(server: server, sessionID: sessionID, path: path)
             weekPhotoVersion += 1
-        } catch let APIError.http(statusCode, _) where statusCode == 404 {
-            weekPhotoError = "This server can't keep a photo of the week."
         } catch {
-            weekPhotoError = "The photo didn't upload. Try again."
+            weekPhotoError = WeekPhoto.errorMessage(error, removing: false)
         }
     }
 

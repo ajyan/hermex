@@ -23,6 +23,14 @@ enum WeekPhoto {
         return CGImageDestinationFinalize(destination) ? output as Data : nil
     }
 
+    /// What a failed photo change tells him: a server without the photo route (404), else try again.
+    nonisolated static func errorMessage(_ error: Error, removing: Bool) -> String {
+        if case let APIError.http(statusCode, _) = error, statusCode == 404 {
+            return "This server can't keep a photo of the week."
+        }
+        return removing ? "The photo wasn't removed. Try again." : "The photo didn't upload. Try again."
+    }
+
     /// `data` decoded at most `maxPixel` on its long edge, upright, for a grid tile.
     nonisolated static func thumbnail(from data: Data, maxPixel: Int) -> UIImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
