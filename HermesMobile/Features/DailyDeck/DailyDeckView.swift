@@ -10,6 +10,11 @@ struct DailyDeckView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var isShowingCalendar = false
     @State private var feedbackCard: DeckCard?
+    /// The sealed weeks, shared by the calendar and the page shown after a seal; rebuilt per session
+    /// and after each seal, since a model keeps the records it has read.
+    @State private var weeks: WeeksModel?
+    /// The week just sealed, shown as its page over the deck.
+    @State private var sealedWeek: SealedWeek?
     @AppStorage(DailyBriefReminder.enabledKey) private var notifies = false
     /// Good/not-good labels on reflect cards; shown only where the server has labels.
     @State private var labels: LabelsViewModel
@@ -118,9 +123,21 @@ struct DailyDeckView: View {
                     Task { await DailyBriefReminder.noteOpened() }
                 }
             }
+            .onChange(of: viewModel.sessionID, initial: true) {
+                weeks = viewModel.makeWeeksModel()
+            }
             .sheet(isPresented: $isShowingCalendar) {
-                DeckCalendarView(viewModel: viewModel) { day, kind in
+                DeckCalendarView(viewModel: viewModel, weeks: weeks) { day, kind in
                     Task { await viewModel.show(date: day, kind: kind) }
+                }
+            }
+            // Presented without the slide: the cover fades itself in over the deck.
+            .fullScreenCover(item: $sealedWeek) { week in
+                SealedWeekCover(week: week) { reopen in
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) { sealedWeek = nil }
+                    if let reopen { Task { await viewModel.show(date: reopen, kind: "weekly") } }
                 }
             }
     }
@@ -184,7 +201,7 @@ struct DailyDeckView: View {
     }
 
     /// "Oct 9 · 3 of 10 · Filed": which day (when it isn't today), where you are, and whether
-    /// it's filed. The header's subtitle.
+    /// it's filed (a v2 weekly review: sealed). The header's subtitle.
     private var progressSubtitle: String {
         var parts: [String] = []
         if viewModel.isReview {
@@ -194,14 +211,14 @@ struct DailyDeckView: View {
             parts.append(DailyDeckPaths.label(viewModel.date))
         }
         parts.append("\(viewModel.index + 1) of \(viewModel.visiblePages.count)")
-        if viewModel.isFiled { parts.append(viewModel.hasChanges ? "Edited" : "Filed") }
+        if viewModel.isFiled { parts.append(DeckCopy.filedStatus(seal: viewModel.isV2Weekly, edited: viewModel.hasChanges)) }
         return parts.joined(separator: " · ")
     }
 
     private func progress(count: Int) -> some View {
         VStack(spacing: 6) {
             ProgressView(value: Double(viewModel.index + 1), total: Double(max(count, 1)))
-                .tint(viewModel.currentPage.map { DeckPalette.of($0).ink } ?? .secondary)
+                .tint(viewModel.currentPage.map { DeckPalette.of($0, inV2Weekly: viewModel.isV2Weekly).ink } ?? .secondary)
                 .accessibilityValue(Text(verbatim: progressSubtitle))
         }
         .padding(.horizontal, 20)
@@ -229,9 +246,94 @@ struct DailyDeckView: View {
     }
 
     private func file() {
+        // What is being filed: the user can open another deck while it's in flight.
+        let (date, seals) = (viewModel.date, viewModel.isV2Weekly)
         Task {
-            // A filing the server finished stays here: the close card shows it as filed.
-            if case .openSession(let sessionID) = await viewModel.file() { openSession(sessionID) }
+            let result = await viewModel.file()
+            // A seal rewrites the record, and a model keeps the records it has read: start afresh.
+            if seals, result != nil { weeks = viewModel.makeWeeksModel() }
+            switch result {
+            case .openSession(let sessionID):
+                openSession(sessionID)
+            case .filed where seals:
+                // A sealed week lands on its page.
+                guard let weeks else { return }
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) { sealedWeek = SealedWeek(id: date, model: weeks) }
+            default:
+                // A filing the server finished stays here: the close card shows it as filed.
+                break
+            }
+        }
+    }
+}
+
+/// A week just sealed, and the model its page reads from.
+struct SealedWeek: Identifiable {
+    /// The week's Sunday.
+    let id: String
+    let model: WeeksModel
+}
+
+/// The page of the week just sealed, over the deck: it fades in, and out again on Done or Edit,
+/// with no motion under Reduce Motion. "Your year in weeks" pushes the year grid, where a sealed
+/// week opens its page and an unsealed one its deck. `close(reopen)` removes it; `reopen` is the
+/// Sunday whose weekly deck to open next, or nil.
+private struct SealedWeekCover: View {
+    let week: SealedWeek
+    let close: (_ reopen: String?) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isShown = false
+    @State private var path: [WeekRoute] = []
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            WeekPageView(model: week.model, weekEnding: week.id) { fade(reopen: week.id) }
+                // The year button floats over the page's foot: the last chips scroll clear of it.
+                .contentMargins(.bottom, 72, for: .scrollContent)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button { fade(reopen: nil) } label: { Text(verbatim: "Done") }
+                    }
+                    ToolbarItem(placement: .bottomBar) {
+                        NavigationLink(value: WeekRoute.year) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "square.grid.3x3")
+                                Text(verbatim: "Your year")
+                            }
+                            .padding(.horizontal, 6)
+                        }
+                        .accessibilityLabel(Text(verbatim: "Your year in weeks"))
+                    }
+                }
+                .navigationDestination(for: WeekRoute.self) { route in
+                    switch route {
+                    case .year:
+                        YearOfWeeksView(model: week.model) { tapped in
+                            switch DeckCalendarRoute.for(review: DeckReview(date: tapped, kind: "weekly", isFiled: false),
+                                                         records: week.model.recordDates) {
+                            case .weekPage(let sealed): path.append(.page(sealed))
+                            case .deck(let date, _): fade(reopen: date)
+                            }
+                        }
+                    case .page(let other):
+                        WeekPageView(model: week.model, weekEnding: other) { fade(reopen: other) }
+                    }
+                }
+        }
+        .opacity(isShown ? 1 : 0)
+        .presentationBackground(.clear)
+        .onAppear {
+            if reduceMotion { isShown = true } else { withAnimation(.easeInOut(duration: 0.35)) { isShown = true } }
+        }
+    }
+
+    private func fade(reopen: String?) {
+        if reduceMotion {
+            close(reopen)
+        } else {
+            withAnimation(.easeInOut(duration: 0.25)) { isShown = false } completion: { close(reopen) }
         }
     }
 }

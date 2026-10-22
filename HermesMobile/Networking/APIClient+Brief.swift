@@ -88,3 +88,17 @@ extension APIClient {
         return try decode(BriefFileResponse.self, from: data)
     }
 }
+
+extension APIClient {
+    /// Saves `jpeg` as the photo of the week ending `weekEnding` (a raw `image/jpeg` body; the
+    /// server keeps at most 4 MB). A server without the route answers 404, which throws.
+    func uploadWeekPhoto(weekEnding: String, jpeg: Data) async throws {
+        _ = try await sendData(endpoint: .briefPhoto(weekEnding: weekEnding), method: "POST",
+                               encodedBody: jpeg, contentType: "image/jpeg")
+    }
+
+    /// Removes the week's photo; a week with none is not an error.
+    func deleteWeekPhoto(weekEnding: String) async throws {
+        _ = try await sendData(endpoint: .briefPhoto(weekEnding: weekEnding), method: "DELETE")
+    }
+}

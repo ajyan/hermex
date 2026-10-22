@@ -13,6 +13,10 @@ protocol DailyDeckDataClient: Sendable {
     func startChat(sessionID: String, message: String, workspace: String) async throws
     /// Files the answers on the server without the model; nil when the server has no filer.
     func fileBrief(_ request: BriefFileRequest) async throws -> BriefFileResponse?
+    /// A file's bytes (the week's photo); a missing file throws a 404 `APIError`.
+    func rawFile(sessionID: String, path: String) async throws -> Data
+    func uploadWeekPhoto(weekEnding: String, jpeg: Data) async throws
+    func deleteWeekPhoto(weekEnding: String) async throws
 }
 
 enum DailyDeckState: Equatable {
@@ -82,6 +86,10 @@ final class DailyDeckViewModel {
 
     var isReview: Bool { kind != "morning" }
 
+    /// The v2 weekly review, whose close card reads "Seal the week"; older weekly decks and
+    /// the other kinds keep the filing copy.
+    var isV2Weekly: Bool { kind == "weekly" && deck?.version == 2 }
+
     var title: String {
         switch kind {
         case "weekly": "Weekly Review"
@@ -113,6 +121,12 @@ final class DailyDeckViewModel {
                   feedback: APIClientFeedbackAdapter(apiClient: apiClient))
     }
 
+    /// A fresh look back over the sealed weeks of this deck's workspace, reading through the deck's
+    /// session so its photos share the cover's cache entries; nil until there is a session.
+    func makeWeeksModel() -> WeeksModel? {
+        sessionID.map { WeeksModel(server: server, client: client, sessionID: $0) }
+    }
+
     var cards: [DeckCard] { deck?.cards ?? [] }
 
     /// Cards answered (the headline and close cards never count, nor feedback alone).
@@ -134,16 +148,28 @@ final class DailyDeckViewModel {
     /// Cards on this deck marked "Not for Me".
     var skippedCount: Int { cards.filter { answers[$0.id]?.feedback != nil }.count }
 
+    /// Counts the cover photo's successful uploads; the photo view reloads when it changes.
+    private(set) var weekPhotoVersion = 0
+    private(set) var isUploadingWeekPhoto = false
+    /// Why the last upload failed; the cover shows it under the photo, which keeps its previous image.
+    private(set) var weekPhotoError: String?
+
     /// The last card marked "Not for Me" and its answer before that, for Undo.
     private(set) var lastDismissal: (card: DeckCard, previous: DeckAnswer?)?
 
     func answer(for card: DeckCard) -> DeckAnswer? { answers[card.id] }
 
-    var isFiled: Bool { filedAnswers != nil }
+    /// For a v2 weekly: whether the week's record exists, as listed when the deck opened or as the
+    /// server confirmed by sealing it here. The server saves the answers before its filer runs, so
+    /// answers alone can be a seal that failed.
+    private(set) var hasWeekRecord = false
+
+    /// Filed, or for a v2 weekly sealed: answers on file and, for a seal, the week's record.
+    var isFiled: Bool { filedAnswers != nil && (!isV2Weekly || hasWeekRecord) }
 
     /// Whether the answers differ from what was filed (always true before the first filing).
     var hasChanges: Bool {
-        guard let filedAnswers else { return true }
+        guard isFiled, let filedAnswers else { return true }
         return meaningful(answers) != meaningful(filedAnswers)
     }
 
@@ -241,6 +267,7 @@ final class DailyDeckViewModel {
             self.date = date
             self.kind = kind
             index = 0
+            weekPhotoError = nil
             await load()
         }
         guard let cardID, state == .ready, let i = visiblePages.firstIndex(where: { $0.id == cardID }) else { return }
@@ -254,6 +281,7 @@ final class DailyDeckViewModel {
         pages = []
         filedAnswers = nil
         filedNote = nil
+        hasWeekRecord = false
         guard names.contains(fileName(DailyDeckPaths.deck(date: date, kind: kind))) else {
             state = .noDeck
             return
@@ -263,6 +291,11 @@ final class DailyDeckViewModel {
         if names.contains(fileName(DailyDeckPaths.answers(date: date, kind: kind))) {
             let filed = try await client.fileContent(sessionID: sessionID, path: DailyDeckPaths.answers(date: date, kind: kind))
             filedAnswers = DeckAnswersFile.decodeAnswers(filed)
+            if kind == "weekly", decoded.version == 2 {
+                // An unreadable folder reads as unsealed: sealing again replaces the week whole.
+                let records = try? await client.entryNames(sessionID: sessionID, path: WeeksModel.directory)
+                hasWeekRecord = records?.contains(fileName(WeeksModel.recordPath(date))) ?? false
+            }
         }
         deck = decoded
         pages = DeckPage.pages(for: decoded.cards)
@@ -434,6 +467,69 @@ final class DailyDeckViewModel {
         }
     }
 
+    // The v2 weekly review's answers, each keyed by the card's item ids (`DeckAnswer`).
+
+    /// Sets one of a card's lists: the energy card's "gave" and "drained", the who card's "who".
+    /// An emptied list stays (as none), so filing doesn't fall back to the drafted chips.
+    func setList(_ key: String, _ values: [String], for card: DeckCard) {
+        update(card) { answer in
+            var lists = answer.lists ?? [:]
+            lists[key] = values
+            answer.lists = lists
+        }
+    }
+
+    /// A list as the card shows it: the answer's once he's touched it (even emptied), else `drafted`.
+    func list(_ key: String, for card: DeckCard, drafted: [String]) -> [String] {
+        answers[card.id]?.lists?[key] ?? drafted
+    }
+
+    /// Scores a value 1–10; tapping its chosen score again clears it. Other scores are ignored.
+    func setScore(_ id: String, _ score: Int, for card: DeckCard) {
+        guard (1...10).contains(score) else { return }
+        update(card) { answer in
+            var scores = answer.scores ?? [:]
+            scores[id] = scores[id] == score ? nil : score
+            answer.scores = scores.isEmpty ? nil : scores
+        }
+    }
+
+    /// Grades an item: a commitment kept, missed, or dropped, a prediction hit, partly, or miss.
+    /// Nil clears it.
+    func setStatus(_ id: String, _ status: String?, for card: DeckCard) {
+        update(card) { answer in
+            var statuses = answer.statuses ?? [:]
+            statuses[id] = status
+            answer.statuses = statuses.isEmpty ? nil : statuses
+        }
+    }
+
+    /// A line for an item: a value's evidence, a prediction's "what happened". An empty line clears
+    /// it, so a value shows (and files) Atlas's evidence again.
+    func setNote(_ id: String, _ text: String, for card: DeckCard) {
+        update(card) { answer in
+            var notes = answer.notes ?? [:]
+            notes[id] = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text
+            answer.notes = notes.isEmpty ? nil : notes
+        }
+    }
+
+    /// The keepsakes card's prediction; one without words is none.
+    func setPrediction(_ prediction: DeckPrediction?, for card: DeckCard) {
+        update(card) { answer in
+            let hasText = !(prediction?.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+            answer.prediction = hasText ? prediction : nil
+        }
+    }
+
+    /// Last week's commitments marked missed on this deck, in the card's order: what the one-thing
+    /// and who cards offer to carry.
+    var missedCommitments: [DeckReviewItem] {
+        guard let card = cards.first(where: { $0.type == .commitments }) else { return [] }
+        let statuses = answers[card.id]?.statuses ?? [:]
+        return card.items.filter { statuses[$0.id] == CommitmentStatus.missed }
+    }
+
     /// A self-rating card's scores so far, read from its answer text.
     func traitScores(for card: DeckCard) -> [String: Int] {
         DeckSelfRatings.scores(in: answers[card.id]?.text, traits: card.selfRatings ?? [])
@@ -523,6 +619,41 @@ final class DailyDeckViewModel {
         store.setAnswers(answers, for: server, date: date, kind: kind)
     }
 
+    // MARK: Photo of the week
+
+    /// Where the week's photo lives in the vault, read back through the workspace file route.
+    var weekPhotoPath: String { "weekly-checkins/photos/\(date).jpg" }
+
+    /// The photo at `path` (a `weekPhotoPath`), or nil when there is none yet or it cannot be read.
+    func weekPhotoData(path: String) async -> Data? {
+        guard let sessionID else { return nil }
+        return try? await client.rawFile(sessionID: sessionID, path: path)
+    }
+
+    /// The picked photo could not be read as an image; nothing was uploaded.
+    func weekPhotoUnreadable() {
+        weekPhotoError = "That photo couldn't be read. Pick another."
+    }
+
+    /// Uploads `jpeg` as this week's photo. Success reloads the cover's photo; failure sets
+    /// `weekPhotoError` and leaves the version, so the slot keeps what it showed.
+    func setWeekPhoto(_ jpeg: Data) async {
+        guard !isUploadingWeekPhoto else { return }
+        isUploadingWeekPhoto = true
+        weekPhotoError = nil
+        defer { isUploadingWeekPhoto = false }
+        let weekEnding = date, path = weekPhotoPath, sessionID = sessionID
+        do {
+            try await client.uploadWeekPhoto(weekEnding: weekEnding, jpeg: jpeg)
+            // The cache outlives this view model, whose version restarts at 0: drop the old image
+            // so a reopened cover reads the new one.
+            WeekPhotoCache.invalidate(server: server, sessionID: sessionID, path: path)
+            weekPhotoVersion += 1
+        } catch {
+            weekPhotoError = WeekPhoto.errorMessage(error, removing: false)
+        }
+    }
+
     // MARK: Filing
 
     /// Files the answers. The server's filer does it without the model; when it leaves
@@ -548,7 +679,7 @@ final class DailyDeckViewModel {
             do {
                 let sessionID = try await startSession(
                     message: try payload.message(refiling: refiling), title: Self.sessionTitle(for: date, kind: kind), workspace: workspace)
-                markFiled(sent, date: date, kind: kind, note: nil)
+                markFiled(sent, date: date, kind: kind, confirmed: false, note: nil)
                 return .openSession(sessionID)
             } catch {
                 filing = .failed(error.localizedDescription)
@@ -559,8 +690,8 @@ final class DailyDeckViewModel {
             filing = .failed(filed.error ?? filed.summary ?? "The server couldn't file the brief.")
             return nil
         }
-        // The answers are filed now; a failure below only loses the follow-ups.
-        markFiled(sent, date: date, kind: kind, note: DailyDeckFiledNote(
+        // The answers are filed now (a seal's record written); a failure below only loses the follow-ups.
+        markFiled(sent, date: date, kind: kind, confirmed: true, note: DailyDeckFiledNote(
             summary: Self.trimmed(filed.summary),
             failures: (filed.ran ?? []).filter { $0.ok == false }.map { step in
                 [step.step, step.error].compactMap { $0 }.joined(separator: ": ")
@@ -581,9 +712,10 @@ final class DailyDeckViewModel {
         return text
     }
 
-    /// Records `sent` as filed for its deck. The draft is cleared only if it still matches what
-    /// was sent, so edits made while filing stay unsent; another deck on screen is left alone.
-    private func markFiled(_ sent: [String: DeckAnswer], date: String, kind: String, note: DailyDeckFiledNote?) {
+    /// Records `sent` as filed for its deck; `confirmed` when the server's filer did it (a seal's
+    /// record now exists). The draft is cleared only if it still matches what was sent, so edits
+    /// made while filing stay unsent; another deck on screen is left alone.
+    private func markFiled(_ sent: [String: DeckAnswer], date: String, kind: String, confirmed: Bool, note: DailyDeckFiledNote?) {
         if store.answers(for: server, date: date, kind: kind) == sent {
             store.setAnswers([:], for: server, date: date, kind: kind)
         }
@@ -591,6 +723,7 @@ final class DailyDeckViewModel {
         guard date == self.date, kind == self.kind else { return }
         filedAnswers = sent
         filedNote = note
+        if confirmed { hasWeekRecord = true }
     }
 
     /// A fresh session (so the chat holds only this filing, never an earlier stopped attempt)
@@ -645,6 +778,18 @@ struct APIClientDailyDeckAdapter: DailyDeckDataClient {
 
     func fileBrief(_ request: BriefFileRequest) async throws -> BriefFileResponse? {
         try await apiClient.fileBrief(request)
+    }
+
+    func rawFile(sessionID: String, path: String) async throws -> Data {
+        try await apiClient.rawFileData(sessionID: sessionID, path: path)
+    }
+
+    func uploadWeekPhoto(weekEnding: String, jpeg: Data) async throws {
+        try await apiClient.uploadWeekPhoto(weekEnding: weekEnding, jpeg: jpeg)
+    }
+
+    func deleteWeekPhoto(weekEnding: String) async throws {
+        try await apiClient.deleteWeekPhoto(weekEnding: weekEnding)
     }
 }
 

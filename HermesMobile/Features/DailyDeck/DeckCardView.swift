@@ -20,7 +20,7 @@ struct DeckPageView: View {
     @Environment(\.openBrainRoute) private var openBrainRoute
 
     var body: some View {
-        let palette = DeckPalette.of(page)
+        let palette = DeckPalette.of(page, inV2Weekly: viewModel.isV2Weekly)
         let words = Group {
             switch page {
             case .card(let card):
@@ -78,9 +78,20 @@ private struct DeckCardView: View {
                 case .close: close
                 case .sleep: sleep
                 case .goal: goal
-                case .weekAhead: DeckWeekAheadCard(card: card, palette: palette)
+                case .weekAhead:
+                    DeckWeekAheadCard(card: card, palette: palette)
+                    DeckFootnote(card: card, palette: palette)
                 case .changes: DeckChangesCard(card: card, palette: palette, viewModel: viewModel)
                 case .ask: ask
+                case .cover: WeekCoverCard(card: card, palette: palette, viewModel: viewModel)
+                case .filmstrip: WeekFilmstripCard(card: card, palette: palette)
+                case .story: WeekStoryCard(card: card, palette: palette, viewModel: viewModel)
+                case .energy: WeekEnergyCard(card: card, palette: palette, viewModel: viewModel)
+                case .commitments: WeekCommitmentsCard(card: card, palette: palette, viewModel: viewModel)
+                case .values: WeekValuesCard(card: card, palette: palette, viewModel: viewModel)
+                case .predictions: WeekPredictionsCard(card: card, palette: palette, viewModel: viewModel)
+                case .who: WeekWhoCard(card: card, palette: palette, viewModel: viewModel)
+                case .keepsakes: WeekKeepsakesCard(card: card, palette: palette, viewModel: viewModel)
                 default: reading
                 }
             }
@@ -143,6 +154,9 @@ private struct DeckCardView: View {
             .padding(.bottom, 18)
             .accessibilityElement(children: .combine)
         }
+        if let rotation = card.rotation {
+            WeekQuestionHeader(rotation: rotation, palette: palette)
+        }
         if card.isMandarin {
             DeckMandarinCard(card: card, palette: palette, asked: viewModel.question(for: card))
         }
@@ -194,18 +208,16 @@ private struct DeckCardView: View {
                 .id(question)
                 .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
         }
+        if card.id == "one-thing", card.chapter != nil {
+            WeekCarryChips(card: card, palette: palette, viewModel: viewModel)
+        }
         if let traits = card.selfRatings {
             selfRatings(traits).padding(.top, 18)
         } else if card.takesText {
-            reflection(card.isLetter ? "Write to her" : card.isMandarin ? "Answer in Mandarin" : "Write a reflection")
+            reflection(DeckCopy.invitation(for: card))
                 .padding(.top, 16)
         }
-        if let reason = card.reason {
-            Text(verbatim: reason)
-                .font(AppFont.footnote())
-                .foregroundStyle(palette.ink)
-                .padding(.top, 20)
-        }
+        DeckFootnote(card: card, palette: palette)
     }
 
     /// Your words once written; until then, the way in.
@@ -215,7 +227,8 @@ private struct DeckCardView: View {
             Button { isWriting = true } label: {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(verbatim: text)
-                        .font(AppFont.body())
+                        // A weekly review's answers are words he keeps (the deep answer, the one thing).
+                        .font(card.chapter == nil ? AppFont.body() : AppFont.serif(style: .body))
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                     Label { Text(verbatim: "Edit") } icon: { Image(systemName: "pencil") }
@@ -312,24 +325,14 @@ private struct DeckCardView: View {
             }
         }
         reflection("Add a note").padding(.top, 24)
-        if let reason = card.reason {
-            Text(verbatim: reason)
-                .font(AppFont.footnote())
-                .foregroundStyle(palette.ink)
-                .padding(.top, 20)
-        }
+        DeckFootnote(card: card, palette: palette)
     }
 
     /// The Daily Ask: today's three roles, live.
     @ViewBuilder
     private var ask: some View {
         DeckAskCard(card: card, deckDate: viewModel.date)
-        if let reason = card.reason {
-            Text(verbatim: reason)
-                .font(AppFont.footnote())
-                .foregroundStyle(palette.ink)
-                .padding(.top, 20)
-        }
+        DeckFootnote(card: card, palette: palette)
     }
 
     /// The goal card: live check-ins, then a note on how yesterday went.
@@ -337,12 +340,7 @@ private struct DeckCardView: View {
     private var goal: some View {
         DeckGoalCard(card: card, palette: palette, deckDate: viewModel.date)
         reflection("Add a note").padding(.top, 24)
-        if let reason = card.reason {
-            Text(verbatim: reason)
-                .font(AppFont.footnote())
-                .foregroundStyle(palette.ink)
-                .padding(.top, 20)
-        }
+        DeckFootnote(card: card, palette: palette)
     }
 
     // MARK: Opener and close
@@ -398,12 +396,23 @@ private struct DeckCardView: View {
     private var close: some View {
         let count = viewModel.answeredCount
         let filed = viewModel.isFiled && !viewModel.hasChanges
-        Text(verbatim: filed ? "Filed" : count == 1 ? "1 reflection" : "\(count) reflections")
+        let seal = viewModel.isV2Weekly
+        Text(verbatim: DeckCopy.closeHeading(seal: seal, filed: filed, count: count))
             .font(AppFont.display(style: .largeTitle, weight: .semibold))
+        if seal {
+            Text(verbatim: DeckCopy.answered(count))
+                .font(AppFont.subheadline(weight: .semibold))
+                .foregroundStyle(palette.ink)
+                .padding(.top, 4)
+        }
         Text(verbatim: filed
-             ? viewModel.filedNote?.summary ?? "In your journal. Edit any card and file again to update it."
+             ? viewModel.filedNote?.summary ?? (seal ? "Sealed in your journal. Edit any card and seal again to update it."
+                                                : "In your journal. Edit any card and file again to update it.")
              : viewModel.isFiled
-             ? "Filing again updates the journal: changed answers replace what was filed, new ones are added, nothing is deleted."
+             ? (seal ? "Sealing again replaces this week's page with these answers."
+                     : "Filing again updates the journal: changed answers replace what was filed, new ones are added, nothing is deleted.")
+             : seal
+             ? "Sealing writes this week's page from your answers."
              : count == 0
              ? "Nothing written yet. Swipe back to any card, or file the follow-ups you chose."
              : "Atlas writes them into today's journal and runs the follow-ups you chose.")
@@ -427,13 +436,14 @@ private struct DeckCardView: View {
         }
         Button(action: file) {
             HStack {
-                if viewModel.filing == .filing { ProgressView().tint(palette.onInk) }
-                Text(verbatim: viewModel.isFiled ? "File Changes" : "File It")
+                if viewModel.filing == .filing { ProgressView().tint(seal ? Color.hxOnAccent : palette.onInk) }
+                Text(verbatim: seal ? (viewModel.isFiled ? "Seal your edits" : "Seal the week")
+                     : viewModel.isFiled ? "File Changes" : "File It")
             }
             .font(AppFont.body(weight: .semibold))
-            .foregroundStyle(palette.onInk)
+            .foregroundStyle(seal ? Color.hxOnAccent : palette.onInk)
             .frame(maxWidth: .infinity, minHeight: 50)
-            .background(palette.ink.opacity(filed ? 0.35 : 1), in: Capsule())
+            .background(seal ? Color.accentColor.opacity(filed ? 0.35 : 1) : palette.ink.opacity(filed ? 0.35 : 1), in: Capsule())
         }
         .buttonStyle(.plain)
         .disabled(viewModel.filing == .filing || !viewModel.hasChanges)

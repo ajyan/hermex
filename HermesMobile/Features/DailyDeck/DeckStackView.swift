@@ -42,7 +42,7 @@ struct DeckStackView: View {
                          contentOpacity: contentOpacity)
         } edge: { page in
             // Far down the stack only the card's paper shows, peeking out askew.
-            let role = DeckPalette.of(page).cardRole
+            let role = DeckPalette.of(page, inV2Weekly: viewModel.isV2Weekly).cardRole
             role.shape
                 .fill(role.fill)
                 .hxShadow(.stacked)

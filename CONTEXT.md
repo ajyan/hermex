@@ -128,6 +128,16 @@ _Avoid_: overdue, stale contact, relationship pulse (the older vault script this
 A Brain item whose text names another item without a `[[link]]` to it. The reader lists them under the item's linked mentions.
 _Avoid_: missing link, implicit backlink
 
+## Daily Deck
+
+**Seal**:
+Filing a v2 weekly review deck. Its close card reads "Seal the week", the server writes the Week record, and the app lands on the week's page. Sealing again after an edit rewrites the record.
+_Avoid_: file (for a v2 weekly review), submit, close the week
+
+**Week record**:
+A sealed week as the vault keeps it in `weekly-checkins/`: `<Sunday>-week-ending.json` for the app and a markdown page beside it, plus an optional photo in `weekly-checkins/photos/<Sunday>.jpg`. Opens as the week page, from the calendar or the year of weeks.
+_Avoid_: check-in, weekly summary, journal entry
+
 ## Chat
 
 **Fork**:
