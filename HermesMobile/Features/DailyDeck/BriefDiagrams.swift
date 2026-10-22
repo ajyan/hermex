@@ -60,8 +60,26 @@ struct BriefDiagramIndex: Decodable, Equatable {
     }
 }
 
-/// A vault diagram, opened from "Open the diagram" on a Brief card or a Prep lesson: the live `atlas-ui` tool in
-/// an interactive answer card. Neither screen has a composer, so the tool's "Ask Atlas" does nothing here.
+/// "Open the diagram": a full-width secondary button in the object's paper (`wash` fill, `edge` hairline, `glow`
+/// label), so a screen's own filled button stays the one primary. Brief cards, Prep lessons and Brain pages share it.
+struct OpenDiagramLabel: View {
+    let paper: HermexPaper
+
+    var body: some View {
+        Label { Text(verbatim: "Open the diagram") } icon: {
+            Image(systemName: "point.3.connected.trianglepath.dotted")
+        }
+        .font(AppFont.body(weight: .semibold))
+        .foregroundStyle(paper.glow)
+        .frame(maxWidth: .infinity, minHeight: 50)
+        .background(paper.wash, in: Capsule())
+        .overlay(Capsule().strokeBorder(paper.edge, lineWidth: 1))
+        .contentShape(Capsule())
+    }
+}
+
+/// A vault diagram, opened from "Open the diagram" on a Brief card, a Prep lesson or a Brain page: the live
+/// `atlas-ui` tool in an interactive answer card. None of them has a composer, so the tool's "Ask Atlas" does nothing here.
 struct DiagramSheet: View {
     let title: String
     /// Reads the diagram's `atlas-ui` fragment.

@@ -37,6 +37,25 @@ final class BrainModelsTests: XCTestCase {
         XCTAssertEqual(page.highlights.last?.note, nil)
     }
 
+    func testPageDecodesItsDiagramAndSurvivesTheCache() throws {
+        let json = #"""
+        {"item": {"module": "wiki", "id": "wiki/sources/kafka.md", "title": "Kafka"},
+         "diagram": {"topic": "kafka", "title": "Kafka", "html": "<title>Kafka</title><p>Brokers</p>"}}
+        """#
+        let page = try JSONDecoder().decode(BrainPage.self, from: Data(json.utf8))
+        XCTAssertEqual(page.diagram, BrainDiagram(topic: "kafka", title: "Kafka", html: "<title>Kafka</title><p>Brokers</p>"))
+        let cached = try JSONDecoder().decode(BrainPage.self, from: JSONEncoder().encode(page))
+        XCTAssertEqual(cached.diagram, page.diagram, "the offline copy keeps the diagram")
+    }
+
+    func testPageWithoutAUsableDiagramHasNone() throws {
+        XCTAssertNil(try JSONDecoder().decode(BrainPage.self, from: Data(pageJSON.utf8)).diagram, "older servers send none")
+        for diagram in [#"null"#, #"{"topic": "kafka", "html": "  "}"#, #""broken""#] {
+            let json = #"{"item": {"module": "wiki", "id": "wiki/a.md", "title": "A"}, "diagram": "# + diagram + #"}"#
+            XCTAssertNil(try JSONDecoder().decode(BrainPage.self, from: Data(json.utf8)).diagram, diagram)
+        }
+    }
+
     func testPageRoundTripsThroughJSON() throws {
         let page = try JSONDecoder().decode(BrainPage.self, from: Data(pageJSON.utf8))
         let data = try JSONEncoder().encode(page)
