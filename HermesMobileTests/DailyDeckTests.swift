@@ -487,6 +487,345 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertNil(actions[1].message)
     }
 
+    // MARK: - The week's question
+
+    func testSectionCardDecodesAndIsNotAnswerable() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"2026-11-25","kind":"morning","cards":[
+          {"id":"week","type":"section","title":"What does being a father ask of you?",
+           "lines":["This week · Being a father","Day 3 · 4 answers so far"],
+           "recap":"Oct 31: “Work hard on things you chose.”",
+           "ref":{"link":"wiki/views/fatherhood"},
+           "week":{"area":"fatherhood","question":"What does being a father ask of you?","monday":"2026-11-23"}}]}
+        """#)
+        let card = try XCTUnwrap(deck.cards.first)
+        XCTAssertEqual(card.type, .section)
+        XCTAssertEqual(card.title, "What does being a father ask of you?")
+        XCTAssertEqual(card.lines, ["This week · Being a father", "Day 3 · 4 answers so far"])
+        XCTAssertEqual(card.recap, "Oct 31: “Work hard on things you chose.”")
+        XCTAssertEqual(card.link, "wiki/views/fatherhood")
+        XCTAssertEqual(card.sourceRoute, .page(.wiki, "wiki/views/fatherhood.md"))
+        XCTAssertEqual(DeckCard.openTitle(for: try XCTUnwrap(card.sourceRoute)), "Open the page")
+        XCTAssertFalse(card.takesText)
+        XCTAssertFalse(card.takesFeedback)
+        XCTAssertEqual(card.sectionSpokenLabel, "This week, Being a father, What does being a father ask of you?")
+        XCTAssertEqual(DeckPalette.of(card).colors, DeckPalette.opener.colors, "the divider wears the opener's paper")
+        XCTAssertEqual(DeckPalette.of(card).name, "This week")
+    }
+
+    func testSectionCardWithNoLinkOrRecapDecodes() throws {
+        let card = try XCTUnwrap(DailyDeck.decode(#"""
+        {"date":"d","kind":"morning","cards":[{"id":"week","type":"section","title":"Q","lines":["This week · Money","No sources fit today"]}]}
+        """#).cards.first)
+        XCTAssertEqual(card.type, .section)
+        XCTAssertNil(card.recap)
+        XCTAssertNil(card.sourceRoute)
+        XCTAssertEqual(card.lines.last, "No sources fit today")
+    }
+
+    func testOpenerSplitsTodayAndThisWeek() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"d","kind":"morning","cards":[
+          {"id":"open","type":"headline","title":"Today"},
+          {"id":"t1","type":"prompt"},{"id":"f1","type":"decision"},{"id":"t2","type":"reflect"},{"id":"f2","type":"decision"},
+          {"id":"week","type":"section","title":"Q"},
+          {"id":"w1","type":"reflect","kind":"journal"},{"id":"w2","type":"reflect","kind":"crm"},
+          {"id":"close","type":"close"}]}
+        """#)
+        let acts = DeckCardView.acts(DeckPage.pages(for: deck.cards))
+        XCTAssertEqual(acts.today.map(\.id), ["t1", "followups-f1", "t2"], "follow-ups are one page; the opener is not listed")
+        XCTAssertEqual(acts.week.map(\.id), ["w1", "w2"], "the divider and close are not listed")
+        // The opener is never listed, and a deck with no section is all one act.
+        let plain = DeckCardView.acts(DeckPage.pages(for: try DailyDeck.decode(Self.deckJSON).cards))
+        XCTAssertEqual(plain.today.count, 5)
+        XCTAssertTrue(plain.week.isEmpty)
+    }
+
+    func testOpenerCountsThreeTodayAndTwoThisWeek() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"d","kind":"morning","cards":[
+          {"id":"a","type":"prompt"},{"id":"b","type":"reflect"},{"id":"c","type":"reflect"},
+          {"id":"week","type":"section"},
+          {"id":"d","type":"reflect"},{"id":"e","type":"reflect"},{"id":"close","type":"close"}]}
+        """#)
+        let acts = DeckCardView.acts(DeckPage.pages(for: deck.cards))
+        XCTAssertEqual(acts.today.count, 3)
+        XCTAssertEqual(acts.week.count, 2)
+    }
+
+    private static let weekDeckJSON = #"""
+    {"date":"2026-10-04","kind":"morning","cards":[
+      {"id":"open","type":"headline","title":"Today"},
+      {"id":"t1","type":"prompt","question":"Today?"},
+      {"id":"week","type":"section","title":"Q0?","question":"Q0?","alt_questions":["Q1?","Q2?"],
+       "lines":["This week · AI"],"week":{"area":"ai","question":"Q0?","monday":"2026-10-26","variant":0,"questions":["Q0?","Q1?","Q2?"]}},
+      {"id":"week-0-1","type":"reflect","kind":"journal","week":{"area":"ai","question":"Q0?","monday":"2026-10-26","variant":0}},
+      {"id":"week-0-2","type":"reflect","kind":"crm","week":{"area":"ai","question":"Q0?","monday":"2026-10-26","variant":0}},
+      {"id":"week-1-1","type":"reflect","kind":"journal","week":{"area":"ai","question":"Q1?","monday":"2026-10-26","variant":1}},
+      {"id":"week-2-1","type":"reflect","kind":"journal","week":{"area":"ai","question":"Q2?","monday":"2026-10-26","variant":2}},
+      {"id":"close","type":"close"}]}
+    """#
+
+    func testWeekSourceCardsDecodeTheirVariant() throws {
+        let deck = try DailyDeck.decode(Self.weekDeckJSON)
+        XCTAssertEqual(deck.cards.map(\.weekVariant), [nil, nil, 0, 0, 0, 1, 2, nil])
+        XCTAssertEqual(deck.cards[2].altQuestions, ["Q1?", "Q2?"])
+    }
+
+    @MainActor
+    func testNewQuestionStepsTheWeekVariantAndSwapsTheSourceCards() async throws {
+        let viewModel = try await loadedViewModel(Self.weekDeckJSON)
+        let section = try XCTUnwrap(viewModel.cards.first { $0.type == .section })
+        let ids = { viewModel.visiblePages.map(\.id) }
+        XCTAssertEqual(viewModel.weekVariant, 0)
+        XCTAssertEqual(ids(), ["open", "t1", "week", "week-0-1", "week-0-2", "close"])
+
+        viewModel.index = 2
+        viewModel.regenerateQuestion(for: section)
+        XCTAssertEqual(viewModel.weekVariant, 1)
+        XCTAssertEqual(viewModel.question(for: section), "Q1?")
+        XCTAssertEqual(ids(), ["open", "t1", "week", "week-1-1", "close"])
+        XCTAssertEqual(viewModel.currentPage?.id, "week", "the divider stays on screen")
+        let acts = DeckCardView.acts(viewModel.visiblePages)
+        XCTAssertEqual(acts.week.map(\.id), ["week-1-1"], "the opener lists the shown question's cards")
+        XCTAssertEqual(acts.today.map(\.id), ["t1"])
+
+        viewModel.regenerateQuestion(for: section)
+        XCTAssertEqual(viewModel.weekVariant, 2)
+        XCTAssertEqual(ids(), ["open", "t1", "week", "week-2-1", "close"])
+        viewModel.regenerateQuestion(for: section)
+        XCTAssertEqual(viewModel.weekVariant, 0, "wraps back to the first question")
+        XCTAssertEqual(ids(), ["open", "t1", "week", "week-0-1", "week-0-2", "close"])
+        XCTAssertNil(viewModel.answer(for: section))
+    }
+
+    @MainActor
+    func testWeekSectionAnswerIsFiledWithoutCountingAsAnAnsweredCard() async throws {
+        let viewModel = try await loadedViewModel(Self.weekDeckJSON)
+        let section = try XCTUnwrap(viewModel.cards.first { $0.type == .section })
+        viewModel.regenerateQuestion(for: section)
+        viewModel.setNote("  Too abstract.  ", for: section)
+        XCTAssertEqual(viewModel.answeredCount, 0, "the divider is not an answered card")
+        XCTAssertTrue(viewModel.hasChanges)
+
+        let payload = DeckAnswersPayload(deck: try XCTUnwrap(viewModel.deck), answers: viewModel.answers, completedAt: morning)
+        XCTAssertEqual(payload.answers.map(\.card), ["week"])
+        XCTAssertEqual(payload.answers.first?.question, "Q1?")
+        XCTAssertEqual(payload.answers.first?.text, "Too abstract.")
+
+        viewModel.setNote("   ", for: section)
+        let blank = DeckAnswersPayload(deck: try XCTUnwrap(viewModel.deck), answers: viewModel.answers, completedAt: morning)
+        XCTAssertNil(blank.answers.first?.text, "a blank note files as none")
+        XCTAssertEqual(blank.answers.first?.question, "Q1?")
+        viewModel.setNote("", for: section)
+        XCTAssertNil(viewModel.answer(for: section)?.text, "an emptied field clears it")
+        viewModel.regenerateQuestion(for: section)
+        viewModel.regenerateQuestion(for: section)
+        XCTAssertNil(viewModel.answer(for: section))
+    }
+
+    @MainActor
+    func testWeekNoteKeepsALeadingSpaceWhileTypingAndFilesTrimmed() async throws {
+        let viewModel = try await loadedViewModel(Self.weekDeckJSON)
+        let section = try XCTUnwrap(viewModel.cards.first { $0.type == .section })
+        viewModel.setNote(" ", for: section)
+        XCTAssertEqual(viewModel.answer(for: section)?.text, " ", "the space typed first stays in the field")
+        let blank = DeckAnswersPayload(deck: try XCTUnwrap(viewModel.deck), answers: viewModel.answers, completedAt: morning)
+        XCTAssertTrue(blank.answers.isEmpty)
+
+        viewModel.setNote(" Too abstract ", for: section)
+        XCTAssertEqual(viewModel.answer(for: section)?.text, " Too abstract ")
+        let payload = DeckAnswersPayload(deck: try XCTUnwrap(viewModel.deck), answers: viewModel.answers, completedAt: morning)
+        XCTAssertEqual(payload.answers.map(\.card), ["week"])
+        XCTAssertEqual(payload.answers.first?.text, "Too abstract")
+    }
+
+    func testDividerSecondLineFollowsTheShownQuestion() {
+        let lines = ["This week · AI", "Day 3 · 2 answers so far"]
+        XCTAssertEqual(DailyDeckViewModel.sectionLines(lines, variant: 0, hasSources: true, date: "2026-10-28"), lines,
+                       "the original question keeps the vault's line")
+        XCTAssertEqual(DailyDeckViewModel.sectionLines(lines, variant: 1, hasSources: true, date: "2026-10-28"),
+                       ["This week · AI", "Day 3"], "the answer count is the original question's")
+        XCTAssertEqual(DailyDeckViewModel.sectionLines(lines, variant: 2, hasSources: false, date: "2026-10-28"),
+                       ["This week · AI", "No sources fit today"])
+        let none = ["This week · AI", "No sources fit today"]
+        XCTAssertEqual(DailyDeckViewModel.sectionLines(none, variant: 0, hasSources: false, date: "2026-10-28"), none)
+        XCTAssertEqual(DailyDeckViewModel.sectionLines(none, variant: 1, hasSources: true, date: "2026-10-28"),
+                       ["This week · AI", "Day 3"], "a Wednesday, counted from the deck's date")
+        XCTAssertEqual(DailyDeckViewModel.sectionLines(none, variant: 1, hasSources: true, date: "2026-11-01"),
+                       ["This week · AI", "Day 7"])
+        XCTAssertEqual(DailyDeckViewModel.sectionLines(none, variant: 1, hasSources: true, date: "bad"), ["This week · AI"])
+        XCTAssertEqual(DailyDeckViewModel.sectionLines(["This week · AI"], variant: 1, hasSources: false, date: "2026-10-28"),
+                       ["This week · AI"])
+    }
+
+    @MainActor
+    func testDividerLinesSwapWithTheQuestion() async throws {
+        let json = Self.weekDeckJSON
+            .replacingOccurrences(of: #""lines":["This week · AI"]"#, with: #""lines":["This week · AI","Day 1 · 1 answer so far"]"#)
+            .replacingOccurrences(of: #","alt_questions":["Q1?","Q2?"]"#, with: #","alt_questions":["Q1?","Q2?","Q3?"]"#)
+        let viewModel = try await loadedViewModel(json)
+        let section = try XCTUnwrap(viewModel.cards.first { $0.type == .section })
+        XCTAssertEqual(viewModel.sectionLines(for: section), ["This week · AI", "Day 1 · 1 answer so far"])
+        viewModel.regenerateQuestion(for: section)
+        XCTAssertEqual(viewModel.sectionLines(for: section), ["This week · AI", "Day 1"])
+        viewModel.regenerateQuestion(for: section)
+        viewModel.regenerateQuestion(for: section)
+        XCTAssertEqual(viewModel.question(for: section), "Q3?")
+        XCTAssertEqual(viewModel.sectionLines(for: section), ["This week · AI", "No sources fit today"],
+                       "Q3? has no source cards")
+        viewModel.regenerateQuestion(for: section)
+        XCTAssertEqual(viewModel.sectionLines(for: section), ["This week · AI", "Day 1 · 1 answer so far"])
+    }
+
+    @MainActor
+    func testWeekNoteAloneIsFiled() async throws {
+        let viewModel = try await loadedViewModel(Self.weekDeckJSON)
+        let section = try XCTUnwrap(viewModel.cards.first { $0.type == .section })
+        viewModel.setNote("Keep this one.", for: section)
+        let payload = DeckAnswersPayload(deck: try XCTUnwrap(viewModel.deck), answers: viewModel.answers, completedAt: morning)
+        XCTAssertEqual(payload.answers.map(\.card), ["week"])
+        XCTAssertNil(payload.answers.first?.question)
+        XCTAssertEqual(viewModel.answeredCount, 0)
+    }
+
+    @MainActor
+    func testDeckWithoutWeekVariantsIsUnchanged() async throws {
+        let viewModel = try await loadedViewModel(Self.feedbackDeckJSON)
+        XCTAssertEqual(viewModel.weekVariant, 0)
+        XCTAssertEqual(viewModel.visiblePages.count, 4)
+        // A section with no alternatives and week cards with no variant stay as they were.
+        let plain = try await loadedViewModel(#"""
+        {"date":"2026-10-04","kind":"morning","cards":[{"id":"week","type":"section","title":"Q"},{"id":"w1","type":"reflect"}]}
+        """#)
+        XCTAssertEqual(plain.visiblePages.map(\.id), ["week", "w1"])
+        // Week cards in a deck with no divider are all shown.
+        let noDivider = try await loadedViewModel(#"""
+        {"date":"2026-10-04","kind":"morning","cards":[
+          {"id":"a","type":"reflect","week":{"variant":0}},{"id":"b","type":"reflect","week":{"variant":1}}]}
+        """#)
+        XCTAssertEqual(noDivider.visiblePages.map(\.id), ["a", "b"])
+    }
+
+    func testViewTakeDecisionKeepsEntriesContextAndTextActions() throws {
+        let card = try XCTUnwrap(DailyDeck.decode(#"""
+        {"date":"2026-11-29","kind":"weekly","cards":[
+          {"id":"view-take","type":"decision","kind":"view_take","title":"What does being a father ask of you?",
+           "lines":["This week · Being a father"],
+           "entries":[{"label":"Tue · Dr K","text":"Be present."},{"label":"Thu · Notes","text":"Slow down."}],
+           "body":"Four answers.","context":"Last time (Oct 31): “Work hard on things you chose.”",
+           "question":"Your take, in a sentence",
+           "actions":[{"id":"open","label":"Still open","input":"text"},{"id":"settled","label":"Settled","input":"text"}],
+           "week":{"area":"fatherhood","question":"Q","monday":"2026-11-23"}}]}
+        """#).cards.first)
+        XCTAssertEqual(card.type, .decision)
+        XCTAssertEqual(card.lines, ["This week · Being a father"])
+        XCTAssertEqual(card.entries.map(\.label), ["Tue · Dr K", "Thu · Notes"])
+        XCTAssertEqual(card.context, "Last time (Oct 31): “Work hard on things you chose.”")
+        XCTAssertEqual(card.question, "Your take, in a sentence")
+        XCTAssertEqual(card.actions.map(\.label), ["Still open", "Settled"])
+        XCTAssertTrue(card.actions.allSatisfy(\.takesText))
+        XCTAssertEqual(card.answerPrompt(chosen: "settled"), "Your take, in a sentence")
+        XCTAssertEqual(card.answerPrompt(chosen: "edit"), "Your version")
+        let plain = try XCTUnwrap(DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"f","type":"decision"}]}"#).cards.first)
+        XCTAssertEqual(plain.answerPrompt(chosen: "answer"), "Your answer")
+    }
+
+    func testWeekSourceKindsWearExistingPapers() throws {
+        func palette(_ kind: String) throws -> DeckPalette {
+            DeckPalette.of(try XCTUnwrap(DailyDeck.decode(
+                #"{"date":"d","kind":"morning","cards":[{"id":"x","type":"reflect","kind":"\#(kind)","title":"T"}]}"#).cards.first))
+        }
+        let journal = try palette("journal")
+        XCTAssertEqual(journal, DeckPalette.journal)
+        XCTAssertEqual(journal.name, "Your journal", "a week's journal entry is not the year-ago card")
+        XCTAssertEqual(journal.colors, HermexPaper.past)
+        let yearAgo = try palette("on_this_day")
+        XCTAssertEqual(yearAgo.name, "A year ago")
+        XCTAssertEqual(yearAgo.colors, journal.colors, "same journal paper")
+        let crm = try palette("crm")
+        XCTAssertEqual(crm, DeckPalette.people)
+        XCTAssertNotEqual(crm.name, DeckPalette.followUps.name, "a person's card is not the follow-ups page")
+        XCTAssertEqual(crm.colors, DeckPalette.followUps.colors, "same plain paper")
+        let email = try palette("email")
+        XCTAssertEqual(email, DeckPalette.plain)
+        XCTAssertEqual(email.colors, try palette("nonsense").colors, "email reads like the inbox item card: the plain paper")
+    }
+
+    func testJournalWeekCardsLeadInTheSerifLikeTheYearAgoCard() throws {
+        let cards = try DailyDeck.decode(#"""
+        {"date":"d","kind":"morning","cards":[{"id":"j","type":"reflect","kind":"journal"},
+          {"id":"y","type":"reflect","kind":"on_this_day"},{"id":"w","type":"reflect","kind":"wiki"}]}
+        """#).cards
+        let lead = "Read to her for an hour."
+        XCTAssertEqual(DeckCardText.leadFont(for: cards[0], lead: lead), DeckCardText.leadFont(for: cards[1], lead: lead))
+        XCTAssertNotEqual(DeckCardText.leadFont(for: cards[0], lead: lead), DeckCardText.leadFont(for: cards[2], lead: lead))
+    }
+
+    func testTheSundayQuestionIsItsOwnPageNotAFollowUp() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"2026-11-01","kind":"weekly","cards":[
+          {"id":"headline","type":"headline","title":"Week of Oct 26"},
+          {"id":"view-take","type":"decision","kind":"view_take","title":"Is the model the product?",
+           "lines":["This week · AI & the industry"],
+           "entries":[{"label":"Wed · Dr K","text":"Maybe."}],"body":"Wed · Dr K: Maybe.",
+           "actions":[{"id":"open","label":"Still open","input":"text"},{"id":"settled","label":"Settled","input":"text"}]},
+          {"id":"view-next","type":"prompt","question":"A new question?"},
+          {"id":"close","type":"close"}]}
+        """#)
+        let pages = DeckPage.pages(for: deck.cards)
+        XCTAssertEqual(pages.map(\.id), ["headline", "view-take", "view-next", "close"], "no follow-ups page")
+        guard case .card(let take) = pages[1] else { return XCTFail("Expected the question's own page") }
+        XCTAssertTrue(take.isViewTake)
+        XCTAssertFalse(take.isFollowUp)
+        XCTAssertTrue(pages[1].answersInPlace, "its answer box needs the keyboard inset")
+        XCTAssertEqual(DeckAheadRow.title(pages[1]), "Is the model the product?")
+        let palette = DeckPalette.of(pages[1])
+        XCTAssertEqual(palette, DeckPalette.weekQuestion)
+        XCTAssertEqual(palette.name, "This week's question")
+        XCTAssertNotEqual(palette.name, DeckPalette.followUps.name)
+        XCTAssertNil(take.decisionBody, "the entries are drawn; their plain copy is not shown again")
+        let empty = try XCTUnwrap(DailyDeck.decode(#"""
+        {"date":"d","kind":"weekly","cards":[{"id":"view-take","type":"decision","kind":"view_take","title":"Q",
+          "body":"No answers this week."}]}
+        """#).cards.first)
+        XCTAssertEqual(empty.decisionBody, "No answers this week.")
+    }
+
+    func testTheSundayQuestionKeepsItsOwnPageInAV2WeeklyReview() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"version":2,"date":"2026-11-01","kind":"weekly","cards":[
+          {"id":"cover","type":"cover","title":"The week you tapered"},
+          {"id":"story","type":"story","chapter":"remember","draft":"You tapered."},
+          {"id":"view-take","type":"decision","kind":"view_take","chapter":"steer","title":"Is the model the product?",
+           "actions":[{"id":"open","label":"Still open","input":"text"},{"id":"settled","label":"Settled","input":"text"}]},
+          {"id":"view-steer","type":"prompt","chapter":"steer","question":"Keep the question or change it?","files_to":"steer"},
+          {"id":"close","type":"close","title":"Seal the week"}]}
+        """#)
+        let pages = DeckPage.pages(for: deck.cards)
+        XCTAssertEqual(pages.map(\.id), ["cover", "story", "view-take", "view-steer", "close"], "no follow-ups page")
+        XCTAssertEqual(DeckAheadRow.title(pages[2]), "Is the model the product?")
+        let take = DeckPalette.of(pages[2], inV2Weekly: true)
+        XCTAssertEqual(take, DeckPalette.weekQuestion, "the week's paper doesn't take over the question's page")
+        XCTAssertEqual(take.name, "This week's question")
+        XCTAssertTrue(pages[2].answersInPlace)
+        XCTAssertEqual(DeckPalette.of(pages[3], inV2Weekly: true), DeckPalette.week, "a chaptered prompt wears the week's paper")
+        XCTAssertEqual(DeckPalette.of(pages[4], inV2Weekly: true), DeckPalette.week)
+    }
+
+    func testFollowUpsStillGatherBesideTheSundayQuestion() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"d","kind":"weekly","cards":[{"id":"f1","type":"decision","title":"Sam"},
+          {"id":"view-take","type":"decision","kind":"view_take","title":"Q"},{"id":"f2","type":"decision","title":"Pat"}]}
+        """#)
+        let pages = DeckPage.pages(for: deck.cards)
+        XCTAssertEqual(pages.map(\.id), ["followups-f1", "view-take"])
+        guard case .followUps(let cards) = pages[0] else { return XCTFail("Expected follow-ups") }
+        XCTAssertEqual(cards.map(\.id), ["f1", "f2"])
+        XCTAssertEqual(DeckAheadRow.title(pages[0]), "2 follow-ups")
+        XCTAssertEqual(cards[0].decisionBody, nil)
+    }
+
     func testFollowUpsShareOnePageWhereTheFirstOneSat() throws {
         let deck = try DailyDeck.decode(Self.deckJSON)
         let extra = try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"a","type":"prompt"},{"id":"f1","type":"decision"},{"id":"b","type":"reflect"},{"id":"f2","type":"decision"},{"id":"close","type":"close"}]}"#)

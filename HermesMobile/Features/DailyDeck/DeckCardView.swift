@@ -52,7 +52,7 @@ struct DeckPageView: View {
 }
 
 /// A single card: lead, attribution, detail, question, reflection.
-private struct DeckCardView: View {
+struct DeckCardView: View {
     let card: DeckCard
     let palette: DeckPalette
     let viewModel: DailyDeckViewModel
@@ -69,12 +69,15 @@ private struct DeckCardView: View {
     @State private var showsSleepHistory = false
     /// The card's diagram, while its sheet is open.
     @State private var openDiagram: BriefDiagramIndex.Entry?
+    /// The week's divider: a new question was asked on this screen, so the "Why?" note shows.
+    @State private var hasAskedNewQuestion = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 switch card.type {
                 case .headline: opener
+                case .section: section
                 case .close: close
                 case .sleep: sleep
                 case .goal: goal
@@ -83,6 +86,10 @@ private struct DeckCardView: View {
                     DeckFootnote(card: card, palette: palette)
                 case .changes: DeckChangesCard(card: card, palette: palette, viewModel: viewModel)
                 case .ask: ask
+                case .decision:
+                    FollowUpRow(card: card, viewModel: viewModel, palette: palette, isPage: true)
+                    // The week's question closes the Understand chapter; other follow-ups carry no chapter.
+                    if card.chapter != nil { DeckFootnote(card: card, palette: palette) }
                 case .cover: WeekCoverCard(card: card, palette: palette, viewModel: viewModel)
                 case .filmstrip: WeekFilmstripCard(card: card, palette: palette)
                 case .story: WeekStoryCard(card: card, palette: palette, viewModel: viewModel)
@@ -366,23 +373,48 @@ private struct DeckCardView: View {
         ForEach(Array(card.entries.enumerated()), id: \.offset) { _, entry in
             recapLine(entry.label, entry.text).padding(.top, 10)
         }
-        let ahead = viewModel.visiblePages.dropFirst().filter {
-            if case .card(let c) = $0, c.type == .close { return false }
-            return true
-        }
-        Text("Today · \(ahead.count) cards")
-            .font(AppFont.display(style: .subheadline, weight: .semibold))
-            .padding(.top, 26)
-            .padding(.bottom, 6)
-        VStack(spacing: 0) {
-            ForEach(Array(ahead.enumerated()), id: \.element.id) { _, page in
-                DeckAheadRow(page)
-            }
-        }
+        let acts = Self.acts(viewModel.visiblePages)
+        act("Today", acts.today).padding(.top, 26)
+        if !acts.week.isEmpty { act("This week", acts.week).padding(.top, 18) }
         Text(verbatim: "Swipe to begin")
             .font(AppFont.footnote())
             .foregroundStyle(palette.ink)
             .padding(.top, 16)
+    }
+
+    /// One act of the opener's list: "Today · 3 cards" over a row per card.
+    private func act(_ name: String, _ pages: [DeckPage]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(verbatim: "\(name) · \(pages.count) \(pages.count == 1 ? "card" : "cards")")
+                .font(AppFont.display(style: .subheadline, weight: .semibold))
+                .padding(.bottom, 6)
+                .accessibilityAddTraits(.isHeader)
+            ForEach(pages) { page in
+                DeckAheadRow(page)
+            }
+        }
+    }
+
+    /// The cards ahead of the opener in two acts: those before the deck's first `section`
+    /// divider (Today) and those after it (This week). The opener, the divider and the close
+    /// card are not listed; a deck with no divider is all Today.
+    static func acts(_ pages: [DeckPage]) -> (today: [DeckPage], week: [DeckPage]) {
+        var today: [DeckPage] = []
+        var week: [DeckPage] = []
+        var inWeek = false
+        for page in pages {
+            if case .card(let card) = page {
+                switch card.type {
+                case .headline, .close: continue
+                case .section:
+                    inWeek = true
+                    continue
+                default: break
+                }
+            }
+            if inWeek { week.append(page) } else { today.append(page) }
+        }
+        return (today, week)
     }
 
     /// "Yesterday · …" on the opener: the label bold in the ink, the line in body text.
@@ -390,6 +422,70 @@ private struct DeckCardView: View {
         (Text(verbatim: label.map { "\($0) · " } ?? "").font(AppFont.display(style: .subheadline, weight: .semibold))
             + Text(verbatim: text).font(AppFont.subheadline()).foregroundStyle(Color.hxTextPrimary.opacity(0.85)))
             .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// The divider between Today and the week's question: its kicker and the question, the last
+    /// time's answer, and (on the open card's foot) "Open the page" for the view it comes from.
+    @ViewBuilder
+    private var section: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(Array(viewModel.sectionLines(for: card).enumerated()), id: \.offset) { _, line in
+                    Text(verbatim: line).font(AppFont.footnote())
+                }
+            }
+            .padding(.trailing, 24)
+            Text(verbatim: shownQuestion)
+                .font(AppFont.display(style: .title, weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 10)
+                .id(shownQuestion)
+                .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: card.sectionSpokenLabel(question: shownQuestion)))
+        .accessibilityAddTraits(.isHeader)
+        if !card.altQuestions.isEmpty { newQuestion }
+        if let recap = card.recap {
+            recapLine("Last time", recap).padding(.top, 14)
+        }
+    }
+
+    private var shownQuestion: String { viewModel.question(for: card) ?? card.title ?? "This week" }
+
+    /// "New question" steps to the week's next drafted question (its sources replace the last's
+    /// in act 2); once asked, an optional one-line note on why goes with it.
+    @ViewBuilder
+    private var newQuestion: some View {
+        Button {
+            hasAskedNewQuestion = true
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) { viewModel.regenerateQuestion(for: card) }
+            AccessibilityNotification.Announcement("New question: \(shownQuestion)").post()
+        } label: {
+            Label { Text(verbatim: "New question") } icon: { Image(systemName: "arrow.triangle.2.circlepath") }
+                .font(AppFont.body(weight: .semibold))
+                .foregroundStyle(palette.ink)
+                .frame(maxWidth: .infinity, minHeight: 50)
+                .background(palette.colors.wash, in: Capsule())
+                .overlay(Capsule().strokeBorder(palette.colors.edge, lineWidth: 1))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 18)
+        .accessibilityLabel(Text(verbatim: "New question"))
+        .accessibilityHint(Text(verbatim: "Shows another question for this week"))
+        let note = viewModel.answer(for: card)?.text ?? ""
+        if hasAskedNewQuestion || viewModel.answer(for: card)?.question != nil || !note.isEmpty {
+            TextField(text: Binding(get: { note }, set: { viewModel.setNote($0, for: card) })) {
+                Text(verbatim: "Why? (optional)")
+            }
+            .font(AppFont.body())
+            .submitLabel(.done)
+            .padding(.horizontal, 16)
+            .frame(minHeight: 46)
+            .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
+            .padding(.top, 10)
+        }
     }
 
     @ViewBuilder
@@ -751,6 +847,9 @@ private struct FollowUpsPage: View {
 private struct FollowUpRow: View {
     let card: DeckCard
     let viewModel: DailyDeckViewModel
+    var palette: DeckPalette = .followUps
+    /// The card has a page to itself (the week's question): its title leads in the display voice.
+    var isPage = false
     /// The Messages sheet that is up: its Text action and the words it opened with.
     @State private var composing: Compose?
     /// The suggested text as edited here; nil until it is changed. Text sends these words.
@@ -767,9 +866,25 @@ private struct FollowUpRow: View {
     var body: some View {
         let chosen = viewModel.answer(for: card)?.action
         VStack(alignment: .leading, spacing: 8) {
-            Text(verbatim: card.title ?? "Follow-up").font(AppFont.headline())
-            if let body = card.body, body != card.title {
+            // The Sunday view-take card: its kicker, the week's answers, and what you said last time.
+            ForEach(Array(card.lines.enumerated()), id: \.offset) { _, line in
+                Text(verbatim: line).font(AppFont.footnote()).foregroundStyle(isPage ? palette.ink : .secondary)
+            }
+            Text(verbatim: card.title ?? (isPage ? palette.name : "Follow-up"))
+                .font(isPage ? AppFont.display(style: .title2, weight: .semibold) : AppFont.headline())
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.trailing, isPage ? 24 : 0)
+                .padding(.bottom, isPage ? 6 : 0)
+                .accessibilityAddTraits(isPage ? .isHeader : [])
+            if let body = card.decisionBody {
                 Text(verbatim: body).font(AppFont.subheadline()).foregroundStyle(.secondary)
+            }
+            if !card.entries.isEmpty {
+                RecapList(entries: card.entries, palette: palette).padding(.vertical, 6)
+            }
+            if let context = card.context {
+                Text(verbatim: context).font(AppFont.subheadline()).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if let preview = draftPreview {
                 VStack(alignment: .leading, spacing: 4) {
@@ -807,7 +922,7 @@ private struct FollowUpRow: View {
                 VStack(alignment: .leading, spacing: 8) { buttons(chosen) }
             }
             if let chosen, card.actions.first(where: { $0.id == chosen })?.takesText == true {
-                AnswerBox(card: card, viewModel: viewModel, prompt: chosen == "edit" ? "Your version" : "Your answer", minHeight: 88)
+                AnswerBox(card: card, viewModel: viewModel, prompt: card.answerPrompt(chosen: chosen), minHeight: 88)
             } else if chosen == "draft" {
                 AnswerBox(card: card, viewModel: viewModel, prompt: "Anything to mention? (optional)", minHeight: 88)
             }
@@ -1023,11 +1138,11 @@ struct DeckAheadRow: View {
 
 extension DeckCardText {
     /// A card's lead font, wherever the card is drawn. Saved words (a quote, a book highlight,
-    /// a past journal entry) keep the serif; every other lead is the rounded display voice,
+    /// a past journal entry, a journal entry picked for the week) keep the serif; every other lead is the rounded display voice,
     /// smaller as the lead grows.
     static func leadFont(for card: DeckCard, lead: String) -> Font {
         let style = leadStyle(length: lead.count, isQuote: card.itemKind == "quote")
-        let quotesSavedWords = ["quote", "book", "on_this_day"].contains(card.itemKind ?? "")
+        let quotesSavedWords = ["quote", "book", "on_this_day", "journal"].contains(card.itemKind ?? "")
         return quotesSavedWords ? AppFont.serif(style: style) : AppFont.display(style: style, weight: .semibold)
     }
 

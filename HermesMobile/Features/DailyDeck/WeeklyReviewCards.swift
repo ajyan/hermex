@@ -62,6 +62,14 @@ struct WeekCoverCard: View {
             .padding(.top, 18)
             .accessibilityLabel(Text(verbatim: "Title: \(title)"))
             .accessibilityHint(Text(verbatim: "Changes the week's title"))
+            if let recap = card.recap {
+                // "This week was about: <question>", when the week had a question.
+                Text(verbatim: recap)
+                    .font(AppFont.footnote())
+                    .foregroundStyle(Color.hxTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 10)
+            }
             if !card.chapters.isEmpty {
                 chapters.padding(.top, 22)
             }

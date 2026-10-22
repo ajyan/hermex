@@ -378,6 +378,54 @@ final class LabelQueueViewModelTests: XCTestCase {
         XCTAssertEqual(items.map(\.card.id), ["r2", "r4", "r5", "r6", "r7"], "answered cards skipped; five at most")
     }
 
+    private static let weekCards = [
+        #"{"id":"q1","type":"reflect","kind":"quote","body":"A"}"#,
+        #"{"id":"week","type":"section","question":"Q0?","alt_questions":["Q1?","Q2?"],"week":{"variant":0}}"#,
+        #"{"id":"week-0-1","type":"reflect","kind":"journal","body":"B","week":{"variant":0}}"#,
+        #"{"id":"week-0-2","type":"reflect","kind":"crm","body":"C","week":{"variant":0}}"#,
+        #"{"id":"week-1-1","type":"reflect","kind":"journal","body":"D","week":{"variant":1}}"#,
+        #"{"id":"week-2-1","type":"reflect","kind":"journal","body":"E","week":{"variant":2}}"#
+    ]
+
+    func testOnlyTheShownQuestionsWeekCardsAreQueued() throws {
+        let deck = try DailyDeck.decode(Self.deck(date: "2026-10-13", cards: Self.weekCards))
+        let entry = [(date: "2026-10-13", kind: "morning", deck: deck)]
+        func ids(_ answers: [String: DeckAnswer]) -> [String] {
+            LabelQueueViewModel.items(decks: entry, isLabeled: { _ in false }, answers: { _ in answers }).map(\.card.id)
+        }
+        XCTAssertEqual(ids([:]), ["q1", "week-0-1", "week-0-2"], "no answer on the divider: the original question")
+        XCTAssertEqual(ids(["week": DeckAnswer(card: "week", text: "Why not.", question: "Q2?")]), ["q1", "week-2-1"])
+        XCTAssertEqual(ids(["week": DeckAnswer(card: "week", question: "Not one of them?")]), ["q1", "week-0-1", "week-0-2"])
+        let noDivider = try DailyDeck.decode(Self.deck(date: "2026-10-13", cards: Self.weekCards.filter { !$0.contains(#""type":"section""#) }))
+        XCTAssertEqual(LabelQueueViewModel.items(decks: [(date: "2026-10-13", kind: "morning", deck: noDivider)],
+                                                 isLabeled: { _ in false }).map(\.card.id),
+                       ["q1", "week-0-1", "week-0-2", "week-1-1", "week-2-1"], "with no divider every week card showed")
+    }
+
+    func testBuildReadsTheShownQuestionFromUnsentElseFiledAnswers() async throws {
+        openedBrief()
+        let names = ["2026-10-13.morning.json", "2026-10-13.morning.answers.json", "2026-10-10.morning.json",
+                     "2026-10-12.morning.json", "2026-10-12.morning.answers.json"]
+        let client = ScriptedDailyDeckClient(workspaces: ["/brain"], names: names, deck: "{}")
+        client.files = [
+            DailyDeckPaths.deck(date: "2026-10-13", kind: "morning"): Self.deck(date: "2026-10-13", cards: Self.weekCards),
+            DailyDeckPaths.answers(date: "2026-10-13", kind: "morning"): #"{"answers":[{"card":"week","question":"Q2?"}]}"#,
+            DailyDeckPaths.deck(date: "2026-10-12", kind: "morning"): Self.deck(date: "2026-10-12", cards: Self.weekCards),
+            DailyDeckPaths.answers(date: "2026-10-12", kind: "morning"): #"{"answers":[{"card":"week","question":"Q2?"}]}"#,
+            DailyDeckPaths.deck(date: "2026-10-10", kind: "morning"): Self.deck(date: "2026-10-10", cards: Self.weekCards)
+        ]
+        store.setAnswers(["week": DeckAnswer(card: "week", question: "Q1?")], for: server, date: "2026-10-12", kind: "morning")
+        store.setAnswers(["week": DeckAnswer(card: "week", question: "Q1?")], for: server, date: "2026-10-10", kind: "morning")
+        let queue = makeQueue(client)
+
+        await queue.build()
+
+        XCTAssertEqual(queue.items.map(\.id), [
+            "2026-10-13|morning|q1", "2026-10-13|morning|week-2-1",
+            "2026-10-12|morning|q1", "2026-10-12|morning|week-1-1", "2026-10-10|morning|q1"
+        ], "filed on the 13th; the unsent step on the 12th wins over the filed one; five at most")
+    }
+
     func testAnswersAndNotForMeSayHowACardLanded() throws {
         let filed = DeckAnswersFile.decodeAnswers(#"""
         {"answers":[{"card":"a","text":"  "},{"card":"b","text":"It stuck."},

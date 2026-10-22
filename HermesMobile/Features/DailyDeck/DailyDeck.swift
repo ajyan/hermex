@@ -33,7 +33,7 @@ struct DailyDeck: Decodable, Equatable {
 /// fails to decode; an unknown `type` renders its `fallback` text as a plain card.
 struct DeckCard: Decodable, Equatable, Identifiable {
     enum CardType: Equatable {
-        case headline, prompt, decision, reflect, item, sleep, goal, weekAhead, changes, ask, close
+        case headline, prompt, decision, reflect, item, sleep, goal, weekAhead, changes, ask, section, close
         /// The v2 weekly review's cards (`WeeklyReviewModels.swift`).
         case cover, filmstrip, story, energy, commitments, values, predictions, who, keepsakes
         case unknown(String)
@@ -50,6 +50,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case "week_ahead": self = .weekAhead
             case "changes": self = .changes
             case "ask": self = .ask
+            case "section": self = .section
             case "close": self = .close
             case "cover": self = .cover
             case "filmstrip": self = .filmstrip
@@ -149,6 +150,10 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     /// The pool item the brief picked (`ref.pool`, "media:kafka", "video:<id>"); nil for cards it didn't pick from a pool.
     let pool: String?
 
+    /// Which of the week's drafted questions this card's sources answer (`week.variant`, 0 the first);
+    /// nil on every card that isn't one of the week's sources.
+    let weekVariant: Int?
+
     /// The Brain page the card's source opens, by the vault folder its link lives in.
     var sourceRoute: BrainRoute? { link.flatMap(Self.brainRoute(forLink:)) }
 
@@ -178,6 +183,35 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         }
     }
 
+    /// What VoiceOver reads for a `section` divider: "This week, Being a father, <the question>".
+    /// `lines[0]` is "This week · <area>"; the question is the title.
+    var sectionSpokenLabel: String { sectionSpokenLabel(question: title) }
+
+    /// The same label for the question on screen, which Regenerate may have changed.
+    func sectionSpokenLabel(question: String?) -> String {
+        let kicker = (lines.first ?? "This week").replacingOccurrences(of: " · ", with: ", ")
+        return [kicker, question].compactMap { $0 }.joined(separator: ", ")
+    }
+
+    /// The placeholder of a decision card's answer box once `chosen` (a text action) is picked:
+    /// the card's own question (the Sunday view-take's "Your take, in a sentence"), else "Your answer".
+    func answerPrompt(chosen: String) -> String {
+        chosen == "edit" ? "Your version" : (question ?? "Your answer")
+    }
+
+    /// The Sunday review's close of the week's question: his answers as `entries`, Still open / Settled.
+    var isViewTake: Bool { type == .decision && itemKind == "view_take" }
+
+    /// A decision that belongs on the shared follow-ups page: every decision but the view-take.
+    var isFollowUp: Bool { type == .decision && !isViewTake }
+
+    /// The prose a decision row shows under its title: none when it repeats the title, and none
+    /// when the card has `entries`, since `body` is only their plain copy for older builds.
+    var decisionBody: String? {
+        guard entries.isEmpty, let body, body != title else { return nil }
+        return body
+    }
+
     /// The Dad card: a prompt to say something to his daughter, with the countdown to her birth
     /// (then her age) in `lines`. Its answer is filed as a letter to her, not into the journal.
     var isLetter: Bool { type == .prompt && itemKind == "letter" }
@@ -199,7 +233,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     var takesFeedback: Bool {
         switch type {
         case .prompt, .reflect, .item, .unknown: true
-        case .headline, .decision, .sleep, .goal, .weekAhead, .changes, .ask, .close: false
+        case .headline, .decision, .sleep, .goal, .weekAhead, .changes, .ask, .section, .close: false
         case .cover, .filmstrip, .story, .energy, .commitments, .values, .predictions, .who, .keepsakes: false
         }
     }
@@ -207,10 +241,20 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     private enum CodingKeys: String, CodingKey {
         case id, type, title, body, source, lines, question, context, voice, why, draft, actions, fallback
         case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
-        case goal, start, lastWeek, phrases, yesterday, questionPinyin, questionEn, rows
+        case goal, start, lastWeek, phrases, yesterday, questionPinyin, questionEn, rows, week
         case chapter, weekNumber, range, chapters, noteFromPast, days, gave, drained, rotation, items, values, suggested
         case weekCommitments = "commitments"
         case itemKind = "kind"
+    }
+
+    private struct Week: Decodable {
+        let variant: Int?
+
+        init(from decoder: Decoder) throws {
+            variant = try? decoder.container(keyedBy: CodingKeys.self).decodeIfPresent(Int.self, forKey: .variant)
+        }
+
+        private enum CodingKeys: String, CodingKey { case variant }
     }
 
     private struct Ref: Decodable {
@@ -264,6 +308,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         questionPinyin = try? c.decodeIfPresent(String.self, forKey: .questionPinyin)
         questionEn = try? c.decodeIfPresent(String.self, forKey: .questionEn)
         rows = ((try? c.decodeIfPresent([Lossy<DeckChangeRow>].self, forKey: .rows)) ?? []).compactMap(\.value)
+        weekVariant = (try? c.decodeIfPresent(Week.self, forKey: .week))?.variant
         chapter = try? c.decodeIfPresent(String.self, forKey: .chapter)
         weekNumber = try? c.decodeIfPresent(Int.self, forKey: .weekNumber)
         range = try? c.decodeIfPresent(String.self, forKey: .range)
@@ -535,8 +580,10 @@ struct DeckAnswer: Codable, Equatable {
     var statuses: [String: String]?
     var prediction: DeckPrediction?
 
+    /// Nothing typed or chosen. Text counts as typed, spaces too, so a field bound to it keeps a
+    /// leading space while editing; filing trims, and a blank text files as none.
     var isEmpty: Bool {
-        !hasText && action == nil && rating == nil && question == nil && feedback == nil && !hasTags && !hasWeeklyFields
+        (text?.isEmpty ?? true) && action == nil && rating == nil && question == nil && feedback == nil && !hasTags && !hasWeeklyFields
     }
 
     private var hasWeeklyFields: Bool {
@@ -557,13 +604,17 @@ struct DeckAnswer: Codable, Equatable {
     /// Whether this answers `card`: a decision whose chosen action needs text
     /// (Answer, Edit) answers nothing until the text is there.
     func isAnswer(for card: DeckCard) -> Bool {
+        // The week's divider holds a question choice and a note, never an answer.
+        if card.type == .section { return false }
         if let action, card.actions.first(where: { $0.id == action })?.takesText == true { return hasText }
         return hasText || action != nil || rating != nil || hasTags || hasWeeklyFields
     }
 
-    /// Whether this says something worth filing: an answer, or feedback on the card.
+    /// Whether this says something worth filing: an answer, or feedback on the card. On the week's
+    /// divider that is the question chosen and the note on why.
     func isMeaningful(for card: DeckCard) -> Bool {
-        feedback != nil || isAnswer(for: card)
+        if card.type == .section { return question != nil || hasText }
+        return feedback != nil || isAnswer(for: card)
     }
 }
 
@@ -614,18 +665,27 @@ enum DeckPage: Identifiable, Equatable {
         }
     }
 
-    /// Cards in deck order, with all decision cards gathered onto one page where the first sat.
+    /// Cards in deck order, with all follow-ups gathered onto one page where the first sat. The
+    /// Sunday view-take is a decision too, but it is the week's question, so it keeps its own page.
     static func pages(for cards: [DeckCard]) -> [DeckPage] {
-        let decisions = cards.filter { $0.type == .decision }
+        let followUps = cards.filter(\.isFollowUp)
         var pages: [DeckPage] = []
         for card in cards {
-            if card.type == .decision {
-                if card.id == decisions.first?.id { pages.append(.followUps(decisions)) }
+            if card.isFollowUp {
+                if card.id == followUps.first?.id { pages.append(.followUps(followUps)) }
             } else {
                 pages.append(.card(card))
             }
         }
         return pages
+    }
+
+    /// Whether the page answers in place (a decision's answer box), so it needs the keyboard inset.
+    var answersInPlace: Bool {
+        switch self {
+        case .followUps: true
+        case .card(let card): card.type == .decision
+        }
     }
 }
 
@@ -856,7 +916,7 @@ struct DeckCardText: Equatable {
             // The check-ins, the week's plan, the week's fixes and the Ask are drawn (`DeckGoalCard`,
             // `DeckWeekAheadCard`, `DeckChangesCard`, `DeckAskCard`).
             lead = card.title ?? card.fallback
-        case .headline, .decision, .close:
+        case .headline, .decision, .section, .close:
             lead = card.title
             detail = card.body
         }

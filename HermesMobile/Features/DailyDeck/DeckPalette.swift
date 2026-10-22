@@ -35,19 +35,28 @@ struct DeckPalette: Equatable {
     // Bright paper in both appearances: index cards on a dark desk. Cards draw in light mode
     // (`DeckPageView`) so system text and controls stay legible on them.
     static let opener = DeckPalette(.opener, symbol: "sun.horizon", name: "Today", shortName: "Today", isNeutralCard: true)
+    /// The "This week" divider: the opener's neutral paper, named for what it opens.
+    static let section = DeckPalette(.opener, symbol: "calendar", name: "This week", shortName: "This week", isNeutralCard: true)
+    /// The Sunday review's close of the week's question (its `view_take` card), on the divider's paper.
+    static let weekQuestion = DeckPalette(.opener, symbol: "questionmark.bubble", name: "This week's question",
+                                          shortName: "Question", isNeutralCard: true)
     static let quote = DeckPalette(.quote, symbol: "quote.opening", name: "Quote", shortName: "Quote")
     static let book = DeckPalette(.book, symbol: "book.closed", name: "Book highlight", shortName: "Book")
     static let wiki = DeckPalette(.wiki, symbol: "leaf", name: "From your wiki", shortName: "Wiki")
     static let reading = DeckPalette(.reading, symbol: "newspaper", name: "From your reading", shortName: "Reading")
     static let notes = DeckPalette(.notes, symbol: "lightbulb", name: "From your notes", shortName: "Notes")
     static let video = DeckPalette(.video, symbol: "play.rectangle", name: "Video", shortName: "Video")
-    static let past = DeckPalette(.past, symbol: "clock.arrow.circlepath", name: "On this day", shortName: "On this day")
+    static let past = DeckPalette(.past, symbol: "clock.arrow.circlepath", name: "A year ago", shortName: "A year ago")
+    /// A past journal entry picked for the week's question: the journal's paper, named for the journal.
+    static let journal = DeckPalette(.past, symbol: "book.pages", name: "Your journal", shortName: "Journal")
     static let sleep = DeckPalette(.notes, symbol: "moon.zzz", name: "Sleep", shortName: "Sleep")
     static let advisor = DeckPalette(.advisor, symbol: "bubble.left", name: "Check-in", shortName: "Check-in")
     /// The Dad card is the Dad advisor's, so it wears the advisor paper with its own mark.
     static let letter = DeckPalette(.advisor, symbol: "heart", name: "Letter to her", shortName: "Letter")
     static let mandarin = DeckPalette(.mandarin, symbol: "character.bubble", name: "Mandarin practice", shortName: "Mandarin")
     static let plain = DeckPalette(.plain, symbol: "tray", name: "From your library", shortName: "Library")
+    /// A reflect card about a person (a week source from the CRM), on the plain paper.
+    static let people = DeckPalette(.plain, symbol: "person.2", name: "From your people", shortName: "People")
     static let followUps = DeckPalette(.plain, symbol: "checklist", name: "Follow-ups", shortName: "Follow-ups")
     // A weekly review's Wrapped cards. Themes quote your own past words; mood reads like a
     // check-in; lessons come from your notes; the goals card wears its goal's paper.
@@ -80,6 +89,7 @@ struct DeckPalette: Equatable {
     static func of(_ card: DeckCard) -> DeckPalette {
         switch card.type {
         case .headline: return .opener
+        case .section: return .section
         case .close: return .quote
         case .prompt where card.chapter != nil: return .week
         case .prompt: return card.isMandarin ? .mandarin : card.isLetter ? .letter : .advisor
@@ -91,7 +101,7 @@ struct DeckPalette: Equatable {
             let goal = GoalPaper.palette(named: card.color ?? "", slug: card.goal ?? card.id)
             return DeckPalette(goal.colors, symbol: "calendar", name: "Week ahead", shortName: "Week ahead")
         case .ask: return .ask
-        case .decision: return .followUps
+        case .decision: return card.isViewTake ? .weekQuestion : .followUps
         case .changes: return .changes
         case .cover, .filmstrip, .story, .energy, .commitments, .values, .predictions, .who, .keepsakes: return .week
         case .item, .unknown:
@@ -114,6 +124,8 @@ struct DeckPalette: Equatable {
             case "insight": return .notes
             case "video": return .video
             case "on_this_day": return .past
+            case "journal": return .journal
+            case "crm": return .people
             default: return .plain
             }
         }
