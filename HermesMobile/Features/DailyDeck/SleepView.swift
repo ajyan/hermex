@@ -16,7 +16,7 @@ final class SleepViewModel {
     private(set) var state: State = .loading
     private(set) var history: SleepHistory?
     var range: SleepRange = .month
-    var metric: SleepMetric = .performance
+    var metric: SleepMetric = .hours
     /// The night shown at the top; nil shows last night.
     private(set) var selectedDate: String?
     /// Rows shown in the nights table, newest first.
@@ -72,12 +72,15 @@ final class SleepViewModel {
 
     func showMoreNights() { tableLimit += 30 }
 
-    func average(_ key: String) -> Double? { history?.averages[key] }
+    /// The shown night's usual: the 30 nights before it.
+    var usual: SleepUsual {
+        guard let night else { return SleepUsual() }
+        return SleepUsual(before: night.date, in: history?.nights ?? [])
+    }
 }
 
 /// Sleep over time, from the sleep card: a night up top (last night by default) with its
-/// hypnogram and every number against the 30-night average, trend charts by span, and a table
-/// of nights. Tapping a bar or a row puts that night up top.
+/// hypnogram and its numbers against usual, trend charts by span, and a table of nights. Tapping a bar or a row puts that night up top.
 struct SleepView: View {
     @State var viewModel: SleepViewModel
     @Environment(\.dismiss) private var dismiss
@@ -117,8 +120,8 @@ struct SleepView: View {
                                    description: Text(verbatim: message))
         case .ready:
             if let night = viewModel.night {
-                SleepNightCard(night: night, stages: viewModel.stages, isLastNight: viewModel.isShowingLastNight,
-                               average: viewModel.average) {
+                SleepNightCard(night: night, stages: viewModel.stages, usual: viewModel.usual,
+                               isLastNight: viewModel.isShowingLastNight) {
                     viewModel.select(nil)
                 }
                 .id("night")
@@ -140,11 +143,10 @@ struct SleepView: View {
 private struct SleepNightCard: View {
     let night: SleepNight
     let stages: [SleepStage]
+    let usual: SleepUsual
     let isLastNight: Bool
-    let average: (String) -> Double?
     let showLastNight: () -> Void
 
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private let paper = HermexPaper.notes
 
     var body: some View {
@@ -161,8 +163,8 @@ private struct SleepNightCard: View {
                 }
             }
         }, content: {
-            if let window {
-                Text(verbatim: window)
+            if night.hours != nil, let hours = usual.hours {
+                Text(verbatim: "Usually \(SleepReadout.duration(hours))")
                     .font(AppFont.subheadline())
                     .foregroundStyle(Color.hxTextPrimary)
             }
@@ -173,19 +175,10 @@ private struct SleepNightCard: View {
                 SleepHypnogram(stages: stages, bedClock: night.bedClock, paper: paper)
                     .padding(.top, 6)
             }
-            ForEach(flagLines, id: \.self) { line in
-                Label { Text(verbatim: line) } icon: { Image(systemName: "exclamationmark.circle") }
-                    .font(AppFont.footnote(weight: .medium))
-                    .foregroundStyle(paper.glow)
+            ForEach(SleepReadout.groups(night, usual: usual), id: \.title) { group in
+                SleepReadingList(group: group, paper: paper)
+                    .padding(.top, 10)
             }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .topLeading),
-                                     count: dynamicTypeSize.isAccessibilitySize ? 2 : 3),
-                      alignment: .leading, spacing: 14) {
-                ForEach(tiles, id: \.label) { tile in
-                    SleepTile(tile: tile, paper: paper)
-                }
-            }
-            .padding(.top, 8)
         }, footer: { EmptyView() })
     }
 
@@ -197,15 +190,8 @@ private struct SleepNightCard: View {
 
     private var headline: String {
         guard let hours = night.hours else { return "No sleep recorded" }
-        if let need = night.need { return "\(Self.hours(hours)) of \(Self.hours(need)) needed" }
-        return "\(Self.hours(hours)) asleep"
-    }
-
-    private var window: String? {
-        guard let bed = night.bedClock, let wake = night.wakeClock else { return nil }
-        var parts = ["Asleep \(SleepTrend.clockLabel(bed))", "up \(SleepTrend.clockLabel(wake))"]
-        if let inBed = night.inBedMinutes { parts.append("\(Self.hours(inBed / 60)) in bed") }
-        return parts.joined(separator: " · ")
+        if let need = night.need { return "\(SleepReadout.duration(hours)) of \(SleepReadout.duration(need)) needed" }
+        return "\(SleepReadout.duration(hours)) asleep"
     }
 
     private func rating(_ quality: Int) -> some View {
@@ -215,100 +201,61 @@ private struct SleepNightCard: View {
             .foregroundStyle(Color.hxTextPrimary)
             .fixedSize(horizontal: false, vertical: true)
     }
-
-    private var flagLines: [String] {
-        night.flags.compactMap { flag in
-            switch flag {
-            case "breathing_up": "Breathing rate 1+ breath a minute over your usual, an early sign of illness"
-            case "hrv_low": "HRV below your normal (Garmin)"
-            default: nil
-            }
-        }
-    }
-
-    private var tiles: [SleepTile.Model] {
-        var out: [SleepTile.Model] = []
-        func add(_ label: String, _ value: Double?, key: String?, format: (Double) -> String, note: String? = nil, lowerIsBetter: Bool = false) {
-            guard let value else { return }
-            let avg = key.flatMap(average)
-            out.append(SleepTile.Model(label: label, value: format(value), note: note ?? avg.map { avg in
-                SleepTile.delta(value - avg, format: format, lowerIsBetter: lowerIsBetter)
-            }))
-        }
-        let percent: (Double) -> String = { "\(Int($0.rounded()))%" }
-        let whole: (Double) -> String = { "\(Int($0.rounded()))" }
-        add("Performance", night.performance, key: "performance", format: whole,
-            note: night.performance.map(SleepRating.performanceTier))
-        add("Wake-ups", night.wakeUps, key: nil, format: whole,
-            note: night.awakeMinutes.map { "\(Int($0.rounded())) min awake" })
-        add("Recovery", night.recovery, key: "recovery", format: whole, note: night.recovery.map(SleepRating.recoveryTier))
-        add("Hours vs need", night.sufficiency, key: nil, format: percent)
-        add("Consistency", night.consistency, key: "consistency", format: percent)
-        add("Efficiency", night.efficiency, key: "efficiency", format: percent)
-        add("HRV", night.hrv, key: "hrv", format: { "\(Int($0.rounded())) ms" },
-            note: night.hrvStatus.map { $0.prefix(1) + $0.dropFirst().lowercased() })
-        add("Resting HR", night.restingHR, key: "resting_hr", format: whole, lowerIsBetter: true)
-        add("Breathing", night.respiration, key: "respiration", format: { String(format: "%.1f", $0) }, lowerIsBetter: true)
-        add("Deep + REM", night.restorative, key: nil, format: percent)
-        add("Sleep debt", night.debtHours, key: nil, format: { Self.hours($0) })
-        add("Garmin score", night.garminScore, key: nil, format: whole)
-        return out
-    }
-
-    static func hours(_ value: Double) -> String {
-        let minutes = Int((value * 60).rounded())
-        if minutes < 60 { return "\(minutes) min" }
-        return minutes % 60 == 0 ? "\(minutes / 60) h" : "\(minutes / 60) h \(minutes % 60) m"
-    }
 }
 
-/// His rating words and WHOOP's tiers, in words so color is never the only signal.
+/// His rating words.
 enum SleepRating {
     static let labels = ["Very poor", "Poor", "Fair", "Good", "Very good"]
-
-    static func performanceTier(_ value: Double) -> String {
-        value >= 85 ? "Optimal" : value >= 70 ? "Sufficient" : "Poor"
-    }
-
-    static func recoveryTier(_ value: Double) -> String {
-        value >= 67 ? "Green" : value >= 34 ? "Yellow" : "Red"
-    }
 }
 
-private struct SleepTile: View {
-    struct Model {
-        let label: String
-        let value: String
-        let note: String?
-    }
-
-    let tile: Model
+/// One group of the night's readout: its title in the paper's ink, then a row per reading with
+/// the label and how it sits against usual on the left and the value on the right.
+private struct SleepReadingList: View {
+    let group: SleepReadingGroup
     let paper: HermexPaper
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(verbatim: tile.label)
+        VStack(alignment: .leading, spacing: 0) {
+            Text(verbatim: group.title)
                 .font(AppFont.caption(weight: .semibold))
                 .foregroundStyle(paper.glow)
-            Text(verbatim: tile.value)
-                .font(AppFont.display(style: .title3, weight: .semibold))
-                .foregroundStyle(Color.hxTextPrimary)
-            if let note = tile.note {
-                Text(verbatim: note)
-                    .font(AppFont.caption2())
-                    .foregroundStyle(Color.hxTextPrimary)
+                .padding(.bottom, 4)
+                .accessibilityAddTraits(.isHeader)
+            ForEach(group.readings, id: \.label) { reading in
+                Divider().overlay(Color.hxSeparator)
+                row(reading)
             }
         }
-        .lineLimit(1)
-        .minimumScaleFactor(0.75)
-        .accessibilityElement(children: .combine)
     }
 
-    /// "+3 vs avg" against the 30-night average; "at avg" when it rounds to nothing.
-    static func delta(_ diff: Double, format: (Double) -> String, lowerIsBetter: Bool) -> String {
-        let shown = format(abs(diff))
-        guard shown != format(0) else { return "at avg" }
-        return "\(diff > 0 ? "+" : "−")\(shown) vs avg"
+    private func row(_ reading: SleepReading) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: reading.label)
+                    .font(AppFont.subheadline())
+                    .foregroundStyle(Color.hxTextPrimary)
+                if let note = reading.note {
+                    if reading.standsOut {
+                        Label { Text(verbatim: note) } icon: { Image(systemName: "exclamationmark.circle") }
+                            .font(AppFont.footnote(weight: .semibold))
+                            .foregroundStyle(paper.glow)
+                    } else {
+                        Text(verbatim: note)
+                            .font(AppFont.footnote())
+                            .foregroundStyle(Color.hxTextSecondary)
+                    }
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            Text(verbatim: reading.value)
+                .font(AppFont.display(style: .title3, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(Color.hxTextPrimary)
+                .lineLimit(1)
+        }
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -339,7 +286,8 @@ private struct SleepHypnogram: View {
             }
         }
         .chartYAxis {
-            AxisMarks(position: .leading) { _ in AxisValueLabel(centered: true) }
+            // Extended so the lane names sit beside the plot, not over its first bars.
+            AxisMarks(preset: .extended, position: .leading) { _ in AxisValueLabel() }
         }
         .frame(height: 140)
         .accessibilityElement()
