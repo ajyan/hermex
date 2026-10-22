@@ -46,15 +46,17 @@ struct DailyAskRole: Decodable, Equatable, Identifiable, Sendable {
     let location: String?
     let url: String?
     let bandLabel: String?
-    /// The why-this-role draft for the application form.
+    /// What the role is and does, in plain words.
     let note: String?
+    /// The honest catch: why this role might not fit him. Absent when there is none.
+    let `catch`: String?
     /// A LinkedIn people search for the company's Applied AI team.
     let searchUrl: String?
     /// The reach-out opener, with `<name>` and the specific hook left for him to fill.
     let opener: String?
 
     private enum CodingKeys: String, CodingKey {
-        case id, company, title, location, url, note, opener
+        case id, company, title, location, url, note, opener, `catch`
         case bandLabel = "band_label"
         case searchUrl = "search_url"
     }

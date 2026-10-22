@@ -396,15 +396,19 @@ struct BrainPage: Codable, Hashable, Sendable {
     let hub: BrainHubContext?
     /// People pages only: the structured encounters/profile view; nil for other pages or older servers.
     let person: BrainPerson?
+    /// The page's interactive diagram from the vault (`diagrams/index.json`); nil for most pages and older servers.
+    let diagram: BrainDiagram?
 
     private enum CodingKeys: String, CodingKey {
         case item, content, links, backlinks, further, prev, next, highlights, facts, unlinked, hub, unlinkedCount, person
+        case diagram
     }
 
     init(item: BrainItem, content: String = "", links: [BrainRef] = [], backlinks: [BrainRef] = [],
          further: [BrainRef] = [], prev: BrainRef? = nil, next: BrainRef? = nil,
          highlights: [BrainHighlight] = [], facts: [BrainFact] = [], unlinked: [BrainRef] = [],
-         unlinkedCount: Int? = nil, hub: BrainHubContext? = nil, person: BrainPerson? = nil) {
+         unlinkedCount: Int? = nil, hub: BrainHubContext? = nil, person: BrainPerson? = nil,
+         diagram: BrainDiagram? = nil) {
         self.item = item
         self.content = content
         self.links = links
@@ -418,6 +422,7 @@ struct BrainPage: Codable, Hashable, Sendable {
         self.unlinkedCount = unlinkedCount ?? unlinked.count
         self.hub = hub
         self.person = person
+        self.diagram = diagram
     }
 
     init(from decoder: Decoder) throws {
@@ -436,6 +441,33 @@ struct BrainPage: Codable, Hashable, Sendable {
                             unlinked.count)
         hub = c.optional(BrainHubContext.self, .hub)
         person = c.optional(BrainPerson.self, .person)
+        diagram = c.optional(BrainDiagram.self, .diagram)
+    }
+}
+
+/// A page's interactive diagram: an `atlas-ui` fragment the server reads from the vault's
+/// `diagrams/` (the same one the Daily Brief's "Open the diagram" shows). One without HTML is dropped.
+struct BrainDiagram: Codable, Hashable, Sendable {
+    let topic: String
+    let title: String?
+    let html: String
+
+    private enum CodingKeys: String, CodingKey { case topic, title, html }
+
+    init(topic: String, title: String? = nil, html: String) {
+        self.topic = topic
+        self.title = title
+        self.html = html
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        topic = c.string(.topic)
+        title = c.optional(String.self, .title).flatMap { $0.isEmpty ? nil : $0 }
+        html = c.string(.html)
+        guard !html.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw DecodingError.dataCorruptedError(forKey: .html, in: c, debugDescription: "empty diagram")
+        }
     }
 }
 

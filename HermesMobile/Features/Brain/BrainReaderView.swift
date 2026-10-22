@@ -234,6 +234,8 @@ struct BrainReaderContent: View {
     private let unlinkedRefs: [BrainRef]
     private let unlinkedTotal: Int
     @State private var showsAllBacklinks = false
+    /// The page's diagram sheet, while open.
+    @State private var showsDiagram = false
 
     init(page: BrainPage, isShowingCachedCopy: Bool, isMissing: Bool = false,
          push: @escaping (BrainRoute) -> Void, onStep: ((Int) -> Void)? = nil, rating: BrainPageRating? = nil,
@@ -298,6 +300,12 @@ struct BrainReaderContent: View {
                     if !BrainReaderLayout.displayTags(page.item.tags).isEmpty {
                         tagRow
                     }
+                    if let diagram = page.diagram {
+                        Button { showsDiagram = true } label: { OpenDiagramLabel(paper: page.item.module.paper) }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(Text(verbatim: "Open the diagram: \(diagram.title ?? page.item.title)"))
+                            .accessibilityHint(Text(verbatim: "Opens an interactive diagram"))
+                    }
                 }
                 if let personLayout {
                     // Outside the body's hub swipe, so paging the timeline never pages the hub.
@@ -327,6 +335,11 @@ struct BrainReaderContent: View {
             }
             .padding(BrainStyle.l)
             .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
+        }
+        .sheet(isPresented: $showsDiagram) {
+            if let diagram = page.diagram {
+                DiagramSheet(title: diagram.title ?? page.item.title) { diagram.html }
+            }
         }
     }
 

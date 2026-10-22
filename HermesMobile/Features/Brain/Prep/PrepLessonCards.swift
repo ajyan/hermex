@@ -295,17 +295,7 @@ struct PrepLessonDiagramButton: View {
 
     var body: some View {
         if loader.client != nil {
-            Button { isOpen = true } label: {
-                Label { Text(verbatim: "Open the diagram") } icon: {
-                    Image(systemName: "point.3.connected.trianglepath.dotted")
-                }
-                .font(AppFont.body(weight: .semibold))
-                .foregroundStyle(HermexPaper.knowledge.glow)
-                .frame(maxWidth: .infinity, minHeight: 50)
-                .background(HermexPaper.knowledge.wash, in: Capsule())
-                .overlay(Capsule().strokeBorder(HermexPaper.knowledge.edge, lineWidth: 1))
-                .contentShape(Capsule())
-            }
+            Button { isOpen = true } label: { OpenDiagramLabel(paper: .knowledge) }
             .buttonStyle(.plain)
             .accessibilityLabel(Text(verbatim: "Open the diagram: \(diagram.title)"))
             .accessibilityHint(Text(verbatim: "Opens an interactive diagram"))
