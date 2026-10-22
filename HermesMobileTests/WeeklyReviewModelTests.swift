@@ -450,6 +450,22 @@ final class WeeklyReviewModelTests: XCTestCase {
         XCTAssertNil(deck.cards[13].chapterLabel, "nor the close")
     }
 
+    func testCoverExposesTheWeeksQuestionRecapAndTheTakeWearsItsChapter() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"version":2,"date":"2026-11-01","kind":"weekly","cards":[
+          {"id":"cover","type":"cover","title":"The week you tapered","recap":"This week was about: Is the model the product?"},
+          {"id":"view-take","type":"decision","kind":"view_take","chapter":"understand","title":"Is the model the product?"},
+          {"id":"view-steer","type":"prompt","chapter":"steer","question":"Keep it?","files_to":"steer"},
+          {"id":"f1","type":"decision","title":"Sam"}]}
+        """#)
+        XCTAssertEqual(deck.cards[0].recap, "This week was about: Is the model the product?")
+        XCTAssertEqual(deck.cards[1].chapterLabel, "2 · Understand", "the take closes the Understand chapter")
+        XCTAssertEqual(deck.cards[2].chapterLabel, "4 · Steer")
+        XCTAssertNil(deck.cards[3].chapterLabel, "a plain follow-up has no chapter line")
+        let bare = try DailyDeck.decode(#"{"version":2,"date":"d","kind":"weekly","cards":[{"id":"cover","type":"cover"}]}"#)
+        XCTAssertNil(bare.cards[0].recap, "a week without a question has no recap")
+    }
+
     // MARK: - Seal
 
     @MainActor

@@ -86,7 +86,10 @@ struct DeckCardView: View {
                     DeckFootnote(card: card, palette: palette)
                 case .changes: DeckChangesCard(card: card, palette: palette, viewModel: viewModel)
                 case .ask: ask
-                case .decision: FollowUpRow(card: card, viewModel: viewModel, palette: palette, isPage: true)
+                case .decision:
+                    FollowUpRow(card: card, viewModel: viewModel, palette: palette, isPage: true)
+                    // The week's question closes the Understand chapter; other follow-ups carry no chapter.
+                    if card.chapter != nil { DeckFootnote(card: card, palette: palette) }
                 case .cover: WeekCoverCard(card: card, palette: palette, viewModel: viewModel)
                 case .filmstrip: WeekFilmstripCard(card: card, palette: palette)
                 case .story: WeekStoryCard(card: card, palette: palette, viewModel: viewModel)
