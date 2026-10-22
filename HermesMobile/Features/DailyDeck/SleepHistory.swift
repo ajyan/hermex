@@ -349,6 +349,7 @@ struct SleepUsual: Equatable {
     var efficiency: Double?
     var restingHR: Double?
     var respiration: Double?
+    var hrv: Double?
 
     init() {}
 
@@ -370,74 +371,113 @@ struct SleepUsual: Equatable {
         efficiency = mean(\.efficiency)
         restingHR = mean(\.restingHR)
         respiration = mean(\.respiration)
+        hrv = mean(\.hrv)
     }
 }
 
-/// One line of a night's readout: its value and how it sits against usual. `standsOut` marks a
-/// value far enough from usual to matter, which the screen calls out in words and an icon.
-struct SleepReading: Equatable {
+/// One tile's figure on the Sleep screen: the value on a track, the usual as a labeled tick, and
+/// for HRV Garmin's normal range shaded. A bar fills from the scale's start; a dot marks the value
+/// alone, for numbers where zero means nothing (heart rate, breathing). `standsOut` marks a value
+/// far enough from usual to matter, which the screen colors and the tile's caption explains.
+struct SleepGauge: Equatable {
     let label: String
     let value: String
-    var note: String?
+    let number: Double
+    let scale: ClosedRange<Double>
+    var usual: Double?
+    var band: ClosedRange<Double>?
+    var isBar = true
+    /// What the tick or shading is: "usual 29 min", "normal 84–103".
+    var reference: String?
     var standsOut = false
+
+    /// Where `x` sits along the track, 0...1.
+    func position(_ x: Double) -> Double {
+        let width = scale.upperBound - scale.lowerBound
+        guard width > 0 else { return 0 }
+        return min(max((x - scale.lowerBound) / width, 0), 1)
+    }
 }
 
-struct SleepReadingGroup: Equatable {
-    let title: String
-    let readings: [SleepReading]
+/// The time axis under a night's sleep window: whole hours around both last night's window and
+/// the usual one, in minutes after noon, with a label every two or three hours.
+struct SleepClockAxis: Equatable {
+    let range: ClosedRange<Double>
+    let ticks: [Double]
+
+    init(_ times: [Double]) {
+        let low = ((times.min() ?? 600) - 30) / 60, high = ((times.max() ?? 1140) + 30) / 60
+        let start = low.rounded(.down) * 60, end = max(high.rounded(.up) * 60, start + 60)
+        range = start...end
+        let step = end - start >= 540 ? 180.0 : 120.0
+        ticks = stride(from: (start / step).rounded(.up) * step, through: end, by: step).map { $0 }
+    }
+
+    func position(_ minutes: Double) -> Double {
+        min(max((minutes - range.lowerBound) / (range.upperBound - range.lowerBound), 0), 1)
+    }
 }
 
-/// A night as three short lists (when, interruptions, body), each value against usual. How long
-/// he slept is the screen's headline, so it isn't repeated here.
+/// A night as figures: the hours against need and usual for the ring, and a tile per number with
+/// its usual. Bed and wake go on the sleep-window track, so they aren't tiles.
 enum SleepReadout {
-    static func groups(_ night: SleepNight, usual: SleepUsual) -> [SleepReadingGroup] {
-        var when: [SleepReading] = []
-        if let bed = night.bedClock { when.append(clock("Fell asleep", bed, usual: usual.bed)) }
-        if let wake = night.wakeClock { when.append(clock("Woke", wake, usual: usual.wake)) }
-        if let inBed = night.inBedMinutes { when.append(SleepReading(label: "In bed", value: duration(inBed / 60))) }
+    /// How far last night's hours were from usual, standing out from 45 minutes short.
+    static func hoursAgainstUsual(_ night: SleepNight, usual: SleepUsual) -> (diff: Double, standsOut: Bool)? {
+        guard let hours = night.hours, let usualHours = usual.hours else { return nil }
+        return (hours - usualHours, hours <= usualHours - 0.75)
+    }
 
-        var interruptions: [SleepReading] = []
+    /// A bed or wake time against usual, standing out from 45 minutes either way.
+    static func clockStandsOut(_ minutes: Double?, usual: Double?) -> Bool {
+        guard let minutes, let usual else { return false }
+        return abs(minutes - usual) >= 45
+    }
+
+    static func gauges(_ night: SleepNight, usual: SleepUsual) -> [SleepGauge] {
+        var out: [SleepGauge] = []
         if let wakeUps = night.wakeUps {
-            interruptions.append(SleepReading(label: "Wake-ups", value: whole(wakeUps),
-                                              note: usual.wakeUps.map { "usually \(whole($0))" },
-                                              standsOut: usual.wakeUps.map { wakeUps >= $0 + 2 } ?? false))
+            out.append(SleepGauge(label: "Wake-ups", value: whole(wakeUps), number: wakeUps,
+                                  scale: 0...(max(wakeUps, usual.wakeUps ?? 0, 3) * 1.25), usual: usual.wakeUps,
+                                  reference: usual.wakeUps.map { "usual \(whole($0))" },
+                                  standsOut: usual.wakeUps.map { wakeUps >= $0 + 2 } ?? false))
         }
         if let awake = night.awakeMinutes {
-            interruptions.append(SleepReading(label: "Time awake", value: "\(whole(awake)) min",
-                                              note: usual.awakeMinutes.map { "usually \(whole($0)) min" },
-                                              standsOut: usual.awakeMinutes.map { awake >= $0 + 20 } ?? false))
+            out.append(SleepGauge(label: "Awake", value: "\(whole(awake)) min", number: awake,
+                                  scale: 0...(max(awake, usual.awakeMinutes ?? 0, 10) * 1.25), usual: usual.awakeMinutes,
+                                  reference: usual.awakeMinutes.map { "usual \(whole($0)) min" },
+                                  standsOut: usual.awakeMinutes.map { awake >= $0 + 20 } ?? false))
         }
         if let efficiency = night.efficiency {
-            interruptions.append(SleepReading(label: "Asleep while in bed", value: "\(whole(efficiency))%",
-                                              note: usual.efficiency.map { "usually \(whole($0))%" },
-                                              standsOut: usual.efficiency.map { efficiency <= $0 - 5 } ?? false))
+            let low = min(efficiency, usual.efficiency ?? efficiency) - 10
+            out.append(SleepGauge(label: "Asleep in bed", value: "\(whole(efficiency))%", number: efficiency,
+                                  scale: (max(low, 0).rounded(.down))...100, usual: usual.efficiency,
+                                  reference: usual.efficiency.map { "usual \(whole($0))%" },
+                                  standsOut: usual.efficiency.map { efficiency <= $0 - 5 } ?? false))
         }
-
-        var body: [SleepReading] = []
         if let hrv = night.hrv {
-            let band = night.hrvBand.map { "normal \(whole($0.lowerBound))–\(whole($0.upperBound))" }
-            let low = night.flags.contains("hrv_low") || night.hrvBand.map { hrv < $0.lowerBound } == true
-            body.append(SleepReading(label: "HRV", value: "\(whole(hrv)) ms",
-                                     note: low ? ["below normal", band].compactMap { $0 }.joined(separator: " · ") : band,
-                                     standsOut: low))
+            let band = night.hrvBand
+            let low = night.flags.contains("hrv_low") || band.map { hrv < $0.lowerBound } == true
+            let points = [hrv] + (band.map { [$0.lowerBound, $0.upperBound] } ?? []) + [usual.hrv].compactMap { $0 }
+            out.append(SleepGauge(label: "HRV", value: "\(whole(hrv)) ms", number: hrv, scale: padded(points),
+                                  usual: band == nil ? usual.hrv : nil, band: band, isBar: false,
+                                  reference: band.map { "normal \(whole($0.lowerBound))–\(whole($0.upperBound))" }
+                                      ?? usual.hrv.map { "usual \(whole($0))" },
+                                  standsOut: low))
         }
         if let restingHR = night.restingHR {
-            body.append(SleepReading(label: "Resting heart rate", value: "\(whole(restingHR)) bpm",
-                                     note: usual.restingHR.map { "usually \(whole($0))" },
-                                     standsOut: usual.restingHR.map { restingHR >= $0 + 3 } ?? false))
+            out.append(SleepGauge(label: "Resting HR", value: "\(whole(restingHR)) bpm", number: restingHR,
+                                  scale: centered(restingHR, on: usual.restingHR, least: 5), usual: usual.restingHR, isBar: false,
+                                  reference: usual.restingHR.map { "usual \(whole($0))" },
+                                  standsOut: usual.restingHR.map { restingHR >= $0 + 3 } ?? false))
         }
         if let breathing = night.respiration {
-            let usualText = usual.respiration.map { String(format: "%.1f", $0) }
             let up = night.flags.contains("breathing_up") || usual.respiration.map { breathing >= $0 + 1 } == true
-            body.append(SleepReading(label: "Breathing", value: String(format: "%.1f /min", breathing),
-                                     note: up ? "up from \(usualText ?? "usual"), an early sign of illness"
-                                         : usualText.map { "usually \($0)" },
-                                     standsOut: up))
+            out.append(SleepGauge(label: "Breaths/min", value: String(format: "%.1f", breathing), number: breathing,
+                                  scale: centered(breathing, on: usual.respiration, least: 1.5), usual: usual.respiration,
+                                  isBar: false, reference: usual.respiration.map { String(format: "usual %.1f", $0) },
+                                  standsOut: up))
         }
-
-        return [SleepReadingGroup(title: "When", readings: when),
-                SleepReadingGroup(title: "Interruptions", readings: interruptions),
-                SleepReadingGroup(title: "Body", readings: body)].filter { !$0.readings.isEmpty }
+        return out
     }
 
     /// "5 h 24 m", "45 min", "8 h".
@@ -447,15 +487,18 @@ enum SleepReadout {
         return minutes % 60 == 0 ? "\(minutes / 60) h" : "\(minutes / 60) h \(minutes % 60) m"
     }
 
-    /// A bed or wake time against usual: "2 h 13 m later than usual" (within half an hour is the
-    /// usual time), standing out from 45 minutes.
-    private static func clock(_ label: String, _ minutes: Double, usual: Double?) -> SleepReading {
-        var reading = SleepReading(label: label, value: SleepTrend.clockLabel(minutes))
-        guard let usual else { return reading }
-        let diff = minutes - usual
-        reading.note = abs(diff) < 30 ? "usual time" : "\(duration(abs(diff) / 60)) \(diff > 0 ? "later" : "earlier") than usual"
-        reading.standsOut = abs(diff) >= 45
-        return reading
+    /// The span of `points` with a fifth of it again on each side.
+    private static func padded(_ points: [Double]) -> ClosedRange<Double> {
+        let low = points.min() ?? 0, high = points.max() ?? 1
+        let pad = max((high - low) * 0.2, 2)
+        return (low - pad)...(high + pad)
+    }
+
+    /// A scale with the usual in the middle and room for the value on either side.
+    private static func centered(_ value: Double, on usual: Double?, least: Double) -> ClosedRange<Double> {
+        let middle = usual ?? value
+        let half = max(abs(value - middle) * 1.6, least)
+        return (middle - half)...(middle + half)
     }
 
     private static func whole(_ value: Double) -> String { "\(Int(value.rounded()))" }
