@@ -47,7 +47,7 @@ Each paper is one hue rendered as a glow that adapts to the appearance:
 | `reading` | `#FFE4D1` / `#5A2A0C` | `#9A4410` / `#F5A37A` | From your reading |
 | `notes` | `#E6DCFF` / `#33197A` | `#5B3FC4` / `#B39DFF` | From your notes, Sleep |
 | `video` | `#D2F0F4` / `#0B4650` | `#0E6D7A` / `#5CCFE0` | Video |
-| `past` | `#FFEFC2` / `#4E3A00` | `#7A5C00` / `#E8C55A` | On this day |
+| `past` | `#FFEFC2` / `#4E3A00` | `#7A5C00` / `#E8C55A` | A year ago, Your journal |
 | `advisor` | `#E4EEF6` / `#14324A` | `#2E5878` / `#9DBEDD` | Check-in |
 | `plain` | `#F4F0E8` / `#2A2A28` | `#5E5646` / `#D6CDBB` | Library, follow-ups |
 | `mandarin` | `#FFDDD6` / `#5E1A0E` | `#B03A22` / `#FF9C85` | Mandarin practice |
@@ -72,6 +72,7 @@ Named in `Config/HermexStyle.swift`; `HermexPaper.forTool(_:)` maps tool kinds.
 | Goal | the goal's own paper (`GoalPaper`) | any |
 | The Daily Brief's Dad card (a letter to his daughter: the countdown, then her age, over the prompt) | `DeckPalette.letter` | `advisor` (the Dad advisor's paper, with a heart mark instead of the check-in's bubble) |
 | The Daily Brief's Mandarin practice card (phrases to hear, a question to answer out loud, yesterday's feedback) | `DeckPalette.mandarin` | `mandarin` |
+| The week's question: the morning's This week divider, and the Sunday review's close of it (his answers, Still open / Settled) on its own page | `DeckPalette.section`, `DeckPalette.weekQuestion` | `opener`, as a neutral summary card like the opener |
 | Money: net worth, accounts, the market card | `.money` | `ledger` |
 | Feedback inbox | `.feedback` | `notes` |
 | Drawer sections: Daily Brief, Brain, People, Goals, Money, Feedback | `opener`, `.knowledge`, `BrainModuleID.people.paper`, `book`, `.money`, `.feedback` | |

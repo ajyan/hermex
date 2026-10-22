@@ -583,8 +583,12 @@ final class DailyDeckTests: XCTestCase {
                 #"{"date":"d","kind":"morning","cards":[{"id":"x","type":"reflect","kind":"\#(kind)","title":"T"}]}"#).cards.first))
         }
         let journal = try palette("journal")
-        XCTAssertEqual(journal, try palette("on_this_day"))
+        XCTAssertEqual(journal, DeckPalette.journal)
+        XCTAssertEqual(journal.name, "Your journal", "a week's journal entry is not the year-ago card")
         XCTAssertEqual(journal.colors, HermexPaper.past)
+        let yearAgo = try palette("on_this_day")
+        XCTAssertEqual(yearAgo.name, "A year ago")
+        XCTAssertEqual(yearAgo.colors, journal.colors, "same journal paper")
         let crm = try palette("crm")
         XCTAssertEqual(crm, DeckPalette.people)
         XCTAssertNotEqual(crm.name, DeckPalette.followUps.name, "a person's card is not the follow-ups page")
@@ -592,6 +596,59 @@ final class DailyDeckTests: XCTestCase {
         let email = try palette("email")
         XCTAssertEqual(email, DeckPalette.plain)
         XCTAssertEqual(email.colors, try palette("nonsense").colors, "email reads like the inbox item card: the plain paper")
+    }
+
+    func testJournalWeekCardsLeadInTheSerifLikeTheYearAgoCard() throws {
+        let cards = try DailyDeck.decode(#"""
+        {"date":"d","kind":"morning","cards":[{"id":"j","type":"reflect","kind":"journal"},
+          {"id":"y","type":"reflect","kind":"on_this_day"},{"id":"w","type":"reflect","kind":"wiki"}]}
+        """#).cards
+        let lead = "Read to her for an hour."
+        XCTAssertEqual(DeckCardText.leadFont(for: cards[0], lead: lead), DeckCardText.leadFont(for: cards[1], lead: lead))
+        XCTAssertNotEqual(DeckCardText.leadFont(for: cards[0], lead: lead), DeckCardText.leadFont(for: cards[2], lead: lead))
+    }
+
+    func testTheSundayQuestionIsItsOwnPageNotAFollowUp() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"2026-11-01","kind":"weekly","cards":[
+          {"id":"headline","type":"headline","title":"Week of Oct 26"},
+          {"id":"view-take","type":"decision","kind":"view_take","title":"Is the model the product?",
+           "lines":["This week · AI & the industry"],
+           "entries":[{"label":"Wed · Dr K","text":"Maybe."}],"body":"Wed · Dr K: Maybe.",
+           "actions":[{"id":"open","label":"Still open","input":"text"},{"id":"settled","label":"Settled","input":"text"}]},
+          {"id":"view-next","type":"prompt","question":"A new question?"},
+          {"id":"close","type":"close"}]}
+        """#)
+        let pages = DeckPage.pages(for: deck.cards)
+        XCTAssertEqual(pages.map(\.id), ["headline", "view-take", "view-next", "close"], "no follow-ups page")
+        guard case .card(let take) = pages[1] else { return XCTFail("Expected the question's own page") }
+        XCTAssertTrue(take.isViewTake)
+        XCTAssertFalse(take.isFollowUp)
+        XCTAssertTrue(pages[1].answersInPlace, "its answer box needs the keyboard inset")
+        XCTAssertEqual(DeckAheadRow.title(pages[1]), "Is the model the product?")
+        let palette = DeckPalette.of(pages[1])
+        XCTAssertEqual(palette, DeckPalette.weekQuestion)
+        XCTAssertEqual(palette.name, "This week's question")
+        XCTAssertNotEqual(palette.name, DeckPalette.followUps.name)
+        XCTAssertNil(take.decisionBody, "the entries are drawn; their plain copy is not shown again")
+        let empty = try XCTUnwrap(DailyDeck.decode(#"""
+        {"date":"d","kind":"weekly","cards":[{"id":"view-take","type":"decision","kind":"view_take","title":"Q",
+          "body":"No answers this week."}]}
+        """#).cards.first)
+        XCTAssertEqual(empty.decisionBody, "No answers this week.")
+    }
+
+    func testFollowUpsStillGatherBesideTheSundayQuestion() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"d","kind":"weekly","cards":[{"id":"f1","type":"decision","title":"Sam"},
+          {"id":"view-take","type":"decision","kind":"view_take","title":"Q"},{"id":"f2","type":"decision","title":"Pat"}]}
+        """#)
+        let pages = DeckPage.pages(for: deck.cards)
+        XCTAssertEqual(pages.map(\.id), ["followups-f1", "view-take"])
+        guard case .followUps(let cards) = pages[0] else { return XCTFail("Expected follow-ups") }
+        XCTAssertEqual(cards.map(\.id), ["f1", "f2"])
+        XCTAssertEqual(DeckAheadRow.title(pages[0]), "2 follow-ups")
+        XCTAssertEqual(cards[0].decisionBody, nil)
     }
 
     func testFollowUpsShareOnePageWhereTheFirstOneSat() throws {

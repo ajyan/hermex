@@ -82,6 +82,7 @@ struct DeckCardView: View {
                 case .weekAhead: DeckWeekAheadCard(card: card, palette: palette)
                 case .changes: DeckChangesCard(card: card, palette: palette, viewModel: viewModel)
                 case .ask: ask
+                case .decision: FollowUpRow(card: card, viewModel: viewModel, palette: palette, isPage: true)
                 default: reading
                 }
             }
@@ -801,6 +802,9 @@ private struct FollowUpsPage: View {
 private struct FollowUpRow: View {
     let card: DeckCard
     let viewModel: DailyDeckViewModel
+    var palette: DeckPalette = .followUps
+    /// The card has a page to itself (the week's question): its title leads in the display voice.
+    var isPage = false
     /// The Messages sheet that is up: its Text action and the words it opened with.
     @State private var composing: Compose?
     /// The suggested text as edited here; nil until it is changed. Text sends these words.
@@ -819,14 +823,19 @@ private struct FollowUpRow: View {
         VStack(alignment: .leading, spacing: 8) {
             // The Sunday view-take card: its kicker, the week's answers, and what you said last time.
             ForEach(Array(card.lines.enumerated()), id: \.offset) { _, line in
-                Text(verbatim: line).font(AppFont.footnote()).foregroundStyle(.secondary)
+                Text(verbatim: line).font(AppFont.footnote()).foregroundStyle(isPage ? palette.ink : .secondary)
             }
-            Text(verbatim: card.title ?? "Follow-up").font(AppFont.headline())
-            if let body = card.body, body != card.title {
+            Text(verbatim: card.title ?? (isPage ? palette.name : "Follow-up"))
+                .font(isPage ? AppFont.display(style: .title2, weight: .semibold) : AppFont.headline())
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.trailing, isPage ? 24 : 0)
+                .padding(.bottom, isPage ? 6 : 0)
+                .accessibilityAddTraits(isPage ? .isHeader : [])
+            if let body = card.decisionBody {
                 Text(verbatim: body).font(AppFont.subheadline()).foregroundStyle(.secondary)
             }
             if !card.entries.isEmpty {
-                RecapList(entries: card.entries, palette: .followUps).padding(.vertical, 6)
+                RecapList(entries: card.entries, palette: palette).padding(.vertical, 6)
             }
             if let context = card.context {
                 Text(verbatim: context).font(AppFont.subheadline()).foregroundStyle(.secondary)
@@ -1084,11 +1093,11 @@ struct DeckAheadRow: View {
 
 extension DeckCardText {
     /// A card's lead font, wherever the card is drawn. Saved words (a quote, a book highlight,
-    /// a past journal entry) keep the serif; every other lead is the rounded display voice,
+    /// a past journal entry, a journal entry picked for the week) keep the serif; every other lead is the rounded display voice,
     /// smaller as the lead grows.
     static func leadFont(for card: DeckCard, lead: String) -> Font {
         let style = leadStyle(length: lead.count, isQuote: card.itemKind == "quote")
-        let quotesSavedWords = ["quote", "book", "on_this_day"].contains(card.itemKind ?? "")
+        let quotesSavedWords = ["quote", "book", "on_this_day", "journal"].contains(card.itemKind ?? "")
         return quotesSavedWords ? AppFont.serif(style: style) : AppFont.display(style: style, weight: .semibold)
     }
 

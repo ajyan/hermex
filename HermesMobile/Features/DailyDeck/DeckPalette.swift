@@ -37,13 +37,18 @@ struct DeckPalette: Equatable {
     static let opener = DeckPalette(.opener, symbol: "sun.horizon", name: "Today", shortName: "Today", isNeutralCard: true)
     /// The "This week" divider: the opener's neutral paper, named for what it opens.
     static let section = DeckPalette(.opener, symbol: "calendar", name: "This week", shortName: "This week", isNeutralCard: true)
+    /// The Sunday review's close of the week's question (its `view_take` card), on the divider's paper.
+    static let weekQuestion = DeckPalette(.opener, symbol: "questionmark.bubble", name: "This week's question",
+                                          shortName: "Question", isNeutralCard: true)
     static let quote = DeckPalette(.quote, symbol: "quote.opening", name: "Quote", shortName: "Quote")
     static let book = DeckPalette(.book, symbol: "book.closed", name: "Book highlight", shortName: "Book")
     static let wiki = DeckPalette(.wiki, symbol: "leaf", name: "From your wiki", shortName: "Wiki")
     static let reading = DeckPalette(.reading, symbol: "newspaper", name: "From your reading", shortName: "Reading")
     static let notes = DeckPalette(.notes, symbol: "lightbulb", name: "From your notes", shortName: "Notes")
     static let video = DeckPalette(.video, symbol: "play.rectangle", name: "Video", shortName: "Video")
-    static let past = DeckPalette(.past, symbol: "clock.arrow.circlepath", name: "On this day", shortName: "On this day")
+    static let past = DeckPalette(.past, symbol: "clock.arrow.circlepath", name: "A year ago", shortName: "A year ago")
+    /// A past journal entry picked for the week's question: the journal's paper, named for the journal.
+    static let journal = DeckPalette(.past, symbol: "book.pages", name: "Your journal", shortName: "Journal")
     static let sleep = DeckPalette(.notes, symbol: "moon.zzz", name: "Sleep", shortName: "Sleep")
     static let advisor = DeckPalette(.advisor, symbol: "bubble.left", name: "Check-in", shortName: "Check-in")
     /// The Dad card is the Dad advisor's, so it wears the advisor paper with its own mark.
@@ -86,7 +91,7 @@ struct DeckPalette: Equatable {
             let goal = GoalPaper.palette(named: card.color ?? "", slug: card.goal ?? card.id)
             return DeckPalette(goal.colors, symbol: "calendar", name: "Week ahead", shortName: "Week ahead")
         case .ask: return .ask
-        case .decision: return .followUps
+        case .decision: return card.isViewTake ? .weekQuestion : .followUps
         case .changes: return .changes
         case .item, .unknown:
             switch card.itemKind {
@@ -107,7 +112,8 @@ struct DeckPalette: Equatable {
             case "media": return .reading
             case "insight": return .notes
             case "video": return .video
-            case "on_this_day", "journal": return .past
+            case "on_this_day": return .past
+            case "journal": return .journal
             case "crm": return .people
             default: return .plain
             }

@@ -24,10 +24,10 @@ struct DeckStackView: View {
         id.unicodeScalars.reduce(0) { $0 + Int($1.value) } % 2 == 0 ? 2.2 : -1.8
     }
 
-    /// True except on the follow-ups page, whose AnswerBox needs the keyboard inset.
+    /// True except on a page that answers in place (follow-ups, the week's question), whose
+    /// AnswerBox needs the keyboard inset.
     private var ignoresKeyboard: Bool {
-        if case .followUps? = viewModel.currentPage { return false }
-        return true
+        viewModel.currentPage?.answersInPlace != true
     }
 
     var body: some View {

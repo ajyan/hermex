@@ -158,6 +158,19 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         chosen == "edit" ? "Your version" : (question ?? "Your answer")
     }
 
+    /// The Sunday review's close of the week's question: his answers as `entries`, Still open / Settled.
+    var isViewTake: Bool { type == .decision && itemKind == "view_take" }
+
+    /// A decision that belongs on the shared follow-ups page: every decision but the view-take.
+    var isFollowUp: Bool { type == .decision && !isViewTake }
+
+    /// The prose a decision row shows under its title: none when it repeats the title, and none
+    /// when the card has `entries`, since `body` is only their plain copy for older builds.
+    var decisionBody: String? {
+        guard entries.isEmpty, let body, body != title else { return nil }
+        return body
+    }
+
     /// The Dad card: a prompt to say something to his daughter, with the countdown to her birth
     /// (then her age) in `lines`. Its answer is filed as a letter to her, not into the journal.
     var isLetter: Bool { type == .prompt && itemKind == "letter" }
@@ -565,18 +578,27 @@ enum DeckPage: Identifiable, Equatable {
         }
     }
 
-    /// Cards in deck order, with all decision cards gathered onto one page where the first sat.
+    /// Cards in deck order, with all follow-ups gathered onto one page where the first sat. The
+    /// Sunday view-take is a decision too, but it is the week's question, so it keeps its own page.
     static func pages(for cards: [DeckCard]) -> [DeckPage] {
-        let decisions = cards.filter { $0.type == .decision }
+        let followUps = cards.filter(\.isFollowUp)
         var pages: [DeckPage] = []
         for card in cards {
-            if card.type == .decision {
-                if card.id == decisions.first?.id { pages.append(.followUps(decisions)) }
+            if card.isFollowUp {
+                if card.id == followUps.first?.id { pages.append(.followUps(followUps)) }
             } else {
                 pages.append(.card(card))
             }
         }
         return pages
+    }
+
+    /// Whether the page answers in place (a decision's answer box), so it needs the keyboard inset.
+    var answersInPlace: Bool {
+        switch self {
+        case .followUps: true
+        case .card(let card): card.type == .decision
+        }
     }
 }
 
