@@ -153,12 +153,12 @@ final class SleepHistoryTests: XCTestCase {
         let gauges = Dictionary(uniqueKeysWithValues: SleepReadout.gauges(n, usual: usual).map { ($0.label, $0) })
         XCTAssertEqual(gauges.keys.sorted(), ["Asleep in bed", "Awake", "Breaths/min", "HRV", "Resting HR", "Wake-ups"])
         XCTAssertEqual(gauges["Awake"]?.reference, "usual 29 min", "every tick is labeled with what it is")
-        XCTAssertEqual(gauges["Awake"]?.shift, SleepShift(way: .up, text: "23 min more"))
+        XCTAssertEqual(gauges["Awake"]?.shift, SleepShift(way: .up, text: "+23 min"))
         XCTAssertNil(gauges["Wake-ups"]?.shift, "one more than usual is noise")
-        XCTAssertEqual(gauges["Asleep in bed"]?.shift, SleepShift(way: .down, text: "8 pts"))
+        XCTAssertEqual(gauges["Asleep in bed"]?.shift, SleepShift(way: .down, text: "−8 pts"))
         XCTAssertEqual(gauges["HRV"]?.reference, "normal 84–103")
         XCTAssertNil(gauges["HRV"]?.usual, "HRV shows Garmin's normal range, not a second tick")
-        XCTAssertEqual(gauges["Breaths/min"]?.shift, SleepShift(way: .up, text: "early illness sign"),
+        XCTAssertEqual(gauges["Breaths/min"]?.shift, SleepShift(way: .up, text: "flagged"),
                        "Garmin's flag counts even under a 1-breath rise")
         XCTAssertNil(gauges["Resting HR"]?.shift)
         for gauge in gauges.values {

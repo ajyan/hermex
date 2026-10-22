@@ -469,14 +469,14 @@ enum SleepReadout {
                                   scale: 0...(max(wakeUps, usual.wakeUps ?? 0, 3) * 1.25), usual: usual.wakeUps,
                                   reference: usual.wakeUps.map { "usual \(whole($0))" },
                                   shift: usual.wakeUps.flatMap { wakeUps >= $0 + 2
-                                      ? SleepShift(way: .up, text: "\(whole(wakeUps - $0)) more") : nil }))
+                                      ? SleepShift(way: .up, text: "+\(whole(wakeUps - $0))") : nil }))
         }
         if let awake = night.awakeMinutes {
             out.append(SleepGauge(label: "Awake", value: "\(whole(awake)) min", number: awake,
                                   scale: 0...(max(awake, usual.awakeMinutes ?? 0, 10) * 1.25), usual: usual.awakeMinutes,
                                   reference: usual.awakeMinutes.map { "usual \(whole($0)) min" },
                                   shift: usual.awakeMinutes.flatMap { awake >= $0 + 20
-                                      ? SleepShift(way: .up, text: "\(whole(awake - $0)) min more") : nil }))
+                                      ? SleepShift(way: .up, text: "+\(whole(awake - $0)) min") : nil }))
         }
         if let efficiency = night.efficiency {
             let low = min(efficiency, usual.efficiency ?? efficiency) - 10
@@ -484,7 +484,7 @@ enum SleepReadout {
                                   scale: (max(low, 0).rounded(.down))...100, usual: usual.efficiency,
                                   reference: usual.efficiency.map { "usual \(whole($0))%" },
                                   shift: usual.efficiency.flatMap { efficiency <= $0 - 5
-                                      ? SleepShift(way: .down, text: "\(whole($0 - efficiency)) pts") : nil }))
+                                      ? SleepShift(way: .down, text: "−\(whole($0 - efficiency)) pts") : nil }))
         }
         if let hrv = night.hrv {
             let band = night.hrvBand
@@ -494,14 +494,14 @@ enum SleepReadout {
                                   usual: band == nil ? usual.hrv : nil, band: band, isBar: false,
                                   reference: band.map { "normal \(whole($0.lowerBound))–\(whole($0.upperBound))" }
                                       ?? usual.hrv.map { "usual \(whole($0))" },
-                                  shift: low ? SleepShift(way: .down, text: "below normal") : nil))
+                                  shift: low ? SleepShift(way: .down, text: "low") : nil))
         }
         if let restingHR = night.restingHR {
             out.append(SleepGauge(label: "Resting HR", value: "\(whole(restingHR)) bpm", number: restingHR,
                                   scale: centered(restingHR, on: usual.restingHR, least: 5), usual: usual.restingHR, isBar: false,
                                   reference: usual.restingHR.map { "usual \(whole($0))" },
                                   shift: usual.restingHR.flatMap { restingHR >= $0 + 3
-                                      ? SleepShift(way: .up, text: "\(whole(restingHR - $0)) bpm") : nil }))
+                                      ? SleepShift(way: .up, text: "+\(whole(restingHR - $0)) bpm") : nil }))
         }
         if let breathing = night.respiration {
             let up = night.flags.contains("breathing_up") || usual.respiration.map { breathing >= $0 + 1 } == true
@@ -509,7 +509,7 @@ enum SleepReadout {
                                   scale: centered(breathing, on: usual.respiration, least: 1.5), usual: usual.respiration,
                                   isBar: false, reference: usual.respiration.map { String(format: "usual %.1f", $0) },
                                   shift: up ? SleepShift(way: .up, text: night.flags.contains("breathing_up")
-                                      ? "early illness sign" : String(format: "%.1f more", breathing - (usual.respiration ?? breathing))) : nil))
+                                      ? "flagged" : String(format: "+%.1f", breathing - (usual.respiration ?? breathing))) : nil))
         }
         return out
     }
