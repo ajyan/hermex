@@ -16,7 +16,7 @@ A personal fork of Hermex: a native SwiftUI thin client for a self-hosted hermes
 Claude-app ergonomics on top of a self-hosted agent: Andrew's own agent, tools, memory, and history, reachable from anywhere over Tailscale, with no third-party chat service in between.
 
 ## Operating Context
-- Server: hermes-webui on the Mac mini, reached at `https://andrews-mac-mini.tailc3b50d.ts.net` (Tailscale serve, tailnet only); `https://localhost:8787` from the simulator.
+- Server: hermes-webui on the Mac mini, reached at its Tailscale Serve address (tailnet only); `https://localhost:8787` from the simulator.
 - Sessions include Hermes chats plus read-only imported Claude Code sessions.
 - Agent runs stream; runs can request approvals and clarifications mid-stream.
 - Push notifications are unavailable while the app is signed with a free personal team.
