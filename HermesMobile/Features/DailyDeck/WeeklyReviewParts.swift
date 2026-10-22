@@ -225,6 +225,11 @@ enum DeckCopy {
         return filed ? "Filed" : count == 1 ? "1 reflection" : "\(count) reflections"
     }
 
+    /// The header's word for a filed deck: a v2 weekly review is sealed; "Edited" once changed since.
+    static func filedStatus(seal: Bool, edited: Bool) -> String {
+        edited ? "Edited" : seal ? "Sealed" : "Filed"
+    }
+
     /// Under a weekly review's close heading.
     static func answered(_ count: Int) -> String {
         count == 1 ? "1 card answered" : "\(count) cards answered"

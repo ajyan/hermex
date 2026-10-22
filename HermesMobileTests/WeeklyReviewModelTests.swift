@@ -542,6 +542,9 @@ final class WeeklyReviewModelTests: XCTestCase {
         XCTAssertEqual(DeckCopy.answered(1), "1 card answered")
         XCTAssertEqual(DeckCopy.answered(0), "0 cards answered")
         XCTAssertEqual(DeckCopy.answered(7), "7 cards answered")
+        XCTAssertEqual(DeckCopy.filedStatus(seal: true, edited: false), "Sealed")
+        XCTAssertEqual(DeckCopy.filedStatus(seal: false, edited: false), "Filed")
+        XCTAssertEqual(DeckCopy.filedStatus(seal: true, edited: true), "Edited")
     }
 
     func testTheOneThingAsksForTheOneThing() throws {

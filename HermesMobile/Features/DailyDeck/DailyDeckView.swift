@@ -201,7 +201,7 @@ struct DailyDeckView: View {
     }
 
     /// "Oct 9 · 3 of 10 · Filed": which day (when it isn't today), where you are, and whether
-    /// it's filed. The header's subtitle.
+    /// it's filed (a v2 weekly review: sealed). The header's subtitle.
     private var progressSubtitle: String {
         var parts: [String] = []
         if viewModel.isReview {
@@ -211,7 +211,7 @@ struct DailyDeckView: View {
             parts.append(DailyDeckPaths.label(viewModel.date))
         }
         parts.append("\(viewModel.index + 1) of \(viewModel.visiblePages.count)")
-        if viewModel.isFiled { parts.append(viewModel.hasChanges ? "Edited" : "Filed") }
+        if viewModel.isFiled { parts.append(DeckCopy.filedStatus(seal: viewModel.isV2Weekly, edited: viewModel.hasChanges)) }
         return parts.joined(separator: " · ")
     }
 
