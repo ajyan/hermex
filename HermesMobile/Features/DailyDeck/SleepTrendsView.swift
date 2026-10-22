@@ -42,25 +42,22 @@ struct SleepTrendSection: View {
     }
 
     private var metricPicker: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 8) {
-                ForEach(SleepMetric.allCases) { metric in
-                    let isOn = metric == viewModel.metric
-                    Button { viewModel.metric = metric } label: {
-                        Text(verbatim: metric.title)
-                            .font(AppFont.subheadline(weight: .medium))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .foregroundStyle(isOn ? Color.white : Color.hxTextPrimary)
-                            .background(isOn ? Color.accentColor : Color.hxCanvas, in: Capsule())
-                            .overlay(Capsule().strokeBorder(isOn ? Color.clear : Color.hxSeparator, lineWidth: 0.5))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(isOn ? .isSelected : [])
+        FlowRow(spacing: 8) {
+            ForEach(SleepMetric.allCases) { metric in
+                let isOn = metric == viewModel.metric
+                Button { viewModel.metric = metric } label: {
+                    Text(verbatim: metric.title)
+                        .font(AppFont.subheadline(weight: .medium))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .foregroundStyle(isOn ? Color.white : Color.hxTextPrimary)
+                        .background(isOn ? Color.accentColor : Color.hxCanvas, in: Capsule())
+                        .overlay(Capsule().strokeBorder(isOn ? Color.clear : Color.hxSeparator, lineWidth: 0.5))
                 }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isOn ? .isSelected : [])
             }
         }
-        .scrollIndicators(.hidden)
     }
 
     private func selected(in points: [SleepPoint]) -> SleepPoint? {
@@ -136,14 +133,20 @@ private struct SleepTrendChart: View {
                 } else {
                     BarMark(x: .value("Night", point.date, unit: unit), y: .value(metric.title, point.value))
                         .foregroundStyle(color)
-                    if let need = point.need {
-                        PointMark(x: .value("Night", point.date, unit: unit), y: .value("Need", need))
-                            .symbol { Capsule().fill(Color.hxTextPrimary).frame(width: 8, height: 2) }
-                            .accessibilityHidden(true)
-                    }
                 }
             }
-            if let average, metric != .window {
+            // Hours get one line at the span's need instead of the average, which sits a few
+            // minutes under it and would draw a second line in the same place.
+            if let need = SleepTrend.mean(points.compactMap(\.need)) {
+                RuleMark(y: .value("Need", need))
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .lineStyle(StrokeStyle(lineWidth: 1.5))
+                    .annotation(position: .top, alignment: .trailing, spacing: 2) {
+                        Text(verbatim: "need \(metric.format(need))")
+                            .font(AppFont.caption2(weight: .semibold))
+                            .foregroundStyle(Color.hxTextPrimary)
+                    }
+            } else if let average, metric != .window {
                 RuleMark(y: .value("Average", average))
                     .foregroundStyle(Color.hxTextSecondary)
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
@@ -182,10 +185,6 @@ private struct SleepTrendChart: View {
         let values = points.map(\.value) + points.compactMap(\.need)
         let top = values.max() ?? 1
         switch metric {
-        case .performance, .recovery, .consistency:
-            // From the nearest ten under the span's low, so a run of 85–95 nights doesn't read as flat.
-            let floor = ((values.min() ?? 0) - 5) / 10
-            return max(0, floor.rounded(.down) * 10)...100
         case .hrv, .restingHR:
             let low = values.min() ?? 0
             let pad = max((top - low) * 0.15, 2)
@@ -202,13 +201,16 @@ struct SleepNightsTable: View {
     let showNight: (String) -> Void
 
     /// Each number column's width, so columns line up across rows and grow with Dynamic Type.
+    /// Bedtime ("11:40 pm") and his rating ("Very good") get wider ones.
     @ScaledMetric(relativeTo: .subheadline) private var cellWidth: CGFloat = 44
+    @ScaledMetric(relativeTo: .subheadline) private var clockWidth: CGFloat = 66
+    @ScaledMetric(relativeTo: .subheadline) private var ratingWidth: CGFloat = 78
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HXSectionHeader(title: "Nights", trailing: "newest first")
             VStack(spacing: 0) {
-                row(cells: ["Night", "Hours", "Perf", "Wakes", "HRV", "You"], isHeader: true)
+                row(cells: ["Night", "Bedtime", "Hours", "Wakes", "Rated"], isHeader: true)
                 ForEach(viewModel.tableNights) { night in
                     Divider().overlay(Color.hxSeparator)
                     Button { showNight(night.date) } label: {
@@ -231,7 +233,7 @@ struct SleepNightsTable: View {
     }
 
     private func row(cells: [String], isHeader: Bool, isSelected: Bool = false) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 10) {
             ForEach(Array(cells.enumerated()), id: \.offset) { index, cell in
                 Text(verbatim: cell)
                     .font(isHeader ? AppFont.caption(weight: .semibold) : AppFont.subheadline(weight: isSelected ? .semibold : .regular))
@@ -239,7 +241,7 @@ struct SleepNightsTable: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .frame(maxWidth: index == 0 ? .infinity : nil, alignment: .leading)
-                    .frame(width: index == 0 ? nil : cellWidth, alignment: .trailing)
+                    .frame(width: [nil, clockWidth, cellWidth, cellWidth, ratingWidth][index], alignment: .trailing)
             }
         }
         .padding(.vertical, isHeader ? 8 : 10)
@@ -248,20 +250,18 @@ struct SleepNightsTable: View {
     }
 
     private func cells(_ night: SleepNight) -> [String] {
-        let day = night.day.map { SleepTrend.label($0) { $0.weekday(.abbreviated).month(.defaultDigits).day() } } ?? night.date
-        let you = night.quality.map { "\($0)/5\(night.felt == nil ? "" : " ✎")" } ?? "–"
-        return [day, night.hours.map { String(format: "%.1f", $0) } ?? "–", whole(night.performance),
-                whole(night.wakeUps), whole(night.hrv), you]
+        let day = night.day.map { SleepTrend.label($0) { $0.weekday(.abbreviated).day() } } ?? night.date
+        return [day, night.bedClock.map(SleepTrend.clockLabel) ?? "–", night.hours.map { String(format: "%.1f", $0) } ?? "–",
+                whole(night.wakeUps), night.quality.map { SleepRating.labels[$0 - 1] } ?? "–"]
     }
 
     private func whole(_ value: Double?) -> String { value.map { "\(Int($0.rounded()))" } ?? "–" }
 
     private func spoken(_ night: SleepNight) -> String {
         var parts = [night.day.map { SleepTrend.label($0) { $0.weekday(.wide).month(.wide).day() } } ?? night.date]
+        if let bed = night.bedClock { parts.append("asleep at \(SleepTrend.clockLabel(bed))") }
         if let hours = night.hours { parts.append("\(String(format: "%.1f", hours)) hours") }
-        if let performance = night.performance { parts.append("performance \(Int(performance))") }
         if let wakeUps = night.wakeUps { parts.append("\(Int(wakeUps)) wake-ups") }
-        if let hrv = night.hrv { parts.append("HRV \(Int(hrv))") }
         if let quality = night.quality { parts.append("you rated it \(SleepRating.labels[quality - 1])") }
         return parts.joined(separator: ", ")
     }

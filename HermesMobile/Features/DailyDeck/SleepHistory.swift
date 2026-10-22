@@ -1,7 +1,6 @@
 import Foundation
 
-/// Where the vault's `tools/sleep_metrics.py` writes every night's Garmin numbers and the
-/// WHOOP-style metrics computed from them.
+/// Where the vault's `tools/sleep_metrics.py` writes every night's Garmin numbers.
 enum SleepHistoryPaths {
     static let history = "data/sleep/history.json"
 }
@@ -11,8 +10,6 @@ enum SleepHistoryPaths {
 /// older nights lack HRV, and a column the app doesn't know is ignored.
 struct SleepHistory: Equatable {
     let nights: [SleepNight]
-    /// The last 30 nights' means, keyed by metric (`performance`, `hrv`, ...).
-    let averages: [String: Double]
     /// Hypnograms for the last 30 nights that have one, by date.
     let stages: [String: [SleepStage]]
 
@@ -30,15 +27,13 @@ struct SleepHistory: Equatable {
             for (column, value) in zip(columns, row) { fields[column] = value }
             return SleepNight(fields)
         }
-        let averages = (raw.averages ?? [:]).compactMapValues(\.number)
         let stages = (raw.stages ?? [:]).mapValues { $0.compactMap(SleepStage.init) }.filter { !$0.value.isEmpty }
-        return SleepHistory(nights: nights, averages: averages, stages: stages)
+        return SleepHistory(nights: nights, stages: stages)
     }
 
     private struct Raw: Decodable {
         let columns: [String]?
         let nights: [[SleepValue]]?
-        let averages: [String: SleepValue]?
         let stages: [String: [[SleepValue]]]?
     }
 }
@@ -64,14 +59,13 @@ enum SleepValue: Decodable, Equatable {
     var list: [SleepValue] { if case .list(let l) = self { l } else { [] } }
 }
 
-/// One night: Garmin's numbers, the metrics computed from them, and his own rating and note.
+/// One night: Garmin's numbers and his own rating and note.
 /// `date` is the morning the night ended ("2026-10-18"); `bed` and `wake` are local
 /// "YYYY-MM-DDTHH:MM" wall-clock times.
 struct SleepNight: Equatable, Identifiable {
     let date: String
     var hours: Double?
     var need: Double?
-    var garminScore: Double?
     var bed: String?
     var wake: String?
     var inBedMinutes: Double?
@@ -91,13 +85,7 @@ struct SleepNight: Equatable, Identifiable {
     /// His 1–5 rating (very poor to very good) and note from the deck's sleep card.
     var quality: Int?
     var felt: String?
-    var performance: Double?
-    var sufficiency: Double?
     var efficiency: Double?
-    var consistency: Double?
-    var restorative: Double?
-    var debtHours: Double?
-    var recovery: Double?
     var flags: [String] = []
 
     var id: String { date }
@@ -111,7 +99,6 @@ struct SleepNight: Equatable, Identifiable {
         self.date = date
         hours = f["sleep_hours"]?.number
         need = f["sleep_need_hours"]?.number
-        garminScore = f["sleep_score"]?.number
         bed = f["bed"]?.text
         wake = f["wake"]?.text
         inBedMinutes = f["in_bed_min"]?.number
@@ -130,13 +117,7 @@ struct SleepNight: Equatable, Identifiable {
         sleepStress = f["sleep_stress"]?.number
         quality = f["quality"]?.number.map { Int($0) }.flatMap { (1...5).contains($0) ? $0 : nil }
         felt = f["felt"]?.text.flatMap { $0.isEmpty ? nil : $0 }
-        performance = f["performance"]?.number
-        sufficiency = f["sufficiency"]?.number
         efficiency = f["efficiency"]?.number
-        consistency = f["consistency"]?.number
-        restorative = f["restorative"]?.number
-        debtHours = f["debt_hours"]?.number
-        recovery = f["recovery"]?.number
         flags = (f["flags"]?.list ?? []).compactMap(\.text)
     }
 
@@ -227,56 +208,39 @@ enum SleepRange: String, CaseIterable, Identifiable {
     }
 }
 
-/// What a trend chart plots. Wake-ups stand on their own: the WHOOP performance formula
-/// doesn't count them, yet they are what separates his bad nights from his good ones.
+/// What a trend chart plots: the numbers that answer how long, how broken, how late, and how
+/// the body coped.
 enum SleepMetric: String, CaseIterable, Identifiable {
-    case performance, hours, wakeUps, recovery, hrv, restingHR, consistency, window
+    case hours, wakeUps, window, hrv, restingHR
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .performance: "Performance"
         case .hours: "Hours"
         case .wakeUps: "Wake-ups"
-        case .recovery: "Recovery"
+        case .window: "Bed & wake"
         case .hrv: "HRV"
         case .restingHR: "Resting HR"
-        case .consistency: "Consistency"
-        case .window: "Bed & wake"
         }
     }
 
     var unit: String {
         switch self {
-        case .performance, .recovery, .consistency: "%"
         case .hours: " h"
-        case .wakeUps: ""
+        case .wakeUps, .window: ""
         case .hrv: " ms"
         case .restingHR: " bpm"
-        case .window: ""
-        }
-    }
-
-    /// Whether more is better, for the change against the previous period (nil: neither).
-    var higherIsBetter: Bool? {
-        switch self {
-        case .performance, .hours, .recovery, .hrv, .consistency: true
-        case .wakeUps, .restingHR: false
-        case .window: nil
         }
     }
 
     func value(_ night: SleepNight) -> Double? {
         switch self {
-        case .performance: night.performance
         case .hours: night.hours
         case .wakeUps: night.wakeUps
-        case .recovery: night.recovery
+        case .window: night.bedClock
         case .hrv: night.hrv
         case .restingHR: night.restingHR
-        case .consistency: night.consistency
-        case .window: night.bedClock
         }
     }
 
@@ -369,4 +333,130 @@ enum SleepTrend {
         calendar.firstWeekday = 2
         return calendar
     }()
+}
+
+// MARK: Against usual
+
+/// What one night is read against: the means of the 30 nights before it, and for bed and wake
+/// the median of the week before (with at least three to go on), the same usual the deck's sleep
+/// card states. Bed and wake are minutes after noon, so 11 pm and 1 am sit either side of midnight.
+struct SleepUsual: Equatable {
+    var hours: Double?
+    var bed: Double?
+    var wake: Double?
+    var wakeUps: Double?
+    var awakeMinutes: Double?
+    var efficiency: Double?
+    var restingHR: Double?
+    var respiration: Double?
+
+    init() {}
+
+    init(before date: String, in nights: [SleepNight]) {
+        let prior = nights.filter { $0.date < date }.suffix(30)
+        func mean(_ value: (SleepNight) -> Double?) -> Double? { SleepTrend.mean(prior.compactMap(value)) }
+        hours = mean(\.hours)
+        let week = prior.suffix(7)
+        func median(_ value: (SleepNight) -> Double?) -> Double? {
+            let values = week.compactMap(value).sorted()
+            guard values.count >= 3 else { return nil }
+            let mid = values.count / 2
+            return (values.count.isMultiple(of: 2) ? (values[mid - 1] + values[mid]) / 2 : values[mid]).rounded()
+        }
+        bed = median(\.bedClock)
+        wake = median(\.wakeClock)
+        wakeUps = mean(\.wakeUps)
+        awakeMinutes = mean(\.awakeMinutes)
+        efficiency = mean(\.efficiency)
+        restingHR = mean(\.restingHR)
+        respiration = mean(\.respiration)
+    }
+}
+
+/// One line of a night's readout: its value and how it sits against usual. `standsOut` marks a
+/// value far enough from usual to matter, which the screen calls out in words and an icon.
+struct SleepReading: Equatable {
+    let label: String
+    let value: String
+    var note: String?
+    var standsOut = false
+}
+
+struct SleepReadingGroup: Equatable {
+    let title: String
+    let readings: [SleepReading]
+}
+
+/// A night as three short lists (when, interruptions, body), each value against usual. How long
+/// he slept is the screen's headline, so it isn't repeated here.
+enum SleepReadout {
+    static func groups(_ night: SleepNight, usual: SleepUsual) -> [SleepReadingGroup] {
+        var when: [SleepReading] = []
+        if let bed = night.bedClock { when.append(clock("Fell asleep", bed, usual: usual.bed)) }
+        if let wake = night.wakeClock { when.append(clock("Woke", wake, usual: usual.wake)) }
+        if let inBed = night.inBedMinutes { when.append(SleepReading(label: "In bed", value: duration(inBed / 60))) }
+
+        var interruptions: [SleepReading] = []
+        if let wakeUps = night.wakeUps {
+            interruptions.append(SleepReading(label: "Wake-ups", value: whole(wakeUps),
+                                              note: usual.wakeUps.map { "usually \(whole($0))" },
+                                              standsOut: usual.wakeUps.map { wakeUps >= $0 + 2 } ?? false))
+        }
+        if let awake = night.awakeMinutes {
+            interruptions.append(SleepReading(label: "Time awake", value: "\(whole(awake)) min",
+                                              note: usual.awakeMinutes.map { "usually \(whole($0)) min" },
+                                              standsOut: usual.awakeMinutes.map { awake >= $0 + 20 } ?? false))
+        }
+        if let efficiency = night.efficiency {
+            interruptions.append(SleepReading(label: "Asleep while in bed", value: "\(whole(efficiency))%",
+                                              note: usual.efficiency.map { "usually \(whole($0))%" },
+                                              standsOut: usual.efficiency.map { efficiency <= $0 - 5 } ?? false))
+        }
+
+        var body: [SleepReading] = []
+        if let hrv = night.hrv {
+            let band = night.hrvBand.map { "normal \(whole($0.lowerBound))–\(whole($0.upperBound))" }
+            let low = night.flags.contains("hrv_low") || night.hrvBand.map { hrv < $0.lowerBound } == true
+            body.append(SleepReading(label: "HRV", value: "\(whole(hrv)) ms",
+                                     note: low ? ["below normal", band].compactMap { $0 }.joined(separator: " · ") : band,
+                                     standsOut: low))
+        }
+        if let restingHR = night.restingHR {
+            body.append(SleepReading(label: "Resting heart rate", value: "\(whole(restingHR)) bpm",
+                                     note: usual.restingHR.map { "usually \(whole($0))" },
+                                     standsOut: usual.restingHR.map { restingHR >= $0 + 3 } ?? false))
+        }
+        if let breathing = night.respiration {
+            let usualText = usual.respiration.map { String(format: "%.1f", $0) }
+            let up = night.flags.contains("breathing_up") || usual.respiration.map { breathing >= $0 + 1 } == true
+            body.append(SleepReading(label: "Breathing", value: String(format: "%.1f /min", breathing),
+                                     note: up ? "up from \(usualText ?? "usual"), an early sign of illness"
+                                         : usualText.map { "usually \($0)" },
+                                     standsOut: up))
+        }
+
+        return [SleepReadingGroup(title: "When", readings: when),
+                SleepReadingGroup(title: "Interruptions", readings: interruptions),
+                SleepReadingGroup(title: "Body", readings: body)].filter { !$0.readings.isEmpty }
+    }
+
+    /// "5 h 24 m", "45 min", "8 h".
+    static func duration(_ hours: Double) -> String {
+        let minutes = Int((hours * 60).rounded())
+        if minutes < 60 { return "\(minutes) min" }
+        return minutes % 60 == 0 ? "\(minutes / 60) h" : "\(minutes / 60) h \(minutes % 60) m"
+    }
+
+    /// A bed or wake time against usual: "2 h 13 m later than usual" (within half an hour is the
+    /// usual time), standing out from 45 minutes.
+    private static func clock(_ label: String, _ minutes: Double, usual: Double?) -> SleepReading {
+        var reading = SleepReading(label: label, value: SleepTrend.clockLabel(minutes))
+        guard let usual else { return reading }
+        let diff = minutes - usual
+        reading.note = abs(diff) < 30 ? "usual time" : "\(duration(abs(diff) / 60)) \(diff > 0 ? "later" : "earlier") than usual"
+        reading.standsOut = abs(diff) >= 45
+        return reading
+    }
+
+    private static func whole(_ value: Double) -> String { "\(Int(value.rounded()))" }
 }
