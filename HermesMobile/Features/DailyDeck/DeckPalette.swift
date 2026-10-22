@@ -83,6 +83,8 @@ struct DeckPalette: Equatable {
         case .ask: return .ask
         case .decision: return .followUps
         case .changes: return .changes
+        // The v2 weekly cards wear a paper of their own once their views land.
+        case .cover, .filmstrip, .story, .energy, .commitments, .values, .predictions, .who, .keepsakes: return .plain
         case .item, .unknown:
             switch card.itemKind {
             case "theme": return .theme

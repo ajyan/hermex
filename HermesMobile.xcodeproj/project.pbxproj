@@ -721,6 +721,7 @@
 		754960F45562E3D0663233FC /* DailyAskModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 446FC64957B2A7BF327BEA73 /* DailyAskModels.swift */; };
 		2D040393A5D1598FA7E58E97 /* DeckMandarinCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E500908D2992BBA8212DC303 /* DeckMandarinCard.swift */; };
 		A0DE1106959C69CCBD66C799 /* DeckWeekAheadCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DEFBDBFEC0F250EDED2408 /* DeckWeekAheadCard.swift */; };
+		70129E19A23FD14699C6646F /* WeeklyReviewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = E37274D150867377E64E0C1F /* WeeklyReviewModels.swift */; };
 		BA321437F2A99AC600DC41E2 /* DeckChangesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3EDD2AB568C4E3F30F3D18 /* DeckChangesCard.swift */; };
 		B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000102 /* BrainViewModel.swift */; };
 		B1A1C0DE0000000000000201 /* BrainViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */; };
@@ -748,6 +749,7 @@
 		B1A1C0DE00000000000000A3 /* BrainModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000103 /* BrainModels.swift */; };
 		A0DEA60AD5799313DB0B6EDF /* OpenDraftChatAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE7EC6B4625B0CC63C3E3A /* OpenDraftChatAction.swift */; };
 		2A8CB7ACCDBA9BBE34E57FDC /* DailyDeckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A997D807C262D12E5491E89 /* DailyDeckTests.swift */; };
+		85FDF517E46BBF3F9E8155AA /* WeeklyReviewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 355B481DD81E8AEE344FABE0 /* WeeklyReviewModelTests.swift */; };
 		AAAFB91D932E2ADD51ACD585 /* SleepHistoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B826C8CFB95FD5314B8A0E1 /* SleepHistoryTests.swift */; };
 		456FFBA86135A0D6C5707B5E /* DeckCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59FBDD2AD47605DA28200130 /* DeckCalendarView.swift */; };
 		5DFA5B4E21C6F51D34489C02 /* DeckSleepNumbers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B33604040E371DDEAAA3233 /* DeckSleepNumbers.swift */; };
@@ -1540,6 +1542,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		446FC64957B2A7BF327BEA73 /* DailyAskModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyAskModels.swift; sourceTree = "<group>"; };
 		E500908D2992BBA8212DC303 /* DeckMandarinCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckMandarinCard.swift; sourceTree = "<group>"; };
 		A0DEFBDBFEC0F250EDED2408 /* DeckWeekAheadCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckWeekAheadCard.swift; sourceTree = "<group>"; };
+		E37274D150867377E64E0C1F /* WeeklyReviewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyReviewModels.swift; sourceTree = "<group>"; };
 		5C3EDD2AB568C4E3F30F3D18 /* DeckChangesCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckChangesCard.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000204 /* BrainModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainModelsTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000902 /* BrainStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainStyle.swift; sourceTree = "<group>"; };
@@ -1566,6 +1569,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		A0DE7EC6B4625B0CC63C3E3A /* OpenDraftChatAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenDraftChatAction.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainViewModelTests.swift; sourceTree = "<group>"; };
 		3A997D807C262D12E5491E89 /* DailyDeckTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDeckTests.swift; sourceTree = "<group>"; };
+		355B481DD81E8AEE344FABE0 /* WeeklyReviewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyReviewModelTests.swift; sourceTree = "<group>"; };
 		6B826C8CFB95FD5314B8A0E1 /* SleepHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepHistoryTests.swift; sourceTree = "<group>"; };
 		59FBDD2AD47605DA28200130 /* DeckCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckCalendarView.swift; sourceTree = "<group>"; };
 		5B33604040E371DDEAAA3233 /* DeckSleepNumbers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckSleepNumbers.swift; sourceTree = "<group>"; };
@@ -1798,6 +1802,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C0FFEE50000000000000000E /* MoneyModelsTests.swift */,
 				C0FFEE500000000000000010 /* MoneyViewModelTests.swift */,
 				3A997D807C262D12E5491E89 /* DailyDeckTests.swift */,
+				355B481DD81E8AEE344FABE0 /* WeeklyReviewModelTests.swift */,
 				6B826C8CFB95FD5314B8A0E1 /* SleepHistoryTests.swift */,
 				B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */,
 				B1A1C0DE0000000000000204 /* BrainModelsTests.swift */,
@@ -2690,6 +2695,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				446FC64957B2A7BF327BEA73 /* DailyAskModels.swift */,
 				E500908D2992BBA8212DC303 /* DeckMandarinCard.swift */,
 				A0DEFBDBFEC0F250EDED2408 /* DeckWeekAheadCard.swift */,
+				E37274D150867377E64E0C1F /* WeeklyReviewModels.swift */,
 				5C3EDD2AB568C4E3F30F3D18 /* DeckChangesCard.swift */,
 				AD79724DF6D6FD92B594BBC5 /* DailyDeckView.swift */,
 				D71D8CEEBE37C8E43E46A2B4 /* DailyDeckViewModel.swift */,
@@ -2995,6 +3001,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				754960F45562E3D0663233FC /* DailyAskModels.swift in Sources */,
 				2D040393A5D1598FA7E58E97 /* DeckMandarinCard.swift in Sources */,
 				A0DE1106959C69CCBD66C799 /* DeckWeekAheadCard.swift in Sources */,
+				70129E19A23FD14699C6646F /* WeeklyReviewModels.swift in Sources */,
 				BA321437F2A99AC600DC41E2 /* DeckChangesCard.swift in Sources */,
 				B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */,
 				B1A1C0DE00000000000000A3 /* BrainModels.swift in Sources */,
@@ -3483,6 +3490,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C0FFEE50000000000000000F /* MoneyModelsTests.swift in Sources */,
 				C0FFEE500000000000000011 /* MoneyViewModelTests.swift in Sources */,
 				2A8CB7ACCDBA9BBE34E57FDC /* DailyDeckTests.swift in Sources */,
+				85FDF517E46BBF3F9E8155AA /* WeeklyReviewModelTests.swift in Sources */,
 				AAAFB91D932E2ADD51ACD585 /* SleepHistoryTests.swift in Sources */,
 				B1A1C0DE0000000000000201 /* BrainViewModelTests.swift in Sources */,
 				B1A1C0DE0000000000000203 /* BrainModelsTests.swift in Sources */,
