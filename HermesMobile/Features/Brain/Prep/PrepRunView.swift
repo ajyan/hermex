@@ -200,7 +200,7 @@ struct PrepRunView: View {
                 // Fresh view state (timer start, example toggle) for every rep.
                 .id(rep.index)
         case .result(let rep, let result, _) where Self.usesRecall(rep) && viewModel.inDialogue:
-            scaffold(rep, hasAction: true) {
+            scaffold(rep, hasAction: true, followsLatest: true) {
                 PrepTutorDialogueView(
                     prompt: rep.item.lesson?.recall?.prompt ?? "",
                     kicker: PrepCopy.followupLine(result.dialogue, type: rep.item.lesson?.recall?.type ?? ""),
@@ -312,7 +312,8 @@ struct PrepRunView: View {
     /// A rep's screen: the progress bar and problem card pinned over the drill's scroll view.
     /// The primary action is pinned in a bottom bar so it never scrolls out of reach.
     private func scaffold<Content: View, Bottom: View>(
-        _ rep: PrepRep, hasAction: Bool, @ViewBuilder content: () -> Content, @ViewBuilder bottom: () -> Bottom
+        _ rep: PrepRep, hasAction: Bool, followsLatest: Bool = false,
+        @ViewBuilder content: () -> Content, @ViewBuilder bottom: () -> Bottom
     ) -> some View {
         // The expanded card is capped at 45% of the screen; its detail scrolls inside.
         let availableHeight = screenHeight
@@ -323,6 +324,10 @@ struct PrepRunView: View {
             .padding(BrainStyle.l)
             .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
         }
+        // The tutor dialogue keeps its newest turn in view: your reply, the Thinking
+        // bubble, streamed text, and the reply field growing all stay at the bottom.
+        .defaultScrollAnchor(followsLatest ? .bottom : nil, for: .initialOffset)
+        .defaultScrollAnchor(followsLatest ? .bottom : nil, for: .sizeChanges)
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: BrainStyle.m) {
                 if let progress {
