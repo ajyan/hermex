@@ -176,7 +176,8 @@ private struct SleepNightCard: View {
             }
             if let bed = night.bedClock, let wake = night.wakeClock {
                 SleepWindowTrack(bed: bed, wake: wake, usualBed: usual.bed, usualWake: usual.wake,
-                                 awake: stages.filter { $0.kind == .awake }, paper: paper)
+                                 awake: stages.filter { $0.kind == .awake }, awakeMinutes: night.awakeMinutes,
+                                 shifts: SleepReadout.windowShifts(night, usual: usual), paper: paper)
             }
             let gauges = SleepReadout.gauges(night, usual: usual)
             if !gauges.isEmpty {
@@ -255,7 +256,7 @@ private struct SleepAmount: View {
     let need: Double?
     let usual: Double?
     let inBedMinutes: Double?
-    let against: (diff: Double, standsOut: Bool)?
+    let against: (shift: SleepShift?, plain: String)?
     let paper: HermexPaper
 
     @ScaledMetric(relativeTo: .title2) private var size: CGFloat = 96
@@ -281,11 +282,13 @@ private struct SleepAmount: View {
                         .font(AppFont.footnote())
                         .foregroundStyle(Color.hxTextSecondary)
                 }
-                if let against {
-                    Text(verbatim: "\(against.diff < 0 ? "−" : "+")\(SleepReadout.duration(abs(against.diff))) vs usual")
-                        .font(AppFont.footnote(weight: .semibold))
-                        .foregroundStyle(against.standsOut ? Color.hxWarning : Color.hxTextPrimary)
-                        .padding(.top, 4)
+                if let shift = against?.shift {
+                    HXChip(paper: paper, symbol: shift.symbol, label: shift.text)
+                        .padding(.vertical, 3)
+                } else if let plain = against?.plain {
+                    Text(verbatim: plain)
+                        .font(AppFont.footnote())
+                        .foregroundStyle(Color.hxTextPrimary)
                 }
                 if let inBedMinutes {
                     Text(verbatim: "In bed \(SleepReadout.duration(inBedMinutes / 60))")
@@ -334,35 +337,64 @@ private struct SleepWindowTrack: View {
     let usualBed: Double?
     let usualWake: Double?
     let awake: [SleepStage]
+    let awakeMinutes: Double?
+    let shifts: [SleepShift]
     let paper: HermexPaper
+
+    /// Room for both times side by side, and their line height.
+    @ScaledMetric(relativeTo: .subheadline) private var timesWidth: CGFloat = 150
+    @ScaledMetric(relativeTo: .subheadline) private var timesHeight: CGFloat = 20
 
     var body: some View {
         let axis = SleepClockAxis([bed, wake] + [usualBed, usualWake].compactMap { $0 })
+        let start = axis.position(bed), end = axis.position(wake)
         VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                clock("Asleep", bed, usual: usualBed)
-                Spacer()
-                clock("Up", wake, usual: usualWake)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center) {
+                    title
+                    Spacer(minLength: 8)
+                    chips
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    title
+                    chips
+                }
             }
+            // Last night's times over the bar's two ends, pushed inward when the bar is too short
+            // to hold both.
+            GeometryReader { geo in
+                let width = geo.size.width
+                let lead = min(width * start, max(width - timesWidth, 0))
+                let trail = min(width * (1 - end), max(width - lead - timesWidth, 0))
+                HStack(spacing: 0) {
+                    Color.clear.frame(width: lead)
+                    Text(verbatim: SleepTrend.clockLabel(bed))
+                    Spacer(minLength: 8)
+                    Text(verbatim: SleepTrend.clockLabel(wake))
+                    Color.clear.frame(width: trail)
+                }
+                .font(AppFont.subheadline(weight: .semibold))
+                .foregroundStyle(Color.hxTextPrimary)
+                .lineLimit(1)
+            }
+            .frame(height: timesHeight)
             GeometryReader { geo in
                 let width = geo.size.width
                 ZStack(alignment: .leading) {
-                    if let usualBed, let usualWake {
-                        RoundedRectangle(cornerRadius: 5)
-                            .fill(paper.glow.opacity(0.3))
-                            .frame(width: max(width * (axis.position(usualWake) - axis.position(usualBed)), 2), height: 24)
-                            .offset(x: width * axis.position(usualBed))
-                    }
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(paper.glow)
-                        .frame(width: max(width * (axis.position(wake) - axis.position(bed)), 2), height: 12)
-                        .offset(x: width * axis.position(bed))
+                    Capsule().fill(Color.hxSeparator).frame(height: 4)
+                    Capsule().fill(paper.glow)
+                        .frame(width: max(width * (end - start), 4), height: 14)
+                        .offset(x: width * start)
                     ForEach(Array(awake.enumerated()), id: \.offset) { _, stretch in
-                        Rectangle()
-                            .fill(paper.card)
-                            .frame(width: max(width * (axis.position(bed + stretch.start + stretch.length) - axis.position(bed + stretch.start)), 2),
-                                   height: 12)
+                        Rectangle().fill(paper.card)
+                            .frame(width: max(width * (axis.position(bed + stretch.start + stretch.length) - axis.position(bed + stretch.start)), 1.5),
+                                   height: 14)
                             .offset(x: width * axis.position(bed + stretch.start))
+                    }
+                    ForEach([usualBed, usualWake].compactMap { $0 }, id: \.self) { usual in
+                        Capsule().fill(Color.hxTextPrimary)
+                            .frame(width: 2, height: 24)
+                            .offset(x: width * axis.position(usual) - 1)
                     }
                 }
                 .frame(height: 24)
@@ -378,11 +410,13 @@ private struct SleepWindowTrack: View {
                 }
             }
             .frame(height: 14)
-            HStack(spacing: 12) {
+            FlowRow(spacing: 12) {
                 if let usualBed, let usualWake {
-                    SleepKey(mark: .range, text: "usual \(SleepTrend.clockLabel(usualBed))–\(SleepTrend.clockLabel(usualWake))", paper: paper)
+                    SleepKey(mark: .tick, text: "usual \(SleepTrend.clockLabel(usualBed)) · \(SleepTrend.clockLabel(usualWake))", paper: paper)
                 }
-                if !awake.isEmpty { SleepKey(mark: .gap, text: "gaps: awake", paper: paper) }
+                if !awake.isEmpty {
+                    SleepKey(mark: .gap, text: awakeMinutes.map { "gaps: awake \(Int($0.rounded())) min" } ?? "gaps: awake", paper: paper)
+                }
             }
         }
         .accessibilityElement(children: .ignore)
@@ -390,11 +424,19 @@ private struct SleepWindowTrack: View {
         .accessibilityValue(Text(verbatim: spoken))
     }
 
-    private func clock(_ label: String, _ minutes: Double, usual: Double?) -> some View {
-        let off = SleepReadout.clockStandsOut(minutes, usual: usual)
-        return (Text(verbatim: "\(label) ").font(AppFont.footnote()).foregroundColor(Color.hxTextSecondary)
-            + Text(verbatim: SleepTrend.clockLabel(minutes)).font(AppFont.subheadline(weight: .semibold))
-                .foregroundColor(off ? Color.hxWarning : Color.hxTextPrimary))
+    private var title: some View {
+        Text(verbatim: "Sleep window")
+            .font(AppFont.caption(weight: .semibold))
+            .foregroundStyle(paper.glow)
+    }
+
+    @ViewBuilder
+    private var chips: some View {
+        if !shifts.isEmpty {
+            HStack(spacing: 6) {
+                ForEach(shifts, id: \.text) { HXChip(paper: paper, symbol: $0.symbol, label: $0.text) }
+            }
+        }
     }
 
     private var spoken: String {
@@ -402,6 +444,7 @@ private struct SleepWindowTrack: View {
         if let usualBed, let usualWake {
             text += ". Usually \(SleepTrend.clockLabel(usualBed)) to \(SleepTrend.clockLabel(usualWake))"
         }
+        text += shifts.map { ". \($0.text)" }.joined()
         return text + (awake.isEmpty ? "" : ". \(awake.count) awake stretches")
     }
 
@@ -412,8 +455,9 @@ private struct SleepWindowTrack: View {
     }
 }
 
-/// One number as a tile: its value (amber when far from usual), a track with the value as a bar
-/// or dot and the usual as a white tick or normal range shaded, and a caption saying which.
+/// One number as a tile: its value, a track with the value as a bar or dot and the usual as a white
+/// tick or normal range shaded, a caption saying which, and a chip when it is far from usual (its
+/// mark then drawn full strength).
 private struct SleepGaugeTile: View {
     let gauge: SleepGauge
     let paper: HermexPaper
@@ -427,12 +471,15 @@ private struct SleepGaugeTile: View {
                 .minimumScaleFactor(0.8)
             Text(verbatim: gauge.value)
                 .font(AppFont.display(style: .title3, weight: .semibold))
-                .foregroundStyle(gauge.standsOut ? Color.hxWarning : Color.hxTextPrimary)
+                .foregroundStyle(Color.hxTextPrimary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             track
             if let reference = gauge.reference {
                 SleepKey(mark: gauge.band == nil ? .tick : .range, text: reference, paper: paper)
+            }
+            if let shift = gauge.shift {
+                HXChip(paper: paper, symbol: shift.symbol, label: shift.text)
             }
         }
         .padding(.horizontal, 8)
@@ -441,13 +488,13 @@ private struct SleepGaugeTile: View {
         .background(paper.wash, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: gauge.label))
-        .accessibilityValue(Text(verbatim: [gauge.value, gauge.reference].compactMap { $0 }.joined(separator: ", ")))
+        .accessibilityValue(Text(verbatim: [gauge.value, gauge.reference, gauge.shift?.text].compactMap { $0 }.joined(separator: ", ")))
     }
 
     private var track: some View {
         GeometryReader { geo in
             let width = geo.size.width
-            let color = gauge.standsOut ? Color.hxWarning : paper.glow
+            let color = paper.glow.opacity(gauge.shift == nil ? 0.55 : 1)
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.hxSeparator).frame(height: 5)
                 if let band = gauge.band {

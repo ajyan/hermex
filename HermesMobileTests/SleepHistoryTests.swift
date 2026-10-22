@@ -153,21 +153,28 @@ final class SleepHistoryTests: XCTestCase {
         let gauges = Dictionary(uniqueKeysWithValues: SleepReadout.gauges(n, usual: usual).map { ($0.label, $0) })
         XCTAssertEqual(gauges.keys.sorted(), ["Asleep in bed", "Awake", "Breaths/min", "HRV", "Resting HR", "Wake-ups"])
         XCTAssertEqual(gauges["Awake"]?.reference, "usual 29 min", "every tick is labeled with what it is")
-        XCTAssertEqual(gauges["Awake"]?.standsOut, true)
-        XCTAssertEqual(gauges["Wake-ups"]?.standsOut, false, "one more than usual is noise")
-        XCTAssertEqual(gauges["Asleep in bed"]?.standsOut, true)
+        XCTAssertEqual(gauges["Awake"]?.shift, SleepShift(way: .up, text: "23 min more"))
+        XCTAssertNil(gauges["Wake-ups"]?.shift, "one more than usual is noise")
+        XCTAssertEqual(gauges["Asleep in bed"]?.shift, SleepShift(way: .down, text: "8 pts"))
         XCTAssertEqual(gauges["HRV"]?.reference, "normal 84–103")
         XCTAssertNil(gauges["HRV"]?.usual, "HRV shows Garmin's normal range, not a second tick")
-        XCTAssertEqual(gauges["Breaths/min"]?.standsOut, true, "Garmin's flag counts even under a 1-breath rise")
+        XCTAssertEqual(gauges["Breaths/min"]?.shift, SleepShift(way: .up, text: "early illness sign"),
+                       "Garmin's flag counts even under a 1-breath rise")
+        XCTAssertNil(gauges["Resting HR"]?.shift)
         for gauge in gauges.values {
             XCTAssertTrue(gauge.scale.contains(gauge.number), "\(gauge.label) value is on its track")
             if let tick = gauge.usual { XCTAssertTrue(gauge.scale.contains(tick), "\(gauge.label) usual is on its track") }
         }
         let hours = SleepReadout.hoursAgainstUsual(n, usual: usual)
-        XCTAssertEqual(hours?.standsOut, true)
-        XCTAssertEqual(hours.map { ($0.diff * 100).rounded() }, -243)
-        XCTAssertTrue(SleepReadout.clockStandsOut(785, usual: 670))
-        XCTAssertFalse(SleepReadout.clockStandsOut(700, usual: 670))
+        XCTAssertEqual(hours?.shift, SleepShift(way: .down, text: "2 h 26 m less than usual"))
+        var close = usual
+        close.hours = 5.6
+        XCTAssertNil(SleepReadout.hoursAgainstUsual(n, usual: close)?.shift)
+        XCTAssertEqual(SleepReadout.hoursAgainstUsual(n, usual: close)?.plain, "−12 min vs usual")
+        n.wake = "2026-10-18T07:10"
+        usual.wake = 1140
+        XCTAssertEqual(SleepReadout.windowShifts(n, usual: usual), [SleepShift(way: .later, text: "1 h 55 m later to bed")],
+                       "a wake time 10 minutes off isn't called out")
         XCTAssertTrue(SleepReadout.gauges(SleepNight(date: "2026-10-18"), usual: usual).isEmpty)
     }
 
