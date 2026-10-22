@@ -1,5 +1,8 @@
 import XCTest
 import Foundation
+import ImageIO
+import UIKit
+import UniformTypeIdentifiers
 @testable import HermesMobile
 
 final class WeeklyReviewModelTests: XCTestCase {
@@ -483,6 +486,65 @@ final class WeeklyReviewModelTests: XCTestCase {
         XCTAssertFalse(morningModel.isV2Weekly)
     }
 
+    // MARK: - Photo of the week
+
+    func testJPEGDownscalesToLongEdge() throws {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 4000, height: 3000),
+                                               format: { let f = UIGraphicsImageRendererFormat(); f.scale = 1; f.opaque = true; return f }())
+        let png = renderer.pngData { context in
+            UIColor.systemTeal.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 4000, height: 3000))
+        }
+        let jpeg = try XCTUnwrap(WeekPhoto.jpeg(from: png))
+        XCTAssertEqual(Array(jpeg.prefix(3)), [0xFF, 0xD8, 0xFF], "the server insists on JPEG magic")
+        let source = try XCTUnwrap(CGImageSourceCreateWithData(jpeg as CFData, nil))
+        let properties = try XCTUnwrap(CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any])
+        XCTAssertEqual(properties[kCGImagePropertyPixelWidth] as? Int, 1600)
+        XCTAssertEqual(properties[kCGImagePropertyPixelHeight] as? Int, 1200)
+        XCTAssertNil(WeekPhoto.jpeg(from: Data("not an image".utf8)))
+    }
+
+    @MainActor
+    func testSetWeekPhotoUploadsForTheDeckDateAndBumpsTheVersion() async throws {
+        let (viewModel, client) = try await weeklyViewModelAndClient()
+        XCTAssertEqual(viewModel.weekPhotoPath, "weekly-checkins/photos/2026-10-25.jpg")
+        XCTAssertEqual(viewModel.weekPhotoVersion, 0)
+        await viewModel.setWeekPhoto(Data([0xFF, 0xD8, 0xFF, 0x01]))
+        XCTAssertEqual(client.uploadedPhotos.map(\.weekEnding), ["2026-10-25"])
+        XCTAssertEqual(client.uploadedPhotos.first?.jpeg, Data([0xFF, 0xD8, 0xFF, 0x01]))
+        XCTAssertEqual(viewModel.weekPhotoVersion, 1)
+        XCTAssertNil(viewModel.weekPhotoError)
+        XCTAssertFalse(viewModel.isUploadingWeekPhoto)
+    }
+
+    @MainActor
+    func testSetWeekPhotoFailureKeepsPreviousState() async throws {
+        let (viewModel, client) = try await weeklyViewModelAndClient()
+        await viewModel.setWeekPhoto(Data([0xFF, 0xD8, 0xFF, 0x01]))
+        XCTAssertEqual(viewModel.weekPhotoVersion, 1)
+
+        client.photoUpload = .failure(APIError.http(statusCode: 500, body: nil))
+        await viewModel.setWeekPhoto(Data([0xFF, 0xD8, 0xFF, 0x02]))
+        XCTAssertEqual(viewModel.weekPhotoVersion, 1, "the cover keeps the image it had")
+        XCTAssertNotNil(viewModel.weekPhotoError)
+        XCTAssertFalse(viewModel.isUploadingWeekPhoto)
+
+        client.photoUpload = .success(())
+        await viewModel.setWeekPhoto(Data([0xFF, 0xD8, 0xFF, 0x03]))
+        XCTAssertEqual(viewModel.weekPhotoVersion, 2)
+        XCTAssertNil(viewModel.weekPhotoError, "a retry clears the message")
+    }
+
+    @MainActor
+    func testWeekPhotoDataReadsThePathAndTreatsA404AsNoPhoto() async throws {
+        let (viewModel, client) = try await weeklyViewModelAndClient()
+        let missing = await viewModel.weekPhotoData()
+        XCTAssertNil(missing)
+        client.rawFiles["weekly-checkins/photos/2026-10-25.jpg"] = Data([1, 2, 3])
+        let photo = await viewModel.weekPhotoData()
+        XCTAssertEqual(photo, Data([1, 2, 3]))
+    }
+
     // MARK: - Helpers
 
     private let server = URL(string: "https://brain.example.test")!
@@ -506,6 +568,17 @@ final class WeeklyReviewModelTests: XCTestCase {
     }
 
     @MainActor
+    private func weeklyViewModelAndClient() async throws -> (DailyDeckViewModel, ScriptedDailyDeckClient) {
+        let store = DailyDeckStore(defaults: try XCTUnwrap(UserDefaults(suiteName: suiteName)))
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-25.weekly.json"], deck: Self.v2DeckJSON)
+        let viewModel = DailyDeckViewModel(server: server, client: client, store: store)
+        await viewModel.show(date: "2026-10-25", kind: "weekly")
+        XCTAssertEqual(viewModel.state, .ready)
+        return (viewModel, client)
+    }
+
+    @MainActor
     private func card(_ id: String, in viewModel: DailyDeckViewModel) throws -> DeckCard {
         try XCTUnwrap(viewModel.cards.first { $0.id == id })
     }
@@ -520,5 +593,45 @@ final class WeeklyReviewModelTests: XCTestCase {
         encoder.keyEncodingStrategy = .convertToSnakeCase
         let data = try encoder.encode(answer)
         return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+}
+
+/// The photo-of-the-week routes against `URLProtocol` mocks.
+final class BriefPhotoHTTPTests: APIClientTestCase {
+    func testUploadSendsJPEGToBriefPhotoWithWeekEnding() async throws {
+        let jpeg = Data([0xFF, 0xD8, 0xFF, 0xE0, 0x01, 0x02])
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.url?.path, "/api/brief/photo")
+            XCTAssertEqual(URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems,
+                           [URLQueryItem(name: "week_ending", value: "2026-10-25")])
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "image/jpeg")
+            XCTAssertEqual(apiTestBodyData(from: request), jpeg)
+            return apiTestJSONResponse(#"{"path":"weekly-checkins/photos/2026-10-25.jpg"}"#, for: request)
+        }
+        try await client.uploadWeekPhoto(weekEnding: "2026-10-25", jpeg: jpeg)
+    }
+
+    func testUploadFailureThrowsTheStatus() async {
+        let client = makeClient { request in apiTestJSONResponse(#"{"error":"too big"}"#, for: request, status: 400) }
+        do {
+            try await client.uploadWeekPhoto(weekEnding: "2026-10-25", jpeg: Data([0xFF, 0xD8, 0xFF]))
+            XCTFail("Expected an error")
+        } catch let APIError.http(statusCode, _) {
+            XCTAssertEqual(statusCode, 400)
+        } catch {
+            XCTFail("Unexpected \(error)")
+        }
+    }
+
+    func testDeleteHitsBriefPhoto() async throws {
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "DELETE")
+            XCTAssertEqual(request.url?.path, "/api/brief/photo")
+            XCTAssertEqual(URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems,
+                           [URLQueryItem(name: "week_ending", value: "2026-10-25")])
+            return apiTestJSONResponse(#"{"removed":true}"#, for: request)
+        }
+        try await client.deleteWeekPhoto(weekEnding: "2026-10-25")
     }
 }

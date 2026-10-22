@@ -13,6 +13,10 @@ protocol DailyDeckDataClient: Sendable {
     func startChat(sessionID: String, message: String, workspace: String) async throws
     /// Files the answers on the server without the model; nil when the server has no filer.
     func fileBrief(_ request: BriefFileRequest) async throws -> BriefFileResponse?
+    /// A file's bytes (the week's photo); a missing file throws a 404 `APIError`.
+    func rawFile(sessionID: String, path: String) async throws -> Data
+    func uploadWeekPhoto(weekEnding: String, jpeg: Data) async throws
+    func deleteWeekPhoto(weekEnding: String) async throws
 }
 
 enum DailyDeckState: Equatable {
@@ -139,6 +143,11 @@ final class DailyDeckViewModel {
     var skippedCount: Int { cards.filter { answers[$0.id]?.feedback != nil }.count }
 
     /// The last card marked "Not for Me" and its answer before that, for Undo.
+    /// Counts the cover photo's successful uploads; the photo view reloads when it changes.
+    private(set) var weekPhotoVersion = 0
+    private(set) var isUploadingWeekPhoto = false
+    /// Why the last upload failed; the cover shows it under the photo, which keeps its previous image.
+    private(set) var weekPhotoError: String?
     private(set) var lastDismissal: (card: DeckCard, previous: DeckAnswer?)?
 
     func answer(for card: DeckCard) -> DeckAnswer? { answers[card.id] }
@@ -590,6 +599,39 @@ final class DailyDeckViewModel {
         store.setAnswers(answers, for: server, date: date, kind: kind)
     }
 
+    // MARK: Photo of the week
+
+    /// Where the week's photo lives in the vault, read back through the workspace file route.
+    var weekPhotoPath: String { "weekly-checkins/photos/\(date).jpg" }
+
+    /// The week's photo bytes, or nil when there is none yet or it cannot be read.
+    func weekPhotoData() async -> Data? {
+        guard let sessionID else { return nil }
+        return try? await client.rawFile(sessionID: sessionID, path: weekPhotoPath)
+    }
+
+    /// The picked photo could not be read as an image; nothing was uploaded.
+    func weekPhotoUnreadable() {
+        weekPhotoError = "That photo couldn't be read. Pick another."
+    }
+
+    /// Uploads `jpeg` as this week's photo. Success reloads the cover's photo; failure sets
+    /// `weekPhotoError` and leaves the version, so the slot keeps what it showed.
+    func setWeekPhoto(_ jpeg: Data) async {
+        guard !isUploadingWeekPhoto else { return }
+        isUploadingWeekPhoto = true
+        weekPhotoError = nil
+        defer { isUploadingWeekPhoto = false }
+        do {
+            try await client.uploadWeekPhoto(weekEnding: date, jpeg: jpeg)
+            weekPhotoVersion += 1
+        } catch let APIError.http(statusCode, _) where statusCode == 404 {
+            weekPhotoError = "This server can't keep a photo of the week."
+        } catch {
+            weekPhotoError = "The photo didn't upload. Try again."
+        }
+    }
+
     // MARK: Filing
 
     /// Files the answers. The server's filer does it without the model; when it leaves
@@ -712,6 +754,18 @@ struct APIClientDailyDeckAdapter: DailyDeckDataClient {
 
     func fileBrief(_ request: BriefFileRequest) async throws -> BriefFileResponse? {
         try await apiClient.fileBrief(request)
+    }
+
+    func rawFile(sessionID: String, path: String) async throws -> Data {
+        try await apiClient.rawFileData(sessionID: sessionID, path: path)
+    }
+
+    func uploadWeekPhoto(weekEnding: String, jpeg: Data) async throws {
+        try await apiClient.uploadWeekPhoto(weekEnding: weekEnding, jpeg: jpeg)
+    }
+
+    func deleteWeekPhoto(weekEnding: String) async throws {
+        try await apiClient.deleteWeekPhoto(weekEnding: weekEnding)
     }
 }
 

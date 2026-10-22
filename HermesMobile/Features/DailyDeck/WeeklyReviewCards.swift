@@ -1,3 +1,4 @@
+import PhotosUI
 import SwiftUI
 
 // The v2 weekly review's cards, drawn inside `DeckCardView` on the `dusk` paper (`DeckPalette.week`).
@@ -18,6 +19,8 @@ struct WeekCoverCard: View {
     @ScaledMetric(relativeTo: .body) private var clearance: CGFloat = 30
     @State private var isEditingTitle = false
     @State private var noteIsOpen = false
+    @State private var showsPhotoPicker = false
+    @State private var photoItem: PhotosPickerItem?
 
     private var editedTitle: String? {
         viewModel.answer(for: card)?.text.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
@@ -77,23 +80,47 @@ struct WeekCoverCard: View {
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
-    /// Where the week's photo goes (Task 11 fills it); for now a quiet placeholder.
+    /// The week's photo: a tap opens the library, and picking again replaces it. The slot keeps its
+    /// image while uploading and when an upload fails, with the reason under it.
     private var photoSlot: some View {
-        RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous)
-            .fill(Color.clear)
-            .aspectRatio(4 / 3, contentMode: .fit)
-            .glowSurface(palette.colors, cornerRadius: HXRadius.lg)
-            .overlay {
-                VStack(spacing: 8) {
-                    Image(systemName: "photo")
-                        .font(AppFont.title())
-                    Text(verbatim: "Photo of the week")
-                        .font(AppFont.subheadline(weight: .medium))
-                }
-                .foregroundStyle(palette.ink)
+        VStack(alignment: .leading, spacing: 6) {
+            Button { showsPhotoPicker = true } label: {
+                WeekPhotoView(viewModel: viewModel, palette: palette)
+                    .overlay {
+                        if viewModel.isUploadingWeekPhoto {
+                            RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous)
+                                .fill(.ultraThinMaterial)
+                                .overlay { ProgressView() }
+                        }
+                    }
+                    .contentShape(Rectangle())
             }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(Text(verbatim: "Photo of the week, none yet"))
+            .buttonStyle(.plain)
+            .disabled(viewModel.isUploadingWeekPhoto)
+            .accessibilityLabel(Text(verbatim: "Photo of the week"))
+            .accessibilityHint(Text(verbatim: "Chooses a photo from your library"))
+            if let error = viewModel.weekPhotoError {
+                Text(verbatim: error)
+                    .font(AppFont.footnote())
+                    .foregroundStyle(Color.hxDanger)
+            }
+        }
+        .photosPicker(isPresented: $showsPhotoPicker, selection: $photoItem, matching: .images)
+        .onChange(of: photoItem) { _, item in
+            guard let item else { return }
+            photoItem = nil
+            Task { await upload(item) }
+        }
+    }
+
+    private func upload(_ item: PhotosPickerItem) async {
+        guard let data = try? await item.loadTransferable(type: Data.self),
+              let jpeg = await Task.detached(priority: .userInitiated, operation: { WeekPhoto.jpeg(from: data) }).value
+        else {
+            viewModel.weekPhotoUnreadable()
+            return
+        }
+        await viewModel.setWeekPhoto(jpeg)
     }
 
     private var chapters: some View {

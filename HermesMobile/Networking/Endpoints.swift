@@ -214,6 +214,8 @@ enum Endpoint {
     /// Files a Daily Deck's answers without the model (this user's webui fork):
     /// POST `{date, kind, answers}`. Servers without it answer 404.
     case briefFile
+    /// The week's photo (this user's webui fork): POST a raw JPEG or DELETE, `?week_ending=YYYY-MM-DD`.
+    case briefPhoto(weekEnding: String)
 
     var path: String {
         switch self {
@@ -561,6 +563,8 @@ enum Endpoint {
             return "/api/jobs/ask"
         case .briefFile:
             return "/api/brief/file"
+        case .briefPhoto:
+            return "/api/brief/photo"
         }
     }
 
@@ -785,6 +789,8 @@ enum Endpoint {
             return items
         case let .goalDetail(slug), let .goalRecord(slug):
             return [URLQueryItem(name: "slug", value: slug)]
+        case let .briefPhoto(weekEnding):
+            return [URLQueryItem(name: "week_ending", value: weekEnding)]
         case let .labels(feature, item):
             var items: [URLQueryItem] = []
             if let feature { items.append(URLQueryItem(name: "feature", value: feature)) }

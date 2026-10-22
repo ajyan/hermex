@@ -128,6 +128,7 @@ actor APIClient {
         method: String,
         encodedBody: Data?,
         timeout: TimeInterval? = nil,
+        contentType: String = "application/json",
         extraHeaders: [String: String] = [:]
     ) async throws -> Data {
         try await sendDataReturningResponse(
@@ -135,6 +136,7 @@ actor APIClient {
             method: method,
             encodedBody: encodedBody,
             timeout: timeout,
+            contentType: contentType,
             extraHeaders: extraHeaders
         ).0
     }
@@ -151,6 +153,7 @@ actor APIClient {
         encodedBody: Data?,
         timeout: TimeInterval? = nil,
         accept: String = "application/json",
+        contentType: String = "application/json",
         extraHeaders: [String: String] = [:]
     ) async throws -> (Data, HTTPURLResponse) {
         var request = URLRequest(url: endpoint.url(relativeTo: baseURL))
@@ -167,7 +170,7 @@ actor APIClient {
         }
 
         if let encodedBody {
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue(contentType, forHTTPHeaderField: "Content-Type")
             request.httpBody = encodedBody
         }
 

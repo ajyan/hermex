@@ -1481,6 +1481,12 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     /// Runs inside `fileBrief` before it answers, to hold a filing in flight.
     var fileGate: (@Sendable () async -> Void)?
     private(set) var fileRequests: [BriefFileRequest] = []
+    /// What `uploadWeekPhoto` does; succeeds by default.
+    var photoUpload: Result<Void, Error> = .success(())
+    private(set) var uploadedPhotos: [(weekEnding: String, jpeg: Data)] = []
+    private(set) var deletedPhotos: [String] = []
+    /// Bytes `rawFile` returns by path; a path not here is a 404.
+    var rawFiles: [String: Data] = [:]
     /// Bodies by path; anything else reads as `deck`.
     var files: [String: String] = [:]
     /// Folder listings other than `briefs/`.
@@ -1530,6 +1536,18 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
         await fileGate?()
         return try filer.get()
     }
+
+    func rawFile(sessionID: String, path: String) async throws -> Data {
+        guard let data = rawFiles[path] else { throw APIError.http(statusCode: 404, body: nil) }
+        return data
+    }
+
+    func uploadWeekPhoto(weekEnding: String, jpeg: Data) async throws {
+        uploadedPhotos.append((weekEnding, jpeg))
+        try photoUpload.get()
+    }
+
+    func deleteWeekPhoto(weekEnding: String) async throws { deletedPhotos.append(weekEnding) }
 }
 
 final class DailyBriefReminderTests: XCTestCase {

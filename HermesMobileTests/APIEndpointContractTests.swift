@@ -367,7 +367,9 @@ final class ContractReadinessTests: XCTestCase {
                 query: ["slug": "nyc-marathon-2026"]
             ),
             .init(name: "goal reflection", method: "POST", endpoint: .goalReflection, path: "/api/goals/reflection"),
-            .init(name: "brief file", method: "POST", endpoint: .briefFile, path: "/api/brief/file")
+            .init(name: "brief file", method: "POST", endpoint: .briefFile, path: "/api/brief/file"),
+            .init(name: "brief photo", method: "POST", endpoint: .briefPhoto(weekEnding: "2026-10-25"),
+                  path: "/api/brief/photo", query: ["week_ending": "2026-10-25"])
         ]
 
         let baseURL = URL(string: "https://example.test")!

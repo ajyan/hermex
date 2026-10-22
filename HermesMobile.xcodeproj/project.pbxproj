@@ -723,6 +723,7 @@
 		A0DE1106959C69CCBD66C799 /* DeckWeekAheadCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DEFBDBFEC0F250EDED2408 /* DeckWeekAheadCard.swift */; };
 		70129E19A23FD14699C6646F /* WeeklyReviewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = E37274D150867377E64E0C1F /* WeeklyReviewModels.swift */; };
 		EDD3F6BF454B243AAEBD30EC /* WeeklyReviewCards+Steer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73791819BE9CF33A7A9059E7 /* WeeklyReviewCards+Steer.swift */; };
+		C11A0C0DE0000000000F0B01 /* WeekPhoto.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11A0C0DE0000000000F0F01 /* WeekPhoto.swift */; };
 		E1738BAB8522C947D164304E /* WeeklyReviewParts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9997FD4AEDC0DB41AE844E37 /* WeeklyReviewParts.swift */; };
 		52EFB3BFAE23A2CBD2F6BD16 /* WeeklyReviewCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42439F008D2F7358721B7C24 /* WeeklyReviewCards.swift */; };
 		F058C6B9FC7434572B340945 /* WeeklyReviewCards+Account.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E9BF54142DCC84C129F3E6 /* WeeklyReviewCards+Account.swift */; };
@@ -1548,6 +1549,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		A0DEFBDBFEC0F250EDED2408 /* DeckWeekAheadCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckWeekAheadCard.swift; sourceTree = "<group>"; };
 		E37274D150867377E64E0C1F /* WeeklyReviewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyReviewModels.swift; sourceTree = "<group>"; };
 		73791819BE9CF33A7A9059E7 /* WeeklyReviewCards+Steer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WeeklyReviewCards+Steer.swift"; sourceTree = "<group>"; };
+		C11A0C0DE0000000000F0F01 /* WeekPhoto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekPhoto.swift; sourceTree = "<group>"; };
 		9997FD4AEDC0DB41AE844E37 /* WeeklyReviewParts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyReviewParts.swift; sourceTree = "<group>"; };
 		42439F008D2F7358721B7C24 /* WeeklyReviewCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyReviewCards.swift; sourceTree = "<group>"; };
 		A2E9BF54142DCC84C129F3E6 /* WeeklyReviewCards+Account.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WeeklyReviewCards+Account.swift"; sourceTree = "<group>"; };
@@ -2163,6 +2165,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				B1A1C0DE00000000000F0001 /* Goals */,
 				C0FFEE500000000000000001 /* Money */,
 				12A06408B1B8DA1A340CBD38 /* DailyDeck */,
+				C11A0C0DE0000000000F0601 /* Weeks */,
 				9BAF7D8BBF390913B4F060B0 /* VoiceCall */,
 				AA0200000000000000000006 /* Activity */,
 				B48200000000000000000001 /* BotProfileAppearance.swift */,
@@ -2682,6 +2685,14 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 			path = Insights;
 			sourceTree = "<group>";
 		};
+		C11A0C0DE0000000000F0601 /* Weeks */ = {
+			isa = PBXGroup;
+			children = (
+				C11A0C0DE0000000000F0F01 /* WeekPhoto.swift */,
+			);
+			path = Weeks;
+			sourceTree = "<group>";
+		};
 		12A06408B1B8DA1A340CBD38 /* DailyDeck */ = {
 			isa = PBXGroup;
 			children = (
@@ -3015,6 +3026,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				A0DE1106959C69CCBD66C799 /* DeckWeekAheadCard.swift in Sources */,
 				70129E19A23FD14699C6646F /* WeeklyReviewModels.swift in Sources */,
 				EDD3F6BF454B243AAEBD30EC /* WeeklyReviewCards+Steer.swift in Sources */,
+				C11A0C0DE0000000000F0B01 /* WeekPhoto.swift in Sources */,
 				E1738BAB8522C947D164304E /* WeeklyReviewParts.swift in Sources */,
 				52EFB3BFAE23A2CBD2F6BD16 /* WeeklyReviewCards.swift in Sources */,
 				F058C6B9FC7434572B340945 /* WeeklyReviewCards+Account.swift in Sources */,
