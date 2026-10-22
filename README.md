@@ -19,8 +19,9 @@ Nothing runs on a hosted backend. Models, memory, and personal data stay on the 
 <div align="center">
 <table>
   <tr>
-    <td align="center"><img src="docs/assets/readme/atlas-brief.png" alt="A Daily Brief card on system-design caching, with an Open the diagram button" width="260" /><br /><sub><b>A card from the Daily Brief</b></sub></td>
-    <td align="center"><img src="docs/assets/readme/atlas-diagram.png" alt="An interactive Elasticsearch architecture diagram with a tapped node explained below it" width="260" /><br /><sub><b>Its interactive diagram</b></sub></td>
+    <td align="center"><img src="docs/assets/readme/atlas-brief-title.png" alt="The Daily Brief's title card: birthdays, the date, a recap of yesterday, and today's 13 cards by kind" width="240" /><br /><sub><b>The Daily Brief</b></sub></td>
+    <td align="center"><img src="docs/assets/readme/atlas-brief.png" alt="A Daily Brief card on system-design caching, with an Open the diagram button" width="240" /><br /><sub><b>One of its cards</b></sub></td>
+    <td align="center"><img src="docs/assets/readme/atlas-diagram.png" alt="An interactive Elasticsearch architecture diagram with a tapped node explained below it" width="240" /><br /><sub><b>An interactive diagram</b></sub></td>
   </tr>
 </table>
 </div>
