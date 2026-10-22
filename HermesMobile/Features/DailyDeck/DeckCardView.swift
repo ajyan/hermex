@@ -439,7 +439,7 @@ struct DeckCardView: View {
     private var section: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
-                ForEach(Array(card.lines.enumerated()), id: \.offset) { _, line in
+                ForEach(Array(viewModel.sectionLines(for: card).enumerated()), id: \.offset) { _, line in
                     Text(verbatim: line).font(AppFont.footnote())
                 }
             }
@@ -469,6 +469,7 @@ struct DeckCardView: View {
         Button {
             hasAskedNewQuestion = true
             withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) { viewModel.regenerateQuestion(for: card) }
+            AccessibilityNotification.Announcement("New question: \(shownQuestion)").post()
         } label: {
             Label { Text(verbatim: "New question") } icon: { Image(systemName: "arrow.triangle.2.circlepath") }
                 .font(AppFont.body(weight: .semibold))

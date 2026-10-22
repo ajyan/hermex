@@ -151,6 +151,11 @@ final class LabelQueueViewModel {
                           landed: { date, cardID in
                               let unsent = store.answers(for: server, date: date, kind: "morning")[cardID]
                               return (unsent ?? answers[date]?[cardID])?.saysHowItLanded == true
+                          },
+                          answers: { date in
+                              // The deck screen's rule: unsent answers when there are any, else what was filed.
+                              let unsent = store.answers(for: server, date: date, kind: "morning")
+                              return unsent.isEmpty ? answers[date] ?? [:] : unsent
                           })
     }
 
@@ -210,13 +215,17 @@ final class LabelQueueViewModel {
     }
 
     /// The first `limit` reflect cards in deck order, decks in the order given, that are neither
-    /// labeled nor `landed` (answered or Not for Me'd, by date and card id).
+    /// labeled nor `landed` (answered or Not for Me'd, by date and card id). Of the week's source
+    /// cards only the shown question's count: the divider's choice comes from `answers` (the deck's
+    /// answers by date), and the other questions' sources were never on screen.
     static func items(decks: [(date: String, kind: String, deck: DailyDeck)], limit: Int = .max,
                       isLabeled: (LabelKey) -> Bool,
-                      landed: (String, String) -> Bool = { _, _ in false }) -> [LabelQueueItem] {
+                      landed: (String, String) -> Bool = { _, _ in false },
+                      answers: (String) -> [String: DeckAnswer] = { _ in [:] }) -> [LabelQueueItem] {
         Array(decks.flatMap { entry in
-            entry.deck.cards
-                .filter { $0.type == .reflect }
+            let variant = DailyDeckViewModel.shownWeekVariant(cards: entry.deck.cards, answers: answers(entry.date))
+            return entry.deck.cards
+                .filter { $0.type == .reflect && !DailyDeckViewModel.isHiddenWeekCard($0, shownVariant: variant) }
                 .map { LabelQueueItem(date: entry.date, kind: entry.kind, card: $0) }
         }
         .filter { !hasLabel($0, isLabeled: isLabeled) && !landed($0.date, $0.card.id) }

@@ -120,23 +120,68 @@ final class DailyDeckViewModel {
 
     /// What the deck shows: every page but cards marked "Not for Me". `index` counts these.
     var visiblePages: [DeckPage] {
-        let variant = weekVariant
-        let hasWeek = cards.contains { $0.type == .section }
+        let variant = Self.shownWeekVariant(cards: cards, answers: answers)
         return pages.filter { page in
             guard case .card(let card) = page else { return true }
-            // Only the shown question's sources (the divider carries a variant too, but always stays);
-            // a deck with no divider shows every week card.
-            if hasWeek, card.type != .section, let cardVariant = card.weekVariant, cardVariant != variant { return false }
+            if Self.isHiddenWeekCard(card, shownVariant: variant) { return false }
             return answers[card.id]?.feedback == nil
         }
     }
 
     /// Which of the week's drafted questions is on the divider: its place among the question and
     /// the alternatives, 0 when the deck has no divider.
-    var weekVariant: Int {
-        guard let section = cards.first(where: { $0.type == .section }),
-              let shown = question(for: section) else { return 0 }
-        return Self.questionOptions(for: section).firstIndex(of: shown) ?? 0
+    var weekVariant: Int { Self.shownWeekVariant(cards: cards, answers: answers) ?? 0 }
+
+    /// The variant the deck's week divider shows, given the deck's answers (filed or unsent): the
+    /// divider's answered question's place among its question and alternatives, 0 when it names
+    /// none of them. Nil when the deck has no divider. Label recent cards reads it too, so only
+    /// the sources he could see are asked about.
+    nonisolated static func shownWeekVariant(cards: [DeckCard], answers: [String: DeckAnswer]) -> Int? {
+        guard let section = cards.first(where: { $0.type == .section }) else { return nil }
+        guard let shown = answers[section.id]?.question ?? section.question else { return 0 }
+        return questionOptions(for: section).firstIndex(of: shown) ?? 0
+    }
+
+    /// The divider's lines for the question on screen. The vault's second line ("Day 3 · 2 answers
+    /// so far", or "No sources fit today") is about the deck's original question, so after "New
+    /// question" it becomes the day alone, or "No sources fit today" when the shown question has
+    /// no source cards; back on the original it is the vault's again.
+    func sectionLines(for card: DeckCard) -> [String] {
+        let variant = weekVariant
+        let hasSources = cards.contains { $0.type != .section && $0.weekVariant == variant }
+        return Self.sectionLines(card.lines, variant: variant, hasSources: hasSources, date: deck?.date ?? date)
+    }
+
+    nonisolated static func sectionLines(_ lines: [String], variant: Int, hasSources: Bool, date: String) -> [String] {
+        guard variant != 0, lines.count > 1 else { return lines }
+        var out = lines
+        if !hasSources {
+            out[1] = "No sources fit today"
+        } else if lines[1].hasPrefix("Day "), let day = lines[1].components(separatedBy: " · ").first {
+            out[1] = day
+        } else if let day = weekDay(date) {
+            out[1] = "Day \(day)"  // the vault's "No sources fit today" carries no day: count it from the date
+        } else {
+            out.remove(at: 1)
+        }
+        return out
+    }
+
+    /// The day of the week of `2026-10-28`, Monday as 1, as the vault counts it.
+    nonisolated private static func weekDay(_ day: String) -> Int? {
+        let parts = day.split(separator: "-").compactMap { Int($0) }
+        let calendar = Calendar(identifier: .gregorian)
+        guard parts.count == 3,
+              let date = calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
+        else { return nil }
+        return (calendar.component(.weekday, from: date) + 5) % 7 + 1
+    }
+
+    /// A week source card for a question the divider isn't showing. The divider carries a variant
+    /// too but always stays, and with no divider (`shownVariant` nil) every week card shows.
+    nonisolated static func isHiddenWeekCard(_ card: DeckCard, shownVariant: Int?) -> Bool {
+        guard let shownVariant, card.type != .section, let variant = card.weekVariant else { return false }
+        return variant != shownVariant
     }
 
     var currentPage: DeckPage? {
@@ -502,13 +547,14 @@ final class DailyDeckViewModel {
         }
     }
 
-    private static func questionOptions(for card: DeckCard) -> [String] {
+    nonisolated private static func questionOptions(for card: DeckCard) -> [String] {
         [card.question].compactMap { $0 } + card.altQuestions
     }
 
-    /// Sets (or, when blank, clears) the note on why a question was chosen. Kept as typed; filing trims it.
+    /// Sets the note on why a question was chosen, kept exactly as typed (a leading space too);
+    /// filing trims it, and a blank note files as none.
     func setNote(_ text: String, for card: DeckCard) {
-        update(card) { $0.text = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text }
+        update(card) { $0.text = text.isEmpty ? nil : text }
     }
 
     /// Replaces the card's question with the user's own; an empty one restores the card's.

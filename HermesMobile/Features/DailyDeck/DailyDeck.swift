@@ -522,8 +522,10 @@ struct DeckAnswer: Codable, Equatable {
     /// "Not for Me" on this card; a card with feedback leaves the deck.
     var feedback: DeckFeedback?
 
+    /// Nothing typed or chosen. Text counts as typed, spaces too, so a field bound to it keeps a
+    /// leading space while editing; filing trims, and a blank text files as none.
     var isEmpty: Bool {
-        !hasText && action == nil && rating == nil && question == nil && feedback == nil && !hasTags
+        (text?.isEmpty ?? true) && action == nil && rating == nil && question == nil && feedback == nil && !hasTags
     }
 
     private var hasTags: Bool { !(tags?.isEmpty ?? true) }

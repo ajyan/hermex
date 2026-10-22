@@ -614,11 +614,68 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(payload.answers.first?.text, "Too abstract.")
 
         viewModel.setNote("   ", for: section)
-        XCTAssertNil(viewModel.answer(for: section)?.text, "a blank note clears it")
-        XCTAssertEqual(viewModel.answer(for: section)?.question, "Q1?")
+        let blank = DeckAnswersPayload(deck: try XCTUnwrap(viewModel.deck), answers: viewModel.answers, completedAt: morning)
+        XCTAssertNil(blank.answers.first?.text, "a blank note files as none")
+        XCTAssertEqual(blank.answers.first?.question, "Q1?")
+        viewModel.setNote("", for: section)
+        XCTAssertNil(viewModel.answer(for: section)?.text, "an emptied field clears it")
         viewModel.regenerateQuestion(for: section)
         viewModel.regenerateQuestion(for: section)
         XCTAssertNil(viewModel.answer(for: section))
+    }
+
+    @MainActor
+    func testWeekNoteKeepsALeadingSpaceWhileTypingAndFilesTrimmed() async throws {
+        let viewModel = try await loadedViewModel(Self.weekDeckJSON)
+        let section = try XCTUnwrap(viewModel.cards.first { $0.type == .section })
+        viewModel.setNote(" ", for: section)
+        XCTAssertEqual(viewModel.answer(for: section)?.text, " ", "the space typed first stays in the field")
+        let blank = DeckAnswersPayload(deck: try XCTUnwrap(viewModel.deck), answers: viewModel.answers, completedAt: morning)
+        XCTAssertTrue(blank.answers.isEmpty)
+
+        viewModel.setNote(" Too abstract ", for: section)
+        XCTAssertEqual(viewModel.answer(for: section)?.text, " Too abstract ")
+        let payload = DeckAnswersPayload(deck: try XCTUnwrap(viewModel.deck), answers: viewModel.answers, completedAt: morning)
+        XCTAssertEqual(payload.answers.map(\.card), ["week"])
+        XCTAssertEqual(payload.answers.first?.text, "Too abstract")
+    }
+
+    func testDividerSecondLineFollowsTheShownQuestion() {
+        let lines = ["This week · AI", "Day 3 · 2 answers so far"]
+        XCTAssertEqual(DailyDeckViewModel.sectionLines(lines, variant: 0, hasSources: true, date: "2026-10-28"), lines,
+                       "the original question keeps the vault's line")
+        XCTAssertEqual(DailyDeckViewModel.sectionLines(lines, variant: 1, hasSources: true, date: "2026-10-28"),
+                       ["This week · AI", "Day 3"], "the answer count is the original question's")
+        XCTAssertEqual(DailyDeckViewModel.sectionLines(lines, variant: 2, hasSources: false, date: "2026-10-28"),
+                       ["This week · AI", "No sources fit today"])
+        let none = ["This week · AI", "No sources fit today"]
+        XCTAssertEqual(DailyDeckViewModel.sectionLines(none, variant: 0, hasSources: false, date: "2026-10-28"), none)
+        XCTAssertEqual(DailyDeckViewModel.sectionLines(none, variant: 1, hasSources: true, date: "2026-10-28"),
+                       ["This week · AI", "Day 3"], "a Wednesday, counted from the deck's date")
+        XCTAssertEqual(DailyDeckViewModel.sectionLines(none, variant: 1, hasSources: true, date: "2026-11-01"),
+                       ["This week · AI", "Day 7"])
+        XCTAssertEqual(DailyDeckViewModel.sectionLines(none, variant: 1, hasSources: true, date: "bad"), ["This week · AI"])
+        XCTAssertEqual(DailyDeckViewModel.sectionLines(["This week · AI"], variant: 1, hasSources: false, date: "2026-10-28"),
+                       ["This week · AI"])
+    }
+
+    @MainActor
+    func testDividerLinesSwapWithTheQuestion() async throws {
+        let json = Self.weekDeckJSON
+            .replacingOccurrences(of: #""lines":["This week · AI"]"#, with: #""lines":["This week · AI","Day 1 · 1 answer so far"]"#)
+            .replacingOccurrences(of: #","alt_questions":["Q1?","Q2?"]"#, with: #","alt_questions":["Q1?","Q2?","Q3?"]"#)
+        let viewModel = try await loadedViewModel(json)
+        let section = try XCTUnwrap(viewModel.cards.first { $0.type == .section })
+        XCTAssertEqual(viewModel.sectionLines(for: section), ["This week · AI", "Day 1 · 1 answer so far"])
+        viewModel.regenerateQuestion(for: section)
+        XCTAssertEqual(viewModel.sectionLines(for: section), ["This week · AI", "Day 1"])
+        viewModel.regenerateQuestion(for: section)
+        viewModel.regenerateQuestion(for: section)
+        XCTAssertEqual(viewModel.question(for: section), "Q3?")
+        XCTAssertEqual(viewModel.sectionLines(for: section), ["This week · AI", "No sources fit today"],
+                       "Q3? has no source cards")
+        viewModel.regenerateQuestion(for: section)
+        XCTAssertEqual(viewModel.sectionLines(for: section), ["This week · AI", "Day 1 · 1 answer so far"])
     }
 
     @MainActor
