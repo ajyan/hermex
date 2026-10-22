@@ -494,7 +494,6 @@ struct PrepRunView: View {
                         prompt: recall.prompt,
                         label: PrepCopy.recallKicker(recall, lessonTitle: lesson.title, isReview: rep.drill == .recall),
                         draft: Binding(get: { viewModel.recallDraft }, set: { viewModel.recallDraft = $0 }),
-                        confidence: Binding(get: { viewModel.confidence }, set: { viewModel.confidence = $0 }),
                         isSubmitting: viewModel.isSubmitting,
                         dontKnow: { Task { await viewModel.dontKnow() } }
                     )

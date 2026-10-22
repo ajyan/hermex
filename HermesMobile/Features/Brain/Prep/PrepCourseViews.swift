@@ -66,11 +66,6 @@ struct PrepTodayRingCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 PrepRunButton(action: action)
             }
-            if let calibration = course.calibration {
-                Text(verbatim: PrepCopy.calibrationLine(calibration))
-                    .font(BrainStyle.meta)
-                    .foregroundStyle(Color.hxTextSecondary)
-            }
         }
     }
 }

@@ -671,10 +671,10 @@ final class PrepViewModelsTests: XCTestCase {
         #"{"index": \#(index), "block": "\#(block)", "drill": "\#(drill)", "item": {"id": "u1.l\#(index)", "title": "Lesson \#(index)", "idea_md": "Idea", "say_it_md": "Say", "check": {"prompt": "Q?", "options": ["A", "B", "C", "D"]}, "recall": {"prompt": "Explain \#(index)."}}}"#
     }
 
-    private func recallResult(_ verdict: String, next: Int, missed: [String] = ["p.b"], xp: Int = 10, surprise: Bool = false) -> PrepAttemptResult {
+    private func recallResult(_ verdict: String, next: Int, missed: [String] = ["p.b"], xp: Int = 10) -> PrepAttemptResult {
         let missedJSON = missed.map { #"{"point_id": "\#($0)", "why": ""}"# }.joined(separator: ",")
         return decode(PrepAttemptResult.self, #"""
-        {"verdict": "\#(verdict)", "next_index": \#(next), "attempt": "att-\#(next)", "xp": \#(xp), "surprise": \#(surprise),
+        {"verdict": "\#(verdict)", "next_index": \#(next), "attempt": "att-\#(next)", "xp": \#(xp),
          "streak": {"days": 3, "freezes": 0, "last_day": "2026-10-20"},
          "grade": {"points_hit": [{"point_id": "p.a", "quote": ""}], "points_missed": [\#(missedJSON)], "strong_answer": "S"},
          "points": [{"id": "p.a", "text": "A"}, {"id": "p.b", "text": "B"}]}
@@ -713,7 +713,6 @@ final class PrepViewModelsTests: XCTestCase {
         await vm.load()
         vm.beginRecall()
         vm.recallDraft = "Recall is fine"
-        vm.confidence = .fairly
         await vm.submitRecall()
         XCTAssertTrue(vm.inDialogue)
         XCTAssertEqual(vm.firstAnswer, "Recall is fine")
@@ -738,7 +737,6 @@ final class PrepViewModelsTests: XCTestCase {
         await vm.load()
         vm.beginRecall()
         vm.recallDraft = "Q&A over contracts"
-        vm.confidence = .fairly
         await vm.submitRecall()
         XCTAssertTrue(vm.inDialogue)
         XCTAssertNil(vm.tutorStreaming)
@@ -763,7 +761,6 @@ final class PrepViewModelsTests: XCTestCase {
         await vm.load()
         vm.beginRecall()
         vm.recallDraft = "Not sure"
-        vm.confidence = .guess
         await vm.submitRecall()
         vm.tutorDraft = "Ranking"
         await vm.sendTutorReply()
@@ -788,7 +785,6 @@ final class PrepViewModelsTests: XCTestCase {
         await vm.load()
         vm.beginRecall()
         vm.recallDraft = "Hm"
-        vm.confidence = .guess
         await vm.submitRecall()
         XCTAssertTrue(vm.inDialogue, "a failed turn keeps the dialogue up to retry")
         XCTAssertEqual(vm.tutorError, "the tutor couldn't reply; try again")
@@ -809,7 +805,6 @@ final class PrepViewModelsTests: XCTestCase {
         await vm.load()
         vm.beginRecall()
         vm.recallDraft = "An answer"
-        vm.confidence = .fairly
         await vm.submitRecall()
         XCTAssertFalse(vm.inDialogue)
         XCTAssertTrue(client.dialogueCalls.isEmpty)
@@ -833,18 +828,15 @@ final class PrepViewModelsTests: XCTestCase {
         vm.beginRecall()
         XCTAssertEqual(vm.lessonStage, .recalling)
         vm.recallDraft = "Routing goes to the fast tier"
-        vm.confidence = .fairly
         await vm.submitRecall()
-        XCTAssertEqual(client.attempts.first?.confidence, .fairly)
         XCTAssertEqual(client.attempts.first?.drill, .lesson)
         XCTAssertEqual(vm.lastXP, 10)
         await vm.continue()
         XCTAssertEqual(vm.lessonStage, .recalling, "a recall review starts on the recall card")
         XCTAssertEqual(vm.recallDraft, "", "each recall starts empty")
-        XCTAssertNil(vm.confidence)
     }
 
-    func testRecallSubmitNeedsTextAndConfidence() async {
+    func testRecallSubmitNeedsText() async {
         let client = FakePrepClient()
         client.todayResults = [.success(courseRun([recallLessonRep(0, drill: "recall", block: "review")]))]
         client.homeResults = [.success(courseHome(xp: 0))]
@@ -852,14 +844,11 @@ final class PrepViewModelsTests: XCTestCase {
         await vm.load()
         XCTAssertFalse(vm.canSubmitRecall)
         vm.recallDraft = "   "
-        vm.confidence = .certain
-        XCTAssertFalse(vm.canSubmitRecall)
-        vm.recallDraft = "An answer"
-        XCTAssertTrue(vm.canSubmitRecall)
-        vm.confidence = nil
         XCTAssertFalse(vm.canSubmitRecall)
         await vm.submitRecall()
         XCTAssertTrue(client.attempts.isEmpty)
+        vm.recallDraft = "An answer"
+        XCTAssertTrue(vm.canSubmitRecall)
     }
 
     func testDontKnowPostsWithoutText() async {
@@ -871,7 +860,6 @@ final class PrepViewModelsTests: XCTestCase {
         await vm.load()
         await vm.dontKnow()
         XCTAssertEqual(client.attempts.first?.dontKnow, true)
-        XCTAssertEqual(client.attempts.first?.confidence, .guess)
         XCTAssertEqual(client.attempts.first?.answer, .choice(""))
     }
 
@@ -887,7 +875,6 @@ final class PrepViewModelsTests: XCTestCase {
         let vm = makeVM(client)
         await vm.load()
         vm.recallDraft = "x"
-        vm.confidence = .fairly
         await vm.submitRecall()
         await vm.overridePoint("p.b")
         guard case let .result(_, result, _) = vm.phase else { return XCTFail("phase \(vm.phase)") }
@@ -922,7 +909,6 @@ final class PrepViewModelsTests: XCTestCase {
         let vm = makeVM(client)
         await vm.load()
         vm.recallDraft = "x"
-        vm.confidence = .fairly
         await vm.submitRecall()
         let (started, startedCont) = AsyncStream<Void>.makeStream()
         let (release, releaseCont) = AsyncStream<Void>.makeStream()
@@ -967,10 +953,8 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertFalse(PrepCopy.isWelcomeBack(lastDay: nil, today: today))
     }
 
-    func testReadyAndCalibrationCopy() {
+    func testReadyAndMilestoneCopy() {
         XCTAssertEqual(PrepCopy.readyLine(ready: 14, total: 48), "14 of 48 ready")
-        XCTAssertEqual(PrepCopy.calibrationLine(PrepCalibration(certainRight: 4, certainTotal: 5)),
-                       "When you say certain, you're right 80% of the time")
         XCTAssertEqual(PrepCopy.milestoneTitle(.ready(10)), "10 topics interview-ready")
         XCTAssertEqual(PrepCopy.milestoneTitle(.streak(7)), "7-day streak")
         XCTAssertEqual(PrepCopy.milestoneTitle(.bossPassed("Fundamentals")), "Fundamentals passed")

@@ -170,28 +170,6 @@ struct PrepUnit: Decodable, Identifiable, Hashable, Sendable {
 }
 
 /// The course path: `course` on home (units without lessons) and `GET /api/tutor/course`.
-/// How often an answer marked "certain" was right over the last 30 days.
-struct PrepCalibration: Decodable, Hashable, Sendable {
-    let certainRight: Int
-    let certainTotal: Int
-
-    init(certainRight: Int, certainTotal: Int) {
-        self.certainRight = certainRight
-        self.certainTotal = certainTotal
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case certainRight = "certain_right"
-        case certainTotal = "certain_total"
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        certainRight = c.int(.certainRight)
-        certainTotal = c.int(.certainTotal)
-    }
-}
-
 struct PrepCourse: Decodable, Hashable, Sendable {
     let units: [PrepUnit]
     let xp: Int
@@ -201,14 +179,13 @@ struct PrepCourse: Decodable, Hashable, Sendable {
     /// Interview-ready lessons across the course, and how many lessons it has.
     let readyCount: Int
     let lessonTotal: Int
-    let calibration: PrepCalibration?
 
     /// The unit whose lessons are being taught now: the last current one, since earlier current units
     /// have only their boss left.
     var currentUnit: PrepUnit? { units.last { $0.state == .current } }
 
     private enum CodingKeys: String, CodingKey {
-        case units, xp, today, reteach, calibration
+        case units, xp, today, reteach
         case needsRewrite = "needs_rewrite"
         case readyCount = "ready_count"
         case lessonTotal = "lesson_total"
@@ -223,7 +200,6 @@ struct PrepCourse: Decodable, Hashable, Sendable {
         needsRewrite = (try? c.decodeIfPresent([String].self, forKey: .needsRewrite)) ?? []
         readyCount = c.int(.readyCount)
         lessonTotal = c.int(.lessonTotal)
-        calibration = c.optional(PrepCalibration.self, .calibration).flatMap { $0.certainTotal > 0 ? $0 : nil }
     }
 }
 
@@ -284,11 +260,6 @@ struct PrepSource: Decodable, Hashable, Sendable {
         guard !ref.isEmpty else { throw PrepCourseMissingID() }
         path = c.text(.path)
     }
-}
-
-/// How sure the user is before a recall is graded.
-enum PrepConfidence: String, Codable, Hashable, Sendable, CaseIterable {
-    case guess, fairly, certain
 }
 
 /// A lesson's recall: the question the user answers from memory, picked from the lesson's pool, with its id and

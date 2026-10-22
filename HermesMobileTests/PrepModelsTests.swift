@@ -558,27 +558,17 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertTrue(run.reps[2].item.lesson?.hasRecall == true)
     }
 
-    func testRecallResultDecodesSurpriseXPAndAttempt() throws {
+    func testRecallResultDecodesXPAndAttempt() throws {
         let json = #"""
-        {"verdict": "partial", "next_index": 1, "attempt": "a-1", "surprise": true, "xp": 10, "overridden": ["p.x"],
+        {"verdict": "partial", "next_index": 1, "attempt": "a-1", "xp": 10, "overridden": ["p.x"],
          "grade": {"points_hit": [{"point_id": "p.a", "quote": ""}], "points_missed": [{"point_id": "p.b", "why": ""}], "strong_answer": "S"},
          "points": [{"id": "p.a", "text": "A"}, {"id": "p.b", "text": "B"}]}
         """#
         let result = try decode(PrepAttemptResult.self, json)
         XCTAssertEqual(result.attemptID, "a-1")
-        XCTAssertTrue(result.surprise)
         XCTAssertEqual(result.xp, 10)
         XCTAssertEqual(result.overridden, ["p.x"])
         XCTAssertEqual(result.judgment?.pointsMissed.map(\.pointID), ["p.b"])
-        XCTAssertFalse(try decode(PrepAttemptResult.self, #"{"verdict": "pass"}"#).surprise)
-    }
-
-    func testOverrideToPassClearsTheSurprise() throws {
-        let base = try decode(PrepAttemptResult.self, #"{"verdict": "miss", "attempt": "a-1", "surprise": true}"#)
-        let partial = try decode(PrepAttemptResult.self, #"{"verdict": "partial", "attempt": "a-2"}"#)
-        let pass = try decode(PrepAttemptResult.self, #"{"verdict": "pass", "attempt": "a-3"}"#)
-        XCTAssertTrue(PrepAttemptResult(merging: base, override: partial).surprise)
-        XCTAssertFalse(PrepAttemptResult(merging: base, override: pass).surprise)
     }
 
     func testBossOverrideRescoresTheSittingAndRevisit() throws {
@@ -601,32 +591,29 @@ final class PrepModelsTests: XCTestCase {
                        "a response without a sitting keeps the one shown")
     }
 
-    func testRecallRequestEncodesConfidenceAndDontKnow() throws {
+    func testRecallRequestEncodesDontKnowWithoutConfidence() throws {
         let request = PrepAttemptRequest(date: "d", index: 0, item: "u1.l1", drill: .recall, answer: .choice(""),
-                                         elapsedMS: 1, hintsUsed: 0, confidence: .certain, dontKnow: true)
+                                         elapsedMS: 1, hintsUsed: 0, dontKnow: true)
         let json = try XCTUnwrap(String(data: JSONEncoder().encode(request), encoding: .utf8))
-        XCTAssertTrue(json.contains(#""confidence":"certain""#))
+        XCTAssertFalse(json.contains("confidence"))
         XCTAssertTrue(json.contains(#""dont_know":true"#))
         let plain = PrepAttemptRequest(date: "d", index: 0, item: "u1.l1", drill: .warmup, answer: .choice("A"),
                                        elapsedMS: 1, hintsUsed: 0)
         let plainJSON = try XCTUnwrap(String(data: JSONEncoder().encode(plain), encoding: .utf8))
-        XCTAssertFalse(plainJSON.contains("confidence"))
         XCTAssertFalse(plainJSON.contains("dont_know"))
     }
 
-    func testCourseDecodesReadinessAndCalibration() throws {
+    func testCourseDecodesReadiness() throws {
         let json = #"""
-        {"xp": 40, "ready_count": 3, "lesson_total": 48, "calibration": {"certain_right": 4, "certain_total": 5},
+        {"xp": 40, "ready_count": 3, "lesson_total": 48,
          "units": [{"id": "u1", "title": "F", "state": "current", "ready_count": 3,
                     "lessons": [{"id": "u1.l1", "state": "ready"}, {"id": "u1.l2", "state": "shaky"}]}]}
         """#
         let course = try decode(PrepCourse.self, json)
         XCTAssertEqual(course.readyCount, 3)
         XCTAssertEqual(course.lessonTotal, 48)
-        XCTAssertEqual(course.calibration, PrepCalibration(certainRight: 4, certainTotal: 5))
         XCTAssertEqual(course.units[0].readyCount, 3)
         XCTAssertEqual(course.units[0].lessons.map(\.state), [.ready, .shaky])
-        XCTAssertNil(try decode(PrepCourse.self, #"{"units": []}"#).calibration)
     }
 
     func testStreakDecodesLastDay() throws {
@@ -816,7 +803,7 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertEqual(body["elapsed_ms"] as? Int, 30_000)
     }
 
-    func testStoryRequestOmitsConfidence() throws {
+    func testStoryRequestOmitsOptionalFields() throws {
         let data = try JSONEncoder().encode(PrepAttemptRequest(
             date: "2026-10-18", index: 3, item: "s1", drill: .story,
             answer: .choice("So the plan was..."), elapsedMS: 200_000, hintsUsed: 0))
@@ -824,7 +811,6 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertEqual(body["drill"] as? String, "story")
         XCTAssertEqual(body["run"] as? String, "daily")
         XCTAssertEqual(body["item"] as? String, "s1")
-        XCTAssertNil(body["confidence"])
         XCTAssertNil(body["parent"])
         XCTAssertNil(body["probe"])
         XCTAssertNil(body["unit"])

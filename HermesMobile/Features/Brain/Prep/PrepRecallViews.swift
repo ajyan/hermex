@@ -13,44 +13,12 @@ struct PrepRunCard<Content: View>: View {
     }
 }
 
-/// Guess / Fairly sure / Certain, picked before a recall is graded.
-struct PrepConfidenceChips: View {
-    @Binding var selection: PrepConfidence?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: BrainStyle.xs) {
-            Text(verbatim: "How sure are you?")
-                .font(BrainStyle.meta)
-                .foregroundStyle(Color.hxTextSecondary)
-            HStack(spacing: BrainStyle.s) {
-                ForEach(PrepConfidence.allCases, id: \.self) { level in
-                    let on = selection == level
-                    Button {
-                        selection = level
-                    } label: {
-                        Text(verbatim: PrepCopy.confidenceLabel(level))
-                            .font(AppFont.body(weight: on ? .semibold : nil))
-                            .foregroundStyle(on ? HermexPaper.knowledge.onGlow : Color.hxTextPrimary)
-                            .padding(.horizontal, BrainStyle.m)
-                            .frame(minHeight: BrainStyle.minTapTarget)
-                            .background(on ? HermexPaper.knowledge.glow : Color.hxSurface, in: Capsule())
-                            .overlay(Capsule().strokeBorder(on ? Color.clear : Color.hxSeparator, lineWidth: 0.5))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(on ? .isSelected : [])
-                }
-            }
-        }
-    }
-}
-
-/// The question with an answer field (tap to talk, or type), the confidence chips, and "I don't know, show me".
+/// The question with an answer field (tap to talk, or type), and "I don't know, show me".
 /// Submit is the run's pinned button.
 struct PrepRecallCard: View {
     let prompt: String
     let label: String
     @Binding var draft: String
-    @Binding var confidence: PrepConfidence?
     let isSubmitting: Bool
     let dontKnow: () -> Void
     @FocusState private var typing: Bool
@@ -76,7 +44,6 @@ struct PrepRecallCard: View {
                     .strokeBorder(Color.hxSeparator, lineWidth: 0.5))
                 .accessibilityLabel(Text(verbatim: "Your answer"))
             PrepStoryMicButton(draft: draft, isSubmitting: isSubmitting) { draft = $0 }
-            PrepConfidenceChips(selection: $confidence)
         }
         Button(action: dontKnow) {
             Text(verbatim: "I don't know, show me")
@@ -90,7 +57,7 @@ struct PrepRecallCard: View {
 }
 
 /// A graded recall: "3 of 4 key points", each point revealed in turn (all at once under Reduce
-/// Motion), "I had that" on misses, the surprise banner on a confident miss. After a question rep the headline
+/// Motion), "I had that" on misses. After a question rep the headline
 /// counts the tutor's follow-ups, each miss says why, and the worked answer for this question waits behind a tap;
 /// "Go deeper in Atlas" opens a chat about it, which never changes the score.
 struct PrepRecallResultView: View {
@@ -114,19 +81,6 @@ struct PrepRecallResultView: View {
     private var isQuestion: Bool { result.dialogue != nil }
 
     var body: some View {
-        if result.surprise {
-            Label {
-                Text(verbatim: "Surprise one. You were sure, and this is the kind that sticks now.")
-                    .font(BrainStyle.rowTitle)
-                    .foregroundStyle(Color.hxTextPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-            } icon: {
-                Image(systemName: "sparkles").foregroundStyle(Color.hxWarning)
-            }
-            .padding(BrainStyle.m)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.hxWarning.opacity(0.14), in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
-        }
         PrepRunCard {
             if result.isUngraded {
                 Text(verbatim: "Saved — Atlas will grade this tonight.")

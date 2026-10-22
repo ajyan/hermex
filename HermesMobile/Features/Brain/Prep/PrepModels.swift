@@ -433,8 +433,6 @@ struct PrepAttemptRequest: Encodable, Hashable, Sendable {
     var run: PrepRunKind = .daily
     /// The unit a test out is for; omitted on other runs.
     var unit: String?
-    /// How sure the user was before a recall was graded; omitted on other drills.
-    var confidence: PrepConfidence?
     /// "I don't know, show me": a recall with no answer.
     var dontKnow = false
     /// A probe's story attempt id and the probe's id; omitted on every other drill.
@@ -442,7 +440,7 @@ struct PrepAttemptRequest: Encodable, Hashable, Sendable {
     var probe: String?
 
     private enum CodingKeys: String, CodingKey {
-        case date, index, item, drill, answer, run, unit, confidence, parent, probe
+        case date, index, item, drill, answer, run, unit, parent, probe
         case elapsedMS = "elapsed_ms"
         case hintsUsed = "hints_used"
         case dontKnow = "dont_know"
@@ -459,7 +457,6 @@ struct PrepAttemptRequest: Encodable, Hashable, Sendable {
         try c.encode(hintsUsed, forKey: .hintsUsed)
         try c.encode(run, forKey: .run)
         try c.encodeIfPresent(unit, forKey: .unit)
-        try c.encodeIfPresent(confidence, forKey: .confidence)
         if dontKnow { try c.encode(true, forKey: .dontKnow) }
         try c.encodeIfPresent(parent, forKey: .parent)
         try c.encodeIfPresent(probe, forKey: .probe)
@@ -546,8 +543,6 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
     let sitting: PrepBossSitting?
     /// Why the option picked on a lesson check is wrong; nil when it was right.
     let why: String?
-    /// A recall answered "certain" that wasn't a pass: the kind of miss that sticks once corrected.
-    let surprise: Bool
     /// The XP this answer earned, when the server says.
     let xp: Int?
     /// The attempt's id, for "I had that" overrides.
@@ -592,8 +587,6 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
         revisit = base.revisit.isEmpty ? base.revisit : override.revisit
         sitting = override.sitting ?? base.sitting
         why = base.why
-        // A surprise is a confident miss; claiming points back can turn it into a pass.
-        surprise = base.surprise && verdict != "pass"
         xp = override.xp ?? base.xp
         attemptID = override.attemptID ?? base.attemptID
         overridden = override.overridden
@@ -619,7 +612,7 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case verdict, correct, feedback, credit, links, streak, grade, logged, points, revisit, sitting, why
-        case surprise, xp, overridden, score, weakest, role, lead, backup, probe
+        case xp, overridden, score, weakest, role, lead, backup, probe
         case elapsedMS = "elapsed_ms"
         case storyTold = "story_told"
         case repVerdict = "rep_verdict"
@@ -652,7 +645,6 @@ struct PrepAttemptResult: Decodable, Hashable, Sendable {
         revisit = c.optional(PrepRevisits.self, .revisit)?.values ?? []
         sitting = c.optional(PrepBossSitting.self, .sitting)
         why = c.optional(String.self, .why).flatMap { $0.isEmpty ? nil : $0 }
-        surprise = c.bool(.surprise)
         xp = c.optional(Int.self, .xp)
         attemptID = c.optional(String.self, .attemptID)
         overridden = c.strings(.overridden)
