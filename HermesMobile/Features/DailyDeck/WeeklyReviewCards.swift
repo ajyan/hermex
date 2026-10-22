@@ -21,6 +21,11 @@ struct WeekCoverCard: View {
     @State private var noteIsOpen = false
     @State private var showsPhotoPicker = false
     @State private var photoItem: PhotosPickerItem?
+    /// A picked photo is being read and converted, before the upload starts.
+    @State private var isPreparingPhoto = false
+    @State private var hasPhoto = false
+
+    private var isBusyWithPhoto: Bool { isPreparingPhoto || viewModel.isUploadingWeekPhoto }
 
     private var editedTitle: String? {
         viewModel.answer(for: card)?.text.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
@@ -85,9 +90,9 @@ struct WeekCoverCard: View {
     private var photoSlot: some View {
         VStack(alignment: .leading, spacing: 6) {
             Button { showsPhotoPicker = true } label: {
-                WeekPhotoView(viewModel: viewModel, palette: palette)
+                WeekPhotoView(viewModel: viewModel, palette: palette, hasPhoto: $hasPhoto)
                     .overlay {
-                        if viewModel.isUploadingWeekPhoto {
+                        if isBusyWithPhoto {
                             RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous)
                                 .fill(.ultraThinMaterial)
                                 .overlay { ProgressView() }
@@ -96,8 +101,9 @@ struct WeekCoverCard: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .disabled(viewModel.isUploadingWeekPhoto)
+            .disabled(isBusyWithPhoto)
             .accessibilityLabel(Text(verbatim: "Photo of the week"))
+            .accessibilityValue(Text(verbatim: isBusyWithPhoto ? "Uploading" : hasPhoto ? "Added" : "None yet"))
             .accessibilityHint(Text(verbatim: "Chooses a photo from your library"))
             if let error = viewModel.weekPhotoError {
                 Text(verbatim: error)
@@ -109,11 +115,13 @@ struct WeekCoverCard: View {
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
             photoItem = nil
+            isPreparingPhoto = true
             Task { await upload(item) }
         }
     }
 
     private func upload(_ item: PhotosPickerItem) async {
+        defer { isPreparingPhoto = false }
         guard let data = try? await item.loadTransferable(type: Data.self),
               let jpeg = await Task.detached(priority: .userInitiated, operation: { WeekPhoto.jpeg(from: data) }).value
         else {

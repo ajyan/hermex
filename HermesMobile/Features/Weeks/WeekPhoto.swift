@@ -24,25 +24,32 @@ enum WeekPhoto {
     }
 }
 
-/// Decoded week photos, per server, path and upload version, so paging back to the cover (or
-/// reopening it) doesn't fetch the file again and a photo never shows under another server.
-private enum WeekPhotoCache {
+/// Decoded week photos, per server, workspace session and path, so paging back to the cover (or
+/// reopening it) doesn't fetch the file again and a photo never shows under another server or
+/// workspace. An upload drops its entry, since a new view model starts again at version 0.
+enum WeekPhotoCache {
     static let images: NSCache<NSString, UIImage> = {
         let cache = NSCache<NSString, UIImage>()
         cache.countLimit = 8
         return cache
     }()
 
-    static func key(server: URL, path: String, version: Int) -> NSString {
-        "\(server.absoluteString)|\(path)|\(version)" as NSString
+    static func key(server: URL, sessionID: String?, path: String) -> NSString {
+        "\(server.absoluteString)|\(sessionID ?? "")|\(path)" as NSString
+    }
+
+    static func invalidate(server: URL, sessionID: String?, path: String) {
+        images.removeObject(forKey: key(server: server, sessionID: sessionID, path: path))
     }
 }
 
 /// The week's photo, or a quiet placeholder while there is none (or it can't be read). It loads
-/// through the view model, and reloads when the path or the upload version changes.
+/// through the view model, and reloads when the path or the upload version changes (an upload clears its cache entry first).
 struct WeekPhotoView: View {
     let viewModel: DailyDeckViewModel
     let palette: DeckPalette
+    /// Whether a photo is showing, for the slot's VoiceOver value.
+    @Binding var hasPhoto: Bool
 
     @State private var image: UIImage?
     /// The path `image` belongs to, so another week never shows this week's photo.
@@ -74,6 +81,7 @@ struct WeekPhotoView: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
             .task(id: loadID) { await load() }
+            .onChange(of: image != nil) { _, showing in hasPhoto = showing }
     }
 
     /// A missing photo (404) and any other failure both leave the placeholder; a failed reload
@@ -84,12 +92,12 @@ struct WeekPhotoView: View {
             image = nil
             imagePath = path
         }
-        let key = WeekPhotoCache.key(server: viewModel.server, path: path, version: viewModel.weekPhotoVersion)
+        let key = WeekPhotoCache.key(server: viewModel.server, sessionID: viewModel.sessionID, path: path)
         if let cached = WeekPhotoCache.images.object(forKey: key) {
             image = cached
             return
         }
-        guard let data = await viewModel.weekPhotoData(), let decoded = UIImage(data: data) else { return }
+        guard let data = await viewModel.weekPhotoData(path: path), let decoded = UIImage(data: data) else { return }
         let ready = await decoded.byPreparingForDisplay() ?? decoded
         guard !Task.isCancelled else { return }
         WeekPhotoCache.images.setObject(ready, forKey: key)

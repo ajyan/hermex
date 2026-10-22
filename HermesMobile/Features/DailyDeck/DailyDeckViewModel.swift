@@ -142,12 +142,13 @@ final class DailyDeckViewModel {
     /// Cards on this deck marked "Not for Me".
     var skippedCount: Int { cards.filter { answers[$0.id]?.feedback != nil }.count }
 
-    /// The last card marked "Not for Me" and its answer before that, for Undo.
     /// Counts the cover photo's successful uploads; the photo view reloads when it changes.
     private(set) var weekPhotoVersion = 0
     private(set) var isUploadingWeekPhoto = false
     /// Why the last upload failed; the cover shows it under the photo, which keeps its previous image.
     private(set) var weekPhotoError: String?
+
+    /// The last card marked "Not for Me" and its answer before that, for Undo.
     private(set) var lastDismissal: (card: DeckCard, previous: DeckAnswer?)?
 
     func answer(for card: DeckCard) -> DeckAnswer? { answers[card.id] }
@@ -254,6 +255,7 @@ final class DailyDeckViewModel {
             self.date = date
             self.kind = kind
             index = 0
+            weekPhotoError = nil
             await load()
         }
         guard let cardID, state == .ready, let i = visiblePages.firstIndex(where: { $0.id == cardID }) else { return }
@@ -604,10 +606,10 @@ final class DailyDeckViewModel {
     /// Where the week's photo lives in the vault, read back through the workspace file route.
     var weekPhotoPath: String { "weekly-checkins/photos/\(date).jpg" }
 
-    /// The week's photo bytes, or nil when there is none yet or it cannot be read.
-    func weekPhotoData() async -> Data? {
+    /// The photo at `path` (a `weekPhotoPath`), or nil when there is none yet or it cannot be read.
+    func weekPhotoData(path: String) async -> Data? {
         guard let sessionID else { return nil }
-        return try? await client.rawFile(sessionID: sessionID, path: weekPhotoPath)
+        return try? await client.rawFile(sessionID: sessionID, path: path)
     }
 
     /// The picked photo could not be read as an image; nothing was uploaded.
@@ -622,8 +624,12 @@ final class DailyDeckViewModel {
         isUploadingWeekPhoto = true
         weekPhotoError = nil
         defer { isUploadingWeekPhoto = false }
+        let weekEnding = date, path = weekPhotoPath, sessionID = sessionID
         do {
-            try await client.uploadWeekPhoto(weekEnding: date, jpeg: jpeg)
+            try await client.uploadWeekPhoto(weekEnding: weekEnding, jpeg: jpeg)
+            // The cache outlives this view model, whose version restarts at 0: drop the old image
+            // so a reopened cover reads the new one.
+            WeekPhotoCache.invalidate(server: server, sessionID: sessionID, path: path)
             weekPhotoVersion += 1
         } catch let APIError.http(statusCode, _) where statusCode == 404 {
             weekPhotoError = "This server can't keep a photo of the week."

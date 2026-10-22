@@ -518,6 +518,40 @@ final class WeeklyReviewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testUploadDropsTheCachedPhotoSoAReopenedCoverReadsTheNewOne() async throws {
+        let (viewModel, _) = try await weeklyViewModelAndClient()
+        let key = WeekPhotoCache.key(server: server, sessionID: viewModel.sessionID, path: viewModel.weekPhotoPath)
+        let otherWorkspace = WeekPhotoCache.key(server: server, sessionID: "other-session", path: viewModel.weekPhotoPath)
+        XCTAssertNotEqual(key, otherWorkspace, "another workspace session never shares an entry")
+        WeekPhotoCache.images.setObject(UIImage(), forKey: key)
+        XCTAssertNotNil(WeekPhotoCache.images.object(forKey: key))
+
+        await viewModel.setWeekPhoto(Data([0xFF, 0xD8, 0xFF, 0x01]))
+        XCTAssertNil(WeekPhotoCache.images.object(forKey: key), "a new view model at version 0 must miss, not show the old photo")
+    }
+
+    @MainActor
+    func testFailedUploadKeepsTheCachedPhoto() async throws {
+        let (viewModel, client) = try await weeklyViewModelAndClient()
+        let key = WeekPhotoCache.key(server: server, sessionID: viewModel.sessionID, path: viewModel.weekPhotoPath)
+        WeekPhotoCache.images.setObject(UIImage(), forKey: key)
+        client.photoUpload = .failure(APIError.http(statusCode: 500, body: nil))
+        await viewModel.setWeekPhoto(Data([0xFF, 0xD8, 0xFF, 0x01]))
+        XCTAssertNotNil(WeekPhotoCache.images.object(forKey: key))
+        WeekPhotoCache.images.removeObject(forKey: key)
+    }
+
+    @MainActor
+    func testShowingAnotherDeckClearsTheUploadError() async throws {
+        let (viewModel, client) = try await weeklyViewModelAndClient()
+        client.photoUpload = .failure(APIError.http(statusCode: 500, body: nil))
+        await viewModel.setWeekPhoto(Data([0xFF, 0xD8, 0xFF, 0x01]))
+        XCTAssertNotNil(viewModel.weekPhotoError)
+        await viewModel.show(date: "2026-10-18", kind: "weekly")
+        XCTAssertNil(viewModel.weekPhotoError)
+    }
+
+    @MainActor
     func testSetWeekPhotoFailureKeepsPreviousState() async throws {
         let (viewModel, client) = try await weeklyViewModelAndClient()
         await viewModel.setWeekPhoto(Data([0xFF, 0xD8, 0xFF, 0x01]))
@@ -538,10 +572,10 @@ final class WeeklyReviewModelTests: XCTestCase {
     @MainActor
     func testWeekPhotoDataReadsThePathAndTreatsA404AsNoPhoto() async throws {
         let (viewModel, client) = try await weeklyViewModelAndClient()
-        let missing = await viewModel.weekPhotoData()
+        let missing = await viewModel.weekPhotoData(path: viewModel.weekPhotoPath)
         XCTAssertNil(missing)
         client.rawFiles["weekly-checkins/photos/2026-10-25.jpg"] = Data([1, 2, 3])
-        let photo = await viewModel.weekPhotoData()
+        let photo = await viewModel.weekPhotoData(path: viewModel.weekPhotoPath)
         XCTAssertEqual(photo, Data([1, 2, 3]))
     }
 
