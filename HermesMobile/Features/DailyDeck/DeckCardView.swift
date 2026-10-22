@@ -183,11 +183,12 @@ struct DeckCardView: View {
         }
         if let diagram = viewModel.diagram(for: card) {
             // A secondary button in the card's paper, so "Write a reflection" stays the one filled button.
-            Button { openDiagram = diagram } label: { OpenDiagramLabel(paper: palette.colors) }
+            Button { openDiagram = diagram } label: { OpenDiagramLabel(paper: palette.colors, isMap: diagram.isMap) }
             .buttonStyle(.plain)
             .padding(.top, 18)
-            .accessibilityLabel(Text(verbatim: "Open the diagram: \(diagram.title ?? "interactive")"))
-            .accessibilityHint(Text(verbatim: "Opens an interactive diagram"))
+            .accessibilityLabel(Text(verbatim: diagram.isMap ? "Open the map" : "Open the diagram: \(diagram.title ?? "interactive")"))
+            .accessibilityHint(Text(verbatim: diagram.isMap ? "Opens the piece's parts and argument, step by step"
+                                    : "Opens an interactive diagram"))
         }
         if !card.isMandarin, let detail = text.detail {
             Text(inlineMarkdown(detail))
@@ -197,6 +198,9 @@ struct DeckCardView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 22)
                 .textSelection(.enabled)
+        }
+        if let piece = card.piece {
+            PieceArgument(piece: piece, palette: palette).padding(.top, 22)
         }
         if !card.points.isEmpty {
             MoodChart(points: card.points, palette: palette).padding(.top, 22)
@@ -553,6 +557,79 @@ struct DeckCardView: View {
 
 /// A recap's entries: each label set small and bold above its text, shown once for a run of
 /// entries that share it (the items under "Career Priorities"), with hairlines between groups.
+/// A Piece card's argument: "The argument · N steps", each a numbered claim with where it sits in the piece,
+/// then "In its own words", a few of its quotes in the saved-words serif with where each comes from.
+private struct PieceArgument: View {
+    let piece: DeckPiece
+    let palette: DeckPalette
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(verbatim: "The argument · \(piece.steps.count) \(piece.steps.count == 1 ? "step" : "steps")")
+                .font(AppFont.subheadline(weight: .semibold))
+                .foregroundStyle(palette.ink)
+                .accessibilityAddTraits(.isHeader)
+                .padding(.bottom, 10)
+            ForEach(Array(piece.steps.enumerated()), id: \.offset) { index, step in
+                if index > 0 {
+                    Rectangle().fill(palette.ink.opacity(0.12)).frame(height: 0.5).padding(.vertical, 12)
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text(verbatim: "\(index + 1)")
+                        .font(AppFont.display(style: .subheadline, weight: .semibold))
+                        .foregroundStyle(palette.ink)
+                        .frame(minWidth: 16, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(verbatim: step.claim)
+                            .font(AppFont.body())
+                            .foregroundStyle(Color.hxTextPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let span = step.span {
+                            Text(verbatim: span)
+                                .font(AppFont.footnote(weight: .medium))
+                                .foregroundStyle(palette.ink)
+                        }
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(Text(verbatim: "Step \(index + 1): \(step.claim)\(step.span.map { ". \($0)" } ?? "")"))
+            }
+            if !piece.quotes.isEmpty {
+                Text(verbatim: "In its own words")
+                    .font(AppFont.subheadline(weight: .semibold))
+                    .foregroundStyle(palette.ink)
+                    .accessibilityAddTraits(.isHeader)
+                    .padding(.top, 26)
+                    .padding(.bottom, 10)
+                VStack(alignment: .leading, spacing: 14) {
+                    ForEach(piece.quotes, id: \.self) { quote in
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Image(systemName: "quote.opening")
+                                .font(AppFont.footnote(weight: .semibold))
+                                .foregroundStyle(palette.ink)
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(verbatim: quote.text)
+                                    .font(AppFont.serif(style: .body))
+                                    .lineSpacing(3)
+                                    .foregroundStyle(Color.hxTextPrimary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                if let at = quote.at {
+                                    Text(verbatim: at)
+                                        .font(AppFont.footnote(weight: .medium))
+                                        .foregroundStyle(palette.ink)
+                                }
+                            }
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 private struct RecapList: View {
     let entries: [DeckEntry]
     let palette: DeckPalette

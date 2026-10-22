@@ -48,6 +48,17 @@ final class BrainModelsTests: XCTestCase {
         XCTAssertEqual(cached.diagram, page.diagram, "the offline copy keeps the diagram")
     }
 
+    func testAPieceMapDiagramIsAMapAndKeepsItsKindInTheCache() throws {
+        let json = #"""
+        {"item": {"module": "highlights", "id": "youtube_highlights/summaries/rag-summary.md", "title": "RAG"},
+         "diagram": {"topic": "map-rag", "title": "The map: RAG", "html": "<title>The map</title>", "kind": "map"}}
+        """#
+        let page = try JSONDecoder().decode(BrainPage.self, from: Data(json.utf8))
+        XCTAssertEqual(page.diagram?.isMap, true)
+        let cached = try JSONDecoder().decode(BrainPage.self, from: JSONEncoder().encode(page))
+        XCTAssertEqual(cached.diagram?.isMap, true)
+    }
+
     func testPageWithoutAUsableDiagramHasNone() throws {
         XCTAssertNil(try JSONDecoder().decode(BrainPage.self, from: Data(pageJSON.utf8)).diagram, "older servers send none")
         for diagram in [#"null"#, #"{"topic": "kafka", "html": "  "}"#, #""broken""#] {

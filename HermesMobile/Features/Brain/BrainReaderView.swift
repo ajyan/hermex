@@ -301,10 +301,14 @@ struct BrainReaderContent: View {
                         tagRow
                     }
                     if let diagram = page.diagram {
-                        Button { showsDiagram = true } label: { OpenDiagramLabel(paper: page.item.module.paper) }
+                        Button { showsDiagram = true } label: {
+                            OpenDiagramLabel(paper: page.item.module.paper, isMap: diagram.isMap)
+                        }
                             .buttonStyle(.plain)
-                            .accessibilityLabel(Text(verbatim: "Open the diagram: \(diagram.title ?? page.item.title)"))
-                            .accessibilityHint(Text(verbatim: "Opens an interactive diagram"))
+                            .accessibilityLabel(Text(verbatim: diagram.isMap ? "Open the map"
+                                                     : "Open the diagram: \(diagram.title ?? page.item.title)"))
+                            .accessibilityHint(Text(verbatim: diagram.isMap ? "Opens the piece's parts and argument, step by step"
+                                                    : "Opens an interactive diagram"))
                     }
                 }
                 if let personLayout {

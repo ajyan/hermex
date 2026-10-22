@@ -143,6 +143,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let values: [DeckValue]
     /// The who card's suggested people.
     let suggested: [String]
+    /// A Piece card's argument and quotes, from the long piece's map (the vault's tools/piece_view.py).
+    let piece: DeckPiece?
 
     /// The vault file the card came from (`ref.link`, "wiki/nyc-marathon"); nil for pooled
     /// material with no page of its own (books, quotes, videos).
@@ -243,6 +245,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
         case goal, start, lastWeek, phrases, yesterday, questionPinyin, questionEn, rows, week
         case chapter, weekNumber, range, chapters, noteFromPast, days, gave, drained, rotation, items, values, suggested
+        case piece
         case weekCommitments = "commitments"
         case itemKind = "kind"
     }
@@ -322,6 +325,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         items = ((try? c.decodeIfPresent([Lossy<DeckReviewItem>].self, forKey: .items)) ?? []).compactMap(\.value)
         values = ((try? c.decodeIfPresent([Lossy<DeckValue>].self, forKey: .values)) ?? []).compactMap(\.value)
         suggested = (try? c.decodeIfPresent([String].self, forKey: .suggested)) ?? []
+        piece = (try? c.decodeIfPresent(DeckPiece.self, forKey: .piece)).flatMap { $0.steps.isEmpty ? nil : $0 }
         let ref = try? c.decodeIfPresent(Ref.self, forKey: .ref)
         link = ref?.link.flatMap { $0.isEmpty ? nil : $0 }
         pool = ref?.pool.flatMap { $0.isEmpty ? nil : $0 }
@@ -410,6 +414,43 @@ struct DeckEntry: Decodable, Equatable, Hashable {
     }
 
     private enum CodingKeys: String, CodingKey { case label, text }
+}
+
+/// A Piece card's long piece, laid out from its map: the argument in numbered steps, each with where it
+/// sits in the piece ("Parts 3–5 · from 0:24"), then a few quotes from across it in its own words.
+struct DeckPiece: Decodable, Equatable, Hashable {
+    struct Step: Decodable, Equatable, Hashable {
+        let name: String?
+        let claim: String
+        let span: String?
+    }
+
+    struct Quote: Decodable, Equatable, Hashable {
+        let text: String
+        let at: String?
+    }
+
+    /// "3 hours · 15 parts".
+    let meta: String?
+    let steps: [Step]
+    let quotes: [Quote]
+
+    init(meta: String?, steps: [Step], quotes: [Quote]) {
+        self.meta = meta
+        self.steps = steps
+        self.quotes = quotes
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        meta = try? c.decodeIfPresent(String.self, forKey: .meta)
+        steps = ((try? c.decodeIfPresent([Lossy<Step>].self, forKey: .steps)) ?? []).compactMap(\.value)
+            .filter { !$0.claim.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        quotes = ((try? c.decodeIfPresent([Lossy<Quote>].self, forKey: .quotes)) ?? []).compactMap(\.value)
+            .filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    }
+
+    private enum CodingKeys: String, CodingKey { case meta, steps, quotes }
 }
 
 /// One weekday on the mood card. Energy (Garmin Body Battery) and mood (read from what you
@@ -903,7 +944,7 @@ struct DeckCardText: Equatable {
             attribution = card.source == card.title ? nil : card.source
             // A recap's entries, a mood chart, or goal meters are drawn; the plain `body` copy is only
             // for older builds. A theme's summary is its `context`.
-            let drawn = !card.entries.isEmpty || !card.points.isEmpty || !card.meters.isEmpty
+            let drawn = !card.entries.isEmpty || !card.points.isEmpty || !card.meters.isEmpty || card.piece != nil
             detail = card.context ?? (drawn ? nil : (card.body ?? (card.title == nil ? nil : card.fallback)))
         case .sleep:
             // The question leads; the numbers show after the rating so they don't decide it.

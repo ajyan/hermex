@@ -8,8 +8,11 @@ struct BriefDiagramIndex: Decodable, Equatable {
         let topic: String
         let title: String?
         let keys: [String]
+        /// "map" for a long piece's map (a Piece card's), drawn from its piece map; nil for a diagram.
+        let kind: String?
 
         var id: String { topic }
+        var isMap: Bool { kind == "map" }
         var fragmentPath: String { "\(BriefDiagramIndex.directory)/\(topic).html" }
     }
 
@@ -61,12 +64,14 @@ struct BriefDiagramIndex: Decodable, Equatable {
 }
 
 /// "Open the diagram": a full-width secondary button in the object's paper (`wash` fill, `edge` hairline, `glow`
-/// label), so a screen's own filled button stays the one primary. Brief cards, Prep lessons and Brain pages share it.
+/// label), so a screen's own filled button stays the one primary. Brief cards, Prep lessons and Brain pages share it;
+/// a Piece card's says "Open the map".
 struct OpenDiagramLabel: View {
     let paper: HermexPaper
+    var isMap = false
 
     var body: some View {
-        Label { Text(verbatim: "Open the diagram") } icon: {
+        Label { Text(verbatim: isMap ? "Open the map" : "Open the diagram") } icon: {
             Image(systemName: "point.3.connected.trianglepath.dotted")
         }
         .font(AppFont.body(weight: .semibold))
