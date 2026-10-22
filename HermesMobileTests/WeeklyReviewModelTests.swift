@@ -22,7 +22,7 @@ final class WeeklyReviewModelTests: XCTestCase {
       {"id": "energy", "type": "energy", "chapter": "understand", "gave": ["Running", "Dinner with Jon"], "drained": ["Meetings"]},
       {"id": "deep", "type": "prompt", "chapter": "understand", "question": "What did you notice?", "rotation": "Examen", "files_to": "Reflection"},
       {"id": "commitments", "type": "commitments", "chapter": "account", "items": [
-        {"id": "one-thing", "text": "Ship the deck", "carried": 1}, {"id": "who-jon-chan", "text": "See Jon Chan", "carried": 0}, {"text": "no id"}]},
+        {"id": "one-thing", "text": "Ship the deck", "carried": 1}, {"id": "who-jon-chan", "text": "Jon Chan", "carried": 0}, {"text": "no id"}]},
       {"id": "values", "type": "values", "chapter": "account", "values": [
         {"id": "present", "name": "Present", "evidence": "Phone down at dinner."}, {"id": "people", "name": "People", "evidence": ""}]},
       {"id": "goals-career", "type": "item", "kind": "goals", "chapter": "account", "title": "Your goals", "meters": []},
@@ -160,10 +160,15 @@ final class WeeklyReviewModelTests: XCTestCase {
         var empty = DeckAnswer(card: "commitments")
         empty.scores = [:]
         empty.notes = [:]
-        empty.lists = ["gave": []]
+        empty.lists = [:]
         empty.statuses = [:]
         XCTAssertFalse(empty.isAnswer(for: card))
         XCTAssertTrue(empty.isEmpty)
+
+        var emptied = DeckAnswer(card: "energy")
+        emptied.lists = ["gave": []]
+        XCTAssertTrue(emptied.isAnswer(for: card), "an emptied list says none, so it answers")
+        XCTAssertFalse(emptied.isEmpty)
 
         var statuses = DeckAnswer(card: "commitments")
         statuses.statuses = ["one-thing": "kept"]
@@ -289,6 +294,10 @@ final class WeeklyReviewModelTests: XCTestCase {
         viewModel.setScore("present", 4, for: values)
         XCTAssertEqual(viewModel.answer(for: values)?.scores, ["present": 4])
 
+        // Clearing a line goes back to Atlas's evidence, which is what the vault files.
+        viewModel.setNote("present", "  ", for: values)
+        XCTAssertNil(viewModel.answer(for: values)?.notes, "an emptied note is no note")
+
         // A prediction's grade and note sit under its id on the predictions answer.
         let predictions = try card("predictions", in: viewModel)
         viewModel.setStatus("2026-10-04-p", "hit", for: predictions)
@@ -330,7 +339,7 @@ final class WeeklyReviewModelTests: XCTestCase {
         viewModel.setStatus("who-jon-chan", "missed", for: commitments)
         XCTAssertEqual(viewModel.missedCommitments.map(\.id), ["one-thing", "who-jon-chan"], "in the card's order")
         viewModel.setStatus("one-thing", "dropped", for: commitments)
-        XCTAssertEqual(viewModel.missedCommitments.map(\.text), ["See Jon Chan"])
+        XCTAssertEqual(viewModel.missedCommitments.map(\.text), ["Jon Chan"])
     }
 
     @MainActor
@@ -386,6 +395,39 @@ final class WeeklyReviewModelTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testRemovingEveryEnergyChipKeepsTheEmptyLists() async throws {
+        let viewModel = try await weeklyViewModel()
+        let energy = try card("energy", in: viewModel)
+        XCTAssertEqual(viewModel.list("gave", for: energy, drafted: energy.gave), ["Running", "Dinner with Jon"])
+        viewModel.setList("gave", [], for: energy)
+        viewModel.setList("drained", [], for: energy)
+        XCTAssertEqual(viewModel.answer(for: energy)?.lists, ["gave": [], "drained": []])
+        XCTAssertEqual(viewModel.list("gave", for: energy, drafted: energy.gave), [], "the card shows no chips")
+        XCTAssertEqual(viewModel.list("drained", for: energy, drafted: energy.drained), [])
+
+        let payload = DeckAnswersPayload(deck: try XCTUnwrap(viewModel.deck), answers: viewModel.answers,
+                                         completedAt: Date(timeIntervalSince1970: 0))
+        XCTAssertEqual(payload.answers.first { $0.card == "energy" }?.lists, ["gave": [], "drained": []],
+                       "filed as none, so the vault doesn't fall back to the drafted chips")
+    }
+
+    func testCarryChipsNeverOverwriteTypedWords() {
+        let missed = [DeckReviewItem(id: "one-thing", text: "Ship the deck"), DeckReviewItem(id: "who-ana", text: "Ana")]
+        XCTAssertTrue(WeekCarryChips.offers(missed, current: ""))
+        XCTAssertTrue(WeekCarryChips.offers(missed, current: "Ana"), "a carried one stays, to switch or untap")
+        XCTAssertFalse(WeekCarryChips.offers(missed, current: "Write the essay"))
+        XCTAssertFalse(WeekCarryChips.offers([], current: ""))
+    }
+
+    func testAddingAPersonDedupesByCase() {
+        let suggested = ["Ana Ruiz", "Priya"]
+        XCTAssertEqual(WeekWhoCard.adding("ana ruiz", to: [], suggested: suggested), ["Ana Ruiz"], "picks the suggestion")
+        XCTAssertEqual(WeekWhoCard.adding("ANA RUIZ", to: ["Ana Ruiz"], suggested: suggested), ["Ana Ruiz"])
+        XCTAssertEqual(WeekWhoCard.adding("Bea", to: ["Priya"], suggested: suggested), ["Priya", "Bea"])
+        XCTAssertEqual(WeekWhoCard.adding("bea", to: ["Priya", "Bea"], suggested: suggested), ["Priya", "Bea"])
+    }
+
     func testChapterLabelNumbersTheChapters() throws {
         let deck = try DailyDeck.decode(Self.v2DeckJSON)
         let labels = Dictionary(uniqueKeysWithValues: deck.cards.map { ($0.id, $0.chapterLabel) })
@@ -423,7 +465,6 @@ final class WeeklyReviewModelTests: XCTestCase {
     private func card(_ id: String, in viewModel: DailyDeckViewModel) throws -> DeckCard {
         try XCTUnwrap(viewModel.cards.first { $0.id == id })
     }
-
 
     private static func card(_ id: String) -> DeckCard {
         // swiftlint:disable:next force_try

@@ -446,6 +446,11 @@ final class DailyDeckViewModel {
         }
     }
 
+    /// A list as the card shows it: the answer's once he's touched it (even emptied), else `drafted`.
+    func list(_ key: String, for card: DeckCard, drafted: [String]) -> [String] {
+        answers[card.id]?.lists?[key] ?? drafted
+    }
+
     /// Scores a value 1–10; tapping its chosen score again clears it. Other scores are ignored.
     func setScore(_ id: String, _ score: Int, for card: DeckCard) {
         guard (1...10).contains(score) else { return }
@@ -466,12 +471,13 @@ final class DailyDeckViewModel {
         }
     }
 
-    /// A line for an item, as typed: a value's evidence, a prediction's "what happened".
+    /// A line for an item: a value's evidence, a prediction's "what happened". An empty line clears
+    /// it, so a value shows (and files) Atlas's evidence again.
     func setNote(_ id: String, _ text: String, for card: DeckCard) {
         update(card) { answer in
             var notes = answer.notes ?? [:]
-            notes[id] = text
-            answer.notes = notes
+            notes[id] = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text
+            answer.notes = notes.isEmpty ? nil : notes
         }
     }
 

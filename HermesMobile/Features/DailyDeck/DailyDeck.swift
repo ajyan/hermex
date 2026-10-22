@@ -527,7 +527,8 @@ struct DeckAnswer: Codable, Equatable {
     var feedback: DeckFeedback?
     /// The v2 weekly cards' answers, each encoded only when set: the values card's 1–10 `scores` and
     /// its evidence `notes`, the energy and who cards' `lists`, the commitments and predictions cards'
-    /// `statuses`, and the keepsakes card's `prediction`. Keys are the card's item ids.
+    /// `statuses`, and the keepsakes card's `prediction`. Keys are the card's item ids. A list that is
+    /// present but empty still answers: chips he removed are filed as none, not refilled from the draft.
     var scores: [String: Int]?
     var notes: [String: String]?
     var lists: [String: [String]]?
@@ -540,7 +541,7 @@ struct DeckAnswer: Codable, Equatable {
 
     private var hasWeeklyFields: Bool {
         !(scores?.isEmpty ?? true) || !(notes?.isEmpty ?? true) || prediction != nil
-            || !(statuses?.isEmpty ?? true) || (lists?.values.contains { !$0.isEmpty } ?? false)
+            || !(statuses?.isEmpty ?? true) || !(lists?.isEmpty ?? true)
     }
 
     private var hasTags: Bool { !(tags?.isEmpty ?? true) }

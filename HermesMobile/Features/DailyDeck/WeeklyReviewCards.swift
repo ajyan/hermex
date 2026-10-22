@@ -344,7 +344,7 @@ struct WeekEnergyCard: View {
 
     /// The answer's list once he's touched it, else Atlas's.
     private func list(_ key: String, drafted: [String]) -> [String] {
-        viewModel.answer(for: card)?.lists?[key] ?? drafted
+        viewModel.list(key, for: card, drafted: drafted)
     }
 
     private func section(_ key: String, _ title: String, drafted: [String]) -> some View {

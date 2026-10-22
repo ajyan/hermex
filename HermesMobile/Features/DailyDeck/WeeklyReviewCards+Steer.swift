@@ -3,6 +3,7 @@ import SwiftUI
 // The weekly review's Steer chapter: the one thing to carry, who to see, and the keepsakes.
 
 /// On the one-thing card: last week's missed commitments, each a tap away from being this week's.
+/// Offered only while the answer is empty or is one of them, so a tap never overwrites his words.
 struct WeekCarryChips: View {
     let card: DeckCard
     let palette: DeckPalette
@@ -10,8 +11,8 @@ struct WeekCarryChips: View {
 
     var body: some View {
         let missed = viewModel.missedCommitments
-        if !missed.isEmpty {
-            let current = viewModel.answer(for: card)?.text?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let current = viewModel.answer(for: card)?.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if Self.offers(missed, current: current) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(verbatim: "Carry it from last week")
                     .font(AppFont.footnote(weight: .semibold))
@@ -28,6 +29,11 @@ struct WeekCarryChips: View {
             }
             .padding(.top, 18)
         }
+    }
+
+    /// Whether to offer `missed`: there are some, and the answer is empty or already one of them.
+    static func offers(_ missed: [DeckReviewItem], current: String) -> Bool {
+        !missed.isEmpty && (current.isEmpty || missed.contains { $0.text == current })
     }
 }
 
@@ -75,15 +81,21 @@ struct WeekWhoCard: View {
             DeckFootnote(card: card, palette: palette)
         }
         .weekAddAlert("Add a person", prompt: "Name", isPresented: $isAdding) { name in
-            if !chosen.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) {
-                viewModel.setList("who", chosen + [name], for: card)
-            }
+            viewModel.setList("who", Self.adding(name, to: chosen, suggested: card.suggested), for: card)
         }
     }
 
     private func toggle(_ name: String) {
         let chosen = chosen
         viewModel.setList("who", chosen.contains(name) ? chosen.filter { $0 != name } : chosen + [name], for: card)
+    }
+
+    /// `chosen` with `name` added. A name already offered, in any case, is chosen under its own
+    /// spelling rather than added twice.
+    static func adding(_ name: String, to chosen: [String], suggested: [String]) -> [String] {
+        let same = { (other: String) in other.caseInsensitiveCompare(name) == .orderedSame }
+        guard !chosen.contains(where: same) else { return chosen }
+        return chosen + [suggested.first(where: same) ?? name]
     }
 
     static func unique(_ names: [String]) -> [String] {
@@ -211,6 +223,8 @@ private struct WeekPredictionSheet: View {
     @State private var text = ""
     @State private var probability = DeckPrediction.defaultProbability
     @State private var due = Date()
+    /// The picker's first day: today, or a saved due day already behind it.
+    @State private var earliest = Date()
 
     var body: some View {
         NavigationStack {
@@ -233,7 +247,7 @@ private struct WeekPredictionSheet: View {
                     .font(AppFont.body())
                 }
                 .accessibilityValue(Text(verbatim: "\(probability) percent"))
-                DatePicker(selection: $due, in: Date()..., displayedComponents: .date) {
+                DatePicker(selection: $due, in: earliest..., displayedComponents: .date) {
                     Text(verbatim: "Know by").font(AppFont.body())
                 }
                 Spacer(minLength: 0)
@@ -254,6 +268,7 @@ private struct WeekPredictionSheet: View {
             text = saved?.text ?? ""
             probability = saved?.probability ?? DeckPrediction.defaultProbability
             due = DeckPrediction.date(day: saved?.due ?? DeckPrediction.defaultDue(deckDate: viewModel.date)) ?? Date()
+            earliest = Calendar.current.startOfDay(for: min(due, Date()))
             isFocused = saved == nil
         }
         .onChange(of: text) { save() }
