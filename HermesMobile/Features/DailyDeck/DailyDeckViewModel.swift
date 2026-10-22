@@ -120,10 +120,23 @@ final class DailyDeckViewModel {
 
     /// What the deck shows: every page but cards marked "Not for Me". `index` counts these.
     var visiblePages: [DeckPage] {
-        pages.filter { page in
+        let variant = weekVariant
+        let hasWeek = cards.contains { $0.type == .section }
+        return pages.filter { page in
             guard case .card(let card) = page else { return true }
+            // Only the shown question's sources (the divider carries a variant too, but always stays);
+            // a deck with no divider shows every week card.
+            if hasWeek, card.type != .section, let cardVariant = card.weekVariant, cardVariant != variant { return false }
             return answers[card.id]?.feedback == nil
         }
+    }
+
+    /// Which of the week's drafted questions is on the divider: its place among the question and
+    /// the alternatives, 0 when the deck has no divider.
+    var weekVariant: Int {
+        guard let section = cards.first(where: { $0.type == .section }),
+              let shown = question(for: section) else { return 0 }
+        return Self.questionOptions(for: section).firstIndex(of: shown) ?? 0
     }
 
     var currentPage: DeckPage? {
@@ -475,11 +488,27 @@ final class DailyDeckViewModel {
 
     /// Steps to the card's next question, wrapping back to its own.
     func regenerateQuestion(for card: DeckCard) {
-        let options = [card.question].compactMap { $0 } + card.altQuestions
+        let options = Self.questionOptions(for: card)
         guard options.count > 1 else { return }
         let current = options.firstIndex(of: question(for: card) ?? "") ?? 0
         let next = options[(current + 1) % options.count]
+        let anchor = currentPage?.id
         update(card) { $0.question = next == card.question ? nil : next }
+        // The week's divider swaps the cards after it; stay on the page that was on screen.
+        if let anchor, let position = visiblePages.firstIndex(where: { $0.id == anchor }) {
+            index = position
+        } else {
+            index = min(index, max(visiblePages.count - 1, 0))
+        }
+    }
+
+    private static func questionOptions(for card: DeckCard) -> [String] {
+        [card.question].compactMap { $0 } + card.altQuestions
+    }
+
+    /// Sets (or, when blank, clears) the note on why a question was chosen. Kept as typed; filing trims it.
+    func setNote(_ text: String, for card: DeckCard) {
+        update(card) { $0.text = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text }
     }
 
     /// Replaces the card's question with the user's own; an empty one restores the card's.

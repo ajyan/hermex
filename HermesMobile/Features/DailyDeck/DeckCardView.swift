@@ -69,6 +69,8 @@ struct DeckCardView: View {
     @State private var showsSleepHistory = false
     /// The card's diagram, while its sheet is open.
     @State private var openDiagram: BriefDiagramIndex.Entry?
+    /// The week's divider: a new question was asked on this screen, so the "Why?" note shows.
+    @State private var hasAskedNewQuestion = false
 
     var body: some View {
         ScrollView {
@@ -442,16 +444,55 @@ struct DeckCardView: View {
                 }
             }
             .padding(.trailing, 24)
-            Text(verbatim: card.title ?? "This week")
+            Text(verbatim: shownQuestion)
                 .font(AppFont.display(style: .title, weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
+                .id(shownQuestion)
+                .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: card.sectionSpokenLabel))
+        .accessibilityLabel(Text(verbatim: card.sectionSpokenLabel(question: shownQuestion)))
         .accessibilityAddTraits(.isHeader)
+        if !card.altQuestions.isEmpty { newQuestion }
         if let recap = card.recap {
             recapLine("Last time", recap).padding(.top, 14)
+        }
+    }
+
+    private var shownQuestion: String { viewModel.question(for: card) ?? card.title ?? "This week" }
+
+    /// "New question" steps to the week's next drafted question (its sources replace the last's
+    /// in act 2); once asked, an optional one-line note on why goes with it.
+    @ViewBuilder
+    private var newQuestion: some View {
+        Button {
+            hasAskedNewQuestion = true
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) { viewModel.regenerateQuestion(for: card) }
+        } label: {
+            Label { Text(verbatim: "New question") } icon: { Image(systemName: "arrow.triangle.2.circlepath") }
+                .font(AppFont.body(weight: .semibold))
+                .foregroundStyle(palette.ink)
+                .frame(maxWidth: .infinity, minHeight: 50)
+                .background(palette.colors.wash, in: Capsule())
+                .overlay(Capsule().strokeBorder(palette.colors.edge, lineWidth: 1))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 18)
+        .accessibilityLabel(Text(verbatim: "New question"))
+        .accessibilityHint(Text(verbatim: "Shows another question for this week"))
+        let note = viewModel.answer(for: card)?.text ?? ""
+        if hasAskedNewQuestion || viewModel.answer(for: card)?.question != nil || !note.isEmpty {
+            TextField(text: Binding(get: { note }, set: { viewModel.setNote($0, for: card) })) {
+                Text(verbatim: "Why? (optional)")
+            }
+            .font(AppFont.body())
+            .submitLabel(.done)
+            .padding(.horizontal, 16)
+            .frame(minHeight: 46)
+            .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
+            .padding(.top, 10)
         }
     }
 

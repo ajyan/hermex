@@ -116,6 +116,10 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     /// The pool item the brief picked (`ref.pool`, "media:kafka", "video:<id>"); nil for cards it didn't pick from a pool.
     let pool: String?
 
+    /// Which of the week's drafted questions this card's sources answer (`week.variant`, 0 the first);
+    /// nil on every card that isn't one of the week's sources.
+    let weekVariant: Int?
+
     /// The Brain page the card's source opens, by the vault folder its link lives in.
     var sourceRoute: BrainRoute? { link.flatMap(Self.brainRoute(forLink:)) }
 
@@ -147,9 +151,12 @@ struct DeckCard: Decodable, Equatable, Identifiable {
 
     /// What VoiceOver reads for a `section` divider: "This week, Being a father, <the question>".
     /// `lines[0]` is "This week · <area>"; the question is the title.
-    var sectionSpokenLabel: String {
+    var sectionSpokenLabel: String { sectionSpokenLabel(question: title) }
+
+    /// The same label for the question on screen, which Regenerate may have changed.
+    func sectionSpokenLabel(question: String?) -> String {
         let kicker = (lines.first ?? "This week").replacingOccurrences(of: " · ", with: ", ")
-        return [kicker, title].compactMap { $0 }.joined(separator: ", ")
+        return [kicker, question].compactMap { $0 }.joined(separator: ", ")
     }
 
     /// The placeholder of a decision card's answer box once `chosen` (a text action) is picked:
@@ -199,9 +206,19 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     private enum CodingKeys: String, CodingKey {
         case id, type, title, body, source, lines, question, context, voice, why, draft, actions, fallback
         case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
-        case goal, start, lastWeek, phrases, yesterday, questionPinyin, questionEn, rows
+        case goal, start, lastWeek, phrases, yesterday, questionPinyin, questionEn, rows, week
         case weekCommitments = "commitments"
         case itemKind = "kind"
+    }
+
+    private struct Week: Decodable {
+        let variant: Int?
+
+        init(from decoder: Decoder) throws {
+            variant = try? decoder.container(keyedBy: CodingKeys.self).decodeIfPresent(Int.self, forKey: .variant)
+        }
+
+        private enum CodingKeys: String, CodingKey { case variant }
     }
 
     private struct Ref: Decodable {
@@ -255,6 +272,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         questionPinyin = try? c.decodeIfPresent(String.self, forKey: .questionPinyin)
         questionEn = try? c.decodeIfPresent(String.self, forKey: .questionEn)
         rows = ((try? c.decodeIfPresent([Lossy<DeckChangeRow>].self, forKey: .rows)) ?? []).compactMap(\.value)
+        weekVariant = (try? c.decodeIfPresent(Week.self, forKey: .week))?.variant
         let ref = try? c.decodeIfPresent(Ref.self, forKey: .ref)
         link = ref?.link.flatMap { $0.isEmpty ? nil : $0 }
         pool = ref?.pool.flatMap { $0.isEmpty ? nil : $0 }
@@ -521,13 +539,17 @@ struct DeckAnswer: Codable, Equatable {
     /// Whether this answers `card`: a decision whose chosen action needs text
     /// (Answer, Edit) answers nothing until the text is there.
     func isAnswer(for card: DeckCard) -> Bool {
+        // The week's divider holds a question choice and a note, never an answer.
+        if card.type == .section { return false }
         if let action, card.actions.first(where: { $0.id == action })?.takesText == true { return hasText }
         return hasText || action != nil || rating != nil || hasTags
     }
 
-    /// Whether this says something worth filing: an answer, or feedback on the card.
+    /// Whether this says something worth filing: an answer, or feedback on the card. On the week's
+    /// divider that is the question chosen and the note on why.
     func isMeaningful(for card: DeckCard) -> Bool {
-        feedback != nil || isAnswer(for: card)
+        if card.type == .section { return question != nil || hasText }
+        return feedback != nil || isAnswer(for: card)
     }
 }
 

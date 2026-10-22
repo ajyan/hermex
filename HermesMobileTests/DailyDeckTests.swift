@@ -553,6 +553,103 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(acts.week.count, 2)
     }
 
+    private static let weekDeckJSON = #"""
+    {"date":"2026-10-04","kind":"morning","cards":[
+      {"id":"open","type":"headline","title":"Today"},
+      {"id":"t1","type":"prompt","question":"Today?"},
+      {"id":"week","type":"section","title":"Q0?","question":"Q0?","alt_questions":["Q1?","Q2?"],
+       "lines":["This week · AI"],"week":{"area":"ai","question":"Q0?","monday":"2026-10-26","variant":0,"questions":["Q0?","Q1?","Q2?"]}},
+      {"id":"week-0-1","type":"reflect","kind":"journal","week":{"area":"ai","question":"Q0?","monday":"2026-10-26","variant":0}},
+      {"id":"week-0-2","type":"reflect","kind":"crm","week":{"area":"ai","question":"Q0?","monday":"2026-10-26","variant":0}},
+      {"id":"week-1-1","type":"reflect","kind":"journal","week":{"area":"ai","question":"Q1?","monday":"2026-10-26","variant":1}},
+      {"id":"week-2-1","type":"reflect","kind":"journal","week":{"area":"ai","question":"Q2?","monday":"2026-10-26","variant":2}},
+      {"id":"close","type":"close"}]}
+    """#
+
+    func testWeekSourceCardsDecodeTheirVariant() throws {
+        let deck = try DailyDeck.decode(Self.weekDeckJSON)
+        XCTAssertEqual(deck.cards.map(\.weekVariant), [nil, nil, 0, 0, 0, 1, 2, nil])
+        XCTAssertEqual(deck.cards[2].altQuestions, ["Q1?", "Q2?"])
+    }
+
+    @MainActor
+    func testNewQuestionStepsTheWeekVariantAndSwapsTheSourceCards() async throws {
+        let viewModel = try await loadedViewModel(Self.weekDeckJSON)
+        let section = try XCTUnwrap(viewModel.cards.first { $0.type == .section })
+        let ids = { viewModel.visiblePages.map(\.id) }
+        XCTAssertEqual(viewModel.weekVariant, 0)
+        XCTAssertEqual(ids(), ["open", "t1", "week", "week-0-1", "week-0-2", "close"])
+
+        viewModel.index = 2
+        viewModel.regenerateQuestion(for: section)
+        XCTAssertEqual(viewModel.weekVariant, 1)
+        XCTAssertEqual(viewModel.question(for: section), "Q1?")
+        XCTAssertEqual(ids(), ["open", "t1", "week", "week-1-1", "close"])
+        XCTAssertEqual(viewModel.currentPage?.id, "week", "the divider stays on screen")
+        let acts = DeckCardView.acts(viewModel.visiblePages)
+        XCTAssertEqual(acts.week.map(\.id), ["week-1-1"], "the opener lists the shown question's cards")
+        XCTAssertEqual(acts.today.map(\.id), ["t1"])
+
+        viewModel.regenerateQuestion(for: section)
+        XCTAssertEqual(viewModel.weekVariant, 2)
+        XCTAssertEqual(ids(), ["open", "t1", "week", "week-2-1", "close"])
+        viewModel.regenerateQuestion(for: section)
+        XCTAssertEqual(viewModel.weekVariant, 0, "wraps back to the first question")
+        XCTAssertEqual(ids(), ["open", "t1", "week", "week-0-1", "week-0-2", "close"])
+        XCTAssertNil(viewModel.answer(for: section))
+    }
+
+    @MainActor
+    func testWeekSectionAnswerIsFiledWithoutCountingAsAnAnsweredCard() async throws {
+        let viewModel = try await loadedViewModel(Self.weekDeckJSON)
+        let section = try XCTUnwrap(viewModel.cards.first { $0.type == .section })
+        viewModel.regenerateQuestion(for: section)
+        viewModel.setNote("  Too abstract.  ", for: section)
+        XCTAssertEqual(viewModel.answeredCount, 0, "the divider is not an answered card")
+        XCTAssertTrue(viewModel.hasChanges)
+
+        let payload = DeckAnswersPayload(deck: try XCTUnwrap(viewModel.deck), answers: viewModel.answers, completedAt: morning)
+        XCTAssertEqual(payload.answers.map(\.card), ["week"])
+        XCTAssertEqual(payload.answers.first?.question, "Q1?")
+        XCTAssertEqual(payload.answers.first?.text, "Too abstract.")
+
+        viewModel.setNote("   ", for: section)
+        XCTAssertNil(viewModel.answer(for: section)?.text, "a blank note clears it")
+        XCTAssertEqual(viewModel.answer(for: section)?.question, "Q1?")
+        viewModel.regenerateQuestion(for: section)
+        viewModel.regenerateQuestion(for: section)
+        XCTAssertNil(viewModel.answer(for: section))
+    }
+
+    @MainActor
+    func testWeekNoteAloneIsFiled() async throws {
+        let viewModel = try await loadedViewModel(Self.weekDeckJSON)
+        let section = try XCTUnwrap(viewModel.cards.first { $0.type == .section })
+        viewModel.setNote("Keep this one.", for: section)
+        let payload = DeckAnswersPayload(deck: try XCTUnwrap(viewModel.deck), answers: viewModel.answers, completedAt: morning)
+        XCTAssertEqual(payload.answers.map(\.card), ["week"])
+        XCTAssertNil(payload.answers.first?.question)
+        XCTAssertEqual(viewModel.answeredCount, 0)
+    }
+
+    @MainActor
+    func testDeckWithoutWeekVariantsIsUnchanged() async throws {
+        let viewModel = try await loadedViewModel(Self.feedbackDeckJSON)
+        XCTAssertEqual(viewModel.weekVariant, 0)
+        XCTAssertEqual(viewModel.visiblePages.count, 4)
+        // A section with no alternatives and week cards with no variant stay as they were.
+        let plain = try await loadedViewModel(#"""
+        {"date":"2026-10-04","kind":"morning","cards":[{"id":"week","type":"section","title":"Q"},{"id":"w1","type":"reflect"}]}
+        """#)
+        XCTAssertEqual(plain.visiblePages.map(\.id), ["week", "w1"])
+        // Week cards in a deck with no divider are all shown.
+        let noDivider = try await loadedViewModel(#"""
+        {"date":"2026-10-04","kind":"morning","cards":[
+          {"id":"a","type":"reflect","week":{"variant":0}},{"id":"b","type":"reflect","week":{"variant":1}}]}
+        """#)
+        XCTAssertEqual(noDivider.visiblePages.map(\.id), ["a", "b"])
+    }
+
     func testViewTakeDecisionKeepsEntriesContextAndTextActions() throws {
         let card = try XCTUnwrap(DailyDeck.decode(#"""
         {"date":"2026-11-29","kind":"weekly","cards":[
