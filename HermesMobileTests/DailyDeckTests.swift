@@ -1483,6 +1483,8 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     private(set) var fileRequests: [BriefFileRequest] = []
     /// What `uploadWeekPhoto` does; succeeds by default.
     var photoUpload: Result<Void, Error> = .success(())
+    /// What `deleteWeekPhoto` does; succeeds by default.
+    var photoDelete: Result<Void, Error> = .success(())
     private(set) var uploadedPhotos: [(weekEnding: String, jpeg: Data)] = []
     private(set) var deletedPhotos: [String] = []
     /// Bytes `rawFile` returns by path; a path not here is a 404.
@@ -1495,6 +1497,7 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     private(set) var renamed: [(String, String)] = []
     private(set) var listedSessions: [String] = []
     private(set) var readPaths: [String] = []
+    private let readLock = NSLock()
     private(set) var sent: [Sent] = []
 
     init(workspaces: [String], names: [String]?, deck: String) {
@@ -1522,7 +1525,8 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     }
 
     func fileContent(sessionID: String, path: String) async throws -> String {
-        readPaths.append(path)
+        // Week records are read concurrently.
+        readLock.withLock { readPaths.append(path) }
         return files[path] ?? deck
     }
 
@@ -1547,7 +1551,10 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
         try photoUpload.get()
     }
 
-    func deleteWeekPhoto(weekEnding: String) async throws { deletedPhotos.append(weekEnding) }
+    func deleteWeekPhoto(weekEnding: String) async throws {
+        deletedPhotos.append(weekEnding)
+        try photoDelete.get()
+    }
 }
 
 final class DailyBriefReminderTests: XCTestCase {
