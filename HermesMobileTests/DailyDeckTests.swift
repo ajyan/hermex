@@ -571,6 +571,10 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(card.question, "Your take, in a sentence")
         XCTAssertEqual(card.actions.map(\.label), ["Still open", "Settled"])
         XCTAssertTrue(card.actions.allSatisfy(\.takesText))
+        XCTAssertEqual(card.answerPrompt(chosen: "settled"), "Your take, in a sentence")
+        XCTAssertEqual(card.answerPrompt(chosen: "edit"), "Your version")
+        let plain = try XCTUnwrap(DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"f","type":"decision"}]}"#).cards.first)
+        XCTAssertEqual(plain.answerPrompt(chosen: "answer"), "Your answer")
     }
 
     func testWeekSourceKindsWearExistingPapers() throws {
@@ -581,7 +585,10 @@ final class DailyDeckTests: XCTestCase {
         let journal = try palette("journal")
         XCTAssertEqual(journal, try palette("on_this_day"))
         XCTAssertEqual(journal.colors, HermexPaper.past)
-        XCTAssertEqual(try palette("crm"), DeckPalette.followUps)
+        let crm = try palette("crm")
+        XCTAssertEqual(crm, DeckPalette.people)
+        XCTAssertNotEqual(crm.name, DeckPalette.followUps.name, "a person's card is not the follow-ups page")
+        XCTAssertEqual(crm.colors, DeckPalette.followUps.colors, "same plain paper")
         let email = try palette("email")
         XCTAssertEqual(email, DeckPalette.plain)
         XCTAssertEqual(email.colors, try palette("nonsense").colors, "email reads like the inbox item card: the plain paper")

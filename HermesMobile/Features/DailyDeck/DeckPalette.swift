@@ -50,6 +50,8 @@ struct DeckPalette: Equatable {
     static let letter = DeckPalette(.advisor, symbol: "heart", name: "Letter to her", shortName: "Letter")
     static let mandarin = DeckPalette(.mandarin, symbol: "character.bubble", name: "Mandarin practice", shortName: "Mandarin")
     static let plain = DeckPalette(.plain, symbol: "tray", name: "From your library", shortName: "Library")
+    /// A reflect card about a person (a week source from the CRM), on the plain paper.
+    static let people = DeckPalette(.plain, symbol: "person.2", name: "From your people", shortName: "People")
     static let followUps = DeckPalette(.plain, symbol: "checklist", name: "Follow-ups", shortName: "Follow-ups")
     // A weekly review's Wrapped cards. Themes quote your own past words; mood reads like a
     // check-in; lessons come from your notes; the goals card wears its goal's paper.
@@ -106,7 +108,7 @@ struct DeckPalette: Equatable {
             case "insight": return .notes
             case "video": return .video
             case "on_this_day", "journal": return .past
-            case "crm": return .followUps
+            case "crm": return .people
             default: return .plain
             }
         }

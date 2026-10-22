@@ -152,6 +152,12 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         return [kicker, title].compactMap { $0 }.joined(separator: ", ")
     }
 
+    /// The placeholder of a decision card's answer box once `chosen` (a text action) is picked:
+    /// the card's own question (the Sunday view-take's "Your take, in a sentence"), else "Your answer".
+    func answerPrompt(chosen: String) -> String {
+        chosen == "edit" ? "Your version" : (question ?? "Your answer")
+    }
+
     /// The Dad card: a prompt to say something to his daughter, with the countdown to her birth
     /// (then her age) in `lines`. Its answer is filed as a letter to her, not into the journal.
     var isLetter: Bool { type == .prompt && itemKind == "letter" }

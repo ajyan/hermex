@@ -436,7 +436,7 @@ struct DeckCardView: View {
     private var section: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
-                ForEach(card.lines, id: \.self) { line in
+                ForEach(Array(card.lines.enumerated()), id: \.offset) { _, line in
                     Text(verbatim: line).font(AppFont.footnote())
                 }
             }
@@ -445,7 +445,6 @@ struct DeckCardView: View {
                 .font(AppFont.display(style: .title, weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
-                .textSelection(.enabled)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: card.sectionSpokenLabel))
@@ -819,7 +818,7 @@ private struct FollowUpRow: View {
         let chosen = viewModel.answer(for: card)?.action
         VStack(alignment: .leading, spacing: 8) {
             // The Sunday view-take card: its kicker, the week's answers, and what you said last time.
-            ForEach(card.lines, id: \.self) { line in
+            ForEach(Array(card.lines.enumerated()), id: \.offset) { _, line in
                 Text(verbatim: line).font(AppFont.footnote()).foregroundStyle(.secondary)
             }
             Text(verbatim: card.title ?? "Follow-up").font(AppFont.headline())
@@ -869,7 +868,7 @@ private struct FollowUpRow: View {
                 VStack(alignment: .leading, spacing: 8) { buttons(chosen) }
             }
             if let chosen, card.actions.first(where: { $0.id == chosen })?.takesText == true {
-                AnswerBox(card: card, viewModel: viewModel, prompt: chosen == "edit" ? "Your version" : "Your answer", minHeight: 88)
+                AnswerBox(card: card, viewModel: viewModel, prompt: card.answerPrompt(chosen: chosen), minHeight: 88)
             } else if chosen == "draft" {
                 AnswerBox(card: card, viewModel: viewModel, prompt: "Anything to mention? (optional)", minHeight: 88)
             }
