@@ -130,37 +130,59 @@ final class SleepHistoryTests: XCTestCase {
         XCTAssertNil(SleepUsual(before: "2026-10-18", in: []).hours)
     }
 
-    func testReadoutCallsOutWhatIsFarFromUsual() {
+    func testGaugesMarkUsualAndCallOutWhatIsFarFromIt() {
         var n = SleepNight(date: "2026-10-18")
+        n.hours = 5.4
         n.bed = "2026-10-18T01:05"
-        n.wake = "2026-10-18T07:10"
         n.wakeUps = 3
+        n.awakeMinutes = 52
         n.efficiency = 86
         n.hrv = 92
         n.hrvBand = 84...103
+        n.restingHR = 48
         n.respiration = 14.2
         n.flags = ["breathing_up"]
         var usual = SleepUsual()
-        usual.bed = 670 // 11:10 pm
-        usual.wake = 1140 // 7:00 am
+        usual.hours = 7.83
+        usual.bed = 670
         usual.wakeUps = 2
+        usual.awakeMinutes = 29
         usual.efficiency = 94
+        usual.restingHR = 46
         usual.respiration = 14.1
-        let groups = SleepReadout.groups(n, usual: usual)
-        XCTAssertEqual(groups.map(\.title), ["When", "Interruptions", "Body"])
-        let readings = Dictionary(uniqueKeysWithValues: groups.flatMap(\.readings).map { ($0.label, $0) })
-        XCTAssertEqual(readings["Fell asleep"], SleepReading(label: "Fell asleep", value: "1:05 am",
-                                                             note: "1 h 55 m later than usual", standsOut: true))
-        XCTAssertEqual(readings["Woke"]?.note, "usual time")
-        XCTAssertEqual(readings["Woke"]?.standsOut, false)
-        XCTAssertEqual(readings["Wake-ups"]?.note, "usually 2")
-        XCTAssertEqual(readings["Wake-ups"]?.standsOut, false, "one more than usual is noise")
-        XCTAssertEqual(readings["Asleep while in bed"]?.standsOut, true)
-        XCTAssertEqual(readings["HRV"]?.note, "normal 84–103")
-        XCTAssertEqual(readings["HRV"]?.standsOut, false)
-        XCTAssertEqual(readings["Breathing"]?.standsOut, true, "Garmin's flag counts even under a 1-breath rise")
-        XCTAssertNil(readings["Time awake"], "a missing number has no row")
-        XCTAssertTrue(SleepReadout.groups(SleepNight(date: "2026-10-18"), usual: usual).isEmpty)
+        let gauges = Dictionary(uniqueKeysWithValues: SleepReadout.gauges(n, usual: usual).map { ($0.label, $0) })
+        XCTAssertEqual(gauges.keys.sorted(), ["Asleep in bed", "Awake", "Breaths/min", "HRV", "Resting HR", "Wake-ups"])
+        XCTAssertEqual(gauges["Awake"]?.reference, "usual 29 min", "every tick is labeled with what it is")
+        XCTAssertEqual(gauges["Awake"]?.shift, SleepShift(way: .up, text: "+23 min"))
+        XCTAssertNil(gauges["Wake-ups"]?.shift, "one more than usual is noise")
+        XCTAssertEqual(gauges["Asleep in bed"]?.shift, SleepShift(way: .down, text: "−8 pts"))
+        XCTAssertEqual(gauges["HRV"]?.reference, "normal 84–103")
+        XCTAssertNil(gauges["HRV"]?.usual, "HRV shows Garmin's normal range, not a second tick")
+        XCTAssertEqual(gauges["Breaths/min"]?.shift, SleepShift(way: .up, text: "flagged"),
+                       "Garmin's flag counts even under a 1-breath rise")
+        XCTAssertNil(gauges["Resting HR"]?.shift)
+        for gauge in gauges.values {
+            XCTAssertTrue(gauge.scale.contains(gauge.number), "\(gauge.label) value is on its track")
+            if let tick = gauge.usual { XCTAssertTrue(gauge.scale.contains(tick), "\(gauge.label) usual is on its track") }
+        }
+        let hours = SleepReadout.hoursAgainstUsual(n, usual: usual)
+        XCTAssertEqual(hours?.shift, SleepShift(way: .down, text: "2 h 26 m less than usual"))
+        var close = usual
+        close.hours = 5.6
+        XCTAssertNil(SleepReadout.hoursAgainstUsual(n, usual: close)?.shift)
+        XCTAssertEqual(SleepReadout.hoursAgainstUsual(n, usual: close)?.plain, "−12 min vs usual")
+        n.wake = "2026-10-18T07:10"
+        usual.wake = 1140
+        XCTAssertEqual(SleepReadout.windowShifts(n, usual: usual), [SleepShift(way: .later, text: "1 h 55 m later to bed")],
+                       "a wake time 10 minutes off isn't called out")
+        XCTAssertTrue(SleepReadout.gauges(SleepNight(date: "2026-10-18"), usual: usual).isEmpty)
+    }
+
+    func testClockAxisCoversBothWindowsOnWholeHours() {
+        let axis = SleepClockAxis([785, 1162, 652, 1155]) // 1:05 am, 7:22 am, 10:52 pm, 7:15 am
+        XCTAssertEqual(axis.range, 600...1200, "10 pm to 8 am")
+        XCTAssertEqual(axis.ticks, [720, 900, 1080], "midnight, 3 am, 6 am")
+        XCTAssertEqual(axis.position(900), 0.5)
     }
 
     private func night(daysBefore: Int, hours: Double) -> SleepNight {

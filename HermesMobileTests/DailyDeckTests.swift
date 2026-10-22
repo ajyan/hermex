@@ -792,6 +792,27 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(empty.decisionBody, "No answers this week.")
     }
 
+    func testTheSundayQuestionKeepsItsOwnPageInAV2WeeklyReview() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"version":2,"date":"2026-11-01","kind":"weekly","cards":[
+          {"id":"cover","type":"cover","title":"The week you tapered"},
+          {"id":"story","type":"story","chapter":"remember","draft":"You tapered."},
+          {"id":"view-take","type":"decision","kind":"view_take","chapter":"steer","title":"Is the model the product?",
+           "actions":[{"id":"open","label":"Still open","input":"text"},{"id":"settled","label":"Settled","input":"text"}]},
+          {"id":"view-steer","type":"prompt","chapter":"steer","question":"Keep the question or change it?","files_to":"steer"},
+          {"id":"close","type":"close","title":"Seal the week"}]}
+        """#)
+        let pages = DeckPage.pages(for: deck.cards)
+        XCTAssertEqual(pages.map(\.id), ["cover", "story", "view-take", "view-steer", "close"], "no follow-ups page")
+        XCTAssertEqual(DeckAheadRow.title(pages[2]), "Is the model the product?")
+        let take = DeckPalette.of(pages[2], inV2Weekly: true)
+        XCTAssertEqual(take, DeckPalette.weekQuestion, "the week's paper doesn't take over the question's page")
+        XCTAssertEqual(take.name, "This week's question")
+        XCTAssertTrue(pages[2].answersInPlace)
+        XCTAssertEqual(DeckPalette.of(pages[3], inV2Weekly: true), DeckPalette.week, "a chaptered prompt wears the week's paper")
+        XCTAssertEqual(DeckPalette.of(pages[4], inV2Weekly: true), DeckPalette.week)
+    }
+
     func testFollowUpsStillGatherBesideTheSundayQuestion() throws {
         let deck = try DailyDeck.decode(#"""
         {"date":"d","kind":"weekly","cards":[{"id":"f1","type":"decision","title":"Sam"},
@@ -1799,14 +1820,25 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     /// Runs inside `fileBrief` before it answers, to hold a filing in flight.
     var fileGate: (@Sendable () async -> Void)?
     private(set) var fileRequests: [BriefFileRequest] = []
+    /// What `uploadWeekPhoto` does; succeeds by default.
+    var photoUpload: Result<Void, Error> = .success(())
+    /// What `deleteWeekPhoto` does; succeeds by default.
+    var photoDelete: Result<Void, Error> = .success(())
+    private(set) var uploadedPhotos: [(weekEnding: String, jpeg: Data)] = []
+    private(set) var deletedPhotos: [String] = []
+    /// Bytes `rawFile` returns by path; a path not here is a 404.
+    var rawFiles: [String: Data] = [:]
     /// Bodies by path; anything else reads as `deck`.
     var files: [String: String] = [:]
     /// Folder listings other than `briefs/`.
     var listings: [String: [String]] = [:]
+    /// Errors a listing throws instead, by path.
+    var listingErrors: [String: Error] = [:]
     private(set) var createdWorkspaces: [String] = []
     private(set) var renamed: [(String, String)] = []
     private(set) var listedSessions: [String] = []
     private(set) var readPaths: [String] = []
+    private let readLock = NSLock()
     private(set) var sent: [Sent] = []
 
     init(workspaces: [String], names: [String]?, deck: String) {
@@ -1825,6 +1857,7 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     func renameSession(id: String, title: String) async throws { renamed.append((id, title)) }
 
     func entryNames(sessionID: String, path: String) async throws -> [String] {
+        if let error = listingErrors[path] { throw error }
         if let listing = listings[path] { return listing }
         if path != DailyDeckPaths.directory { throw APIError.http(statusCode: 404, body: #"{"error": "Not a directory"}"#) }
         listedSessions.append(sessionID)
@@ -1834,7 +1867,8 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     }
 
     func fileContent(sessionID: String, path: String) async throws -> String {
-        readPaths.append(path)
+        // Week records are read concurrently.
+        readLock.withLock { readPaths.append(path) }
         return files[path] ?? deck
     }
 
@@ -1847,6 +1881,21 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
         fileRequests.append(request)
         await fileGate?()
         return try filer.get()
+    }
+
+    func rawFile(sessionID: String, path: String) async throws -> Data {
+        guard let data = rawFiles[path] else { throw APIError.http(statusCode: 404, body: nil) }
+        return data
+    }
+
+    func uploadWeekPhoto(weekEnding: String, jpeg: Data) async throws {
+        uploadedPhotos.append((weekEnding, jpeg))
+        try photoUpload.get()
+    }
+
+    func deleteWeekPhoto(weekEnding: String) async throws {
+        deletedPhotos.append(weekEnding)
+        try photoDelete.get()
     }
 }
 

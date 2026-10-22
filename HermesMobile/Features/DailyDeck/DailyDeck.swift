@@ -34,6 +34,8 @@ struct DailyDeck: Decodable, Equatable {
 struct DeckCard: Decodable, Equatable, Identifiable {
     enum CardType: Equatable {
         case headline, prompt, decision, reflect, item, sleep, goal, weekAhead, changes, ask, section, close
+        /// The v2 weekly review's cards (`WeeklyReviewModels.swift`).
+        case cover, filmstrip, story, energy, commitments, values, predictions, who, keepsakes
         case unknown(String)
 
         init(_ raw: String) {
@@ -50,6 +52,15 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case "ask": self = .ask
             case "section": self = .section
             case "close": self = .close
+            case "cover": self = .cover
+            case "filmstrip": self = .filmstrip
+            case "story": self = .story
+            case "energy": self = .energy
+            case "commitments": self = .commitments
+            case "values": self = .values
+            case "predictions": self = .predictions
+            case "who": self = .who
+            case "keepsakes": self = .keepsakes
             default: self = .unknown(raw)
             }
         }
@@ -109,6 +120,29 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let questionEn: String?
     /// A weekly review's What changed card: the fixes whose status moved this week, newest first.
     let rows: [DeckChangeRow]
+    /// A v2 weekly card's chapter ("remember", "understand", "account", "steer"); the cover and close have none.
+    let chapter: String?
+    /// The cover's week number, date range ("Oct 19–25"), chapter list, and the note a year-ago self left.
+    let weekNumber: Int?
+    let range: String?
+    let chapters: [DeckChapter]
+    let noteFromPast: DeckPastNote?
+    /// The filmstrip's seven days.
+    let days: [DeckDay]
+    /// The story card's drafted paragraph. On the wire this is the card's `draft` key, a string here
+    /// and a `DeckDraft` on the text-drafting cards, so it decodes under its own name.
+    let storyDraft: String?
+    /// The energy card's suggested chips.
+    let gave: [String]
+    let drained: [String]
+    /// The deep question's rotation ("Examen").
+    let rotation: String?
+    /// The commitments and predictions cards' rows to grade.
+    let items: [DeckReviewItem]
+    /// The values card's five values, with the evidence the brief found for each.
+    let values: [DeckValue]
+    /// The who card's suggested people.
+    let suggested: [String]
 
     /// The vault file the card came from (`ref.link`, "wiki/nyc-marathon"); nil for pooled
     /// material with no page of its own (books, quotes, videos).
@@ -200,6 +234,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         switch type {
         case .prompt, .reflect, .item, .unknown: true
         case .headline, .decision, .sleep, .goal, .weekAhead, .changes, .ask, .section, .close: false
+        case .cover, .filmstrip, .story, .energy, .commitments, .values, .predictions, .who, .keepsakes: false
         }
     }
 
@@ -207,6 +242,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         case id, type, title, body, source, lines, question, context, voice, why, draft, actions, fallback
         case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
         case goal, start, lastWeek, phrases, yesterday, questionPinyin, questionEn, rows, week
+        case chapter, weekNumber, range, chapters, noteFromPast, days, gave, drained, rotation, items, values, suggested
         case weekCommitments = "commitments"
         case itemKind = "kind"
     }
@@ -273,6 +309,19 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         questionEn = try? c.decodeIfPresent(String.self, forKey: .questionEn)
         rows = ((try? c.decodeIfPresent([Lossy<DeckChangeRow>].self, forKey: .rows)) ?? []).compactMap(\.value)
         weekVariant = (try? c.decodeIfPresent(Week.self, forKey: .week))?.variant
+        chapter = try? c.decodeIfPresent(String.self, forKey: .chapter)
+        weekNumber = try? c.decodeIfPresent(Int.self, forKey: .weekNumber)
+        range = try? c.decodeIfPresent(String.self, forKey: .range)
+        chapters = ((try? c.decodeIfPresent([Lossy<DeckChapter>].self, forKey: .chapters)) ?? []).compactMap(\.value)
+        noteFromPast = try? c.decodeIfPresent(DeckPastNote.self, forKey: .noteFromPast)
+        days = ((try? c.decodeIfPresent([Lossy<DeckDay>].self, forKey: .days)) ?? []).compactMap(\.value)
+        storyDraft = try? c.decodeIfPresent(String.self, forKey: .draft)
+        gave = (try? c.decodeIfPresent([String].self, forKey: .gave)) ?? []
+        drained = (try? c.decodeIfPresent([String].self, forKey: .drained)) ?? []
+        rotation = try? c.decodeIfPresent(String.self, forKey: .rotation)
+        items = ((try? c.decodeIfPresent([Lossy<DeckReviewItem>].self, forKey: .items)) ?? []).compactMap(\.value)
+        values = ((try? c.decodeIfPresent([Lossy<DeckValue>].self, forKey: .values)) ?? []).compactMap(\.value)
+        suggested = (try? c.decodeIfPresent([String].self, forKey: .suggested)) ?? []
         let ref = try? c.decodeIfPresent(Ref.self, forKey: .ref)
         link = ref?.link.flatMap { $0.isEmpty ? nil : $0 }
         pool = ref?.pool.flatMap { $0.isEmpty ? nil : $0 }
@@ -476,7 +525,7 @@ struct DeckMandarinFeedback: Decodable, Equatable {
     private enum CodingKeys: String, CodingKey { case said, natural, naturalPinyin, notes }
 }
 
-private struct Lossy<Value: Decodable>: Decodable {
+struct Lossy<Value: Decodable>: Decodable {
     let value: Value?
     init(from decoder: Decoder) throws { value = try? Value(from: decoder) }
 }
@@ -521,11 +570,25 @@ struct DeckAnswer: Codable, Equatable {
     var question: String?
     /// "Not for Me" on this card; a card with feedback leaves the deck.
     var feedback: DeckFeedback?
+    /// The v2 weekly cards' answers, each encoded only when set: the values card's 1–10 `scores` and
+    /// its evidence `notes`, the energy and who cards' `lists`, the commitments and predictions cards'
+    /// `statuses`, and the keepsakes card's `prediction`. Keys are the card's item ids. A list that is
+    /// present but empty still answers: chips he removed are filed as none, not refilled from the draft.
+    var scores: [String: Int]?
+    var notes: [String: String]?
+    var lists: [String: [String]]?
+    var statuses: [String: String]?
+    var prediction: DeckPrediction?
 
     /// Nothing typed or chosen. Text counts as typed, spaces too, so a field bound to it keeps a
     /// leading space while editing; filing trims, and a blank text files as none.
     var isEmpty: Bool {
-        (text?.isEmpty ?? true) && action == nil && rating == nil && question == nil && feedback == nil && !hasTags
+        (text?.isEmpty ?? true) && action == nil && rating == nil && question == nil && feedback == nil && !hasTags && !hasWeeklyFields
+    }
+
+    private var hasWeeklyFields: Bool {
+        !(scores?.isEmpty ?? true) || !(notes?.isEmpty ?? true) || prediction != nil
+            || !(statuses?.isEmpty ?? true) || !(lists?.isEmpty ?? true)
     }
 
     private var hasTags: Bool { !(tags?.isEmpty ?? true) }
@@ -544,7 +607,7 @@ struct DeckAnswer: Codable, Equatable {
         // The week's divider holds a question choice and a note, never an answer.
         if card.type == .section { return false }
         if let action, card.actions.first(where: { $0.id == action })?.takesText == true { return hasText }
-        return hasText || action != nil || rating != nil || hasTags
+        return hasText || action != nil || rating != nil || hasTags || hasWeeklyFields
     }
 
     /// Whether this says something worth filing: an answer, or feedback on the card. On the week's
@@ -846,6 +909,9 @@ struct DeckCardText: Equatable {
             // The question leads; the numbers show after the rating so they don't decide it.
             lead = card.question
             leadIsQuestion = true
+        case .cover, .filmstrip, .story, .energy, .commitments, .values, .predictions, .who, .keepsakes:
+            // Each is drawn by its own view; the cover leads with its title and the story with its draft.
+            lead = card.type == .story ? card.storyDraft : card.title
         case .goal, .weekAhead, .changes, .ask:
             // The check-ins, the week's plan, the week's fixes and the Ask are drawn (`DeckGoalCard`,
             // `DeckWeekAheadCard`, `DeckChangesCard`, `DeckAskCard`).

@@ -151,8 +151,11 @@ private struct DailyAskForm: View {
     @ViewBuilder
     private func expanded(_ role: DailyAskRole) -> some View {
         let reach = ask.isReachFirst != flipped.contains(role.id)
-        if let text = reach ? role.opener : role.note {
-            draftBlock(heading: reach ? "Opener" : "Why this role", text: text)
+        if reach {
+            if let text = role.opener { draftBlock(heading: "Opener", text: text) }
+        } else {
+            if let text = role.note { textBlock(heading: "The role", text: text) }
+            if let text = role.catch, !text.isEmpty { textBlock(heading: "Might not fit", text: text) }
         }
         if reach {
             TextField(text: Binding(get: { names[role.id] ?? "" }, set: { names[role.id] = $0 })) {
@@ -190,6 +193,18 @@ private struct DailyAskForm: View {
 
     private func flip(_ role: DailyAskRole) {
         if flipped.contains(role.id) { flipped.remove(role.id) } else { flipped.insert(role.id) }
+    }
+
+    /// A labeled read-only paragraph: what the role is, or its catch.
+    private func textBlock(heading: String, text: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(verbatim: heading)
+                .font(AppFont.caption(weight: .semibold))
+                .foregroundStyle(.secondary)
+            Text(verbatim: text).font(AppFont.body()).textSelection(.enabled)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 
     /// The follow-up card's draft block, read-only, with Copy.

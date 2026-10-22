@@ -154,6 +154,9 @@ struct HermexPaper: Equatable {
     static let plain = HermexPaper(paper: 0xF4F0E8, ink: 0x2A2A28, glowLight: 0x5E5646, glowDark: 0xD6CDBB, hue: 0xA09680, warm: true)
     static let mandarin = HermexPaper(paper: 0xFFDDD6, ink: 0x5E1A0E, glowLight: 0xB03A22, glowDark: 0xFF9C85, hue: 0xF2694B)
     static let ledger = HermexPaper(paper: 0xEEF3D6, ink: 0x2F3A0A, glowLight: 0x4F6300, glowDark: 0xC2DA6E, hue: 0x9DB83A)
+    /// A week: the weekly review's cards, the week page, and the year's tiles. A dusky plum, kept
+    /// clear of `book`'s rose.
+    static let dusk = HermexPaper(paper: 0xF3E4EE, ink: 0x4A1F3D, glowLight: 0x8C3D74, glowDark: 0xE7A3CF, hue: 0xC0679F)
 
-    static let all: [HermexPaper] = [.opener, .quote, .book, .wiki, .reading, .notes, .video, .past, .advisor, .plain, .mandarin, .ledger]
+    static let all: [HermexPaper] = [.opener, .quote, .book, .wiki, .reading, .notes, .video, .past, .advisor, .plain, .mandarin, .ledger, .dusk]
 }

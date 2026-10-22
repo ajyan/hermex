@@ -66,6 +66,8 @@ struct DeckPalette: Equatable {
     static let recap = DeckPalette(.plain, symbol: "list.bullet", name: "Recap", shortName: "Recap")
     /// The week's fixes from the feedback loop, on the recap's paper.
     static let changes = DeckPalette(.plain, symbol: "wrench.and.screwdriver", name: "What changed", shortName: "Changes")
+    /// The v2 weekly review: every card of the week wears its paper, its two questions included.
+    static let week = DeckPalette(.dusk, symbol: "sunset", name: "Your week", shortName: "Week")
     /// The Daily Ask wears its goal's paper (`land-ai-role`, color `notes`).
     static let ask = DeckPalette(GoalPaper.palette(named: "notes", slug: "land-ai-role").colors,
                                  symbol: "briefcase", name: "Today's Ask", shortName: "Ask")
@@ -77,11 +79,19 @@ struct DeckPalette: Equatable {
         }
     }
 
+    /// A page's palette within its deck: a v2 weekly review closes on the week's dusk paper, not
+    /// the quote paper other decks close on.
+    static func of(_ page: DeckPage, inV2Weekly: Bool) -> DeckPalette {
+        if inV2Weekly, case .card(let card) = page, card.type == .close { return .week }
+        return of(page)
+    }
+
     static func of(_ card: DeckCard) -> DeckPalette {
         switch card.type {
         case .headline: return .opener
         case .section: return .section
         case .close: return .quote
+        case .prompt where card.chapter != nil: return .week
         case .prompt: return card.isMandarin ? .mandarin : card.isLetter ? .letter : .advisor
         case .sleep: return .sleep
         case .goal:
@@ -93,6 +103,7 @@ struct DeckPalette: Equatable {
         case .ask: return .ask
         case .decision: return card.isViewTake ? .weekQuestion : .followUps
         case .changes: return .changes
+        case .cover, .filmstrip, .story, .energy, .commitments, .values, .predictions, .who, .keepsakes: return .week
         case .item, .unknown:
             switch card.itemKind {
             case "theme": return .theme

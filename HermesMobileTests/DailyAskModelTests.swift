@@ -46,7 +46,7 @@ final class DailyAskModelTests: XCTestCase {
       {"id": "ashby:harvey:1", "company": "Harvey", "title": "Senior Software Engineer, Agents",
        "location": "New York, NY", "url": "https://jobs.ashbyhq.com/harvey/1", "band_label": "$200K–$270K base",
        "note": "I build agent evals.", "search_url": "https://www.linkedin.com/search/results/people/?keywords=Harvey%20Applied%20AI",
-       "opener": "Hi <name> — I saw Harvey is hiring."},
+       "opener": "Hi <name> — I saw Harvey is hiring.", "catch": "Legal domain."},
       {"id": "ashby:ramp:2", "company": "Ramp", "title": "Applied AI Engineer", "band_label": "band unknown", "future_field": 1},
       {"id": "greenhouse:anthropic:3", "company": "Anthropic", "title": "Applied AI Engineer, Enterprise Tech"}
      ]}
@@ -69,6 +69,8 @@ final class DailyAskModelTests: XCTestCase {
         XCTAssertEqual(full.roles?.count, 3)
         XCTAssertEqual(full.roles?.first?.bandLabel, "$200K–$270K base")
         XCTAssertEqual(full.roles?.first?.searchUrl, "https://www.linkedin.com/search/results/people/?keywords=Harvey%20Applied%20AI")
+        XCTAssertEqual(full.roles?.first?.catch, "Legal domain.")
+        XCTAssertNil(full.roles?[1].catch)
         XCTAssertEqual(full.week?.applications?.done, 1)
         XCTAssertTrue(full.needsNeverMissTwice)
         XCTAssertFalse(full.isReachFirst)
