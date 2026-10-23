@@ -89,6 +89,20 @@ final class DeckSignalsTests: XCTestCase {
                        "the vault's chip ids (style_learn.CHIPS)")
     }
 
+    func testHeadlineDecodesLearned() throws {
+        let deck = try DailyDeck.decode("""
+        {"date": "2026-10-04", "kind": "morning", "cards": [
+          {"id": "headline", "type": "headline", "title": "Today", "learned": [
+            {"id": "wiki.length.shorter", "text": "Knowledge cards: keep explanations short.", "state": "learned"},
+            {"id": "email.structure.parts", "state": "unlearned"}]}]}
+        """)
+        XCTAssertEqual(deck.cards.first?.learned, [DeckLearned(id: "wiki.length.shorter",
+                                                               text: "Knowledge cards: keep explanations short.",
+                                                               state: "learned")], "a row without text drops alone")
+        XCTAssertEqual(DeckLearned(id: "a", text: "Short.", state: "learned").line, "Learned: Short.")
+        XCTAssertEqual(DeckLearned(id: "a", text: "Short.", state: "unlearned").line, "Unlearned: Short.")
+    }
+
     func testFiledSignalsReadBack() {
         let filed = """
         {"version": 1, "answers": [], "style": [{"card": "book", "chips": ["too-long"]}, {"bad": 1}],

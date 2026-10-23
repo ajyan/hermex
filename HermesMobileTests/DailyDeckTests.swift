@@ -1553,6 +1553,23 @@ final class DailyDeckTests: XCTestCase {
     }
 
     @MainActor
+    func testUndoAfterFilingMarksChanges() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.feedbackDeckJSON)
+        let viewModel = makeViewModel(client)
+        await viewModel.load()
+        viewModel.setText("Ship it.", for: try XCTUnwrap(viewModel.cards.first { $0.id == "book" }))
+        _ = await viewModel.file()
+        XCTAssertFalse(viewModel.hasChanges)
+        viewModel.undoLearned("wiki.length.shorter")
+        XCTAssertTrue(viewModel.hasChanges, "the close card offers to file the undo")
+        XCTAssertEqual(viewModel.signals.undo, ["wiki.length.shorter"])
+        viewModel.undoLearned("wiki.length.shorter")
+        XCTAssertFalse(viewModel.hasChanges)
+        XCTAssertEqual(viewModel.signals.undo, [])
+    }
+
+    @MainActor
     private func loadedViewModel(_ json: String) async throws -> DailyDeckViewModel {
         store.setWorkspace("/vault", for: server)
         let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: json)

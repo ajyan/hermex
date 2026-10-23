@@ -134,3 +134,15 @@ extension DeckAnswersFile {
         return signals
     }
 }
+
+/// A style rule the vault learned (or dropped) since the last deck, on the headline with Undo.
+struct DeckLearned: Decodable, Equatable, Identifiable {
+    /// `<kind>.<dimension>.<direction>`, what Undo files.
+    let id: String
+    let text: String
+    /// "learned" or "unlearned".
+    let state: String
+
+    var isLearned: Bool { state == "learned" }
+    var line: String { "\(isLearned ? "Learned" : "Unlearned"): \(text)" }
+}

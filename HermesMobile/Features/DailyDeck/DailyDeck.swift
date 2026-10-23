@@ -120,6 +120,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let questionEn: String?
     /// A weekly review's What changed card: the fixes whose status moved this week, newest first.
     let rows: [DeckChangeRow]
+    /// The headline's style rules learned or dropped since the last deck (`tools/style_learn.py`).
+    let learned: [DeckLearned]
     /// A v2 weekly card's chapter ("remember", "understand", "account", "steer"); the cover and close have none.
     let chapter: String?
     /// The cover's week number, date range ("Oct 19–25"), chapter list, and the note a year-ago self left.
@@ -245,7 +247,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
         case goal, start, lastWeek, phrases, yesterday, questionPinyin, questionEn, rows, week
         case chapter, weekNumber, range, chapters, noteFromPast, days, gave, drained, rotation, items, values, suggested
-        case piece
+        case piece, learned
         case weekCommitments = "commitments"
         case itemKind = "kind"
     }
@@ -311,6 +313,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         questionPinyin = try? c.decodeIfPresent(String.self, forKey: .questionPinyin)
         questionEn = try? c.decodeIfPresent(String.self, forKey: .questionEn)
         rows = ((try? c.decodeIfPresent([Lossy<DeckChangeRow>].self, forKey: .rows)) ?? []).compactMap(\.value)
+        learned = ((try? c.decodeIfPresent([Lossy<DeckLearned>].self, forKey: .learned)) ?? []).compactMap(\.value)
         weekVariant = (try? c.decodeIfPresent(Week.self, forKey: .week))?.variant
         chapter = try? c.decodeIfPresent(String.self, forKey: .chapter)
         weekNumber = try? c.decodeIfPresent(Int.self, forKey: .weekNumber)
