@@ -2013,24 +2013,24 @@ final class DailyBriefReminderTests: XCTestCase {
         calendar.date(from: DateComponents(year: 2026, month: 10, day: day, hour: hour, minute: minute))!
     }
 
-    func testEightOClockRepeatsAndAWeekOfNineOClockRemindersFollow() {
-        let plan = DailyBriefReminder.plan(now: at(8, 7), openedOn: nil, calendar: calendar)
-        XCTAssertEqual(plan.first, .init(id: "dailyBrief.ready", components: DateComponents(hour: 8, minute: 0), repeats: true, isReminder: false))
+    func testSixOClockRepeatsAndAWeekOfSevenOClockRemindersFollow() {
+        let plan = DailyBriefReminder.plan(now: at(8, 5), openedOn: nil, calendar: calendar)
+        XCTAssertEqual(plan.first, .init(id: "dailyBrief.ready", components: DateComponents(hour: 6, minute: 0), repeats: true, isReminder: false))
         let reminders = plan.filter(\.isReminder)
         XCTAssertEqual(reminders.map(\.id).first, "dailyBrief.reminder.2026-10-08")
         XCTAssertEqual(reminders.count, 7)
-        XCTAssertTrue(reminders.allSatisfy { !$0.repeats && $0.components.hour == 9 && $0.components.minute == 0 })
+        XCTAssertTrue(reminders.allSatisfy { !$0.repeats && $0.components.hour == 7 && $0.components.minute == 0 })
     }
 
     func testOpeningTodaysBriefSkipsOnlyTodaysReminder() {
-        let plan = DailyBriefReminder.plan(now: at(8, 8, 30), openedOn: "2026-10-08", calendar: calendar)
+        let plan = DailyBriefReminder.plan(now: at(8, 6, 30), openedOn: "2026-10-08", calendar: calendar)
         XCTAssertEqual(plan.dropFirst().map(\.id).first, "dailyBrief.reminder.2026-10-09")
         XCTAssertEqual(plan.filter(\.isReminder).count, 6)
         XCTAssertEqual(plan.compactMap(\.review), [.init(date: "2026-10-11", kind: "weekly")], "Sunday's review")
     }
 
-    func testAfterNineTodaysReminderIsPast() {
-        let plan = DailyBriefReminder.plan(now: at(8, 9, 30), openedOn: nil, calendar: calendar)
+    func testAfterSevenTodaysReminderIsPast() {
+        let plan = DailyBriefReminder.plan(now: at(8, 7, 30), openedOn: nil, calendar: calendar)
         XCTAssertEqual(plan.dropFirst().map(\.id).first, "dailyBrief.reminder.2026-10-09")
     }
 
