@@ -113,11 +113,22 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
     private var _dialogueCalls: [(String, String?)] = []
     var dialogueCalls: [(String, String?)] { lock.withLock { _dialogueCalls } }
 
+    /// When set, runs before each scripted event is handed over (and before the end), so a test can read
+    /// the view model's state between events.
+    var dialogueProbe: (@MainActor () -> Void)?
+
     func dialogue(attempt: String, answer: String?) -> AsyncThrowingStream<PrepDialogueEvent, Error> {
         let script = lock.withLock { () -> [PrepDialogueEvent] in
             _dialogueCalls.append((attempt, answer))
             _log.append("dialogue")
             return dialogueScripts.isEmpty ? [] : dialogueScripts.removeFirst()
+        }
+        if let probe = dialogueProbe {
+            let events = ScriptedEvents(script)
+            return AsyncThrowingStream(unfolding: {
+                await probe()
+                return events.next()
+            })
         }
         return AsyncThrowingStream { continuation in
             for event in script { continuation.yield(event) }
@@ -128,6 +139,24 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
     func endDialogue(attempt: String) async throws -> PrepAttemptResult {
         try next("endDialogue:\(attempt)", &endResults)
     }
+}
+
+/// A dialogue script handed over one event at a time.
+private final class ScriptedEvents: @unchecked Sendable {
+    private let lock = NSLock()
+    private var rest: [PrepDialogueEvent]
+
+    init(_ script: [PrepDialogueEvent]) { rest = script }
+
+    func next() -> PrepDialogueEvent? {
+        lock.withLock { rest.isEmpty ? nil : rest.removeFirst() }
+    }
+}
+
+/// The view model's streaming bubble as each probe saw it.
+@MainActor
+private final class StreamingTrace {
+    var seen: [String?] = []
 }
 
 @MainActor
@@ -771,6 +800,37 @@ final class PrepViewModelsTests: XCTestCase {
         guard case let .result(_, result, _) = vm.phase else { return XCTFail("expected a result") }
         XCTAssertEqual(result.verdict, "partial")
         XCTAssertEqual(PrepCopy.endHeadline(hit: 2, total: 2, followups: result.dialogue?.followups), "Got it in 1 follow-up")
+    }
+
+    func testAReplyShowsThinkingWhileGradedAndARepeatIsReset() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([questionRep(0)]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.success(dialogueResult("miss", attempt: "a1", hit: [], missed: ["r1", "r2"], followups: 0, open: true))]
+        let asked = [("tutor", "Where is the loss?")]
+        let replied = asked + [("you", "Ranking")]
+        client.dialogueScripts = [
+            [.turn("Where is the loss?"),
+             .done(dialogueResult("miss", attempt: "a2", hit: [], missed: ["r1", "r2"], followups: 0, open: true, turns: asked))],
+            [.graded(dialogueResult("partial", attempt: "a3", hit: ["r1"], missed: ["r2"], followups: 1, open: true, turns: replied)),
+             .delta("Where is "), .reset, .delta("What buries it?"), .turn("What buries it?"),
+             .done(dialogueResult("partial", attempt: "a4", hit: ["r1"], missed: ["r2"], followups: 1, open: true,
+                                  turns: replied + [("tutor", "What buries it?")]))],
+        ]
+        let vm = makeVM(client)
+        await vm.load()
+        vm.beginRecall()
+        vm.recallDraft = "Not sure"
+        await vm.submitRecall()
+        let trace = StreamingTrace()
+        client.dialogueProbe = { trace.seen.append(vm.tutorStreaming) }
+        vm.tutorDraft = "Ranking"
+        await vm.sendTutorReply()
+        XCTAssertEqual(trace.seen, ["", "", "Where is ", "", "What buries it?", nil, nil],
+                       "Thinking from the tap, through grading, and again after a reset")
+        XCTAssertNil(vm.tutorStreaming)
+        guard case let .result(_, result, _) = vm.phase else { return XCTFail("expected a result") }
+        XCTAssertEqual(result.dialogue?.turns.last?.text, "What buries it?")
     }
 
     func testShowMeEndsTheDialogue() async {
