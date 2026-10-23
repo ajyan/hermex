@@ -1121,6 +1121,16 @@ enum PrepCopy {
         return text.trimmingCharacters(in: .whitespaces)
     }
 
+    /// An idea bullet's first sentence, for the "Take with you" card: the text through the first `.`, `?` or `!`
+    /// (and any closing quote) that a capital, quote, bracket, digit or the end follows. A period inside a quote
+    /// that runs on in lowercase doesn't end it; with no sentence end, the whole text.
+    static func takeawayLine(_ text: String) -> String {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let pattern = #"[.?!]["”’)]*(?=\s+[A-Z"“(<`0-9]|\s*$)"#
+        guard let range = text.range(of: pattern, options: .regularExpression) else { return text }
+        return String(text[..<range.upperBound])
+    }
+
     /// The "Lock it in" card's instruction.
     static func lockInPrompt(_ points: Int) -> String {
         points == 1 ? "Say what this means in your own words, then check it."

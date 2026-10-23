@@ -894,6 +894,18 @@ final class PrepDialogueModelTests: XCTestCase {
         XCTAssertEqual(PrepCopy.ideaLead("Budget"), "Budget", "an older lead without a colon is unchanged")
     }
 
+    func testTakeawayLineIsTheIdeasFirstSentence() {
+        XCTAssertEqual(PrepCopy.takeawayLine("For refusals, state the line and show one example. Add one request that sounds risky."),
+                       "For refusals, state the line and show one example.")
+        XCTAssertEqual(PrepCopy.takeawayLine(" Cluster the failures by cause "), "Cluster the failures by cause",
+                       "a sentence with no end comes back whole")
+        XCTAssertEqual(PrepCopy.takeawayLine(#"Give one exact reply for when no quote supports an answer, such as "The policy does not cover this." An empty quote set tells the model to stop."#),
+                       #"Give one exact reply for when no quote supports an answer, such as "The policy does not cover this.""#,
+                       "the closing quote stays with its sentence")
+        XCTAssertEqual(PrepCopy.takeawayLine("Use a cheap model, e.g. a small one, first. Then escalate."),
+                       "Use a cheap model, e.g. a small one, first.", "a period before lowercase text doesn't end it")
+    }
+
     func testLockInPromptCountsThePoints() {
         XCTAssertEqual(PrepCopy.lockInPrompt(3), "Say what each of these 3 means in your own words, then check it.")
         XCTAssertEqual(PrepCopy.lockInPrompt(1), "Say what this means in your own words, then check it.")
