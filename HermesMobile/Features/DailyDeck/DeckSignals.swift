@@ -48,9 +48,11 @@ enum DeckStyleChip: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    /// Cards with a writing style to learn: those with a kind (a reflection, an item). Not the headline, sleep,
-    /// goals, Ask, follow-up decisions or the close.
-    static func styleCards(_ type: DeckCard.CardType) -> Bool { type == .reflect || type == .item }
+    /// Cards with a writing style to learn: those with a kind (a reflection, an item) in a morning deck, the only
+    /// decks the learner reads. Not the headline, sleep, goals, Ask, follow-up decisions or the close.
+    static func styleCards(_ type: DeckCard.CardType, deckKind: String) -> Bool {
+        deckKind == "morning" && (type == .reflect || type == .item)
+    }
 
     var label: String {
         switch self {

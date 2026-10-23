@@ -1532,6 +1532,8 @@ final class DailyDeckTests: XCTestCase {
         viewModel.setStyleNote("  say it plainly ", on: book)
         XCTAssertEqual(viewModel.signals.style["book"], DeckStyleMark(chips: ["too-long", "voice"], note: "say it plainly"))
         XCTAssertEqual(store.signals(for: server, date: "2026-10-04", kind: "morning"), viewModel.signals, "kept as a draft")
+        viewModel.setStyleNote("", on: book)
+        XCTAssertEqual(viewModel.signals.style["book"]?.note, "say it plainly", "reopening the sheet with an empty note keeps his words")
         viewModel.toggleStyle(.tooLong, on: book)
         viewModel.toggleStyle(.voice, on: book)
         XCTAssertTrue(viewModel.signals.isEmpty)

@@ -79,11 +79,12 @@ final class DeckSignalsTests: XCTestCase {
     }
 
     func testStyleChipsOnlyOnKindedCards() {
-        XCTAssertTrue(DeckStyleChip.styleCards(.reflect))
-        XCTAssertTrue(DeckStyleChip.styleCards(.item))
+        XCTAssertTrue(DeckStyleChip.styleCards(.reflect, deckKind: "morning"))
+        XCTAssertTrue(DeckStyleChip.styleCards(.item, deckKind: "morning"))
         for type: DeckCard.CardType in [.headline, .close, .sleep, .goal, .ask] {
-            XCTAssertFalse(DeckStyleChip.styleCards(type), "\(type) has no writing style to learn")
+            XCTAssertFalse(DeckStyleChip.styleCards(type, deckKind: "morning"), "\(type) has no writing style to learn")
         }
+        XCTAssertFalse(DeckStyleChip.styleCards(.item, deckKind: "weekly"), "the learner reads morning decks only")
         XCTAssertEqual(DeckStyleChip.allCases.map(\.rawValue),
                        ["too-long", "too-thin", "jargon", "show-quotes", "less-quotes", "structure", "voice"],
                        "the vault's chip ids (style_learn.CHIPS)")

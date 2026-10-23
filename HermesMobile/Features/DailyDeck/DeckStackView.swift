@@ -85,7 +85,7 @@ struct DeckStackView: View {
         if case .card(let card) = page {
             ratings = FeedbackRating.deck(card: card, date: viewModel.date, kind: viewModel.kind,
                                           showsQuestion: viewModel.question(for: card) == card.question)
-            styleCard = DeckStyleChip.styleCards(card.type) ? card : nil
+            styleCard = DeckStyleChip.styleCards(card.type, deckKind: viewModel.kind) ? card : nil
         }
         swipeFeedback = SwipeFeedback(
             context: .dailyDeck(title: viewModel.title, date: viewModel.date, kind: viewModel.kind, page: page),

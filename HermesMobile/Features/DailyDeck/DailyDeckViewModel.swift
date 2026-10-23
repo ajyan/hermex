@@ -727,11 +727,13 @@ final class DailyDeckViewModel {
 
     func styleChips(on card: DeckCard) -> Set<String> { Set(signals.style[card.id]?.chips ?? []) }
 
-    /// Keeps the swipe-up note with `card`'s chips; only "Not my voice" files it.
+    /// Keeps the swipe-up note with `card`'s chips; only "Not my voice" files it. An empty note (the sheet reopened)
+    /// keeps the words already there.
     func setStyleNote(_ note: String, on card: DeckCard) {
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard signals.style[card.id]?.chips.contains(DeckStyleChip.voice.rawValue) == true else { return }
-        updateSignals { $0.style[card.id]?.note = trimmed.isEmpty ? nil : trimmed }
+        guard !trimmed.isEmpty, signals.style[card.id]?.chips.contains(DeckStyleChip.voice.rawValue) == true,
+              signals.style[card.id]?.note != trimmed else { return }
+        updateSignals { $0.style[card.id]?.note = trimmed }
     }
 
     /// The close card's pick between the day's variant faces ("a" or "b"); choosing the picked face again clears it.
