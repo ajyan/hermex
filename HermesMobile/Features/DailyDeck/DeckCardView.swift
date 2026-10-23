@@ -556,6 +556,10 @@ struct DeckCardView: View {
         if case .failed(let message) = viewModel.filing {
             Text(verbatim: message).font(AppFont.footnote()).foregroundStyle(Color.hxDanger).padding(.top, 12)
         }
+        if let variantCard = viewModel.variantCard, !seal {
+            DeckVariantPick(card: variantCard, viewModel: viewModel, palette: palette)
+                .padding(.top, 24)
+        }
         Button(action: file) {
             HStack {
                 if viewModel.filing == .filing { ProgressView().tint(seal ? Color.hxOnAccent : palette.onInk) }
@@ -587,11 +591,13 @@ private struct PieceArgument: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(verbatim: "The argument · \(piece.steps.count) \(piece.steps.count == 1 ? "step" : "steps")")
-                .font(AppFont.subheadline(weight: .semibold))
-                .foregroundStyle(palette.ink)
-                .accessibilityAddTraits(.isHeader)
-                .padding(.bottom, 10)
+            if !piece.steps.isEmpty {  // the variant's gist face shows the quotes alone
+                Text(verbatim: "The argument · \(piece.steps.count) \(piece.steps.count == 1 ? "step" : "steps")")
+                    .font(AppFont.subheadline(weight: .semibold))
+                    .foregroundStyle(palette.ink)
+                    .accessibilityAddTraits(.isHeader)
+                    .padding(.bottom, 10)
+            }
             ForEach(Array(piece.steps.enumerated()), id: \.offset) { index, step in
                 if index > 0 {
                     Rectangle().fill(palette.ink.opacity(0.12)).frame(height: 0.5).padding(.vertical, 12)
