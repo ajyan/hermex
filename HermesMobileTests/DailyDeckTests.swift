@@ -1585,6 +1585,38 @@ final class DailyDeckTests: XCTestCase {
     }
 
     @MainActor
+    func testUsageFoldsIntoSignals() async throws {
+        let viewModel = try await loadedViewModel(Self.feedbackDeckJSON)
+        viewModel.showCard("book")
+        viewModel.reachedEnd("book")
+        viewModel.reachedEnd("wiki")  // not on screen: ignored
+        viewModel.opened("map", on: "book")
+        viewModel.opened("map", on: "book")
+        viewModel.opened("source", on: "book")
+        viewModel.showCard(nil)
+        let usage = try XCTUnwrap(viewModel.signals.usage["book"])
+        XCTAssertTrue(usage.reachedEnd)
+        XCTAssertEqual(usage.opened, ["map", "source"])
+        XCTAssertGreaterThanOrEqual(usage.seconds, 0)
+        XCTAssertNil(viewModel.signals.usage["wiki"])
+    }
+
+    @MainActor
+    func testFiledUsageCarriesAnswerLength() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.feedbackDeckJSON)
+        let viewModel = makeViewModel(client)
+        await viewModel.load()
+        let book = try XCTUnwrap(viewModel.cards.first { $0.id == "book" })
+        viewModel.showCard("book")
+        viewModel.opened("map", on: "book")  // the test clock stands still, so time alone makes no usage row
+        viewModel.setText("Twelve chars", for: book)
+        viewModel.showCard(nil)
+        _ = await viewModel.file()
+        XCTAssertEqual(client.fileRequests.first?.answers.usage?.first?.answerChars, 12)
+    }
+
+    @MainActor
     private func loadedViewModel(_ json: String) async throws -> DailyDeckViewModel {
         store.setWorkspace("/vault", for: server)
         let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: json)

@@ -46,8 +46,11 @@ struct DeckPageView: View {
     /// "Open the page" on an open card whose source is a Brain page.
     private var sourceAction: HXCardAction? {
         guard case .card(let card) = page, let route = card.sourceRoute, openBrainRoute.isAvailable else { return nil }
-        let open = openBrainRoute
-        return HXCardAction(title: DeckCard.openTitle(for: route)) { open(route) }
+        let (open, deck) = (openBrainRoute, viewModel)
+        return HXCardAction(title: DeckCard.openTitle(for: route)) {
+            deck.opened("source", on: card.id)
+            open(route)
+        }
     }
 }
 
@@ -101,6 +104,12 @@ struct DeckCardView: View {
                 case .keepsakes: WeekKeepsakesCard(card: card, palette: palette, viewModel: viewModel)
                 default: reading
                 }
+                // Reaching the end of the card counts toward the style learner's usage (`DeckSignals`).
+                Color.clear.frame(height: 1)
+                    .onScrollVisibilityChange(threshold: 0.9) { visible in
+                        if visible { viewModel.reachedEnd(card.id) }
+                    }
+                    .accessibilityHidden(true)
             }
             .padding(.horizontal, 24)
             .padding(.top, 28)
@@ -184,7 +193,10 @@ struct DeckCardView: View {
         // Secondary buttons in the card's paper, so "Write a reflection" stays the one filled button: a Piece
         // card's map first, then a diagram of its topic when there is one.
         ForEach(Array(viewModel.diagrams(for: card).enumerated()), id: \.element.id) { index, diagram in
-            Button { openDiagram = diagram } label: { OpenDiagramLabel(paper: palette.colors, isMap: diagram.isMap) }
+            Button {
+                viewModel.opened(diagram.isMap ? "map" : "diagram", on: card.id)
+                openDiagram = diagram
+            } label: { OpenDiagramLabel(paper: palette.colors, isMap: diagram.isMap) }
             .buttonStyle(.plain)
             .padding(.top, index == 0 ? 18 : 10)
             .accessibilityLabel(Text(verbatim: diagram.isMap ? "Open the map" : "Open the diagram: \(diagram.title ?? "interactive")"))
