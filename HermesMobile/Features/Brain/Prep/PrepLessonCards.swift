@@ -237,7 +237,8 @@ private struct PrepIdeaPoint<Detail: View>: View {
     }
 }
 
-/// The lesson's idea leads after its question is graded, so the rep ends on what to remember.
+/// The lesson's idea leads, each with its first sentence, after its question is graded, so the rep ends on what
+/// to remember.
 struct PrepTakeaway: View {
     let idea: [PrepLessonCards.Bullet]
 
@@ -252,10 +253,16 @@ struct PrepTakeaway: View {
                             .foregroundStyle(HermexPaper.knowledge.glow)
                             .monospacedDigit()
                             .accessibilityHidden(true)
-                        Text(verbatim: PrepCopy.ideaLead(bullet.lead))
-                            .font(AppFont.body(weight: .semibold))
-                            .foregroundStyle(Color.hxTextPrimary)
-                            .fixedSize(horizontal: false, vertical: true)
+                        VStack(alignment: .leading, spacing: BrainStyle.xs) {
+                            Text(verbatim: PrepCopy.ideaLead(bullet.lead))
+                                .font(AppFont.body(weight: .semibold))
+                                .foregroundStyle(Color.hxTextPrimary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text(verbatim: PrepCopy.takeawayLine(bullet.text))
+                                .font(AppFont.body())
+                                .foregroundStyle(Color.hxTextSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                 }
             }
