@@ -1572,6 +1572,19 @@ final class DailyDeckTests: XCTestCase {
     }
 
     @MainActor
+    func testVariantCardAndPick() async throws {
+        let viewModel = try await loadedViewModel(DeckVariantTests.deckJSON)
+        let card = try XCTUnwrap(viewModel.variantCard)
+        XCTAssertEqual(card.id, "pick-1", "the first card with a variant")
+        viewModel.choose("b", on: card)
+        XCTAssertEqual(viewModel.signals.pick, DeckPick(card: "pick-1", chose: "b"))
+        viewModel.choose("a", on: card)
+        XCTAssertEqual(viewModel.signals.pick, DeckPick(card: "pick-1", chose: "a"), "choosing the other face replaces it")
+        viewModel.choose("a", on: card)
+        XCTAssertNil(viewModel.signals.pick, "choosing it again clears the pick")
+    }
+
+    @MainActor
     private func loadedViewModel(_ json: String) async throws -> DailyDeckViewModel {
         store.setWorkspace("/vault", for: server)
         let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: json)

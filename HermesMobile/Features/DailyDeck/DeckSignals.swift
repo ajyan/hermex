@@ -148,3 +148,45 @@ struct DeckLearned: Decodable, Equatable, Identifiable {
     var isLearned: Bool { state == "learned" }
     var line: String { "\(isLearned ? "Learned" : "Unlearned"): \(text)" }
 }
+
+/// The day's variant card: the same card written two ways along one style `dimension`. The card's own fields hold
+/// the `shown` face; the close card shows both to pick from (`DeckVariantPick`).
+struct DeckVariant: Decodable, Equatable {
+    let dimension: String
+    /// "a" or "b".
+    let shown: String
+    let a: DeckFace
+    let b: DeckFace
+}
+
+/// One way of writing the variant card: only the fields that differ between the two.
+struct DeckFace: Equatable {
+    /// The style direction this face follows ("shorter", "parts", …).
+    let dir: String
+    let context: String?
+    let entries: [DeckEntry]?
+    let piece: DeckPiece?
+
+    /// The face as plain text for the close card's side-by-side.
+    var preview: String {
+        if let context { return context }
+        if let entries { return entries.map { ($0.label.map { "\($0): " } ?? "") + $0.text }.joined(separator: "\n") }
+        if let piece {
+            let steps = piece.steps.enumerated().map { "\($0.offset + 1). \($0.element.claim)" }
+            return (steps + piece.quotes.map { "“\($0.text)”" }).joined(separator: "\n")
+        }
+        return ""
+    }
+}
+
+extension DeckFace: Decodable {
+    private enum CodingKeys: String, CodingKey { case dir, context, entries, piece }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        dir = try c.decode(String.self, forKey: .dir)
+        context = try? c.decodeIfPresent(String.self, forKey: .context)
+        entries = (try? c.decodeIfPresent([Lossy<DeckEntry>].self, forKey: .entries))?.compactMap(\.value)
+        piece = try? c.decodeIfPresent(DeckPiece.self, forKey: .piece)
+    }
+}

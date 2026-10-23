@@ -132,6 +132,9 @@ final class DailyDeckViewModel {
 
     var cards: [DeckCard] { deck?.cards ?? [] }
 
+    /// The day's variant card (written two ways), whose faces the close card offers to pick between.
+    var variantCard: DeckCard? { cards.first { $0.variant != nil } }
+
     /// Cards answered (the headline and close cards never count, nor feedback alone).
     var answeredCount: Int { cards.filter { answers[$0.id]?.isAnswer(for: $0) == true }.count }
 
