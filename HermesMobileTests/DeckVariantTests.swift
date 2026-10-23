@@ -31,6 +31,26 @@ final class DeckVariantTests: XCTestCase {
         XCTAssertEqual(deck.cards[1].title, "Life")
     }
 
+    func testPreviewsDropTheSharedStart() throws {
+        let gist = #"{"label": "The gist", "text": "G."}"#, why = #"{"label": "Why it matters", "text": "W."}"#
+        let variant = try JSONDecoder().decode(DeckVariant.self, from: Data("""
+        {"dimension": "structure", "shown": "a",
+         "a": {"dir": "parts", "entries": [\(gist), {"label": "Idea", "text": "I."}, \(why)]},
+         "b": {"dir": "gist", "entries": [\(gist), \(why)]}}
+        """.utf8))
+        XCTAssertEqual(variant.previews.a, "…\nIdea: I.\nWhy it matters: W.")
+        XCTAssertEqual(variant.previews.b, "…\nWhy it matters: W.")
+        let quotes = try JSONDecoder().decode(DeckVariant.self, from: Data(#"""
+        {"dimension": "quotes", "shown": "b",
+         "a": {"dir": "verbatim", "piece": {"steps": [{"claim": "S."}], "quotes": [{"text": "Q."}]}},
+         "b": {"dir": "summary", "piece": {"steps": [{"claim": "S."}], "quotes": []}}}
+        """#.utf8))
+        XCTAssertEqual(quotes.previews.a, "…\n“Q.”")
+        XCTAssertEqual(quotes.previews.b, "… and nothing more")
+        let length = try XCTUnwrap(DailyDeck.decode(Self.deckJSON).cards[0].variant)
+        XCTAssertEqual(length.previews.a, "One. Two. Three.", "nothing shared: each face whole")
+    }
+
     func testFacePreview() throws {
         let entries = try JSONDecoder().decode([DeckEntry].self, from: Data(#"""
         [{"label": "The gist", "text": "G."}, {"text": "Plain."}]

@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// The close card's "Which reads better?": the day's variant card written two ways, side by side as their first
-/// lines, with no labels saying which is which. One tap picks a face (again clears it); the pick is filed with the
-/// answers for the vault's style learner (`DailyDeckViewModel.choose`).
+/// The close card's "Which reads better?": the day's variant card written two ways, one above the other from where
+/// they differ (`DeckVariant.previews`), with no labels saying which is which. One tap picks a face, again clears it;
+/// the pick is filed with the answers for the vault's style learner (`DailyDeckViewModel.choose`).
 struct DeckVariantPick: View {
     let card: DeckCard
     let viewModel: DailyDeckViewModel
@@ -18,19 +18,22 @@ struct DeckVariantPick: View {
                 Text(verbatim: card.title ?? "Today's card, written two ways")
                     .font(AppFont.footnote())
                     .foregroundStyle(Color.hxTextSecondary)
-                ForEach([("a", variant.a), ("b", variant.b)], id: \.0) { id, face in
-                    faceButton(id, face)
-                }
+                let previews = variant.previews
+                faceButton("a", previews.a)
+                faceButton("b", previews.b)
+                Text(verbatim: "Tap your pick again to clear it.")
+                    .font(AppFont.footnote())
+                    .foregroundStyle(Color.hxTextSecondary)
             }
         }
     }
 
-    private func faceButton(_ id: String, _ face: DeckFace) -> some View {
+    private func faceButton(_ id: String, _ preview: String) -> some View {
         let isPicked = viewModel.signals.pick == DeckPick(card: card.id, chose: id)
         return Button {
             viewModel.choose(id, on: card)
         } label: {
-            Text(verbatim: face.preview)
+            Text(verbatim: preview)
                 .font(AppFont.body())
                 .foregroundStyle(Color.hxTextPrimary)
                 .lineLimit(6)
@@ -44,7 +47,7 @@ struct DeckVariantPick: View {
                 }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(Text(verbatim: "Version \(id == "a" ? 1 : 2): \(face.preview)"))
+        .accessibilityLabel(Text(verbatim: "Version \(id == "a" ? 1 : 2): \(preview)"))
         .accessibilityAddTraits(isPicked ? .isSelected : [])
     }
 }

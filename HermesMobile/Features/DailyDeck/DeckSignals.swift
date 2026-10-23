@@ -157,6 +157,20 @@ struct DeckVariant: Decodable, Equatable {
     let shown: String
     let a: DeckFace
     let b: DeckFace
+
+    /// Each face as the close card previews it: only from where the two differ ("…" standing for the lines they
+    /// share), so a 6-line preview never shows two identical starts. A face with nothing after the shared lines
+    /// reads "… and nothing more".
+    var previews: (a: String, b: String) {
+        let lines = (a.preview.components(separatedBy: "\n"), b.preview.components(separatedBy: "\n"))
+        let shared = zip(lines.0, lines.1).prefix { $0 == $1 }.count
+        guard shared > 0 else { return (a.preview, b.preview) }
+        let rest = { (face: [String]) -> String in
+            let tail = face.dropFirst(shared)
+            return tail.isEmpty ? "… and nothing more" : "…\n" + tail.joined(separator: "\n")
+        }
+        return (rest(lines.0), rest(lines.1))
+    }
 }
 
 /// One way of writing the variant card: only the fields that differ between the two.
