@@ -65,6 +65,9 @@ final class DailyDeckViewModel {
     private(set) var workspace: String?
     /// What was last filed for the deck on screen; nil until it is filed.
     private(set) var filedAnswers: [String: DeckAnswer]?
+    /// How the deck was read, filed beside the answers for the style learner (`DeckSignals`).
+    private(set) var signals = DeckSignals()
+    private var filedSignals = DeckSignals()
     /// The server filer's report from this screen's last filing; nil after a chat filing.
     private(set) var filedNote: DailyDeckFiledNote?
     /// Days with a deck in `briefs/`, newest first.
@@ -228,7 +231,14 @@ final class DailyDeckViewModel {
     /// Whether the answers differ from what was filed (always true before the first filing).
     var hasChanges: Bool {
         guard isFiled, let filedAnswers else { return true }
-        return meaningful(answers) != meaningful(filedAnswers)
+        return meaningful(answers) != meaningful(filedAnswers) || Self.decided(signals) != Self.decided(filedSignals)
+    }
+
+    /// The signals the user chose (chips, pick, undo): reading a filed deck again changes its usage, not this.
+    private static func decided(_ signals: DeckSignals) -> DeckSignals {
+        var decided = signals
+        decided.usage = [:]
+        return decided
     }
 
     private func meaningful(_ answers: [String: DeckAnswer]) -> [String: DeckAnswer] {
@@ -338,6 +348,8 @@ final class DailyDeckViewModel {
         deck = nil
         pages = []
         filedAnswers = nil
+        signals = DeckSignals()
+        filedSignals = DeckSignals()
         filedNote = nil
         hasWeekRecord = false
         guard names.contains(fileName(DailyDeckPaths.deck(date: date, kind: kind))) else {
@@ -349,6 +361,7 @@ final class DailyDeckViewModel {
         if names.contains(fileName(DailyDeckPaths.answers(date: date, kind: kind))) {
             let filed = try await client.fileContent(sessionID: sessionID, path: DailyDeckPaths.answers(date: date, kind: kind))
             filedAnswers = DeckAnswersFile.decodeAnswers(filed)
+            filedSignals = DeckAnswersFile.decodeSignals(filed)
             if kind == "weekly", decoded.version == 2 {
                 // An unreadable folder reads as unsealed: sealing again replaces the week whole.
                 let records = try? await client.entryNames(sessionID: sessionID, path: WeeksModel.directory)
@@ -359,6 +372,8 @@ final class DailyDeckViewModel {
         pages = DeckPage.pages(for: decoded.cards)
         let draft = store.answers(for: server, date: date, kind: kind)
         answers = draft.isEmpty ? (filedAnswers ?? [:]) : draft
+        let drafted = store.signals(for: server, date: date, kind: kind)
+        signals = drafted.isEmpty ? filedSignals : drafted
         index = min(index, max(visiblePages.count - 1, 0))
         lastDismissal = nil
         state = .ready
@@ -695,6 +710,53 @@ final class DailyDeckViewModel {
         store.setAnswers(answers, for: server, date: date, kind: kind)
     }
 
+    // MARK: Style signals
+
+    /// Taps a style chip on `card` on or off.
+    func toggleStyle(_ chip: DeckStyleChip, on card: DeckCard) {
+        updateSignals { signals in
+            var mark = signals.style[card.id] ?? DeckStyleMark(chips: [])
+            if let at = mark.chips.firstIndex(of: chip.rawValue) {
+                mark.chips.remove(at: at)
+            } else {
+                mark.chips.append(chip.rawValue)
+            }
+            signals.style[card.id] = mark.chips.isEmpty ? nil : mark
+        }
+    }
+
+    func styleChips(on card: DeckCard) -> Set<String> { Set(signals.style[card.id]?.chips ?? []) }
+
+    /// Keeps the swipe-up note with `card`'s chips; only "Not my voice" files it. An empty note (the sheet reopened)
+    /// keeps the words already there.
+    func setStyleNote(_ note: String, on card: DeckCard) {
+        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, signals.style[card.id]?.chips.contains(DeckStyleChip.voice.rawValue) == true,
+              signals.style[card.id]?.note != trimmed else { return }
+        updateSignals { $0.style[card.id]?.note = trimmed }
+    }
+
+    /// The close card's pick between the day's variant faces ("a" or "b"); choosing the picked face again clears it.
+    func choose(_ face: String, on card: DeckCard) {
+        updateSignals { $0.pick = $0.pick == DeckPick(card: card.id, chose: face) ? nil : DeckPick(card: card.id, chose: face) }
+    }
+
+    /// Undoes a learned rule from the headline, or takes the undo back.
+    func undoLearned(_ id: String) {
+        updateSignals { signals in
+            if let at = signals.undo.firstIndex(of: id) {
+                signals.undo.remove(at: at)
+            } else {
+                signals.undo.append(id)
+            }
+        }
+    }
+
+    private func updateSignals(_ change: (inout DeckSignals) -> Void) {
+        change(&signals)
+        store.setSignals(signals, for: server, date: date, kind: kind)
+    }
+
     // MARK: Photo of the week
 
     /// Where the week's photo lives in the vault, read back through the workspace file route.
@@ -740,8 +802,8 @@ final class DailyDeckViewModel {
         guard let deck, let workspace, filing != .filing else { return nil }
         filing = .filing
         // What is sent: the user can type or open another day while it's in flight.
-        let (date, kind, sent) = (date, kind, answers)
-        let payload = DeckAnswersPayload(deck: deck, answers: sent, completedAt: now())
+        let (date, kind, sent, sentSignals) = (date, kind, answers, signals)
+        let payload = DeckAnswersPayload(deck: deck, answers: sent, signals: sentSignals, completedAt: now())
         let refiling = isFiled
         let filed: BriefFileResponse?
         do {
@@ -755,7 +817,7 @@ final class DailyDeckViewModel {
             do {
                 let sessionID = try await startSession(
                     message: try payload.message(refiling: refiling), title: Self.sessionTitle(for: date, kind: kind), workspace: workspace)
-                markFiled(sent, date: date, kind: kind, confirmed: false, note: nil)
+                markFiled(sent, sentSignals, date: date, kind: kind, confirmed: false, note: nil)
                 return .openSession(sessionID)
             } catch {
                 filing = .failed(error.localizedDescription)
@@ -767,7 +829,7 @@ final class DailyDeckViewModel {
             return nil
         }
         // The answers are filed now (a seal's record written); a failure below only loses the follow-ups.
-        markFiled(sent, date: date, kind: kind, confirmed: true, note: DailyDeckFiledNote(
+        markFiled(sent, sentSignals, date: date, kind: kind, confirmed: true, note: DailyDeckFiledNote(
             summary: Self.trimmed(filed.summary),
             failures: (filed.ran ?? []).filter { $0.ok == false }.map { step in
                 [step.step, step.error].compactMap { $0 }.joined(separator: ": ")
@@ -791,13 +853,18 @@ final class DailyDeckViewModel {
     /// Records `sent` as filed for its deck; `confirmed` when the server's filer did it (a seal's
     /// record now exists). The draft is cleared only if it still matches what was sent, so edits
     /// made while filing stay unsent; another deck on screen is left alone.
-    private func markFiled(_ sent: [String: DeckAnswer], date: String, kind: String, confirmed: Bool, note: DailyDeckFiledNote?) {
+    private func markFiled(_ sent: [String: DeckAnswer], _ sentSignals: DeckSignals, date: String, kind: String,
+                           confirmed: Bool, note: DailyDeckFiledNote?) {
         if store.answers(for: server, date: date, kind: kind) == sent {
             store.setAnswers([:], for: server, date: date, kind: kind)
+        }
+        if store.signals(for: server, date: date, kind: kind) == sentSignals {
+            store.setSignals(DeckSignals(), for: server, date: date, kind: kind)
         }
         filing = .idle
         guard date == self.date, kind == self.kind else { return }
         filedAnswers = sent
+        filedSignals = sentSignals
         filedNote = note
         if confirmed { hasWeekRecord = true }
     }

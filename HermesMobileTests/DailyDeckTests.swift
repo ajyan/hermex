@@ -1521,6 +1521,56 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(viewModel.answers, [:])
     }
 
+    // MARK: - Style signals
+
+    @MainActor
+    func testToggleStyleTwiceClears() async throws {
+        let viewModel = try await loadedViewModel(Self.feedbackDeckJSON)
+        let book = try XCTUnwrap(viewModel.cards.first { $0.id == "book" })
+        viewModel.toggleStyle(.tooLong, on: book)
+        viewModel.toggleStyle(.voice, on: book)
+        viewModel.setStyleNote("  say it plainly ", on: book)
+        XCTAssertEqual(viewModel.signals.style["book"], DeckStyleMark(chips: ["too-long", "voice"], note: "say it plainly"))
+        XCTAssertEqual(store.signals(for: server, date: "2026-10-04", kind: "morning"), viewModel.signals, "kept as a draft")
+        viewModel.setStyleNote("", on: book)
+        XCTAssertEqual(viewModel.signals.style["book"]?.note, "say it plainly", "reopening the sheet with an empty note keeps his words")
+        viewModel.toggleStyle(.tooLong, on: book)
+        viewModel.toggleStyle(.voice, on: book)
+        XCTAssertTrue(viewModel.signals.isEmpty)
+    }
+
+    @MainActor
+    func testFilingSendsSignalsAndUsageAloneIsNoChange() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.feedbackDeckJSON)
+        let viewModel = makeViewModel(client)
+        await viewModel.load()
+        let book = try XCTUnwrap(viewModel.cards.first { $0.id == "book" })
+        viewModel.toggleStyle(.jargon, on: book)
+        _ = await viewModel.file()
+        XCTAssertEqual(client.fileRequests.first?.answers.style, [DeckSignalRows.Style(card: "book", chips: ["jargon"], note: nil)])
+        XCTAssertFalse(viewModel.hasChanges)
+        viewModel.choose("a", on: book)
+        XCTAssertTrue(viewModel.hasChanges, "a pick after filing asks to file again")
+    }
+
+    @MainActor
+    func testUndoAfterFilingMarksChanges() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.feedbackDeckJSON)
+        let viewModel = makeViewModel(client)
+        await viewModel.load()
+        viewModel.setText("Ship it.", for: try XCTUnwrap(viewModel.cards.first { $0.id == "book" }))
+        _ = await viewModel.file()
+        XCTAssertFalse(viewModel.hasChanges)
+        viewModel.undoLearned("wiki.length.shorter")
+        XCTAssertTrue(viewModel.hasChanges, "the close card offers to file the undo")
+        XCTAssertEqual(viewModel.signals.undo, ["wiki.length.shorter"])
+        viewModel.undoLearned("wiki.length.shorter")
+        XCTAssertFalse(viewModel.hasChanges)
+        XCTAssertEqual(viewModel.signals.undo, [])
+    }
+
     @MainActor
     private func loadedViewModel(_ json: String) async throws -> DailyDeckViewModel {
         store.setWorkspace("/vault", for: server)
