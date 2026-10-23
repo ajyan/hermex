@@ -533,7 +533,8 @@ final class PrepRunViewModel {
         guard token == generation, case let .result(_, result, _) = phase, let attempt = result.attemptID else { return }
         tutorBusy = true
         tutorError = nil
-        tutorStreaming = answer == nil ? "" : nil
+        // The Thinking bubble from the tap on, while a reply is graded as well as while the turn is written.
+        tutorStreaming = ""
         defer {
             if token == generation {
                 tutorBusy = false
@@ -550,6 +551,8 @@ final class PrepRunViewModel {
                     tutorStreaming = graded.dialogue?.open == true ? "" : nil
                 case .delta(let text):
                     tutorStreaming = (tutorStreaming ?? "") + text
+                case .reset:
+                    tutorStreaming = ""
                 case .turn:
                     tutorStreaming = nil
                 case .done(let done):

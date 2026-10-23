@@ -847,6 +847,7 @@ final class PrepDialogueModelTests: XCTestCase {
 
     func testUnknownAndErrorEvents() {
         XCTAssertNil(PrepDialogueEvent.decode(event: "ping", data: "{}"))
+        XCTAssertEqual(PrepDialogueEvent.decode(event: "reset", data: "{}"), .reset)
         XCTAssertEqual(PrepDialogueEvent.decode(event: "error", data: #"{"status": 409, "error": "moved on"}"#),
                        .failed(status: 409, message: "moved on"))
     }
