@@ -114,9 +114,14 @@ struct DailyDeckView: View {
                 Task { await viewModel.show(date: review.date, kind: review.kind, cardID: review.cardID) }
             }
             .onChange(of: scenePhase) { _, phase in
+                viewModel.scenePhaseChanged(active: phase == .active)
                 // Left open overnight, the brief moves on to the new day's deck.
                 if phase == .active { Task { await viewModel.refreshDay() } }
             }
+            // Time on each card, for the style learner (DeckSignals.usage).
+            .onChange(of: viewModel.currentCardID, initial: true) { _, id in viewModel.showCard(id) }
+            .onAppear { viewModel.screenAppeared() }
+            .onDisappear { viewModel.screenDisappeared() }
             .onChange(of: viewModel.state) {
                 // Opening today's brief is the answer the 07:00 reminder waits for.
                 if viewModel.state == .ready, !viewModel.isReview, viewModel.date == viewModel.today {

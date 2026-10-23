@@ -38,6 +38,8 @@ struct DeckPageView: View {
                 .opensAsFullCard(palette.cardRole, title: palette.name, action: sourceAction) {
                     // No swipe-up feedback here: its sheet belongs to the deck under the open card.
                     DeckPageView(page: page, viewModel: viewModel, file: file, isOpen: true)
+                        .onAppear { viewModel.screenAppeared() }
+                        .onDisappear { viewModel.screenDisappeared() }
                 }
                 .padding(.vertical, 12)
         }
@@ -46,8 +48,11 @@ struct DeckPageView: View {
     /// "Open the page" on an open card whose source is a Brain page.
     private var sourceAction: HXCardAction? {
         guard case .card(let card) = page, let route = card.sourceRoute, openBrainRoute.isAvailable else { return nil }
-        let open = openBrainRoute
-        return HXCardAction(title: DeckCard.openTitle(for: route)) { open(route) }
+        let (open, deck) = (openBrainRoute, viewModel)
+        return HXCardAction(title: DeckCard.openTitle(for: route)) {
+            deck.opened("source", on: card.id)
+            open(route)
+        }
     }
 }
 
@@ -71,6 +76,7 @@ struct DeckCardView: View {
     @State private var openDiagram: BriefDiagramIndex.Entry?
     /// The week's divider: a new question was asked on this screen, so the "Why?" note shows.
     @State private var hasAskedNewQuestion = false
+    @State private var endInView = false
 
     var body: some View {
         ScrollView {
@@ -101,6 +107,17 @@ struct DeckCardView: View {
                 case .keepsakes: WeekKeepsakesCard(card: card, palette: palette, viewModel: viewModel)
                 default: reading
                 }
+                // Reaching the end of the card counts toward the style learner's usage (`DeckSignals`). A short card's
+                // end is in view while it is still the next card under the stack, so it's checked again on arrival.
+                Color.clear.frame(height: 1)
+                    .onScrollVisibilityChange(threshold: 0.9) { visible in
+                        endInView = visible
+                        if visible { viewModel.reachedEnd(card.id) }
+                    }
+                    .onChange(of: viewModel.currentCardID) { _, id in
+                        if endInView, id == card.id { viewModel.reachedEnd(card.id) }
+                    }
+                    .accessibilityHidden(true)
             }
             .padding(.horizontal, 24)
             .padding(.top, 28)
@@ -184,7 +201,10 @@ struct DeckCardView: View {
         // Secondary buttons in the card's paper, so "Write a reflection" stays the one filled button: a Piece
         // card's map first, then a diagram of its topic when there is one.
         ForEach(Array(viewModel.diagrams(for: card).enumerated()), id: \.element.id) { index, diagram in
-            Button { openDiagram = diagram } label: { OpenDiagramLabel(paper: palette.colors, isMap: diagram.isMap) }
+            Button {
+                viewModel.opened(diagram.isMap ? "map" : "diagram", on: card.id)
+                openDiagram = diagram
+            } label: { OpenDiagramLabel(paper: palette.colors, isMap: diagram.isMap) }
             .buttonStyle(.plain)
             .padding(.top, index == 0 ? 18 : 10)
             .accessibilityLabel(Text(verbatim: diagram.isMap ? "Open the map" : "Open the diagram: \(diagram.title ?? "interactive")"))

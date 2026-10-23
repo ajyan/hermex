@@ -1585,6 +1585,76 @@ final class DailyDeckTests: XCTestCase {
     }
 
     @MainActor
+    func testUsageFoldsIntoSignals() async throws {
+        let viewModel = try await loadedViewModel(Self.feedbackDeckJSON)
+        viewModel.screenAppeared()
+        viewModel.index = 1
+        viewModel.showCard(viewModel.currentCardID)
+        viewModel.reachedEnd("book")
+        viewModel.reachedEnd("wiki")  // not on screen: ignored
+        viewModel.opened("map", on: "book")
+        viewModel.opened("map", on: "book")
+        viewModel.opened("source", on: "book")
+        viewModel.showCard(nil)
+        let usage = try XCTUnwrap(viewModel.signals.usage["book"])
+        XCTAssertTrue(usage.reachedEnd)
+        XCTAssertEqual(usage.opened, ["map", "source"])
+        XCTAssertGreaterThanOrEqual(usage.seconds, 0)
+        XCTAssertNil(viewModel.signals.usage["wiki"])
+    }
+
+    @MainActor
+    func testFiledUsageCarriesAnswerLength() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.feedbackDeckJSON)
+        let viewModel = makeViewModel(client)
+        await viewModel.load()
+        let book = try XCTUnwrap(viewModel.cards.first { $0.id == "book" })
+        viewModel.showCard("book")
+        viewModel.opened("map", on: "book")  // the test clock stands still, so time alone makes no usage row
+        viewModel.setText("Twelve chars", for: book)
+        viewModel.showCard(nil)
+        _ = await viewModel.file()
+        XCTAssertEqual(client.fileRequests.first?.answers.usage?.first?.answerChars, 12)
+    }
+
+    @MainActor
+    func testReachedEndCountsTheCardOnScreenWhateverOrderTheViewsReport() async throws {
+        let viewModel = try await loadedViewModel(Self.feedbackDeckJSON)
+        viewModel.reachedEnd("book")  // drawn as the next card under the headline: ignored
+        XCTAssertNil(viewModel.signals.usage["book"])
+        viewModel.index = 1  // swiped to it; the card view re-reports its end before the deck view calls showCard
+        viewModel.reachedEnd("book")
+        XCTAssertEqual(viewModel.signals.usage["book"]?.reachedEnd, true)
+    }
+
+    @MainActor
+    func testTheClockRunsWhileTheDeckOrItsOpenCardIsOnScreen() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.feedbackDeckJSON)
+        var clock = morning
+        let viewModel = DailyDeckViewModel(server: server, client: client, store: store, now: { clock })
+        await viewModel.load()
+        viewModel.screenAppeared()
+        viewModel.index = 1
+        viewModel.showCard(viewModel.currentCardID)
+        clock += 10
+        viewModel.screenAppeared()     // the card opens full screen
+        viewModel.screenDisappeared()  // the deck under it goes away
+        clock += 20
+        viewModel.scenePhaseChanged(active: false)
+        clock += 600                   // backgrounded
+        viewModel.scenePhaseChanged(active: true)
+        clock += 5
+        viewModel.screenDisappeared()  // the open card closes...
+        clock += 100                   // ...and nothing shows the deck (another tab)
+        viewModel.screenAppeared()
+        clock += 5
+        viewModel.showCard(nil)
+        XCTAssertEqual(viewModel.signals.usage["book"]?.seconds, 40)
+    }
+
+    @MainActor
     private func loadedViewModel(_ json: String) async throws -> DailyDeckViewModel {
         store.setWorkspace("/vault", for: server)
         let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: json)

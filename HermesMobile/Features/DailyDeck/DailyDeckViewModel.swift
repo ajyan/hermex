@@ -68,6 +68,10 @@ final class DailyDeckViewModel {
     /// How the deck was read, filed beside the answers for the style learner (`DeckSignals`).
     private(set) var signals = DeckSignals()
     private var filedSignals = DeckSignals()
+    @ObservationIgnored private var usageTracker = DeckUsageTracker()
+    /// The deck's views on screen (the deck, its open card) and the scene's state: the clock runs only when both say so.
+    @ObservationIgnored private var screensShowing = 0
+    @ObservationIgnored private var sceneActive = true
     /// The server filer's report from this screen's last filing; nil after a chat filing.
     private(set) var filedNote: DailyDeckFiledNote?
     /// Days with a deck in `briefs/`, newest first.
@@ -209,6 +213,12 @@ final class DailyDeckViewModel {
         return visible.indices.contains(index) ? visible[index] : nil
     }
 
+    /// The card on screen, for usage timing; nil on a page that isn't a card.
+    var currentCardID: String? {
+        guard case .card(let card) = currentPage else { return nil }
+        return card.id
+    }
+
     /// Cards on this deck marked "Not for Me".
     var skippedCount: Int { cards.filter { answers[$0.id]?.feedback != nil }.count }
 
@@ -326,6 +336,7 @@ final class DailyDeckViewModel {
         let wasOnToday = date == today && kind == "morning"
         today = day
         guard wasOnToday else { return }
+        showCard(nil)
         date = day
         index = 0
         await load()
@@ -335,6 +346,7 @@ final class DailyDeckViewModel {
     /// lands on that card once loaded (the deck already on screen just moves to it).
     func show(date: String, kind: String = "morning", cardID: String? = nil) async {
         if date != self.date || kind != self.kind || state != .ready {
+            showCard(nil)  // the card leaving keeps its time on the deck it belongs to
             self.date = date
             self.kind = kind
             index = 0
@@ -755,6 +767,55 @@ final class DailyDeckViewModel {
         }
     }
 
+    /// The card on screen is now `id` (nil: none, or a page that isn't a card); the one leaving keeps its time.
+    func showCard(_ id: String?) {
+        if let (card, seconds) = usageTracker.show(id, at: now()) { addSeconds(seconds, to: card) }
+    }
+
+    /// The app became active or left the foreground: only time in the foreground counts.
+    func scenePhaseChanged(active: Bool) {
+        sceneActive = active
+        syncClock()
+    }
+
+    /// The deck, or a card opened full screen over it, appeared. Counted rather than flagged: the open card appears
+    /// before the deck under it disappears, so the clock keeps running through the hand-off.
+    func screenAppeared() {
+        screensShowing += 1
+        syncClock()
+    }
+
+    func screenDisappeared() {
+        screensShowing = max(0, screensShowing - 1)
+        syncClock()
+    }
+
+    private func syncClock() {
+        if sceneActive && screensShowing > 0 {
+            usageTracker.resume(at: now())
+        } else if let (card, seconds) = usageTracker.pause(at: now()) {
+            addSeconds(seconds, to: card)
+        }
+    }
+
+    /// The bottom of `card` is in view; counted only for the card on screen (the stack draws the next card under it,
+    /// and a card view may report its end before the deck reports the swipe, so this checks the deck's index).
+    func reachedEnd(_ card: String) {
+        guard currentCardID == card, signals.usage[card]?.reachedEnd != true else { return }
+        updateSignals { $0.usage[card, default: DeckUsage()].reachedEnd = true }
+    }
+
+    /// `what` ("map", "diagram" or "source") was opened from `card`; each counts once.
+    func opened(_ what: String, on card: String) {
+        guard signals.usage[card]?.opened.contains(what) != true else { return }
+        updateSignals { $0.usage[card, default: DeckUsage()].opened.append(what) }
+    }
+
+    private func addSeconds(_ seconds: Double, to card: String) {
+        guard seconds >= 1 else { return }  // a deck switch flushes first, so the card is this deck's
+        updateSignals { $0.usage[card, default: DeckUsage()].seconds += seconds.rounded() }
+    }
+
     private func updateSignals(_ change: (inout DeckSignals) -> Void) {
         change(&signals)
         store.setSignals(signals, for: server, date: date, kind: kind)
@@ -805,6 +866,13 @@ final class DailyDeckViewModel {
         guard let deck, let workspace, filing != .filing else { return nil }
         filing = .filing
         // What is sent: the user can type or open another day while it's in flight.
+        if !signals.usage.isEmpty {  // each read card's answer length, as filed
+            updateSignals { signals in
+                for id in signals.usage.keys {
+                    signals.usage[id]?.answerChars = answers[id]?.text?.trimmingCharacters(in: .whitespacesAndNewlines).count ?? 0
+                }
+            }
+        }
         let (date, kind, sent, sentSignals) = (date, kind, answers, signals)
         let payload = DeckAnswersPayload(deck: deck, answers: sent, signals: sentSignals, completedAt: now())
         let refiling = isFiled
