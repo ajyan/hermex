@@ -763,14 +763,21 @@ struct DeckAnswersPayload: Encodable, Equatable, Sendable {
     let kind: String
     let completedAt: String
     let answers: [DeckAnswer]
+    /// The style learner's signals (`DeckSignals`), each left out when empty.
+    let style: [DeckSignalRows.Style]?
+    let usage: [DeckSignalRows.Usage]?
+    let pick: DeckPick?
+    let undo: [String]?
 
-    private enum CodingKeys: String, CodingKey { case version, date, kind, completedAt, answers }
+    private enum CodingKeys: String, CodingKey { case version, date, kind, completedAt, answers, style, usage, pick, undo }
 
-    /// Answers in deck order, empty ones dropped, text trimmed.
-    init(deck: DailyDeck, answers: [String: DeckAnswer], completedAt: Date) {
+    /// Answers in deck order, empty ones dropped, text trimmed; then the signals in deck order.
+    init(deck: DailyDeck, answers: [String: DeckAnswer], signals: DeckSignals = DeckSignals(), completedAt: Date) {
         date = deck.date
         kind = deck.kind
         self.completedAt = ISO8601DateFormatter().string(from: completedAt)
+        let rows = DeckSignalRows(signals, cardOrder: deck.cards.map(\.id))
+        (style, usage, pick, undo) = (rows.style, rows.usage, rows.pick, rows.undo)
         self.answers = deck.cards.compactMap { card in
             guard var answer = answers[card.id], answer.isMeaningful(for: card) else { return nil }
             answer.text = answer.text?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -889,6 +896,26 @@ struct DailyDeckStore {
     }
 
     static let draftDays = 7
+
+    /// The deck's style signals (`DeckSignals`), kept like the answers' drafts.
+    func signals(for server: URL, date: String, kind: String) -> DeckSignals {
+        guard let data = defaults.data(forKey: key("signals", server)),
+              let all = try? JSONDecoder().decode([String: DeckSignals].self, from: data)
+        else { return DeckSignals() }
+        return all["\(date).\(kind)"] ?? DeckSignals()
+    }
+
+    func setSignals(_ signals: DeckSignals, for server: URL, date: String, kind: String) {
+        let k = key("signals", server)
+        var all = (defaults.data(forKey: k)).flatMap { try? JSONDecoder().decode([String: DeckSignals].self, from: $0) } ?? [:]
+        all["\(date).\(kind)"] = signals.isEmpty ? nil : signals
+        for stale in all.keys.sorted(by: >).dropFirst(Self.draftDays) { all[stale] = nil }
+        if all.isEmpty {
+            defaults.removeObject(forKey: k)
+        } else if let data = try? JSONEncoder().encode(all) {
+            defaults.set(data, forKey: k)
+        }
+    }
 
     private func drafts(for server: URL) -> [String: [String: DeckAnswer]] {
         guard let data = defaults.data(forKey: key("drafts", server)),
