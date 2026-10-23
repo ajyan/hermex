@@ -118,7 +118,7 @@ struct DailyDeckView: View {
                 if phase == .active { Task { await viewModel.refreshDay() } }
             }
             .onChange(of: viewModel.state) {
-                // Opening today's brief is the answer the 09:00 reminder waits for.
+                // Opening today's brief is the answer the 07:00 reminder waits for.
                 if viewModel.state == .ready, !viewModel.isReview, viewModel.date == viewModel.today {
                     Task { await DailyBriefReminder.noteOpened() }
                 }

@@ -1,13 +1,14 @@
 import Foundation
 import UserNotifications
 
-/// The 08:00 "your Daily Brief is ready" notification and a 09:00 reminder on days the
+/// The 06:00 "your Daily Brief is ready" notification and a 07:00 reminder on days the
 /// brief hasn't been opened by then. Local notifications only: nothing leaves the device.
 ///
-/// The 08:00 notification repeats daily. Reminders can't be cancelled by a condition the
+/// The 06:00 notification repeats daily. Reminders can't be cancelled by a condition the
 /// system checks, so one is scheduled per day for the next week and opening today's
 /// brief removes today's. The week is rescheduled each time the app comes forward, so
-/// reminders only lapse after a week away; the 08:00 notification never does.
+/// reminders only lapse after a week away; the 06:00 notification never does.
+/// The brief is built at 05:30 (second-brain's `daily-brief` cron), so 06:00 finds it ready.
 /// Device-wide, not per server: the brief is opened on whichever server is active.
 enum DailyBriefReminder {
     /// Bool in UserDefaults; absent until the user first opens the Daily Brief.
@@ -21,8 +22,8 @@ enum DailyBriefReminder {
     static let reminderPrefix = "dailyBrief.reminder."
     /// Sundays and the 1st: "Your weekly (monthly) review is ready", opening that review.
     static let reviewPrefix = "dailyBrief.review."
-    static let readyTime = (hour: 8, minute: 0)
-    static let reminderTime = (hour: 9, minute: 0)
+    static let readyTime = (hour: 6, minute: 0)
+    static let reminderTime = (hour: 7, minute: 0)
     static let reminderDays = 7
 
     /// One scheduled notification, as plain values so the schedule is testable.
@@ -40,7 +41,7 @@ enum DailyBriefReminder {
         let kind: String
     }
 
-    /// What should be pending at `now`: the daily 08:00, plus a 09:00 reminder for each of
+    /// What should be pending at `now`: the daily 06:00, plus a 07:00 reminder for each of
     /// the next `reminderDays` days still ahead, skipping today once the brief was opened.
     static func plan(now: Date, openedOn: String?, calendar: Calendar = .current) -> [Planned] {
         var planned = [Planned(id: readyID,
