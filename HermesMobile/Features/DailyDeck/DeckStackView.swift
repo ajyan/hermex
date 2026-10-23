@@ -62,7 +62,8 @@ struct DeckStackView: View {
         .sheet(item: $swipeFeedback) { sheet in
             if let availability {
                 FeedbackSheet(context: sheet.context, client: availability.client, screenshot: sheet.screenshot,
-                              ratings: sheet.ratings, labels: labels)
+                              ratings: sheet.ratings, labels: labels,
+                              style: sheet.styleCard.map { DeckStyleChipsSection(card: $0, viewModel: viewModel) })
             }
         }
     }
@@ -73,18 +74,23 @@ struct DeckStackView: View {
         let id = UUID()
         let context: FeedbackContext
         let ratings: [FeedbackRating]
+        /// The card whose writing style chips can rate; nil off a card or on one without a kind.
+        let styleCard: DeckCard?
         let screenshot: UIImage?
     }
 
     private func openFeedback(on page: DeckPage) {
         var ratings: [FeedbackRating] = []
+        var styleCard: DeckCard?
         if case .card(let card) = page {
             ratings = FeedbackRating.deck(card: card, date: viewModel.date, kind: viewModel.kind,
                                           showsQuestion: viewModel.question(for: card) == card.question)
+            styleCard = DeckStyleChip.styleCards(card.type) ? card : nil
         }
         swipeFeedback = SwipeFeedback(
             context: .dailyDeck(title: viewModel.title, date: viewModel.date, kind: viewModel.kind, page: page),
             ratings: ratings,
+            styleCard: styleCard,
             // Taken before the sheet covers the card.
             screenshot: FeedbackScreenshot.capture(FeedbackScreenshot.keyWindow())
         )

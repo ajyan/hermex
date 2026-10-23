@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Send feedback about the screen it was opened from: ✓/✗ rows for what it shows (when given),
+/// Send feedback about the screen it was opened from: ✓/✗ rows for what it shows (when given), a deck card's
+/// style chips (when given),
 /// the screen's context in plain words, what goes along (a removable screenshot, screen state),
 /// then what should change. Presented by `.feedbackContext(_:)` and by swiping up on a Daily
 /// Deck card. Copy is English-only (personal fork).
@@ -8,14 +9,16 @@ struct FeedbackSheet: View {
     @State private var viewModel: FeedbackSheetViewModel
     private let ratings: [FeedbackRating]
     private let labels: LabelsViewModel?
+    private let style: DeckStyleChipsSection?
     @FocusState private var isEditing: Bool
     @Environment(\.dismiss) private var dismiss
 
     init(context: FeedbackContext, client: any FeedbackDataClient, screenshot: UIImage? = nil,
-         ratings: [FeedbackRating] = [], labels: LabelsViewModel? = nil) {
+         ratings: [FeedbackRating] = [], labels: LabelsViewModel? = nil, style: DeckStyleChipsSection? = nil) {
         _viewModel = State(initialValue: FeedbackSheetViewModel(context: context, client: client, screenshot: screenshot))
         self.ratings = labels == nil ? [] : ratings
         self.labels = labels
+        self.style = style
     }
 
     var body: some View {
@@ -29,6 +32,10 @@ struct FeedbackSheet: View {
                 } header: {
                     Text(verbatim: "Rate")
                 }
+            }
+
+            if let style {
+                style
             }
 
             Section {
@@ -76,7 +83,10 @@ struct FeedbackSheet: View {
         .interactiveDismissDisabled(viewModel.isSending)
         // With ratings to tap, the keyboard waits until the note is chosen.
         .onAppear { isEditing = ratings.isEmpty }
-        .onDisappear { viewModel.dismiss() }
+        .onDisappear {
+            style?.keepNote(viewModel.text)
+            viewModel.dismiss()
+        }
     }
 
     private var header: some View {

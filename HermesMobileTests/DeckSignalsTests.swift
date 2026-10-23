@@ -78,6 +78,17 @@ final class DeckSignalsTests: XCTestCase {
         XCTAssertTrue(store.signals(for: server, date: "2026-10-03", kind: "morning").isEmpty)
     }
 
+    func testStyleChipsOnlyOnKindedCards() {
+        XCTAssertTrue(DeckStyleChip.styleCards(.reflect))
+        XCTAssertTrue(DeckStyleChip.styleCards(.item))
+        for type: DeckCard.CardType in [.headline, .close, .sleep, .goal, .ask] {
+            XCTAssertFalse(DeckStyleChip.styleCards(type), "\(type) has no writing style to learn")
+        }
+        XCTAssertEqual(DeckStyleChip.allCases.map(\.rawValue),
+                       ["too-long", "too-thin", "jargon", "show-quotes", "less-quotes", "structure", "voice"],
+                       "the vault's chip ids (style_learn.CHIPS)")
+    }
+
     func testFiledSignalsReadBack() {
         let filed = """
         {"version": 1, "answers": [], "style": [{"card": "book", "chips": ["too-long"]}, {"bad": 1}],

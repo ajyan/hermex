@@ -48,6 +48,10 @@ enum DeckStyleChip: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// Cards with a writing style to learn: those with a kind (a reflection, an item). Not the headline, sleep,
+    /// goals, Ask, follow-up decisions or the close.
+    static func styleCards(_ type: DeckCard.CardType) -> Bool { type == .reflect || type == .item }
+
     var label: String {
         switch self {
         case .tooLong: "Too long"

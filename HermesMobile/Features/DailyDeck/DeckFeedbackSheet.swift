@@ -117,7 +117,7 @@ struct DeckFeedbackSheet: View {
 }
 
 /// Lays chips out left to right, wrapping to a new row when one won't fit.
-private struct ChipFlow: Layout {
+struct ChipFlow: Layout {
     var spacing: CGFloat
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
