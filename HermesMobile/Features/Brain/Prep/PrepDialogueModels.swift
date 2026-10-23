@@ -54,6 +54,8 @@ enum PrepDialogueEvent: Hashable, Sendable {
     case graded(PrepAttemptResult)
     /// A chunk of the tutor's turn as it streams.
     case delta(String)
+    /// The turn streamed so far was a repeat and is dropped; a new one streams in its place.
+    case reset
     /// The tutor's whole turn.
     case turn(String)
     /// The step's final state.
@@ -72,6 +74,8 @@ enum PrepDialogueEvent: Hashable, Sendable {
         case "delta", "turn":
             guard let text = (try? PrepDecoding.decode(PrepDialogueText.self, from: bytes))?.text else { return nil }
             return event == "delta" ? .delta(text) : .turn(text)
+        case "reset":
+            return .reset
         case "error":
             let body = try? PrepDecoding.decode(PrepDialogueError.self, from: bytes)
             return .failed(status: body?.status ?? 0, message: body?.error ?? "")
