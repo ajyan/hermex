@@ -1587,7 +1587,9 @@ final class DailyDeckTests: XCTestCase {
     @MainActor
     func testUsageFoldsIntoSignals() async throws {
         let viewModel = try await loadedViewModel(Self.feedbackDeckJSON)
-        viewModel.showCard("book")
+        viewModel.screenAppeared()
+        viewModel.index = 1
+        viewModel.showCard(viewModel.currentCardID)
         viewModel.reachedEnd("book")
         viewModel.reachedEnd("wiki")  // not on screen: ignored
         viewModel.opened("map", on: "book")
@@ -1614,6 +1616,42 @@ final class DailyDeckTests: XCTestCase {
         viewModel.showCard(nil)
         _ = await viewModel.file()
         XCTAssertEqual(client.fileRequests.first?.answers.usage?.first?.answerChars, 12)
+    }
+
+    @MainActor
+    func testReachedEndCountsTheCardOnScreenWhateverOrderTheViewsReport() async throws {
+        let viewModel = try await loadedViewModel(Self.feedbackDeckJSON)
+        viewModel.reachedEnd("book")  // drawn as the next card under the headline: ignored
+        XCTAssertNil(viewModel.signals.usage["book"])
+        viewModel.index = 1  // swiped to it; the card view re-reports its end before the deck view calls showCard
+        viewModel.reachedEnd("book")
+        XCTAssertEqual(viewModel.signals.usage["book"]?.reachedEnd, true)
+    }
+
+    @MainActor
+    func testTheClockRunsWhileTheDeckOrItsOpenCardIsOnScreen() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.feedbackDeckJSON)
+        var clock = morning
+        let viewModel = DailyDeckViewModel(server: server, client: client, store: store, now: { clock })
+        await viewModel.load()
+        viewModel.screenAppeared()
+        viewModel.index = 1
+        viewModel.showCard(viewModel.currentCardID)
+        clock += 10
+        viewModel.screenAppeared()     // the card opens full screen
+        viewModel.screenDisappeared()  // the deck under it goes away
+        clock += 20
+        viewModel.scenePhaseChanged(active: false)
+        clock += 600                   // backgrounded
+        viewModel.scenePhaseChanged(active: true)
+        clock += 5
+        viewModel.screenDisappeared()  // the open card closes...
+        clock += 100                   // ...and nothing shows the deck (another tab)
+        viewModel.screenAppeared()
+        clock += 5
+        viewModel.showCard(nil)
+        XCTAssertEqual(viewModel.signals.usage["book"]?.seconds, 40)
     }
 
     @MainActor

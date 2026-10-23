@@ -38,6 +38,8 @@ struct DeckPageView: View {
                 .opensAsFullCard(palette.cardRole, title: palette.name, action: sourceAction) {
                     // No swipe-up feedback here: its sheet belongs to the deck under the open card.
                     DeckPageView(page: page, viewModel: viewModel, file: file, isOpen: true)
+                        .onAppear { viewModel.screenAppeared() }
+                        .onDisappear { viewModel.screenDisappeared() }
                 }
                 .padding(.vertical, 12)
         }
@@ -74,6 +76,7 @@ struct DeckCardView: View {
     @State private var openDiagram: BriefDiagramIndex.Entry?
     /// The week's divider: a new question was asked on this screen, so the "Why?" note shows.
     @State private var hasAskedNewQuestion = false
+    @State private var endInView = false
 
     var body: some View {
         ScrollView {
@@ -104,10 +107,15 @@ struct DeckCardView: View {
                 case .keepsakes: WeekKeepsakesCard(card: card, palette: palette, viewModel: viewModel)
                 default: reading
                 }
-                // Reaching the end of the card counts toward the style learner's usage (`DeckSignals`).
+                // Reaching the end of the card counts toward the style learner's usage (`DeckSignals`). A short card's
+                // end is in view while it is still the next card under the stack, so it's checked again on arrival.
                 Color.clear.frame(height: 1)
                     .onScrollVisibilityChange(threshold: 0.9) { visible in
+                        endInView = visible
                         if visible { viewModel.reachedEnd(card.id) }
+                    }
+                    .onChange(of: viewModel.currentCardID) { _, id in
+                        if endInView, id == card.id { viewModel.reachedEnd(card.id) }
                     }
                     .accessibilityHidden(true)
             }

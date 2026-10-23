@@ -120,7 +120,8 @@ struct DailyDeckView: View {
             }
             // Time on each card, for the style learner (DeckSignals.usage).
             .onChange(of: viewModel.currentCardID, initial: true) { _, id in viewModel.showCard(id) }
-            .onDisappear { viewModel.showCard(nil) }
+            .onAppear { viewModel.screenAppeared() }
+            .onDisappear { viewModel.screenDisappeared() }
             .onChange(of: viewModel.state) {
                 // Opening today's brief is the answer the 07:00 reminder waits for.
                 if viewModel.state == .ready, !viewModel.isReview, viewModel.date == viewModel.today {

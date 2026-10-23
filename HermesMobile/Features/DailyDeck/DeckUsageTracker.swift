@@ -8,7 +8,8 @@ struct DeckUsageTracker {
     private(set) var current: String?
     /// When the running stretch began; nil while paused or off a card.
     private var since: Date?
-    private var isPaused = false
+    /// Paused until the deck is on screen and the app active (`resume`).
+    private var isPaused = true
 
     /// The card on screen changed to `card` (nil: none). Returns the stretch the previous card just finished.
     mutating func show(_ card: String?, at date: Date) -> (String, Double)? {

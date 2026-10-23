@@ -68,7 +68,10 @@ final class DailyDeckViewModel {
     /// How the deck was read, filed beside the answers for the style learner (`DeckSignals`).
     private(set) var signals = DeckSignals()
     private var filedSignals = DeckSignals()
-    private var usageTracker = DeckUsageTracker()
+    @ObservationIgnored private var usageTracker = DeckUsageTracker()
+    /// The deck's views on screen (the deck, its open card) and the scene's state: the clock runs only when both say so.
+    @ObservationIgnored private var screensShowing = 0
+    @ObservationIgnored private var sceneActive = true
     /// The server filer's report from this screen's last filing; nil after a chat filing.
     private(set) var filedNote: DailyDeckFiledNote?
     /// Days with a deck in `briefs/`, newest first.
@@ -771,16 +774,34 @@ final class DailyDeckViewModel {
 
     /// The app became active or left the foreground: only time in the foreground counts.
     func scenePhaseChanged(active: Bool) {
-        if active {
+        sceneActive = active
+        syncClock()
+    }
+
+    /// The deck, or a card opened full screen over it, appeared. Counted rather than flagged: the open card appears
+    /// before the deck under it disappears, so the clock keeps running through the hand-off.
+    func screenAppeared() {
+        screensShowing += 1
+        syncClock()
+    }
+
+    func screenDisappeared() {
+        screensShowing = max(0, screensShowing - 1)
+        syncClock()
+    }
+
+    private func syncClock() {
+        if sceneActive && screensShowing > 0 {
             usageTracker.resume(at: now())
         } else if let (card, seconds) = usageTracker.pause(at: now()) {
             addSeconds(seconds, to: card)
         }
     }
 
-    /// The bottom of `card` scrolled into view; counted only for the card on screen (the stack renders its neighbours).
+    /// The bottom of `card` is in view; counted only for the card on screen (the stack draws the next card under it,
+    /// and a card view may report its end before the deck reports the swipe, so this checks the deck's index).
     func reachedEnd(_ card: String) {
-        guard usageTracker.current == card, signals.usage[card]?.reachedEnd != true else { return }
+        guard currentCardID == card, signals.usage[card]?.reachedEnd != true else { return }
         updateSignals { $0.usage[card, default: DeckUsage()].reachedEnd = true }
     }
 
@@ -791,7 +812,7 @@ final class DailyDeckViewModel {
     }
 
     private func addSeconds(_ seconds: Double, to card: String) {
-        guard seconds >= 1, cards.contains(where: { $0.id == card }) else { return }
+        guard seconds >= 1 else { return }  // a deck switch flushes first, so the card is this deck's
         updateSignals { $0.usage[card, default: DeckUsage()].seconds += seconds.rounded() }
     }
 

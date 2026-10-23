@@ -11,6 +11,7 @@ final class DeckUsageTrackerTests: XCTestCase {
 
     func testSecondsAccumulateAcrossVisits() {
         var tracker = DeckUsageTracker()
+        tracker.resume(at: t0)
         let seconds = fold([
             tracker.show("A", at: t0),
             tracker.show("B", at: t0 + 10),
@@ -22,6 +23,7 @@ final class DeckUsageTrackerTests: XCTestCase {
 
     func testBackgroundStopsTheClock() {
         var tracker = DeckUsageTracker()
+        tracker.resume(at: t0)
         let seconds = fold([
             tracker.show("A", at: t0),
             tracker.pause(at: t0 + 5),
@@ -33,8 +35,15 @@ final class DeckUsageTrackerTests: XCTestCase {
         XCTAssertNil(tracker.current)
     }
 
+    func testStartsPausedUntilTheDeckIsOnScreen() {
+        var tracker = DeckUsageTracker()
+        XCTAssertNil(tracker.show("A", at: t0))
+        XCTAssertNil(tracker.show(nil, at: t0 + 30), "no time before resume")
+    }
+
     func testShowingTheSameCardKeepsTheClockRunning() {
         var tracker = DeckUsageTracker()
+        tracker.resume(at: t0)
         XCTAssertNil(tracker.show("A", at: t0))
         XCTAssertNil(tracker.show("A", at: t0 + 4))
         XCTAssertEqual(tracker.show(nil, at: t0 + 9)?.1, 9)
