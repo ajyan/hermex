@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// One card waiting in Label recent cards.
+/// One card waiting in Rate earlier cards.
 struct LabelQueueItem: Identifiable, Equatable {
     let date: String
     let kind: String
@@ -16,10 +16,10 @@ struct LabelQueueItem: Identifiable, Equatable {
     }
 }
 
-/// Label recent cards (Settings › Feedback, and the morning deck's closing card): up to five
-/// reflect cards from the last 14 days of morning Daily Decks, newest first, that haven't said
-/// how they landed yet: not labeled (a feedback note on a card labels it on the server), not
-/// written about, not sent away with Not for Me. Read-only: it reads `briefs/` through the session
+/// Rate earlier cards, on today's morning deck's closing card: a few reflect cards a day from the
+/// last 14 days of morning Daily Decks, newest first, that haven't said how they landed yet: not
+/// labeled (a feedback note on a card labels it on the server), not written about, not sent away
+/// with Not for Me. It asks until both Deck eval judges are calibrated on these labels. Read-only: it reads `briefs/` through the session
 /// the Daily Deck already opened, and never creates or renames a session or stores a workspace.
 /// Built once, by one task its entry points share; every tap saves at once, so leaving at any
 /// point loses nothing.
@@ -35,16 +35,17 @@ final class LabelQueueViewModel {
     }
 
     static let windowDays = 14
-    /// Cards in one batch: a few at a time, never a backlog.
-    static let batchSize = 5
-    /// Tapped labels per part the Deck evals want (`deck_evals.py` MIN_EXPLICIT); past that on
-    /// both parts, the closing card stops asking.
-    static let tappedLabelsWanted = 20
+    /// Cards to rate a day: a few, never a backlog. Cards labeled earlier today count.
+    static let dailyBatch = 3
+    /// The Deck eval judges' newest calibrations (`deck_evals.py calibrate`, Sundays), in the workspace.
+    static let calibrationPaths = ["evals/deck/calibration.json", "evals/deck/calibration-card.json"]
 
     private(set) var state: State = .idle
     /// Fixed once built, so "N of M" holds still while cards are labeled.
     private(set) var items: [LabelQueueItem] = []
     private(set) var index = 0
+    /// Whether both judges said calibrated at the last build; a missing or unreadable file says no.
+    private(set) var judgesCalibrated = false
     let labels: LabelsViewModel
 
     private let server: URL
@@ -64,12 +65,6 @@ final class LabelQueueViewModel {
         self.now = now
     }
 
-    convenience init(server: URL, labelsClient: any LabelsDataClient) {
-        self.init(server: server,
-                  deckClient: APIClientDailyDeckAdapter(apiClient: APIClient(baseURL: server)),
-                  labels: LabelsViewModel(client: labelsClient))
-    }
-
     var current: LabelQueueItem? { items.indices.contains(index) ? items[index] : nil }
 
     /// Cards in the queue still missing a label; drops as they are labeled.
@@ -79,12 +74,8 @@ final class LabelQueueViewModel {
         Self.hasLabel(item) { labels.verdict(for: $0) != nil }
     }
 
-    /// Whether the evals still want tapped labels on cards or questions.
-    var evalsWantLabels: Bool {
-        ["card", "question"].contains {
-            labels.tappedCount(feature: LabelKey.dailyDeckFeature, part: $0) < Self.tappedLabelsWanted
-        }
-    }
+    /// Whether the evals still want labels: until both judges agree with them.
+    var evalsWantLabels: Bool { !judgesCalibrated }
 
     /// Moves to the next card, labeled or skipped.
     func next() {
@@ -142,11 +133,16 @@ final class LabelQueueViewModel {
         } catch let error as APIError where error.isNotFound {
             return [] // No `briefs/` yet: nothing to label.
         }
+        judgesCalibrated = await readCalibrated(sessionID: sessionID)
+        try Task.checkCancellation() // a stopped build fails to retry, never reads as calibrated or empty
+        let today = DailyDeckPaths.day(now())
+        let left = max(0, Self.dailyBatch - labels.tappedItemCount(feature: LabelKey.dailyDeckFeature, on: today))
+        guard left > 0, !judgesCalibrated else { return [] }
         let dates = Self.windowDates(DailyDeckViewModel.deckDates(in: names, kind: "morning"), now: now())
         let filed = DailyDeckViewModel.filedDates(in: names, kind: "morning")
         let decks = try await read(dates: dates, sessionID: sessionID)
         let answers = await readAnswers(dates: dates.filter(filed.contains), sessionID: sessionID)
-        return Self.items(decks: decks, limit: Self.batchSize,
+        return Self.items(decks: decks, limit: left,
                           isLabeled: { labels.verdict(for: $0) != nil },
                           landed: { date, cardID in
                               let unsent = store.answers(for: server, date: date, kind: "morning")[cardID]
@@ -157,6 +153,21 @@ final class LabelQueueViewModel {
                               let unsent = store.answers(for: server, date: date, kind: "morning")
                               return unsent.isEmpty ? answers[date] ?? [:] : unsent
                           })
+    }
+
+    /// Whether every judge's calibration file says `calibrated: true`.
+    private func readCalibrated(sessionID: String) async -> Bool {
+        for path in Self.calibrationPaths {
+            guard !Task.isCancelled, let content = try? await deckClient.fileContent(sessionID: sessionID, path: path),
+                  Self.isCalibrated(content) else { return false }
+        }
+        return true
+    }
+
+    /// A calibration file's verdict: `{"calibrated": true, …}`; anything else is not calibrated.
+    static func isCalibrated(_ content: String) -> Bool {
+        let object = try? JSONSerialization.jsonObject(with: Data(content.utf8)) as? [String: Any]
+        return object?["calibrated"] as? Bool == true
     }
 
     /// The filed answers for `dates` by day. A file that can't be read or decoded counts as none:

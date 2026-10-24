@@ -104,7 +104,7 @@ struct FeedbackRating: Identifiable {
     }
 }
 
-/// The Rate rows under a reflect card in Label recent cards, in the card's ink.
+/// The Rate rows under a reflect card in Rate earlier cards, in the card's ink.
 struct DeckRateRows: View {
     let card: DeckCard
     let date: String

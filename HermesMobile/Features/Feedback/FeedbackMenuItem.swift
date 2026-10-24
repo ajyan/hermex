@@ -2,7 +2,7 @@ import Observation
 import SwiftUI
 
 /// Whether the active server takes feedback, and labels on generated content (the Rate
-/// controls and Label recent cards). The server-keyed shell owns one, so a server switch
+/// controls and Rate earlier cards). The server-keyed shell owns one, so a server switch
 /// (which rebuilds the shell) checks again. Memory only.
 @MainActor
 @Observable

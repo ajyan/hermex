@@ -416,14 +416,18 @@ final class LabelQueueViewModelTests: XCTestCase {
         ]
         store.setAnswers(["week": DeckAnswer(card: "week", question: "Q1?")], for: server, date: "2026-10-12", kind: "morning")
         store.setAnswers(["week": DeckAnswer(card: "week", question: "Q1?")], for: server, date: "2026-10-10", kind: "morning")
-        let queue = makeQueue(client)
+        let labelsClient = StubLabelsClient()
+        await labelsClient.setRecords(try ["q1", "week-2-1"].map { id in
+            try FeedbackDecoding.decode(LabelRecord.self, from: Data(
+                #"{"ts":"2026-10-01T08:00:00-04:00","feature":"daily_deck","item":"2026-10-13|morning|\#(id)","part":"card","verdict":"good"}"#.utf8))
+        })
+        let queue = makeQueue(client, labels: labelsClient)
 
         await queue.build()
 
         XCTAssertEqual(queue.items.map(\.id), [
-            "2026-10-13|morning|q1", "2026-10-13|morning|week-2-1",
             "2026-10-12|morning|q1", "2026-10-12|morning|week-1-1", "2026-10-10|morning|q1"
-        ], "filed on the 13th; the unsent step on the 12th wins over the filed one; five at most")
+        ], "the 13th's cards were labeled on an earlier day; the unsent step on the 12th wins over the filed one")
     }
 
     func testAnswersAndNotForMeSayHowACardLanded() throws {
@@ -451,26 +455,47 @@ final class LabelQueueViewModelTests: XCTestCase {
                        "only days with a filed answers file are read")
     }
 
-    func testTheEvalsWantTappedLabelsNotNoteLabels() async throws {
+    func testTheClosingCardAsksUntilBothJudgesAreCalibrated() async throws {
         openedBrief()
-        let client = ScriptedDailyDeckClient(workspaces: ["/brain"], names: [], deck: "{}")
+        let client = ScriptedDailyDeckClient(workspaces: ["/brain"], names: Self.names, deck: "{}")
+        client.files = Self.files.merging([
+            "evals/deck/calibration.json": #"{"agreement": 0.9, "n": 30, "calibrated": true}"#
+        ]) { $1 }
+        let asking = makeQueue(client)
+        await asking.build()
+        XCTAssertTrue(asking.evalsWantLabels, "the card judge has no calibration yet")
+        XCTAssertFalse(asking.items.isEmpty)
+
+        client.files["evals/deck/calibration-card.json"] = #"{"agreement": 0.88, "n": 24, "calibrated": true}"#
+        let done = makeQueue(client)
+        await done.build()
+        XCTAssertFalse(done.evalsWantLabels)
+        XCTAssertEqual(done.items, [], "calibrated judges need no more cards")
+
+        XCTAssertFalse(LabelQueueViewModel.isCalibrated(#"{"calibrated": false}"#))
+        XCTAssertFalse(LabelQueueViewModel.isCalibrated("not json"))
+    }
+
+    func testCardsLabeledTodayCountAgainstTheDaysThree() async throws {
+        openedBrief()
+        let client = ScriptedDailyDeckClient(workspaces: ["/brain"], names: Self.names, deck: "{}")
+        client.files = Self.files
         let labelsClient = StubLabelsClient()
-        func record(_ i: Int, _ part: String, source: String? = nil) throws -> LabelRecord {
-            let src = source.map { #","source":"\#($0)""# } ?? ""
-            let json = #"{"feature":"daily_deck","item":"2026-10-10|morning|r\#(i)","part":"\#(part)","verdict":"bad"\#(src)}"#
-            return try FeedbackDecoding.decode(LabelRecord.self, from: Data(json.utf8))
+        let json = { (item: String, part: String, ts: String) in
+            #"{"ts":"\#(ts)","feature":"daily_deck","item":"\#(item)","part":"\#(part)","verdict":"good"}"#
         }
-        var records = try (0..<20).map { try record($0, "card") }
-        records += try (0..<19).map { try record($0, "question") }
-        records.append(try record(19, "question", source: "feedback"))
-        await labelsClient.setRecords(records)
+        await labelsClient.setRecords(try [
+            json("2026-10-01|morning|a", "card", "2026-10-13T08:10:00-04:00"),
+            json("2026-10-01|morning|a", "question", "2026-10-13T08:10:05-04:00"),
+            json("2026-10-01|morning|b", "card", "2026-10-12T21:00:00-04:00")
+        ].map { try FeedbackDecoding.decode(LabelRecord.self, from: Data($0.utf8)) })
         let queue = makeQueue(client, labels: labelsClient)
 
         await queue.build()
-        XCTAssertTrue(queue.evalsWantLabels, "19 tapped question labels; the note label doesn't count")
 
-        await queue.labels.tap(.good, for: LabelKey(feature: "daily_deck", item: "2026-10-10|morning|r19", part: "question"))
-        XCTAssertFalse(queue.evalsWantLabels, "tapping over a note label makes it a tapped one")
+        XCTAssertEqual(queue.labels.tappedItemCount(feature: "daily_deck", on: "2026-10-13"), 1,
+                       "a card and its question are one card; yesterday's doesn't count")
+        XCTAssertEqual(queue.items.map(\.id), ["2026-10-13|morning|q1", "2026-10-10|morning|w1"], "two left today")
     }
 
     func testBuildReadsTheWindowsDecksAndCountsDownAsCardsAreLabeled() async throws {

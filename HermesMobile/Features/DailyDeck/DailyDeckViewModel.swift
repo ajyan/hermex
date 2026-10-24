@@ -174,7 +174,7 @@ final class DailyDeckViewModel {
 
     /// The variant the deck's week divider shows, given the deck's answers (filed or unsent): the
     /// divider's answered question's place among its question and alternatives, 0 when it names
-    /// none of them. Nil when the deck has no divider. Label recent cards reads it too, so only
+    /// none of them. Nil when the deck has no divider. Rate earlier cards reads it too, so only
     /// the sources he could see are asked about.
     nonisolated static func shownWeekVariant(cards: [DeckCard], answers: [String: DeckAnswer]) -> Int? {
         guard let section = cards.first(where: { $0.type == .section }) else { return nil }
