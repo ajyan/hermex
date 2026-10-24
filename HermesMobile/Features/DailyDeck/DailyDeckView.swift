@@ -122,11 +122,9 @@ struct DailyDeckView: View {
             .onChange(of: viewModel.currentCardID, initial: true) { _, id in viewModel.showCard(id) }
             .onAppear { viewModel.screenAppeared() }
             .onDisappear { viewModel.screenDisappeared() }
-            .onChange(of: viewModel.state) {
-                // Opening today's brief is the answer the 07:00 reminder waits for.
-                if viewModel.state == .ready, !viewModel.isReview, viewModel.date == viewModel.today {
-                    Task { await DailyBriefReminder.noteOpened() }
-                }
+            .onChange(of: viewModel.isTodayFiled, initial: true) { _, filed in
+                // Filing today's brief is the answer the 07:30 and 08:00 notifications wait for.
+                if filed { Task { await DailyBriefReminder.noteFiled() } }
             }
             .onChange(of: viewModel.sessionID, initial: true) {
                 weeks = viewModel.makeWeeksModel()

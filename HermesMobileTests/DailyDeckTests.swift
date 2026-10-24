@@ -2096,25 +2096,31 @@ final class DailyBriefReminderTests: XCTestCase {
         calendar.date(from: DateComponents(year: 2026, month: 10, day: day, hour: hour, minute: minute))!
     }
 
-    func testSixOClockRepeatsAndAWeekOfSevenOClockRemindersFollow() {
-        let plan = DailyBriefReminder.plan(now: at(8, 5), openedOn: nil, calendar: calendar)
-        XCTAssertEqual(plan.first, .init(id: "dailyBrief.ready", components: DateComponents(hour: 6, minute: 0), repeats: true, isReminder: false))
+    func testAWeekOfHalfPastSevenNotificationsAndEightOClockRemindersFollow() {
+        let plan = DailyBriefReminder.plan(now: at(8, 5), filedOn: nil, calendar: calendar)
+        let ready = plan.filter { !$0.isReminder && $0.review == nil }
         let reminders = plan.filter(\.isReminder)
+        XCTAssertEqual(ready.first, .init(id: "dailyBrief.ready.2026-10-08",
+                                          components: DateComponents(year: 2026, month: 10, day: 8, hour: 7, minute: 30),
+                                          repeats: false, isReminder: false))
         XCTAssertEqual(reminders.map(\.id).first, "dailyBrief.reminder.2026-10-08")
-        XCTAssertEqual(reminders.count, 7)
-        XCTAssertTrue(reminders.allSatisfy { !$0.repeats && $0.components.hour == 7 && $0.components.minute == 0 })
+        XCTAssertEqual([ready.count, reminders.count], [7, 7])
+        XCTAssertTrue(ready.allSatisfy { !$0.repeats && $0.components.hour == 7 && $0.components.minute == 30 })
+        XCTAssertTrue(reminders.allSatisfy { !$0.repeats && $0.components.hour == 8 && $0.components.minute == 0 })
     }
 
-    func testOpeningTodaysBriefSkipsOnlyTodaysReminder() {
-        let plan = DailyBriefReminder.plan(now: at(8, 6, 30), openedOn: "2026-10-08", calendar: calendar)
-        XCTAssertEqual(plan.dropFirst().map(\.id).first, "dailyBrief.reminder.2026-10-09")
+    func testFilingTodaysBriefSkipsOnlyTodaysNotifications() {
+        let plan = DailyBriefReminder.plan(now: at(8, 6, 30), filedOn: "2026-10-08", calendar: calendar)
+        XCTAssertEqual(plan.filter { !$0.isReminder && $0.review == nil }.map(\.id).first, "dailyBrief.ready.2026-10-09")
+        XCTAssertEqual(plan.filter(\.isReminder).map(\.id).first, "dailyBrief.reminder.2026-10-09")
         XCTAssertEqual(plan.filter(\.isReminder).count, 6)
         XCTAssertEqual(plan.compactMap(\.review), [.init(date: "2026-10-11", kind: "weekly")], "Sunday's review")
     }
 
-    func testAfterSevenTodaysReminderIsPast() {
-        let plan = DailyBriefReminder.plan(now: at(8, 7, 30), openedOn: nil, calendar: calendar)
-        XCTAssertEqual(plan.dropFirst().map(\.id).first, "dailyBrief.reminder.2026-10-09")
+    func testUnfiledAtQuarterToEightOnlyTodaysReminderIsLeft() {
+        let plan = DailyBriefReminder.plan(now: at(8, 7, 45), filedOn: nil, calendar: calendar)
+        XCTAssertEqual(plan.filter { !$0.isReminder && $0.review == nil }.map(\.id).first, "dailyBrief.ready.2026-10-09")
+        XCTAssertEqual(plan.filter(\.isReminder).map(\.id).first, "dailyBrief.reminder.2026-10-08")
     }
 
     func testDailyBriefDeepLinkRoundTrips() throws {
@@ -2142,7 +2148,7 @@ final class DeckReviewTests: XCTestCase {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "America/New_York")!
         let friday = calendar.date(from: DateComponents(year: 2026, month: 10, day: 30, hour: 7))!
-        let reviews = DailyBriefReminder.plan(now: friday, openedOn: nil, calendar: calendar).compactMap(\.review)
+        let reviews = DailyBriefReminder.plan(now: friday, filedOn: nil, calendar: calendar).compactMap(\.review)
         XCTAssertEqual(reviews, [
             .init(date: "2026-11-01", kind: "weekly"),
             .init(date: "2026-10-31", kind: "monthly")
