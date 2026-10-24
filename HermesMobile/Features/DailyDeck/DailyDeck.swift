@@ -705,7 +705,7 @@ struct DeckAnswer: Codable, Equatable {
     }
 
     /// Written about, or sent away with Not for Me: the card already says how it landed, so
-    /// Label recent cards doesn't ask again.
+    /// Rate earlier cards doesn't ask again.
     var saysHowItLanded: Bool { hasText || feedback != nil }
 
     /// Whether this answers `card`: a decision whose chosen action needs text

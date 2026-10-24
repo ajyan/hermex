@@ -14,6 +14,8 @@ final class LabelsViewModel {
     private(set) var errors: [LabelKey: String] = [:]
     /// Labels the server made from a feedback note rather than a tap.
     private var fromNotes: Set<LabelKey> = []
+    /// The day (`yyyy-MM-dd`) each tapped label was set, from the server's `ts`.
+    private var tappedDays: [LabelKey: String] = [:]
     /// Scopes read successfully: `feature` alone for a feature-wide read, `feature|item` for one item.
     private var loadedScopes: Set<String> = []
 
@@ -27,9 +29,10 @@ final class LabelsViewModel {
     func isPending(_ key: LabelKey) -> Bool { pending[key] != nil }
     func error(for key: LabelKey) -> String? { errors[key] }
 
-    /// How many of `feature`'s `part` labels were tapped, not made from a feedback note.
-    func tappedCount(feature: String, part: String) -> Int {
-        verdicts.keys.filter { $0.feature == feature && $0.part == part && !fromNotes.contains($0) }.count
+    /// How many of `feature`'s items got a tapped label on `day` (`yyyy-MM-dd`); a card's label
+    /// and its question's count once.
+    func tappedItemCount(feature: String, on day: String) -> Int {
+        Set(tappedDays.filter { $0.key.feature == feature && $0.value == day && verdicts[$0.key] != nil }.map(\.key.item)).count
     }
 
     /// Whether `item`'s labels have been read, by a feature-wide read or its own. Rate rows
@@ -48,6 +51,7 @@ final class LabelsViewModel {
         for record in records where pending[record.key] == nil {
             verdicts[record.key] = record.currentVerdict
             if record.source == "feedback" { fromNotes.insert(record.key) } else { fromNotes.remove(record.key) }
+            tappedDays[record.key] = record.source == "feedback" ? nil : record.ts.map { String($0.prefix(10)) }
         }
         loadedScopes.insert(item.map { "\(feature)|\($0)" } ?? feature)
     }
@@ -69,6 +73,7 @@ final class LabelsViewModel {
             let saved = try await client.save(body)
             verdicts[key] = saved.currentVerdict
             fromNotes.remove(key)
+            tappedDays[key] = saved.ts.map { String($0.prefix(10)) } ?? DailyDeckPaths.day(Date())
         } catch {
             errors[key] = "Couldn't save. Try again."
         }

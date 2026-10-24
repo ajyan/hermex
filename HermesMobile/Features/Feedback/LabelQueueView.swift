@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The morning deck's closing-card link to Label recent cards: shown once the queue is built,
-/// while it has cards and the evals still want tapped labels. Opens the queue in a sheet, which
+/// The morning deck's closing-card link to Rate earlier cards: shown once the queue is built,
+/// while it has cards and the Deck eval judges aren't calibrated yet. Opens the queue in a sheet, which
 /// stays open after the last card is rated. The Daily Deck starts the build.
 struct RateRecentCardsLink: View {
     let queue: LabelQueueViewModel
@@ -13,12 +13,17 @@ struct RateRecentCardsLink: View {
         VStack(spacing: 0) {
             if queue.state == .ready, queue.evalsWantLabels, queue.unlabeledCount > 0 {
                 Button { isOpen = true } label: {
-                    Label {
-                        Text(verbatim: queue.unlabeledCount == 1 ? "Rate 1 earlier card" : "Rate \(queue.unlabeledCount) earlier cards")
-                    } icon: {
-                        Image(systemName: "checkmark.circle")
+                    VStack(spacing: 2) {
+                        Label {
+                            Text(verbatim: queue.unlabeledCount == 1 ? "Rate 1 earlier card" : "Rate \(queue.unlabeledCount) earlier cards")
+                        } icon: {
+                            Image(systemName: "checkmark.circle")
+                        }
+                        .font(AppFont.subheadline(weight: .semibold))
+                        Text(verbatim: "Teaches the deck's judges what lands for you")
+                            .font(AppFont.footnote())
+                            .opacity(0.7)
                     }
-                    .font(AppFont.subheadline(weight: .semibold))
                     .foregroundStyle(palette.ink)
                     .frame(maxWidth: .infinity, minHeight: 44)
                 }
@@ -38,45 +43,7 @@ struct RateRecentCardsLink: View {
     }
 }
 
-/// The Feedback inbox's "Label recent cards" row: opens the queue, with how many cards are
-/// still unlabeled once it is built.
-struct LabelQueueRow: View {
-    let queue: LabelQueueViewModel
-
-    var body: some View {
-        NavigationLink {
-            LabelQueueView(viewModel: queue)
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "checkmark.circle")
-                    .foregroundStyle(Color.hxTextSecondary)
-                    .accessibilityHidden(true)
-                Text(verbatim: "Label recent cards")
-                    .font(AppFont.body())
-                    .foregroundStyle(Color.hxTextPrimary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                if queue.state == .ready {
-                    Text(verbatim: "\(queue.unlabeledCount)")
-                        .font(AppFont.footnote())
-                        .foregroundStyle(Color.hxTextSecondary)
-                        .accessibilityLabel(Text(verbatim: "\(queue.unlabeledCount) unlabeled"))
-                }
-                Image(systemName: "chevron.forward")
-                    .font(AppFont.caption(weight: .semibold))
-                    .foregroundStyle(Color.hxTextSecondary)
-                    .accessibilityHidden(true)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 11)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .hxCard()
-        .accessibilityElement(children: .combine)
-    }
-}
-
-/// Label recent cards: one Daily Deck reflect card at a time, drawn as the Deck draws it,
+/// Rate earlier cards: one Daily Deck reflect card at a time, drawn as the Deck draws it,
 /// with Rate rows for its card and question and Skip/Next. Each tap saves at once.
 struct LabelQueueView: View {
     let viewModel: LabelQueueViewModel
