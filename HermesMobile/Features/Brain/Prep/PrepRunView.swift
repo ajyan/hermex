@@ -116,7 +116,7 @@ struct PrepRunView: View {
 
     private var title: String {
         if case .finished = viewModel.phase { return "Run complete" }
-        return currentRep.map { PrepCopy.blockTitle($0.block) } ?? ""
+        return currentRep.map { PrepCopy.runTitle(block: $0.block, lessonTitle: $0.item.lesson?.title) } ?? ""
     }
 
     private var feedbackContext: FeedbackContext {

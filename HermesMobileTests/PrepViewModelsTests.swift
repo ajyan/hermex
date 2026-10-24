@@ -1567,6 +1567,13 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(PrepCopy.reviewLine(reviews: 1, missed: 0), "1 review")
     }
 
+    func testRunTitleNamesTheLessonOverItsBlock() {
+        XCTAssertEqual(PrepCopy.runTitle(block: "reteach", lessonTitle: "Escalate on evals, not hunches"),
+                       "Escalate on evals, not hunches")
+        XCTAssertEqual(PrepCopy.runTitle(block: "review", lessonTitle: nil), "Review")
+        XCTAssertEqual(PrepCopy.runTitle(block: "reteach", lessonTitle: "  "), "Another way to see it")
+    }
+
     func testFeedbackSplitsAfterTheFirstSentence() {
         let parts = PrepCopy.feedbackParts("It's Sliding window. Grow a range on the right. Shrink it.")
         XCTAssertEqual(parts.lead, "It's Sliding window.")
