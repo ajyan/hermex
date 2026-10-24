@@ -474,6 +474,7 @@
 		C03250000000000000B101 /* TranscribeResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03250000000000000F101 /* TranscribeResponse.swift */; };
 		C03250000000000000B102 /* APIClient+Transcribe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03250000000000000F102 /* APIClient+Transcribe.swift */; };
 		D1A7B0000000000000B001 /* APIClient+Brief.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A7B0000000000000F001 /* APIClient+Brief.swift */; };
+		A60DCE8661933C58246C641E /* APIClient+Mandarin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1519D1F2FDE4754940659CEF /* APIClient+Mandarin.swift */; };
 		C03250000000000000B103 /* MultipartFormData.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03250000000000000F103 /* MultipartFormData.swift */; };
 		C03250000000000000B104 /* ComposerVoiceNoteRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03250000000000000F104 /* ComposerVoiceNoteRecorder.swift */; };
 		C03250000000000000B105 /* APIClientTranscribeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03250000000000000F105 /* APIClientTranscribeTests.swift */; };
@@ -720,6 +721,7 @@
 		900A2A32C06B243E5E952458 /* DailyAskModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE286E9D44D3D280A038AFAE /* DailyAskModel.swift */; };
 		754960F45562E3D0663233FC /* DailyAskModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 446FC64957B2A7BF327BEA73 /* DailyAskModels.swift */; };
 		2D040393A5D1598FA7E58E97 /* DeckMandarinCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E500908D2992BBA8212DC303 /* DeckMandarinCard.swift */; };
+		7996C4637483EC2F9FFB5D8F /* MandarinPractice.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E40E9A114A449B71C984B6 /* MandarinPractice.swift */; };
 		A0DE1106959C69CCBD66C799 /* DeckWeekAheadCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DEFBDBFEC0F250EDED2408 /* DeckWeekAheadCard.swift */; };
 		1D1690542CB14BFC98AD9520 /* DeckUsageTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 207F26B7DB7C4F0BAF86AD12 /* DeckUsageTracker.swift */; };
 		70D8A76A4B70437EB3ABB465 /* DeckVariantPick.swift in Sources */ = {isa = PBXBuildFile; fileRef = 724D31DFBB984CEDA6184201 /* DeckVariantPick.swift */; };
@@ -1295,6 +1297,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		C03250000000000000F101 /* TranscribeResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscribeResponse.swift; sourceTree = "<group>"; };
 		C03250000000000000F102 /* APIClient+Transcribe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "APIClient+Transcribe.swift"; sourceTree = "<group>"; };
 		D1A7B0000000000000F001 /* APIClient+Brief.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "APIClient+Brief.swift"; sourceTree = "<group>"; };
+		1519D1F2FDE4754940659CEF /* APIClient+Mandarin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "APIClient+Mandarin.swift"; sourceTree = "<group>"; };
 		C03250000000000000F103 /* MultipartFormData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultipartFormData.swift; sourceTree = "<group>"; };
 		C03250000000000000F104 /* ComposerVoiceNoteRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerVoiceNoteRecorder.swift; sourceTree = "<group>"; };
 		C03250000000000000F105 /* APIClientTranscribeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientTranscribeTests.swift; sourceTree = "<group>"; };
@@ -1557,6 +1560,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		EE286E9D44D3D280A038AFAE /* DailyAskModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyAskModel.swift; sourceTree = "<group>"; };
 		446FC64957B2A7BF327BEA73 /* DailyAskModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyAskModels.swift; sourceTree = "<group>"; };
 		E500908D2992BBA8212DC303 /* DeckMandarinCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckMandarinCard.swift; sourceTree = "<group>"; };
+		A9E40E9A114A449B71C984B6 /* MandarinPractice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MandarinPractice.swift; sourceTree = "<group>"; };
 		A0DEFBDBFEC0F250EDED2408 /* DeckWeekAheadCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckWeekAheadCard.swift; sourceTree = "<group>"; };
 		207F26B7DB7C4F0BAF86AD12 /* DeckUsageTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckUsageTracker.swift; sourceTree = "<group>"; };
 		724D31DFBB984CEDA6184201 /* DeckVariantPick.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckVariantPick.swift; sourceTree = "<group>"; };
@@ -2137,6 +2141,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				1A2B3C4D5E6F7000000000B8 /* Endpoints.swift */,
 				C03250000000000000F102 /* APIClient+Transcribe.swift */,
 				D1A7B0000000000000F001 /* APIClient+Brief.swift */,
+				1519D1F2FDE4754940659CEF /* APIClient+Mandarin.swift */,
 				C03260000000000000F101 /* APIClient+TTS.swift */,
 				C03270000000000000F101 /* APIClient+SessionExport.swift */,
 				C03250000000000000F103 /* MultipartFormData.swift */,
@@ -2742,6 +2747,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				EE286E9D44D3D280A038AFAE /* DailyAskModel.swift */,
 				446FC64957B2A7BF327BEA73 /* DailyAskModels.swift */,
 				E500908D2992BBA8212DC303 /* DeckMandarinCard.swift */,
+				A9E40E9A114A449B71C984B6 /* MandarinPractice.swift */,
 				A0DEFBDBFEC0F250EDED2408 /* DeckWeekAheadCard.swift */,
 				207F26B7DB7C4F0BAF86AD12 /* DeckUsageTracker.swift */,
 				724D31DFBB984CEDA6184201 /* DeckVariantPick.swift */,
@@ -3056,6 +3062,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				900A2A32C06B243E5E952458 /* DailyAskModel.swift in Sources */,
 				754960F45562E3D0663233FC /* DailyAskModels.swift in Sources */,
 				2D040393A5D1598FA7E58E97 /* DeckMandarinCard.swift in Sources */,
+				7996C4637483EC2F9FFB5D8F /* MandarinPractice.swift in Sources */,
 				A0DE1106959C69CCBD66C799 /* DeckWeekAheadCard.swift in Sources */,
 				1D1690542CB14BFC98AD9520 /* DeckUsageTracker.swift in Sources */,
 				70D8A76A4B70437EB3ABB465 /* DeckVariantPick.swift in Sources */,
@@ -3302,6 +3309,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C03250000000000000B101 /* TranscribeResponse.swift in Sources */,
 				C03250000000000000B102 /* APIClient+Transcribe.swift in Sources */,
 				D1A7B0000000000000B001 /* APIClient+Brief.swift in Sources */,
+				A60DCE8661933C58246C641E /* APIClient+Mandarin.swift in Sources */,
 				C03260000000000000B101 /* APIClient+TTS.swift in Sources */,
 				C03270000000000000B101 /* APIClient+SessionExport.swift in Sources */,
 				C03250000000000000B103 /* MultipartFormData.swift in Sources */,

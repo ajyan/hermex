@@ -1195,7 +1195,6 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertTrue(card.isMandarin)
         XCTAssertFalse(card.isLetter)
         XCTAssertEqual(card.phrases.map(\.hanzi), ["最近怎么样？", "我在准备马拉松。", "不用担心。"], "a phrase without characters is dropped")
-        XCTAssertEqual(card.phrases.map(\.review), [false, false, true])
         XCTAssertEqual(card.yesterday?.notes.count, 1)
         XCTAssertEqual(card.yesterday?.naturalPinyin, "Wǒ shàng ge zhōu mò pǎo le èr shí yīng lǐ.")
         XCTAssertEqual(card.questionPinyin, "Nǐ pǎo bù pǎo de zěn me yàng le?")
@@ -1253,11 +1252,11 @@ final class DailyDeckTests: XCTestCase {
 
     func testMandarinQuestionFollowsTheOneHeAsked() throws {
         let card = try DailyDeck.decode(Self.mandarinDeckJSON).cards[0]
-        let own = DeckMandarinCard.questionLine(card: card, asked: "你今天怎么样？")
+        let own = card.mandarinQuestion(asked: "你今天怎么样？")
         XCTAssertEqual(own.hanzi, "你今天怎么样？")
         XCTAssertNil(own.pinyin, "the deck's pinyin belongs to the deck's question")
         XCTAssertNil(own.english)
-        let deck = DeckMandarinCard.questionLine(card: card, asked: try XCTUnwrap(card.question))
+        let deck = card.mandarinQuestion(asked: try XCTUnwrap(card.question))
         XCTAssertEqual(deck.pinyin, card.questionPinyin)
         XCTAssertEqual(deck.english, card.questionEn)
     }
@@ -2310,4 +2309,158 @@ private final class MandarinSpySession: ListenAudioSessionControlling {
     private(set) var deactivations = 0
     func activate() { activations += 1 }
     func deactivate() { deactivations += 1 }
+}
+
+/// A scripted Mandarin API: answers and recalls succeed with what's queued, or throw.
+private final class FakeMandarinClient: MandarinPracticeClient, @unchecked Sendable {
+    var answers: [MandarinAnswerRequest] = []
+    var recalls: [MandarinRecallRequest] = []
+    var answerResult: Result<MandarinAnswerResponse, Error> = .success(MandarinAnswerResponse(feedback: nil))
+    var recallFails = false
+
+    func answer(_ request: MandarinAnswerRequest) async throws -> MandarinAnswerResponse {
+        answers.append(request)
+        return try answerResult.get()
+    }
+
+    func recall(_ request: MandarinRecallRequest) async throws -> MandarinRecallResponse {
+        recalls.append(request)
+        if recallFails { throw URLError(.notConnectedToInternet) }
+        return try JSONDecoder().decode(MandarinRecallResponse.self, from: Data(#"{"ok":true,"progress":{"phrases":9}}"#.utf8))
+    }
+}
+
+@MainActor
+final class MandarinPracticeTests: XCTestCase {
+    private static let deckJSON = """
+    {"date": "2026-10-25", "kind": "morning", "cards": [
+      {"id": "mandarin", "type": "prompt", "kind": "mandarin", "title": "Dad asks about the job search",
+       "yesterday": {"said": "我要继续喝很多水，休息早一点。", "natural": "我要多喝水，早一点休息。",
+                     "fixes": [{"said": "休息早一点", "natural": "早一点休息", "natural_pinyin": "zǎo yì diǎn xiū xi",
+                                "en": "rest earlier", "why": "Time words go before the verb."},
+                               {"said": "bad"}],
+                     "gaps": [{"en": "anxious", "hanzi": "紧张", "pinyin": "jǐn zhāng", "build": "tight + stretched"}],
+                     "pattern": {"pattern": "因为…所以…", "en": "Reason, then result."}},
+       "phrases": [{"hanzi": "还不错", "en": "Not bad"}, {"hanzi": "在等消息", "en": ""}],
+       "recall": [{"hanzi": "宝宝一月份出生。", "en": "The baby is due in January.", "source": "lesson"},
+                  {"hanzi": "紧张", "en": "anxious", "source": "gap"}],
+       "pattern": {"id": "stpvo", "name": "Time and place before the verb", "form": "我 + 昨天 + 在家 + 看书", "en": "Who, when, where."},
+       "progress": {"phrases": 36, "used_week": 6, "english_now": 1.2, "english_before": 2.8},
+       "question": "你找工作找得怎么样了？"}
+    ]}
+    """
+
+    private var defaults: UserDefaults!
+    private let server = URL(string: "https://hermes.example")!
+
+    override func setUp() {
+        super.setUp()
+        defaults = UserDefaults(suiteName: "MandarinPracticeTests.\(UUID().uuidString)")
+    }
+
+    private func card(_ json: String = deckJSON) throws -> DeckCard { try DailyDeck.decode(json).cards[0] }
+
+    private func practice(_ card: DeckCard, client: FakeMandarinClient?) -> MandarinPractice {
+        MandarinPractice(card: card, date: "2026-10-25", server: server, client: client,
+                         store: MandarinPracticeStore(defaults: defaults))
+    }
+
+    func testCardDecodesRecallPatternProgressAndStructuredFeedback() throws {
+        let card = try card()
+        XCTAssertEqual(card.recall.map(\.source), ["lesson", "gap"])
+        XCTAssertNil(card.phrases[1].en, "an empty English cue is no cue")
+        XCTAssertEqual(card.pattern?.form, "我 + 昨天 + 在家 + 看书")
+        XCTAssertEqual(card.progress, DeckMandarinProgress(phrases: 36, usedWeek: 6, englishNow: 1.2, englishBefore: 2.8))
+        XCTAssertEqual(card.yesterday?.fixes.map(\.natural), ["早一点休息"], "a fix without its natural words is dropped")
+        XCTAssertEqual(card.yesterday?.gaps.first?.build, "tight + stretched")
+        XCTAssertEqual(card.yesterday?.pattern?.pattern, "因为…所以…")
+    }
+
+    func testStepsStartAtTheFixAndMoveOnAsEachIsDone() async throws {
+        let client = FakeMandarinClient()
+        let practice = practice(try card(), client: client)
+        XCTAssertEqual(practice.steps, [.fix, .recall, .talk])
+        XCTAssertEqual(practice.step, .fix)
+        XCTAssertEqual(practice.currentFix?.said, "休息早一点")
+        practice.nextFix()
+        XCTAssertEqual(practice.step, .recall)
+        await practice.recall(try XCTUnwrap(practice.currentRecall), got: true)
+        XCTAssertEqual(practice.currentRecall?.hanzi, "紧张")
+        XCTAssertEqual(practice.progress?.phrases, 9, "a recall brings the server's progress back")
+        await practice.recall(try XCTUnwrap(practice.currentRecall), got: false)
+        XCTAssertEqual(practice.step, .talk)
+        XCTAssertEqual(client.recalls.map(\.got), [true, false])
+        XCTAssertEqual(practice.record.recalled, ["宝宝一月份出生。": true, "紧张": false])
+    }
+
+    func testAFailedRecallStaysOnThePhrase() async throws {
+        let client = FakeMandarinClient()
+        client.recallFails = true
+        let practice = practice(try card(), client: client)
+        let phrase = try XCTUnwrap(practice.currentRecall)
+        await practice.recall(phrase, got: true)
+        XCTAssertEqual(practice.currentRecall, phrase, "nothing counts until the server has it")
+        XCTAssertNotNil(practice.recallError)
+    }
+
+    func testAnswerBringsFeedbackOnceAndAgainOnlyForNewWords() async throws {
+        let client = FakeMandarinClient()
+        let feedback = try JSONDecoder().decode(MandarinAnswerResponse.self, from: Data(#"""
+        {"feedback": {"natural": "我最近面试了三家公司，有点紧张，不过感觉还不错。"}, "used": ["还不错"], "progress": {"phrases": 38}}
+        """#.utf8))
+        client.answerResult = .success(feedback)
+        let practice = practice(try card(), client: client)
+        await practice.submit("  我最近面试了三家公司，有一点anxious，可是还不错  ", question: nil)
+        XCTAssertEqual(practice.result, feedback)
+        XCTAssertEqual(practice.answering, .idle)
+        XCTAssertEqual(practice.progress?.phrases, 38)
+        XCTAssertTrue(practice.isDone(.talk))
+        await practice.submit("我最近面试了三家公司，有一点anxious，可是还不错", question: nil)
+        XCTAssertEqual(client.answers.count, 1, "the same answer isn't sent twice")
+        await practice.submit("我最近面试了三家公司。", question: "你好吗？")
+        XCTAssertEqual(client.answers.map(\.question), [nil, "你好吗？"])
+    }
+
+    func testAnswerWithoutFeedbackOrServerCanBeTriedAgain() async throws {
+        let client = FakeMandarinClient()
+        client.answerResult = .failure(URLError(.timedOut))
+        let practice = practice(try card(), client: client)
+        await practice.submit("还不错", question: nil)
+        XCTAssertEqual(practice.answering, .failed("Couldn't reach the server. Try again."))
+        XCTAssertNil(practice.result)
+        client.answerResult = .success(MandarinAnswerResponse(feedback: nil))
+        await practice.retry()
+        XCTAssertEqual(practice.answering, .idle)
+        XCTAssertNil(practice.result?.feedback, "no feedback yet: tomorrow's card brings it")
+        await practice.retry()
+        XCTAssertEqual(client.answers.count, 3, "an answer without feedback can be sent again")
+    }
+
+    func testThePracticeResumesForTheSameServerAndDayOnly() async throws {
+        let card = try card()
+        let first = practice(card, client: FakeMandarinClient())
+        first.nextFix()
+        await first.recall(try XCTUnwrap(first.currentRecall), got: true)
+        let again = practice(card, client: FakeMandarinClient())
+        XCTAssertEqual(again.step, .recall)
+        XCTAssertEqual(again.currentRecall?.hanzi, "紧张")
+        let other = MandarinPractice(card: card, date: "2026-10-25", server: URL(string: "https://other.example")!,
+                                     client: nil, store: MandarinPracticeStore(defaults: defaults))
+        XCTAssertEqual(other.step, .fix, "another server starts fresh")
+    }
+
+    func testACardWithoutYesterdayOrRecallStartsAtTalk() throws {
+        let card = try card(#"{"date":"d","kind":"morning","cards":[{"id":"m","type":"prompt","kind":"mandarin","question":"你好吗？"}]}"#)
+        let practice = practice(card, client: nil)
+        XCTAssertEqual(practice.steps, [.talk])
+        XCTAssertEqual(practice.step, .talk)
+    }
+
+    func testProgressLine() {
+        XCTAssertEqual(MandarinProgressLine.text(DeckMandarinProgress(phrases: 36, usedWeek: 6, englishNow: 1.2, englishBefore: 3)),
+                       "36 phrases · 6 used this week · English per answer 3 → 1.2")
+        XCTAssertEqual(MandarinProgressLine.text(DeckMandarinProgress(phrases: 1, usedWeek: nil, englishNow: nil, englishBefore: nil)),
+                       "1 phrase")
+        XCTAssertNil(MandarinProgressLine.text(DeckMandarinProgress(phrases: nil, usedWeek: nil, englishNow: nil, englishBefore: nil)))
+    }
 }

@@ -137,7 +137,7 @@ struct DeckCardView: View {
         }
         .foregroundStyle(palette.ink)
         .tint(palette.ink)
-        .sheet(isPresented: $isWriting) {
+        .sheet(isPresented: $isWriting, onDismiss: sendMandarinAnswer) {
             ReflectionSheet(card: card, palette: palette, viewModel: viewModel)
         }
         .sheet(isPresented: $showsSleepHistory) {
@@ -182,7 +182,10 @@ struct DeckCardView: View {
             WeekQuestionHeader(rotation: rotation, palette: palette)
         }
         if card.isMandarin {
-            DeckMandarinCard(card: card, palette: palette, asked: viewModel.question(for: card))
+            DeckMandarinCard(card: card, palette: palette, asked: viewModel.question(for: card),
+                             practice: viewModel.mandarinPractice(for: card)) {
+                reflection(DeckCopy.invitation(for: card))
+            }
         }
         if !card.isMandarin, let lead = text.lead {
             Text(inlineMarkdown(lead))
@@ -245,11 +248,20 @@ struct DeckCardView: View {
         }
         if let traits = card.selfRatings {
             selfRatings(traits).padding(.top, 18)
-        } else if card.takesText {
+        } else if card.takesText, !card.isMandarin {
             reflection(DeckCopy.invitation(for: card))
                 .padding(.top, 16)
         }
         DeckFootnote(card: card, palette: palette)
+    }
+
+    /// The Mandarin card's answer goes for feedback as soon as its sheet closes; an unchanged answer
+    /// that already has feedback isn't sent again.
+    private func sendMandarinAnswer() {
+        guard card.isMandarin, let text = viewModel.answer(for: card)?.text else { return }
+        let practice = viewModel.mandarinPractice(for: card)
+        let asked = viewModel.question(for: card)
+        Task { await practice.submit(text, question: asked == card.question ? nil : asked) }
     }
 
     /// Your words once written; until then, the way in.
@@ -878,6 +890,9 @@ private struct ReflectionSheet: View {
                     .font(AppFont.display(style: .title3, weight: .semibold))
                     .foregroundStyle(palette.ink)
                     .fixedSize(horizontal: false, vertical: true)
+                if card.isMandarin, !card.phrases.isEmpty {
+                    MandarinCueList(phrases: card.phrases, used: [], palette: palette, speaker: nil)
+                }
                 TextEditor(text: $text)
                     .font(AppFont.body())
                     .foregroundStyle(Color.hxTextPrimary)
