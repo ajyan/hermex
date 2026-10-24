@@ -195,8 +195,10 @@ struct MessageBubbleView: View {
     }
 
     private var assistantMessageRow: some View {
+        let citations = isStreaming ? [] : BrainCitation.citations(in: messageText)
+        let shownText = BrainCitation.withoutChippedLinkLine(messageText, citations: citations)
         let segments = TranscriptMediaSegmentCache.segments(
-            in: messageText,
+            in: shownText,
             workspaceRoot: chatWorkspaceRoot,
             isStreaming: isStreaming
         )
@@ -207,10 +209,10 @@ struct MessageBubbleView: View {
             }
 
             if isStreaming {
-                assistantContent(segments: segments)
+                assistantContent(shownText, segments: segments)
             } else {
-                ResponseTextSelection(identity: messageText, collectsGlyphs: responseIsVisible, onAskHermex: onAskHermex) {
-                    assistantContent(segments: segments)
+                ResponseTextSelection(identity: shownText, collectsGlyphs: responseIsVisible, onAskHermex: onAskHermex) {
+                    assistantContent(shownText, segments: segments)
                 }
                 .onGeometryChange(for: Bool.self) { geometry in
                     guard let viewport = geometry.bounds(of: .scrollView(axis: .vertical)) else { return true }
@@ -218,12 +220,9 @@ struct MessageBubbleView: View {
                 } action: { responseIsVisible = $0 }
             }
 
-            if !isStreaming {
-                let citations = BrainCitation.citations(in: messageText)
-                if !citations.isEmpty {
-                    BrainCitationChips(citations: citations)
-                        .padding(.top, 4)
-                }
+            if !citations.isEmpty {
+                BrainCitationChips(citations: citations)
+                    .padding(.top, 4)
             }
 
             linkPreview(linkPreviewURL)
@@ -232,7 +231,7 @@ struct MessageBubbleView: View {
     }
 
     @ViewBuilder
-    private func assistantContent(segments: [TranscriptMediaSegment]) -> some View {
+    private func assistantContent(_ text: String, segments: [TranscriptMediaSegment]) -> some View {
         if segments.containsTranscriptMedia {
             TranscriptMediaContentView(
                 segments: segments,
@@ -243,7 +242,7 @@ struct MessageBubbleView: View {
                 isStreaming: isStreaming
             )
         } else {
-            MarkdownRenderer(content: messageText, isStreaming: isStreaming)
+            MarkdownRenderer(content: text, isStreaming: isStreaming)
         }
     }
 

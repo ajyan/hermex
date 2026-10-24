@@ -96,6 +96,24 @@ final class DesignSystemTests: XCTestCase {
         XCTAssertEqual(BrainCitation.citations(in: five).count, BrainCitation.limit)
     }
 
+    func testATrailingLineOfChippedLinksIsDropped() {
+        let text = """
+        Two pieces fit.
+
+        [7 Keys](brain://articles/7-keys)
+        [No Easy Secret](brain://articles/no-easy-secret)
+        """
+        let citations = BrainCitation.citations(in: text)
+        XCTAssertEqual(BrainCitation.withoutChippedLinkLine(text, citations: citations), "Two pieces fit.")
+
+        let prose = "Logged to [Yale](brain://people/yale)."
+        XCTAssertEqual(BrainCitation.withoutChippedLinkLine(prose, citations: BrainCitation.citations(in: prose)), prose,
+                       "a sentence that links a page keeps its words")
+        let four = "Read these.\n\n" + (1...4).map { "[P\($0)](brain://people/p\($0))" }.joined(separator: " · ")
+        XCTAssertEqual(BrainCitation.withoutChippedLinkLine(four, citations: BrainCitation.citations(in: four)), four,
+                       "a link past the chip limit keeps the line")
+    }
+
     func testGlowTextClearsAAOnItsWashInBothAppearances() {
         for style in [UIUserInterfaceStyle.light, .dark] {
             let traits = UITraitCollection(userInterfaceStyle: style)
