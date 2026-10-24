@@ -17,6 +17,7 @@ struct DeckMandarinCard<Answer: View>: View {
     @State private var speaker = MandarinSpeaker()
     /// Fixes and recall phrases whose answer is showing.
     @State private var revealed: Set<String> = []
+    @State private var isCalling = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -29,6 +30,7 @@ struct DeckMandarinCard<Answer: View>: View {
             }
         }
         .onDisappear { speaker.stop() }
+        .sheet(isPresented: $isCalling) { MandarinCallSheet(practice: practice, palette: palette) }
     }
 
     // MARK: Step bar
@@ -197,6 +199,15 @@ struct DeckMandarinCard<Answer: View>: View {
                 .foregroundStyle(Color.hxTextSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        Button { speaker.stop(); isCalling = true } label: {
+            Label { Text(verbatim: "Calling Mom or Dad?") } icon: { Image(systemName: "phone") }
+                .font(AppFont.subheadline(weight: .semibold))
+                .foregroundStyle(palette.ink)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .overlay(Capsule().strokeBorder(palette.ink, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(Text(verbatim: "Three things to say before the call, and what you couldn't say after it"))
     }
 
     @ViewBuilder
