@@ -328,6 +328,27 @@ struct BrainCitation: Equatable, Identifiable {
     }
 }
 
+extension BrainCitation {
+    /// `markdown` without its last paragraph when that paragraph only lists Brain links that
+    /// `citations` already draws as chips (a reply ending in a list of its sources), so the
+    /// links don't show twice. Anything else in the paragraph keeps it.
+    static func withoutChippedLinkLine(_ markdown: String, citations: [BrainCitation]) -> String {
+        guard !citations.isEmpty, let pattern else { return markdown }
+        let trimmed = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
+        let start = trimmed.range(of: "\n\n", options: .backwards)?.upperBound ?? trimmed.startIndex
+        let paragraph = String(trimmed[start...])
+        let range = NSRange(paragraph.startIndex..., in: paragraph)
+        let matches = pattern.matches(in: paragraph, range: range)
+        let chipped = Set(citations.map(\.url.absoluteString))
+        guard !matches.isEmpty, matches.allSatisfy({ match in
+            Range(match.range(at: 2), in: paragraph).map { chipped.contains(String(paragraph[$0])) } ?? false
+        }) else { return markdown }
+        let rest = pattern.stringByReplacingMatches(in: paragraph, range: range, withTemplate: "")
+        guard rest.allSatisfy({ $0.isWhitespace || "·•|,;-–—*".contains($0) }) else { return markdown }
+        return String(trimmed[..<start]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
 /// The Brain pages a reply cites, as one row of knowledge chips under it (DESIGN.md
 /// § Components). Tapping one opens it through the transcript's link router, like the
 /// inline link.
