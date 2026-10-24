@@ -1318,6 +1318,13 @@ enum PrepCopy {
         }
     }
 
+    /// A run's header for one rep: the lesson's title when the rep carries a lesson (a recall screen shows
+    /// nothing else that names the topic), else its block's name.
+    static func runTitle(block: String, lessonTitle: String?) -> String {
+        let title = lessonTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return title.isEmpty ? blockTitle(block) : title
+    }
+
     static func mapTitle(mastered: Int, total: Int) -> String {
         "\(mastered) of \(total) patterns mastered"
     }
