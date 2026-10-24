@@ -241,6 +241,9 @@ final class DailyDeckViewModel {
     /// Filed, or for a v2 weekly sealed: answers on file and, for a seal, the week's record.
     var isFiled: Bool { filedAnswers != nil && (!isV2Weekly || hasWeekRecord) }
 
+    /// Today's morning brief is on screen and filed: the Daily Brief notifications stop for today.
+    var isTodayFiled: Bool { state == .ready && !isReview && date == today && isFiled }
+
     /// Whether the answers differ from what was filed (always true before the first filing).
     var hasChanges: Bool {
         guard isFiled, let filedAnswers else { return true }

@@ -1,29 +1,28 @@
 import Foundation
 import UserNotifications
 
-/// The 06:00 "your Daily Brief is ready" notification and a 07:00 reminder on days the
-/// brief hasn't been opened by then. Local notifications only: nothing leaves the device.
+/// The 07:30 "your Daily Brief is ready" notification and an 08:00 reminder, each only on
+/// days the brief hasn't been filed by then. Local notifications only: nothing leaves the device.
 ///
-/// The 06:00 notification repeats daily. Reminders can't be cancelled by a condition the
-/// system checks, so one is scheduled per day for the next week and opening today's
-/// brief removes today's. The week is rescheduled each time the app comes forward, so
-/// reminders only lapse after a week away; the 06:00 notification never does.
-/// The brief is built at 05:30 (second-brain's `daily-brief` cron), so 06:00 finds it ready.
+/// Notifications can't be cancelled by a condition the system checks, so both are scheduled
+/// per day for the next week and filing today's brief removes what's left of today's. The
+/// week is rescheduled each time the app comes forward, so they only lapse after a week away.
+/// The brief is built at 05:30 (second-brain's `daily-brief` cron), so it's ready well before.
 /// Device-wide, not per server: the brief is opened on whichever server is active.
 enum DailyBriefReminder {
     /// Bool in UserDefaults; absent until the user first opens the Daily Brief.
     static let enabledKey = "dailyBrief.notificationsEnabled"
-    /// `yyyy-MM-dd` of the last day the brief was opened.
-    static let openedOnKey = "dailyBrief.openedOn"
+    /// `yyyy-MM-dd` of the last day the brief was filed.
+    static let filedOnKey = "dailyBrief.filedOn"
     /// Marks the notification so a tap opens the Daily Brief.
     static let userInfoKey = "dailyBrief"
 
-    static let readyID = "dailyBrief.ready"
+    static let readyPrefix = "dailyBrief.ready."
     static let reminderPrefix = "dailyBrief.reminder."
     /// Sundays and the 1st: "Your weekly (monthly) review is ready", opening that review.
     static let reviewPrefix = "dailyBrief.review."
-    static let readyTime = (hour: 6, minute: 0)
-    static let reminderTime = (hour: 7, minute: 0)
+    static let readyTime = (hour: 7, minute: 30)
+    static let reminderTime = (hour: 8, minute: 0)
     static let reminderDays = 7
 
     /// One scheduled notification, as plain values so the schedule is testable.
@@ -41,24 +40,24 @@ enum DailyBriefReminder {
         let kind: String
     }
 
-    /// What should be pending at `now`: the daily 06:00, plus a 07:00 reminder for each of
-    /// the next `reminderDays` days still ahead, skipping today once the brief was opened.
-    static func plan(now: Date, openedOn: String?, calendar: Calendar = .current) -> [Planned] {
-        var planned = [Planned(id: readyID,
-                               components: DateComponents(hour: readyTime.hour, minute: readyTime.minute),
-                               repeats: true, isReminder: false)]
+    /// What should be pending at `now`: a 07:30 ready notification and an 08:00 reminder for
+    /// each of the next `reminderDays` days still ahead, skipping today's once the brief was filed.
+    static func plan(now: Date, filedOn: String?, calendar: Calendar = .current) -> [Planned] {
+        var planned: [Planned] = []
         let today = calendar.startOfDay(for: now)
-        for offset in 0..<reminderDays {
-            guard let day = calendar.date(byAdding: .day, value: offset, to: today),
-                  let fireDate = calendar.date(bySettingHour: reminderTime.hour, minute: reminderTime.minute, second: 0, of: day),
-                  fireDate > now
-            else { continue }
-            let key = DailyDeckPaths.day(day, calendar: calendar)
-            if offset == 0 && openedOn == key { continue }
-            planned.append(Planned(
-                id: reminderPrefix + key,
-                components: calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate),
-                repeats: false, isReminder: true))
+        for (prefix, time, isReminder) in [(readyPrefix, readyTime, false), (reminderPrefix, reminderTime, true)] {
+            for offset in 0..<reminderDays {
+                guard let day = calendar.date(byAdding: .day, value: offset, to: today),
+                      let fireDate = calendar.date(bySettingHour: time.hour, minute: time.minute, second: 0, of: day),
+                      fireDate > now
+                else { continue }
+                let key = DailyDeckPaths.day(day, calendar: calendar)
+                if offset == 0 && filedOn == key { continue }
+                planned.append(Planned(
+                    id: prefix + key,
+                    components: calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate),
+                    repeats: false, isReminder: isReminder))
+            }
         }
         for offset in 0..<reminderDays {
             guard let day = calendar.date(byAdding: .day, value: offset, to: today),
@@ -112,12 +111,13 @@ enum DailyBriefReminder {
         await refresh(defaults: defaults)
     }
 
-    /// Records that today's brief was opened: no reminder today, and today's notifications
+    /// Records that today's brief was filed: no more notifications today, and today's
     /// leave Notification Center.
-    static func noteOpened(now: Date = Date(), defaults: UserDefaults = .standard) async {
+    static func noteFiled(now: Date = Date(), defaults: UserDefaults = .standard) async {
         let today = DailyDeckPaths.day(now)
-        defaults.set(today, forKey: openedOnKey)
-        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [readyID, reminderPrefix + today])
+        guard defaults.string(forKey: filedOnKey) != today else { return }
+        defaults.set(today, forKey: filedOnKey)
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [readyPrefix + today, reminderPrefix + today])
         await refresh(now: now, defaults: defaults)
     }
 
@@ -126,10 +126,10 @@ enum DailyBriefReminder {
     static func refresh(now: Date = Date(), defaults: UserDefaults = .standard) async {
         let center = UNUserNotificationCenter.current()
         let pending = await center.pendingNotificationRequests().map(\.identifier)
-            .filter { $0 == readyID || $0.hasPrefix(reminderPrefix) || $0.hasPrefix(reviewPrefix) }
+            .filter { $0.hasPrefix(userInfoKey + ".") }  // every Daily Brief id, including the old repeating "dailyBrief.ready"
         center.removePendingNotificationRequests(withIdentifiers: pending)
         guard isEnabled(defaults) else { return }
-        for item in plan(now: now, openedOn: defaults.string(forKey: openedOnKey)) {
+        for item in plan(now: now, filedOn: defaults.string(forKey: filedOnKey)) {
             let content = UNMutableNotificationContent()
             if let review = item.review {
                 content.title = review.kind == "weekly" ? "Your weekly review is ready" : "Your monthly review is ready"
