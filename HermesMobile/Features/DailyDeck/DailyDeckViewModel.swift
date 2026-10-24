@@ -108,14 +108,20 @@ final class DailyDeckViewModel {
     private let store: DailyDeckStore
     /// The feedback API, for Undo on the What changed card; nil leaves the card read-only.
     private let feedback: (any FeedbackDataClient)?
+    /// The Mandarin card's live API (instant feedback, recall); nil keeps the card's steps local.
+    private let mandarin: (any MandarinPracticeClient)?
+    /// Each day's Mandarin practice, kept while this screen lives so a sheet and the card share it.
+    @ObservationIgnored private var mandarinPractices: [String: MandarinPractice] = [:]
     private let now: () -> Date
 
     init(server: URL, client: any DailyDeckDataClient, store: DailyDeckStore = DailyDeckStore(),
-         feedback: (any FeedbackDataClient)? = nil, now: @escaping () -> Date = Date.init) {
+         feedback: (any FeedbackDataClient)? = nil, mandarin: (any MandarinPracticeClient)? = nil,
+         now: @escaping () -> Date = Date.init) {
         self.server = server
         self.client = client
         self.store = store
         self.feedback = feedback
+        self.mandarin = mandarin
         self.now = now
         let today = DailyDeckPaths.day(now())
         self.today = today
@@ -125,7 +131,17 @@ final class DailyDeckViewModel {
     convenience init(server: URL) {
         let apiClient = APIClient(baseURL: server)
         self.init(server: server, client: APIClientDailyDeckAdapter(apiClient: apiClient),
-                  feedback: APIClientFeedbackAdapter(apiClient: apiClient))
+                  feedback: APIClientFeedbackAdapter(apiClient: apiClient),
+                  mandarin: APIClientMandarinAdapter(apiClient: apiClient))
+    }
+
+    /// The Mandarin card's practice for the deck on screen; the same object until the card changes.
+    func mandarinPractice(for card: DeckCard) -> MandarinPractice {
+        let key = "\(date)|\(card.question ?? "")"
+        if let practice = mandarinPractices[key] { return practice }
+        let practice = MandarinPractice(card: card, date: date, server: server, client: mandarin)
+        mandarinPractices[key] = practice
+        return practice
     }
 
     /// A fresh look back over the sealed weeks of this deck's workspace, reading through the deck's

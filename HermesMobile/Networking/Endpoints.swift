@@ -216,6 +216,10 @@ enum Endpoint {
     case briefFile
     /// The week's photo (this user's webui fork): POST a raw JPEG or DELETE, `?week_ending=YYYY-MM-DD`.
     case briefPhoto(weekEnding: String)
+    /// The Daily Deck's Mandarin card, live (`api/vault_mandarin.py` on this user's webui fork):
+    /// POST `{date, text, question?}` for instant feedback, POST `{date, hanzi, got}` for a recall.
+    case mandarinAnswer
+    case mandarinRecall
 
     var path: String {
         switch self {
@@ -565,6 +569,10 @@ enum Endpoint {
             return "/api/brief/file"
         case .briefPhoto:
             return "/api/brief/photo"
+        case .mandarinAnswer:
+            return "/api/mandarin/answer"
+        case .mandarinRecall:
+            return "/api/mandarin/recall"
         }
     }
 
