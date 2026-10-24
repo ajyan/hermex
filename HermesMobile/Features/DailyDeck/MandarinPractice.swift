@@ -5,6 +5,8 @@ import Observation
 protocol MandarinPracticeClient: Sendable {
     func answer(_ request: MandarinAnswerRequest) async throws -> MandarinAnswerResponse
     func recall(_ request: MandarinRecallRequest) async throws -> MandarinRecallResponse
+    func callPrep(_ request: MandarinCallPrepRequest) async throws -> MandarinCallResponse
+    func callAfter(_ request: MandarinCallAfterRequest) async throws -> MandarinCallResponse
 }
 
 struct APIClientMandarinAdapter: MandarinPracticeClient {
@@ -17,6 +19,14 @@ struct APIClientMandarinAdapter: MandarinPracticeClient {
     func recall(_ request: MandarinRecallRequest) async throws -> MandarinRecallResponse {
         try await apiClient.recallMandarin(request)
     }
+
+    func callPrep(_ request: MandarinCallPrepRequest) async throws -> MandarinCallResponse {
+        try await apiClient.mandarinCallPrep(request)
+    }
+
+    func callAfter(_ request: MandarinCallAfterRequest) async throws -> MandarinCallResponse {
+        try await apiClient.mandarinCallAfter(request)
+    }
 }
 
 /// What he has done on a day's Mandarin card: fixes stepped through, phrases recalled (Got it is
@@ -26,6 +36,21 @@ struct MandarinPracticeRecord: Codable, Equatable {
     var recalled: [String: Bool] = [:]
     var answeredText: String?
     var result: MandarinAnswerResponse?
+    /// The family call: three things to say per relative ("mom", "dad"), and what came back after it.
+    var callPrep: [String: [MandarinCallItem]] = [:]
+    var callPhrases: [MandarinCallItem] = []
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        fixesSeen = (try? c.decodeIfPresent(Int.self, forKey: .fixesSeen)) ?? 0
+        recalled = (try? c.decodeIfPresent([String: Bool].self, forKey: .recalled)) ?? [:]
+        answeredText = try? c.decodeIfPresent(String.self, forKey: .answeredText)
+        result = try? c.decodeIfPresent(MandarinAnswerResponse.self, forKey: .result)
+        callPrep = (try? c.decodeIfPresent([String: [MandarinCallItem]].self, forKey: .callPrep)) ?? [:]
+        callPhrases = (try? c.decodeIfPresent([MandarinCallItem].self, forKey: .callPhrases)) ?? []
+    }
 }
 
 /// The newest `days` records per server in UserDefaults; nothing here is a credential.
@@ -69,6 +94,9 @@ final class MandarinPractice {
     private(set) var answering: Answering = .idle
     private(set) var isSavingRecall = false
     private(set) var recallError: String?
+    /// The family call's request in flight ("mom", "dad", or "after"), and its last error.
+    private(set) var callLoading: String?
+    private(set) var callError: String?
     /// The latest progress the server reported: after an answer or a recall, else the deck's.
     private(set) var progress: DeckMandarinProgress?
 
@@ -165,6 +193,50 @@ final class MandarinPractice {
             answering = .idle
         } catch {
             answering = .failed("Couldn't reach the server. Try again.")
+        }
+    }
+
+    /// Three things from his week to tell `who` ("mom" or "dad"); asked once per day per relative.
+    func prepareCall(_ who: String) async {
+        guard let client, callLoading == nil, record.callPrep[who] == nil else { return }
+        callLoading = who
+        callError = nil
+        defer { callLoading = nil }
+        do {
+            let items = try await client.callPrep(MandarinCallPrepRequest(date: date, who: who)).items
+            guard !items.isEmpty else {
+                callError = "Nothing came back. Try again."
+                return
+            }
+            record.callPrep[who] = items
+            save()
+        } catch {
+            callError = "Couldn't reach the server. Try again."
+        }
+    }
+
+    /// What he couldn't say on the call, back in Mandarin and added to tomorrow's recall. Returns
+    /// whether it was saved, so the sheet keeps his words when it wasn't.
+    @discardableResult
+    func saveAfterCall(_ text: String) async -> Bool {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let client, !text.isEmpty, callLoading == nil else { return false }
+        callLoading = "after"
+        callError = nil
+        defer { callLoading = nil }
+        do {
+            let response = try await client.callAfter(MandarinCallAfterRequest(date: date, text: text))
+            guard !response.items.isEmpty else {
+                callError = "Nothing came back. Try again."
+                return false
+            }
+            record.callPhrases += response.items
+            progress = response.progress ?? progress
+            save()
+            return true
+        } catch {
+            callError = "Couldn't reach the server. Try again."
+            return false
         }
     }
 
