@@ -54,6 +54,8 @@ struct DeckPalette: Equatable {
     /// The Dad card is the Dad advisor's, so it wears the advisor paper with its own mark.
     static let letter = DeckPalette(.advisor, symbol: "heart", name: "Letter to her", shortName: "Letter")
     static let mandarin = DeckPalette(.mandarin, symbol: "character.bubble", name: "Mandarin practice", shortName: "Mandarin")
+    /// Atlas's questions from last night's review: Atlas's own system cards (like What changed) wear the plain paper.
+    static let dream = DeckPalette(.plain, symbol: "moon.stars", name: "Atlas asks", shortName: "Atlas")
     static let plain = DeckPalette(.plain, symbol: "tray", name: "From your library", shortName: "Library")
     /// A reflect card about a person (a week source from the CRM), on the plain paper.
     static let people = DeckPalette(.plain, symbol: "person.2", name: "From your people", shortName: "People")
@@ -92,7 +94,7 @@ struct DeckPalette: Equatable {
         case .section: return .section
         case .close: return .quote
         case .prompt where card.chapter != nil: return .week
-        case .prompt: return card.isMandarin ? .mandarin : card.isLetter ? .letter : .advisor
+        case .prompt: return card.isMandarin ? .mandarin : card.isLetter ? .letter : card.isDream ? .dream : .advisor
         case .sleep: return .sleep
         case .goal:
             let goal = GoalPaper.palette(named: card.color ?? "", slug: card.goals.first ?? card.id)

@@ -1342,6 +1342,30 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(text.attribution, "Dad")
     }
 
+    func testAtlasQuestionsFromLastNightWearTheirOwnMarkAndLeadWithTheTitle() throws {
+        let json = #"""
+        {"date": "2026-10-25", "kind": "morning", "cards": [
+          {"id": "dream-2", "type": "prompt", "kind": "dream", "voice": "Atlas", "context": "Diagrams",
+           "question": "Is the diagram skill still a goal, or is it parked?",
+           "reason": "From Atlas's review of Sat, Oct 24", "files_to": "dream",
+           "ref": {"link": "dreams/2026-10-24.md", "n": 2}},
+          {"id": "advisor", "type": "prompt", "voice": "Ted", "question": "What's the one thing?"}
+        ]}
+        """#
+        let cards = try DailyDeck.decode(json).cards
+        let dream = cards[0]
+        XCTAssertTrue(dream.isDream)
+        XCTAssertFalse(cards[1].isDream, "a plain check-in stays a check-in")
+        XCTAssertTrue(dream.takesText)
+        XCTAssertEqual(DeckPalette.of(dream).name, "Atlas asks")
+        XCTAssertEqual(DeckPalette.of(dream).colors, HermexPaper.plain, "Atlas's own cards wear the plain paper")
+        XCTAssertEqual(DeckPalette.of(cards[1]).name, "Check-in")
+        let text = DeckCardText(dream)
+        XCTAssertEqual(text.lead, "Diagrams", "the short title leads; the question follows it")
+        XCTAssertFalse(text.leadIsQuestion)
+        XCTAssertEqual(text.attribution, "Atlas")
+    }
+
     func testARatingAloneAnswersTheSleepCardAndIsFiledAsSnakeCaseJSON() throws {
         let deck = try DailyDeck.decode(Self.sleepDeckJSON)
         let rated = DeckAnswer(card: "sleep", rating: 4)

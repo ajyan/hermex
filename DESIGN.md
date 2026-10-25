@@ -73,6 +73,7 @@ Named in `Config/HermexStyle.swift`; `HermexPaper.forTool(_:)` maps tool kinds.
 | Goal | the goal's own paper (`GoalPaper`) | any |
 | The Daily Brief's Dad card (a letter to his daughter: the countdown, then her age, over the prompt) | `DeckPalette.letter` | `advisor` (the Dad advisor's paper, with a heart mark instead of the check-in's bubble) |
 | The Daily Brief's Mandarin practice card (phrases to hear, a question to answer out loud, yesterday's feedback) | `DeckPalette.mandarin` | `mandarin` |
+| The Daily Brief's "Atlas asks" cards (open questions from last night's self-review, a short title over one question) | `DeckPalette.dream` | `plain` (Atlas's own system cards, like What changed, with a moon mark) |
 | The week's question: the morning's This week divider, and the Sunday review's close of it (his answers, Still open / Settled) on its own page | `DeckPalette.section`, `DeckPalette.weekQuestion` | `opener`, as a neutral summary card like the opener |
 | A week: weekly review cards, week page, year tiles | `DeckPalette.week` | `dusk` |
 | Money: net worth, accounts, the market card | `.money` | `ledger` |
