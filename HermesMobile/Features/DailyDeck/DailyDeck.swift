@@ -259,6 +259,10 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     /// filed to the vault's Mandarin log, which writes the feedback shown on the next one.
     var isMandarin: Bool { type == .prompt && itemKind == "mandarin" }
 
+    /// One of Atlas's open questions from last night's self-review: `context` is its short title and
+    /// the question follows. Its answer is filed into that night's dream log, which the next review reads.
+    var isDream: Bool { type == .prompt && itemKind == "dream" }
+
     /// The weekly work-ethic card's traits, each rated 1–10 by tapping instead of typed. Keyed off
     /// the card's stable id, so decks already written get the picker too; the answer stays text.
     var selfRatings: [String]? {
