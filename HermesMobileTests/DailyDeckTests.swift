@@ -504,6 +504,28 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(DeckPalette.of(card).name, "This week")
     }
 
+    func testSectionDecodesIntentionLine() throws {
+        let card = try XCTUnwrap(DailyDeck.decode(#"""
+        {"date":"d","kind":"morning","cards":[
+          {"id":"week","type":"section","title":"Q","intention":{"text":"Send five asks","if_then":"If it is 9am, then I write."}},
+          {"id":"week2","type":"section","title":"Q","intention":{"text":"Rest"}},
+          {"id":"week3","type":"section","title":"Q","intention":"nope"}]}
+        """#).cards.first)
+        XCTAssertEqual(card.intention, DeckIntentionLine(text: "Send five asks", ifThen: "If it is 9am, then I write."))
+        XCTAssertEqual(card.intention?.line, "Your intention: Send five asks \u{b7} If it is 9am, then I write.")
+        let deck = try DailyDeck.decode(#"""
+        {"date":"d","kind":"morning","cards":[
+          {"id":"week2","type":"section","title":"Q","intention":{"text":"Rest"}},
+          {"id":"week3","type":"section","title":"Q","intention":"nope"},
+          {"id":"week4","type":"section","title":"Q","intention":{"text":"  ","if_then":"x"}},
+          {"id":"week5","type":"section","title":"Q"}]}
+        """#)
+        XCTAssertEqual(deck.cards[0].intention?.line, "Your intention: Rest")
+        XCTAssertNil(deck.cards[1].intention)
+        XCTAssertNil(deck.cards[2].intention, "no text, no line")
+        XCTAssertNil(deck.cards[3].intention)
+    }
+
     func testSectionCardWithNoLinkOrRecapDecodes() throws {
         let card = try XCTUnwrap(DailyDeck.decode(#"""
         {"date":"d","kind":"morning","cards":[{"id":"week","type":"section","title":"Q","lines":["This week · Money","No sources fit today"]}]}

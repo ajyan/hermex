@@ -151,6 +151,15 @@ struct WeekRecord: Decodable, Equatable {
     let note: Note?
     let prediction: Prediction?
     let graded: [Graded]
+    /// A v2 record's moments of the week, in the order he kept them; a v1 record has none.
+    let moments: [Moment]
+    /// How the week ended, in his words.
+    let ended: String?
+    /// The intention the week began with and how it went; nil when there wasn't one.
+    let lastIntention: LastIntention?
+    let reflect: Reflect?
+    /// What he meant to do next week.
+    let intention: Intention?
 
     struct Energy: Decodable, Equatable {
         let gave: [String]
@@ -185,11 +194,78 @@ struct WeekRecord: Decodable, Equatable {
     }
 
     /// `score` and `evidence` are nil when the week didn't score it.
+    /// A v2 record's value adds the question it asked, his `answer`, and the week's `fact` ("22 people").
     struct Value: Decodable, Equatable, Identifiable {
         let id: String
         let name: String?
         let score: Int?
         let evidence: String?
+        let question: String?
+        let answer: String?
+        let fact: DeckFact?
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = try c.decode(String.self, forKey: .id)
+            name = try? c.decodeIfPresent(String.self, forKey: .name)
+            score = try? c.decodeIfPresent(Int.self, forKey: .score)
+            evidence = try? c.decodeIfPresent(String.self, forKey: .evidence)
+            question = try? c.decodeIfPresent(String.self, forKey: .question)
+            answer = try? c.decodeIfPresent(String.self, forKey: .answer)
+            fact = try? c.decodeIfPresent(DeckFact.self, forKey: .fact)
+        }
+
+        private enum CodingKeys: String, CodingKey { case id, name, score, evidence, question, answer, fact }
+    }
+
+    /// One moment on a v2 record: `day` ("Thu") and `value` ("present") are empty for his own words.
+    struct Moment: Decodable, Equatable {
+        let day: String
+        let line: String
+        let value: String
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            day = (try? c.decodeIfPresent(String.self, forKey: .day)) ?? ""
+            line = try c.decode(String.self, forKey: .line)
+            value = (try? c.decodeIfPresent(String.self, forKey: .value)) ?? ""
+        }
+
+        private enum CodingKeys: String, CodingKey { case day, line, value }
+    }
+
+    /// The week's starting intention and how it went: `status` is held, partly, or didnt (nil unmarked).
+    struct LastIntention: Decodable, Equatable {
+        let text: String?
+        let status: String?
+        let note: String?
+    }
+
+    /// A reflect question and his answer to it.
+    struct Reflection: Decodable, Equatable {
+        let question: String?
+        let answer: String?
+    }
+
+    struct Reflect: Decodable, Equatable {
+        let proud: Reflection?
+        let lesson: Reflection?
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            proud = try? c.decodeIfPresent(Reflection.self, forKey: .proud)
+            lesson = try? c.decodeIfPresent(Reflection.self, forKey: .lesson)
+        }
+
+        private enum CodingKeys: String, CodingKey { case proud, lesson }
+    }
+
+    /// Next week's intention: the thread it continues, the obstacle he named, and his if-then plan.
+    struct Intention: Decodable, Equatable {
+        let thread: String?
+        let text: String?
+        let obstacle: String?
+        let ifThen: String?
     }
 
     struct OneThing: Decodable, Equatable {
@@ -227,6 +303,7 @@ struct WeekRecord: Decodable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case weekEnding, weekNumber, title, story, photo, energy, deep, commitments, values, oneThing, who, note, prediction, graded
+        case moments, ended, lastIntention, reflect, intention
     }
 
     init(from decoder: Decoder) throws {
@@ -245,6 +322,11 @@ struct WeekRecord: Decodable, Equatable {
         note = try? c.decodeIfPresent(Note.self, forKey: .note)
         prediction = try? c.decodeIfPresent(Prediction.self, forKey: .prediction)
         graded = Self.list(c, .graded)
+        moments = Self.list(c, .moments)
+        ended = try? c.decodeIfPresent(String.self, forKey: .ended)
+        lastIntention = try? c.decodeIfPresent(LastIntention.self, forKey: .lastIntention)
+        reflect = try? c.decodeIfPresent(Reflect.self, forKey: .reflect)
+        intention = try? c.decodeIfPresent(Intention.self, forKey: .intention)
     }
 
     /// An entry that fails to decode is dropped, never the record.
@@ -256,5 +338,22 @@ struct WeekRecord: Decodable, Equatable {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return try decoder.decode(WeekRecord.self, from: data)
+    }
+}
+
+/// The morning deck's This-week divider carries the intention he sealed on Sunday.
+struct DeckIntentionLine: Decodable, Equatable {
+    let text: String
+    let ifThen: String?
+
+    init(text: String, ifThen: String? = nil) {
+        self.text = text
+        self.ifThen = ifThen
+    }
+
+    /// "Your intention: Send five asks · If it is 9am, then I write."
+    var line: String {
+        let plan = ifThen?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return "Your intention: \(text)" + (plan.isEmpty ? "" : " \u{b7} \(plan)")
     }
 }

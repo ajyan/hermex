@@ -486,6 +486,13 @@ struct DeckCardView: View {
                 .padding(.top, 10)
                 .id(shownQuestion)
                 .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+            if let intention = card.intention {
+                Text(verbatim: intention.line)
+                    .font(AppFont.subheadline())
+                    .foregroundStyle(Color.hxTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 8)
+            }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: card.sectionSpokenLabel(question: shownQuestion)))

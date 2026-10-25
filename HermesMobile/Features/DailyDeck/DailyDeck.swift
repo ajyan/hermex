@@ -165,6 +165,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let valueID: String?
     let name: String?
     let fact: DeckFact?
+    /// A section divider's intention from Sunday's review; nil when empty.
+    let intention: DeckIntentionLine?
     /// The v3 intention card's coach changes, one per goal.
     let changes: [DeckGoalChange]
     /// A Piece card's argument and quotes, from the long piece's map (the vault's tools/piece_view.py).
@@ -209,14 +211,14 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         }
     }
 
-    /// What VoiceOver reads for a `section` divider: "This week, Being a father, <the question>".
+    /// What VoiceOver reads for a `section` divider: "This week, Being a father, <the question>", then the intention line when it has one.
     /// `lines[0]` is "This week · <area>"; the question is the title.
     var sectionSpokenLabel: String { sectionSpokenLabel(question: title) }
 
     /// The same label for the question on screen, which Regenerate may have changed.
     func sectionSpokenLabel(question: String?) -> String {
         let kicker = (lines.first ?? "This week").replacingOccurrences(of: " · ", with: ", ")
-        return [kicker, question].compactMap { $0 }.joined(separator: ", ")
+        return [kicker, question, intention?.line].compactMap { $0 }.joined(separator: ", ")
     }
 
     /// The placeholder of a decision card's answer box once `chosen` (a text action) is picked:
@@ -274,7 +276,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         case phrases, recall, yesterday, pattern, progress, questionPinyin, questionEn, rows, week
         case chapter, weekNumber, range, noteFromPast
         case piece, learned, variant
-        case moments, spares, ended, text, ifThen, name, fact, changes
+        case moments, spares, ended, text, ifThen, name, fact, changes, intention
         case valueID = "value"
         case itemKind = "kind"
     }
@@ -353,6 +355,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         valueID = try? c.decodeIfPresent(String.self, forKey: .valueID)
         name = try? c.decodeIfPresent(String.self, forKey: .name)
         fact = try? c.decodeIfPresent(DeckFact.self, forKey: .fact)
+        intention = (try? c.decodeIfPresent(DeckIntentionLine.self, forKey: .intention))
+            .flatMap { $0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
         changes = ((try? c.decodeIfPresent([Lossy<DeckGoalChange>].self, forKey: .changes)) ?? []).compactMap(\.value)
         piece = (try? c.decodeIfPresent(DeckPiece.self, forKey: .piece)).flatMap { $0.steps.isEmpty ? nil : $0 }
         let ref = try? c.decodeIfPresent(Ref.self, forKey: .ref)

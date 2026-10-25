@@ -499,6 +499,67 @@ final class WeeklyReviewModelTests: XCTestCase {
         XCTAssertEqual(payload.version, 1)
     }
 
+    func testDecodesV2WeekRecord() throws {
+        let record = try WeekRecord.decode(Data(#"""
+        {"version": 2, "week_ending": "2026-11-01", "week_number": 44, "title": "The week you tapered", "story": "Slept more.",
+         "photo": "weekly-checkins/photos/2026-11-01.jpg",
+         "moments": [{"day": "Thu", "line": "Called Dad.", "value": "present"}, {"day": "", "line": "my own words", "value": ""}, {"line": 4}],
+         "ended": "On the couch, tired.",
+         "last_intention": {"text": "Send three asks", "status": "partly", "note": "Only two."},
+         "reflect": {"proud": {"question": "What are you most proud of?", "answer": "Showing up."},
+                     "lesson": {"question": "What did it teach you?", "answer": null}},
+         "values": [{"id": "people", "name": "Showed up for my people", "score": 9, "question": "Who?", "answer": "Meg.",
+                     "fact": {"big": "22 people", "line": "Most: Meg, 3 days"}},
+                    {"id": "body", "name": "Body", "score": null, "fact": "ran twice"}],
+         "intention": {"thread": "Outreach", "text": "Send five asks", "obstacle": "Tuesdays", "if_then": "If it is 9am, then I write."},
+         "note": {"text": "Be kind.", "opens_on": "2027-10-31"}, "brand_new": [1]}
+        """#.utf8))
+        XCTAssertEqual(record.moments.map(\.line), ["Called Dad.", "my own words"], "a moment that fails to decode is dropped")
+        XCTAssertEqual(record.moments.map(\.day), ["Thu", ""])
+        XCTAssertEqual(record.moments.map(\.value), ["present", ""])
+        XCTAssertEqual(record.ended, "On the couch, tired.")
+        XCTAssertEqual(record.lastIntention?.text, "Send three asks")
+        XCTAssertEqual(record.lastIntention?.status, "partly")
+        XCTAssertEqual(record.lastIntention?.note, "Only two.")
+        XCTAssertEqual(record.reflect?.proud?.question, "What are you most proud of?")
+        XCTAssertEqual(record.reflect?.proud?.answer, "Showing up.")
+        XCTAssertNil(record.reflect?.lesson?.answer)
+        XCTAssertEqual(record.values.map(\.answer), ["Meg.", nil])
+        XCTAssertEqual(record.values[0].question, "Who?")
+        XCTAssertEqual(record.values[0].fact, DeckFact(big: "22 people", line: "Most: Meg, 3 days"))
+        XCTAssertEqual(record.values[1].fact, DeckFact(big: nil, line: "ran twice"))
+        XCTAssertEqual(record.intention?.thread, "Outreach")
+        XCTAssertEqual(record.intention?.text, "Send five asks")
+        XCTAssertEqual(record.intention?.obstacle, "Tuesdays")
+        XCTAssertEqual(record.intention?.ifThen, "If it is 9am, then I write.")
+        XCTAssertEqual(record.note?.opensOn, "2027-10-31")
+
+        let nulls = try WeekRecord.decode(Data(#"{"version": 2, "week_ending": "2026-11-08", "moments": null, "last_intention": null, "reflect": null, "intention": null}"#.utf8))
+        XCTAssertEqual(nulls.moments, [])
+        XCTAssertNil(nulls.lastIntention)
+        XCTAssertNil(nulls.reflect)
+        XCTAssertNil(nulls.intention)
+    }
+
+    func testV1WeekRecordStillDecodes() throws {
+        let record = try WeekRecord.decode(Data(#"""
+        {"version": 1, "week_ending": "2026-10-25", "week_number": 43, "title": "The week you tapered", "story": "Slept more.",
+         "energy": {"gave": ["Running"], "drained": []}, "deep": {"rotation": "Examen", "question": "Q?", "answer": "A."},
+         "values": [{"id": "present", "name": "Present", "score": 7, "evidence": "Phone down."}],
+         "one_thing": {"text": "Send three asks", "carried": 2}, "note": null}
+        """#.utf8))
+        XCTAssertEqual(record.moments, [])
+        XCTAssertNil(record.ended)
+        XCTAssertNil(record.lastIntention)
+        XCTAssertNil(record.reflect)
+        XCTAssertNil(record.intention)
+        XCTAssertEqual(record.values.map(\.evidence), ["Phone down."])
+        XCTAssertNil(record.values[0].answer)
+        XCTAssertNil(record.values[0].fact)
+        XCTAssertEqual(record.deep?.answer, "A.")
+        XCTAssertEqual(record.oneThing?.text, "Send three asks")
+    }
+
     func testWeekRecordDecodesMinimalBackfill() throws {
         let record = try WeekRecord.decode(Data(#"""
         {"version": 1, "week_ending": "2025-07-06", "week_number": 27, "title": "Week 27", "story": "A quiet week.",

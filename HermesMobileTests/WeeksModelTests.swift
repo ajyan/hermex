@@ -284,6 +284,16 @@ final class WeeksModelTests: XCTestCase {
                        .deck("2026-10-18", "monthly"), "only weekly reviews have a week page")
     }
 
+    func testSealedV2WeeklyOpensWeekPage() throws {
+        // A moments-era deck is only reachable as its week page once the record exists.
+        let deck = try DailyDeck.decode(#"{"version": 2, "date": "2026-10-25", "kind": "weekly", "cards": [{"id": "cover", "type": "cover"}]}"#)
+        XCTAssertEqual(deck.version, 2)
+        let review = DeckReview(date: deck.date, kind: deck.kind, isFiled: true)
+        XCTAssertEqual(DeckCalendarRoute.for(review: review, records: [deck.date]), .weekPage("2026-10-25"))
+        XCTAssertEqual(DeckCalendarRoute.for(review: review, records: []), .deck("2026-10-25", "weekly"),
+                       "unsealed, it still opens as a deck")
+    }
+
     // MARK: Helpers
 
     private func makeModel(_ client: ScriptedDailyDeckClient) -> WeeksModel {
