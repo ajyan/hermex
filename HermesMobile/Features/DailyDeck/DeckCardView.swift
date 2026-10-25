@@ -87,23 +87,16 @@ struct DeckCardView: View {
                 case .close: close
                 case .sleep: sleep
                 case .goal: goal
-                case .weekAhead:
-                    DeckWeekAheadCard(card: card, palette: palette)
-                    DeckFootnote(card: card, palette: palette)
                 case .changes: DeckChangesCard(card: card, palette: palette, viewModel: viewModel)
                 case .ask: ask
                 case .decision:
                     FollowUpRow(card: card, viewModel: viewModel, palette: palette, isPage: true)
-                    // The week's question closes the Understand chapter; other follow-ups carry no chapter.
+                    // The week's question closes the Reflect chapter; other follow-ups carry no chapter.
                     if card.chapter != nil { DeckFootnote(card: card, palette: palette) }
                 case .cover: WeekCoverCard(card: card, palette: palette, viewModel: viewModel)
-                case .filmstrip: WeekFilmstripCard(card: card, palette: palette)
-                case .story: WeekStoryCard(card: card, palette: palette, viewModel: viewModel)
-                case .energy: WeekEnergyCard(card: card, palette: palette, viewModel: viewModel)
-                case .commitments: WeekCommitmentsCard(card: card, palette: palette, viewModel: viewModel)
-                case .values: WeekValuesCard(card: card, palette: palette, viewModel: viewModel)
-                case .predictions: WeekPredictionsCard(card: card, palette: palette, viewModel: viewModel)
-                case .who: WeekWhoCard(card: card, palette: palette, viewModel: viewModel)
+                case .lastIntention: WeekLastIntentionCard(card: card, palette: palette, viewModel: viewModel)
+                case .value: WeekValueCard(card: card, palette: palette, viewModel: viewModel)
+                case .intention: WeekIntentionCard(card: card, palette: palette, viewModel: viewModel)
                 case .keepsakes: WeekKeepsakesCard(card: card, palette: palette, viewModel: viewModel)
                 default: reading
                 }
@@ -178,9 +171,6 @@ struct DeckCardView: View {
             .padding(.bottom, 18)
             .accessibilityElement(children: .combine)
         }
-        if let rotation = card.rotation {
-            WeekQuestionHeader(rotation: rotation, palette: palette)
-        }
         if card.isMandarin {
             DeckMandarinCard(card: card, palette: palette, asked: viewModel.question(for: card),
                              practice: viewModel.mandarinPractice(for: card)) {
@@ -243,9 +233,6 @@ struct DeckCardView: View {
                 .id(question)
                 .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
         }
-        if card.id == "one-thing", card.chapter != nil {
-            WeekCarryChips(card: card, palette: palette, viewModel: viewModel)
-        }
         if let traits = card.selfRatings {
             selfRatings(traits).padding(.top, 18)
         } else if card.takesText, !card.isMandarin {
@@ -271,7 +258,7 @@ struct DeckCardView: View {
             Button { isWriting = true } label: {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(verbatim: text)
-                        // A weekly review's answers are words he keeps (the deep answer, the one thing).
+                        // A weekly review's answers are words he keeps (proud, the lesson).
                         .font(card.chapter == nil ? AppFont.body() : AppFont.serif(style: .body))
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)

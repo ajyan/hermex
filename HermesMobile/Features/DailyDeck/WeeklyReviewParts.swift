@@ -35,6 +35,108 @@ struct WeekCardHeading: View {
     }
 }
 
+/// The small line over a weekly card's headline ("Last week you meant to", "People · 2 of 5"),
+/// clear of the kind mark in the corner.
+struct WeekKicker: View {
+    let text: String
+    let palette: DeckPalette
+
+    @ScaledMetric(relativeTo: .body) private var clearance: CGFloat = 30
+
+    var body: some View {
+        Text(verbatim: text)
+            .font(AppFont.footnote(weight: .semibold))
+            .foregroundStyle(palette.ink)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.trailing, clearance)
+            .padding(.bottom, 8)
+    }
+}
+
+/// His words on a weekly card, opened in `WeekEditorSheet` by a tap: an optional label over the
+/// words in serif, or the placeholder until he writes some.
+struct WeekWordsBox: View {
+    var label: String?
+    let text: String
+    let placeholder: String
+    let palette: DeckPalette
+    let action: () -> Void
+
+    var body: some View {
+        let words = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 6) {
+                if let label {
+                    Text(verbatim: label)
+                        .font(AppFont.footnote(weight: .semibold))
+                        .foregroundStyle(palette.ink)
+                }
+                Text(verbatim: words.isEmpty ? placeholder : words)
+                    .font(AppFont.serif(style: .subheadline))
+                    .foregroundStyle(words.isEmpty ? Color.hxTextSecondary : Color.hxTextPrimary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .glowSurface(palette.colors, cornerRadius: HXRadius.md, opaque: true)
+            .contentShape(RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(verbatim: [label, words.isEmpty ? "Not written yet" : words].compactMap { $0 }.joined(separator: ": ")))
+        .accessibilityHint(Text(verbatim: "Edits it"))
+    }
+}
+
+/// A 1–10 score on ten segments, tapped to set; tapping the chosen score again clears it
+/// (`DailyDeckViewModel.setScore`). One adjustable element for VoiceOver: "Present, 7 of 10".
+struct WeekScoreRow: View {
+    let title: String
+    let score: Int?
+    let palette: DeckPalette
+    let set: (Int) -> Void
+
+    @ScaledMetric(relativeTo: .body) private var segmentHeight: CGFloat = 10
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(verbatim: title)
+                    .font(AppFont.subheadline(weight: .semibold))
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Text(verbatim: score.map(String.init) ?? "–")
+                    .font(AppFont.display(style: .headline, weight: .semibold))
+                    .foregroundStyle(palette.ink)
+                    .monospacedDigit()
+            }
+            HStack(spacing: 4) {
+                ForEach(1...10, id: \.self) { segment in
+                    Button { set(segment) } label: {
+                        Capsule()
+                            .fill(segment <= (score ?? 0) ? palette.ink : Color.hxSeparator)
+                            .frame(height: min(segmentHeight, 14))
+                            .frame(maxWidth: .infinity, minHeight: 32)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: title))
+        .accessibilityValue(Text(verbatim: score.map { "\($0) of 10" } ?? "Not scored"))
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: if (score ?? 0) < 10 { set((score ?? 0) + 1) }
+            case .decrement: if let score, score > 1 { set(score - 1) }
+            @unknown default: break
+            }
+        }
+    }
+}
+
 /// A hairline between rows, in the card's hue.
 struct WeekHairline: View {
     let palette: DeckPalette
@@ -139,7 +241,7 @@ private struct WeekAddAlert: ViewModifier {
 }
 
 /// Editing a weekly card's words: the whole sheet on the card's paper, saving as he types, so
-/// closing it any way keeps them. `serif` for words he keeps (the story, evidence, the note).
+/// closing it any way keeps them. `serif` for words he keeps (a value's line, the note).
 struct WeekEditorSheet: View {
     let title: String
     /// A small line under the title saying what to write.
@@ -219,13 +321,13 @@ enum DeckCopy {
         return card.id == "one-thing" ? "Write the one thing" : "Write a reflection"
     }
 
-    /// The close card's heading: a v2 weekly review is sealed, other decks count their reflections.
+    /// The close card's heading: a sealed weekly review is sealed, other decks count their reflections.
     static func closeHeading(seal: Bool, filed: Bool, count: Int) -> String {
         if seal { return filed ? "Sealed" : "Seal the week" }
         return filed ? "Filed" : count == 1 ? "1 reflection" : "\(count) reflections"
     }
 
-    /// The header's word for a filed deck: a v2 weekly review is sealed; "Edited" once changed since.
+    /// The header's word for a filed deck: a sealed weekly review is sealed; "Edited" once changed since.
     static func filedStatus(seal: Bool, edited: Bool) -> String {
         edited ? "Edited" : seal ? "Sealed" : "Filed"
     }

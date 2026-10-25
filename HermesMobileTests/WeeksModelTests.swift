@@ -11,7 +11,7 @@ final class WeeksModelTests: XCTestCase {
         return calendar
     }
 
-    private func day(_ value: String) -> Date { DeckPrediction.date(day: value, calendar: iso)! }
+    private func day(_ value: String) -> Date { DailyDeckPaths.date(day: value, calendar: iso)! }
 
     /// Every Sunday whose ISO week-based year is `year`, found by walking the days around it.
     private func isoSundays(of year: Int) -> [String] {

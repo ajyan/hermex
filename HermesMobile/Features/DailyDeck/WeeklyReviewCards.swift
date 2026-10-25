@@ -1,15 +1,16 @@
 import PhotosUI
 import SwiftUI
 
-// The v2 weekly review's cards, drawn inside `DeckCardView` on the `dusk` paper (`DeckPalette.week`).
-// The cover, Remember, and Understand live here; Account in `WeeklyReviewCards+Account.swift`, Steer in
-// `WeeklyReviewCards+Steer.swift`, and the pieces they share in `WeeklyReviewParts.swift`. Words are edited in `WeekEditorSheet`, so a card never holds a
-// long text field. Serif is only for words he wrote and keeps: the story, evidence, and the note.
+// The weekly review's cards, drawn inside `DeckCardView` on the `dusk` paper (`DeckPalette.week`).
+// The cover lives here; last week, the values, and the intention in `WeeklyReviewCards+V3.swift`, the
+// keepsakes in `WeeklyReviewCards+Steer.swift`, and the pieces they share in `WeeklyReviewParts.swift`.
+// Words are edited in `WeekEditorSheet`, so a card never holds a long text field. Serif is only for
+// words he wrote and keeps: a value's line, the intention's fields, and the note.
 
 // MARK: Cover
 
-/// The cover: the week and its range, the photo slot, the title (Atlas's until he edits it), the
-/// four chapters with their minutes, and a note sealed a year ago, opened by a tap.
+/// The cover: the week and its range, the photo slot, the title (Atlas's until he edits it), a note
+/// sealed a year ago (opened by a tap), the week's moments, and how it ended.
 struct WeekCoverCard: View {
     let card: DeckCard
     let palette: DeckPalette
@@ -24,6 +25,7 @@ struct WeekCoverCard: View {
     /// A picked photo is being read and converted, before the upload starts.
     @State private var isPreparingPhoto = false
     @State private var hasPhoto = false
+    @State private var isAddingMoment = false
 
     private var isBusyWithPhoto: Bool { isPreparingPhoto || viewModel.isUploadingWeekPhoto }
 
@@ -70,12 +72,10 @@ struct WeekCoverCard: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 10)
             }
-            if !card.chapters.isEmpty {
-                chapters.padding(.top, 22)
-            }
             if let note = card.noteFromPast {
                 noteFromPast(note).padding(.top, 20)
             }
+            moments.padding(.top, 18)
             Text(verbatim: "Swipe to begin")
                 .font(AppFont.footnote())
                 .foregroundStyle(palette.ink)
@@ -84,6 +84,9 @@ struct WeekCoverCard: View {
         .sheet(isPresented: $isEditingTitle) {
             WeekEditorSheet(title: "The week's title", placeholder: card.title ?? "A few words for the week",
                             palette: palette, initial: title) { viewModel.setText($0, for: card) }
+        }
+        .weekAddAlert("Add a moment", prompt: "What happened?", isPresented: $isAddingMoment) { line in
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { viewModel.addOwnMoment(line, for: card) }
         }
     }
 
@@ -139,33 +142,89 @@ struct WeekCoverCard: View {
         await viewModel.setWeekPhoto(jpeg)
     }
 
-    private var chapters: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(card.chapters.enumerated()), id: \.element.id) { index, chapter in
+    /// The moments he keeps, each with its weekday, line, and value, and Swap or remove while the
+    /// rules allow; then how the week ended. A week with no moments asks for one of his own.
+    @ViewBuilder
+    private var moments: some View {
+        let kept = viewModel.keptMoments(for: card)
+        let canSwap = viewModel.canSwap(for: card)
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(kept.enumerated()), id: \.element.id) { index, moment in
                 if index > 0 { WeekHairline(palette: palette) }
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text(verbatim: "\(index + 1)")
-                        .font(AppFont.display(style: .subheadline, weight: .semibold))
-                        .foregroundStyle(palette.ink)
-                        .monospacedDigit()
-                        .frame(minWidth: 14, alignment: .leading)
-                    Text(verbatim: chapter.label)
-                        .font(AppFont.body())
-                        .foregroundStyle(Color.hxTextPrimary)
-                    Spacer(minLength: 8)
-                    if let minutes = chapter.minutes {
-                        Text(verbatim: "\(minutes) min")
-                            .font(AppFont.footnote())
-                            .foregroundStyle(Color.hxTextSecondary)
-                            .monospacedDigit()
-                    }
-                }
-                .padding(.vertical, 9)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(Text(verbatim: "Chapter \(index + 1), \(chapter.label)"
-                    + (chapter.minutes.map { ", \($0) minutes" } ?? "")))
+                momentRow(moment, canSwap: canSwap, canRemove: viewModel.canRemoveMoment(moment.id, for: card))
+            }
+            if card.moments.isEmpty {
+                Text(verbatim: "A quiet week on paper. Add a moment?")
+                    .font(AppFont.subheadline())
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, kept.isEmpty ? 0 : 14)
+                WeekAddChip(title: "moment", palette: palette) { isAddingMoment = true }
+                    .padding(.top, 6)
+                    .accessibilityLabel(Text(verbatim: "Add a moment"))
+            } else if let ended = card.ended?.trimmingCharacters(in: .whitespacesAndNewlines), !ended.isEmpty {
+                (Text(verbatim: "Ended: ").foregroundStyle(palette.ink).fontWeight(.semibold)
+                    + Text(verbatim: ended).foregroundStyle(Color.hxTextPrimary))
+                    .font(AppFont.subheadline())
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 14)
             }
         }
+    }
+
+    private func momentRow(_ moment: DeckMoment, canSwap: Bool, canRemove: Bool) -> some View {
+        let value = WeekValues.shortName(moment.value)
+        return HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(verbatim: moment.day)
+                .font(AppFont.footnote(weight: .semibold))
+                .foregroundStyle(Color.hxTextSecondary)
+                .frame(minWidth: 32, alignment: .leading)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(verbatim: moment.line)
+                    .font(AppFont.subheadline())
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let value { HXChip(paper: palette.colors, label: value) }
+            }
+            Spacer(minLength: 4)
+            if canSwap {
+                Button { change { viewModel.swapMoment(moment.id, for: card) } } label: {
+                    Text(verbatim: "Swap")
+                        .font(AppFont.footnote(weight: .semibold))
+                        .foregroundStyle(palette.ink)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            if canRemove {
+                Button { change { viewModel.removeMoment(moment.id, for: card) } } label: {
+                    Image(systemName: "xmark")
+                        .font(AppFont.caption(weight: .bold))
+                        .foregroundStyle(palette.ink)
+                        .frame(minWidth: 28, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.vertical, 4)
+        // One element for VoiceOver, with Swap and Remove as its actions.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: [moment.day, moment.line, value].compactMap { $0?.isEmpty == false ? $0 : nil }
+            .joined(separator: ". ")))
+        .accessibilityActions {
+            if canSwap {
+                Button { change { viewModel.swapMoment(moment.id, for: card) } } label: { Text(verbatim: "Swap") }
+            }
+            if canRemove {
+                Button { change { viewModel.removeMoment(moment.id, for: card) } } label: { Text(verbatim: "Remove") }
+            }
+        }
+    }
+
+    private func change(_ body: () -> Void) {
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2), body)
     }
 
     /// A sealed envelope until tapped; then the note, in his own words.
@@ -215,228 +274,6 @@ struct WeekCoverCard: View {
     static func weekNumber(ofDay day: String) -> Int? {
         var calendar = Calendar(identifier: .iso8601)
         calendar.timeZone = .current
-        return DeckPrediction.date(day: day, calendar: calendar).map { calendar.component(.weekOfYear, from: $0) }
-    }
-}
-
-// MARK: Remember
-
-/// The week as seven rows: the day, its line and who was there, a run when there was one, and a
-/// small bar for the night's sleep.
-struct WeekFilmstripCard: View {
-    let card: DeckCard
-    let palette: DeckPalette
-
-    @ScaledMetric(relativeTo: .body) private var barHeight: CGFloat = 30
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            WeekCardHeading(title: card.title ?? "Your week", palette: palette)
-            VStack(spacing: 0) {
-                ForEach(Array(card.days.enumerated()), id: \.offset) { index, day in
-                    if index > 0 { WeekHairline(palette: palette) }
-                    row(day)
-                }
-            }
-            .padding(.top, 12)
-            if card.days.contains(where: { $0.sleepHours != nil }) {
-                Text(verbatim: "bar = sleep")
-                    .font(AppFont.caption2())
-                    .foregroundStyle(Color.hxTextSecondary)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .padding(.top, 6)
-                    .accessibilityHidden(true)
-            }
-            DeckFootnote(card: card, palette: palette)
-        }
-    }
-
-    private func row(_ day: DeckDay) -> some View {
-        let line = day.line.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 } ?? "—"
-        return HStack(alignment: .center, spacing: 12) {
-            Text(verbatim: day.label)
-                .font(AppFont.footnote(weight: .semibold))
-                .foregroundStyle(Color.hxTextSecondary)
-                .frame(minWidth: 32, alignment: .leading)
-            VStack(alignment: .leading, spacing: 3) {
-                (Text(verbatim: line).foregroundStyle(Color.hxTextPrimary)
-                    + Text(verbatim: day.people.isEmpty ? "" : " · " + day.people.map(Self.shortName).joined(separator: ", "))
-                    .foregroundStyle(Color.hxTextSecondary))
-                    .font(AppFont.subheadline())
-                    .fixedSize(horizontal: false, vertical: true)
-                if let run = day.run {
-                    Label { Text(verbatim: run) } icon: { Image(systemName: "figure.run") }
-                        .font(AppFont.caption(weight: .medium))
-                        .foregroundStyle(palette.ink)
-                }
-            }
-            Spacer(minLength: 8)
-            sleepBar(day.sleepHours)
-        }
-        .padding(.vertical, 8)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: Self.spoken(day, line: line)))
-    }
-
-    /// The night as a bar out of ten hours, in the week's glow; an empty track when there's no reading.
-    private func sleepBar(_ hours: Double?) -> some View {
-        Capsule()
-            .fill(palette.colors.wash)
-            .frame(width: 6, height: barHeight)
-            .overlay(alignment: .bottom) {
-                if let hours {
-                    Capsule()
-                        .fill(palette.ink)
-                        .frame(width: 6, height: barHeight * min(max(hours, 0), 10) / 10)
-                }
-            }
-    }
-
-    /// "Mom", "Jon" from "Jon Chan": rows stay one glance long.
-    static func shortName(_ name: String) -> String {
-        String(name.split(separator: " ").first ?? Substring(name))
-    }
-
-    static func spoken(_ day: DeckDay, line: String) -> String {
-        var parts = ["\(day.label): \(line)"]
-        if !day.people.isEmpty { parts.append("with \(day.people.joined(separator: ", "))") }
-        if let run = day.run { parts.append("run, \(run)") }
-        if let hours = day.sleepHours { parts.append("slept \(hours.formatted(.number.precision(.fractionLength(0...1)))) hours") }
-        return parts.joined(separator: ". ")
-    }
-}
-
-/// Atlas's draft of the week, in his words once he edits it.
-struct WeekStoryCard: View {
-    let card: DeckCard
-    let palette: DeckPalette
-    let viewModel: DailyDeckViewModel
-
-    @State private var isEditing = false
-
-    private var edited: String? {
-        viewModel.answer(for: card)?.text.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
-    }
-
-    private var draft: String? {
-        card.storyDraft.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
-    }
-
-    var body: some View {
-        let story = edited ?? draft
-        VStack(alignment: .leading, spacing: 0) {
-            WeekCardHeading(title: card.title ?? "The week", palette: palette)
-            Button { isEditing = true } label: {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(verbatim: edited == nil ? "The week, drafted · edit anything" : "Your week · edit anything")
-                        .font(AppFont.footnote(weight: .semibold))
-                        .foregroundStyle(palette.ink)
-                    Text(verbatim: story ?? "Write the week in a few lines")
-                        .font(AppFont.serif(style: .title3))
-                        .foregroundStyle(story == nil ? Color.hxTextSecondary : Color.hxTextPrimary)
-                        .lineSpacing(5)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Label { Text(verbatim: story == nil ? "Write" : "Edit") } icon: { Image(systemName: "pencil") }
-                        .font(AppFont.footnote(weight: .semibold))
-                        .foregroundStyle(palette.ink)
-                }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .glowSurface(palette.colors, cornerRadius: HXRadius.lg, opaque: true)
-                .contentShape(RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 14)
-            .accessibilityLabel(Text(verbatim: story.map { "The week: \($0)" } ?? "Write the week in a few lines"))
-            .accessibilityHint(Text(verbatim: "Edits the story"))
-            DeckFootnote(card: card, palette: palette)
-        }
-        .sheet(isPresented: $isEditing) {
-            WeekEditorSheet(title: "The week", placeholder: "Write the week in a few lines", serif: true,
-                            palette: palette, initial: story ?? "") { viewModel.setText($0, for: card) }
-        }
-    }
-}
-
-// MARK: Understand
-
-/// What gave him energy and what drained him: Atlas's chips to keep or remove, and his own to add.
-struct WeekEnergyCard: View {
-    let card: DeckCard
-    let palette: DeckPalette
-    let viewModel: DailyDeckViewModel
-
-    @State private var adding: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            WeekCardHeading(title: card.title ?? "Where your energy went", palette: palette)
-            section("gave", "Gave you energy", drafted: card.gave).padding(.top, 16)
-            section("drained", "Drained you", drafted: card.drained).padding(.top, 20)
-            DeckFootnote(card: card, palette: palette)
-        }
-        .weekAddAlert(adding == "gave" ? "Gave you energy" : "Drained you", prompt: "What was it?", isPresented: Binding(
-            get: { adding != nil }, set: { if !$0 { adding = nil } })) { text in
-            guard let key = adding else { return }
-            let list = list(key, drafted: key == "gave" ? card.gave : card.drained)
-            guard !list.contains(where: { $0.caseInsensitiveCompare(text) == .orderedSame }) else { return }
-            viewModel.setList(key, list + [text], for: card)
-        }
-    }
-
-    /// The answer's list once he's touched it, else Atlas's.
-    private func list(_ key: String, drafted: [String]) -> [String] {
-        viewModel.list(key, for: card, drafted: drafted)
-    }
-
-    private func section(_ key: String, _ title: String, drafted: [String]) -> some View {
-        let items = list(key, drafted: drafted)
-        return VStack(alignment: .leading, spacing: 4) {
-            Text(verbatim: title)
-                .font(AppFont.subheadline(weight: .semibold))
-                .foregroundStyle(Color.hxTextPrimary)
-                .accessibilityAddTraits(.isHeader)
-            FlowRow(spacing: 8) {
-                ForEach(items, id: \.self) { item in
-                    Button {
-                        viewModel.setList(key, items.filter { $0 != item }, for: card)
-                    } label: {
-                        HXChip(paper: palette.colors, label: item, lines: 2) {
-                            Image(systemName: "xmark").font(AppFont.caption2(weight: .bold))
-                        }
-                        .frame(minHeight: 36)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(Text(verbatim: item))
-                    .accessibilityHint(Text(verbatim: "Removes it"))
-                }
-                WeekAddChip(title: "add", palette: palette) { adding = key }
-                    .accessibilityLabel(Text(verbatim: "Add to \(title.lowercased())"))
-            }
-        }
-    }
-}
-
-/// On the deep question: "This week's question", and which of the six it is.
-struct WeekQuestionHeader: View {
-    let rotation: String
-    let palette: DeckPalette
-
-    @ScaledMetric(relativeTo: .body) private var clearance: CGFloat = 30
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(verbatim: "This week's question")
-                .font(AppFont.footnote(weight: .semibold))
-            Spacer(minLength: 8)
-            Text(verbatim: "\(rotation) · rotates")
-                .font(AppFont.footnote())
-        }
-        .foregroundStyle(palette.ink)
-        .padding(.trailing, clearance)
-        .padding(.bottom, 12)
-        .accessibilityElement(children: .combine)
+        return DailyDeckPaths.date(day: day, calendar: calendar).map { calendar.component(.weekOfYear, from: $0) }
     }
 }

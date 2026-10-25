@@ -6,39 +6,6 @@ import UniformTypeIdentifiers
 @testable import HermesMobile
 
 final class WeeklyReviewModelTests: XCTestCase {
-    private static let v2DeckJSON = """
-    {"version": 2, "date": "2026-10-25", "kind": "weekly", "wrapped": true, "generated_at": "2026-10-25T18:00:00-04:00",
-     "future_top_level": {"x": 1},
-     "cards": [
-      {"id": "cover", "type": "cover", "week_number": 43, "range": "Oct 19–25", "title": "The week you tapered",
-       "chapters": [{"id": "remember", "label": "Remember", "minutes": 2}, {"id": "steer", "label": "Steer", "minutes": 3}, {"label": "no id"}],
-       "note_from_past": {"week_ending": "2025-10-26", "title": "A year ago", "text": "Be kind to October."}},
-      {"id": "filmstrip", "type": "filmstrip", "chapter": "remember", "days": [
-        {"label": "Mon", "line": "Easy run", "people": ["Jon Chan"], "sleep_hours": 7.5, "run": "5 mi"},
-        {"label": "Tue", "line": "Rest", "people": []},
-        {"label": "Wed", "line": "Deep work", "people": ["Ana"], "sleep_hours": 6.9},
-        {"label": "Thu", "line": "Dinner", "people": []},
-        {"label": "Fri", "line": "Long day", "people": []},
-        {"label": "Sat", "line": "Hike", "people": ["Sam"], "run": "3 mi"},
-        {"label": "Sun", "line": "Reset", "people": []}]},
-      {"id": "story", "type": "story", "chapter": "remember", "draft": "You tapered and slept more."},
-      {"id": "energy", "type": "energy", "chapter": "understand", "gave": ["Running", "Dinner with Jon"], "drained": ["Meetings"]},
-      {"id": "deep", "type": "prompt", "chapter": "understand", "question": "What did you notice?", "rotation": "Examen", "files_to": "Reflection"},
-      {"id": "commitments", "type": "commitments", "chapter": "account", "items": [
-        {"id": "one-thing", "text": "Ship the deck", "carried": 1}, {"id": "who-jon-chan", "text": "Jon Chan", "carried": 0}, {"text": "no id"}]},
-      {"id": "values", "type": "values", "chapter": "account", "values": [
-        {"id": "present", "name": "Present", "evidence": "Phone down at dinner."}, {"id": "people", "name": "People", "evidence": ""}]},
-      {"id": "goals-career", "type": "item", "kind": "goals", "chapter": "account", "title": "Your goals", "meters": []},
-      {"id": "predictions", "type": "predictions", "chapter": "account", "items": [
-        {"id": "2026-10-04-p", "text": "Offer by November", "probability": 70, "due": "2026-10-25", "made_week": "2026-10-04"}]},
-      {"id": "week-career", "type": "week_ahead", "chapter": "steer", "goal": "career"},
-      {"id": "one-thing", "type": "prompt", "chapter": "steer", "question": "What's the one thing for this week?", "files_to": "Upcoming Week Planning"},
-      {"id": "who", "type": "who", "chapter": "steer", "suggested": ["Jon Chan", "Ana"]},
-      {"id": "keepsakes", "type": "keepsakes", "chapter": "steer"},
-      {"id": "close", "type": "close", "title": "Seal the week"}
-     ]}
-    """
-
     /// The v3 Sunday review as the vault's `build_weekly` writes it: four moments shown, two spares.
     private static let v3DeckJSON = """
     {"version": 3, "date": "2026-10-25", "kind": "weekly", "wrapped": true, "generated_at": "2026-10-25T05:30:00-04:00",
@@ -83,7 +50,6 @@ final class WeeklyReviewModelTests: XCTestCase {
 
         let cover = deck.cards[0]
         XCTAssertNil(cover.chapter)
-        XCTAssertEqual(cover.chapters.map(\.id), ["remember", "reflect", "values", "steer"])
         XCTAssertEqual(cover.moments.map(\.id), ["m1", "m2", "m3", "m4"], "a moment without an id is dropped alone")
         XCTAssertEqual(cover.moments[1], DeckMoment(id: "m2", day: "Thu", line: "Meg said you'd seemed flat; you opened up", value: "present"))
         XCTAssertEqual(cover.spares.map(\.id), ["m5", "m6"])
@@ -404,82 +370,21 @@ final class WeeklyReviewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.answer(for: intention)?.lists?["accepted"], ["land-ai-role"])
     }
 
-    func testV2DeckDecodesEveryCardKind() throws {
-        let deck = try DailyDeck.decode(Self.v2DeckJSON)
-        XCTAssertEqual(deck.version, 2)
-        XCTAssertEqual(deck.cards.map(\.id), [
-            "cover", "filmstrip", "story", "energy", "deep", "commitments", "values", "goals-career",
-            "predictions", "week-career", "one-thing", "who", "keepsakes", "close",
-        ])
-        XCTAssertEqual(deck.cards.map(\.type), [
-            .cover, .filmstrip, .story, .energy, .prompt, .commitments, .values, .item,
-            .predictions, .weekAhead, .prompt, .who, .keepsakes, .close,
-        ])
-
-        let cover = deck.cards[0]
-        XCTAssertEqual(cover.weekNumber, 43)
-        XCTAssertEqual(cover.range, "Oct 19–25")
-        XCTAssertEqual(cover.title, "The week you tapered")
-        XCTAssertNil(cover.chapter, "the cover has no chapter")
-        XCTAssertEqual(cover.chapters.map(\.id), ["remember", "steer"], "a chapter without an id is dropped alone")
-        XCTAssertEqual(cover.chapters.map(\.minutes), [2, 3])
-        XCTAssertEqual(cover.noteFromPast, DeckPastNote(weekEnding: "2025-10-26", title: "A year ago", text: "Be kind to October."))
-
-        let filmstrip = deck.cards[1]
-        XCTAssertEqual(filmstrip.chapter, "remember")
-        XCTAssertEqual(filmstrip.days.count, 7)
-        XCTAssertEqual(filmstrip.days[0], DeckDay(label: "Mon", line: "Easy run", people: ["Jon Chan"], sleepHours: 7.5, run: "5 mi"))
-        XCTAssertEqual(filmstrip.days[1].people, [])
-        XCTAssertNil(filmstrip.days[1].sleepHours)
-        XCTAssertNil(filmstrip.days[1].run)
-
-        XCTAssertEqual(deck.cards[2].storyDraft, "You tapered and slept more.")
-        XCTAssertNil(deck.cards[2].draft, "the story's string is not a DeckDraft")
-        XCTAssertEqual(deck.cards[3].gave, ["Running", "Dinner with Jon"])
-        XCTAssertEqual(deck.cards[3].drained, ["Meetings"])
-        XCTAssertEqual(deck.cards[4].rotation, "Examen")
-        XCTAssertEqual(deck.cards[4].question, "What did you notice?")
-
-        XCTAssertEqual(deck.cards[5].items.map(\.id), ["one-thing", "who-jon-chan"], "an item without an id is dropped alone")
-        XCTAssertEqual(deck.cards[5].items.map(\.carried), [1, 0])
-        XCTAssertEqual(deck.cards[6].values, [
-            DeckValue(id: "present", name: "Present", evidence: "Phone down at dinner."),
-            DeckValue(id: "people", name: "People", evidence: ""),
-        ])
-        XCTAssertEqual(deck.cards[8].items, [
-            DeckReviewItem(id: "2026-10-04-p", text: "Offer by November", carried: nil, probability: 70,
-                           due: "2026-10-25", madeWeek: "2026-10-04"),
-        ])
-        XCTAssertEqual(deck.cards[11].suggested, ["Jon Chan", "Ana"])
-        XCTAssertEqual(deck.cards[7].chapter, "account")
-        XCTAssertEqual(deck.cards[9].chapter, "steer")
-        XCTAssertNil(deck.cards[13].chapter)
-    }
-
-    func testNewCardsTakeNoFeedbackAndReadTheirTitleOrDraft() throws {
-        let deck = try DailyDeck.decode(Self.v2DeckJSON)
-        for index in [0, 1, 2, 3, 5, 6, 8, 11, 12] {
-            XCTAssertFalse(deck.cards[index].takesFeedback, deck.cards[index].id)
-        }
-        XCTAssertEqual(DeckCardText(deck.cards[0]).lead, "The week you tapered")
-        XCTAssertEqual(DeckCardText(deck.cards[2]).lead, "You tapered and slept more.")
-    }
-
-    func testUnknownV2FieldsAndTypesStillDecode() throws {
+    func testUnknownFieldsAndTypesStillDecode() throws {
         let deck = try DailyDeck.decode(#"""
         {"version": 3, "date": "2026-10-25", "kind": "weekly", "extra": true, "cards": [
-          {"id": "cover", "type": "cover", "week_number": 43, "brand_new": [1, 2], "chapters": "not a list"},
+          {"id": "cover", "type": "cover", "week_number": 43, "brand_new": [1, 2], "moments": "not a list", "spares": {"x": 1}},
           {"id": "later", "type": "future_card", "chapter": "steer", "gadgets": [{"a": 1}]},
-          {"id": "story", "type": "story", "draft": "", "days": 7, "items": {"x": 1}},
+          {"id": "value-body", "type": "value", "value": "body", "fact": 7, "changes": "none"},
           {"id": "close", "type": "close"}
         ]}
         """#)
-        XCTAssertEqual(deck.cards.map(\.id), ["cover", "later", "story", "close"])
+        XCTAssertEqual(deck.cards.map(\.id), ["cover", "later", "value-body", "close"])
         XCTAssertEqual(deck.cards[1].type, .unknown("future_card"))
-        XCTAssertEqual(deck.cards[0].chapters, [], "a mistyped field is empty, not fatal")
-        XCTAssertEqual(deck.cards[2].items, [])
-        XCTAssertEqual(deck.cards[2].days, [])
-        XCTAssertEqual(deck.cards[2].storyDraft, "")
+        XCTAssertEqual(deck.cards[0].moments, [], "a mistyped field is empty, not fatal")
+        XCTAssertEqual(deck.cards[0].spares, [])
+        XCTAssertNil(deck.cards[2].fact)
+        XCTAssertEqual(deck.cards[2].changes, [])
     }
 
     func testV1WeeklyDeckStillDecodes() throws {
@@ -487,39 +392,31 @@ final class WeeklyReviewModelTests: XCTestCase {
         {"date":"2026-10-18","kind":"weekly","cards":[
           {"id":"headline","type":"headline","title":"Your week","lines":["Weekly review"],"recap":"You tapered."},
           {"id":"mood","type":"item","kind":"mood","title":"Energy and mood","points":[{"label":"Tue","energy":8,"mood":7}]},
-          {"id":"week-career","type":"week_ahead","goal":"career","start":"2026-10-19","commitments":[{"id":"outreach","action":"Outreach","target":6,"skips":0,"unit":"item"}]},
+          {"id":"week-career","type":"week_ahead","goal":"career","start":"2026-10-19","fallback":"Next week: Outreach 6"},
           {"id":"changes","type":"changes","title":"What changed","rows":[]},
           {"id":"close","type":"close"}
         ]}
         """#)
-        XCTAssertEqual(deck.cards.map(\.type), [.headline, .item, .weekAhead, .changes, .close])
+        XCTAssertEqual(deck.cards.map(\.type), [.headline, .item, .unknown("week_ahead"), .changes, .close],
+                       "a retired week-ahead card reads as its fallback")
         XCTAssertNil(deck.version)
         let card = deck.cards[2]
-        XCTAssertEqual(card.weekCommitments.map(\.id), ["outreach"])
+        XCTAssertEqual(DeckCardText(card).lead, "Next week: Outreach 6")
         XCTAssertNil(card.chapter)
         XCTAssertNil(card.weekNumber)
-        XCTAssertEqual(card.items, [])
-        XCTAssertEqual(card.values, [])
-        XCTAssertEqual(card.days, [])
+        XCTAssertEqual(card.moments, [])
         XCTAssertNil(card.noteFromPast)
     }
 
     func testAnswerEncodesOnlySetFields() throws {
-        var answer = DeckAnswer(card: "values")
-        answer.scores = ["present": 7, "people": 9]
+        var answer = DeckAnswer(card: "value-people")
+        answer.scores = ["people": 7]
         let json = try Self.encode(answer)
-        XCTAssertEqual(json["scores"] as? [String: Int], ["present": 7, "people": 9])
-        for key in ["notes", "lists", "statuses", "prediction", "text"] {
+        XCTAssertEqual(json["scores"] as? [String: Int], ["people": 7])
+        for key in ["notes", "lists", "statuses", "text"] {
             XCTAssertNil(json[key], key)
         }
-        XCTAssertTrue(answer.isAnswer(for: Self.card("values")))
-
-        var keepsake = DeckAnswer(card: "keepsakes")
-        keepsake.prediction = DeckPrediction(text: "Offer", probability: 70, due: "2026-11-30")
-        let prediction = try XCTUnwrap(try Self.encode(keepsake)["prediction"] as? [String: Any])
-        XCTAssertEqual(prediction["text"] as? String, "Offer")
-        XCTAssertEqual(prediction["probability"] as? Int, 70)
-        XCTAssertEqual(prediction["due"] as? String, "2026-11-30")
+        XCTAssertTrue(answer.isAnswer(for: Self.card("value-people")))
     }
 
     func testAnswerIsAnAnswerWhenAnyNewFieldIsNonEmpty() {
@@ -550,34 +447,15 @@ final class WeeklyReviewModelTests: XCTestCase {
         var lists = DeckAnswer(card: "energy")
         lists.lists = ["gave": ["Running"], "drained": []]
         XCTAssertTrue(lists.isAnswer(for: card))
-
-        var prediction = DeckAnswer(card: "keepsakes")
-        prediction.prediction = DeckPrediction(text: "Offer", probability: 70, due: "2026-11-30")
-        XCTAssertTrue(prediction.isAnswer(for: card))
     }
 
     func testAnswersPayloadKeepsAScoresOnlyAnswer() throws {
-        let deck = try DailyDeck.decode(Self.v2DeckJSON)
-        var answer = DeckAnswer(card: "values")
-        answer.scores = ["present": 7]
-        let payload = DeckAnswersPayload(deck: deck, answers: ["values": answer], completedAt: Date(timeIntervalSince1970: 0))
-        XCTAssertEqual(payload.answers.map(\.card), ["values"])
+        let deck = try DailyDeck.decode(Self.v3DeckJSON)
+        var answer = DeckAnswer(card: "value-people")
+        answer.scores = ["people": 7]
+        let payload = DeckAnswersPayload(deck: deck, answers: ["value-people": answer], completedAt: Date(timeIntervalSince1970: 0))
+        XCTAssertEqual(payload.answers.map(\.card), ["value-people"])
         XCTAssertEqual(payload.version, 1)
-    }
-
-    func testTopAndBottomValues() {
-        let order = WeeklyValues.order
-        XCTAssertEqual(order, ["present", "people", "dad", "potential", "body"])
-        let scores = ["present": 6, "people": 9, "dad": 7, "potential": 3, "body": 5]
-        XCTAssertEqual(WeeklyValues.topAndBottom(scores, order: order), ["people", "potential"])
-        // A tie goes to the earlier value in fixed order, at both ends.
-        let ties = ["present": 4, "people": 9, "dad": 9, "potential": 4, "body": 6]
-        XCTAssertEqual(WeeklyValues.topAndBottom(ties, order: order), ["people", "present"])
-        let equal = Dictionary(uniqueKeysWithValues: order.map { ($0, 5) })
-        XCTAssertEqual(WeeklyValues.topAndBottom(equal, order: order), ["present"])
-        XCTAssertEqual(WeeklyValues.topAndBottom(["dad": 8], order: order), ["dad"])
-        XCTAssertEqual(WeeklyValues.topAndBottom([:], order: order), [])
-        XCTAssertEqual(WeeklyValues.topAndBottom(["unlisted": 9, "body": 2], order: order), ["body"], "scores for values outside the order are ignored")
     }
 
     func testWeekRecordDecodesMinimalBackfill() throws {
@@ -643,188 +521,89 @@ final class WeeklyReviewModelTests: XCTestCase {
     // MARK: - Answering (view model)
 
     @MainActor
-    func testSetScoreAndNoteStoreOnTheValuesAnswer() async throws {
-        let viewModel = try await weeklyViewModel()
-        let values = try card("values", in: viewModel)
-        viewModel.setScore("present", 7, for: values)
-        viewModel.setScore("people", 9, for: values)
-        viewModel.setNote("present", "Phone down at dinner, twice.", for: values)
-        let answer = try XCTUnwrap(viewModel.answer(for: values))
-        XCTAssertEqual(answer.scores, ["present": 7, "people": 9])
-        XCTAssertEqual(answer.notes, ["present": "Phone down at dinner, twice."])
-        XCTAssertNil(answer.text)
-
-        viewModel.setScore("people", 9, for: values)
-        XCTAssertEqual(viewModel.answer(for: values)?.scores, ["present": 7], "tapping the chosen score again clears it")
-        viewModel.setScore("present", 11, for: values)
-        viewModel.setScore("present", 0, for: values)
-        XCTAssertEqual(viewModel.answer(for: values)?.scores, ["present": 7], "scores outside 1–10 are ignored")
-        viewModel.setScore("present", 4, for: values)
-        XCTAssertEqual(viewModel.answer(for: values)?.scores, ["present": 4])
-
-        // Clearing a line goes back to Atlas's evidence, which is what the vault files.
-        viewModel.setNote("present", "  ", for: values)
-        XCTAssertNil(viewModel.answer(for: values)?.notes, "an emptied note is no note")
-
-        // A prediction's grade and note sit under its id on the predictions answer.
-        let predictions = try card("predictions", in: viewModel)
-        viewModel.setStatus("2026-10-04-p", "hit", for: predictions)
-        viewModel.setNote("2026-10-04-p", "Came early.", for: predictions)
-        XCTAssertEqual(viewModel.answer(for: predictions)?.statuses, ["2026-10-04-p": "hit"])
-        XCTAssertEqual(viewModel.answer(for: predictions)?.notes, ["2026-10-04-p": "Came early."])
+    func testValueCardSliderWritesScore() async throws {
+        let (viewModel, _) = try await v3ViewModelAndClient()
+        let people = try card("value-people", in: viewModel)
+        viewModel.setScore("people", 7, for: people)
+        XCTAssertEqual(viewModel.answer(for: people)?.scores, ["people": 7])
+        XCTAssertNil(viewModel.answer(for: people)?.text)
+        viewModel.setScore("people", 11, for: people)
+        viewModel.setScore("people", 0, for: people)
+        XCTAssertEqual(viewModel.answer(for: people)?.scores, ["people": 7], "scores outside 1–10 are ignored")
+        viewModel.setScore("people", 4, for: people)
+        XCTAssertEqual(viewModel.answer(for: people)?.scores, ["people": 4])
+        viewModel.setScore("people", 4, for: people)
+        XCTAssertNil(viewModel.answer(for: people), "tapping the chosen score again clears it")
     }
 
     @MainActor
-    func testStatusCycleClearsAtNone() async throws {
-        var status: String?
-        var cycle: [String?] = []
-        for _ in 0..<4 {
-            status = CommitmentStatus.next(after: status)
-            cycle.append(status)
-        }
-        XCTAssertEqual(cycle, ["kept", "missed", "dropped", nil])
-        XCTAssertEqual(CommitmentStatus.next(after: "someday"), "kept", "an unknown status starts the cycle over")
+    func testAnOwnMomentJoinsTheCoverAndCanAlwaysGo() async throws {
+        let store = DailyDeckStore(defaults: try XCTUnwrap(UserDefaults(suiteName: suiteName)))
+        store.setWorkspace("/vault", for: server)
+        let quiet = #"{"version":3,"date":"2026-10-25","kind":"weekly","cards":[{"id":"cover","type":"cover","moments":[],"spares":[]},{"id":"close","type":"close"}]}"#
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-25.weekly.json"], deck: quiet)
+        let viewModel = DailyDeckViewModel(server: server, client: client, store: store)
+        await viewModel.show(date: "2026-10-25", kind: "weekly")
+        let cover = try card("cover", in: viewModel)
+        XCTAssertEqual(viewModel.keptMoments(for: cover), [])
 
-        let viewModel = try await weeklyViewModel()
-        let commitments = try card("commitments", in: viewModel)
-        viewModel.setStatus("one-thing", "kept", for: commitments)
-        viewModel.setStatus("who-jon-chan", "missed", for: commitments)
-        XCTAssertEqual(viewModel.answer(for: commitments)?.statuses, ["one-thing": "kept", "who-jon-chan": "missed"])
-        viewModel.setStatus("one-thing", nil, for: commitments)
-        XCTAssertEqual(viewModel.answer(for: commitments)?.statuses, ["who-jon-chan": "missed"])
-        viewModel.setStatus("who-jon-chan", nil, for: commitments)
-        XCTAssertNil(viewModel.answer(for: commitments), "no statuses left leaves no answer")
+        viewModel.addOwnMoment("  ", for: cover)
+        XCTAssertNil(viewModel.answer(for: cover), "blank words add nothing")
+        viewModel.addOwnMoment("Dinner with Meg ", for: cover)
+        viewModel.addOwnMoment("Long run", for: cover)
+        XCTAssertEqual(viewModel.keptMoments(for: cover), [
+            DeckMoment(id: "own-1", day: "", line: "Dinner with Meg", value: ""),
+            DeckMoment(id: "own-2", day: "", line: "Long run", value: ""),
+        ])
+        XCTAssertEqual(viewModel.answer(for: cover)?.lists?["moments"], ["own-1", "own-2"])
+        XCTAssertEqual(viewModel.answer(for: cover)?.notes, ["own-1": "Dinner with Meg", "own-2": "Long run"])
+        XCTAssertFalse(viewModel.canRemove(for: cover), "two moments is under the three the brief's need")
+        XCTAssertTrue(viewModel.canRemoveMoment("own-1", for: cover), "one of his own can always go")
+
+        viewModel.removeMoment("own-1", for: cover)
+        XCTAssertEqual(viewModel.keptMoments(for: cover).map(\.id), ["own-2"])
+        XCTAssertEqual(viewModel.answer(for: cover)?.notes, ["own-2": "Long run"], "its words go with it")
+        viewModel.addOwnMoment("Read to the bump", for: cover)
+        XCTAssertEqual(viewModel.answer(for: cover)?.lists?["moments"], ["own-2", "own-1"], "the next free number")
     }
 
     @MainActor
-    func testMissedCommitmentsFollowCurrentStatuses() async throws {
-        let viewModel = try await weeklyViewModel()
-        let commitments = try card("commitments", in: viewModel)
-        XCTAssertEqual(viewModel.missedCommitments, [])
-        viewModel.setStatus("one-thing", "missed", for: commitments)
-        viewModel.setStatus("who-jon-chan", "kept", for: commitments)
-        XCTAssertEqual(viewModel.missedCommitments.map(\.id), ["one-thing"])
-        viewModel.setStatus("who-jon-chan", "missed", for: commitments)
-        XCTAssertEqual(viewModel.missedCommitments.map(\.id), ["one-thing", "who-jon-chan"], "in the card's order")
-        viewModel.setStatus("one-thing", "dropped", for: commitments)
-        XCTAssertEqual(viewModel.missedCommitments.map(\.text), ["Jon Chan"])
-    }
-
-    @MainActor
-    func testPredictionClearsWhenTextEmpty() async throws {
-        let viewModel = try await weeklyViewModel()
-        let keepsakes = try card("keepsakes", in: viewModel)
-        let offer = DeckPrediction(text: "Offer by November", probability: 60, due: "2026-11-22")
-        viewModel.setPrediction(offer, for: keepsakes)
-        XCTAssertEqual(viewModel.answer(for: keepsakes)?.prediction, offer)
-
-        viewModel.setPrediction(DeckPrediction(text: "  \n ", probability: 60, due: "2026-11-22"), for: keepsakes)
-        XCTAssertNil(viewModel.answer(for: keepsakes), "a prediction without words is no prediction")
-
-        viewModel.setText("Be kind to October.", for: keepsakes)
-        viewModel.setPrediction(offer, for: keepsakes)
-        viewModel.setPrediction(nil, for: keepsakes)
-        XCTAssertNil(viewModel.answer(for: keepsakes)?.prediction)
-        XCTAssertEqual(viewModel.answer(for: keepsakes)?.text, "Be kind to October.", "the note stays")
-
-        XCTAssertEqual(DeckPrediction.defaultDue(deckDate: "2026-10-25"), "2026-11-22", "four weeks after the deck")
-        XCTAssertEqual(DeckPrediction.defaultProbability, 70)
-    }
-
-    @MainActor
-    func testPayloadCarriesV2AnswersInSnakeCase() async throws {
-        let viewModel = try await weeklyViewModel()
-        let deck = try XCTUnwrap(viewModel.deck)
-        viewModel.setScore("present", 7, for: try card("values", in: viewModel))
-        viewModel.setList("gave", ["Running"], for: try card("energy", in: viewModel))
-        viewModel.setList("drained", [], for: try card("energy", in: viewModel))
-        viewModel.setStatus("who-jon-chan", "missed", for: try card("commitments", in: viewModel))
-        viewModel.setList("who", ["Ana"], for: try card("who", in: viewModel))
-        viewModel.setPrediction(DeckPrediction(text: "Offer", probability: 70, due: "2026-11-22"),
-                                for: try card("keepsakes", in: viewModel))
-
-        let payload = DeckAnswersPayload(deck: deck, answers: viewModel.answers, completedAt: Date(timeIntervalSince1970: 0))
-        let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: encoder.encode(payload)) as? [String: Any])
-        XCTAssertEqual(json["version"] as? Int, 1)
-        XCTAssertNotNil(json["completed_at"])
-        let answers = try XCTUnwrap(json["answers"] as? [[String: Any]])
-        XCTAssertEqual(answers.compactMap { $0["card"] as? String }, ["energy", "commitments", "values", "who", "keepsakes"])
-        let byCard = Dictionary(uniqueKeysWithValues: answers.map { ($0["card"] as? String ?? "", $0) })
-        XCTAssertEqual(byCard["values"]?["scores"] as? [String: Int], ["present": 7])
-        XCTAssertEqual(byCard["energy"]?["lists"] as? [String: [String]], ["gave": ["Running"], "drained": []],
-                       "an emptied list is sent, so the filer doesn't fall back to the drafted chips")
-        XCTAssertEqual(byCard["commitments"]?["statuses"] as? [String: String], ["who-jon-chan": "missed"])
-        XCTAssertEqual(byCard["who"]?["lists"] as? [String: [String]], ["who": ["Ana"]])
-        XCTAssertEqual((byCard["keepsakes"]?["prediction"] as? [String: Any])?["probability"] as? Int, 70)
-        for answer in answers {
-            XCTAssertNil(answer["text"], "no text key on answers without text")
-        }
-    }
-
-    @MainActor
-    func testRemovingEveryEnergyChipKeepsTheEmptyLists() async throws {
-        let viewModel = try await weeklyViewModel()
-        let energy = try card("energy", in: viewModel)
-        XCTAssertEqual(viewModel.list("gave", for: energy, drafted: energy.gave), ["Running", "Dinner with Jon"])
-        viewModel.setList("gave", [], for: energy)
-        viewModel.setList("drained", [], for: energy)
-        XCTAssertEqual(viewModel.answer(for: energy)?.lists, ["gave": [], "drained": []])
-        XCTAssertEqual(viewModel.list("gave", for: energy, drafted: energy.gave), [], "the card shows no chips")
-        XCTAssertEqual(viewModel.list("drained", for: energy, drafted: energy.drained), [])
-
-        let payload = DeckAnswersPayload(deck: try XCTUnwrap(viewModel.deck), answers: viewModel.answers,
-                                         completedAt: Date(timeIntervalSince1970: 0))
-        XCTAssertEqual(payload.answers.first { $0.card == "energy" }?.lists, ["gave": [], "drained": []],
-                       "filed as none, so the vault doesn't fall back to the drafted chips")
-    }
-
-    func testCarryChipsNeverOverwriteTypedWords() {
-        let missed = [DeckReviewItem(id: "one-thing", text: "Ship the deck"), DeckReviewItem(id: "who-ana", text: "Ana")]
-        XCTAssertTrue(WeekCarryChips.offers(missed, current: ""))
-        XCTAssertTrue(WeekCarryChips.offers(missed, current: "Ana"), "a carried one stays, to switch or untap")
-        XCTAssertFalse(WeekCarryChips.offers(missed, current: "Write the essay"))
-        XCTAssertFalse(WeekCarryChips.offers([], current: ""))
-    }
-
-    func testCarryChipsLeavePeopleToTheWhoCard() {
-        let missed = [DeckReviewItem(id: "one-thing", text: "Ship the deck"), DeckReviewItem(id: "who-ana", text: "Ana"),
-                      DeckReviewItem(id: "plan-1", text: "Sleep by 11")]
-        XCTAssertEqual(WeekCarryChips.carryable(missed).map(\.id), ["one-thing", "plan-1"],
-                       "a missed person carries on the who card, not into the one thing")
-        XCTAssertEqual(WeekCarryChips.carryable([DeckReviewItem(id: "who-ana", text: "Ana")]), [])
-    }
-
-    func testAddingAPersonDedupesByCase() {
-        let suggested = ["Ana Ruiz", "Priya"]
-        XCTAssertEqual(WeekWhoCard.adding("ana ruiz", to: [], suggested: suggested), ["Ana Ruiz"], "picks the suggestion")
-        XCTAssertEqual(WeekWhoCard.adding("ANA RUIZ", to: ["Ana Ruiz"], suggested: suggested), ["Ana Ruiz"])
-        XCTAssertEqual(WeekWhoCard.adding("Bea", to: ["Priya"], suggested: suggested), ["Priya", "Bea"])
-        XCTAssertEqual(WeekWhoCard.adding("bea", to: ["Priya", "Bea"], suggested: suggested), ["Priya", "Bea"])
+    func testOwnMomentsCountTowardTheThreeTheCoverKeeps() async throws {
+        let (viewModel, _) = try await v3ViewModelAndClient()
+        let cover = try card("cover", in: viewModel)
+        viewModel.removeMoment("m4", for: cover)
+        XCTAssertFalse(viewModel.canRemove(for: cover))
+        viewModel.addOwnMoment("Long lunch", for: cover)
+        XCTAssertEqual(viewModel.keptMoments(for: cover).map(\.id), ["m1", "m2", "m3", "own-1"])
+        XCTAssertTrue(viewModel.canRemove(for: cover), "four moments, one can go")
+        viewModel.removeMoment("m1", for: cover)
+        XCTAssertFalse(viewModel.canRemoveMoment("m2", for: cover))
+        viewModel.removeMoment("m2", for: cover)
+        XCTAssertEqual(viewModel.keptMoments(for: cover).map(\.id), ["m2", "m3", "own-1"])
     }
 
     func testChapterLabelNumbersTheChapters() throws {
-        let deck = try DailyDeck.decode(Self.v2DeckJSON)
+        let deck = try DailyDeck.decode(Self.v3DeckJSON)
         let labels = Dictionary(uniqueKeysWithValues: deck.cards.map { ($0.id, $0.chapterLabel) })
-        XCTAssertEqual(labels["filmstrip"], "1 · Remember")
-        XCTAssertEqual(labels["deep"], "2 · Understand")
-        XCTAssertEqual(labels["values"], "3 · Account")
-        XCTAssertEqual(labels["who"], "4 · Steer")
-        XCTAssertNil(deck.cards[0].chapterLabel, "the cover has no chapter")
-        XCTAssertNil(deck.cards[13].chapterLabel, "nor the close")
+        XCTAssertEqual(labels["last-intention"], "1 · Remember")
+        XCTAssertEqual(labels["proud"], "2 · Reflect")
+        XCTAssertEqual(labels["value-people"], "3 · Values")
+        XCTAssertEqual(labels["intention"], "4 · Steer")
+        XCTAssertEqual(labels["keepsakes"], "4 · Steer")
+        XCTAssertNil(labels["cover"] ?? nil, "the cover has no chapter")
+        XCTAssertNil(labels["close"] ?? nil, "nor the close")
     }
 
     func testCoverExposesTheWeeksQuestionRecapAndTheTakeWearsItsChapter() throws {
         let deck = try DailyDeck.decode(#"""
         {"version":2,"date":"2026-11-01","kind":"weekly","cards":[
           {"id":"cover","type":"cover","title":"The week you tapered","recap":"This week was about: Is the model the product?"},
-          {"id":"view-take","type":"decision","kind":"view_take","chapter":"understand","title":"Is the model the product?"},
+          {"id":"view-take","type":"decision","kind":"view_take","chapter":"reflect","title":"Is the model the product?"},
           {"id":"view-steer","type":"prompt","chapter":"steer","question":"Keep it?","files_to":"steer"},
           {"id":"f1","type":"decision","title":"Sam"}]}
         """#)
         XCTAssertEqual(deck.cards[0].recap, "This week was about: Is the model the product?")
-        XCTAssertEqual(deck.cards[1].chapterLabel, "2 · Understand", "the take closes the Understand chapter")
+        XCTAssertEqual(deck.cards[1].chapterLabel, "2 · Reflect", "the take closes the Reflect chapter")
         XCTAssertEqual(deck.cards[2].chapterLabel, "4 · Steer")
         XCTAssertNil(deck.cards[3].chapterLabel, "a plain follow-up has no chapter line")
         let bare = try DailyDeck.decode(#"{"version":2,"date":"d","kind":"weekly","cards":[{"id":"cover","type":"cover"}]}"#)
@@ -834,17 +613,17 @@ final class WeeklyReviewModelTests: XCTestCase {
     // MARK: - Seal
 
     @MainActor
-    func testV2WeeklyFilesThroughBriefFileWithV2Answers() async throws {
+    func testSealedWeeklyFilesThroughBriefFileWithItsAnswers() async throws {
         let store = DailyDeckStore(defaults: try XCTUnwrap(UserDefaults(suiteName: suiteName)))
         store.setWorkspace("/vault", for: server)
-        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-25.weekly.json"], deck: Self.v2DeckJSON)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-25.weekly.json"], deck: Self.v3DeckJSON)
         client.filer = .success(BriefFileResponse(ok: true, summary: "Sealed."))
         let viewModel = DailyDeckViewModel(server: server, client: client, store: store)
         await viewModel.show(date: "2026-10-25", kind: "weekly")
         XCTAssertTrue(viewModel.isSealedWeekly)
 
-        viewModel.setScore("present", 7, for: try card("values", in: viewModel))
-        viewModel.setList("gave", ["Running"], for: try card("energy", in: viewModel))
+        viewModel.setScore("people", 7, for: try card("value-people", in: viewModel))
+        viewModel.removeMoment("m4", for: try card("cover", in: viewModel))
         _ = await viewModel.file()
 
         let request = try XCTUnwrap(client.fileRequests.first)
@@ -852,24 +631,24 @@ final class WeeklyReviewModelTests: XCTestCase {
         XCTAssertEqual(request.kind, "weekly")
         XCTAssertEqual(request.date, "2026-10-25")
         let byCard = Dictionary(uniqueKeysWithValues: request.answers.answers.map { ($0.card, $0) })
-        XCTAssertEqual(byCard["values"]?.scores, ["present": 7])
-        XCTAssertEqual(byCard["energy"]?.lists, ["gave": ["Running"]])
+        XCTAssertEqual(byCard["value-people"]?.scores, ["people": 7])
+        XCTAssertEqual(byCard["cover"]?.lists, ["moments": ["m1", "m2", "m3"]])
     }
 
     @MainActor
-    func testAV2WeekIsSealedOnlyWhenItsRecordExists() async throws {
+    func testASealedWeekIsSealedOnlyWhenItsRecordExists() async throws {
         let store = DailyDeckStore(defaults: try XCTUnwrap(UserDefaults(suiteName: suiteName)))
         store.setWorkspace("/vault", for: server)
         let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-25.weekly.json", "2026-10-25.weekly.answers.json"],
-                                             deck: Self.v2DeckJSON)
+                                             deck: Self.v3DeckJSON)
         client.files["briefs/2026-10-25.weekly.answers.json"] = """
         {"version": 1, "date": "2026-10-25", "kind": "weekly", "completed_at": "x",
-         "answers": [{"card": "story", "text": "You raced."}]}
+         "answers": [{"card": "proud", "text": "You raced."}]}
         """
         // The server saved the answers, then its filer failed: no record.
         let failed = DailyDeckViewModel(server: server, client: client, store: store)
         await failed.show(date: "2026-10-25", kind: "weekly")
-        XCTAssertEqual(failed.answer(for: try card("story", in: failed))?.text, "You raced.", "the answers come back to seal again")
+        XCTAssertEqual(failed.answer(for: try card("proud", in: failed))?.text, "You raced.", "the answers come back to seal again")
         XCTAssertFalse(failed.isFiled, "answers alone don't make a sealed week")
         XCTAssertTrue(failed.hasChanges, "so Seal the week stays enabled")
 
@@ -906,12 +685,12 @@ final class WeeklyReviewModelTests: XCTestCase {
 
     // MARK: - Close card and prompt copy
 
-    func testAV2WeeklyClosesOnTheWeeksPaper() throws {
+    func testASealedWeeklyClosesOnTheWeeksPaper() throws {
         let close = DeckPage.card(Self.card("close"))
         XCTAssertEqual(DeckPalette.of(close, inV2Weekly: true), .week)
         XCTAssertEqual(DeckPalette.of(close, inV2Weekly: false), .quote, "v1 weekly and morning closes keep their paper")
-        let story = DeckPage.card(try XCTUnwrap(try DailyDeck.decode(Self.v2DeckJSON).cards.first { $0.id == "story" }))
-        XCTAssertEqual(DeckPalette.of(story, inV2Weekly: true), DeckPalette.of(story))
+        let last = DeckPage.card(try XCTUnwrap(try DailyDeck.decode(Self.v3DeckJSON).cards.first { $0.id == "last-intention" }))
+        XCTAssertEqual(DeckPalette.of(last, inV2Weekly: true), DeckPalette.of(last))
     }
 
     func testCloseHeadingSealsAV2WeekAndCountsReflectionsOtherwise() {
@@ -929,9 +708,13 @@ final class WeeklyReviewModelTests: XCTestCase {
     }
 
     func testTheOneThingAsksForTheOneThing() throws {
-        let cards = try DailyDeck.decode(Self.v2DeckJSON).cards
-        XCTAssertEqual(DeckCopy.invitation(for: try XCTUnwrap(cards.first { $0.id == "one-thing" })), "Write the one thing")
-        XCTAssertEqual(DeckCopy.invitation(for: try XCTUnwrap(cards.first { $0.id == "deep" })), "Write a reflection")
+        let cards = try DailyDeck.decode(#"""
+        {"date":"2026-10-18","kind":"weekly","cards":[
+          {"id":"one-thing","type":"prompt","question":"What's the one thing for this week?"},
+          {"id":"deep","type":"prompt","question":"What did you notice?"}]}
+        """#).cards
+        XCTAssertEqual(DeckCopy.invitation(for: cards[0]), "Write the one thing")
+        XCTAssertEqual(DeckCopy.invitation(for: cards[1]), "Write a reflection")
     }
 
     // MARK: - Photo of the week
@@ -954,7 +737,7 @@ final class WeeklyReviewModelTests: XCTestCase {
 
     @MainActor
     func testSetWeekPhotoUploadsForTheDeckDateAndBumpsTheVersion() async throws {
-        let (viewModel, client) = try await weeklyViewModelAndClient()
+        let (viewModel, client) = try await v3ViewModelAndClient()
         XCTAssertEqual(viewModel.weekPhotoPath, "weekly-checkins/photos/2026-10-25.jpg")
         XCTAssertEqual(viewModel.weekPhotoVersion, 0)
         await viewModel.setWeekPhoto(Data([0xFF, 0xD8, 0xFF, 0x01]))
@@ -967,7 +750,7 @@ final class WeeklyReviewModelTests: XCTestCase {
 
     @MainActor
     func testUploadDropsTheCachedPhotoSoAReopenedCoverReadsTheNewOne() async throws {
-        let (viewModel, _) = try await weeklyViewModelAndClient()
+        let (viewModel, _) = try await v3ViewModelAndClient()
         let key = WeekPhotoCache.key(server: server, sessionID: viewModel.sessionID, path: viewModel.weekPhotoPath)
         let otherWorkspace = WeekPhotoCache.key(server: server, sessionID: "other-session", path: viewModel.weekPhotoPath)
         XCTAssertNotEqual(key, otherWorkspace, "another workspace session never shares an entry")
@@ -980,7 +763,7 @@ final class WeeklyReviewModelTests: XCTestCase {
 
     @MainActor
     func testFailedUploadKeepsTheCachedPhoto() async throws {
-        let (viewModel, client) = try await weeklyViewModelAndClient()
+        let (viewModel, client) = try await v3ViewModelAndClient()
         let key = WeekPhotoCache.key(server: server, sessionID: viewModel.sessionID, path: viewModel.weekPhotoPath)
         WeekPhotoCache.images.setObject(UIImage(), forKey: key)
         client.photoUpload = .failure(APIError.http(statusCode: 500, body: nil))
@@ -991,7 +774,7 @@ final class WeeklyReviewModelTests: XCTestCase {
 
     @MainActor
     func testWeeksModelReadsThroughTheDeckSession() async throws {
-        let (viewModel, _) = try await weeklyViewModelAndClient()
+        let (viewModel, _) = try await v3ViewModelAndClient()
         let weeks = try XCTUnwrap(viewModel.makeWeeksModel())
         XCTAssertEqual(weeks.server, viewModel.server)
         XCTAssertEqual(weeks.sessionID, viewModel.sessionID, "photo cache keys must match the deck's cover")
@@ -1001,7 +784,7 @@ final class WeeklyReviewModelTests: XCTestCase {
 
     @MainActor
     func testShowingAnotherDeckClearsTheUploadError() async throws {
-        let (viewModel, client) = try await weeklyViewModelAndClient()
+        let (viewModel, client) = try await v3ViewModelAndClient()
         client.photoUpload = .failure(APIError.http(statusCode: 500, body: nil))
         await viewModel.setWeekPhoto(Data([0xFF, 0xD8, 0xFF, 0x01]))
         XCTAssertNotNil(viewModel.weekPhotoError)
@@ -1011,7 +794,7 @@ final class WeeklyReviewModelTests: XCTestCase {
 
     @MainActor
     func testSetWeekPhotoFailureKeepsPreviousState() async throws {
-        let (viewModel, client) = try await weeklyViewModelAndClient()
+        let (viewModel, client) = try await v3ViewModelAndClient()
         await viewModel.setWeekPhoto(Data([0xFF, 0xD8, 0xFF, 0x01]))
         XCTAssertEqual(viewModel.weekPhotoVersion, 1)
 
@@ -1029,7 +812,7 @@ final class WeeklyReviewModelTests: XCTestCase {
 
     @MainActor
     func testWeekPhotoDataReadsThePathAndTreatsA404AsNoPhoto() async throws {
-        let (viewModel, client) = try await weeklyViewModelAndClient()
+        let (viewModel, client) = try await v3ViewModelAndClient()
         let missing = await viewModel.weekPhotoData(path: viewModel.weekPhotoPath)
         XCTAssertNil(missing)
         client.rawFiles["weekly-checkins/photos/2026-10-25.jpg"] = Data([1, 2, 3])
@@ -1045,29 +828,6 @@ final class WeeklyReviewModelTests: XCTestCase {
     override func tearDown() {
         UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName)
         super.tearDown()
-    }
-
-    /// The v2 fixture deck, open on a view model as the 2026-10-25 weekly review.
-    @MainActor
-    private func weeklyViewModel() async throws -> DailyDeckViewModel {
-        let store = DailyDeckStore(defaults: try XCTUnwrap(UserDefaults(suiteName: suiteName)))
-        store.setWorkspace("/vault", for: server)
-        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-25.weekly.json"], deck: Self.v2DeckJSON)
-        let viewModel = DailyDeckViewModel(server: server, client: client, store: store)
-        await viewModel.show(date: "2026-10-25", kind: "weekly")
-        XCTAssertEqual(viewModel.state, .ready)
-        return viewModel
-    }
-
-    @MainActor
-    private func weeklyViewModelAndClient() async throws -> (DailyDeckViewModel, ScriptedDailyDeckClient) {
-        let store = DailyDeckStore(defaults: try XCTUnwrap(UserDefaults(suiteName: suiteName)))
-        store.setWorkspace("/vault", for: server)
-        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-25.weekly.json"], deck: Self.v2DeckJSON)
-        let viewModel = DailyDeckViewModel(server: server, client: client, store: store)
-        await viewModel.show(date: "2026-10-25", kind: "weekly")
-        XCTAssertEqual(viewModel.state, .ready)
-        return (viewModel, client)
     }
 
     /// The v3 fixture deck, open on a view model as the 2026-10-25 weekly review.

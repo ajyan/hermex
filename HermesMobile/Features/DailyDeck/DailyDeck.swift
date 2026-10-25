@@ -61,11 +61,10 @@ struct DeckCheck: Decodable, Equatable {
 /// fails to decode; an unknown `type` renders its `fallback` text as a plain card.
 struct DeckCard: Decodable, Equatable, Identifiable {
     enum CardType: Equatable {
-        case headline, prompt, decision, reflect, item, sleep, goal, weekAhead, changes, ask, section, close
-        /// The v2 weekly review's cards (`WeeklyReviewModels.swift`).
-        case cover, filmstrip, story, energy, commitments, values, predictions, who, keepsakes
-        /// The v3 weekly review's cards: last week's intention, one card per value, next week's intention.
-        case lastIntention, value, intention
+        case headline, prompt, decision, reflect, item, sleep, goal, changes, ask, section, close
+        /// The weekly review's cards (`WeeklyReviewModels.swift`): the cover of moments, last week's
+        /// intention, one card per value, next week's intention, and the note to the future.
+        case cover, lastIntention, value, intention, keepsakes
         case unknown(String)
 
         init(_ raw: String) {
@@ -77,19 +76,11 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case "item": self = .item
             case "sleep": self = .sleep
             case "goal": self = .goal
-            case "week_ahead": self = .weekAhead
             case "changes": self = .changes
             case "ask": self = .ask
             case "section": self = .section
             case "close": self = .close
             case "cover": self = .cover
-            case "filmstrip": self = .filmstrip
-            case "story": self = .story
-            case "energy": self = .energy
-            case "commitments": self = .commitments
-            case "values": self = .values
-            case "predictions": self = .predictions
-            case "who": self = .who
             case "keepsakes": self = .keepsakes
             case "last_intention": self = .lastIntention
             case "value": self = .value
@@ -138,12 +129,6 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     /// A goal card's personal goals (slugs). The card checks in on them live through the Goals API;
     /// `fallback` is the brief's text for when the server can't serve them.
     let goals: [String]
-    /// A Week ahead card's goal (slug) and the Monday its proposed week starts.
-    let goal: String?
-    let start: String?
-    /// A Week ahead card's proposal for next week, and last week's plan (for Ease off).
-    let weekCommitments: [DeckWeekCommitment]
-    let lastWeek: [DeckWeekCommitment]
     /// A Mandarin card's three new phrases to work into the answer.
     let phrases: [DeckPhrase]
     /// A Mandarin card's phrasebook phrases due today, to recall from their English (Got it / Again).
@@ -162,30 +147,13 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let learned: [DeckLearned]
     /// The day's variant card: this card written two ways, picked between on the close card; nil on other cards.
     let variant: DeckVariant?
-    /// A v2 weekly card's chapter ("remember", "understand", "account", "steer"); the cover and close have none.
+    /// A weekly card's chapter ("remember", "reflect", "values", "steer"); the cover and close have none.
     let chapter: String?
-    /// The cover's week number, date range ("Oct 19–25"), chapter list, and the note a year-ago self left.
+    /// The cover's week number, date range ("Oct 19–25"), and the note a year-ago self left.
     let weekNumber: Int?
     let range: String?
-    let chapters: [DeckChapter]
     let noteFromPast: DeckPastNote?
-    /// The filmstrip's seven days.
-    let days: [DeckDay]
-    /// The story card's drafted paragraph. On the wire this is the card's `draft` key, a string here
-    /// and a `DeckDraft` on the text-drafting cards, so it decodes under its own name.
-    let storyDraft: String?
-    /// The energy card's suggested chips.
-    let gave: [String]
-    let drained: [String]
-    /// The deep question's rotation ("Examen").
-    let rotation: String?
-    /// The commitments and predictions cards' rows to grade.
-    let items: [DeckReviewItem]
-    /// The values card's five values, with the evidence the brief found for each.
-    let values: [DeckValue]
-    /// The who card's suggested people.
-    let suggested: [String]
-    /// The v3 cover's moments of the week and the spares Swap brings in, and how the week ended.
+    /// The cover's moments of the week and the spares Swap brings in, and how the week ended.
     let moments: [DeckMoment]
     let spares: [DeckMoment]
     let ended: String?
@@ -295,21 +263,19 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     var takesFeedback: Bool {
         switch type {
         case .prompt, .reflect, .item, .unknown: true
-        case .headline, .decision, .sleep, .goal, .weekAhead, .changes, .ask, .section, .close: false
-        case .cover, .filmstrip, .story, .energy, .commitments, .values, .predictions, .who, .keepsakes: false
-        case .lastIntention, .value, .intention: false
+        case .headline, .decision, .sleep, .goal, .changes, .ask, .section, .close: false
+        case .cover, .lastIntention, .value, .intention, .keepsakes: false
         }
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, type, title, body, source, lines, question, context, voice, why, draft, actions, fallback
         case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
-        case goal, start, lastWeek, phrases, recall, yesterday, pattern, progress, questionPinyin, questionEn, rows, week
-        case chapter, weekNumber, range, chapters, noteFromPast, days, gave, drained, rotation, items, values, suggested
+        case phrases, recall, yesterday, pattern, progress, questionPinyin, questionEn, rows, week
+        case chapter, weekNumber, range, noteFromPast
         case piece, learned, variant
         case moments, spares, ended, text, ifThen, name, fact, changes
         case valueID = "value"
-        case weekCommitments = "commitments"
         case itemKind = "kind"
     }
 
@@ -364,11 +330,6 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         sleep = try? c.decodeIfPresent(DeckSleep.self, forKey: .sleep)
         tags = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .tags)) ?? []).compactMap(\.value)
         goals = (try? c.decodeIfPresent([String].self, forKey: .goals)) ?? []
-        goal = try? c.decodeIfPresent(String.self, forKey: .goal)
-        start = try? c.decodeIfPresent(String.self, forKey: .start)
-        weekCommitments = ((try? c.decodeIfPresent([Lossy<DeckWeekCommitment>].self, forKey: .weekCommitments)) ?? [])
-            .compactMap(\.value)
-        lastWeek = ((try? c.decodeIfPresent([Lossy<DeckWeekCommitment>].self, forKey: .lastWeek)) ?? []).compactMap(\.value)
         phrases = ((try? c.decodeIfPresent([Lossy<DeckPhrase>].self, forKey: .phrases)) ?? []).compactMap(\.value)
         recall = ((try? c.decodeIfPresent([Lossy<DeckPhrase>].self, forKey: .recall)) ?? []).compactMap(\.value)
         yesterday = try? c.decodeIfPresent(DeckMandarinFeedback.self, forKey: .yesterday)
@@ -383,16 +344,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         chapter = try? c.decodeIfPresent(String.self, forKey: .chapter)
         weekNumber = try? c.decodeIfPresent(Int.self, forKey: .weekNumber)
         range = try? c.decodeIfPresent(String.self, forKey: .range)
-        chapters = ((try? c.decodeIfPresent([Lossy<DeckChapter>].self, forKey: .chapters)) ?? []).compactMap(\.value)
         noteFromPast = try? c.decodeIfPresent(DeckPastNote.self, forKey: .noteFromPast)
-        days = ((try? c.decodeIfPresent([Lossy<DeckDay>].self, forKey: .days)) ?? []).compactMap(\.value)
-        storyDraft = try? c.decodeIfPresent(String.self, forKey: .draft)
-        gave = (try? c.decodeIfPresent([String].self, forKey: .gave)) ?? []
-        drained = (try? c.decodeIfPresent([String].self, forKey: .drained)) ?? []
-        rotation = try? c.decodeIfPresent(String.self, forKey: .rotation)
-        items = ((try? c.decodeIfPresent([Lossy<DeckReviewItem>].self, forKey: .items)) ?? []).compactMap(\.value)
-        values = ((try? c.decodeIfPresent([Lossy<DeckValue>].self, forKey: .values)) ?? []).compactMap(\.value)
-        suggested = (try? c.decodeIfPresent([String].self, forKey: .suggested)) ?? []
         moments = ((try? c.decodeIfPresent([Lossy<DeckMoment>].self, forKey: .moments)) ?? []).compactMap(\.value)
         spares = ((try? c.decodeIfPresent([Lossy<DeckMoment>].self, forKey: .spares)) ?? []).compactMap(\.value)
         ended = try? c.decodeIfPresent(String.self, forKey: .ended)
@@ -740,15 +692,14 @@ struct DeckAnswer: Codable, Equatable {
     var question: String?
     /// "Not for Me" on this card; a card with feedback leaves the deck.
     var feedback: DeckFeedback?
-    /// The v2 weekly cards' answers, each encoded only when set: the values card's 1–10 `scores` and
-    /// its evidence `notes`, the energy and who cards' `lists`, the commitments and predictions cards'
-    /// `statuses`, and the keepsakes card's `prediction`. Keys are the card's item ids. A list that is
+    /// The weekly cards' answers, each encoded only when set: a value card's 1–10 `scores`, the
+    /// cover's kept `lists["moments"]` (his own moments' words in `notes`), last week's `statuses["last"]`,
+    /// the intention card's `notes` and `lists["accepted"]`. Keys are the card's item ids. A list that is
     /// present but empty still answers: chips he removed are filed as none, not refilled from the draft.
     var scores: [String: Int]?
     var notes: [String: String]?
     var lists: [String: [String]]?
     var statuses: [String: String]?
-    var prediction: DeckPrediction?
 
     /// Nothing typed or chosen. Text counts as typed, spaces too, so a field bound to it keeps a
     /// leading space while editing; filing trims, and a blank text files as none.
@@ -757,7 +708,7 @@ struct DeckAnswer: Codable, Equatable {
     }
 
     private var hasWeeklyFields: Bool {
-        !(scores?.isEmpty ?? true) || !(notes?.isEmpty ?? true) || prediction != nil
+        !(scores?.isEmpty ?? true) || !(notes?.isEmpty ?? true)
             || !(statuses?.isEmpty ?? true) || !(lists?.isEmpty ?? true)
     }
 
@@ -973,6 +924,13 @@ enum DailyDeckPaths {
         let parts = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }
+
+    /// A `yyyy-MM-dd` day as noon that day in `calendar`; nil when it doesn't read as one.
+    static func date(day: String, calendar: Calendar = .current) -> Date? {
+        let parts = day.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3 else { return nil }
+        return calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2], hour: 12))
+    }
 }
 
 /// Per-server Daily Deck state in UserDefaults: the brief's workspace, today's
@@ -1106,9 +1064,9 @@ struct DeckCardText: Equatable {
             // The question leads; the numbers show after the rating so they don't decide it.
             lead = card.question
             leadIsQuestion = true
-        case .cover, .filmstrip, .story, .energy, .commitments, .values, .predictions, .who, .keepsakes:
-            // Each is drawn by its own view; the cover leads with its title and the story with its draft.
-            lead = card.type == .story ? card.storyDraft : card.title
+        case .cover, .keepsakes:
+            // Each is drawn by its own view; the cover leads with its title.
+            lead = card.title
         case .lastIntention:
             lead = card.text
             detail = card.fact?.line
@@ -1118,9 +1076,9 @@ struct DeckCardText: Equatable {
             attribution = card.name
         case .intention:
             lead = card.title
-        case .goal, .weekAhead, .changes, .ask:
-            // The check-ins, the week's plan, the week's fixes and the Ask are drawn (`DeckGoalCard`,
-            // `DeckWeekAheadCard`, `DeckChangesCard`, `DeckAskCard`).
+        case .goal, .changes, .ask:
+            // The check-ins, the week's fixes and the Ask are drawn (`DeckGoalCard`, `DeckChangesCard`,
+            // `DeckAskCard`).
             lead = card.title ?? card.fallback
         case .headline, .decision, .section, .close:
             lead = card.title

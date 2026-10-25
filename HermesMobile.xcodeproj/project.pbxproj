@@ -27,11 +27,10 @@
 		A0DE000292B90F697F77D29E /* GoalCheckInCardViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE000292B90F697F77D29D /* GoalCheckInCardViewModelTests.swift */; };
 		8E79A3B222BF417A727CCE9D /* DailyAskModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B423448EC09D605C3DA3D609 /* DailyAskModelTests.swift */; };
 		A0DE0003F6338217394AF92B /* GoalCheckInEditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE0003300540C2C75C9B4A /* GoalCheckInEditTests.swift */; };
-		A0DE32DA8AE24542AF68361E /* WeekAheadViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE9E759868615CA68657FC /* WeekAheadViewModelTests.swift */; };
 		B1A1C0DE00000000000F0009 /* GoalsViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */; };
 		A0DE002C9AEE2AE3608A3D16 /* GoalCheckInCardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE002C9AEE2AE3608A3D15 /* GoalCheckInCardViewModel.swift */; };
 		A0DE0014FAAC7A19A48B2C56 /* GoalCheckInEdit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE0014FAAC7A19A48B2C55 /* GoalCheckInEdit.swift */; };
-		A0DEB2E8294CD05546F5B4B7 /* WeekAheadViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE7728054A2E1F9F736820 /* WeekAheadViewModel.swift */; };
+		A0DEB2E8294CD05546F5B4B7 /* DeckWeekCommitment.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE7728054A2E1F9F736820 /* DeckWeekCommitment.swift */; };
 		A0DE0016FAAC7A19A48B2C72 /* GoalCommitmentRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE0016FAAC7A19A48B2C71 /* GoalCommitmentRow.swift */; };
 		A0DE0015FAAC7A19A48B2C62 /* GoalItemRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE0015FAAC7A19A48B2C61 /* GoalItemRow.swift */; };
 		B1A1C0DE00000000000F0007 /* GoalsModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */; };
@@ -723,7 +722,6 @@
 		2D040393A5D1598FA7E58E97 /* DeckMandarinCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E500908D2992BBA8212DC303 /* DeckMandarinCard.swift */; };
 		B912D5B858D5BD7FD2B98267 /* MandarinCallSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0ECF7E2B4622F71B57A4236 /* MandarinCallSheet.swift */; };
 		7996C4637483EC2F9FFB5D8F /* MandarinPractice.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E40E9A114A449B71C984B6 /* MandarinPractice.swift */; };
-		A0DE1106959C69CCBD66C799 /* DeckWeekAheadCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DEFBDBFEC0F250EDED2408 /* DeckWeekAheadCard.swift */; };
 		1D1690542CB14BFC98AD9520 /* DeckUsageTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 207F26B7DB7C4F0BAF86AD12 /* DeckUsageTracker.swift */; };
 		70D8A76A4B70437EB3ABB465 /* DeckVariantPick.swift in Sources */ = {isa = PBXBuildFile; fileRef = 724D31DFBB984CEDA6184201 /* DeckVariantPick.swift */; };
 		A03097EDF4CD4DA8A36517C9 /* DeckStyleChipsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FBFD88AD195438D825CC526 /* DeckStyleChipsSection.swift */; };
@@ -737,7 +735,7 @@
 		C11A0C0DE0000000000F0B05 /* WeeksModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11A0C0DE0000000000F0F05 /* WeeksModelTests.swift */; };
 		E1738BAB8522C947D164304E /* WeeklyReviewParts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9997FD4AEDC0DB41AE844E37 /* WeeklyReviewParts.swift */; };
 		52EFB3BFAE23A2CBD2F6BD16 /* WeeklyReviewCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42439F008D2F7358721B7C24 /* WeeklyReviewCards.swift */; };
-		F058C6B9FC7434572B340945 /* WeeklyReviewCards+Account.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E9BF54142DCC84C129F3E6 /* WeeklyReviewCards+Account.swift */; };
+		F058C6B9FC7434572B340945 /* WeeklyReviewCards+V3.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E9BF54142DCC84C129F3E6 /* WeeklyReviewCards+V3.swift */; };
 		BA321437F2A99AC600DC41E2 /* DeckChangesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3EDD2AB568C4E3F30F3D18 /* DeckChangesCard.swift */; };
 		B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000102 /* BrainViewModel.swift */; };
 		B1A1C0DE0000000000000201 /* BrainViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000202 /* BrainViewModelTests.swift */; };
@@ -871,11 +869,10 @@
 		A0DE000292B90F697F77D29D /* GoalCheckInCardViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCheckInCardViewModelTests.swift; sourceTree = "<group>"; };
 		B423448EC09D605C3DA3D609 /* DailyAskModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyAskModelTests.swift; sourceTree = "<group>"; };
 		A0DE0003300540C2C75C9B4A /* GoalCheckInEditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCheckInEditTests.swift; sourceTree = "<group>"; };
-		A0DE9E759868615CA68657FC /* WeekAheadViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekAheadViewModelTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsViewModels.swift; sourceTree = "<group>"; };
 		A0DE002C9AEE2AE3608A3D15 /* GoalCheckInCardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCheckInCardViewModel.swift; sourceTree = "<group>"; };
 		A0DE0014FAAC7A19A48B2C55 /* GoalCheckInEdit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCheckInEdit.swift; sourceTree = "<group>"; };
-		A0DE7728054A2E1F9F736820 /* WeekAheadViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekAheadViewModel.swift; sourceTree = "<group>"; };
+		A0DE7728054A2E1F9F736820 /* DeckWeekCommitment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckWeekCommitment.swift; sourceTree = "<group>"; };
 		A0DE0016FAAC7A19A48B2C71 /* GoalCommitmentRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCommitmentRow.swift; sourceTree = "<group>"; };
 		A0DE0015FAAC7A19A48B2C61 /* GoalItemRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalItemRow.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsModelsTests.swift; sourceTree = "<group>"; };
@@ -1563,7 +1560,6 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		E500908D2992BBA8212DC303 /* DeckMandarinCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckMandarinCard.swift; sourceTree = "<group>"; };
 		A0ECF7E2B4622F71B57A4236 /* MandarinCallSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MandarinCallSheet.swift; sourceTree = "<group>"; };
 		A9E40E9A114A449B71C984B6 /* MandarinPractice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MandarinPractice.swift; sourceTree = "<group>"; };
-		A0DEFBDBFEC0F250EDED2408 /* DeckWeekAheadCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckWeekAheadCard.swift; sourceTree = "<group>"; };
 		207F26B7DB7C4F0BAF86AD12 /* DeckUsageTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckUsageTracker.swift; sourceTree = "<group>"; };
 		724D31DFBB984CEDA6184201 /* DeckVariantPick.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckVariantPick.swift; sourceTree = "<group>"; };
 		5FBFD88AD195438D825CC526 /* DeckStyleChipsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckStyleChipsSection.swift; sourceTree = "<group>"; };
@@ -1577,7 +1573,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		C11A0C0DE0000000000F0F05 /* WeeksModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeksModelTests.swift; sourceTree = "<group>"; };
 		9997FD4AEDC0DB41AE844E37 /* WeeklyReviewParts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyReviewParts.swift; sourceTree = "<group>"; };
 		42439F008D2F7358721B7C24 /* WeeklyReviewCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyReviewCards.swift; sourceTree = "<group>"; };
-		A2E9BF54142DCC84C129F3E6 /* WeeklyReviewCards+Account.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WeeklyReviewCards+Account.swift"; sourceTree = "<group>"; };
+		A2E9BF54142DCC84C129F3E6 /* WeeklyReviewCards+V3.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WeeklyReviewCards+V3.swift"; sourceTree = "<group>"; };
 		5C3EDD2AB568C4E3F30F3D18 /* DeckChangesCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckChangesCard.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000204 /* BrainModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainModelsTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000902 /* BrainStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrainStyle.swift; sourceTree = "<group>"; };
@@ -1711,7 +1707,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */,
 				A0DE002C9AEE2AE3608A3D15 /* GoalCheckInCardViewModel.swift */,
 				A0DE0014FAAC7A19A48B2C55 /* GoalCheckInEdit.swift */,
-				A0DE7728054A2E1F9F736820 /* WeekAheadViewModel.swift */,
+				A0DE7728054A2E1F9F736820 /* DeckWeekCommitment.swift */,
 				A0DE0016FAAC7A19A48B2C71 /* GoalCommitmentRow.swift */,
 				A0DE0015FAAC7A19A48B2C61 /* GoalItemRow.swift */,
 				B1A1C0DE00000000000F0004 /* GoalsDataClient.swift */,
@@ -1859,7 +1855,6 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				A0DE000292B90F697F77D29D /* GoalCheckInCardViewModelTests.swift */,
 				B423448EC09D605C3DA3D609 /* DailyAskModelTests.swift */,
 				A0DE0003300540C2C75C9B4A /* GoalCheckInEditTests.swift */,
-				A0DE9E759868615CA68657FC /* WeekAheadViewModelTests.swift */,
 				B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */,
 				B1A1C0DE0000000000000E16 /* PrepViewModelsTests.swift */,
 				C0F5E5F40000000000000000 /* PrepMockTests.swift */,
@@ -2751,7 +2746,6 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				E500908D2992BBA8212DC303 /* DeckMandarinCard.swift */,
 				A0ECF7E2B4622F71B57A4236 /* MandarinCallSheet.swift */,
 				A9E40E9A114A449B71C984B6 /* MandarinPractice.swift */,
-				A0DEFBDBFEC0F250EDED2408 /* DeckWeekAheadCard.swift */,
 				207F26B7DB7C4F0BAF86AD12 /* DeckUsageTracker.swift */,
 				724D31DFBB984CEDA6184201 /* DeckVariantPick.swift */,
 				5FBFD88AD195438D825CC526 /* DeckStyleChipsSection.swift */,
@@ -2760,7 +2754,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				73791819BE9CF33A7A9059E7 /* WeeklyReviewCards+Steer.swift */,
 				9997FD4AEDC0DB41AE844E37 /* WeeklyReviewParts.swift */,
 				42439F008D2F7358721B7C24 /* WeeklyReviewCards.swift */,
-				A2E9BF54142DCC84C129F3E6 /* WeeklyReviewCards+Account.swift */,
+				A2E9BF54142DCC84C129F3E6 /* WeeklyReviewCards+V3.swift */,
 				5C3EDD2AB568C4E3F30F3D18 /* DeckChangesCard.swift */,
 				AD79724DF6D6FD92B594BBC5 /* DailyDeckView.swift */,
 				D71D8CEEBE37C8E43E46A2B4 /* DailyDeckViewModel.swift */,
@@ -3067,7 +3061,6 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				2D040393A5D1598FA7E58E97 /* DeckMandarinCard.swift in Sources */,
 				B912D5B858D5BD7FD2B98267 /* MandarinCallSheet.swift in Sources */,
 				7996C4637483EC2F9FFB5D8F /* MandarinPractice.swift in Sources */,
-				A0DE1106959C69CCBD66C799 /* DeckWeekAheadCard.swift in Sources */,
 				1D1690542CB14BFC98AD9520 /* DeckUsageTracker.swift in Sources */,
 				70D8A76A4B70437EB3ABB465 /* DeckVariantPick.swift in Sources */,
 				A03097EDF4CD4DA8A36517C9 /* DeckStyleChipsSection.swift in Sources */,
@@ -3080,7 +3073,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C11A0C0DE0000000000F0B04 /* YearOfWeeksView.swift in Sources */,
 				E1738BAB8522C947D164304E /* WeeklyReviewParts.swift in Sources */,
 				52EFB3BFAE23A2CBD2F6BD16 /* WeeklyReviewCards.swift in Sources */,
-				F058C6B9FC7434572B340945 /* WeeklyReviewCards+Account.swift in Sources */,
+				F058C6B9FC7434572B340945 /* WeeklyReviewCards+V3.swift in Sources */,
 				BA321437F2A99AC600DC41E2 /* DeckChangesCard.swift in Sources */,
 				B1A1C0DE0000000000000002 /* BrainViewModel.swift in Sources */,
 				B1A1C0DE00000000000000A3 /* BrainModels.swift in Sources */,
@@ -3116,7 +3109,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				B1A1C0DE00000000000F0009 /* GoalsViewModels.swift in Sources */,
 				A0DE002C9AEE2AE3608A3D16 /* GoalCheckInCardViewModel.swift in Sources */,
 				A0DE0014FAAC7A19A48B2C56 /* GoalCheckInEdit.swift in Sources */,
-				A0DEB2E8294CD05546F5B4B7 /* WeekAheadViewModel.swift in Sources */,
+				A0DEB2E8294CD05546F5B4B7 /* DeckWeekCommitment.swift in Sources */,
 				A0DE0016FAAC7A19A48B2C72 /* GoalCommitmentRow.swift in Sources */,
 				A0DE0015FAAC7A19A48B2C62 /* GoalItemRow.swift in Sources */,
 				B1A1C0DE00000000000F0005 /* GoalsDataClient.swift in Sources */,
@@ -3589,7 +3582,6 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				A0DE000292B90F697F77D29E /* GoalCheckInCardViewModelTests.swift in Sources */,
 				8E79A3B222BF417A727CCE9D /* DailyAskModelTests.swift in Sources */,
 				A0DE0003F6338217394AF92B /* GoalCheckInEditTests.swift in Sources */,
-				A0DE32DA8AE24542AF68361E /* WeekAheadViewModelTests.swift in Sources */,
 				B1A1C0DE00000000000F0007 /* GoalsModelsTests.swift in Sources */,
 				B1A1C0DE0000000000000E15 /* PrepViewModelsTests.swift in Sources */,
 				C0F5E5F30000000000000000 /* PrepMockTests.swift in Sources */,

@@ -99,14 +99,10 @@ struct DeckPalette: Equatable {
         case .goal:
             let goal = GoalPaper.palette(named: card.color ?? "", slug: card.goals.first ?? card.id)
             return DeckPalette(goal.colors, symbol: "flag", name: "Goals", shortName: "Goals")
-        case .weekAhead:
-            let goal = GoalPaper.palette(named: card.color ?? "", slug: card.goal ?? card.id)
-            return DeckPalette(goal.colors, symbol: "calendar", name: "Week ahead", shortName: "Week ahead")
         case .ask: return .ask
         case .decision: return card.isViewTake ? .weekQuestion : .followUps
         case .changes: return .changes
-        case .cover, .filmstrip, .story, .energy, .commitments, .values, .predictions, .who, .keepsakes: return .week
-        case .lastIntention, .value, .intention: return .week
+        case .cover, .lastIntention, .value, .intention, .keepsakes: return .week
         case .item, .unknown:
             switch card.itemKind {
             case "theme": return .theme

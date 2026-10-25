@@ -582,9 +582,9 @@ final class DailyDeckViewModel {
         }
     }
 
-    // The v2 weekly review's answers, each keyed by the card's item ids (`DeckAnswer`).
+    // The weekly review's answers, each keyed by the card's item ids (`DeckAnswer`).
 
-    /// Sets one of a card's lists: the energy card's "gave" and "drained", the who card's "who".
+    /// Sets one of a card's lists: the cover's kept "moments", the intention card's "accepted".
     /// An emptied list stays (as none), so filing doesn't fall back to the drafted chips.
     func setList(_ key: String, _ values: [String], for card: DeckCard) {
         update(card) { answer in
@@ -609,8 +609,7 @@ final class DailyDeckViewModel {
         }
     }
 
-    /// Grades an item: a commitment kept, missed, or dropped, a prediction hit, partly, or miss.
-    /// Nil clears it.
+    /// Grades an item: last week's intention held, partly, or didnt. Nil clears it.
     func setStatus(_ id: String, _ status: String?, for card: DeckCard) {
         update(card) { answer in
             var statuses = answer.statuses ?? [:]
@@ -619,30 +618,14 @@ final class DailyDeckViewModel {
         }
     }
 
-    /// A line for an item: a value's evidence, a prediction's "what happened". An empty line clears
-    /// it, so a value shows (and files) Atlas's evidence again.
+    /// A line for an item: an intention field, or the words of a moment he added. An empty line
+    /// clears it.
     func setNote(_ id: String, _ text: String, for card: DeckCard) {
         update(card) { answer in
             var notes = answer.notes ?? [:]
             notes[id] = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text
             answer.notes = notes.isEmpty ? nil : notes
         }
-    }
-
-    /// The keepsakes card's prediction; one without words is none.
-    func setPrediction(_ prediction: DeckPrediction?, for card: DeckCard) {
-        update(card) { answer in
-            let hasText = !(prediction?.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
-            answer.prediction = hasText ? prediction : nil
-        }
-    }
-
-    /// Last week's commitments marked missed on this deck, in the card's order: what the one-thing
-    /// and who cards offer to carry.
-    var missedCommitments: [DeckReviewItem] {
-        guard let card = cards.first(where: { $0.type == .commitments }) else { return [] }
-        let statuses = answers[card.id]?.statuses ?? [:]
-        return card.items.filter { statuses[$0.id] == CommitmentStatus.missed }
     }
 
     /// A self-rating card's scores so far, read from its answer text.
@@ -759,10 +742,32 @@ final class DailyDeckViewModel {
         answers[card.id]?.lists?["moments"] ?? card.moments.map(\.id)
     }
 
-    /// The cover's moments as he keeps them, in order. An id the card doesn't carry is left out.
+    /// The cover's moments as he keeps them, in order: the card's and its spares, and his own
+    /// (`own-<n>`, its words in the answer's `notes`). An id with nothing to show is left out.
     func keptMoments(for card: DeckCard) -> [DeckMoment] {
         let pool = Dictionary((card.moments + card.spares).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        return keptMomentIDs(for: card).compactMap { pool[$0] }
+        let notes = answers[card.id]?.notes ?? [:]
+        return keptMomentIDs(for: card).compactMap { id in
+            if let moment = pool[id] { return moment }
+            guard id.hasPrefix(Self.ownMomentPrefix), let line = notes[id] else { return nil }
+            return DeckMoment(id: id, day: "", line: line, value: "")
+        }
+    }
+
+    nonisolated static let ownMomentPrefix = "own-"
+
+    /// Adds a moment of his own to the end of the cover, under the next free `own-<n>` id; blank
+    /// words add nothing. Offered on a week the brief found no moments in.
+    func addOwnMoment(_ line: String, for card: DeckCard) {
+        let line = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !line.isEmpty else { return }
+        let kept = keptMomentIDs(for: card)
+        let taken = Set(kept).union((answers[card.id]?.notes ?? [:]).keys)
+        var number = 1
+        while taken.contains("\(Self.ownMomentPrefix)\(number)") { number += 1 }
+        let id = "\(Self.ownMomentPrefix)\(number)"
+        setNote(id, line, for: card)
+        setList("moments", kept + [id], for: card)
     }
 
     /// Moment ids the cover has shown on this screen: its own moments, whatever he keeps, and every
@@ -785,6 +790,12 @@ final class DailyDeckViewModel {
     /// Whether a moment can go: the cover keeps at least three it can show.
     func canRemove(for card: DeckCard) -> Bool { keptMoments(for: card).count > 3 }
 
+    /// Whether moment `id` can go: one of his own always can, so a moment added by mistake comes
+    /// back off; the brief's need at least three left.
+    func canRemoveMoment(_ id: String, for card: DeckCard) -> Bool {
+        id.hasPrefix(Self.ownMomentPrefix) || canRemove(for: card)
+    }
+
     /// Puts the first spare not shown yet in moment `id`'s place; nothing without one.
     func swapMoment(_ id: String, for card: DeckCard) {
         var kept = keptMomentIDs(for: card)
@@ -794,14 +805,15 @@ final class DailyDeckViewModel {
         setList("moments", kept, for: card)
     }
 
-    /// Takes moment `id` off the cover; nothing once only three are left.
+    /// Takes moment `id` off the cover; nothing once only three are left, unless it's his own.
     func removeMoment(_ id: String, for card: DeckCard) {
-        guard canRemove(for: card) else { return }
+        guard canRemoveMoment(id, for: card) else { return }
         var kept = keptMomentIDs(for: card)
         guard let index = kept.firstIndex(of: id) else { return }
         shownMoments[card.id] = shownMomentIDs(for: card)
         kept.remove(at: index)
         setList("moments", kept, for: card)
+        if id.hasPrefix(Self.ownMomentPrefix) { setNote(id, "", for: card) }  // his words go with it
     }
 
     /// The intention card's fields: "text" (the intention, the answer's `text`) and "thread",

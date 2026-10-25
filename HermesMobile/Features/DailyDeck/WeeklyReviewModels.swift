@@ -1,24 +1,8 @@
 import Foundation
 
-// The weekly review's deck pieces (v2 and v3) and the week record the app reads back. The vault writes both
+// The weekly review's deck pieces and the week record the app reads back. The vault writes both
 // (`tools/daily_deck.py` for the deck, `tools/brain/commands/brief.py` for the record); every
 // field decodes tolerantly, so a newer vault never costs the deck or the page.
-
-/// One chapter on the cover: "Remember", with the minutes it should take.
-struct DeckChapter: Decodable, Equatable, Identifiable {
-    let id: String
-    let label: String
-    let minutes: Int?
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = try c.decode(String.self, forKey: .id)
-        label = (try? c.decodeIfPresent(String.self, forKey: .label)) ?? ""
-        minutes = try? c.decodeIfPresent(Int.self, forKey: .minutes)
-    }
-
-    private enum CodingKeys: String, CodingKey { case id, label, minutes }
-}
 
 /// The note an earlier week left for this one, shown sealed on the cover until tapped.
 struct DeckPastNote: Decodable, Equatable {
@@ -118,134 +102,12 @@ struct DeckGoalChange: Decodable, Equatable, Identifiable {
     private enum CodingKeys: String, CodingKey { case goal, title, label, reason, start, commitments }
 }
 
-/// One day on the filmstrip: its weekday, a line about it, who you saw, hours slept, and a run.
-struct DeckDay: Decodable, Equatable {
-    let label: String
-    let line: String?
-    let people: [String]
-    let sleepHours: Double?
-    let run: String?
-
-    init(label: String, line: String?, people: [String] = [], sleepHours: Double?, run: String?) {
-        self.label = label
-        self.line = line
-        self.people = people
-        self.sleepHours = sleepHours
-        self.run = run
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        label = try c.decode(String.self, forKey: .label)
-        line = try? c.decodeIfPresent(String.self, forKey: .line)
-        people = (try? c.decodeIfPresent([String].self, forKey: .people)) ?? []
-        sleepHours = try? c.decodeIfPresent(Double.self, forKey: .sleepHours)
-        run = try? c.decodeIfPresent(String.self, forKey: .run)
-    }
-
-    private enum CodingKeys: String, CodingKey { case label, line, people, sleepHours, run }
-}
-
-/// A row to grade on the commitments card (`carried` counts the weeks it has rolled over) or the
-/// predictions card (`probability`, `due`, and the Sunday it was `madeWeek`).
-struct DeckReviewItem: Decodable, Equatable, Identifiable {
-    let id: String
-    let text: String
-    let carried: Int?
-    let probability: Int?
-    let due: String?
-    let madeWeek: String?
-
-    init(id: String, text: String, carried: Int? = nil, probability: Int? = nil, due: String? = nil, madeWeek: String? = nil) {
-        self.id = id
-        self.text = text
-        self.carried = carried
-        self.probability = probability
-        self.due = due
-        self.madeWeek = madeWeek
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = try c.decode(String.self, forKey: .id)
-        text = try c.decode(String.self, forKey: .text)
-        carried = try? c.decodeIfPresent(Int.self, forKey: .carried)
-        probability = try? c.decodeIfPresent(Int.self, forKey: .probability)
-        due = try? c.decodeIfPresent(String.self, forKey: .due)
-        madeWeek = try? c.decodeIfPresent(String.self, forKey: .madeWeek)
-    }
-
-    private enum CodingKeys: String, CodingKey { case id, text, carried, probability, due, madeWeek }
-}
-
-/// One of the five values on the values card, with the evidence the brief found for it.
-struct DeckValue: Decodable, Equatable, Identifiable {
-    let id: String
-    let name: String
-    let evidence: String?
-
-    init(id: String, name: String, evidence: String? = nil) {
-        self.id = id
-        self.name = name
-        self.evidence = evidence
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = try c.decode(String.self, forKey: .id)
-        name = (try? c.decodeIfPresent(String.self, forKey: .name)) ?? id
-        evidence = try? c.decodeIfPresent(String.self, forKey: .evidence)
-    }
-
-    private enum CodingKeys: String, CodingKey { case id, name, evidence }
-}
-
-/// A prediction made on the keepsakes card: what, how sure, and when it can be graded.
-struct DeckPrediction: Codable, Equatable {
-    var text: String
-    var probability: Int
-    var due: String
-}
-
-extension DeckPrediction {
-    static let defaultProbability = 70
-
-    /// A new prediction's due day, `yyyy-MM-dd`: four weeks after the deck's day.
-    static func defaultDue(deckDate: String, calendar: Calendar = .current) -> String {
-        let start = date(day: deckDate, calendar: calendar) ?? Date()
-        return DailyDeckPaths.day(calendar.date(byAdding: .day, value: 28, to: start) ?? start, calendar: calendar)
-    }
-
-    /// A `yyyy-MM-dd` day as a date in `calendar`, nil when it doesn't read as one.
-    static func date(day: String, calendar: Calendar = .current) -> Date? {
-        let parts = day.split(separator: "-").compactMap { Int($0) }
-        guard parts.count == 3 else { return nil }
-        return calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2], hour: 12))
-    }
-}
-
-/// A commitment's grade on the commitments card. Tapping a row steps through the cycle.
-enum CommitmentStatus {
-    static let kept = "kept"
-    static let missed = "missed"
-    static let dropped = "dropped"
-
-    /// None, kept, missed, dropped, and back to none.
-    static let cycle: [String?] = [nil, kept, missed, dropped]
-
-    /// The status after `status`; an unknown one starts over at kept.
-    static func next(after status: String?) -> String? {
-        let index = cycle.firstIndex(of: status) ?? 0
-        return cycle[(index + 1) % cycle.count]
-    }
-}
-
 extension DeckCard {
-    /// The v2 weekly chapters, in the order the review walks them.
-    static let weeklyChapters = ["remember", "understand", "account", "steer"]
+    /// The weekly chapters, in the order the review walks them.
+    static let weeklyChapters = ["remember", "reflect", "values", "steer"]
 
     /// The card's chapter as it shows in place of the reason line: "1 · Remember". Nil on the
-    /// cover, the close, and any card off the v2 weekly deck.
+    /// cover, the close, and any card off the weekly deck.
     var chapterLabel: String? {
         guard let chapter, !chapter.isEmpty else { return nil }
         let name = chapter.prefix(1).uppercased() + chapter.dropFirst()
@@ -254,21 +116,20 @@ extension DeckCard {
     }
 }
 
-/// The five values, scored 1–10 each week, and which two the week is remembered by.
-enum WeeklyValues {
-    /// The fixed order the vault uses; a tie goes to the earlier value.
+/// The five values the weekly review walks, one card each, in the vault's order.
+enum WeekValues {
     static let order = ["present", "people", "dad", "potential", "body"]
 
-    /// The highest-scored value, then the lowest. When every score is equal (or only one is
-    /// scored) only the top one counts. Scores for ids outside `order` are ignored.
-    static func topAndBottom(_ scores: [String: Int], order: [String]) -> [String] {
-        let scored = order.compactMap { id in scores[id].map { (id: id, score: $0) } }
-        guard var top = scored.first, var bottom = scored.first else { return [] }
-        for entry in scored.dropFirst() {
-            if entry.score > top.score { top = entry }
-            if entry.score < bottom.score { bottom = entry }
+    /// The moment chip's name for a value: "People" for "people"; nil for an id outside the five.
+    static func shortName(_ id: String) -> String? {
+        switch id {
+        case "present": "Present"
+        case "people": "People"
+        case "dad": "Dad"
+        case "potential": "Potential"
+        case "body": "Body"
+        default: nil
         }
-        return top.score == bottom.score ? [top.id] : [top.id, bottom.id]
     }
 }
 
