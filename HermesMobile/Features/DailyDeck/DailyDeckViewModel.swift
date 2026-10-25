@@ -782,8 +782,8 @@ final class DailyDeckViewModel {
     /// Whether Swap has a spare left to bring in; when not, no row offers it.
     func canSwap(for card: DeckCard) -> Bool { nextSpare(for: card) != nil }
 
-    /// Whether a moment can go: the cover keeps at least three.
-    func canRemove(for card: DeckCard) -> Bool { keptMomentIDs(for: card).count > 3 }
+    /// Whether a moment can go: the cover keeps at least three it can show.
+    func canRemove(for card: DeckCard) -> Bool { keptMoments(for: card).count > 3 }
 
     /// Puts the first spare not shown yet in moment `id`'s place; nothing without one.
     func swapMoment(_ id: String, for card: DeckCard) {
@@ -879,7 +879,8 @@ final class DailyDeckViewModel {
         }
         guard generation == intentionDraftGeneration else { return }  // another deck opened
         isDraftingIntention = false
-        guard self.deck?.date == deck.date, kind == deck.kind else { return }  // or failed to open
+        // Or another deck is loading, or failed to load: its answers aren't this deck's.
+        guard state == .ready, date == deck.date, kind == deck.kind, self.deck?.date == deck.date else { return }
         if let draft, !draft.isEmpty {
             fillIntention("thread", draft.thread, for: card)
             fillIntention("text", draft.intention, for: card)

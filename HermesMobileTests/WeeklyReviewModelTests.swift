@@ -174,6 +174,46 @@ final class WeeklyReviewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testRemoveCountsOnlyMomentsTheCoverCanShow() async throws {
+        let (viewModel, _) = try await v3ViewModelAndClient()
+        let cover = try card("cover", in: viewModel)
+        viewModel.setList("moments", ["m1", "m2", "gone", "m3"], for: cover)
+        XCTAssertEqual(viewModel.keptMoments(for: cover).map(\.id), ["m1", "m2", "m3"])
+        XCTAssertFalse(viewModel.canRemove(for: cover), "a stale id isn't a fourth moment")
+        viewModel.removeMoment("m1", for: cover)
+        XCTAssertEqual(viewModel.keptMoments(for: cover).map(\.id), ["m1", "m2", "m3"])
+    }
+
+    @MainActor
+    func testALateDraftIsDroppedOnceAnotherDeckIsOnScreen() async throws {
+        let (viewModel, client) = try await v3ViewModelAndClient()
+        let store = DailyDeckStore(defaults: try XCTUnwrap(UserDefaults(suiteName: suiteName)))
+        let intention = try card("intention", in: viewModel)
+        client.intentionDraft = .success(WeekIntentionDraft(thread: "Honesty", intention: "Drafted", obstacle: "Late calls", ifThen: nil))
+        let arrived = expectation(description: "the draft was asked for")
+        let (release, releaser) = AsyncStream<Void>.makeStream()
+        client.intentionGate = {
+            arrived.fulfill()
+            for await _ in release { break }
+        }
+        let drafting = Task { await viewModel.intentionDraft() }
+        await fulfillment(of: [arrived], timeout: 5)
+
+        // He opens last week's review from the calendar, and its load fails before the deck opens.
+        client.listingErrors[DailyDeckPaths.directory] = APIError.http(statusCode: 500, body: nil)
+        await viewModel.show(date: "2026-10-18", kind: "weekly")
+        if case .failed = viewModel.state {} else { XCTFail("expected the load to fail, got \(viewModel.state)") }
+        releaser.yield()
+        releaser.finish()
+        await drafting.value
+
+        XCTAssertFalse(viewModel.isDraftingIntention)
+        XCTAssertTrue(store.answers(for: server, date: "2026-10-18", kind: "weekly").isEmpty, "nothing lands on the other deck")
+        XCTAssertNil(store.answers(for: server, date: "2026-10-25", kind: "weekly")["intention"])
+        XCTAssertNil(viewModel.answer(for: intention), "the old deck's answers are untouched")
+    }
+
+    @MainActor
     func testAnswerPayloadForV3Cards() async throws {
         let (viewModel, _) = try await v3ViewModelAndClient()
         let deck = try XCTUnwrap(viewModel.deck)

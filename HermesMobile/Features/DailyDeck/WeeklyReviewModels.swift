@@ -118,7 +118,7 @@ struct DeckGoalChange: Decodable, Equatable, Identifiable {
     private enum CodingKeys: String, CodingKey { case goal, title, label, reason, start, commitments }
 }
 
-/// One day on the filmstrip:its weekday, a line about it, who you saw, hours slept, and a run.
+/// One day on the filmstrip: its weekday, a line about it, who you saw, hours slept, and a run.
 struct DeckDay: Decodable, Equatable {
     let label: String
     let line: String?
