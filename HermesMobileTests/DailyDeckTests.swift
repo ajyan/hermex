@@ -2570,3 +2570,146 @@ final class MandarinPracticeTests: XCTestCase {
         XCTAssertNil(MandarinProgressLine.text(DeckMandarinProgress(phrases: nil, usedWeek: nil, englishNow: nil, englishBefore: nil)))
     }
 }
+
+// MARK: - Meals
+
+private actor FakeMealsClient: MealsDataClient {
+    var weekResult: Result<String, Error> = .success(#"{"week":"2026-10-26","accepted":false}"#)
+    var acceptResult: Result<String, Error> = .success(
+        #"{"week":"2026-10-26","groceries":{"Whole Foods":9,"Weee!":12},"prep":["Kimchi jjigae: slice the pork belly"],"reminders":{"added":21,"learned":[]}}"#)
+    private(set) var accepted: [MealsAcceptRequest] = []
+
+    func setAccept(_ result: Result<String, Error>) { acceptResult = result }
+
+    func week(_ monday: String) async throws -> MealsWeek {
+        try PrepDecoding.decode(MealsWeek.self, from: Data(try weekResult.get().utf8))
+    }
+
+    func accept(_ request: MealsAcceptRequest) async throws -> MealsWeek {
+        accepted.append(request)
+        return try PrepDecoding.decode(MealsWeek.self, from: Data(try acceptResult.get().utf8))
+    }
+}
+
+extension DailyDeckTests {
+    static let mealsDeckJSON = #"""
+    {"version": 1, "date": "2026-10-04", "kind": "morning", "cards": [
+      {"id": "meals-dinner", "type": "dinner", "title": "Last night's dinner?", "question": "What was dinner on Saturday?",
+       "date": "2026-10-24", "files_to": "meals",
+       "options": [{"id": "kimchi-jjigae", "label": "Kimchi jjigae"}, {"id": 7}, {"id": "other", "label": "Something else"},
+                   {"id": "out", "label": "Ate out"}]},
+      {"id": "meals-plan", "type": "meals", "title": "This week's dinners", "question": "Dinners for the week of Oct 26",
+       "fallback": "Atlas's picks: Sheet pan chicken.",
+       "meals": {"week": "2026-10-26", "nights": 2, "min_nights": 1, "max_nights": 9, "servings": 3,
+         "slots": [
+           {"id": "night-1", "candidates": [
+             {"dish": "sheet-pan-chicken", "name": "Sheet pan chicken", "veg": ["cauliflower"], "why": "in season: cauliflower", "tag": "new"},
+             {"dish": "lions-head", "name": "Lion's head", "veg": []}]},
+           {"id": "night-2", "candidates": [
+             {"dish": "kimchi-jjigae", "name": "Kimchi jjigae", "veg": ["daikon"], "why": "", "tag": null},
+             {"dish": "lions-head", "name": "Lion's head"}, {"dish": "gyudon", "name": "Gyudon"},
+             {"dish": "oyakodon", "name": "Oyakodon"}, {"name": "no slug"}]},
+           {"id": "night-3", "candidates": [{"dish": "gyudon", "name": "Gyudon"}, {"dish": "oyakodon", "name": "Oyakodon"}]},
+           {"id": "empty", "candidates": []}],
+         "backup": {"dish": "pantry-pasta", "name": "Pantry pasta"}, "on_hand": ["fridge sauce"]}},
+      {"id": "close", "type": "close"}
+    ]}
+    """#
+
+    func testDinnerAndMealsCardsDecodeTolerantly() throws {
+        let cards = try DailyDeck.decode(Self.mealsDeckJSON).cards
+        let dinner = cards[0]
+        XCTAssertEqual(dinner.type, .dinner)
+        XCTAssertEqual(dinner.date, "2026-10-24")
+        XCTAssertEqual(dinner.options.map(\.id), ["kimchi-jjigae", "other", "out"], "a malformed option drops only itself")
+        XCTAssertTrue(dinner.takesText)
+        XCTAssertFalse(dinner.takesFeedback)
+        XCTAssertEqual(DeckCardText(dinner).lead, "What was dinner on Saturday?")
+        XCTAssertEqual(DeckPalette.of(dinner).name, "Last night's dinner")
+
+        let meals = cards[1]
+        XCTAssertEqual(meals.type, .meals)
+        let plan = try XCTUnwrap(meals.meals)
+        XCTAssertEqual(plan.slots.map(\.id), ["night-1", "night-2", "night-3"], "a night with no dinners is dropped")
+        XCTAssertEqual(plan.slots[1].candidates.count, 4, "a candidate without a dish is dropped")
+        XCTAssertEqual(plan.maxNights, 3, "never more nights than slots")
+        XCTAssertEqual(plan.nights, 2)
+        XCTAssertEqual(plan.onHand, ["fridge sauce"])
+        XCTAssertNil(plan.slots[1].candidates[0].why, "an empty why reads as none")
+        XCTAssertEqual(plan.slots[0].candidates[0].tag, "new")
+        XCTAssertFalse(meals.takesFeedback)
+        XCTAssertEqual(DeckPalette.of(meals).name, "This week's dinners")
+        XCTAssertEqual(DeckPalette.of(meals).colors, .kitchen)
+        XCTAssertNil(try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"m","type":"meals","meals":{"week":"w","slots":[]}}]}"#).cards[0].meals,
+                     "a plan with no nights shows the fallback")
+    }
+
+    func testMealsSelectionSwapsShufflesAndNeverRepeatsADinner() throws {
+        let plan = try XCTUnwrap(try DailyDeck.decode(Self.mealsDeckJSON).cards[1].meals)
+        var selection = MealsSelection(plan: plan)
+        let first = plan.slots[0], second = plan.slots[1]
+        XCTAssertEqual(selection.pick(in: second).dish, "kimchi-jjigae")
+        XCTAssertEqual(selection.alternatives(in: second, plan: plan).map(\.dish), ["lions-head", "gyudon"])
+        XCTAssertTrue(selection.canShuffle(second, plan: plan))
+        selection.shuffle(second)
+        XCTAssertEqual(selection.alternatives(in: second, plan: plan).map(\.dish), ["oyakodon", "lions-head"], "↻ moves on and wraps")
+
+        selection.choose(second.candidates[1], in: second)  // Lion's head on night 2
+        XCTAssertEqual(selection.alternatives(in: first, plan: plan).map(\.dish), [],
+                       "night 1 can't offer what night 2 picked, nor its own pick")
+        XCTAssertEqual(selection.request(plan),
+                       MealsAcceptRequest(week: "2026-10-26",
+                                          picks: [.init(dish: "sheet-pan-chicken", veg: ["cauliflower"]), .init(dish: "lions-head", veg: [])],
+                                          backup: "pantry-pasta"))
+        selection.nights = 3
+        XCTAssertEqual(selection.request(plan).picks.map(\.dish), ["sheet-pan-chicken", "lions-head", "gyudon"])
+    }
+
+    @MainActor
+    func testAcceptingTheMealPlanShowsOnlyWhatTheServerSaved() async throws {
+        let client = FakeMealsClient()
+        let model = MealsPlanModel(client: client)
+        await model.load(week: "2026-10-26")
+        XCTAssertNil(model.accepted("2026-10-26"))
+        XCTAssertTrue(model.unplanned.contains("2026-10-26"))
+
+        await client.setAccept(.failure(APIError.http(statusCode: 500, body: nil)))
+        let request = MealsAcceptRequest(week: "2026-10-26", picks: [.init(dish: "kimchi-jjigae", veg: ["daikon"])], backup: nil)
+        let failed = await model.accept(request)
+        XCTAssertFalse(failed)
+        XCTAssertNil(model.accepted("2026-10-26"), "no success before the server says so")
+        XCTAssertEqual(model.error, "Couldn't save the plan. Try again.")
+
+        await client.setAccept(.success(#"{"week":"2026-10-26","groceries":{"Whole Foods":9,"Weee!":12},"prep":["Slice the pork"],"reminders":{"error":"approve it on the Mac"}}"#))
+        let saved = await model.accept(request)
+        XCTAssertTrue(saved)
+        let week = try XCTUnwrap(model.accepted("2026-10-26"))
+        XCTAssertEqual(week.groceryLine, "Weee! 12 · Whole Foods 9")
+        XCTAssertEqual(week.remindersError, "approve it on the Mac")
+        XCTAssertNil(model.error)
+        let sent = await client.accepted
+        XCTAssertEqual(sent.count, 2)
+
+        model.reopen("2026-10-26")
+        XCTAssertNil(model.accepted("2026-10-26"), "Change reopens the week")
+    }
+
+    @MainActor
+    func testTheDinnerCardFilesItsPickRatingAndNote() async throws {
+        store.setWorkspace("/vault", for: server)
+        let model = makeViewModel(ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.mealsDeckJSON))
+        await model.load()
+        let card = try XCTUnwrap(model.cards.first { $0.type == .dinner })
+        model.pick("kimchi-jjigae", for: card)
+        model.rate(2, for: card)
+        model.setText("more gochugaru", for: card)
+        model.pick("other", for: card)
+        XCTAssertEqual(model.answer(for: card)?.action, "other")
+        XCTAssertEqual(model.answer(for: card)?.text, "more gochugaru", "changing the pick keeps the note")
+        model.pick("other", for: card)
+        XCTAssertNil(model.answer(for: card)?.action, "picking it again clears it")
+        let plan = try XCTUnwrap(model.cards.first { $0.type == .meals })
+        model.markAccepted(plan)
+        XCTAssertEqual(model.answer(for: plan)?.action, "accepted")
+    }
+}

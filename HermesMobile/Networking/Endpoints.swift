@@ -211,6 +211,10 @@ enum Endpoint {
     case goalReflection
     /// Today's job-search Ask (`api/vault_jobs.py`): GET today's three roles and lock state, POST an action.
     case jobsAsk
+    /// The week's dinners (`api/vault_meals.py` on this user's webui fork): GET a week's accepted plan
+    /// (`?week=<monday>`), POST `{week, picks: [{dish, veg}], backup?}` to accept one.
+    case mealsWeek(week: String)
+    case mealsAccept
     /// Files a Daily Deck's answers without the model (this user's webui fork):
     /// POST `{date, kind, answers}`. Servers without it answer 404.
     case briefFile
@@ -568,6 +572,10 @@ enum Endpoint {
             return "/api/goals/reflection"
         case .jobsAsk:
             return "/api/jobs/ask"
+        case .mealsWeek:
+            return "/api/meals/week"
+        case .mealsAccept:
+            return "/api/meals/accept"
         case .briefFile:
             return "/api/brief/file"
         case .briefPhoto:
@@ -806,6 +814,8 @@ enum Endpoint {
             return [URLQueryItem(name: "slug", value: slug)]
         case let .briefPhoto(weekEnding):
             return [URLQueryItem(name: "week_ending", value: weekEnding)]
+        case let .mealsWeek(week):
+            return [URLQueryItem(name: "week", value: week)]
         case let .labels(feature, item):
             var items: [URLQueryItem] = []
             if let feature { items.append(URLQueryItem(name: "feature", value: feature)) }

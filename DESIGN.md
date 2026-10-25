@@ -53,6 +53,7 @@ Each paper is one hue rendered as a glow that adapts to the appearance:
 | `mandarin` | `#FFDDD6` / `#5E1A0E` | `#B03A22` / `#FF9C85` | Mandarin practice |
 | `ledger` | `#EEF3D6` / `#2F3A0A` | `#4F6300` / `#C2DA6E` | (Money, not a Brief card) |
 | `dusk` | `#F3E4EE` / `#4A1F3D` | `#8C3D74` / `#E7A3CF` | The weekly review's cards |
+| `kitchen` | `#E3EEDB` / `#22381A` | `#46682F` / `#B2D49A` | Last night's dinner, This week's dinners |
 
 ### The object key
 
@@ -77,6 +78,7 @@ Named in `Config/HermexStyle.swift`; `HermexPaper.forTool(_:)` maps tool kinds.
 | The week's question: the morning's This week divider, and the Sunday review's close of it (his answers, Still open / Settled) on its own page | `DeckPalette.section`, `DeckPalette.weekQuestion` | `opener`, as a neutral summary card like the opener |
 | A week: weekly review cards, week page, year tiles | `DeckPalette.week` | `dusk` |
 | Money: net worth, accounts, the market card | `.money` | `ledger` |
+| Meals: the Daily Brief's "Last night's dinner?" and Sunday "This week's dinners" cards | `.meal` (`DeckPalette.dinner`, `DeckPalette.meals`) | `kitchen` |
 | Feedback inbox | `.feedback` | `notes` |
 | Drawer sections: Daily Brief, Brain, People, Goals, Money, Feedback | `opener`, `.knowledge`, `BrainModuleID.people.paper`, `book`, `.money`, `.feedback` | |
 

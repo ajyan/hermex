@@ -87,6 +87,8 @@ extension HermexPaper {
     static let money = HermexPaper.ledger
     /// The in-app feedback inbox and its drawer row.
     static let feedback = HermexPaper.notes
+    /// Meals: the Daily Brief's dinner and week-of-dinners cards.
+    static let meal = HermexPaper.kitchen
 
     static func forTool(_ kind: ToolCallSummaryFormatter.Kind) -> HermexPaper {
         switch kind {
