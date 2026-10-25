@@ -26,6 +26,16 @@ enum VoiceCallTiming {
     static let finalTranscriptWait: TimeInterval = 1.0
     /// Wait without a reply token before the thinking cue plays.
     static let thinkingCueDelay: TimeInterval = 1.5
+    /// Wait without reply text before saying "One moment", so a long think isn't dead air.
+    static let holdOnDelay: TimeInterval = 8
+    /// After that, how often "Still working on it" repeats while nothing has been said.
+    static let stillWorkingInterval: TimeInterval = 15
+    /// A transcript ending mid-thought ("tell me a fact about") waits this long after its
+    /// last change before it is sent, in case the user is still choosing the next word.
+    static let midThoughtWait: TimeInterval = 1.5
+    /// Words recognized this soon after Atlas starts replying were said before any of its
+    /// audio played (synthesis alone takes longer), so they can't be talking over it.
+    static let talkOverGrace: TimeInterval = 1.0
     /// How long to listen for an approval answer before denying.
     static let approvalListenTimeout: TimeInterval = 8
     /// How long the system call may take to connect its audio before the call gives up.
