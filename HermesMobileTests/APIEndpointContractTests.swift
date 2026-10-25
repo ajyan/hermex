@@ -368,6 +368,7 @@ final class ContractReadinessTests: XCTestCase {
             ),
             .init(name: "goal reflection", method: "POST", endpoint: .goalReflection, path: "/api/goals/reflection"),
             .init(name: "brief file", method: "POST", endpoint: .briefFile, path: "/api/brief/file"),
+            .init(name: "brief intention", method: "POST", endpoint: .briefIntention, path: "/api/brief/intention"),
             .init(name: "brief photo", method: "POST", endpoint: .briefPhoto(weekEnding: "2026-10-25"),
                   path: "/api/brief/photo", query: ["week_ending": "2026-10-25"])
         ]

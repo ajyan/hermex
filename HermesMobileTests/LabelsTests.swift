@@ -910,6 +910,11 @@ private final class QueueDeckClient: DailyDeckDataClient, @unchecked Sendable {
     func rawFile(sessionID: String, path: String) async throws -> Data { XCTFail("rawFile"); return Data() }
     func uploadWeekPhoto(weekEnding: String, jpeg: Data) async throws { XCTFail("uploadWeekPhoto") }
     func deleteWeekPhoto(weekEnding: String) async throws { XCTFail("deleteWeekPhoto") }
+    func draftIntention(date: String, answers: DeckAnswersPayload) async throws -> WeekIntentionDraft {
+        XCTFail("draftIntention"); return WeekIntentionDraft()
+    }
+    func goalsToday() async throws -> String { XCTFail("goalsToday"); return "" }
+    func confirmWeek(_ request: GoalWeekRequest) async throws { XCTFail("confirmWeek") }
 
     func fileContent(sessionID: String, path: String) async throws -> String {
         onRead?()

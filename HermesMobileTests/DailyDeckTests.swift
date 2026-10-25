@@ -2067,6 +2067,18 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     private(set) var readPaths: [String] = []
     private let readLock = NSLock()
     private(set) var sent: [Sent] = []
+    /// What `draftIntention` answers; an empty draft (the route's `{}`) by default.
+    var intentionDraft: Result<WeekIntentionDraft, Error> = .success(WeekIntentionDraft())
+    /// Runs inside `draftIntention` before it answers, to hold a draft in flight.
+    var intentionGate: (@Sendable () async -> Void)?
+    private(set) var intentionRequests: [(date: String, answers: DeckAnswersPayload)] = []
+    /// The Goals server's today, sent back as `as_of`.
+    var serverToday: Result<String, Error> = .success("2026-10-25")
+    /// What `confirmWeek` does; succeeds by default.
+    var weekConfirm: Result<Void, Error> = .success(())
+    /// Runs inside `confirmWeek` before it answers, to hold a confirm in flight.
+    var confirmGate: (@Sendable () async -> Void)?
+    private(set) var weekRequests: [GoalWeekRequest] = []
 
     init(workspaces: [String], names: [String]?, deck: String) {
         self.workspaces = workspaces
@@ -2123,6 +2135,20 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     func deleteWeekPhoto(weekEnding: String) async throws {
         deletedPhotos.append(weekEnding)
         try photoDelete.get()
+    }
+
+    func draftIntention(date: String, answers: DeckAnswersPayload) async throws -> WeekIntentionDraft {
+        intentionRequests.append((date, answers))
+        await intentionGate?()
+        return try intentionDraft.get()
+    }
+
+    func goalsToday() async throws -> String { try serverToday.get() }
+
+    func confirmWeek(_ request: GoalWeekRequest) async throws {
+        weekRequests.append(request)
+        await confirmGate?()
+        try weekConfirm.get()
     }
 }
 

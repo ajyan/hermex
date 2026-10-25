@@ -1,6 +1,6 @@
 import Foundation
 
-// The v2 weekly review's deck pieces and the week record the app reads back. The vault writes both
+// The weekly review's deck pieces (v2 and v3) and the week record the app reads back. The vault writes both
 // (`tools/daily_deck.py` for the deck, `tools/brain/commands/brief.py` for the record); every
 // field decodes tolerantly, so a newer vault never costs the deck or the page.
 
@@ -42,7 +42,83 @@ struct DeckPastNote: Decodable, Equatable {
     private enum CodingKeys: String, CodingKey { case weekEnding, title, text }
 }
 
-/// One day on the filmstrip: its weekday, a line about it, who you saw, hours slept, and a run.
+/// One moment of the week on the v3 cover (`moments`, or a `spares` one to swap in): its weekday,
+/// a line about it, and the value it speaks to ("present", "people", "dad", "potential", "body").
+struct DeckMoment: Decodable, Equatable, Identifiable {
+    let id: String
+    let day: String
+    let line: String
+    let value: String
+
+    init(id: String, day: String, line: String, value: String) {
+        self.id = id
+        self.day = day
+        self.line = line
+        self.value = value
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        day = (try? c.decodeIfPresent(String.self, forKey: .day)) ?? ""
+        line = (try? c.decodeIfPresent(String.self, forKey: .line)) ?? ""
+        value = (try? c.decodeIfPresent(String.self, forKey: .value)) ?? ""
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, day, line, value }
+}
+
+/// A v3 card's fact: a value card's `{big, line}` ("22 people", "Most: Meg, 3 days"). The last
+/// intention's fact is a plain string on the wire, which reads as the line alone.
+struct DeckFact: Decodable, Equatable {
+    let big: String?
+    let line: String?
+
+    init(big: String?, line: String?) {
+        self.big = big
+        self.line = line
+    }
+
+    init(from decoder: Decoder) throws {
+        if let line = try? decoder.singleValueContainer().decode(String.self) {
+            self.init(big: nil, line: line)
+        } else {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            self.init(big: try? c.decodeIfPresent(String.self, forKey: .big),
+                      line: try? c.decodeIfPresent(String.self, forKey: .line))
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey { case big, line }
+}
+
+/// One goal's change to next week on the v3 intention card: "Outreach 10 → 5" with the coach's
+/// reason. Accepting confirms `commitments` (the proposal, dropped rows already left out) for the
+/// week starting `start` through `POST /api/goals/week`.
+struct DeckGoalChange: Decodable, Equatable, Identifiable {
+    let goal: String
+    let title: String
+    let label: String
+    let reason: String
+    let start: String
+    let commitments: [DeckWeekCommitment]
+
+    var id: String { goal }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        goal = try c.decode(String.self, forKey: .goal)
+        title = (try? c.decodeIfPresent(String.self, forKey: .title)) ?? goal
+        label = (try? c.decodeIfPresent(String.self, forKey: .label)) ?? ""
+        reason = (try? c.decodeIfPresent(String.self, forKey: .reason)) ?? ""
+        start = (try? c.decodeIfPresent(String.self, forKey: .start)) ?? ""
+        commitments = ((try? c.decodeIfPresent([Lossy<DeckWeekCommitment>].self, forKey: .commitments)) ?? []).compactMap(\.value)
+    }
+
+    private enum CodingKeys: String, CodingKey { case goal, title, label, reason, start, commitments }
+}
+
+/// One day on the filmstrip:its weekday, a line about it, who you saw, hours slept, and a run.
 struct DeckDay: Decodable, Equatable {
     let label: String
     let line: String?

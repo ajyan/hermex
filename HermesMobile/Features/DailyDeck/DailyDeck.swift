@@ -64,6 +64,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         case headline, prompt, decision, reflect, item, sleep, goal, weekAhead, changes, ask, section, close
         /// The v2 weekly review's cards (`WeeklyReviewModels.swift`).
         case cover, filmstrip, story, energy, commitments, values, predictions, who, keepsakes
+        /// The v3 weekly review's cards: last week's intention, one card per value, next week's intention.
+        case lastIntention, value, intention
         case unknown(String)
 
         init(_ raw: String) {
@@ -89,6 +91,9 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case "predictions": self = .predictions
             case "who": self = .who
             case "keepsakes": self = .keepsakes
+            case "last_intention": self = .lastIntention
+            case "value": self = .value
+            case "intention": self = .intention
             default: self = .unknown(raw)
             }
         }
@@ -180,6 +185,20 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let values: [DeckValue]
     /// The who card's suggested people.
     let suggested: [String]
+    /// The v3 cover's moments of the week and the spares Swap brings in, and how the week ended.
+    let moments: [DeckMoment]
+    let spares: [DeckMoment]
+    let ended: String?
+    /// The v3 last-intention card's intention and its if-then plan, as last week sealed them.
+    let text: String?
+    let ifThen: String?
+    /// A v3 value card's value ("people", wire `value`) and its name ("Showed up for my people");
+    /// with the last-intention card, the week's `fact` beside it.
+    let valueID: String?
+    let name: String?
+    let fact: DeckFact?
+    /// The v3 intention card's coach changes, one per goal.
+    let changes: [DeckGoalChange]
     /// A Piece card's argument and quotes, from the long piece's map (the vault's tools/piece_view.py).
     let piece: DeckPiece?
 
@@ -278,6 +297,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         case .prompt, .reflect, .item, .unknown: true
         case .headline, .decision, .sleep, .goal, .weekAhead, .changes, .ask, .section, .close: false
         case .cover, .filmstrip, .story, .energy, .commitments, .values, .predictions, .who, .keepsakes: false
+        case .lastIntention, .value, .intention: false
         }
     }
 
@@ -287,6 +307,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         case goal, start, lastWeek, phrases, recall, yesterday, pattern, progress, questionPinyin, questionEn, rows, week
         case chapter, weekNumber, range, chapters, noteFromPast, days, gave, drained, rotation, items, values, suggested
         case piece, learned, variant
+        case moments, spares, ended, text, ifThen, name, fact, changes
+        case valueID = "value"
         case weekCommitments = "commitments"
         case itemKind = "kind"
     }
@@ -371,6 +393,15 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         items = ((try? c.decodeIfPresent([Lossy<DeckReviewItem>].self, forKey: .items)) ?? []).compactMap(\.value)
         values = ((try? c.decodeIfPresent([Lossy<DeckValue>].self, forKey: .values)) ?? []).compactMap(\.value)
         suggested = (try? c.decodeIfPresent([String].self, forKey: .suggested)) ?? []
+        moments = ((try? c.decodeIfPresent([Lossy<DeckMoment>].self, forKey: .moments)) ?? []).compactMap(\.value)
+        spares = ((try? c.decodeIfPresent([Lossy<DeckMoment>].self, forKey: .spares)) ?? []).compactMap(\.value)
+        ended = try? c.decodeIfPresent(String.self, forKey: .ended)
+        text = try? c.decodeIfPresent(String.self, forKey: .text)
+        ifThen = try? c.decodeIfPresent(String.self, forKey: .ifThen)
+        valueID = try? c.decodeIfPresent(String.self, forKey: .valueID)
+        name = try? c.decodeIfPresent(String.self, forKey: .name)
+        fact = try? c.decodeIfPresent(DeckFact.self, forKey: .fact)
+        changes = ((try? c.decodeIfPresent([Lossy<DeckGoalChange>].self, forKey: .changes)) ?? []).compactMap(\.value)
         piece = (try? c.decodeIfPresent(DeckPiece.self, forKey: .piece)).flatMap { $0.steps.isEmpty ? nil : $0 }
         let ref = try? c.decodeIfPresent(Ref.self, forKey: .ref)
         link = ref?.link.flatMap { $0.isEmpty ? nil : $0 }
@@ -1078,6 +1109,15 @@ struct DeckCardText: Equatable {
         case .cover, .filmstrip, .story, .energy, .commitments, .values, .predictions, .who, .keepsakes:
             // Each is drawn by its own view; the cover leads with its title and the story with its draft.
             lead = card.type == .story ? card.storyDraft : card.title
+        case .lastIntention:
+            lead = card.text
+            detail = card.fact?.line
+        case .value:
+            lead = card.question
+            leadIsQuestion = true
+            attribution = card.name
+        case .intention:
+            lead = card.title
         case .goal, .weekAhead, .changes, .ask:
             // The check-ins, the week's plan, the week's fixes and the Ask are drawn (`DeckGoalCard`,
             // `DeckWeekAheadCard`, `DeckChangesCard`, `DeckAskCard`).

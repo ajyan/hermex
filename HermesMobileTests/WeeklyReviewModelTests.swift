@@ -39,6 +39,331 @@ final class WeeklyReviewModelTests: XCTestCase {
      ]}
     """
 
+    /// The v3 Sunday review as the vault's `build_weekly` writes it: four moments shown, two spares.
+    private static let v3DeckJSON = """
+    {"version": 3, "date": "2026-10-25", "kind": "weekly", "wrapped": true, "generated_at": "2026-10-25T05:30:00-04:00",
+     "cards": [
+      {"id": "cover", "type": "cover", "week_number": 43, "range": "Oct 19–25", "title": "The week Meg told you the truth",
+       "chapters": [{"id": "remember", "label": "Remember", "minutes": 3}, {"id": "reflect", "label": "Reflect", "minutes": 6},
+                    {"id": "values", "label": "Values", "minutes": 8}, {"id": "steer", "label": "Steer", "minutes": 5}],
+       "moments": [{"id": "m1", "day": "Mon", "line": "Easy five miles before work", "value": "body", "strength": 2},
+                   {"id": "m2", "day": "Thu", "line": "Meg said you'd seemed flat; you opened up", "value": "present", "strength": 3},
+                   {"id": "m3", "day": "Fri", "line": "Read to the bump", "value": "dad", "strength": 2},
+                   {"id": "m4", "day": "Sat", "line": "Shipped the eval harness", "value": "potential", "strength": 2},
+                   {"day": "Sun", "line": "no id"}],
+       "spares": [{"id": "m5", "day": "Sat", "line": "Solved Aunt Jenny's problem", "value": "people", "strength": 1},
+                  {"id": "m6", "day": "Sun", "line": "Long lunch with Alex", "value": "people", "strength": 1}],
+       "ended": "A quiet weekend, laughing with Alex", "note_from_past": null},
+      {"id": "last-intention", "type": "last_intention", "text": "Get my sleep in a good place", "if_then": "",
+       "fact": "6 of 7 nights over 7 h. Thu was 5.4 h.", "chapter": "remember"},
+      {"id": "proud", "type": "prompt", "question": "What are you most proud of this week: opening up to Meg?",
+       "files_to": "Wins & Accomplishments", "chapter": "reflect"},
+      {"id": "lesson", "type": "prompt", "question": "What challenged you most this week, and what did it teach you?",
+       "files_to": "Challenges & Learnings", "chapter": "reflect"},
+      {"id": "value-present", "type": "value", "value": "present", "name": "Was present",
+       "question": "Anything for Was present this week?", "chapter": "values"},
+      {"id": "value-people", "type": "value", "value": "people", "name": "Showed up for my people",
+       "fact": {"big": "22 people", "line": "Most: Meg, 3 days"}, "question": "What did Meg's honesty give you?", "chapter": "values"},
+      {"id": "intention", "type": "intention", "chapter": "steer", "changes": [
+        {"goal": "land-ai-role", "title": "Land an Applied AI Engineer role", "label": "Outreach 10 → 5",
+         "reason": "Fewer, warmer notes landed better.", "start": "2026-10-26",
+         "commitments": [{"id": "outreach", "action": "Outreach", "target": 5, "skips": 0, "unit": "item"}]},
+        {"title": "no goal"}]},
+      {"id": "keepsakes", "type": "keepsakes", "chapter": "steer"},
+      {"id": "close", "type": "close"}
+     ]}
+    """
+
+    func testDecodesV3Deck() throws {
+        let deck = try DailyDeck.decode(Self.v3DeckJSON)
+        XCTAssertEqual(deck.version, 3)
+        XCTAssertEqual(deck.cards.map(\.type), [
+            .cover, .lastIntention, .prompt, .prompt, .value, .value, .intention, .keepsakes, .close,
+        ])
+
+        let cover = deck.cards[0]
+        XCTAssertNil(cover.chapter)
+        XCTAssertEqual(cover.chapters.map(\.id), ["remember", "reflect", "values", "steer"])
+        XCTAssertEqual(cover.moments.map(\.id), ["m1", "m2", "m3", "m4"], "a moment without an id is dropped alone")
+        XCTAssertEqual(cover.moments[1], DeckMoment(id: "m2", day: "Thu", line: "Meg said you'd seemed flat; you opened up", value: "present"))
+        XCTAssertEqual(cover.spares.map(\.id), ["m5", "m6"])
+        XCTAssertEqual(cover.ended, "A quiet weekend, laughing with Alex")
+        XCTAssertNil(cover.noteFromPast)
+
+        let last = deck.cards[1]
+        XCTAssertEqual(last.text, "Get my sleep in a good place")
+        XCTAssertEqual(last.ifThen, "")
+        XCTAssertEqual(last.fact, DeckFact(big: nil, line: "6 of 7 nights over 7 h. Thu was 5.4 h."), "a plain-string fact is its line")
+        XCTAssertEqual(last.chapter, "remember")
+
+        XCTAssertEqual(deck.cards[2].question, "What are you most proud of this week: opening up to Meg?")
+        XCTAssertEqual(deck.cards[2].chapter, "reflect")
+
+        let present = deck.cards[4]
+        XCTAssertEqual(present.valueID, "present")
+        XCTAssertNil(present.fact, "a value without a fact has none")
+        let people = deck.cards[5]
+        XCTAssertEqual(people.valueID, "people")
+        XCTAssertEqual(people.name, "Showed up for my people")
+        XCTAssertEqual(people.fact, DeckFact(big: "22 people", line: "Most: Meg, 3 days"))
+        XCTAssertEqual(people.question, "What did Meg's honesty give you?")
+        XCTAssertEqual(people.chapter, "values")
+
+        let intention = deck.cards[6]
+        XCTAssertEqual(intention.changes.map(\.goal), ["land-ai-role"], "a change without a goal is dropped alone")
+        let change = try XCTUnwrap(intention.changes.first)
+        XCTAssertEqual(change.title, "Land an Applied AI Engineer role")
+        XCTAssertEqual(change.label, "Outreach 10 → 5")
+        XCTAssertEqual(change.reason, "Fewer, warmer notes landed better.")
+        XCTAssertEqual(change.start, "2026-10-26")
+        XCTAssertEqual(change.commitments.map(\.id), ["outreach"])
+        XCTAssertEqual(change.commitments.first?.target, 5)
+        XCTAssertEqual(change.commitments.first?.unit, "item")
+
+        for card in deck.cards where [.lastIntention, .value, .intention].contains(card.type) {
+            XCTAssertFalse(card.takesFeedback, card.id)
+            XCTAssertEqual(DeckPalette.of(card), .week, card.id)
+        }
+    }
+
+    @MainActor
+    func testV3WeeklyIsASealedWeekly() async throws {
+        let (viewModel, _) = try await v3ViewModelAndClient()
+        XCTAssertTrue(viewModel.isSealedWeekly)
+    }
+
+    @MainActor
+    func testSwapUsesFirstUnshownSpareAndStopsWhenNoneLeft() async throws {
+        let (viewModel, _) = try await v3ViewModelAndClient()
+        let cover = try card("cover", in: viewModel)
+        XCTAssertEqual(viewModel.keptMoments(for: cover).map(\.id), ["m1", "m2", "m3", "m4"], "with no answer, the card's moments")
+        XCTAssertNil(viewModel.answer(for: cover), "reading the kept moments answers nothing")
+        XCTAssertTrue(viewModel.canSwap(for: cover))
+
+        viewModel.swapMoment("m2", for: cover)
+        XCTAssertEqual(viewModel.keptMoments(for: cover).map(\.id), ["m1", "m5", "m3", "m4"], "the first spare takes the row's place")
+        XCTAssertEqual(viewModel.answer(for: cover)?.lists?["moments"], ["m1", "m5", "m3", "m4"])
+
+        viewModel.swapMoment("m5", for: cover)
+        XCTAssertEqual(viewModel.keptMoments(for: cover).map(\.id), ["m1", "m6", "m3", "m4"], "a swapped-in spare swaps for the next")
+        XCTAssertFalse(viewModel.canSwap(for: cover), "every spare has been shown")
+
+        viewModel.swapMoment("m1", for: cover)
+        XCTAssertEqual(viewModel.keptMoments(for: cover).map(\.id), ["m1", "m6", "m3", "m4"], "no spare left: swap does nothing")
+        viewModel.swapMoment("m9", for: cover)
+        XCTAssertEqual(viewModel.keptMoments(for: cover).map(\.id), ["m1", "m6", "m3", "m4"], "an id not kept: nothing")
+    }
+
+    @MainActor
+    func testRemoveStopsAtThree() async throws {
+        let (viewModel, _) = try await v3ViewModelAndClient()
+        let cover = try card("cover", in: viewModel)
+        XCTAssertTrue(viewModel.canRemove(for: cover))
+        viewModel.removeMoment("m3", for: cover)
+        XCTAssertEqual(viewModel.keptMoments(for: cover).map(\.id), ["m1", "m2", "m4"])
+        XCTAssertFalse(viewModel.canRemove(for: cover))
+        viewModel.removeMoment("m1", for: cover)
+        XCTAssertEqual(viewModel.keptMoments(for: cover).map(\.id), ["m1", "m2", "m4"], "never under three")
+
+        viewModel.swapMoment("m1", for: cover)
+        XCTAssertEqual(viewModel.keptMoments(for: cover).map(\.id), ["m5", "m2", "m4"])
+        XCTAssertTrue(viewModel.canSwap(for: cover), "m6 is still unshown")
+        viewModel.swapMoment("m5", for: cover)
+        XCTAssertEqual(viewModel.keptMoments(for: cover).map(\.id), ["m6", "m2", "m4"], "m5, once shown, never swaps back in")
+        XCTAssertFalse(viewModel.canSwap(for: cover))
+    }
+
+    @MainActor
+    func testAnswerPayloadForV3Cards() async throws {
+        let (viewModel, _) = try await v3ViewModelAndClient()
+        let deck = try XCTUnwrap(viewModel.deck)
+        let cover = try card("cover", in: viewModel)
+        let last = try card("last-intention", in: viewModel)
+        let people = try card("value-people", in: viewModel)
+        let intention = try card("intention", in: viewModel)
+        viewModel.setText("The week Meg told me the truth", for: cover)
+        viewModel.removeMoment("m4", for: cover)
+        viewModel.setStatus("last", "partly", for: last)
+        viewModel.setText("Late calls", for: last)
+        viewModel.setScore("people", 8, for: people)
+        viewModel.setText("Called Mom twice.", for: people)
+        viewModel.setIntentionField("text", "Asleep by 11, five nights", for: intention)
+        viewModel.setIntentionField("thread", "Honesty", for: intention)
+        viewModel.setIntentionField("obstacle", "Late calls", for: intention)
+        viewModel.setIntentionField("if_then", "If it's 10:30, the phone goes on the charger", for: intention)
+        XCTAssertEqual(viewModel.intentionFieldsTouched, ["text", "thread", "obstacle", "if_then"])
+        XCTAssertEqual(viewModel.intentionField("if_then", for: intention), "If it's 10:30, the phone goes on the charger")
+        XCTAssertEqual(viewModel.intentionField("text", for: intention), "Asleep by 11, five nights")
+
+        let payload = DeckAnswersPayload(deck: deck, answers: viewModel.answers, completedAt: Date(timeIntervalSince1970: 0))
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let data = try encoder.encode(payload)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(json["version"] as? Int, 1)
+        let answers = try XCTUnwrap(json["answers"] as? [[String: Any]])
+        XCTAssertEqual(answers.compactMap { $0["card"] as? String }, ["cover", "last-intention", "value-people", "intention"])
+        let byCard = Dictionary(uniqueKeysWithValues: answers.map { ($0["card"] as? String ?? "", $0) })
+        XCTAssertEqual(byCard["cover"]?["text"] as? String, "The week Meg told me the truth")
+        XCTAssertEqual(byCard["cover"]?["lists"] as? [String: [String]], ["moments": ["m1", "m2", "m3"]])
+        XCTAssertEqual(byCard["last-intention"]?["statuses"] as? [String: String], ["last": "partly"])
+        XCTAssertEqual(byCard["last-intention"]?["text"] as? String, "Late calls")
+        XCTAssertEqual(byCard["value-people"]?["scores"] as? [String: Int], ["people": 8])
+        XCTAssertEqual(byCard["value-people"]?["text"] as? String, "Called Mom twice.")
+        XCTAssertEqual(byCard["intention"]?["text"] as? String, "Asleep by 11, five nights")
+        XCTAssertEqual(byCard["intention"]?["notes"] as? [String: String], [
+            "thread": "Honesty", "obstacle": "Late calls", "if_then": "If it's 10:30, the phone goes on the charger",
+        ])
+
+        // Read back as the filed answers file, `if_then` stays the vault's key.
+        let filed = DeckAnswersFile.decodeAnswers(String(decoding: data, as: UTF8.self))
+        XCTAssertEqual(filed["intention"]?.notes?["if_then"], "If it's 10:30, the phone goes on the charger")
+    }
+
+    @MainActor
+    func testIntentionDraftDoesNotOverwriteTouchedFields() async throws {
+        let (viewModel, client) = try await v3ViewModelAndClient()
+        let intention = try card("intention", in: viewModel)
+        viewModel.setStatus("last", "didnt", for: try card("last-intention", in: viewModel))
+        client.intentionDraft = .success(WeekIntentionDraft(thread: "Honesty with Meg", intention: "Asleep by 11, five nights",
+                                                            obstacle: "Late calls", ifThen: "If it's 10:30, the phone goes on the charger"))
+        viewModel.setIntentionField("obstacle", "My own words", for: intention)
+
+        await viewModel.intentionDraft()
+        XCTAssertEqual(client.intentionRequests.count, 1)
+        XCTAssertEqual(client.intentionRequests.first?.date, "2026-10-25")
+        XCTAssertEqual(client.intentionRequests.first?.answers.answers.first { $0.card == "last-intention" }?.statuses, ["last": "didnt"],
+                       "the draft reads the answers so far")
+        XCTAssertEqual(viewModel.intentionField("obstacle", for: intention), "My own words", "his edit stands")
+        XCTAssertEqual(viewModel.intentionField("text", for: intention), "Asleep by 11, five nights")
+        XCTAssertEqual(viewModel.intentionField("thread", for: intention), "Honesty with Meg")
+        XCTAssertEqual(viewModel.intentionField("if_then", for: intention), "If it's 10:30, the phone goes on the charger")
+
+        // Touched, so editing an earlier answer doesn't ask again.
+        viewModel.setText("Proud of it", for: try card("proud", in: viewModel))
+        await viewModel.intentionDraft()
+        XCTAssertEqual(client.intentionRequests.count, 1)
+    }
+
+    @MainActor
+    func testALateDraftFillsOnlyWhatHeHasNotTyped() async throws {
+        let (viewModel, client) = try await v3ViewModelAndClient()
+        let intention = try card("intention", in: viewModel)
+        client.intentionDraft = .success(WeekIntentionDraft(thread: "Honesty", intention: "Drafted", obstacle: "Drafted obstacle", ifThen: nil))
+        let arrived = expectation(description: "the draft was asked for")
+        let (release, releaser) = AsyncStream<Void>.makeStream()
+        client.intentionGate = {
+            arrived.fulfill()
+            for await _ in release { break }
+        }
+        let drafting = Task { await viewModel.intentionDraft() }
+        await fulfillment(of: [arrived], timeout: 5)
+        XCTAssertTrue(viewModel.isDraftingIntention)
+        viewModel.setIntentionField("text", "Typed while it drafted", for: intention)
+        releaser.yield()
+        releaser.finish()
+        await drafting.value
+
+        XCTAssertFalse(viewModel.isDraftingIntention)
+        XCTAssertEqual(viewModel.intentionField("text", for: intention), "Typed while it drafted")
+        XCTAssertEqual(viewModel.intentionField("obstacle", for: intention), "Drafted obstacle")
+        XCTAssertEqual(viewModel.intentionField("thread", for: intention), "Honesty")
+        XCTAssertEqual(viewModel.intentionField("if_then", for: intention), "", "a field the draft left out stays blank")
+    }
+
+    @MainActor
+    func testUntouchedIntentionDraftsAgainOnlyWhenAnEarlierAnswerChanged() async throws {
+        let (viewModel, client) = try await v3ViewModelAndClient()
+        let intention = try card("intention", in: viewModel)
+        client.intentionDraft = .success(WeekIntentionDraft(thread: nil, intention: "First", obstacle: nil, ifThen: nil))
+        await viewModel.intentionDraft()
+        await viewModel.intentionDraft()
+        XCTAssertEqual(client.intentionRequests.count, 1, "nothing changed: no second draft")
+
+        viewModel.setText("Proud of it", for: try card("proud", in: viewModel))
+        client.intentionDraft = .success(WeekIntentionDraft(thread: nil, intention: "Second", obstacle: nil, ifThen: nil))
+        await viewModel.intentionDraft()
+        XCTAssertEqual(client.intentionRequests.count, 2)
+        XCTAssertEqual(viewModel.intentionField("text", for: intention), "Second", "an untouched field takes the newer draft")
+        XCTAssertTrue(viewModel.intentionFieldsTouched.isEmpty)
+    }
+
+    @MainActor
+    func testIntentionDraftFailurePrefillsFromLastWeek() async throws {
+        let (viewModel, client) = try await v3ViewModelAndClient()
+        let intention = try card("intention", in: viewModel)
+        let last = try card("last-intention", in: viewModel)
+        viewModel.setStatus("last", "partly", for: last)
+        viewModel.setText("Late calls with the West Coast", for: last)
+        client.intentionDraft = .failure(URLError(.timedOut))
+
+        await viewModel.intentionDraft()
+        XCTAssertEqual(viewModel.intentionField("text", for: intention), "Get my sleep in a good place", "it didn't fully hold")
+        XCTAssertEqual(viewModel.intentionField("obstacle", for: intention), "Late calls with the West Coast")
+        XCTAssertEqual(viewModel.intentionField("thread", for: intention), "")
+        XCTAssertEqual(viewModel.intentionField("if_then", for: intention), "")
+        XCTAssertTrue(viewModel.intentionFieldsTouched.isEmpty, "a prefill is not his edit")
+    }
+
+    @MainActor
+    func testAnEmptyDraftAfterAHeldWeekLeavesTheIntentionBlank() async throws {
+        let (viewModel, client) = try await v3ViewModelAndClient()
+        let intention = try card("intention", in: viewModel)
+        viewModel.setStatus("last", "held", for: try card("last-intention", in: viewModel))
+        client.intentionDraft = .success(WeekIntentionDraft(thread: nil, intention: " ", obstacle: nil, ifThen: nil))
+
+        await viewModel.intentionDraft()
+        XCTAssertEqual(viewModel.intentionField("text", for: intention), "", "a held intention isn't carried")
+        XCTAssertEqual(viewModel.intentionField("obstacle", for: intention), "", "nothing got in the way")
+        XCTAssertNil(viewModel.answer(for: intention))
+    }
+
+    @MainActor
+    func testAcceptChangeOnlyAfterServerSuccess() async throws {
+        let (viewModel, client) = try await v3ViewModelAndClient()
+        let intention = try card("intention", in: viewModel)
+        let change = try XCTUnwrap(intention.changes.first)
+        client.serverToday = .success("2026-10-25")
+        client.weekConfirm = .failure(APIError.http(statusCode: 500, body: nil))
+
+        let failed = await viewModel.acceptChange(change, for: intention)
+        XCTAssertFalse(failed)
+        XCTAssertNil(viewModel.answer(for: intention)?.lists?["accepted"], "a failed confirm accepts nothing")
+        XCTAssertFalse(viewModel.isAccepted(change, for: intention))
+
+        client.weekConfirm = .success(())
+        let arrived = expectation(description: "the confirm was sent")
+        let (release, releaser) = AsyncStream<Void>.makeStream()
+        client.confirmGate = {
+            arrived.fulfill()
+            for await _ in release { break }
+        }
+        let accepting = Task { await viewModel.acceptChange(change, for: intention) }
+        await fulfillment(of: [arrived], timeout: 5)
+        XCTAssertEqual(viewModel.acceptingChanges, ["land-ai-role"])
+        XCTAssertFalse(viewModel.isAccepted(change, for: intention), "not before the server answers")
+        releaser.yield()
+        releaser.finish()
+        let accepted = await accepting.value
+
+        XCTAssertTrue(accepted)
+        XCTAssertTrue(viewModel.acceptingChanges.isEmpty)
+        XCTAssertEqual(viewModel.answer(for: intention)?.lists?["accepted"], ["land-ai-role"])
+        XCTAssertTrue(viewModel.isAccepted(change, for: intention))
+        let request = try XCTUnwrap(client.weekRequests.last)
+        XCTAssertEqual(client.weekRequests.count, 2)
+        XCTAssertEqual(request.slug, "land-ai-role")
+        XCTAssertEqual(request.start, "2026-10-26")
+        XCTAssertEqual(request.asOf, "2026-10-25", "the Goals server's today, as the week-ahead confirm sends")
+        XCTAssertEqual(request.commitments.map(\.id), ["outreach"])
+        XCTAssertEqual(request.commitments.first?.target, 5)
+
+        let again = await viewModel.acceptChange(change, for: intention)
+        XCTAssertTrue(again)
+        XCTAssertEqual(client.weekRequests.count, 2, "an accepted change isn't sent twice")
+        XCTAssertEqual(viewModel.answer(for: intention)?.lists?["accepted"], ["land-ai-role"])
+    }
+
     func testV2DeckDecodesEveryCardKind() throws {
         let deck = try DailyDeck.decode(Self.v2DeckJSON)
         XCTAssertEqual(deck.version, 2)
@@ -476,7 +801,7 @@ final class WeeklyReviewModelTests: XCTestCase {
         client.filer = .success(BriefFileResponse(ok: true, summary: "Sealed."))
         let viewModel = DailyDeckViewModel(server: server, client: client, store: store)
         await viewModel.show(date: "2026-10-25", kind: "weekly")
-        XCTAssertTrue(viewModel.isV2Weekly)
+        XCTAssertTrue(viewModel.isSealedWeekly)
 
         viewModel.setScore("present", 7, for: try card("values", in: viewModel))
         viewModel.setList("gave", ["Running"], for: try card("energy", in: viewModel))
@@ -521,7 +846,7 @@ final class WeeklyReviewModelTests: XCTestCase {
     }
 
     @MainActor
-    func testOnlyAV2WeeklyDeckIsV2Weekly() async throws {
+    func testOnlyAV2OrLaterWeeklyDeckIsSealedWeekly() async throws {
         let store = DailyDeckStore(defaults: try XCTUnwrap(UserDefaults(suiteName: suiteName)))
         store.setWorkspace("/vault", for: server)
         let v1 = #"{"date":"2026-10-18","kind":"weekly","cards":[{"id":"close","type":"close"}]}"#
@@ -529,14 +854,14 @@ final class WeeklyReviewModelTests: XCTestCase {
         let v1Model = DailyDeckViewModel(server: server, client: v1Client, store: store)
         await v1Model.show(date: "2026-10-18", kind: "weekly")
         XCTAssertEqual(v1Model.state, .ready)
-        XCTAssertFalse(v1Model.isV2Weekly, "a v1 weekly keeps its filing copy")
+        XCTAssertFalse(v1Model.isSealedWeekly, "a v1 weekly keeps its filing copy")
 
         let morning = #"{"version":2,"date":"2026-10-25","kind":"morning","cards":[{"id":"close","type":"close"}]}"#
         let morningClient = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-25.morning.json"], deck: morning)
         let morningModel = DailyDeckViewModel(server: server, client: morningClient, store: store)
         await morningModel.show(date: "2026-10-25", kind: "morning")
         XCTAssertEqual(morningModel.state, .ready)
-        XCTAssertFalse(morningModel.isV2Weekly)
+        XCTAssertFalse(morningModel.isSealedWeekly)
     }
 
     // MARK: - Close card and prompt copy
@@ -705,6 +1030,18 @@ final class WeeklyReviewModelTests: XCTestCase {
         return (viewModel, client)
     }
 
+    /// The v3 fixture deck, open on a view model as the 2026-10-25 weekly review.
+    @MainActor
+    private func v3ViewModelAndClient() async throws -> (DailyDeckViewModel, ScriptedDailyDeckClient) {
+        let store = DailyDeckStore(defaults: try XCTUnwrap(UserDefaults(suiteName: suiteName)))
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-25.weekly.json"], deck: Self.v3DeckJSON)
+        let viewModel = DailyDeckViewModel(server: server, client: client, store: store)
+        await viewModel.show(date: "2026-10-25", kind: "weekly")
+        XCTAssertEqual(viewModel.state, .ready)
+        return (viewModel, client)
+    }
+
     @MainActor
     private func card(_ id: String, in viewModel: DailyDeckViewModel) throws -> DeckCard {
         try XCTUnwrap(viewModel.cards.first { $0.id == id })
@@ -760,5 +1097,48 @@ final class BriefPhotoHTTPTests: APIClientTestCase {
             return apiTestJSONResponse(#"{"removed":true}"#, for: request)
         }
         try await client.deleteWeekPhoto(weekEnding: "2026-10-25")
+    }
+}
+
+/// The intention draft route against `URLProtocol` mocks.
+final class BriefIntentionHTTPTests: APIClientTestCase {
+    private func payload() throws -> DeckAnswersPayload {
+        let deck = try DailyDeck.decode(#"""
+        {"version": 3, "date": "2026-10-25", "kind": "weekly", "cards": [
+          {"id": "last-intention", "type": "last_intention", "text": "Sleep"}, {"id": "intention", "type": "intention"}]}
+        """#)
+        var last = DeckAnswer(card: "last-intention")
+        last.statuses = ["last": "partly"]
+        var intention = DeckAnswer(card: "intention")
+        intention.notes = ["if_then": "If 10:30, then bed"]
+        return DeckAnswersPayload(deck: deck, answers: ["last-intention": last, "intention": intention],
+                                  completedAt: Date(timeIntervalSince1970: 0))
+    }
+
+    func testDraftPostsTheDateAndAnswersAndReadsIfThen() async throws {
+        let client = makeClient { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.url?.path, "/api/brief/intention")
+            let body = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(apiTestBodyData(from: request))) as? [String: Any])
+            XCTAssertEqual(body["date"] as? String, "2026-10-25")
+            let answers = try XCTUnwrap(body["answers"] as? [[String: Any]], "the answers list, as the vault reads it")
+            XCTAssertEqual(answers.compactMap { $0["card"] as? String }, ["last-intention", "intention"])
+            XCTAssertEqual(answers[0]["statuses"] as? [String: String], ["last": "partly"])
+            XCTAssertEqual(answers[1]["notes"] as? [String: String], ["if_then": "If 10:30, then bed"])
+            return apiTestJSONResponse(
+                #"{"thread":"Honesty","intention":"Asleep by 11","obstacle":"Late calls","if_then":"If 10:30, then bed","extra":1}"#,
+                for: request)
+        }
+        let draft = try await client.draftIntention(date: "2026-10-25", answers: try payload())
+        XCTAssertEqual(draft, WeekIntentionDraft(thread: "Honesty", intention: "Asleep by 11", obstacle: "Late calls",
+                                                 ifThen: "If 10:30, then bed"))
+        XCTAssertFalse(draft.isEmpty)
+    }
+
+    func testAnEmptyReplyIsAnEmptyDraft() async throws {
+        let client = makeClient { request in apiTestJSONResponse("{}", for: request) }
+        let draft = try await client.draftIntention(date: "2026-10-25", answers: try payload())
+        XCTAssertEqual(draft, WeekIntentionDraft(thread: nil, intention: nil, obstacle: nil, ifThen: nil))
+        XCTAssertTrue(draft.isEmpty)
     }
 }

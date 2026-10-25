@@ -214,14 +214,14 @@ struct DailyDeckView: View {
             parts.append(DailyDeckPaths.label(viewModel.date))
         }
         parts.append("\(viewModel.index + 1) of \(viewModel.visiblePages.count)")
-        if viewModel.isFiled { parts.append(DeckCopy.filedStatus(seal: viewModel.isV2Weekly, edited: viewModel.hasChanges)) }
+        if viewModel.isFiled { parts.append(DeckCopy.filedStatus(seal: viewModel.isSealedWeekly, edited: viewModel.hasChanges)) }
         return parts.joined(separator: " · ")
     }
 
     private func progress(count: Int) -> some View {
         VStack(spacing: 6) {
             ProgressView(value: Double(viewModel.index + 1), total: Double(max(count, 1)))
-                .tint(viewModel.currentPage.map { DeckPalette.of($0, inV2Weekly: viewModel.isV2Weekly).ink } ?? .secondary)
+                .tint(viewModel.currentPage.map { DeckPalette.of($0, inV2Weekly: viewModel.isSealedWeekly).ink } ?? .secondary)
                 .accessibilityValue(Text(verbatim: progressSubtitle))
         }
         .padding(.horizontal, 20)
@@ -250,7 +250,7 @@ struct DailyDeckView: View {
 
     private func file() {
         // What is being filed: the user can open another deck while it's in flight.
-        let (date, seals) = (viewModel.date, viewModel.isV2Weekly)
+        let (date, seals) = (viewModel.date, viewModel.isSealedWeekly)
         Task {
             let result = await viewModel.file()
             // A seal rewrites the record, and a model keeps the records it has read: start afresh.

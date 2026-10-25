@@ -17,6 +17,12 @@ protocol DailyDeckDataClient: Sendable {
     func rawFile(sessionID: String, path: String) async throws -> Data
     func uploadWeekPhoto(weekEnding: String, jpeg: Data) async throws
     func deleteWeekPhoto(weekEnding: String) async throws
+    /// Drafts the Sunday review's intention from its answers so far; an empty draft when the model can't.
+    func draftIntention(date: String, answers: DeckAnswersPayload) async throws -> WeekIntentionDraft
+    /// The Goals server's today, sent as `as_of` with a week confirm.
+    func goalsToday() async throws -> String
+    /// Confirms a goal's commitments for a week (`POST /api/goals/week`).
+    func confirmWeek(_ request: GoalWeekRequest) async throws
 }
 
 enum DailyDeckState: Equatable {
@@ -93,9 +99,9 @@ final class DailyDeckViewModel {
 
     var isReview: Bool { kind != "morning" }
 
-    /// The v2 weekly review, whose close card reads "Seal the week"; older weekly decks and
-    /// the other kinds keep the filing copy.
-    var isV2Weekly: Bool { kind == "weekly" && deck?.version == 2 }
+    /// The v2 and later weekly review, which seals the week into its record and whose close card
+    /// reads "Seal the week"; v1 weekly decks and the other kinds keep the filing copy.
+    var isSealedWeekly: Bool { kind == "weekly" && (deck?.version ?? 0) >= 2 }
 
     var title: String {
         switch kind {
@@ -249,13 +255,13 @@ final class DailyDeckViewModel {
 
     func answer(for card: DeckCard) -> DeckAnswer? { answers[card.id] }
 
-    /// For a v2 weekly: whether the week's record exists, as listed when the deck opened or as the
+    /// For a sealed weekly: whether the week's record exists, as listed when the deck opened or as the
     /// server confirmed by sealing it here. The server saves the answers before its filer runs, so
     /// answers alone can be a seal that failed.
     private(set) var hasWeekRecord = false
 
-    /// Filed, or for a v2 weekly sealed: answers on file and, for a seal, the week's record.
-    var isFiled: Bool { filedAnswers != nil && (!isV2Weekly || hasWeekRecord) }
+    /// Filed, or for a sealed weekly sealed: answers on file and, for a seal, the week's record.
+    var isFiled: Bool { filedAnswers != nil && (!isSealedWeekly || hasWeekRecord) }
 
     /// Today's morning brief is on screen and filed: the Daily Brief notifications stop for today.
     var isTodayFiled: Bool { state == .ready && !isReview && date == today && isFiled }
@@ -396,7 +402,7 @@ final class DailyDeckViewModel {
             let filed = try await client.fileContent(sessionID: sessionID, path: DailyDeckPaths.answers(date: date, kind: kind))
             filedAnswers = DeckAnswersFile.decodeAnswers(filed)
             filedSignals = DeckAnswersFile.decodeSignals(filed)
-            if kind == "weekly", decoded.version == 2 {
+            if kind == "weekly", (decoded.version ?? 0) >= 2 {
                 // An unreadable folder reads as unsealed: sealing again replaces the week whole.
                 let records = try? await client.entryNames(sessionID: sessionID, path: WeeksModel.directory)
                 hasWeekRecord = records?.contains(fileName(WeeksModel.recordPath(date))) ?? false
@@ -410,6 +416,7 @@ final class DailyDeckViewModel {
         signals = drafted.isEmpty ? filedSignals : drafted
         index = min(index, max(visiblePages.count - 1, 0))
         lastDismissal = nil
+        resetIntention()
         state = .ready
     }
 
@@ -744,6 +751,190 @@ final class DailyDeckViewModel {
         store.setAnswers(answers, for: server, date: date, kind: kind)
     }
 
+    // MARK: The v3 weekly review
+
+    /// The cover's moment ids as kept: the answer's `lists["moments"]` once he swapped or removed
+    /// one, else the card's own moments.
+    private func keptMomentIDs(for card: DeckCard) -> [String] {
+        answers[card.id]?.lists?["moments"] ?? card.moments.map(\.id)
+    }
+
+    /// The cover's moments as he keeps them, in order. An id the card doesn't carry is left out.
+    func keptMoments(for card: DeckCard) -> [DeckMoment] {
+        let pool = Dictionary((card.moments + card.spares).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return keptMomentIDs(for: card).compactMap { pool[$0] }
+    }
+
+    /// Moment ids the cover has shown on this screen: its own moments, whatever he keeps, and every
+    /// spare swapped in, so a spare he swapped or removed doesn't come back.
+    private var shownMoments: [String: Set<String>] = [:]
+
+    private func shownMomentIDs(for card: DeckCard) -> Set<String> {
+        (shownMoments[card.id] ?? []).union(card.moments.map(\.id)).union(keptMomentIDs(for: card))
+    }
+
+    /// The first spare not shown yet: what Swap brings in.
+    private func nextSpare(for card: DeckCard) -> DeckMoment? {
+        let shown = shownMomentIDs(for: card)
+        return card.spares.first { !shown.contains($0.id) }
+    }
+
+    /// Whether Swap has a spare left to bring in; when not, no row offers it.
+    func canSwap(for card: DeckCard) -> Bool { nextSpare(for: card) != nil }
+
+    /// Whether a moment can go: the cover keeps at least three.
+    func canRemove(for card: DeckCard) -> Bool { keptMomentIDs(for: card).count > 3 }
+
+    /// Puts the first spare not shown yet in moment `id`'s place; nothing without one.
+    func swapMoment(_ id: String, for card: DeckCard) {
+        var kept = keptMomentIDs(for: card)
+        guard let index = kept.firstIndex(of: id), let spare = nextSpare(for: card) else { return }
+        shownMoments[card.id] = shownMomentIDs(for: card).union([spare.id])
+        kept[index] = spare.id
+        setList("moments", kept, for: card)
+    }
+
+    /// Takes moment `id` off the cover; nothing once only three are left.
+    func removeMoment(_ id: String, for card: DeckCard) {
+        guard canRemove(for: card) else { return }
+        var kept = keptMomentIDs(for: card)
+        guard let index = kept.firstIndex(of: id) else { return }
+        shownMoments[card.id] = shownMomentIDs(for: card)
+        kept.remove(at: index)
+        setList("moments", kept, for: card)
+    }
+
+    /// The intention card's fields: "text" (the intention, the answer's `text`) and "thread",
+    /// "obstacle" and "if_then" (its `notes`).
+    nonisolated static let intentionKeys = ["text", "thread", "obstacle", "if_then"]
+
+    /// The intention fields he has edited, which a draft never overwrites. A field already written
+    /// when the deck opened counts as his.
+    private(set) var intentionFieldsTouched: Set<String> = []
+    /// Whether an intention draft is in flight.
+    private(set) var isDraftingIntention = false
+    /// The answers to the cards before the intention card when the last draft was asked; nil before the first.
+    @ObservationIgnored private var intentionDraftedFrom: [DeckAnswer]?
+    @ObservationIgnored private var intentionDraftGeneration = 0
+
+    /// One intention field as it stands; empty when unset.
+    func intentionField(_ key: String, for card: DeckCard) -> String {
+        let answer = answers[card.id]
+        return (key == "text" ? answer?.text : answer?.notes?[key]) ?? ""
+    }
+
+    /// His edit to an intention field: "text" sets the answer's text, any other key its note.
+    func setIntentionField(_ key: String, _ value: String, for card: DeckCard) {
+        intentionFieldsTouched.insert(key)
+        writeIntentionField(key, value, for: card)
+    }
+
+    private func writeIntentionField(_ key: String, _ value: String, for card: DeckCard) {
+        if key == "text" { setText(value, for: card) } else { setNote(key, value, for: card) }
+    }
+
+    /// A newly opened deck starts with no draft asked for; fields already written stay his.
+    private func resetIntention() {
+        intentionDraftGeneration += 1
+        intentionDraftedFrom = nil
+        isDraftingIntention = false
+        shownMoments = [:]
+        let card = cards.first { $0.type == .intention }
+        intentionFieldsTouched = Set(Self.intentionKeys.filter { key in
+            card.map { !intentionField(key, for: $0).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? false
+        })
+    }
+
+    /// Asks the server to draft the intention from the answers so far. It asks once; it asks again
+    /// only while he hasn't touched a field and an earlier answer changed since. The draft fills only
+    /// the fields he hasn't touched, even when he typed while it was drafting. When the model gives
+    /// nothing (or fails), the obstacle prefills from what got in the way last week, and the
+    /// intention from last week's when it didn't hold.
+    func intentionDraft() async {
+        guard let deck, let card = cards.first(where: { $0.type == .intention }), !isDraftingIntention else { return }
+        let payload = DeckAnswersPayload(deck: deck, answers: answers, completedAt: now())
+        let earlier = Set(deck.cards.prefix { $0.id != card.id }.map(\.id))
+        let from = payload.answers.filter { earlier.contains($0.card) }
+        if let drafted = intentionDraftedFrom {
+            guard intentionFieldsTouched.isEmpty, drafted != from else { return }
+        } else if intentionFieldsTouched.isSuperset(of: Self.intentionKeys) {
+            return  // nothing left to fill
+        }
+        intentionDraftedFrom = from
+        intentionDraftGeneration += 1
+        let generation = intentionDraftGeneration
+        isDraftingIntention = true
+        let draft: WeekIntentionDraft?
+        do {
+            draft = try await client.draftIntention(date: deck.date, answers: payload)
+        } catch {
+            if error is CancellationError || (error as? URLError)?.code == .cancelled || Task.isCancelled {
+                if generation == intentionDraftGeneration {
+                    isDraftingIntention = false
+                    intentionDraftedFrom = nil  // the card left before an answer: ask again when it's back
+                }
+                return
+            }
+            draft = nil
+        }
+        guard generation == intentionDraftGeneration else { return }  // another deck opened
+        isDraftingIntention = false
+        guard self.deck?.date == deck.date, kind == deck.kind else { return }  // or failed to open
+        if let draft, !draft.isEmpty {
+            fillIntention("thread", draft.thread, for: card)
+            fillIntention("text", draft.intention, for: card)
+            fillIntention("obstacle", draft.obstacle, for: card)
+            fillIntention("if_then", draft.ifThen, for: card)
+        } else if let last = cards.first(where: { $0.type == .lastIntention }) {
+            let answer = answers[last.id]
+            fillIntention("obstacle", answer?.text, for: card, onlyIfEmpty: true)
+            if answer?.statuses?["last"] != "held" { fillIntention("text", last.text, for: card, onlyIfEmpty: true) }
+        }
+    }
+
+    /// Writes a drafted value into a field he hasn't touched; a blank value changes nothing.
+    private func fillIntention(_ key: String, _ value: String?, for card: DeckCard, onlyIfEmpty: Bool = false) {
+        guard !intentionFieldsTouched.contains(key),
+              let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty,
+              !onlyIfEmpty || intentionField(key, for: card).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else { return }
+        writeIntentionField(key, value, for: card)
+    }
+
+    /// Goals whose coach change is being confirmed now.
+    private(set) var acceptingChanges: Set<String> = []
+
+    /// Whether the server confirmed this goal's change from this deck (`lists["accepted"]`).
+    func isAccepted(_ change: DeckGoalChange, for card: DeckCard) -> Bool {
+        answers[card.id]?.lists?["accepted"]?.contains(change.goal) == true
+    }
+
+    /// Confirms the coach's change for its goal's week, sending the Goals server's today as `as_of`
+    /// like the week-ahead confirm. The goal joins `lists["accepted"]` only once the server confirmed
+    /// it. Returns whether the change stands accepted.
+    func acceptChange(_ change: DeckGoalChange, for card: DeckCard) async -> Bool {
+        if isAccepted(change, for: card) { return true }
+        guard !change.start.isEmpty, !acceptingChanges.contains(change.goal) else { return false }
+        acceptingChanges.insert(change.goal)
+        defer { acceptingChanges.remove(change.goal) }
+        let (date, kind) = (date, kind)
+        do {
+            let asOf = try await client.goalsToday()
+            try await client.confirmWeek(GoalWeekRequest(slug: change.goal, start: change.start, asOf: asOf,
+                                                         commitments: change.commitments))
+        } catch {
+            return false
+        }
+        // The server has the week either way; the answer belongs to the deck it was accepted on.
+        guard date == self.date, kind == self.kind else { return true }
+        update(card) { answer in
+            var lists = answer.lists ?? [:]
+            lists["accepted", default: []].append(change.goal)
+            answer.lists = lists
+        }
+        return true
+    }
+
     // MARK: Style signals
 
     /// Taps a style chip on `card` on or off.
@@ -1023,6 +1214,18 @@ struct APIClientDailyDeckAdapter: DailyDeckDataClient {
 
     func deleteWeekPhoto(weekEnding: String) async throws {
         try await apiClient.deleteWeekPhoto(weekEnding: weekEnding)
+    }
+
+    func draftIntention(date: String, answers: DeckAnswersPayload) async throws -> WeekIntentionDraft {
+        try await apiClient.draftIntention(date: date, answers: answers)
+    }
+
+    func goalsToday() async throws -> String {
+        try await APIClientGoalsAdapter(apiClient: apiClient).home().today
+    }
+
+    func confirmWeek(_ request: GoalWeekRequest) async throws {
+        _ = try await APIClientGoalsAdapter(apiClient: apiClient).confirmWeek(request)
     }
 }
 

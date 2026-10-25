@@ -20,7 +20,7 @@ struct DeckPageView: View {
     @Environment(\.openBrainRoute) private var openBrainRoute
 
     var body: some View {
-        let palette = DeckPalette.of(page, inV2Weekly: viewModel.isV2Weekly)
+        let palette = DeckPalette.of(page, inV2Weekly: viewModel.isSealedWeekly)
         let words = Group {
             switch page {
             case .card(let card):
@@ -550,7 +550,7 @@ struct DeckCardView: View {
     private var close: some View {
         let count = viewModel.answeredCount
         let filed = viewModel.isFiled && !viewModel.hasChanges
-        let seal = viewModel.isV2Weekly
+        let seal = viewModel.isSealedWeekly
         Text(verbatim: DeckCopy.closeHeading(seal: seal, filed: filed, count: count))
             .font(AppFont.display(style: .largeTitle, weight: .semibold))
         if seal {

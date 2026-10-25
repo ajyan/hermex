@@ -106,6 +106,7 @@ struct DeckPalette: Equatable {
         case .decision: return card.isViewTake ? .weekQuestion : .followUps
         case .changes: return .changes
         case .cover, .filmstrip, .story, .energy, .commitments, .values, .predictions, .who, .keepsakes: return .week
+        case .lastIntention, .value, .intention: return .week
         case .item, .unknown:
             switch card.itemKind {
             case "theme": return .theme
