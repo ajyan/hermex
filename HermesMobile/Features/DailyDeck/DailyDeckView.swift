@@ -107,7 +107,7 @@ struct DailyDeckView: View {
             .feedbackContext(feedbackContext)
             .task {
                 if let review = DailyBriefLaunch.take() {
-                    await viewModel.show(date: review.date, kind: review.kind, cardID: review.cardID)
+                    await viewModel.show(date: review.date, kind: review.kind)
                 } else {
                     await viewModel.load()
                 }
@@ -115,7 +115,7 @@ struct DailyDeckView: View {
             }
             .onChange(of: DailyBriefLaunch.shared.pending) { _, request in
                 guard request != nil, viewModel.workspace != nil, let review = DailyBriefLaunch.take() else { return }
-                Task { await viewModel.show(date: review.date, kind: review.kind, cardID: review.cardID) }
+                Task { await viewModel.show(date: review.date, kind: review.kind) }
             }
             .onChange(of: scenePhase) { _, phase in
                 viewModel.scenePhaseChanged(active: phase == .active)
@@ -218,14 +218,14 @@ struct DailyDeckView: View {
             parts.append(DailyDeckPaths.label(viewModel.date))
         }
         parts.append("\(viewModel.index + 1) of \(viewModel.visiblePages.count)")
-        if viewModel.isFiled { parts.append(DeckCopy.filedStatus(seal: viewModel.isV2Weekly, edited: viewModel.hasChanges)) }
+        if viewModel.isFiled { parts.append(DeckCopy.filedStatus(seal: viewModel.isSealedWeekly, edited: viewModel.hasChanges)) }
         return parts.joined(separator: " · ")
     }
 
     private func progress(count: Int) -> some View {
         VStack(spacing: 6) {
             ProgressView(value: Double(viewModel.index + 1), total: Double(max(count, 1)))
-                .tint(viewModel.currentPage.map { DeckPalette.of($0, inV2Weekly: viewModel.isV2Weekly).ink } ?? .secondary)
+                .tint(viewModel.currentPage.map { DeckPalette.of($0, inV2Weekly: viewModel.isSealedWeekly).ink } ?? .secondary)
                 .accessibilityValue(Text(verbatim: progressSubtitle))
         }
         .padding(.horizontal, 20)
@@ -254,7 +254,7 @@ struct DailyDeckView: View {
 
     private func file() {
         // What is being filed: the user can open another deck while it's in flight.
-        let (date, seals) = (viewModel.date, viewModel.isV2Weekly)
+        let (date, seals) = (viewModel.date, viewModel.isSealedWeekly)
         Task {
             let result = await viewModel.file()
             // A seal rewrites the record, and a model keeps the records it has read: start afresh.
@@ -345,9 +345,8 @@ private struct SealedWeekCover: View {
     }
 }
 
-/// A review a notification tap (or a goal card's "Next week's plan is waiting") asked for, at
-/// `cardID` when set. The Daily Brief screen opens it when it appears, or right away when it is
-/// already on screen.
+/// A review a notification tap asked for. The Daily Brief screen opens it when it appears, or right
+/// away when it is already on screen.
 @MainActor
 @Observable
 final class DailyBriefLaunch {
@@ -355,14 +354,13 @@ final class DailyBriefLaunch {
         let id = UUID()
         let date: String
         let kind: String
-        let cardID: String?
     }
 
     static let shared = DailyBriefLaunch()
     private(set) var pending: Request?
 
-    static func request(date: String, kind: String, cardID: String? = nil) {
-        shared.pending = Request(date: date, kind: kind, cardID: cardID)
+    static func request(date: String, kind: String) {
+        shared.pending = Request(date: date, kind: kind)
     }
 
     static func take() -> Request? {

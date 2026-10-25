@@ -89,33 +89,6 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(DeckPalette.of(card).name, "Today's Ask")
     }
 
-    func testWeekAheadCardDecodesItsCommitmentsAndLastWeek() throws {
-        let deck = try DailyDeck.decode(#"""
-        {"date":"2026-10-18","kind":"weekly","cards":[
-          {"id":"week-career","type":"week_ahead","goal":"career","title":"Next week · Land an AI role","color":"wiki",
-           "start":"2026-10-19","fallback":"Next week: Outreach 6",
-           "commitments":[{"id":"outreach","action":"Outreach","target":6,"skips":0,"unit":"item","was":5,
-                           "reason":"Hit twice.","extra":{"x":1}},
-                          {"action":"No id"},
-                          {"id":"prep","action":"Prep session","target":5,"skips":1,"unit":"day","source":"prep.days",
-                           "days":["mon"]}],
-           "last_week":[{"id":"outreach","action":"Outreach","target":5,"skips":0,"unit":"item"}]}]}
-        """#)
-        let card = try XCTUnwrap(deck.cards.first)
-        XCTAssertEqual(card.type, .weekAhead)
-        XCTAssertEqual(card.goal, "career")
-        XCTAssertEqual(card.start, "2026-10-19")
-        XCTAssertEqual(card.weekCommitments.map(\.id), ["outreach", "prep"], "a malformed commitment is dropped alone")
-        XCTAssertEqual(card.weekCommitments[0].was, 5)
-        XCTAssertEqual(card.weekCommitments[0].reason, "Hit twice.")
-        XCTAssertEqual(card.weekCommitments[1].source, "prep.days")
-        XCTAssertEqual(card.weekCommitments[1].days, ["mon"])
-        XCTAssertNil(card.weekCommitments[1].was)
-        XCTAssertEqual(card.lastWeek.map(\.target), [5])
-        XCTAssertFalse(card.takesFeedback)
-        XCTAssertFalse(card.takesText)
-    }
-
     // MARK: - What changed
 
     func testChangesCardDecodes() throws {
@@ -529,6 +502,30 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(card.sectionSpokenLabel, "This week, Being a father, What does being a father ask of you?")
         XCTAssertEqual(DeckPalette.of(card).colors, DeckPalette.opener.colors, "the divider wears the opener's paper")
         XCTAssertEqual(DeckPalette.of(card).name, "This week")
+    }
+
+    func testSectionDecodesIntentionLine() throws {
+        let card = try XCTUnwrap(DailyDeck.decode(#"""
+        {"date":"d","kind":"morning","cards":[
+          {"id":"week","type":"section","title":"Q","intention":{"text":"Send five asks","if_then":"If it is 9am, then I write."}},
+          {"id":"week2","type":"section","title":"Q","intention":{"text":"Rest"}},
+          {"id":"week3","type":"section","title":"Q","intention":"nope"}]}
+        """#).cards.first)
+        XCTAssertEqual(card.intention, DeckIntentionLine(text: "Send five asks", ifThen: "If it is 9am, then I write."))
+        XCTAssertEqual(card.intention?.line, "Your intention: Send five asks \u{b7} If it is 9am, then I write.")
+        let deck = try DailyDeck.decode(#"""
+        {"date":"d","kind":"morning","cards":[
+          {"id":"week2","type":"section","title":"Q","intention":{"text":"Rest"}},
+          {"id":"week3","type":"section","title":"Q","intention":"nope"},
+          {"id":"week4","type":"section","title":"Q","intention":{"text":"  ","if_then":"x"}},
+          {"id":"week5","type":"section","title":"Q"},
+          {"id":"week6","type":"section","title":"Q","intention":{"text":"Rest","if_then":4}}]}
+        """#)
+        XCTAssertEqual(deck.cards[0].intention?.line, "Your intention: Rest")
+        XCTAssertNil(deck.cards[1].intention)
+        XCTAssertNil(deck.cards[2].intention, "no text, no line")
+        XCTAssertNil(deck.cards[3].intention)
+        XCTAssertEqual(deck.cards[4].intention?.line, "Your intention: Rest", "a mistyped if_then drops only itself")
     }
 
     func testSectionCardWithNoLinkOrRecapDecodes() throws {
@@ -1715,25 +1712,6 @@ final class DailyDeckTests: XCTestCase {
     ]}
     """
 
-    @MainActor
-    func testShowWithACardIDLandsOnThatCard() async {
-        store.setWorkspace("/vault", for: server)
-        let weekly = #"{"date":"2026-10-04","kind":"weekly","cards":[{"id":"headline","type":"headline"},{"id":"recap","type":"item"},{"id":"week-career","type":"week_ahead","goal":"career"},{"id":"close","type":"close"}]}"#
-        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.weekly.json"], deck: weekly)
-
-        let viewModel = makeViewModel(client)
-        await viewModel.show(date: "2026-10-04", kind: "weekly", cardID: "week-career")
-        XCTAssertEqual(viewModel.index, 2)
-        viewModel.index = 0
-        await viewModel.show(date: "2026-10-04", kind: "weekly", cardID: "week-career")
-        XCTAssertEqual(viewModel.index, 2, "the deck already on screen still moves to the card")
-
-        let other = makeViewModel(client)
-        await other.show(date: "2026-10-04", kind: "weekly", cardID: "week-gone")
-        XCTAssertEqual(other.state, .ready)
-        XCTAssertEqual(other.index, 0)
-    }
-
     // MARK: - Journal calendar
 
     func testMonthGridPadsToTheFirstWeekday() {
@@ -2067,6 +2045,18 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     private(set) var readPaths: [String] = []
     private let readLock = NSLock()
     private(set) var sent: [Sent] = []
+    /// What `draftIntention` answers; an empty draft (the route's `{}`) by default.
+    var intentionDraft: Result<WeekIntentionDraft, Error> = .success(WeekIntentionDraft())
+    /// Runs inside `draftIntention` before it answers, to hold a draft in flight.
+    var intentionGate: (@Sendable () async -> Void)?
+    private(set) var intentionRequests: [(date: String, answers: DeckAnswersPayload)] = []
+    /// The Goals server's today, sent back as `as_of`.
+    var serverToday: Result<String, Error> = .success("2026-10-25")
+    /// What `confirmWeek` does; succeeds by default.
+    var weekConfirm: Result<Void, Error> = .success(())
+    /// Runs inside `confirmWeek` before it answers, to hold a confirm in flight.
+    var confirmGate: (@Sendable () async -> Void)?
+    private(set) var weekRequests: [GoalWeekRequest] = []
 
     init(workspaces: [String], names: [String]?, deck: String) {
         self.workspaces = workspaces
@@ -2123,6 +2113,21 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     func deleteWeekPhoto(weekEnding: String) async throws {
         deletedPhotos.append(weekEnding)
         try photoDelete.get()
+    }
+
+    func draftIntention(date: String, answers: DeckAnswersPayload) async throws -> WeekIntentionDraft {
+        intentionRequests.append((date, answers))
+        await intentionGate?()
+        try Task.checkCancellation()  // as `URLSession` does when the caller's task is cancelled
+        return try intentionDraft.get()
+    }
+
+    func goalsToday() async throws -> String { try serverToday.get() }
+
+    func confirmWeek(_ request: GoalWeekRequest) async throws {
+        weekRequests.append(request)
+        await confirmGate?()
+        try weekConfirm.get()
     }
 }
 

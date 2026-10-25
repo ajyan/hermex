@@ -35,7 +35,8 @@ enum DailyDeckJournal {
 }
 
 /// Where a review in the calendar opens: a week with a record opens its week page, every other
-/// review its deck.
+/// review its deck. A v2 weekly deck is only reachable as its week page: its views are gone, so a v2
+/// deck with no record (none exists today) would open in the generic reader.
 enum DeckCalendarRoute: Equatable {
     case weekPage(String)
     /// (date, kind)

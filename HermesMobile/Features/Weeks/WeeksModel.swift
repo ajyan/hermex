@@ -73,7 +73,7 @@ struct DuePrediction: Identifiable, Equatable {
     /// The ISO years with a sealed week, and this one, oldest first.
     var years: [Int] {
         let calendar = Self.calendar
-        var years = Set(recordDates.compactMap { DeckPrediction.date(day: $0, calendar: calendar) }
+        var years = Set(recordDates.compactMap { DailyDeckPaths.date(day: $0, calendar: calendar) }
             .map { calendar.component(.yearForWeekOfYear, from: $0) })
         years.insert(currentYear)
         return years.sorted()
@@ -258,7 +258,7 @@ struct DuePrediction: Identifiable, Equatable {
     nonisolated static func sunday(in name: String, suffix: String) -> String? {
         guard name.hasSuffix(suffix) else { return nil }
         let day = String(name.dropLast(suffix.count))
-        guard day.count == 10, let date = DeckPrediction.date(day: day, calendar: calendar),
+        guard day.count == 10, let date = DailyDeckPaths.date(day: day, calendar: calendar),
               calendar.component(.weekday, from: date) == 1, DailyDeckPaths.day(date, calendar: calendar) == day
         else { return nil }
         return day
@@ -267,7 +267,7 @@ struct DuePrediction: Identifiable, Equatable {
     /// "Week 43 · Oct 19–25, 2026": the record's number, else the ISO week's, and the week's days.
     nonisolated static func weekLabel(weekEnding: String, number: Int?) -> String {
         let calendar = calendar
-        guard let end = DeckPrediction.date(day: weekEnding, calendar: calendar),
+        guard let end = DailyDeckPaths.date(day: weekEnding, calendar: calendar),
               let start = calendar.date(byAdding: .day, value: -6, to: end) else { return number.map { "Week \($0)" } ?? weekEnding }
         let week = number ?? calendar.component(.weekOfYear, from: end)
         let month = Date.FormatStyle.dateTime.month(.abbreviated).day()
@@ -284,7 +284,7 @@ struct DuePrediction: Identifiable, Equatable {
 
     /// "Oct 24, 2027" for `2027-10-24`.
     nonisolated static func dayLabel(_ day: String) -> String {
-        DeckPrediction.date(day: day, calendar: calendar).map(dayLabel) ?? day
+        DailyDeckPaths.date(day: day, calendar: calendar).map(dayLabel) ?? day
     }
 
     private nonisolated static func dayLabel(_ date: Date) -> String {

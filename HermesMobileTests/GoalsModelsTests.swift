@@ -87,7 +87,6 @@ final class GoalsModelsTests: XCTestCase {
         XCTAssertNil(row.source)
         XCTAssertEqual(row.sourceDays, [])
         XCTAssertEqual(row.items, [])
-        XCTAssertNil(goal.weekPending)
         XCTAssertEqual(goal.confirmedStarts, [])
         XCTAssertEqual(goal.sourceErrors, [])
     }
@@ -110,8 +109,7 @@ final class GoalsModelsTests: XCTestCase {
 
     func testGoalSummaryDecodesCoachFields() throws {
         let json = #"{"slug":"a","week_pending":"2026-10-19","confirmed_starts":["2026-10-12T08:00:00"],"source_errors":["prep: unreadable"]}"#
-        let goal = try PrepDecoding.decode(GoalSummary.self, from: Data(json.utf8))
-        XCTAssertEqual(goal.weekPending, "2026-10-19")
+        let goal = try PrepDecoding.decode(GoalSummary.self, from: Data(json.utf8))  // `week_pending` is ignored
         XCTAssertEqual(goal.confirmedStarts, ["2026-10-12T08:00:00"])
         XCTAssertEqual(goal.sourceErrors, ["prep: unreadable"])
     }

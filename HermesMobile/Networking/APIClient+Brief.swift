@@ -61,6 +61,44 @@ struct BriefFileResponse: Decodable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey { case ok, summary, ran, agentSteps, error }
 }
 
+/// `POST /api/brief/intention`: the review's answers so far, the same list the filer gets.
+struct BriefIntentionRequest: Encodable, Sendable {
+    let date: String
+    let answers: [DeckAnswer]
+}
+
+/// The drafted intention for next week. Every field is optional; the route answers `{}` when the
+/// model is down or slow, which decodes as an empty draft.
+struct WeekIntentionDraft: Decodable, Equatable, Sendable {
+    let thread: String?
+    let intention: String?
+    let obstacle: String?
+    let ifThen: String?
+
+    init(thread: String? = nil, intention: String? = nil, obstacle: String? = nil, ifThen: String? = nil) {
+        self.thread = thread
+        self.intention = intention
+        self.obstacle = obstacle
+        self.ifThen = ifThen
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        thread = try? c.decodeIfPresent(String.self, forKey: .thread)
+        intention = try? c.decodeIfPresent(String.self, forKey: .intention)
+        obstacle = try? c.decodeIfPresent(String.self, forKey: .obstacle)
+        ifThen = try? c.decodeIfPresent(String.self, forKey: .ifThen)
+    }
+
+    /// Nothing drafted: every field missing or blank.
+    var isEmpty: Bool {
+        [thread, intention, obstacle, ifThen].allSatisfy { $0?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true }
+    }
+
+    // `APIClient`'s decoder converts snake_case, so `if_then` arrives as `ifThen`.
+    private enum CodingKeys: String, CodingKey { case thread, intention, obstacle, ifThen }
+}
+
 /// A filing the server refused or failed, in the server's words when it gave any.
 struct BriefFileError: LocalizedError, Equatable {
     let message: String
@@ -86,6 +124,16 @@ extension APIClient {
             throw APIError.http(statusCode: statusCode, body: body)
         }
         return try decode(BriefFileResponse.self, from: data)
+    }
+}
+
+extension APIClient {
+    /// Asks the server to draft next week's intention from the review's answers so far. Read-only;
+    /// a server without the route throws its 404, and one whose model failed answers an empty draft.
+    func draftIntention(date: String, answers: DeckAnswersPayload) async throws -> WeekIntentionDraft {
+        let data = try await sendData(endpoint: .briefIntention, method: "POST",
+                                      body: BriefIntentionRequest(date: date, answers: answers.answers))
+        return try decode(WeekIntentionDraft.self, from: data)
     }
 }
 

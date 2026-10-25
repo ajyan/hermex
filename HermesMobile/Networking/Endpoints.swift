@@ -218,6 +218,9 @@ enum Endpoint {
     /// Files a Daily Deck's answers without the model (this user's webui fork):
     /// POST `{date, kind, answers}`. Servers without it answer 404.
     case briefFile
+    /// Drafts the Sunday review's intention from its answers so far (this user's webui fork):
+    /// POST `{date, answers}`; answers `{thread?, intention?, obstacle?, if_then?}`, or `{}` when the model can't.
+    case briefIntention
     /// The week's photo (this user's webui fork): POST a raw JPEG or DELETE, `?week_ending=YYYY-MM-DD`.
     case briefPhoto(weekEnding: String)
     /// The Daily Deck's Mandarin card, live (`api/vault_mandarin.py` on this user's webui fork):
@@ -578,6 +581,8 @@ enum Endpoint {
             return "/api/meals/accept"
         case .briefFile:
             return "/api/brief/file"
+        case .briefIntention:
+            return "/api/brief/intention"
         case .briefPhoto:
             return "/api/brief/photo"
         case .mandarinAnswer:

@@ -96,17 +96,6 @@ private struct GoalCheckInSection: View {
                     .font(AppFont.subheadline(weight: .medium))
                     .padding(.top, 6)
             }
-            if let pending = goal.weekPending {
-                // The Sunday deck's plan for this week isn't confirmed yet: open it at this goal's card.
-                Button {
-                    DailyBriefLaunch.request(date: pending, kind: "weekly", cardID: "week-\(goal.slug)")
-                } label: {
-                    Label { Text(verbatim: "Next week's plan is waiting") } icon: { Image(systemName: "calendar") }
-                }
-                .buttonStyle(.chatDecision(.secondary))
-                .environment(\.hxPaper, tint.paper)
-                .padding(.top, 14)
-            }
             if !yesterday.isEmpty {
                 header("Yesterday")
                 ForEach(Array(yesterday.enumerated()), id: \.element.id) { index, row in

@@ -11,7 +11,7 @@ final class WeeksModelTests: XCTestCase {
         return calendar
     }
 
-    private func day(_ value: String) -> Date { DeckPrediction.date(day: value, calendar: iso)! }
+    private func day(_ value: String) -> Date { DailyDeckPaths.date(day: value, calendar: iso)! }
 
     /// Every Sunday whose ISO week-based year is `year`, found by walking the days around it.
     private func isoSundays(of year: Int) -> [String] {
@@ -282,6 +282,24 @@ final class WeeksModelTests: XCTestCase {
                        .deck("2026-10-11", "weekly"), "a filed week without a record opens its deck")
         XCTAssertEqual(DeckCalendarRoute.for(review: DeckReview(date: "2026-10-18", kind: "monthly", isFiled: false), records: records),
                        .deck("2026-10-18", "monthly"), "only weekly reviews have a week page")
+    }
+
+    func testWeekPageOffersEditOnlyForAMomentsRecordOrAnUnreadableOne() throws {
+        let moments = try WeekRecord.decode(Data(#"{"version": 2, "week_ending": "2026-11-01", "moments": []}"#.utf8))
+        let older = try WeekRecord.decode(Data(#"{"week_ending": "2026-10-25", "title": "The v2 week", "story": "Slept more."}"#.utf8))
+        XCTAssertTrue(WeekPageView.showsEdit(for: moments), "today's review reopens to change and seal again")
+        XCTAssertFalse(WeekPageView.showsEdit(for: older), "an earlier review's deck can't be edited any more")
+        XCTAssertTrue(WeekPageView.showsEdit(for: nil), "an unreadable record can still be sealed again")
+    }
+
+    func testSealedV2WeeklyOpensWeekPage() throws {
+        // A moments-era deck is only reachable as its week page once the record exists.
+        let deck = try DailyDeck.decode(#"{"version": 2, "date": "2026-10-25", "kind": "weekly", "cards": [{"id": "cover", "type": "cover"}]}"#)
+        XCTAssertEqual(deck.version, 2)
+        let review = DeckReview(date: deck.date, kind: deck.kind, isFiled: true)
+        XCTAssertEqual(DeckCalendarRoute.for(review: review, records: [deck.date]), .weekPage("2026-10-25"))
+        XCTAssertEqual(DeckCalendarRoute.for(review: review, records: []), .deck("2026-10-25", "weekly"),
+                       "unsealed, it still opens as a deck")
     }
 
     // MARK: Helpers
