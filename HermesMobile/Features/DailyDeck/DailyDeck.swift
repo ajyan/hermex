@@ -61,7 +61,7 @@ struct DeckCheck: Decodable, Equatable {
 /// fails to decode; an unknown `type` renders its `fallback` text as a plain card.
 struct DeckCard: Decodable, Equatable, Identifiable {
     enum CardType: Equatable {
-        case headline, prompt, decision, reflect, item, sleep, goal, weekAhead, changes, ask, section, close
+        case headline, prompt, decision, reflect, item, sleep, goal, weekAhead, changes, ask, dinner, meals, section, close
         /// The v2 weekly review's cards (`WeeklyReviewModels.swift`).
         case cover, filmstrip, story, energy, commitments, values, predictions, who, keepsakes
         case unknown(String)
@@ -78,6 +78,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case "week_ahead": self = .weekAhead
             case "changes": self = .changes
             case "ask": self = .ask
+            case "dinner": self = .dinner
+            case "meals": self = .meals
             case "section": self = .section
             case "close": self = .close
             case "cover": self = .cover
@@ -182,6 +184,13 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let suggested: [String]
     /// A Piece card's argument and quotes, from the long piece's map (the vault's tools/piece_view.py).
     let piece: DeckPiece?
+    /// A dinner card's night ("2026-10-26"), the dinner it asks about.
+    let date: String?
+    /// A dinner card's choices: the week's dinners not yet logged, then "other" and "out". The pick
+    /// files as the answer's `action`, 👍/👎 as `rating` 2/1, and a cooking note as `text`.
+    let options: [DeckSleepTag]
+    /// The Sunday meals card's week of candidates, accepted live through /api/meals/accept.
+    let meals: DeckMealsPlan?
 
     /// The vault file the card came from (`ref.link`, "wiki/nyc-marathon"); nil for pooled
     /// material with no page of its own (books, quotes, videos).
@@ -270,13 +279,15 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     }
 
     /// Whether answering this card means typing (prompt and reflect cards, and a sleep or goal card's note).
-    var takesText: Bool { (type == .prompt && selfRatings == nil) || type == .reflect || type == .sleep || type == .goal }
+    var takesText: Bool {
+        (type == .prompt && selfRatings == nil) || type == .reflect || type == .sleep || type == .goal || type == .dinner
+    }
 
     /// Whether "Not for Me" applies: material the brief chose, not the deck's own pages.
     var takesFeedback: Bool {
         switch type {
         case .prompt, .reflect, .item, .unknown: true
-        case .headline, .decision, .sleep, .goal, .weekAhead, .changes, .ask, .section, .close: false
+        case .headline, .decision, .sleep, .goal, .weekAhead, .changes, .ask, .dinner, .meals, .section, .close: false
         case .cover, .filmstrip, .story, .energy, .commitments, .values, .predictions, .who, .keepsakes: false
         }
     }
@@ -286,7 +297,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
         case goal, start, lastWeek, phrases, recall, yesterday, pattern, progress, questionPinyin, questionEn, rows, week
         case chapter, weekNumber, range, chapters, noteFromPast, days, gave, drained, rotation, items, values, suggested
-        case piece, learned, variant
+        case piece, learned, variant, date, options, meals
         case weekCommitments = "commitments"
         case itemKind = "kind"
     }
@@ -372,6 +383,9 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         values = ((try? c.decodeIfPresent([Lossy<DeckValue>].self, forKey: .values)) ?? []).compactMap(\.value)
         suggested = (try? c.decodeIfPresent([String].self, forKey: .suggested)) ?? []
         piece = (try? c.decodeIfPresent(DeckPiece.self, forKey: .piece)).flatMap { $0.steps.isEmpty ? nil : $0 }
+        date = try? c.decodeIfPresent(String.self, forKey: .date)
+        options = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .options)) ?? []).compactMap(\.value)
+        meals = (try? c.decodeIfPresent(DeckMealsPlan.self, forKey: .meals)).flatMap { $0.slots.isEmpty ? nil : $0 }
         let ref = try? c.decodeIfPresent(Ref.self, forKey: .ref)
         link = ref?.link.flatMap { $0.isEmpty ? nil : $0 }
         pool = ref?.pool.flatMap { $0.isEmpty ? nil : $0 }
@@ -423,10 +437,79 @@ struct DeckSleepCoach: Decodable, Equatable {
     let text: String
 }
 
-/// Something that might have shaped the night ("Late meal"); `id` is what gets filed.
+/// Something that might have shaped the night ("Late meal"); `id` is what gets filed. A dinner
+/// card's options have the same shape.
 struct DeckSleepTag: Decodable, Equatable, Identifiable {
     let id: String
     let label: String
+}
+
+/// The Sunday meals card's plan (the vault's `tools/meals.py`): one slot per night, each a ranked
+/// list of dinners whose first is Atlas's pick. `nights` of them show, adjustable within
+/// `minNights...maxNights`; each dinner is `servings` servings.
+struct DeckMealsPlan: Decodable, Equatable {
+    let week: String
+    let nights: Int
+    let minNights: Int
+    let maxNights: Int
+    let servings: Int
+    let slots: [DeckMealSlot]
+    let backup: DeckMealCandidate?
+    let onHand: [String]
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        week = try c.decode(String.self, forKey: .week)
+        slots = ((try? c.decodeIfPresent([Lossy<DeckMealSlot>].self, forKey: .slots)) ?? []).compactMap(\.value)
+            .filter { !$0.candidates.isEmpty }
+        maxNights = min((try? c.decodeIfPresent(Int.self, forKey: .maxNights)) ?? slots.count, slots.count)
+        minNights = min(max((try? c.decodeIfPresent(Int.self, forKey: .minNights)) ?? 1, 1), maxNights)
+        nights = min(max((try? c.decodeIfPresent(Int.self, forKey: .nights)) ?? maxNights, minNights), maxNights)
+        servings = (try? c.decodeIfPresent(Int.self, forKey: .servings)) ?? 3
+        backup = try? c.decodeIfPresent(DeckMealCandidate.self, forKey: .backup)
+        onHand = (try? c.decodeIfPresent([String].self, forKey: .onHand)) ?? []
+    }
+
+    /// `min_nights`, `max_nights` and `on_hand` on the wire: the deck decodes snake_case keys.
+    private enum CodingKeys: String, CodingKey { case week, nights, minNights, maxNights, servings, slots, backup, onHand }
+}
+
+/// One night of the meals card: its candidates, best first.
+struct DeckMealSlot: Decodable, Equatable, Identifiable {
+    let id: String
+    let candidates: [DeckMealCandidate]
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        candidates = ((try? c.decodeIfPresent([Lossy<DeckMealCandidate>].self, forKey: .candidates)) ?? [])
+            .compactMap(\.value)
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, candidates }
+}
+
+/// A dinner on the meals card: the dish (`dish` is its slug, what gets accepted), this week's
+/// vegetables, why it was picked ("in season: delicata · made 6×"), and a tag ("new", "carried over",
+/// "uses on hand").
+struct DeckMealCandidate: Decodable, Equatable, Identifiable {
+    let dish: String
+    let name: String
+    let veg: [String]
+    let why: String?
+    let tag: String?
+    var id: String { dish }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        dish = try c.decode(String.self, forKey: .dish)
+        name = (try? c.decodeIfPresent(String.self, forKey: .name)) ?? dish
+        veg = (try? c.decodeIfPresent([String].self, forKey: .veg)) ?? []
+        why = (try? c.decodeIfPresent(String.self, forKey: .why)).flatMap { $0.isEmpty ? nil : $0 }
+        tag = (try? c.decodeIfPresent(String.self, forKey: .tag)).flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    private enum CodingKeys: String, CodingKey { case dish, name, veg, why, tag }
 }
 
 /// One night on the charts: its weekday, hours slept against hours needed, and overnight HRV
@@ -1071,14 +1154,14 @@ struct DeckCardText: Equatable {
             // for older builds. A theme's summary is its `context`.
             let drawn = !card.entries.isEmpty || !card.points.isEmpty || !card.meters.isEmpty || card.piece != nil
             detail = card.context ?? (drawn ? nil : (card.body ?? (card.title == nil ? nil : card.fallback)))
-        case .sleep:
+        case .sleep, .dinner:
             // The question leads; the numbers show after the rating so they don't decide it.
             lead = card.question
             leadIsQuestion = true
         case .cover, .filmstrip, .story, .energy, .commitments, .values, .predictions, .who, .keepsakes:
             // Each is drawn by its own view; the cover leads with its title and the story with its draft.
             lead = card.type == .story ? card.storyDraft : card.title
-        case .goal, .weekAhead, .changes, .ask:
+        case .goal, .weekAhead, .changes, .ask, .meals:
             // The check-ins, the week's plan, the week's fixes and the Ask are drawn (`DeckGoalCard`,
             // `DeckWeekAheadCard`, `DeckChangesCard`, `DeckAskCard`).
             lead = card.title ?? card.fallback
