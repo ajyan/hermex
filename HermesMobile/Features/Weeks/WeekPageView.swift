@@ -5,8 +5,8 @@ import SwiftUI
 /// then what he kept of it (energy, the deep answer, the values, the one thing, who, the note to the
 /// future, the prediction and its grade). A moments (v2) record (`momentsSections`) is its
 /// moments, how it ended, and his answers instead. Empty sections are left out, so a backfilled week
-/// is its photo, title, and story. Edit reopens the filed deck (also when the record can't be read); the
-/// photo can be added, replaced, or removed.
+/// is its photo, title, and story. Edit reopens the filed deck (`showsEdit`); the photo can be added,
+/// replaced, or removed.
 struct WeekPageView: View {
     let model: WeeksModel
     let weekEnding: String
@@ -36,6 +36,15 @@ struct WeekPageView: View {
 
     private var isLoading: Bool { if case .loading = phase { true } else { false } }
 
+    private var record: WeekRecord? { if case .ready(let record) = phase { record } else { nil } }
+
+    /// Edit reopens the week's deck: for a moments record, sealed by today's review, and when the
+    /// record can't be read (nil), so the week can be sealed again. An older record's deck was an
+    /// earlier review whose cards the app no longer draws, so its week only rereads.
+    static func showsEdit(for record: WeekRecord?) -> Bool {
+        record?.isMomentsRecord ?? true
+    }
+
     /// Try the photo itself when the listing has it or couldn't be read.
     private var loadsPhoto: Bool { !model.photosListed || model.photoDates.contains(weekEnding) }
 
@@ -59,12 +68,13 @@ struct WeekPageView: View {
         .background(Color.hxCanvas.ignoresSafeArea())
         .hxNavigationTitle("Your week")
         .toolbar {
-            // Edit stays when the record can't be read, so the week can be sealed again.
             if !isLoading {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     if case .ready = phase { photoMenu }
-                    Button("Edit", action: edit)
-                        .accessibilityHint(Text(verbatim: "Reopens the week's review to change and seal again"))
+                    if Self.showsEdit(for: record) {
+                        Button("Edit", action: edit)
+                            .accessibilityHint(Text(verbatim: "Reopens the week's review to change and seal again"))
+                    }
                 }
             }
         }

@@ -103,7 +103,7 @@ struct DailyDeckView: View {
             .feedbackContext(feedbackContext)
             .task {
                 if let review = DailyBriefLaunch.take() {
-                    await viewModel.show(date: review.date, kind: review.kind, cardID: review.cardID)
+                    await viewModel.show(date: review.date, kind: review.kind)
                 } else {
                     await viewModel.load()
                 }
@@ -111,7 +111,7 @@ struct DailyDeckView: View {
             }
             .onChange(of: DailyBriefLaunch.shared.pending) { _, request in
                 guard request != nil, viewModel.workspace != nil, let review = DailyBriefLaunch.take() else { return }
-                Task { await viewModel.show(date: review.date, kind: review.kind, cardID: review.cardID) }
+                Task { await viewModel.show(date: review.date, kind: review.kind) }
             }
             .onChange(of: scenePhase) { _, phase in
                 viewModel.scenePhaseChanged(active: phase == .active)
@@ -341,9 +341,8 @@ private struct SealedWeekCover: View {
     }
 }
 
-/// A review a notification tap (or a goal card's "Next week's plan is waiting") asked for, at
-/// `cardID` when set. The Daily Brief screen opens it when it appears, or right away when it is
-/// already on screen.
+/// A review a notification tap asked for. The Daily Brief screen opens it when it appears, or right
+/// away when it is already on screen.
 @MainActor
 @Observable
 final class DailyBriefLaunch {
@@ -351,14 +350,13 @@ final class DailyBriefLaunch {
         let id = UUID()
         let date: String
         let kind: String
-        let cardID: String?
     }
 
     static let shared = DailyBriefLaunch()
     private(set) var pending: Request?
 
-    static func request(date: String, kind: String, cardID: String? = nil) {
-        shared.pending = Request(date: date, kind: kind, cardID: cardID)
+    static func request(date: String, kind: String) {
+        shared.pending = Request(date: date, kind: kind)
     }
 
     static func take() -> Request? {

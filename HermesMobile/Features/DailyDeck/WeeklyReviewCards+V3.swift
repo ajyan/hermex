@@ -184,7 +184,8 @@ struct WeekIntentionCard: View {
             }
         }
         // Only once this card is on top: the stack draws it a card early, before the last value is answered.
-        .task(id: viewModel.currentCardID == card.id) { await viewModel.draftIntentionOnArrival() }
+        // The view model owns the request, so leaving the card doesn't cancel it.
+        .task(id: viewModel.currentCardID == card.id) { viewModel.draftIntentionOnArrival() }
     }
 
     /// "Outreach 10 → 5 · Accept", the coach's reason under it.

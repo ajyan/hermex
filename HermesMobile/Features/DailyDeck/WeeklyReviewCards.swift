@@ -211,8 +211,7 @@ struct WeekCoverCard: View {
         .padding(.vertical, 4)
         // One element for VoiceOver, with Swap and Remove as its actions.
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: [moment.day, moment.line, value].compactMap { $0?.isEmpty == false ? $0 : nil }
-            .joined(separator: ". ")))
+        .accessibilityLabel(Text(verbatim: WeekValues.spokenMoment(day: moment.day, line: moment.line, value: moment.value)))
         .accessibilityActions {
             if canSwap {
                 Button { change { viewModel.swapMoment(moment.id, for: card) } } label: { Text(verbatim: "Swap") }

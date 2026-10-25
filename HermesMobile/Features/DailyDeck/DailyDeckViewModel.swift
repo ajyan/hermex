@@ -367,9 +367,8 @@ final class DailyDeckViewModel {
         await load()
     }
 
-    /// Opens another deck: a past day's brief to reread or edit, or a review. With `cardID`, it
-    /// lands on that card once loaded (the deck already on screen just moves to it).
-    func show(date: String, kind: String = "morning", cardID: String? = nil) async {
+    /// Opens another deck: a past day's brief to reread or edit, or a review.
+    func show(date: String, kind: String = "morning") async {
         if date != self.date || kind != self.kind || state != .ready {
             showCard(nil)  // the card leaving keeps its time on the deck it belongs to
             self.date = date
@@ -378,8 +377,6 @@ final class DailyDeckViewModel {
             weekPhotoError = nil
             await load()
         }
-        guard let cardID, state == .ready, let i = visiblePages.firstIndex(where: { $0.id == cardID }) else { return }
-        index = i
     }
 
     /// Loads the deck and, when it was filed, the filed answers. Unsent edits on this
@@ -828,6 +825,8 @@ final class DailyDeckViewModel {
     /// The answers to the cards before the intention card when the last draft was asked; nil before the first.
     @ObservationIgnored private var intentionDraftedFrom: [DeckAnswer]?
     @ObservationIgnored private var intentionDraftGeneration = 0
+    /// The draft in flight. The view model owns it, so leaving the intention card doesn't cancel it.
+    @ObservationIgnored private var intentionDraftTask: Task<Void, Never>?
 
     /// One intention field as it stands; empty when unset.
     func intentionField(_ key: String, for card: DeckCard) -> String {
@@ -845,9 +844,12 @@ final class DailyDeckViewModel {
         if key == "text" { setText(value, for: card) } else { setNote(key, value, for: card) }
     }
 
-    /// A newly opened deck starts with no draft asked for; fields already written stay his.
+    /// A newly opened deck starts with no draft asked for; fields already written stay his. A draft
+    /// still in flight for the deck before is cancelled, and its answer dropped.
     private func resetIntention() {
         intentionDraftGeneration += 1
+        intentionDraftTask?.cancel()
+        intentionDraftTask = nil
         intentionDraftedFrom = nil
         isDraftingIntention = false
         shownMoments = [:]
@@ -857,42 +859,48 @@ final class DailyDeckViewModel {
         })
     }
 
-    /// Asks the server to draft the intention from the answers so far. It asks once; it asks again
-    /// only while he hasn't touched a field and an earlier answer changed since. The draft fills only
-    /// the fields he hasn't touched, even when he typed while it was drafting. When the model gives
+    /// Asks the server to draft the intention from the answers so far, on an unfiled deck. It asks
+    /// once; it asks again only while he hasn't touched a field and an earlier answer changed since.
+    /// While a draft is in flight it asks nothing and returns that draft. The draft fills only the
+    /// fields he hasn't touched, even when he typed while it was drafting. When the model gives
     /// nothing (or fails), the obstacle prefills from what got in the way last week, and the
-    /// intention from last week's when it didn't hold.
-    func intentionDraft() async {
-        guard let deck, let card = cards.first(where: { $0.type == .intention }), !isDraftingIntention else { return }
+    /// intention from last week's when it didn't hold. Returns the draft in flight, for a caller that
+    /// waits for it to land; nil when none was asked.
+    @discardableResult
+    func intentionDraft() -> Task<Void, Never>? {
+        if isDraftingIntention { return intentionDraftTask }
+        guard let deck, let card = cards.first(where: { $0.type == .intention }), !isFiled else { return nil }
         let payload = DeckAnswersPayload(deck: deck, answers: answers, completedAt: now())
         let earlier = Set(deck.cards.prefix { $0.id != card.id }.map(\.id))
         let from = payload.answers.filter { earlier.contains($0.card) }
         if let drafted = intentionDraftedFrom {
-            guard intentionFieldsTouched.isEmpty, drafted != from else { return }
+            guard intentionFieldsTouched.isEmpty, drafted != from else { return nil }
         } else if intentionFieldsTouched.isSuperset(of: Self.intentionKeys) {
-            return  // nothing left to fill
+            return nil  // nothing left to fill
         }
         intentionDraftedFrom = from
         intentionDraftGeneration += 1
         let generation = intentionDraftGeneration
         isDraftingIntention = true
-        let draft: WeekIntentionDraft?
-        do {
-            draft = try await client.draftIntention(date: deck.date, answers: payload)
-        } catch {
-            if error is CancellationError || (error as? URLError)?.code == .cancelled || Task.isCancelled {
-                if generation == intentionDraftGeneration {
-                    isDraftingIntention = false
-                    intentionDraftedFrom = nil  // the card left before an answer: ask again when it's back
-                }
-                return
-            }
-            draft = nil
+        let task = Task { [weak self] in
+            let draft = try? await self?.client.draftIntention(date: deck.date, answers: payload)
+            self?.landIntentionDraft(draft, deck: deck, card: card, generation: generation)
         }
+        intentionDraftTask = task
+        return task
+    }
+
+    /// Applies a draft that came back, only to the deck that asked while it is on screen and unfiled.
+    private func landIntentionDraft(_ draft: WeekIntentionDraft?, deck: DailyDeck, card: DeckCard, generation: Int) {
         guard generation == intentionDraftGeneration else { return }  // another deck opened
         isDraftingIntention = false
+        intentionDraftTask = nil
         // Or another deck is loading, or failed to load: its answers aren't this deck's.
         guard state == .ready, date == deck.date, kind == deck.kind, self.deck?.date == deck.date else { return }
+        guard !isFiled, filing != .filing else {
+            intentionDraftedFrom = nil  // what was sent is what's filed; a failed filing may ask again
+            return
+        }
         if let draft, !draft.isEmpty {
             fillIntention("thread", draft.thread, for: card)
             fillIntention("text", draft.intention, for: card)
@@ -909,13 +917,12 @@ final class DailyDeckViewModel {
     }
 
     /// The intention card's draft, asked for once he is on that card. The stack draws the card under
-    /// the top one early, so drafting on appear would miss the last value's answer. A filed deck,
-    /// or an intention he (or an earlier draft) has started, keeps what it has.
-    func draftIntentionOnArrival() async {
-        guard let card = cards.first(where: { $0.type == .intention }), currentCardID == card.id, !isFiled else { return }
-        let answer = answers[card.id]
-        guard answer?.text == nil, answer?.notes?.isEmpty ?? true else { return }
-        await intentionDraft()
+    /// the top one early, so drafting on appear would miss the last value's answer. Arriving again
+    /// drafts again only under `intentionDraft`'s rules.
+    @discardableResult
+    func draftIntentionOnArrival() -> Task<Void, Never>? {
+        guard let card = cards.first(where: { $0.type == .intention }), currentCardID == card.id else { return nil }
+        return intentionDraft()
     }
 
     /// Writes a drafted value into a field he hasn't touched; a blank value changes nothing.

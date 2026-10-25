@@ -1712,25 +1712,6 @@ final class DailyDeckTests: XCTestCase {
     ]}
     """
 
-    @MainActor
-    func testShowWithACardIDLandsOnThatCard() async {
-        store.setWorkspace("/vault", for: server)
-        let weekly = #"{"date":"2026-10-04","kind":"weekly","cards":[{"id":"headline","type":"headline"},{"id":"recap","type":"item"},{"id":"week-career","type":"item","kind":"goals"},{"id":"close","type":"close"}]}"#
-        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.weekly.json"], deck: weekly)
-
-        let viewModel = makeViewModel(client)
-        await viewModel.show(date: "2026-10-04", kind: "weekly", cardID: "week-career")
-        XCTAssertEqual(viewModel.index, 2)
-        viewModel.index = 0
-        await viewModel.show(date: "2026-10-04", kind: "weekly", cardID: "week-career")
-        XCTAssertEqual(viewModel.index, 2, "the deck already on screen still moves to the card")
-
-        let other = makeViewModel(client)
-        await other.show(date: "2026-10-04", kind: "weekly", cardID: "week-gone")
-        XCTAssertEqual(other.state, .ready)
-        XCTAssertEqual(other.index, 0)
-    }
-
     // MARK: - Journal calendar
 
     func testMonthGridPadsToTheFirstWeekday() {
@@ -2137,6 +2118,7 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     func draftIntention(date: String, answers: DeckAnswersPayload) async throws -> WeekIntentionDraft {
         intentionRequests.append((date, answers))
         await intentionGate?()
+        try Task.checkCancellation()  // as `URLSession` does when the caller's task is cancelled
         return try intentionDraft.get()
     }
 

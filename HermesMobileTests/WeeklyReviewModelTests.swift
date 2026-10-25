@@ -162,7 +162,7 @@ final class WeeklyReviewModelTests: XCTestCase {
             arrived.fulfill()
             for await _ in release { break }
         }
-        let drafting = Task { await viewModel.intentionDraft() }
+        let drafting = viewModel.intentionDraft()
         await fulfillment(of: [arrived], timeout: 5)
 
         // He opens last week's review from the calendar, and its load fails before the deck opens.
@@ -171,7 +171,7 @@ final class WeeklyReviewModelTests: XCTestCase {
         if case .failed = viewModel.state {} else { XCTFail("expected the load to fail, got \(viewModel.state)") }
         releaser.yield()
         releaser.finish()
-        await drafting.value
+        await drafting?.value
 
         XCTAssertFalse(viewModel.isDraftingIntention)
         XCTAssertTrue(store.answers(for: server, date: "2026-10-18", kind: "weekly").isEmpty, "nothing lands on the other deck")
@@ -235,7 +235,7 @@ final class WeeklyReviewModelTests: XCTestCase {
                                                             obstacle: "Late calls", ifThen: "If it's 10:30, the phone goes on the charger"))
         viewModel.setIntentionField("obstacle", "My own words", for: intention)
 
-        await viewModel.intentionDraft()
+        await viewModel.intentionDraft()?.value
         XCTAssertEqual(client.intentionRequests.count, 1)
         XCTAssertEqual(client.intentionRequests.first?.date, "2026-10-25")
         XCTAssertEqual(client.intentionRequests.first?.answers.answers.first { $0.card == "last-intention" }?.statuses, ["last": "didnt"],
@@ -247,7 +247,7 @@ final class WeeklyReviewModelTests: XCTestCase {
 
         // Touched, so editing an earlier answer doesn't ask again.
         viewModel.setText("Proud of it", for: try card("proud", in: viewModel))
-        await viewModel.intentionDraft()
+        await viewModel.intentionDraft()?.value
         XCTAssertEqual(client.intentionRequests.count, 1)
     }
 
@@ -262,13 +262,13 @@ final class WeeklyReviewModelTests: XCTestCase {
             arrived.fulfill()
             for await _ in release { break }
         }
-        let drafting = Task { await viewModel.intentionDraft() }
+        let drafting = viewModel.intentionDraft()
         await fulfillment(of: [arrived], timeout: 5)
         XCTAssertTrue(viewModel.isDraftingIntention)
         viewModel.setIntentionField("text", "Typed while it drafted", for: intention)
         releaser.yield()
         releaser.finish()
-        await drafting.value
+        await drafting?.value
 
         XCTAssertFalse(viewModel.isDraftingIntention)
         XCTAssertEqual(viewModel.intentionField("text", for: intention), "Typed while it drafted")
@@ -281,17 +281,134 @@ final class WeeklyReviewModelTests: XCTestCase {
     func testUntouchedIntentionDraftsAgainOnlyWhenAnEarlierAnswerChanged() async throws {
         let (viewModel, client) = try await v3ViewModelAndClient()
         let intention = try card("intention", in: viewModel)
-        client.intentionDraft = .success(WeekIntentionDraft(thread: nil, intention: "First", obstacle: nil, ifThen: nil))
-        await viewModel.intentionDraft()
-        await viewModel.intentionDraft()
-        XCTAssertEqual(client.intentionRequests.count, 1, "nothing changed: no second draft")
+        try show("intention", in: viewModel)
+        client.intentionDraft = .success(WeekIntentionDraft(thread: "Old thread", intention: "First", obstacle: nil, ifThen: nil))
+        await viewModel.draftIntentionOnArrival()?.value
+        XCTAssertEqual(viewModel.intentionField("text", for: intention), "First")
+        try show("proud", in: viewModel)
+        try show("intention", in: viewModel)
+        XCTAssertNil(viewModel.draftIntentionOnArrival(), "nothing earlier changed: no second draft")
+        XCTAssertEqual(client.intentionRequests.count, 1)
 
         viewModel.setText("Proud of it", for: try card("proud", in: viewModel))
-        client.intentionDraft = .success(WeekIntentionDraft(thread: nil, intention: "Second", obstacle: nil, ifThen: nil))
-        await viewModel.intentionDraft()
-        XCTAssertEqual(client.intentionRequests.count, 2)
-        XCTAssertEqual(viewModel.intentionField("text", for: intention), "Second", "an untouched field takes the newer draft")
+        client.intentionDraft = .success(WeekIntentionDraft(thread: "New thread", intention: "Second", obstacle: nil, ifThen: nil))
+        await viewModel.draftIntentionOnArrival()?.value
+        XCTAssertEqual(client.intentionRequests.count, 2, "an earlier answer changed and the intention is untouched")
+        XCTAssertEqual(viewModel.intentionField("text", for: intention), "Second", "a drafted, untouched field takes the newer draft")
+        XCTAssertEqual(viewModel.intentionField("thread", for: intention), "New thread")
         XCTAssertTrue(viewModel.intentionFieldsTouched.isEmpty)
+
+        // Once he edits a field, a changed earlier answer drafts nothing more, and his words stand.
+        viewModel.setIntentionField("thread", "My thread", for: intention)
+        viewModel.setText("Prouder", for: try card("proud", in: viewModel))
+        XCTAssertNil(viewModel.draftIntentionOnArrival())
+        XCTAssertEqual(client.intentionRequests.count, 2)
+        XCTAssertEqual(viewModel.intentionField("thread", for: intention), "My thread")
+
+        // Reopened, the fields the drafts wrote count as his.
+        await viewModel.show(date: "2026-10-18", kind: "weekly")
+        await viewModel.show(date: "2026-10-25", kind: "weekly")
+        XCTAssertEqual(viewModel.intentionFieldsTouched, ["text", "thread"])
+    }
+
+    @MainActor
+    func testADraftStartedOnTheIntentionCardStillFillsAfterCurrentCardIDMovesOn() async throws {
+        let (viewModel, client) = try await v3ViewModelAndClient()
+        let intention = try card("intention", in: viewModel)
+        try show("intention", in: viewModel)
+        client.intentionDraft = .success(WeekIntentionDraft(thread: "Honesty", intention: "Drafted", obstacle: nil, ifThen: nil))
+        let arrived = expectation(description: "the draft was asked for")
+        let (release, releaser) = AsyncStream<Void>.makeStream()
+        client.intentionGate = {
+            arrived.fulfill()
+            for await _ in release { break }
+        }
+        // The card's `.task` is cancelled when he swipes on; the draft isn't that task's.
+        let onCard = Task { await viewModel.draftIntentionOnArrival()?.value }
+        await fulfillment(of: [arrived], timeout: 5)
+        try show("proud", in: viewModel)
+        onCard.cancel()
+        releaser.yield()
+        releaser.finish()
+        await onCard.value
+
+        XCTAssertFalse(viewModel.isDraftingIntention)
+        XCTAssertEqual(viewModel.intentionField("text", for: intention), "Drafted")
+        XCTAssertEqual(viewModel.intentionField("thread", for: intention), "Honesty")
+    }
+
+    @MainActor
+    func testNoDraftFillsAfterTheDeckIsFiled() async throws {
+        let (viewModel, client) = try await v3ViewModelAndClient()
+        let intention = try card("intention", in: viewModel)
+        viewModel.setStatus("last", "didnt", for: try card("last-intention", in: viewModel))
+        try show("intention", in: viewModel)
+        client.intentionDraft = .success(WeekIntentionDraft(thread: "Honesty", intention: "Drafted", obstacle: nil, ifThen: nil))
+        client.filer = .success(BriefFileResponse(ok: true, summary: "Sealed."))
+        let arrived = expectation(description: "the draft was asked for")
+        let (release, releaser) = AsyncStream<Void>.makeStream()
+        client.intentionGate = {
+            arrived.fulfill()
+            for await _ in release { break }
+        }
+        let drafting = viewModel.draftIntentionOnArrival()
+        await fulfillment(of: [arrived], timeout: 5)
+        let filed = await viewModel.file()
+        XCTAssertEqual(filed, .filed)
+        XCTAssertTrue(viewModel.isFiled)
+        releaser.yield()
+        releaser.finish()
+        await drafting?.value
+
+        XCTAssertFalse(viewModel.isDraftingIntention)
+        XCTAssertEqual(viewModel.intentionField("text", for: intention), "", "neither the draft nor last week's fallback lands")
+        XCTAssertEqual(viewModel.intentionField("thread", for: intention), "")
+        XCTAssertFalse(viewModel.hasChanges, "the filed deck has nothing unsent")
+        XCTAssertNil(viewModel.draftIntentionOnArrival(), "a filed deck doesn't draft")
+    }
+
+    @MainActor
+    func testArrivingAgainWhileADraftIsInFlightSendsNoSecondRequest() async throws {
+        let (viewModel, client) = try await v3ViewModelAndClient()
+        let intention = try card("intention", in: viewModel)
+        try show("intention", in: viewModel)
+        client.intentionDraft = .success(WeekIntentionDraft(thread: nil, intention: "Drafted", obstacle: nil, ifThen: nil))
+        let arrived = expectation(description: "the draft was asked for")
+        let (release, releaser) = AsyncStream<Void>.makeStream()
+        client.intentionGate = {
+            arrived.fulfill()
+            for await _ in release { break }
+        }
+        let first = viewModel.draftIntentionOnArrival()
+        await fulfillment(of: [arrived], timeout: 5)
+        try show("proud", in: viewModel)
+        viewModel.setText("Proud of it", for: try card("proud", in: viewModel))
+        try show("intention", in: viewModel)
+        let second = viewModel.draftIntentionOnArrival()
+        XCTAssertEqual(second, first, "it waits on the draft in flight")
+        XCTAssertEqual(client.intentionRequests.count, 1)
+        releaser.yield()
+        releaser.finish()
+        await first?.value
+
+        XCTAssertEqual(viewModel.intentionField("text", for: intention), "Drafted")
+        XCTAssertEqual(client.intentionRequests.count, 1)
+    }
+
+    @MainActor
+    func testADroppedDraftOnTheCardPrefillsFromLastWeek() async throws {
+        let (viewModel, client) = try await v3ViewModelAndClient()
+        let intention = try card("intention", in: viewModel)
+        let last = try card("last-intention", in: viewModel)
+        viewModel.setStatus("last", "didnt", for: last)
+        viewModel.setText("Late calls", for: last)
+        viewModel.setIntentionField("obstacle", "My own words", for: intention)
+        try show("intention", in: viewModel)
+        client.intentionDraft = .failure(URLError(.networkConnectionLost))
+
+        await viewModel.draftIntentionOnArrival()?.value
+        XCTAssertEqual(viewModel.intentionField("text", for: intention), "Get my sleep in a good place")
+        XCTAssertEqual(viewModel.intentionField("obstacle", for: intention), "My own words", "a touched field keeps his words")
     }
 
     @MainActor
@@ -303,7 +420,7 @@ final class WeeklyReviewModelTests: XCTestCase {
         viewModel.setText("Late calls with the West Coast", for: last)
         client.intentionDraft = .failure(URLError(.timedOut))
 
-        await viewModel.intentionDraft()
+        await viewModel.intentionDraft()?.value
         XCTAssertEqual(viewModel.intentionField("text", for: intention), "Get my sleep in a good place", "it didn't fully hold")
         XCTAssertEqual(viewModel.intentionField("obstacle", for: intention), "Late calls with the West Coast")
         XCTAssertEqual(viewModel.intentionField("thread", for: intention), "")
@@ -318,7 +435,7 @@ final class WeeklyReviewModelTests: XCTestCase {
         viewModel.setStatus("last", "held", for: try card("last-intention", in: viewModel))
         client.intentionDraft = .success(WeekIntentionDraft(thread: nil, intention: " ", obstacle: nil, ifThen: nil))
 
-        await viewModel.intentionDraft()
+        await viewModel.intentionDraft()?.value
         XCTAssertEqual(viewModel.intentionField("text", for: intention), "", "a held intention isn't carried")
         XCTAssertEqual(viewModel.intentionField("obstacle", for: intention), "", "nothing got in the way")
         XCTAssertNil(viewModel.answer(for: intention))
@@ -329,18 +446,18 @@ final class WeeklyReviewModelTests: XCTestCase {
         let (viewModel, client) = try await v3ViewModelAndClient()
         let people = try card("value-people", in: viewModel)
         viewModel.index = try XCTUnwrap(viewModel.visiblePages.firstIndex { $0.id == people.id })
-        await viewModel.draftIntentionOnArrival()
+        XCTAssertNil(viewModel.draftIntentionOnArrival())
         XCTAssertTrue(client.intentionRequests.isEmpty, "the card under the top one doesn't draft")
 
         viewModel.setScore("people", 8, for: people)
         viewModel.index = try XCTUnwrap(viewModel.visiblePages.firstIndex { $0.id == "intention" })
-        await viewModel.draftIntentionOnArrival()
+        await viewModel.draftIntentionOnArrival()?.value
         XCTAssertEqual(client.intentionRequests.count, 1)
         let sent = try XCTUnwrap(client.intentionRequests.first?.answers.answers.first { $0.card == "value-people" })
         XCTAssertEqual(sent.scores, ["people": 8], "the draft sees the last value's answer")
 
-        await viewModel.draftIntentionOnArrival()
-        XCTAssertEqual(client.intentionRequests.count, 1, "a started intention isn't drafted again on return")
+        XCTAssertNil(viewModel.draftIntentionOnArrival())
+        XCTAssertEqual(client.intentionRequests.count, 1, "nothing earlier changed: no second draft on return")
     }
 
     @MainActor
@@ -353,7 +470,7 @@ final class WeeklyReviewModelTests: XCTestCase {
         viewModel.setStatus("last", "held", for: last)
         client.intentionDraft = .failure(URLError(.timedOut))
 
-        await viewModel.intentionDraft()
+        await viewModel.intentionDraft()?.value
         XCTAssertEqual(viewModel.intentionField("obstacle", for: intention), "")
         XCTAssertEqual(viewModel.intentionField("text", for: intention), "")
         XCTAssertEqual(viewModel.answer(for: last)?.text, "Late calls", "his words stay on the card for Partly")
@@ -539,6 +656,13 @@ final class WeeklyReviewModelTests: XCTestCase {
         XCTAssertNil(nulls.lastIntention)
         XCTAssertNil(nulls.reflect)
         XCTAssertNil(nulls.intention)
+    }
+
+    func testAMomentWithoutAValueHasNoChipAndSpeaksNoValue() {
+        XCTAssertNil(WeekValues.shortName(""), "a plain moment has no chip")
+        XCTAssertEqual(WeekValues.spokenMoment(day: "Fri", line: "Read to the bump", value: ""), "Fri. Read to the bump")
+        XCTAssertEqual(WeekValues.spokenMoment(day: "Fri", line: "Read to the bump", value: "dad"), "Fri. Read to the bump. Dad")
+        XCTAssertEqual(WeekValues.spokenMoment(day: "", line: "my own words", value: ""), "my own words")
     }
 
     func testV2RecordWithNoMomentsIsStillAMomentsRecord() throws {
@@ -959,6 +1083,13 @@ final class WeeklyReviewModelTests: XCTestCase {
         await viewModel.show(date: "2026-10-25", kind: "weekly")
         XCTAssertEqual(viewModel.state, .ready)
         return (viewModel, client)
+    }
+
+    /// Puts the card on top, as swiping to it does.
+    @MainActor
+    private func show(_ id: String, in viewModel: DailyDeckViewModel) throws {
+        viewModel.index = try XCTUnwrap(viewModel.visiblePages.firstIndex { $0.id == id })
+        XCTAssertEqual(viewModel.currentCardID, id)
     }
 
     @MainActor

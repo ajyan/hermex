@@ -120,7 +120,8 @@ extension DeckCard {
 enum WeekValues {
     static let order = ["present", "people", "dad", "potential", "body"]
 
-    /// The moment chip's name for a value: "People" for "people"; nil for an id outside the five.
+    /// The moment chip's name for a value: "People" for "people"; nil (no chip) for an id outside
+    /// the five, or none ("", a plain moment the vault couldn't tag).
     static func shortName(_ id: String) -> String? {
         switch id {
         case "present": "Present"
@@ -130,6 +131,11 @@ enum WeekValues {
         case "body": "Body"
         default: nil
         }
+    }
+
+    /// A moment row as VoiceOver reads it: "Thu. Meg opened up. Present", without the value when it has no chip.
+    static func spokenMoment(day: String, line: String, value: String) -> String {
+        [day, line, shortName(value) ?? ""].filter { !$0.isEmpty }.joined(separator: ". ")
     }
 }
 

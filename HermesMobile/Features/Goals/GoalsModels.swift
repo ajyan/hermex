@@ -274,9 +274,6 @@ struct GoalSummary: Decodable, Hashable, Sendable, Identifiable {
     var week: GoalWeek
     var dailyChecks: [GoalDailyCheck]
     var flags: GoalFlags
-    /// The date of the weekly deck (`briefs/<date>.weekly.json`) holding this week's plan while it
-    /// waits to be confirmed or changed; nil when none.
-    var weekPending: String?
     var confirmedStarts: [String]
     /// Why a source such as Prep could not be read, shown instead of a silent zero.
     var sourceErrors: [String]
@@ -287,7 +284,7 @@ struct GoalSummary: Decodable, Hashable, Sendable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case slug, title, status, deadline, identity, week, flags, color, icon
-        case weekPending = "week_pending", confirmedStarts = "confirmed_starts", sourceErrors = "source_errors"
+        case confirmedStarts = "confirmed_starts", sourceErrors = "source_errors"
         case finishDue = "finish_due"
         case daysLeft = "days_left", nextMilestone = "next_milestone", dailyChecks = "daily_checks"
     }
@@ -306,7 +303,6 @@ struct GoalSummary: Decodable, Hashable, Sendable, Identifiable {
         week = c.optional(GoalWeek.self, .week) ?? GoalWeek()
         dailyChecks = c.lossy(GoalDailyCheck.self, .dailyChecks)
         flags = c.optional(GoalFlags.self, .flags) ?? GoalFlags()
-        weekPending = c.optional(String.self, .weekPending)
         confirmedStarts = c.optional([String].self, .confirmedStarts) ?? []
         sourceErrors = c.optional([String].self, .sourceErrors) ?? []
         finishDue = c.bool(.finishDue)

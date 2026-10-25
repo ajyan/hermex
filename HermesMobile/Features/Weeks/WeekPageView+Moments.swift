@@ -79,7 +79,7 @@ extension WeekPageView {
             Spacer(minLength: 0)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: [moment.day, moment.line, value ?? ""].filter { !$0.isEmpty }.joined(separator: ". ")))
+        .accessibilityLabel(Text(verbatim: WeekValues.spokenMoment(day: moment.day, line: moment.line, value: moment.value)))
     }
 
     /// The words of last week's intention, how it went, and what he said got in the way.
