@@ -541,6 +541,23 @@ final class WeeklyReviewModelTests: XCTestCase {
         XCTAssertNil(nulls.intention)
     }
 
+    func testV2RecordWithNoMomentsIsStillAMomentsRecord() throws {
+        let record = try WeekRecord.decode(Data(#"""
+        {"version": 2, "week_ending": "2026-11-08", "moments": [], "ended": null,
+         "reflect": {"proud": {"question": "Q?", "answer": "A."}, "lesson": null},
+         "intention": {"thread": "Outreach", "text": null, "obstacle": null, "if_then": "If 9am, then write."}}
+        """#.utf8))
+        XCTAssertEqual(record.version, 2)
+        XCTAssertTrue(record.moments.isEmpty)
+        XCTAssertTrue(record.isMomentsRecord, "its Last week, Reflect, Values and This week still show")
+        XCTAssertEqual(record.reflect?.proud?.answer, "A.")
+        XCTAssertEqual(record.intention?.thread, "Outreach")
+        XCTAssertEqual(record.intention?.ifThen, "If 9am, then write.")
+        let v1 = try WeekRecord.decode(Data(#"{"version": 1, "week_ending": "2026-10-25", "moments": []}"#.utf8))
+        XCTAssertFalse(v1.isMomentsRecord)
+        XCTAssertFalse(try WeekRecord.decode(Data(#"{"week_ending": "2026-10-25"}"#.utf8)).isMomentsRecord)
+    }
+
     func testV1WeekRecordStillDecodes() throws {
         let record = try WeekRecord.decode(Data(#"""
         {"version": 1, "week_ending": "2026-10-25", "week_number": 43, "title": "The week you tapered", "story": "Slept more.",

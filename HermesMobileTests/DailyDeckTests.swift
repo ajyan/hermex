@@ -518,12 +518,14 @@ final class DailyDeckTests: XCTestCase {
           {"id":"week2","type":"section","title":"Q","intention":{"text":"Rest"}},
           {"id":"week3","type":"section","title":"Q","intention":"nope"},
           {"id":"week4","type":"section","title":"Q","intention":{"text":"  ","if_then":"x"}},
-          {"id":"week5","type":"section","title":"Q"}]}
+          {"id":"week5","type":"section","title":"Q"},
+          {"id":"week6","type":"section","title":"Q","intention":{"text":"Rest","if_then":4}}]}
         """#)
         XCTAssertEqual(deck.cards[0].intention?.line, "Your intention: Rest")
         XCTAssertNil(deck.cards[1].intention)
         XCTAssertNil(deck.cards[2].intention, "no text, no line")
         XCTAssertNil(deck.cards[3].intention)
+        XCTAssertEqual(deck.cards[4].intention?.line, "Your intention: Rest", "a mistyped if_then drops only itself")
     }
 
     func testSectionCardWithNoLinkOrRecapDecodes() throws {

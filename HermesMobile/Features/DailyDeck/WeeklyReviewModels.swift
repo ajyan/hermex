@@ -151,6 +151,8 @@ struct WeekRecord: Decodable, Equatable {
     let note: Note?
     let prediction: Prediction?
     let graded: [Graded]
+    /// The record's format (1 or 2); nil when the file doesn't say.
+    let version: Int?
     /// A v2 record's moments of the week, in the order he kept them; a v1 record has none.
     let moments: [Moment]
     /// How the week ended, in his words.
@@ -303,7 +305,7 @@ struct WeekRecord: Decodable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case weekEnding, weekNumber, title, story, photo, energy, deep, commitments, values, oneThing, who, note, prediction, graded
-        case moments, ended, lastIntention, reflect, intention
+        case version, moments, ended, lastIntention, reflect, intention
     }
 
     init(from decoder: Decoder) throws {
@@ -322,6 +324,7 @@ struct WeekRecord: Decodable, Equatable {
         note = try? c.decodeIfPresent(Note.self, forKey: .note)
         prediction = try? c.decodeIfPresent(Prediction.self, forKey: .prediction)
         graded = Self.list(c, .graded)
+        version = try? c.decodeIfPresent(Int.self, forKey: .version)
         moments = Self.list(c, .moments)
         ended = try? c.decodeIfPresent(String.self, forKey: .ended)
         lastIntention = try? c.decodeIfPresent(LastIntention.self, forKey: .lastIntention)
@@ -334,6 +337,10 @@ struct WeekRecord: Decodable, Equatable {
         ((try? c.decodeIfPresent([Lossy<T>].self, forKey: key)) ?? []).compactMap(\.value)
     }
 
+    /// Whether the week page uses the moments layout: a v2 record, even one with no moments, or
+    /// any record that carries moments. Everything else renders as it always did.
+    var isMomentsRecord: Bool { (version ?? 0) >= 2 || !moments.isEmpty }
+
     static func decode(_ data: Data) throws -> WeekRecord {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -345,6 +352,14 @@ struct WeekRecord: Decodable, Equatable {
 struct DeckIntentionLine: Decodable, Equatable {
     let text: String
     let ifThen: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        text = try c.decode(String.self, forKey: .text)
+        ifThen = try? c.decodeIfPresent(String.self, forKey: .ifThen)
+    }
+
+    private enum CodingKeys: String, CodingKey { case text, ifThen }
 
     init(text: String, ifThen: String? = nil) {
         self.text = text

@@ -3,7 +3,7 @@ import SwiftUI
 
 /// One sealed week, to reread for years: the photo, the week and its days, the title, the story,
 /// then what he kept of it (energy, the deep answer, the values, the one thing, who, the note to the
-/// future, the prediction and its grade). A moments record (`momentsSections`) is its
+/// future, the prediction and its grade). A moments (v2) record (`momentsSections`) is its
 /// moments, how it ended, and his answers instead. Empty sections are left out, so a backfilled week
 /// is its photo, title, and story. Edit reopens the filed deck (also when the record can't be read); the
 /// photo can be added, replaced, or removed.
@@ -140,7 +140,7 @@ struct WeekPageView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 4)
                 .accessibilityAddTraits(.isHeader)
-            if record.moments.isEmpty {
+            if !record.isMomentsRecord {
                 if let story = Self.nonEmpty(record.story) {
                     saved(story, style: .title3)
                         .padding(.top, 14)
@@ -404,154 +404,5 @@ struct WeekPageView: View {
     static func nonEmpty(_ text: String?) -> String? {
         guard let text = text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
         return text
-    }
-}
-
-// MARK: Moments record
-
-/// A moments record (`WeekRecord.moments` non-empty): the week as he sealed it, in the order of
-/// the review: moments, how it ended, last week's intention, what he reflected on, each value,
-/// next week's intention, and the note. A section with nothing in it is left out.
-extension WeekPageView {
-    @ViewBuilder func momentsSections(_ record: WeekRecord) -> some View {
-        section("Moments") {
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(Array(record.moments.enumerated()), id: \.offset) { _, moment in
-                    momentRow(moment)
-                }
-                if let ended = Self.nonEmpty(record.ended) {
-                    (Text(verbatim: "Ended: ").foregroundStyle(palette.ink).fontWeight(.semibold)
-                        + Text(verbatim: ended).foregroundStyle(Color.hxTextPrimary))
-                        .font(AppFont.subheadline())
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 4)
-                }
-            }
-        }
-        if let last = record.lastIntention, let text = Self.nonEmpty(last.text) {
-            section("Last week") { lastIntentionView(last, text: text) }
-        }
-        let reflections = [record.reflect?.proud, record.reflect?.lesson].compactMap { $0 }
-            .filter { Self.nonEmpty($0.answer) != nil }
-        if !reflections.isEmpty {
-            section("Reflect") {
-                VStack(alignment: .leading, spacing: 18) {
-                    ForEach(Array(reflections.enumerated()), id: \.offset) { _, reflection in
-                        VStack(alignment: .leading, spacing: 8) {
-                            if let question = Self.nonEmpty(reflection.question) {
-                                Text(verbatim: question)
-                                    .font(AppFont.display(style: .headline, weight: .semibold))
-                                    .foregroundStyle(Color.hxTextPrimary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            saved(Self.nonEmpty(reflection.answer) ?? "")
-                        }
-                    }
-                }
-            }
-        }
-        let scored = record.values.filter { $0.score != nil }
-        if !scored.isEmpty {
-            section("Values") {
-                VStack(alignment: .leading, spacing: 14) {
-                    ForEach(scored) { valueRow($0) }
-                }
-            }
-        }
-        if let intention = record.intention, Self.nonEmpty(intention.text) != nil {
-            section("This week") { intentionView(intention) }
-        }
-        if let note = record.note, let text = Self.nonEmpty(note.text) {
-            noteRow(text: text, opensOn: note.opensOn)
-                .padding(.top, 28)
-        }
-    }
-
-    private func momentRow(_ moment: WeekRecord.Moment) -> some View {
-        let value = WeekValues.shortName(moment.value)
-        return HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(verbatim: moment.day)
-                .font(AppFont.footnote(weight: .semibold))
-                .foregroundStyle(Color.hxTextSecondary)
-                .frame(minWidth: 32, alignment: .leading)
-            VStack(alignment: .leading, spacing: 6) {
-                Text(verbatim: moment.line)
-                    .font(AppFont.subheadline())
-                    .foregroundStyle(Color.hxTextPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let value { HXChip(paper: palette.colors, label: value) }
-            }
-            Spacer(minLength: 0)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: [moment.day, moment.line, value ?? ""].filter { !$0.isEmpty }.joined(separator: ". ")))
-    }
-
-    /// The words of last week's intention, how it went, and what he said got in the way.
-    private func lastIntentionView(_ last: WeekRecord.LastIntention, text: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(verbatim: text)
-                .font(AppFont.body())
-                .foregroundStyle(Color.hxTextPrimary)
-                .fixedSize(horizontal: false, vertical: true)
-            if let status = last.status.flatMap({ Self.intentionStatus[$0] }) {
-                HXChip(paper: palette.colors, label: status)
-            }
-            if let note = Self.nonEmpty(last.note) { saved(note) }
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private static let intentionStatus = ["held": "Held", "partly": "Partly", "didnt": "Didn't"]
-
-    /// A value's name and score, the week's fact, and his answer in serif.
-    private func valueRow(_ value: WeekRecord.Value) -> some View {
-        let name = value.name ?? value.id.capitalized
-        let score = value.score ?? 0
-        let fact = [value.fact?.big, value.fact?.line].compactMap(Self.nonEmpty).joined(separator: " \u{b7} ")
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(verbatim: name)
-                    .font(AppFont.subheadline(weight: .semibold))
-                    .foregroundStyle(Color.hxTextPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 4)
-                HXChip(paper: palette.colors, label: "\(score)")
-                    .accessibilityHidden(true)
-            }
-            if !fact.isEmpty {
-                Text(verbatim: fact)
-                    .font(AppFont.footnote())
-                    .foregroundStyle(Color.hxTextSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if let answer = Self.nonEmpty(value.answer) { saved(answer) }
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text(verbatim: ["\(name), \(score) of 10", fact, Self.nonEmpty(value.answer) ?? ""]
-            .filter { !$0.isEmpty }.joined(separator: ". ")))
-    }
-
-    private func intentionView(_ intention: WeekRecord.Intention) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            saved(Self.nonEmpty(intention.text) ?? "")
-            planLine("What might get in the way", intention.obstacle)
-            planLine("If-then", intention.ifThen)
-        }
-    }
-
-    @ViewBuilder private func planLine(_ label: String, _ text: String?) -> some View {
-        if let text = Self.nonEmpty(text) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: label)
-                    .font(AppFont.footnote(weight: .semibold))
-                    .foregroundStyle(Color.hxTextSecondary)
-                Text(verbatim: text)
-                    .font(AppFont.body())
-                    .foregroundStyle(Color.hxTextPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .accessibilityElement(children: .combine)
-        }
     }
 }
