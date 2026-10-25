@@ -304,7 +304,7 @@ struct VoiceCallView: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// The orb doubles as the one-tap shortcut: send now, or cut Atlas off.
+    /// The orb doubles as the one-tap shortcut: send now, take a turn back, or cut Atlas off.
     private var orb: some View {
         let action = controller?.tapAction
         return VStack(spacing: 12) {
@@ -342,6 +342,7 @@ struct VoiceCallView: View {
         switch controller?.tapAction {
         case .send: "Tap to send"
         case .interrupt: "Tap to interrupt"
+        case .cancel: "Tap to cancel"
         case nil: controller?.isMuted == true ? "You're muted" : nil
         }
     }

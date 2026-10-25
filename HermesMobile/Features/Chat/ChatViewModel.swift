@@ -7152,6 +7152,12 @@ extension ChatViewModel: VoiceCallChatDriving {
         }
         let message = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !message.isEmpty else { return false }
+        // A call hung up mid-reply leaves its run going on the server. The next spoken
+        // turn replaces it; sending into the busy session would only be refused.
+        if activeStreamID != nil {
+            VoiceCallDiagnostics.write("send: stopping the earlier run first")
+            _ = await cancelActiveStream()
+        }
         let sent = await performChatSend(
             sessionID: sessionID,
             localMessageID: "local-\(UUID().uuidString)",
