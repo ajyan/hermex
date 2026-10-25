@@ -17,9 +17,10 @@ struct LabelQueueItem: Identifiable, Equatable {
 }
 
 /// Rate earlier cards, on today's morning deck's closing card: a few reflect cards a day from the
-/// last 14 days of morning Daily Decks, newest first, that haven't said how they landed yet: not
-/// labeled (a feedback note on a card labels it on the server), not written about, not sent away
-/// with Not for Me. It asks until both Deck eval judges are calibrated on these labels. Read-only: it reads `briefs/` through the session
+/// last 14 days of morning Daily Decks that haven't said how they landed yet: not labeled (a
+/// feedback note on a card labels it on the server), not written about, not sent away with Not
+/// for Me. Cards the morning check doubted come first (see `items`), the rest newest first. It
+/// asks until both Deck eval judges are calibrated on these labels. Read-only: it reads `briefs/` through the session
 /// the Daily Deck already opened, and never creates or renames a session or stores a workspace.
 /// Built once, by one task its entry points share; every tap saves at once, so leaving at any
 /// point loses nothing.
@@ -225,22 +226,38 @@ final class LabelQueueViewModel {
         return dates.filter { $0 >= start && $0 <= today }.sorted(by: >)
     }
 
-    /// The first `limit` reflect cards in deck order, decks in the order given, that are neither
-    /// labeled nor `landed` (answered or Not for Me'd, by date and card id). Of the week's source
-    /// cards only the shown question's count: the divider's choice comes from `answers` (the deck's
-    /// answers by date), and the other questions' sources were never on screen.
+    /// The first `limit` reflect cards that are neither labeled nor `landed` (answered or Not for
+    /// Me'd, by date and card id), doubtful ones first: cards with a part the eval judge failed
+    /// and the morning check `kept` (the judge disagreed with what he saw, so his label says the
+    /// most), then cards with a judge-failed part that was `regenerated`, then the rest. Within
+    /// each group, deck order, decks in the order given. Of the week's source cards only the shown
+    /// question's count: the divider's choice comes from `answers` (the deck's answers by date),
+    /// and the other questions' sources were never on screen.
     static func items(decks: [(date: String, kind: String, deck: DailyDeck)], limit: Int = .max,
                       isLabeled: (LabelKey) -> Bool,
                       landed: (String, String) -> Bool = { _, _ in false },
                       answers: (String) -> [String: DeckAnswer] = { _ in [:] }) -> [LabelQueueItem] {
-        Array(decks.flatMap { entry in
+        let candidates = decks.flatMap { entry in
             let variant = DailyDeckViewModel.shownWeekVariant(cards: entry.deck.cards, answers: answers(entry.date))
             return entry.deck.cards
                 .filter { $0.type == .reflect && !DailyDeckViewModel.isHiddenWeekCard($0, shownVariant: variant) }
-                .map { LabelQueueItem(date: entry.date, kind: entry.kind, card: $0) }
+                .map { (item: LabelQueueItem(date: entry.date, kind: entry.kind, card: $0),
+                        doubt: doubt(of: $0.id, checks: entry.deck.checks)) }
         }
-        .filter { !hasLabel($0, isLabeled: isLabeled) && !landed($0.date, $0.card.id) }
-        .prefix(limit))
+        .filter { !hasLabel($0.item, isLabeled: isLabeled) && !landed($0.item.date, $0.item.card.id) }
+        // The position breaks ties, since `sorted` promises no stability.
+        let ordered = candidates.enumerated()
+            .sorted { ($0.element.doubt, $0.offset) < ($1.element.doubt, $1.offset) }
+            .map(\.element.item)
+        return Array(ordered.prefix(limit))
+    }
+
+    /// 0 for a card with a judge-failed part shown as is, 1 for one regenerated, 2 otherwise.
+    private static func doubt(of cardID: String, checks: [DeckCheck]) -> Int {
+        let failed = checks.filter { $0.card == cardID && $0.judgeFailed }
+        if failed.contains(where: { $0.action == "kept" }) { return 0 }
+        if failed.contains(where: { $0.action == "regenerated" }) { return 1 }
+        return 2
     }
 
     /// A label on its card or its question: either says how the card landed.
