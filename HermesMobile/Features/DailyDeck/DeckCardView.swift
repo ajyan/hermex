@@ -89,6 +89,8 @@ struct DeckCardView: View {
                 case .goal: goal
                 case .changes: DeckChangesCard(card: card, palette: palette, viewModel: viewModel)
                 case .ask: ask
+                case .dinner: dinner
+                case .meals: DeckMealsCard(card: card, palette: palette, viewModel: viewModel)
                 case .decision:
                     FollowUpRow(card: card, viewModel: viewModel, palette: palette, isPage: true)
                     // The week's question closes the Reflect chapter; other follow-ups carry no chapter.
@@ -356,6 +358,38 @@ struct DeckCardView: View {
             }
         }
         reflection("Add a note").padding(.top, 24)
+        DeckFootnote(card: card, palette: palette)
+    }
+
+    // MARK: Meals
+
+    /// Last night's dinner: which of the week's dinners it was, how it went, and a cooking note.
+    @ViewBuilder
+    private var dinner: some View {
+        let answer = viewModel.answer(for: card)
+        Text(verbatim: card.question ?? "What was last night's dinner?")
+            .font(AppFont.display(style: .title2, weight: .semibold))
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.trailing, 30)
+        FlowRow(spacing: 8) {
+            ForEach(card.options) { option in
+                ChoiceButton(title: option.label, isSelected: answer?.action == option.id) {
+                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { viewModel.pick(option.id, for: card) }
+                }
+            }
+        }
+        .padding(.top, 18)
+        if let pick = answer?.action, pick != "out" {
+            Text(verbatim: "Make it again?")
+                .font(AppFont.subheadline(weight: .semibold))
+                .padding(.top, 20)
+            HStack(spacing: 8) {
+                ChoiceButton(title: "Yes", isSelected: answer?.rating == 2) { viewModel.rate(2, for: card) }
+                ChoiceButton(title: "Not really", isSelected: answer?.rating == 1) { viewModel.rate(1, for: card) }
+            }
+            .padding(.top, 10)
+        }
+        reflection(answer?.action == "other" ? "What did you make?" : "Add a cooking note").padding(.top, 24)
         DeckFootnote(card: card, palette: palette)
     }
 

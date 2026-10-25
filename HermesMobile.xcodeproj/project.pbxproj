@@ -717,6 +717,7 @@
 		1F2EF7D6C585EAF7E1C46CD2 /* DeckCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */; };
 		A0DE001C71B0EBD4FA4E885E /* DeckGoalCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE001C71B0EBD4FA4E885D /* DeckGoalCard.swift */; };
 		AE625BAC72CC28032AA09722 /* DeckAskCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20F34E30177D3A494A9742C3 /* DeckAskCard.swift */; };
+		E59CE87523735D3C4DD69907 /* DeckMealsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D4B11B7B4571096494EF4D5 /* DeckMealsCard.swift */; };
 		900A2A32C06B243E5E952458 /* DailyAskModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE286E9D44D3D280A038AFAE /* DailyAskModel.swift */; };
 		754960F45562E3D0663233FC /* DailyAskModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 446FC64957B2A7BF327BEA73 /* DailyAskModels.swift */; };
 		2D040393A5D1598FA7E58E97 /* DeckMandarinCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E500908D2992BBA8212DC303 /* DeckMandarinCard.swift */; };
@@ -1556,6 +1557,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckCardView.swift; sourceTree = "<group>"; };
 		A0DE001C71B0EBD4FA4E885D /* DeckGoalCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckGoalCard.swift; sourceTree = "<group>"; };
 		20F34E30177D3A494A9742C3 /* DeckAskCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckAskCard.swift; sourceTree = "<group>"; };
+		0D4B11B7B4571096494EF4D5 /* DeckMealsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckMealsCard.swift; sourceTree = "<group>"; };
 		EE286E9D44D3D280A038AFAE /* DailyAskModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyAskModel.swift; sourceTree = "<group>"; };
 		446FC64957B2A7BF327BEA73 /* DailyAskModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyAskModels.swift; sourceTree = "<group>"; };
 		E500908D2992BBA8212DC303 /* DeckMandarinCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckMandarinCard.swift; sourceTree = "<group>"; };
@@ -2744,6 +2746,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */,
 				A0DE001C71B0EBD4FA4E885D /* DeckGoalCard.swift */,
 				20F34E30177D3A494A9742C3 /* DeckAskCard.swift */,
+				0D4B11B7B4571096494EF4D5 /* DeckMealsCard.swift */,
 				EE286E9D44D3D280A038AFAE /* DailyAskModel.swift */,
 				446FC64957B2A7BF327BEA73 /* DailyAskModels.swift */,
 				E500908D2992BBA8212DC303 /* DeckMandarinCard.swift */,
@@ -3059,6 +3062,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				1F2EF7D6C585EAF7E1C46CD2 /* DeckCardView.swift in Sources */,
 				A0DE001C71B0EBD4FA4E885E /* DeckGoalCard.swift in Sources */,
 				AE625BAC72CC28032AA09722 /* DeckAskCard.swift in Sources */,
+				E59CE87523735D3C4DD69907 /* DeckMealsCard.swift in Sources */,
 				900A2A32C06B243E5E952458 /* DailyAskModel.swift in Sources */,
 				754960F45562E3D0663233FC /* DailyAskModels.swift in Sources */,
 				2D040393A5D1598FA7E58E97 /* DeckMandarinCard.swift in Sources */,
