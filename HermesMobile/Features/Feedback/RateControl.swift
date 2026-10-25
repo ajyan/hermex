@@ -4,6 +4,7 @@ import SwiftUI
 /// verdict again clears it. ✗ asks for an optional note first. Saving is non-optimistic: the
 /// tapped button shows a spinner until the server answers, and a failure leaves the previous
 /// label with an inline error. Neutral until chosen; the chosen verdict wears the accent.
+/// A confirmed ✗ on a Daily Deck label adds a row of optional reason chips under it.
 /// English-only copy (personal fork).
 struct RateControl: View {
     /// What is being rated, e.g. "Card", "Question", "This page".
@@ -14,6 +15,8 @@ struct RateControl: View {
     let labels: LabelsViewModel
     /// The unselected buttons' and label's color; on a glow card, the card's ink.
     var ink: Color = .hxTextSecondary
+    /// On a glow card, its paper: unselected reason chips wear it. Nil draws them neutral.
+    var paper: HermexPaper?
 
     @State private var isAskingNote = false
     @State private var note = ""
@@ -27,6 +30,9 @@ struct RateControl: View {
                 Spacer(minLength: 8)
                 button(.good)
                 button(.bad)
+            }
+            if labels.verdict(for: key) == .bad, !LabelReason.options(for: key).isEmpty {
+                LabelReasonChips(key: key, title: title, labels: labels, paper: paper)
             }
             if let error = labels.error(for: key) {
                 Text(verbatim: error)
@@ -83,6 +89,72 @@ struct RateControl: View {
     }
 }
 
+/// Why a ✗ is bad, as a wrapping row of chips: one tap saves the label again with that reason,
+/// and tapping the chosen one clears it. A chip shows chosen once the server has it, in the
+/// accent since it's a control; until then it spins. Unchosen chips wear the card's glow, or
+/// stay neutral off a card. Each keeps a 44 pt hit row.
+private struct LabelReasonChips: View {
+    let key: LabelKey
+    let title: String?
+    let labels: LabelsViewModel
+    let paper: HermexPaper?
+
+    var body: some View {
+        // No spacing between rows: each chip's 44 pt hit row already sets them apart.
+        FlowRow(spacing: 0) {
+            ForEach(LabelReason.options(for: key)) { reason in
+                chip(reason).padding(.trailing, 6)
+            }
+        }
+        .padding(.bottom, 4)
+    }
+
+    private func chip(_ reason: LabelReason) -> some View {
+        let isSelected = labels.reason(for: key) == reason.key
+        let spins = labels.pendingReasons[key] == reason.key
+        return Button {
+            let labels = labels, key = key, title = title
+            Task { await labels.tapReason(reason.key, for: key, title: title) }
+        } label: {
+            face(reason, isSelected: isSelected, spins: spins)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(labels.isPending(key))
+        .accessibilityLabel(Text(verbatim: "Reason: \(reason.label)"))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    @ViewBuilder
+    private func face(_ reason: LabelReason, isSelected: Bool, spins: Bool) -> some View {
+        if !isSelected, let paper {
+            HXChip(paper: paper, label: reason.label) {
+                if spins { ProgressView().controlSize(.mini) }
+            }
+        } else {
+            // HXChip's capsule, filled with the accent when chosen and neutral otherwise.
+            HStack(spacing: 5) {
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(AppFont.caption2(weight: .semibold))
+                        .accessibilityHidden(true)
+                }
+                Text(verbatim: reason.label)
+                    .font(AppFont.caption(weight: .medium))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                if spins { ProgressView().controlSize(.mini) }
+            }
+            .foregroundStyle(isSelected ? Color.hxOnAccent : Color.hxTextPrimary)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(isSelected ? Color.accentColor : Color.hxCanvas, in: Capsule())
+            .overlay(Capsule().strokeBorder(isSelected ? Color.clear : Color.hxSeparator, lineWidth: 0.5))
+        }
+    }
+}
+
 /// One ✓/✗ row: what it rates, its label key, and the item's name for the feedback inbox.
 struct FeedbackRating: Identifiable {
     let label: String
@@ -117,7 +189,8 @@ struct DeckRateRows: View {
         VStack(spacing: 0) {
             Rectangle().fill(palette.edge).frame(height: 0.5).accessibilityHidden(true)
             ForEach(FeedbackRating.deck(card: card, date: date, kind: kind, showsQuestion: showsQuestion)) { rating in
-                RateControl(label: rating.label, key: rating.key, title: rating.title, labels: labels, ink: palette.ink)
+                RateControl(label: rating.label, key: rating.key, title: rating.title, labels: labels,
+                            ink: palette.ink, paper: palette.colors)
             }
         }
     }

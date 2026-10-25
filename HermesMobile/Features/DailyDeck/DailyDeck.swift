@@ -10,8 +10,10 @@ struct DailyDeck: Decodable, Equatable {
     let advisor: String?
     /// A card that fails to decode (no `id`, say) is dropped, never the deck.
     let cards: [DeckCard]
+    /// What the morning check found and did, a line per checked part; missing means none.
+    let checks: [DeckCheck]
 
-    private enum CodingKeys: String, CodingKey { case version, date, kind, advisor, cards }
+    private enum CodingKeys: String, CodingKey { case version, date, kind, advisor, cards, checks }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -20,12 +22,38 @@ struct DailyDeck: Decodable, Equatable {
         kind = try c.decode(String.self, forKey: .kind)
         advisor = try? c.decodeIfPresent(String.self, forKey: .advisor)
         cards = try c.decode([Lossy<DeckCard>].self, forKey: .cards).compactMap(\.value)
+        checks = ((try? c.decodeIfPresent([Lossy<DeckCheck>].self, forKey: .checks)) ?? []).compactMap(\.value)
     }
 
     static func decode(_ content: String) throws -> DailyDeck {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return try decoder.decode(DailyDeck.self, from: Data(content.utf8))
+    }
+}
+
+/// One finding of the morning check (second-brain `tools/daily_deck.py`): a card's part
+/// (`card`, `question`), what was wrong with it, and what the check did about it.
+struct DeckCheck: Decodable, Equatable {
+    /// The card's id.
+    let card: String
+    let part: String?
+    /// `judge:<criterion>` when the eval judge failed the part.
+    let defect: String?
+    /// `kept` (shown as is), `regenerated`, `fallback`, or `ok`.
+    let action: String?
+
+    /// Whether the eval judge failed this part.
+    var judgeFailed: Bool { defect?.hasPrefix("judge:") == true }
+
+    private enum CodingKeys: String, CodingKey { case card, part, defect, action }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        card = try c.decode(String.self, forKey: .card)
+        part = try? c.decodeIfPresent(String.self, forKey: .part)
+        defect = try? c.decodeIfPresent(String.self, forKey: .defect)
+        action = try? c.decodeIfPresent(String.self, forKey: .action)
     }
 }
 

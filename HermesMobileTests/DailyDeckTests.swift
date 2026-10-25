@@ -41,6 +41,24 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(deck.cards[6].lines, [])
     }
 
+    func testMorningChecksDecodeTolerantly() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"2026-10-04","kind":"morning","cards":[],"checks":[
+          {"card":"q1","part":"question","defect":"judge:on_idea","action":"kept","extra":1},
+          {"card":"b1","part":7,"defect":"empty"},
+          {"part":"card","action":"ok"},
+          "junk"
+        ]}
+        """#)
+        XCTAssertEqual(deck.checks.map(\.card), ["q1", "b1"], "a check without its card is dropped, never the deck")
+        XCTAssertTrue(deck.checks[0].judgeFailed)
+        XCTAssertEqual(deck.checks[0].action, "kept")
+        XCTAssertNil(deck.checks[1].part, "a wrong-typed field reads as missing")
+        XCTAssertFalse(deck.checks[1].judgeFailed, "only a `judge:` defect is the judge's")
+        XCTAssertEqual(try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[]}"#).checks, [])
+        XCTAssertEqual(try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[],"checks":"x"}"#).checks, [])
+    }
+
     func testGoalCardDecodes() throws {
         let deck = try DailyDeck.decode(#"""
         {"date":"d","kind":"morning","cards":[
