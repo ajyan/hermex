@@ -31,6 +31,31 @@ final class LabelsModelsTests: XCTestCase {
         XCTAssertNil(records[3].verdict, "an unknown verdict reads as none")
     }
 
+    func testRecordDecodesAnOptionalReason() throws {
+        let data = Data(#"""
+        {"labels": [
+          {"feature": "daily_deck", "item": "d|morning|c", "part": "question", "verdict": "bad", "reason": "on_idea"},
+          {"feature": "daily_deck", "item": "d|morning|c", "part": "card", "verdict": "bad", "reason": 7},
+          {"feature": "daily_deck", "item": "d|morning|e", "part": "card", "verdict": "bad"}
+        ]}
+        """#.utf8)
+        let records = try FeedbackDecoding.decode(LabelList.self, from: data).labels
+        XCTAssertEqual(records.map(\.reason), ["on_idea", nil, nil], "a wrong-typed reason reads as none, never drops the label")
+    }
+
+    func testReasonChipsArePerPartOnDailyDeckLabelsOnly() {
+        let question = LabelReason.options(for: .deckQuestion(date: "d", kind: "morning", cardID: "c"))
+        let card = LabelReason.options(for: .deckCard(date: "d", kind: "morning", cardID: "c"))
+        XCTAssertEqual(question.map(\.key), ["on_idea", "on_card", "thought_provoking", "answerable", "no_repeat"])
+        XCTAssertEqual(question.map(\.label), ["Argues with the card", "Not about this card", "Doesn't make me think",
+                                               "Confusing", "Repeats the card"])
+        XCTAssertEqual(card.map(\.key), ["substantive", "clean", "no_repeat", "grounded", "readable", "selection"])
+        XCTAssertEqual(card.map(\.label), ["Too thin", "Messy text", "Repeats the title", "Gets facts wrong",
+                                           "Hard to read", "Doesn't belong in the deck"])
+        XCTAssertEqual(LabelReason.options(for: .brainPage(module: .wiki, id: "a")), [], "Brain pages get no chips")
+        XCTAssertEqual(LabelReason.options(for: LabelKey(feature: "daily_deck", item: "d|morning|c", part: "other")), [])
+    }
+
     func testMissingLabelsKeyIsAnEmptyList() throws {
         XCTAssertEqual(try FeedbackDecoding.decode(LabelList.self, from: Data("{}".utf8)).labels, [])
     }
@@ -77,6 +102,8 @@ final class LabelsModelsTests: XCTestCase {
 
         XCTAssertEqual(bare, #"{"feature":"brain","item":"wiki\/stoicism","part":"page","verdict":"good"}"#)
         XCTAssertEqual(full, #"{"feature":"brain","item":"wiki\/stoicism","note":"Thin","part":"page","title":"Stoicism","verdict":"bad"}"#)
+        let reasoned = String(decoding: try encoder.encode(LabelCreate(key: key, verdict: .bad, reason: "clean")), as: UTF8.self)
+        XCTAssertEqual(reasoned, #"{"feature":"brain","item":"wiki\/stoicism","part":"page","reason":"clean","verdict":"bad"}"#)
     }
 
     func testLabelsQueryEncodesPlusPipeSlashAndSpaces() throws {
@@ -135,6 +162,22 @@ final class LabelsDataClientHTTPTests: APIClientTestCase {
             .save(LabelCreate(key: .brainPage(module: .wiki, id: "a"), verdict: .bad, note: "Thin"))
         XCTAssertEqual(record.verdict, .bad)
         XCTAssertEqual(record.note, "Thin")
+    }
+
+    func testSaveSendsTheReasonAndReadsItBack() async throws {
+        let client = makeClient { request in
+            let body = try XCTUnwrap(apiTestBodyData(from: request))
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            XCTAssertEqual(json["reason"] as? String, "on_idea")
+            XCTAssertEqual(json["verdict"] as? String, "bad")
+            XCTAssertEqual(json["note"] as? String, "Off")
+            return apiTestJSONResponse(
+                #"{"ts":"t","feature":"daily_deck","item":"d|morning|c","part":"question","verdict":"bad","note":"Off","reason":"on_idea"}"#,
+                for: request)
+        }
+        let record = try await APIClientLabelsAdapter(apiClient: client)
+            .save(LabelCreate(key: .deckQuestion(date: "d", kind: "morning", cardID: "c"), verdict: .bad, note: "Off", reason: "on_idea"))
+        XCTAssertEqual(record.reason, "on_idea")
     }
 
     func testListReadsTheLabelsEnvelope() async throws {
@@ -234,6 +277,115 @@ final class LabelsViewModelTests: XCTestCase {
         XCTAssertEqual(labels.verdict(for: key), .good)
     }
 
+    func testAReasonSavesAgainAsBadWithItsNoteAndShowsOnlyAfterTheServerAnswers() async {
+        let client = StubLabelsClient()
+        let labels = LabelsViewModel(client: client)
+        await labels.tap(.bad, for: key, note: "Misses the point", title: "Seneca")
+        await client.holdSaves()
+
+        let save = Task { await labels.tapReason("grounded", for: key, title: "Seneca") }
+        await client.waitForSave(count: 2)
+
+        XCTAssertNil(labels.reason(for: key), "non-optimistic: the chip isn't chosen before the server answers")
+        XCTAssertEqual(labels.pendingReasons[key], "grounded")
+        XCTAssertTrue(labels.isPending(key))
+        await labels.tap(.good, for: key)
+        await labels.tapReason("clean", for: key)
+
+        await client.releaseSaves()
+        await save.value
+
+        XCTAssertEqual(labels.reason(for: key), "grounded")
+        XCTAssertEqual(labels.verdict(for: key), .bad)
+        XCTAssertFalse(labels.isPending(key))
+        let saved = await client.saved
+        XCTAssertEqual(saved, [
+            LabelCreate(key: key, verdict: .bad, note: "Misses the point", title: "Seneca"),
+            LabelCreate(key: key, verdict: .bad, note: "Misses the point", title: "Seneca", reason: "grounded")
+        ], "taps while a reason saves are ignored")
+    }
+
+    func testTappingTheChosenReasonClearsItAndKeepsTheBadLabel() async {
+        let client = StubLabelsClient()
+        let labels = LabelsViewModel(client: client)
+        await labels.tap(.bad, for: key)
+        await labels.tapReason("clean", for: key)
+        await labels.tapReason("readable", for: key)
+        XCTAssertEqual(labels.reason(for: key), "readable", "another chip replaces the reason")
+
+        await labels.tapReason("readable", for: key)
+
+        XCTAssertNil(labels.reason(for: key))
+        XCTAssertEqual(labels.verdict(for: key), .bad)
+        let saved = await client.saved
+        XCTAssertEqual(saved.map(\.verdict), [.bad, .bad, .bad, .bad])
+        XCTAssertEqual(saved.map(\.reason), [nil, "clean", "readable", nil])
+    }
+
+    func testAReasonNeedsAConfirmedBadLabel() async {
+        let client = StubLabelsClient()
+        let labels = LabelsViewModel(client: client)
+
+        await labels.tapReason("clean", for: key)
+        await labels.tap(.good, for: key)
+        await labels.tapReason("clean", for: key)
+
+        let saved = await client.saved
+        XCTAssertEqual(saved.map(\.verdict), [.good], "no reason on an unlabeled or good label")
+        XCTAssertNil(labels.reason(for: key))
+    }
+
+    func testAFailedReasonSaveKeepsTheLastReasonWithAnInlineError() async {
+        let client = StubLabelsClient()
+        let labels = LabelsViewModel(client: client)
+        await labels.tap(.bad, for: key)
+        await labels.tapReason("clean", for: key)
+        await client.fail(with: APIError.http(statusCode: 500, body: nil))
+
+        await labels.tapReason("grounded", for: key)
+
+        XCTAssertEqual(labels.reason(for: key), "clean")
+        XCTAssertEqual(labels.verdict(for: key), .bad)
+        XCTAssertNotNil(labels.error(for: key))
+        XCTAssertFalse(labels.isPending(key))
+    }
+
+    func testANewVerdictStartsWithoutAReason() async {
+        let client = StubLabelsClient()
+        let labels = LabelsViewModel(client: client)
+        await labels.tap(.bad, for: key)
+        await labels.tapReason("clean", for: key)
+
+        await labels.tap(.good, for: key)
+        XCTAssertNil(labels.reason(for: key))
+        await labels.tap(.bad, for: key)
+        XCTAssertNil(labels.reason(for: key), "a fresh ✗ has no reason until one is tapped")
+    }
+
+    func testLoadReadsReasonsAndNotesOnBadLabelsOnly() async throws {
+        let client = StubLabelsClient()
+        let question = LabelKey.deckQuestion(date: "2026-10-12", kind: "morning", cardID: "quote-3")
+        await client.setRecords([
+            record(key, "bad", note: "Thin", reason: "substantive"),
+            record(question, "good", reason: "on_idea")
+        ])
+        let labels = LabelsViewModel(client: client)
+
+        try await labels.load(feature: "daily_deck")
+
+        XCTAssertEqual(labels.reason(for: key), "substantive")
+        XCTAssertNil(labels.reason(for: question), "a reason only stands on a bad label")
+
+        await labels.tapReason("clean", for: key)
+        let saved = await client.saved
+        XCTAssertEqual(saved, [LabelCreate(key: key, verdict: .bad, note: "Thin", reason: "clean")],
+                       "a loaded label's note goes along with a new reason")
+
+        await client.setRecords([record(key, "clear")])
+        try await labels.load(feature: "daily_deck")
+        XCTAssertNil(labels.reason(for: key))
+    }
+
     func testLoadReplacesTheFeaturesLabelsAndDropsCleared() async throws {
         let client = StubLabelsClient()
         let other = LabelKey.brainPage(module: .wiki, id: "a")
@@ -292,9 +444,12 @@ final class LabelsViewModelTests: XCTestCase {
         XCTAssertFalse(availability.labelsAvailable)
     }
 
-    private func record(_ key: LabelKey, _ verdict: String) -> LabelRecord {
-        let json = #"{"feature":"\#(key.feature)","item":"\#(key.item)","part":"\#(key.part)","verdict":"\#(verdict)"}"#
-        return try! FeedbackDecoding.decode(LabelRecord.self, from: Data(json.utf8))
+    private func record(_ key: LabelKey, _ verdict: String, note: String? = nil, reason: String? = nil) -> LabelRecord {
+        var object: [String: Any] = ["feature": key.feature, "item": key.item, "part": key.part, "verdict": verdict]
+        object["note"] = note
+        object["reason"] = reason
+        let data = try! JSONSerialization.data(withJSONObject: object)
+        return try! FeedbackDecoding.decode(LabelRecord.self, from: data)
     }
 }
 
@@ -376,6 +531,40 @@ final class LabelQueueViewModelTests: XCTestCase {
             landed: { date, id in date == "2026-10-13" && ["r1", "r3"].contains(id) })
 
         XCTAssertEqual(items.map(\.card.id), ["r2", "r4", "r5", "r6", "r7"], "answered cards skipped; five at most")
+    }
+
+    func testCardsTheJudgeDoubtedComeFirstKeptThenRegenerated() throws {
+        let newer = try DailyDeck.decode(#"""
+        {"date":"2026-10-13","kind":"morning","cards":[
+          {"id":"a","type":"reflect","kind":"wiki","body":"A"},
+          {"id":"b","type":"reflect","kind":"wiki","body":"B","question":"B?"},
+          {"id":"c","type":"reflect","kind":"wiki","body":"C","question":"C?"},
+          {"id":"d","type":"reflect","kind":"wiki","body":"D"},
+          {"id":"x","type":"reflect","kind":"wiki","body":"X"}
+        ],"checks":[
+          {"card":"b","part":"question","defect":"judge:on_idea","action":"regenerated"},
+          {"card":"c","part":"card","defect":"judge:clean","action":"kept"},
+          {"card":"d","part":"card","defect":"empty","action":"kept"},
+          {"card":"a","part":"card","defect":"judge:clean","action":"ok"},
+          {"card":"x","part":"card","defect":"judge:clean","action":"kept"}
+        ]}
+        """#)
+        let older = try DailyDeck.decode(#"""
+        {"date":"2026-10-12","kind":"morning","cards":[
+          {"id":"e","type":"reflect","kind":"wiki","body":"E"},
+          {"id":"f","type":"reflect","kind":"wiki","body":"F"}
+        ],"checks":[{"card":"f","part":"question","defect":"judge:answerable","action":"kept"}]}
+        """#)
+        let decks = [(date: "2026-10-13", kind: "morning", deck: newer), (date: "2026-10-12", kind: "morning", deck: older)]
+        let labeled: Set<LabelKey> = [.deckCard(date: "2026-10-13", kind: "morning", cardID: "x")]
+        func ids(limit: Int = .max) -> [String] {
+            LabelQueueViewModel.items(decks: decks, limit: limit, isLabeled: { labeled.contains($0) }).map(\.id)
+        }
+
+        XCTAssertEqual(ids(), ["2026-10-13|morning|c", "2026-10-12|morning|f", "2026-10-13|morning|b",
+                               "2026-10-13|morning|a", "2026-10-13|morning|d", "2026-10-12|morning|e"],
+                       "kept judge failures, then regenerated ones, then the rest, each newest first in deck order; a labeled card stays out")
+        XCTAssertEqual(ids(limit: 2), ["2026-10-13|morning|c", "2026-10-12|morning|f"], "ordered before the day's limit")
     }
 
     private static let weekCards = [
@@ -762,8 +951,9 @@ actor StubLabelsClient: LabelsDataClient {
         heldSave = nil
     }
 
-    func waitForSave() async {
-        guard saved.isEmpty else { return }
+    /// Waits until `count` saves have arrived.
+    func waitForSave(count: Int = 1) async {
+        guard saved.count < count else { return }
         await withCheckedContinuation { saveWaiter = $0 }
     }
 
@@ -778,8 +968,11 @@ actor StubLabelsClient: LabelsDataClient {
         saveWaiter = nil
         if holdsSaves { await withCheckedContinuation { heldSave = $0 } }
         if let saveError { throw saveError }
-        let json = #"{"feature":"\#(body.feature)","item":"\#(body.item)","part":"\#(body.part)","verdict":"\#(body.verdict.rawValue)"}"#
-        return try FeedbackDecoding.decode(LabelRecord.self, from: Data(json.utf8))
+        // Echoes the saved body, as the server does.
+        var object: [String: Any] = ["feature": body.feature, "item": body.item, "part": body.part, "verdict": body.verdict.rawValue]
+        object["note"] = body.note
+        object["reason"] = body.reason
+        return try FeedbackDecoding.decode(LabelRecord.self, from: JSONSerialization.data(withJSONObject: object))
     }
 
     func isAvailable() async -> Bool {
