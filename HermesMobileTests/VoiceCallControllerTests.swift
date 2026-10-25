@@ -93,10 +93,20 @@ private final class FakeChat: VoiceCallChatDriving {
     var cancelCount = 0
     var responses: [ApprovalChoice] = []
     var sendResult = true
+    /// When set, each send waits for `releaseSend()`, like a slow `chat/start`.
+    var holdsSend = false
+    private var pendingSend: CheckedContinuation<Void, Never>?
 
     func sendVoiceMessage(_ text: String) async -> Bool {
         sent.append(text)
+        if holdsSend { await withCheckedContinuation { pendingSend = $0 } }
         return sendResult
+    }
+
+    func releaseSend() {
+        holdsSend = false
+        pendingSend?.resume()
+        pendingSend = nil
     }
 
     func cancelActiveStream() async -> Bool {
@@ -206,11 +216,13 @@ final class VoiceCallControllerTests: XCTestCase {
         )
     }
 
-    /// Starts a call and gets Atlas mid-reply with "First sentence." queued.
+    /// Starts a call and gets Atlas mid-reply with "First sentence." queued, past the
+    /// talk-over grace, so new speech can interrupt it.
     private func startSpeaking() async {
         await controller.start()
         await say("hello")
         update(text: "First sentence. Second")
+        clock += VoiceCallTiming.talkOverGrace
     }
 
     /// A controller wired to the same fakes, with an opening turn.
@@ -577,7 +589,7 @@ final class VoiceCallControllerTests: XCTestCase {
         await controller.lastChatTask?.value
         XCTAssertEqual(chat.sent, [tag + "what's on my calendar"])
         XCTAssertEqual(controller.state, .thinking)
-        XCTAssertNil(controller.tapAction)
+        XCTAssertEqual(controller.tapAction, .cancel)
     }
 
     func testTapInterruptsAtlasAndCancelsTheRunOnce() async {
@@ -1009,6 +1021,187 @@ final class VoiceCallControllerTests: XCTestCase {
         await startSpeaking()
         update(text: "First sentence. Second", tool: "terminal")
         XCTAssertEqual(controller.currentTool, "terminal")
+    }
+
+    func testTapTakesBackTheTurnAtlasIsWorkingOn() async {
+        await controller.start()
+        await say("with similar like you could do demo")
+        XCTAssertEqual(controller.tapAction, .cancel)
+
+        controller.performTapAction()
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.cancelCount, 1)
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertNil(controller.lastSentTurn)
+
+        // The cancelled run's text is never spoken, and the next turn sends normally.
+        update(text: "Here is a demo.", streaming: false)
+        XCTAssertTrue(speaker.spoken.isEmpty)
+        await say("who is my dad")
+        XCTAssertEqual(chat.sent.last, tag + "who is my dad")
+    }
+
+    func testTapCancelBeforeTheSendIsAcceptedCancelsTheRunItStarts() async {
+        await controller.start()
+        chat.holdsSend = true
+        voice(true, for: 0.6)
+        listener.onFinal?("hello")
+        voice(false, for: 0.9)
+        XCTAssertEqual(controller.state, .thinking)
+
+        controller.performTapAction()
+        XCTAssertEqual(chat.cancelCount, 0)
+        chat.releaseSend()
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.cancelCount, 1)
+        XCTAssertEqual(controller.state, .listening)
+    }
+
+    func testTextShownBeforeTheSendIsAcceptedIsNotThisTurnsReply() async {
+        await controller.start()
+        chat.holdsSend = true
+        voice(true, for: 0.6)
+        listener.onFinal?("who is my dad")
+        voice(false, for: 0.9)
+        let send = controller.lastChatTask
+
+        // An earlier call's run, still on screen until this turn lands.
+        update(text: "No Richard Giant in the CRM.", streaming: true)
+        update(text: "No Richard Giant in the CRM.", streaming: false)
+        XCTAssertTrue(speaker.spoken.isEmpty)
+        XCTAssertEqual(controller.state, .thinking)
+
+        chat.releaseSend()
+        await send?.value
+        update(text: nil, streaming: true)
+        update(text: "Your dad is Richard.", streaming: false)
+        XCTAssertEqual(speaker.spoken, ["Your dad is Richard."])
+    }
+
+    func testLongWaitsAreFilledWithHoldOnLines() async {
+        await controller.start()
+        await say("what's on my calendar")
+        clock += VoiceCallTiming.holdOnDelay - 0.3
+        controller.tick()
+        XCTAssertTrue(speaker.spoken.isEmpty)
+        clock += 0.3
+        controller.tick()
+        XCTAssertEqual(speaker.spoken, [VoiceCallPhrases.holdOn])
+        XCTAssertEqual(speaker.cueStates.last, false)
+        // The cue waits while the line plays, then resumes.
+        controller.tick()
+        XCTAssertEqual(speaker.cueStates.last, false)
+        speaker.drain()
+        XCTAssertEqual(controller.state, .thinking)
+        controller.tick()
+        XCTAssertEqual(speaker.cueStates.last, true)
+
+        clock += VoiceCallTiming.stillWorkingInterval + 0.1
+        controller.tick()
+        XCTAssertEqual(speaker.spoken, [VoiceCallPhrases.holdOn, VoiceCallPhrases.stillWorking])
+
+        update(text: "You have two meetings. One")
+        XCTAssertEqual(controller.state, .speaking)
+        XCTAssertEqual(speaker.spoken.last, "You have two meetings.")
+    }
+
+    func testQuickRepliesGetNoHoldOnLine() async {
+        await controller.start()
+        await say("what time is it")
+        clock += 3
+        controller.tick()
+        update(text: "It's 2:41.")
+        update(text: "It's 2:41.", streaming: false)
+        speaker.drain()
+        clock += VoiceCallTiming.holdOnDelay
+        controller.tick()
+        XCTAssertEqual(speaker.spoken, ["It's 2:41."])
+    }
+
+    func testSpeechFromBeforeTheReplyDoesNotInterruptIt() async {
+        await controller.start()
+        await say("find me an article")
+        update(text: "Here's one from your library. It")
+        // Recognized just as the reply starts: said before any of it could be heard.
+        listener.onPartial?("? Put your finger on the screen")
+        XCTAssertEqual(controller.state, .speaking)
+        XCTAssertEqual(speaker.stopCount, 0)
+
+        // The same speech, recognized further along, is still not talk-over.
+        clock += VoiceCallTiming.talkOverGrace
+        listener.onPartial?("? Put your finger on the screen now")
+        XCTAssertEqual(controller.state, .speaking)
+
+        // New words are.
+        listener.onPartial?("hold on a second")
+        await controller.lastChatTask?.value
+        XCTAssertEqual(controller.state, .listening)
+    }
+
+    func testWordsHeardWhileThinkingAreNotTalkOver() async {
+        await controller.start()
+        await say("find me an article")
+        listener.onPartial?("put your finger on the")
+        update(text: "Here's one. It")
+        clock += VoiceCallTiming.talkOverGrace
+        listener.onPartial?("put your finger on the screen")
+        XCTAssertEqual(controller.state, .speaking)
+        XCTAssertEqual(speaker.stopCount, 0)
+    }
+
+    func testTurnEndingMidThoughtWaitsForTheNextWord() async {
+        await controller.start()
+        voice(true, for: 0.6)
+        listener.onFinal?(". Tell me an interesting fact about.")
+        voice(false, for: 0.9)
+        controller.tick()
+        XCTAssertTrue(chat.sent.isEmpty)
+
+        voice(true, for: 0.5)
+        listener.onFinal?("Wales.")
+        voice(false, for: 0.9)
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.sent, [tag + "Tell me an interesting fact about. Wales."])
+    }
+
+    func testTurnEndingMidThoughtSendsAfterTheLongerWait() async {
+        await controller.start()
+        voice(true, for: 0.6)
+        listener.onFinal?("Tell me a fact about.")
+        voice(false, for: 0.9)
+        clock += VoiceCallTiming.midThoughtWait - 1.0
+        controller.tick()
+        XCTAssertTrue(chat.sent.isEmpty)
+        clock += 0.6
+        controller.tick()
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.sent, [tag + "Tell me a fact about."])
+    }
+
+    func testTapSendsATurnEndingMidThoughtAtOnce() async {
+        await controller.start()
+        voice(true, for: 0.5)
+        listener.onPartial?("remind me to")
+        controller.performTapAction()
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.sent, [tag + "remind me to"])
+    }
+
+    func testEndsMidThought() {
+        XCTAssertTrue(VoiceCallController.endsMidThought("Tell me an interesting fact about."))
+        XCTAssertTrue(VoiceCallController.endsMidThought("send it to the"))
+        XCTAssertTrue(VoiceCallController.endsMidThought("I was thinking, um"))
+        XCTAssertFalse(VoiceCallController.endsMidThought("What's it for?"))
+        XCTAssertFalse(VoiceCallController.endsMidThought("Who is Alex Fisher?"))
+        XCTAssertFalse(VoiceCallController.endsMidThought("October 2018."))
+        XCTAssertFalse(VoiceCallController.endsMidThought(""))
+    }
+
+    func testTranscriptDropsTheRecognizersLeadingPunctuation() async {
+        await controller.start()
+        voice(true, for: 0.5)
+        listener.onPartial?(". What are my current goals")
+        XCTAssertEqual(controller.partialTranscript, "What are my current goals")
     }
 }
 

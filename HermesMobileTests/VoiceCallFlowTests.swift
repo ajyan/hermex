@@ -94,6 +94,30 @@ final class VoiceCallFlowTests: XCTestCase {
         XCTAssertEqual(speaker.spoken, ["Sure.", last])
     }
 
+    func testRedialReplacesTheRunAHungUpCallLeftGoing() async throws {
+        let server = OneRunServer()
+        MockURLProtocol.requestHandler = server.handle
+        await say("who is Richard Giant")
+        stream.emit(.token("I know your dad, Richard. "))
+        feed()
+        controller.end()
+
+        // Calling the same chat again while that run is still going on the server.
+        let redial = FlowSpeaker()
+        controller = VoiceCallController(
+            listener: listener, speaker: redial, chat: chat, bridge: FlowBridge(),
+            now: { [unowned self] in clock }, clock: { Self.callTime }, suppressThinkingCue: { true }, tickInterval: nil
+        )
+        await controller.start()
+        feed()
+        await say("who is my dad")
+
+        XCTAssertEqual(server.cancels, 1)
+        XCTAssertEqual(sentTurns.last, VoiceCallPhrases.voicePrefix(at: Self.callTime) + "who is my dad")
+        XCTAssertEqual(controller.state, .thinking)
+        XCTAssertTrue(redial.spoken.isEmpty)
+    }
+
     // MARK: - Helpers
 
     private func feed() {
@@ -169,6 +193,37 @@ final class VoiceCallFlowTests: XCTestCase {
             viewModel?.flushPendingStreamingContent()
         }
         return viewModel
+    }
+}
+
+/// A session with one run slot, as hermes-webui keeps it: a start while a run is
+/// going is refused with 409 and that run's id, and a cancel frees the slot.
+private final class OneRunServer: @unchecked Sendable {
+    private let lock = NSLock()
+    private var running = false
+    private var cancelCount = 0
+
+    var cancels: Int { lock.withLock { cancelCount } }
+
+    func handle(_ request: URLRequest) throws -> (HTTPURLResponse, Data) {
+        lock.lock()
+        defer { lock.unlock() }
+        switch request.url?.path {
+        case "/api/chat/start":
+            guard !running else {
+                return apiTestJSONResponse(
+                    #"{"error":"A response is already running","active_stream_id":"stream-1"}"#, for: request, status: 409
+                )
+            }
+            running = true
+            return apiTestJSONResponse(#"{"session_id":"session-abc","stream_id":"stream-1"}"#, for: request)
+        case "/api/chat/cancel":
+            running = false
+            cancelCount += 1
+            return apiTestJSONResponse(#"{"ok":true}"#, for: request)
+        default:
+            return apiTestJSONResponse("{}", for: request)
+        }
     }
 }
 

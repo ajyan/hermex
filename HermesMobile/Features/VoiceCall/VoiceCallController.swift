@@ -22,6 +22,8 @@ enum VoiceCallPhrases {
     static let denied = "Denied."
     static let didntCatch = "I didn't catch that."
     static let hangingUpNoSpeech = "I haven't heard anything, so I'm hanging up"
+    static let holdOn = "One moment."
+    static let stillWorking = "Still working on it."
 
     /// The tag before each spoken turn, carrying the phone's local time (`[voice 2:41 PM] `)
     /// so Atlas can answer "what time is it?" without a tool call.
@@ -80,6 +82,7 @@ final class VoiceCallController {
             guard state != oldValue else { return }
             log("state \(oldValue) -> \(state)")
             if state == .listening { listeningSince = now() }
+            if state == .speaking { speakingSince = now() }
         }
     }
     private(set) var partialTranscript = ""
@@ -122,6 +125,14 @@ final class VoiceCallController {
     @ObservationIgnored private var discardFinals = false
     /// Words Atlas has said this reply; hearing them back is echo, not the user.
     @ObservationIgnored private var spokenWords: Set<String> = []
+    /// Words heard while Atlas worked on this reply (the room, or the user talking to
+    /// someone else). The recognizer can deliver them late, once Atlas is already
+    /// speaking; they are not the user talking over it.
+    @ObservationIgnored private var ambientWords: Set<String> = []
+    /// When `speaking` began, for the talk-over grace period.
+    @ObservationIgnored private var speakingSince: TimeInterval?
+    /// The transcript last held back for ending mid-thought, so the log says so once.
+    @ObservationIgnored private var heldMidThought: String?
     /// A turn has ended with only a partial transcript; waiting briefly for the final one.
     @ObservationIgnored private var awaitingFinalSince: TimeInterval?
     @ObservationIgnored private var isHeld = false
@@ -140,7 +151,15 @@ final class VoiceCallController {
     @ObservationIgnored private var shaper = SpeechTextShaper()
     /// False once the reply is abandoned (barge-in, hold) or not yet sent.
     @ObservationIgnored private var replyActive = false
+    /// True from a send until the server accepts it. Until then the chat still shows the
+    /// previous run (an earlier call's, say), whose text is not this turn's reply.
+    @ObservationIgnored private var awaitingSendAcceptance = false
+    /// Counts sends, so a slow acceptance can't clear a later turn's wait.
+    @ObservationIgnored private var sendCount = 0
     @ObservationIgnored private var replyStarted = false
+    /// Seconds into thinking when the next hold-on line is due, and how many were said this turn.
+    @ObservationIgnored private var nextHoldOnAt = VoiceCallTiming.holdOnDelay
+    @ObservationIgnored private var holdOnLinesSaid = 0
     /// True once this turn's first reply text was timed; an approval pause doesn't add a second sample.
     @ObservationIgnored private var latencyRecorded = false
     @ObservationIgnored private var runSeenStreaming = false
@@ -237,6 +256,8 @@ final class VoiceCallController {
         case send
         /// Cut Atlas off and listen, as talking over it would.
         case interrupt
+        /// Take back the turn Atlas is working on (misheard, or asked wrong) and listen.
+        case cancel
     }
 
     /// What tapping the call visual does right now, if anything.
@@ -245,6 +266,7 @@ final class VoiceCallController {
         switch state {
         case .listening where !partialTranscript.isEmpty: return .send
         case .speaking: return .interrupt
+        case .thinking where replyActive: return .cancel
         default: return nil
         }
     }
@@ -253,7 +275,7 @@ final class VoiceCallController {
         switch tapAction {
         case .send:
             log("tap: send")
-            submitTurn()
+            submitTurn(tapped: true)
         case .interrupt:
             log("tap: interrupt")
             speaker.stopNow()
@@ -261,6 +283,19 @@ final class VoiceCallController {
                 lastChatTask = Task { [chat] in _ = await chat.cancelActiveStream() }
             }
             replyActive = false
+            setCue(false)
+            returnToListening()
+        case .cancel:
+            log("tap: cancel")
+            speaker.stopNow()
+            // The send may not be accepted yet; cancel the run it starts, not nothing.
+            let send = lastChatTask
+            lastChatTask = Task { [chat] in
+                await send?.value
+                _ = await chat.cancelActiveStream()
+            }
+            replyActive = false
+            lastSentTurn = nil
             setCue(false)
             returnToListening()
         case nil:
@@ -345,9 +380,17 @@ final class VoiceCallController {
             if runFinished, !replyStarted, let runFinishedAt, time - runFinishedAt >= VoiceCallTiming.noReplyTextGrace {
                 log("run finished with no reply text; giving up")
                 finishReply()
-            } else if !replyStarted, let thinkingSince, time - thinkingSince >= VoiceCallTiming.thinkingCueDelay,
-               !suppressThinkingCue() {
-                setCue(true)
+            } else if !replyStarted, !runFinished, replyActive, !isHeld, let thinkingSince {
+                let waited = time - thinkingSince
+                if waited >= nextHoldOnAt {
+                    // A long silence on a call reads as a dropped line; say it's still coming.
+                    setCue(false)
+                    say(holdOnLinesSaid == 0 ? VoiceCallPhrases.holdOn : VoiceCallPhrases.stillWorking)
+                    holdOnLinesSaid += 1
+                    nextHoldOnAt = waited + VoiceCallTiming.stillWorkingInterval
+                } else if waited >= VoiceCallTiming.thinkingCueDelay, !speaker.isSpeaking, !suppressThinkingCue() {
+                    setCue(true)
+                }
             }
         case .awaitingApproval:
             if let approvalListenStart, time - approvalListenStart >= VoiceCallTiming.approvalListenTimeout {
@@ -366,6 +409,7 @@ final class VoiceCallController {
 
     private func handlePartial(_ text: String) {
         if checkTalkOver(text) { return }
+        noteAmbient(text)
         guard isHearing, !discardFinals else { return }
         if partialTranscript.isEmpty {
             let afterSpeech = turnStartedAt.map { String(format: " (%.2fs after speech started)", now() - $0) } ?? ""
@@ -380,6 +424,7 @@ final class VoiceCallController {
 
     private func handleFinal(_ text: String) {
         if checkTalkOver(text) { return }
+        noteAmbient(text)
         guard isHearing, !discardFinals else { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         log("final: \"\(trimmed)\"\(awaitingFinalSince.map { String(format: " (%.2fs after end of turn)", now() - $0) } ?? "")")
@@ -403,7 +448,13 @@ final class VoiceCallController {
         case .awaitingApproval where approvalListenStart == nil: isReadBack = true
         default: return false
         }
-        let novel = Self.words(in: heard).filter { !spokenWords.contains($0) }
+        let words = Self.words(in: heard)
+        if !isReadBack, let speakingSince, now() - speakingSince < VoiceCallTiming.talkOverGrace {
+            log("speech from before the reply ignored: \"\(heard)\"")
+            ambientWords.formUnion(words)
+            return true
+        }
+        let novel = words.filter { !spokenWords.contains($0) && !ambientWords.contains($0) }
         guard novel.count >= VoiceCallTiming.bargeInNovelWords || novel.contains(where: Self.stopWords.contains) else {
             log("echo ignored: \"\(heard)\"")
             return true
@@ -419,6 +470,24 @@ final class VoiceCallController {
     }
 
     private static let stopWords: Set<String> = ["stop", "wait"]
+
+    private func noteAmbient(_ heard: String) {
+        guard state == .thinking else { return }
+        ambientWords.formUnion(Self.words(in: heard))
+    }
+
+    /// Whether `text` stops on a word that needs another after it ("tell me a fact about").
+    /// A question mark from the recognizer means the sentence is done ("what's it for?").
+    static func endsMidThought(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.hasSuffix("?"), let last = words(in: trimmed).last else { return false }
+        return midThoughtWords.contains(last)
+    }
+
+    private static let midThoughtWords: Set<String> = [
+        "a", "an", "the", "and", "or", "but", "because", "to", "of", "for", "with", "about",
+        "from", "at", "into", "than", "my", "your", "our", "their", "um", "uh",
+    ]
 
     static func words(in text: String) -> [String] {
         text.lowercased()
@@ -437,7 +506,11 @@ final class VoiceCallController {
     }
 
     private func publishTranscript() {
-        let text = (finals + [partial]).filter { !$0.isEmpty }.joined(separator: " ")
+        // The recognizer can open a segment with the last one's punctuation (". What are my goals").
+        let text = (finals + [partial])
+            .map { $0.drop { $0.isPunctuation || $0.isWhitespace } }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
         if partialTranscript != text { partialTranscript = text }
         if !text.isEmpty { unansweredNoSpeechPrompts = 0 }
     }
@@ -501,11 +574,22 @@ final class VoiceCallController {
 
     // MARK: - Turns
 
-    private func submitTurn() {
+    /// Sends what has been heard. A pause that ended the turn (`tapped` false) waits a
+    /// little longer when the words stop mid-thought; `tick` comes back to it.
+    private func submitTurn(tapped: Bool = false) {
         guard state == .listening else { return }
         awaitingFinalSince = nil
         let text = partialTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+        if !tapped, Self.endsMidThought(text), let transcriptChangedAt,
+           now() - transcriptChangedAt < VoiceCallTiming.midThoughtWait {
+            if heldMidThought != text {
+                heldMidThought = text
+                log("turn held: ends mid-thought")
+            }
+            return
+        }
+        heldMidThought = nil
         lastSentTurn = text
         let spokenFor = turnStartedAt.map { String(format: " (turn started %.1fs ago)", now() - $0) } ?? ""
         turnStartedAt = nil
@@ -524,22 +608,31 @@ final class VoiceCallController {
     private func send(_ text: String, note: String = "") {
         state = .thinking
         spokenWords = []
+        ambientWords = []
         discardFinals = true
         clearTranscript()
         shaper = SpeechTextShaper()
         replyActive = true
+        awaitingSendAcceptance = true
+        sendCount += 1
+        let turn = sendCount
         replyStarted = false
         latencyRecorded = false
         runSeenStreaming = false
         runFinished = false
         runFinishedAt = nil
-        thinkingSince = now()
+        beginThinking()
+        holdOnLinesSaid = 0
         sentAt = now()
         log("send: \"\(text)\"\(note)")
         lastChatTask = Task { [weak self, chat] in
             let sent = await chat.sendVoiceMessage(VoiceCallPhrases.voicePrefix(at: clock()) + text)
             self?.log("send \(sent ? "accepted" : "FAILED") \(self?.since(self?.sentAt) ?? "")")
-            guard !sent, let self, self.replyActive, self.state == .thinking else { return }
+            guard let self, self.sendCount == turn else { return }
+            self.awaitingSendAcceptance = false
+            // The stream may have opened while the send was in flight.
+            if sent, self.lastIsStreaming { self.runSeenStreaming = true }
+            guard !sent, self.replyActive, self.state == .thinking else { return }
             self.replyActive = false
             self.setCue(false)
             self.say(VoiceCallPhrases.sendFailed)
@@ -586,7 +679,14 @@ final class VoiceCallController {
     private func setCue(_ on: Bool) {
         guard cueOn != on else { return }
         cueOn = on
+        log("thinking cue \(on ? "on" : "off")")
         speaker.setThinkingCue(on)
+    }
+
+    /// Starts (or restarts, after an approval) the wait for reply text.
+    private func beginThinking() {
+        thinkingSince = now()
+        nextHoldOnAt = VoiceCallTiming.holdOnDelay
     }
 
     // MARK: - Chat
@@ -607,7 +707,7 @@ final class VoiceCallController {
             log("stream \(isStreaming ? "open" : "closed") \(since(sentAt))")
         }
         lastIsStreaming = isStreaming
-        if isStreaming { runSeenStreaming = true }
+        if isStreaming, !awaitingSendAcceptance { runSeenStreaming = true }
 
         if let approval {
             if pendingApproval == nil, !handledApprovalIDs.contains(approval.id) {
@@ -630,7 +730,7 @@ final class VoiceCallController {
             state = replyStarted ? .speaking : .thinking
         }
 
-        guard replyActive, !isHeld, pendingApproval == nil else { return }
+        guard replyActive, !awaitingSendAcceptance, !isHeld, pendingApproval == nil else { return }
         if let streamingText, !streamingText.isEmpty {
             speak(shaper.append(streamingText, final: runFinished))
             if !replyStarted {
@@ -759,7 +859,7 @@ final class VoiceCallController {
         if replyActive {
             state = .thinking
             replyStarted = false
-            thinkingSince = now()
+            beginThinking()
         } else {
             returnToListening()
         }
