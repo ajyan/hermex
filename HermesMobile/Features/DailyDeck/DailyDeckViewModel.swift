@@ -900,9 +900,22 @@ final class DailyDeckViewModel {
             fillIntention("if_then", draft.ifThen, for: card)
         } else if let last = cards.first(where: { $0.type == .lastIntention }) {
             let answer = answers[last.id]
-            fillIntention("obstacle", answer?.text, for: card, onlyIfEmpty: true)
-            if answer?.statuses?["last"] != "held" { fillIntention("text", last.text, for: card, onlyIfEmpty: true) }
+            let status = answer?.statuses?["last"]
+            // What got in the way counts only while the card asks for it: a week since marked held
+            // keeps those words in its answer, but they aren't this week's obstacle.
+            if status == "partly" || status == "didnt" { fillIntention("obstacle", answer?.text, for: card, onlyIfEmpty: true) }
+            if status != "held" { fillIntention("text", last.text, for: card, onlyIfEmpty: true) }
         }
+    }
+
+    /// The intention card's draft, asked for once he is on that card. The stack draws the card under
+    /// the top one early, so drafting on appear would miss the last value's answer. A filed deck,
+    /// or an intention he (or an earlier draft) has started, keeps what it has.
+    func draftIntentionOnArrival() async {
+        guard let card = cards.first(where: { $0.type == .intention }), currentCardID == card.id, !isFiled else { return }
+        let answer = answers[card.id]
+        guard answer?.text == nil, answer?.notes?.isEmpty ?? true else { return }
+        await intentionDraft()
     }
 
     /// Writes a drafted value into a field he hasn't touched; a blank value changes nothing.

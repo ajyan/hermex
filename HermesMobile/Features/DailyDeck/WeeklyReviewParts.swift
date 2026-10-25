@@ -83,8 +83,16 @@ struct WeekWordsBox: View {
             .contentShape(RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(Text(verbatim: [label, words.isEmpty ? "Not written yet" : words].compactMap { $0 }.joined(separator: ": ")))
+        .accessibilityLabel(Text(verbatim: Self.spoken(label: label, words: words.isEmpty ? "Not written yet" : words)))
         .accessibilityHint(Text(verbatim: "Edits it"))
+    }
+}
+
+extension WeekWordsBox {
+    /// "Thread: Honesty"; a label that ends in its own punctuation ("What got in the way?") takes a space.
+    static func spoken(label: String?, words: String) -> String {
+        guard let label, !label.isEmpty else { return words }
+        return label + (label.last.map { ".?!:".contains($0) } == true ? " " : ": ") + words
     }
 }
 

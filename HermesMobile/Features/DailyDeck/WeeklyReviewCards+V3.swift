@@ -85,14 +85,16 @@ struct WeekValueCard: View {
         let answer = viewModel.answer(for: card)
         VStack(alignment: .leading, spacing: 0) {
             WeekKicker(text: kicker, palette: palette)
-            if let fact = card.fact, fact.big != nil || fact.line != nil {
+            let big = WeekLastIntentionCard.nonBlank(card.fact?.big)
+            let line = WeekLastIntentionCard.nonBlank(card.fact?.line)
+            if big != nil || line != nil {
                 VStack(alignment: .leading, spacing: 2) {
-                    if let big = WeekLastIntentionCard.nonBlank(fact.big) {
+                    if let big {
                         Text(verbatim: big)
                             .font(AppFont.display(style: .largeTitle, weight: .semibold))
                             .foregroundStyle(palette.ink)
                     }
-                    if let line = WeekLastIntentionCard.nonBlank(fact.line) {
+                    if let line {
                         Text(verbatim: line)
                             .font(AppFont.subheadline())
                             .foregroundStyle(Color.hxTextSecondary)
@@ -181,12 +183,8 @@ struct WeekIntentionCard: View {
                 viewModel.setIntentionField(field.id, $0, for: card)
             }
         }
-        .task {
-            // A filed week, or one he's started, keeps what it has; a draft would read as an edit.
-            let answer = viewModel.answer(for: card)
-            guard !viewModel.isFiled, answer?.text == nil, answer?.notes?.isEmpty ?? true else { return }
-            await viewModel.intentionDraft()
-        }
+        // Only once this card is on top: the stack draws it a card early, before the last value is answered.
+        .task(id: viewModel.currentCardID == card.id) { await viewModel.draftIntentionOnArrival() }
     }
 
     /// "Outreach 10 → 5 · Accept", the coach's reason under it.
@@ -211,7 +209,9 @@ struct WeekIntentionCard: View {
             }
             .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
-            if accepted {
+            if change.start.isEmpty {
+                EmptyView()  // nothing to confirm without the week it starts
+            } else if accepted {
                 Label { Text(verbatim: "Accepted") } icon: { Image(systemName: "checkmark") }
                     .font(AppFont.footnote(weight: .semibold))
                     .foregroundStyle(palette.ink)
@@ -232,7 +232,8 @@ struct WeekIntentionCard: View {
                 .buttonStyle(.borderless)
                 .tint(Color.accentColor)
                 .frame(minHeight: 44)
-                .accessibilityLabel(Text(verbatim: "Accept \(change.label.isEmpty ? change.title : change.label)"))
+                .accessibilityLabel(Text(verbatim: "Accept " + (change.label.isEmpty ? change.title : change.label)
+                    .replacingOccurrences(of: "→", with: "to")))
             }
         }
         .padding(.vertical, 8)

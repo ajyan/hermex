@@ -325,6 +325,47 @@ final class WeeklyReviewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testTheIntentionDraftsOnlyOnTheIntentionCardWithTheLastValueAnswered() async throws {
+        let (viewModel, client) = try await v3ViewModelAndClient()
+        let people = try card("value-people", in: viewModel)
+        viewModel.index = try XCTUnwrap(viewModel.visiblePages.firstIndex { $0.id == people.id })
+        await viewModel.draftIntentionOnArrival()
+        XCTAssertTrue(client.intentionRequests.isEmpty, "the card under the top one doesn't draft")
+
+        viewModel.setScore("people", 8, for: people)
+        viewModel.index = try XCTUnwrap(viewModel.visiblePages.firstIndex { $0.id == "intention" })
+        await viewModel.draftIntentionOnArrival()
+        XCTAssertEqual(client.intentionRequests.count, 1)
+        let sent = try XCTUnwrap(client.intentionRequests.first?.answers.answers.first { $0.card == "value-people" })
+        XCTAssertEqual(sent.scores, ["people": 8], "the draft sees the last value's answer")
+
+        await viewModel.draftIntentionOnArrival()
+        XCTAssertEqual(client.intentionRequests.count, 1, "a started intention isn't drafted again on return")
+    }
+
+    @MainActor
+    func testAWeekSinceMarkedHeldDoesNotMakeItsOldWordsTheObstacle() async throws {
+        let (viewModel, client) = try await v3ViewModelAndClient()
+        let intention = try card("intention", in: viewModel)
+        let last = try card("last-intention", in: viewModel)
+        viewModel.setStatus("last", "partly", for: last)
+        viewModel.setText("Late calls", for: last)
+        viewModel.setStatus("last", "held", for: last)
+        client.intentionDraft = .failure(URLError(.timedOut))
+
+        await viewModel.intentionDraft()
+        XCTAssertEqual(viewModel.intentionField("obstacle", for: intention), "")
+        XCTAssertEqual(viewModel.intentionField("text", for: intention), "")
+        XCTAssertEqual(viewModel.answer(for: last)?.text, "Late calls", "his words stay on the card for Partly")
+    }
+
+    func testWordsBoxSpeaksItsLabelOnce() {
+        XCTAssertEqual(WeekWordsBox.spoken(label: "Thread", words: "Honesty"), "Thread: Honesty")
+        XCTAssertEqual(WeekWordsBox.spoken(label: "What got in the way?", words: "Late calls"), "What got in the way? Late calls")
+        XCTAssertEqual(WeekWordsBox.spoken(label: nil, words: "A line"), "A line")
+    }
+
+    @MainActor
     func testAcceptChangeOnlyAfterServerSuccess() async throws {
         let (viewModel, client) = try await v3ViewModelAndClient()
         let intention = try card("intention", in: viewModel)
