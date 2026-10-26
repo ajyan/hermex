@@ -1574,6 +1574,12 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(PrepCopy.runTitle(block: "reteach", lessonTitle: "  "), "Another way to see it")
     }
 
+    func testBossMetaNamesTheLessonItTests() {
+        XCTAssertEqual(PrepCopy.bossMeta(lessonTitle: "Tools are an interface"), "Boss quiz · Tools are an interface")
+        XCTAssertEqual(PrepCopy.bossMeta(lessonTitle: " "), "Boss quiz")
+        XCTAssertEqual(PrepCopy.runTitle(block: "boss", lessonTitle: "Tools are an interface"), "Tools are an interface")
+    }
+
     func testFeedbackSplitsAfterTheFirstSentence() {
         let parts = PrepCopy.feedbackParts("It's Sliding window. Grow a range on the right. Shrink it.")
         XCTAssertEqual(parts.lead, "It's Sliding window.")

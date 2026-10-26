@@ -27,7 +27,7 @@ struct PrepProblemCard: View {
         self.maxHeight = maxHeight
         let item = rep.item
         if rep.drill == .boss {
-            meta = "Boss quiz"
+            meta = PrepCopy.bossMeta(lessonTitle: item.title)
             title = item.summary
             summary = ""
             example = ""
