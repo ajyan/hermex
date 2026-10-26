@@ -1325,6 +1325,13 @@ enum PrepCopy {
         return title.isEmpty ? blockTitle(block) : title
     }
 
+    /// A boss card's meta line: names the lesson its question tests, so a question from the unit's lessons
+    /// doesn't look unrelated to the day's review. Falls back to "Boss quiz" for an untitled item.
+    static func bossMeta(lessonTitle: String) -> String {
+        let title = lessonTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        return title.isEmpty ? "Boss quiz" : "Boss quiz · \(title)"
+    }
+
     static func mapTitle(mastered: Int, total: Int) -> String {
         "\(mastered) of \(total) patterns mastered"
     }

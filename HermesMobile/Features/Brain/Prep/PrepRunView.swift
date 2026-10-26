@@ -116,7 +116,10 @@ struct PrepRunView: View {
 
     private var title: String {
         if case .finished = viewModel.phase { return "Run complete" }
-        return currentRep.map { PrepCopy.runTitle(block: $0.block, lessonTitle: $0.item.lesson?.title) } ?? ""
+        // A boss rep carries no lesson object; its item's title is the lesson the question tests.
+        return currentRep.map { rep in
+            PrepCopy.runTitle(block: rep.block, lessonTitle: rep.item.lesson?.title ?? (rep.drill == .boss ? rep.item.title : nil))
+        } ?? ""
     }
 
     private var feedbackContext: FeedbackContext {
