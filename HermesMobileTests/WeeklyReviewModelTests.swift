@@ -226,6 +226,25 @@ final class WeeklyReviewModelTests: XCTestCase {
         XCTAssertEqual(filed["intention"]?.notes?["if_then"], "If it's 10:30, the phone goes on the charger")
     }
 
+    /// Steer's "Next week leads with" (2026-10-26): the tapped front files as the intention's `front` note,
+    /// which the vault's week record keeps and the next Monday's deck leads with.
+    @MainActor
+    func testTheFrontPickedInSteerFilesAsTheIntentionsFrontNote() async throws {
+        let (viewModel, _) = try await v3ViewModelAndClient()
+        let intention = try card("intention", in: viewModel)
+        XCTAssertEqual(viewModel.intentionField("front", for: intention), "", "the suggestion stands until he taps")
+        viewModel.setIntentionField("front", "fatherhood", for: intention)
+        viewModel.setIntentionField("front", "living-well", for: intention)
+        XCTAssertEqual(viewModel.answers["intention"]?.notes?["front"], "living-well", "the last tap wins")
+        let card = try DailyDeck.decode(#"""
+        {"date":"d","kind":"weekly","cards":[{"id":"intention","type":"intention","front":"ai","front_reason":"Resume final · Sun, Nov 8",
+          "fronts":[{"id":"ai","label":"Landing the AI role"},{"id":"living-well","label":"Body"}]}]}
+        """#).cards[0]
+        XCTAssertEqual(card.fronts.map(\.label), ["Landing the AI role", "Body"])
+        XCTAssertEqual(card.front, "ai")
+        XCTAssertEqual(card.frontReason, "Resume final · Sun, Nov 8")
+    }
+
     @MainActor
     func testIntentionDraftDoesNotOverwriteTouchedFields() async throws {
         let (viewModel, client) = try await v3ViewModelAndClient()
