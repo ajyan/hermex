@@ -548,12 +548,47 @@ final class DailyDeckTests: XCTestCase {
           {"id":"close","type":"close"}]}
         """#)
         let acts = DeckCardView.acts(DeckPage.pages(for: deck.cards))
-        XCTAssertEqual(acts.today.map(\.id), ["t1", "followups-f1", "t2"], "follow-ups are one page; the opener is not listed")
-        XCTAssertEqual(acts.week.map(\.id), ["w1", "w2"], "the divider and close are not listed")
+        XCTAssertEqual(acts.map(\.name), ["Today", "This week"])
+        XCTAssertEqual(acts[0].pages.map(\.id), ["t1", "followups-f1", "t2"], "follow-ups are one page; the opener is not listed")
+        XCTAssertEqual(acts[1].pages.map(\.id), ["w1", "w2"], "the divider and close are not listed")
         // The opener is never listed, and a deck with no section is all one act.
         let plain = DeckCardView.acts(DeckPage.pages(for: try DailyDeck.decode(Self.deckJSON).cards))
-        XCTAssertEqual(plain.today.count, 5)
-        XCTAssertTrue(plain.week.isEmpty)
+        XCTAssertEqual(plain.map(\.name), ["Today"])
+        XCTAssertEqual(plain[0].pages.count, 5)
+    }
+
+    /// The deck arranged by season front (vault deck_fronts, 2026-10-26): a group per divider on the
+    /// opener, front dividers and "Yesterday's one" decode, and today's one thing rides on the close.
+    func testFrontDeckGroupsTheOpenerAndDecodesItsCards() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"d","kind":"morning","cards":[
+          {"id":"open","type":"headline","title":"Today"},
+          {"id":"yesterday-one","type":"choice","title":"Yesterday's one","body":"Text Evan","question":"Did it happen?",
+           "options":[{"id":"done","label":"Done"},{"id":"not","label":"Not today"}]},
+          {"id":"week","type":"section","title":"Q","lines":["This week · Landing the AI role"],"week":{"area":"ai","variant":0}},
+          {"id":"ask","type":"ask"},
+          {"id":"front-fatherhood","type":"front","front":"fatherhood","title":"Becoming a dad","lines":["81 days to go"]},
+          {"id":"letter","type":"prompt","kind":"letter"},
+          {"id":"front-tail","type":"front","front":"tail","title":"Also","lines":["Outside this season's fronts"]},
+          {"id":"year-ago","type":"reflect","kind":"on_this_day"},
+          {"id":"close","type":"close","question":"Your one thing today",
+           "options":[{"id":"ai-1","label":"Reach out to Anthropic"},{"id":"fatherhood-2","label":"Write today's letter to her"}]}]}
+        """#)
+        let acts = DeckCardView.acts(DeckPage.pages(for: deck.cards))
+        XCTAssertEqual(acts.map(\.name), ["Today", "This week · Landing the AI role", "Becoming a dad", "Also"])
+        XCTAssertEqual(acts.map { $0.pages.map(\.id) }, [["yesterday-one"], ["ask"], ["letter"], ["year-ago"]])
+        let cards = Dictionary(uniqueKeysWithValues: deck.cards.map { ($0.id, $0) })
+        XCTAssertEqual(cards["front-fatherhood"]?.type, .front)
+        XCTAssertEqual(cards["front-fatherhood"]?.front, "fatherhood")
+        XCTAssertEqual(DeckPalette.of(cards["front-fatherhood"]!).name, "Becoming a dad")
+        XCTAssertEqual(DeckPalette.of(cards["front-tail"]!).name, "Also")
+        let check = try XCTUnwrap(cards["yesterday-one"])
+        XCTAssertEqual(check.type, .choice)
+        XCTAssertEqual(check.options.map(\.label), ["Done", "Not today"])
+        XCTAssertTrue(check.takesText, "a note can go with the tap")
+        XCTAssertEqual(DeckCardText(check).lead, "Did it happen?")
+        XCTAssertEqual(cards["close"]?.options.map(\.id), ["ai-1", "fatherhood-2"])
+        XCTAssertFalse(cards["front-tail"]!.takesFeedback)
     }
 
     func testOpenerCountsThreeTodayAndTwoThisWeek() throws {
@@ -564,8 +599,7 @@ final class DailyDeckTests: XCTestCase {
           {"id":"d","type":"reflect"},{"id":"e","type":"reflect"},{"id":"close","type":"close"}]}
         """#)
         let acts = DeckCardView.acts(DeckPage.pages(for: deck.cards))
-        XCTAssertEqual(acts.today.count, 3)
-        XCTAssertEqual(acts.week.count, 2)
+        XCTAssertEqual(acts.map(\.pages.count), [3, 2])
     }
 
     private static let weekDeckJSON = #"""
@@ -602,8 +636,8 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(ids(), ["open", "t1", "week", "week-1-1", "close"])
         XCTAssertEqual(viewModel.currentPage?.id, "week", "the divider stays on screen")
         let acts = DeckCardView.acts(viewModel.visiblePages)
-        XCTAssertEqual(acts.week.map(\.id), ["week-1-1"], "the opener lists the shown question's cards")
-        XCTAssertEqual(acts.today.map(\.id), ["t1"])
+        XCTAssertEqual(acts.last?.pages.map(\.id), ["week-1-1"], "the opener lists the shown question's cards")
+        XCTAssertEqual(acts.first?.pages.map(\.id), ["t1"])
 
         viewModel.regenerateQuestion(for: section)
         XCTAssertEqual(viewModel.weekVariant, 2)

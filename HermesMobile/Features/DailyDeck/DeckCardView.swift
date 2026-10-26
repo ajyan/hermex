@@ -84,6 +84,8 @@ struct DeckCardView: View {
                 switch card.type {
                 case .headline: opener
                 case .section: section
+                case .front: frontDivider
+                case .choice: choice
                 case .close: close
                 case .sleep: sleep
                 case .goal: goal
@@ -452,9 +454,9 @@ struct DeckCardView: View {
         ForEach(Array(card.entries.enumerated()), id: \.offset) { _, entry in
             recapLine(entry.label, entry.text).padding(.top, 10)
         }
-        let acts = Self.acts(viewModel.visiblePages)
-        act("Today", acts.today).padding(.top, 26)
-        if !acts.week.isEmpty { act("This week", acts.week).padding(.top, 18) }
+        ForEach(Array(Self.acts(viewModel.visiblePages).enumerated()), id: \.offset) { index, group in
+            act(group.name, group.pages).padding(.top, index == 0 ? 26 : 18)
+        }
         Text(verbatim: "Swipe to begin")
             .font(AppFont.footnote())
             .foregroundStyle(palette.ink)
@@ -474,26 +476,28 @@ struct DeckCardView: View {
         }
     }
 
-    /// The cards ahead of the opener in two acts: those before the deck's first `section`
-    /// divider (Today) and those after it (This week). The opener, the divider and the close
-    /// card are not listed; a deck with no divider is all Today.
-    static func acts(_ pages: [DeckPage]) -> (today: [DeckPage], week: [DeckPage]) {
-        var today: [DeckPage] = []
-        var week: [DeckPage] = []
-        var inWeek = false
+    /// The cards ahead of the opener, grouped by the divider they follow: those before any divider
+    /// are Today, the week's `section` opens its front's group (its kicker, "This week · Body"),
+    /// and each `front` divider opens one under its title ("Becoming a dad", "Also"). The opener,
+    /// the dividers and the close card are not listed, and a group with no cards is left out.
+    static func acts(_ pages: [DeckPage]) -> [(name: String, pages: [DeckPage])] {
+        var groups: [(name: String, pages: [DeckPage])] = [("Today", [])]
         for page in pages {
             if case .card(let card) = page {
                 switch card.type {
                 case .headline, .close: continue
                 case .section:
-                    inWeek = true
+                    groups.append((card.lines.first ?? "This week", []))
+                    continue
+                case .front:
+                    groups.append((card.title ?? "Also", []))
                     continue
                 default: break
                 }
             }
-            if inWeek { week.append(page) } else { today.append(page) }
+            groups[groups.count - 1].pages.append(page)
         }
-        return (today, week)
+        return groups.filter { !$0.pages.isEmpty }
     }
 
     /// "Yesterday · …" on the opener: the label bold in the ink, the line in body text.
@@ -538,6 +542,71 @@ struct DeckCardView: View {
     }
 
     private var shownQuestion: String { viewModel.question(for: card) ?? card.title ?? "This week" }
+
+    /// A season front's divider: where the front stands today over its name.
+    @ViewBuilder
+    private var frontDivider: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(Array(card.lines.enumerated()), id: \.offset) { _, line in
+                    Text(verbatim: line).font(AppFont.footnote())
+                }
+            }
+            .padding(.trailing, 24)
+            Text(verbatim: card.title ?? palette.name)
+                .font(AppFont.display(style: .title, weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 10)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: ([card.title ?? palette.name] + card.lines).joined(separator: ", ")))
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    /// "Yesterday's one": the action he picked on yesterday's close, and whether it happened.
+    @ViewBuilder
+    private var choice: some View {
+        let answer = viewModel.answer(for: card)
+        if let title = card.title {
+            Text(verbatim: title).font(AppFont.footnote()).padding(.trailing, 30)
+        }
+        if let body = card.body {
+            Text(verbatim: body)
+                .font(AppFont.display(style: .title2, weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 8)
+        }
+        Text(verbatim: card.question ?? "Did it happen?")
+            .font(AppFont.subheadline(weight: .semibold))
+            .padding(.top, 18)
+        FlowRow(spacing: 8) {
+            ForEach(card.options) { option in
+                ChoiceButton(title: option.label, isSelected: answer?.action == option.id) {
+                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { viewModel.pick(option.id, for: card) }
+                }
+            }
+        }
+        .padding(.top, 10)
+        reflection("Add a note").padding(.top, 24)
+    }
+
+    /// The close card's three actions for today, one to tap; tomorrow's deck asks whether it happened.
+    @ViewBuilder
+    private var todaysOne: some View {
+        let picked = viewModel.answer(for: card)?.action
+        VStack(alignment: .leading, spacing: 10) {
+            Text(verbatim: card.question ?? "Your one thing today")
+                .font(AppFont.subheadline(weight: .semibold))
+                .accessibilityAddTraits(.isHeader)
+            FlowRow(spacing: 8) {
+                ForEach(card.options) { option in
+                    ChoiceButton(title: option.label, isSelected: picked == option.id) {
+                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { viewModel.pick(option.id, for: card) }
+                    }
+                }
+            }
+        }
+    }
 
     /// "New question" steps to the week's next drafted question (its sources replace the last's
     /// in act 2); once asked, an optional one-line note on why goes with it.
@@ -615,6 +684,9 @@ struct DeckCardView: View {
         }
         if case .failed(let message) = viewModel.filing {
             Text(verbatim: message).font(AppFont.footnote()).foregroundStyle(Color.hxDanger).padding(.top, 12)
+        }
+        if !card.options.isEmpty, !seal {
+            todaysOne.padding(.top, 24)
         }
         if let variantCard = viewModel.variantCard, !seal {
             DeckVariantPick(card: variantCard, viewModel: viewModel, palette: palette)

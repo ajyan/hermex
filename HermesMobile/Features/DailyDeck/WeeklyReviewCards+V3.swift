@@ -159,6 +159,7 @@ struct WeekIntentionCard: View {
                 .padding(.top, 8)
                 .accessibilityElement(children: .combine)
             }
+            if !card.fronts.isEmpty { frontPicker.padding(.top, 14) }
             VStack(spacing: 10) {
                 ForEach(Self.fields) { field in
                     WeekWordsBox(label: field.label, text: viewModel.intentionField(field.id, for: card),
@@ -186,6 +187,31 @@ struct WeekIntentionCard: View {
         // Only once this card is on top: the stack draws it a card early, before the last value is answered.
         // The view model owns the request, so leaving the card doesn't cancel it.
         .task(id: viewModel.currentCardID == card.id) { viewModel.draftIntentionOnArrival() }
+    }
+
+    /// Which season front leads next week's Daily Deck: the suggested one until he taps another
+    /// (filed as the `front` note), with why it was suggested.
+    private var frontPicker: some View {
+        let picked = viewModel.intentionField("front", for: card)
+        let chosen = picked.isEmpty ? card.front : picked
+        return VStack(alignment: .leading, spacing: 8) {
+            Text(verbatim: "Next week leads with")
+                .font(AppFont.subheadline(weight: .semibold))
+                .foregroundStyle(Color.hxTextPrimary)
+            FlowRow(spacing: 8) {
+                ForEach(card.fronts) { front in
+                    ChoiceButton(title: front.label, isSelected: chosen == front.id) {
+                        viewModel.setIntentionField("front", front.id, for: card)
+                    }
+                }
+            }
+            if let reason = card.frontReason, chosen == card.front {
+                Text(verbatim: "Suggested · \(reason)")
+                    .font(AppFont.caption())
+                    .foregroundStyle(Color.hxTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     /// "Outreach 10 → 5 · Accept", the coach's reason under it.

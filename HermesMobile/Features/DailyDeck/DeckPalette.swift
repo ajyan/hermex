@@ -40,6 +40,16 @@ struct DeckPalette: Equatable {
     /// The Sunday review's close of the week's question (its `view_take` card), on the divider's paper.
     static let weekQuestion = DeckPalette(.opener, symbol: "questionmark.bubble", name: "This week's question",
                                           shortName: "Question", isNeutralCard: true)
+    /// A season front's divider: the neutral opener paper with the front's own symbol.
+    static func front(_ slug: String?) -> DeckPalette {
+        let (symbol, name, short) = [
+            "ai": ("briefcase", "Landing the AI role", "AI role"), "fatherhood": ("heart", "Becoming a dad", "Dad"),
+            "living-well": ("figure.run", "Body", "Body"), "relationships": ("person.2", "People", "People"),
+        ][slug ?? ""] ?? ("tray", "Also", "Also")
+        return DeckPalette(.opener, symbol: symbol, name: name, shortName: short, isNeutralCard: true)
+    }
+    static let yesterdayOne = DeckPalette(.opener, symbol: "checkmark.circle", name: "Yesterday's one",
+                                          shortName: "Yesterday", isNeutralCard: true)
     static let quote = DeckPalette(.quote, symbol: "quote.opening", name: "Quote", shortName: "Quote")
     static let book = DeckPalette(.book, symbol: "book.closed", name: "Book highlight", shortName: "Book")
     static let wiki = DeckPalette(.wiki, symbol: "leaf", name: "From your wiki", shortName: "Wiki")
@@ -94,6 +104,8 @@ struct DeckPalette: Equatable {
         switch card.type {
         case .headline: return .opener
         case .section: return .section
+        case .front: return .front(card.front)
+        case .choice: return .yesterdayOne
         case .close: return .quote
         case .prompt where card.chapter != nil: return .week
         case .prompt: return card.isMandarin ? .mandarin : card.isLetter ? .letter : card.isDream ? .dream : .advisor

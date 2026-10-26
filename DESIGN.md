@@ -76,6 +76,7 @@ Named in `Config/HermexStyle.swift`; `HermexPaper.forTool(_:)` maps tool kinds.
 | The Daily Brief's Mandarin practice card (phrases to hear, a question to answer out loud, yesterday's feedback) | `DeckPalette.mandarin` | `mandarin` |
 | The Daily Brief's "Atlas asks" cards (open questions from last night's self-review, a short title over one question) | `DeckPalette.dream` | `plain` (Atlas's own system cards, like What changed, with a moon mark) |
 | The week's question: the morning's This week divider, and the Sunday review's close of it (his answers, Still open / Settled) on its own page | `DeckPalette.section`, `DeckPalette.weekQuestion` | `opener`, as a neutral summary card like the opener |
+| A season front's divider in the morning deck (Landing the AI role, Becoming a dad, Body, People, and Also), and Yesterday's one | `DeckPalette.front(_:)`, `DeckPalette.yesterdayOne` | `opener`, neutral like the This week divider; each front keeps its own symbol |
 | A week: weekly review cards (the cover's moment rows, each weekday and line with an `HXChip` naming its value; last week's intention; one value card per value, its fact, question, line and 1–10 score; the intention card's four fields and coach changes; the note to the future), week page, year tiles | `DeckPalette.week` | `dusk` |
 | Money: net worth, accounts, the market card | `.money` | `ledger` |
 | Meals: the Daily Brief's "Last night's dinner?" and Sunday "This week's dinners" cards | `.meal` (`DeckPalette.dinner`, `DeckPalette.meals`) | `kitchen` |
