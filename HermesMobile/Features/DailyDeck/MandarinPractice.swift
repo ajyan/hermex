@@ -44,8 +44,10 @@ struct APIClientMandarinAdapter: MandarinPracticeClient {
     }
 }
 
-/// What he has done on a day's Mandarin card: fixes stepped through, phrases recalled (Got it is
-/// true), and the answer the feedback is for. Kept per server and day, so the card resumes.
+/// What he has done on a day's Mandarin card: phrases recalled (Got it is true), chunks said and the
+/// first telling, the call and its review, his retries and reveals, and the typed answer the feedback
+/// is for. Kept per server and day, so the card resumes. (`fixesSeen` from the old Fix step still
+/// decodes, and is ignored.)
 struct MandarinPracticeRecord: Codable, Equatable {
     var fixesSeen = 0
     var recalled: [String: Bool] = [:]
@@ -57,6 +59,14 @@ struct MandarinPracticeRecord: Codable, Equatable {
     /// The Mandarin call: its session and the waits before each answer, kept when it ends.
     var callSessionID: String?
     var callWaitMS: [Int] = []
+    var saidChunks: [String] = []
+    var telling: String?
+    var review: MandarinCallReview?
+    /// Try again: what he said again for each moment, and the moments whose natural way is showing.
+    var retries: [Int: String] = [:]
+    var revealed: [Int] = []
+    /// "Type it instead": the call step shows the typed answer.
+    var isTyping = false
 
     init() {}
 
@@ -70,6 +80,12 @@ struct MandarinPracticeRecord: Codable, Equatable {
         callPhrases = (try? c.decodeIfPresent([MandarinCallItem].self, forKey: .callPhrases)) ?? []
         callSessionID = try? c.decodeIfPresent(String.self, forKey: .callSessionID)
         callWaitMS = (try? c.decodeIfPresent([Int].self, forKey: .callWaitMS)) ?? []
+        saidChunks = (try? c.decodeIfPresent([String].self, forKey: .saidChunks)) ?? []
+        telling = try? c.decodeIfPresent(String.self, forKey: .telling)
+        review = try? c.decodeIfPresent(MandarinCallReview.self, forKey: .review)
+        retries = (try? c.decodeIfPresent([Int: String].self, forKey: .retries)) ?? [:]
+        revealed = (try? c.decodeIfPresent([Int].self, forKey: .revealed)) ?? []
+        isTyping = (try? c.decodeIfPresent(Bool.self, forKey: .isTyping)) ?? false
     }
 }
 
@@ -101,13 +117,21 @@ struct MandarinPracticeStore {
     }
 }
 
-/// One day's Mandarin card in four steps: fix yesterday's slips, recall due phrases (Got it / Again),
-/// talk (answer the question, cues on hand), and the takeaways that come back seconds after answering.
-/// Recalls and answers count only once the server has them; a failure leaves the step where it was.
+/// Copy for the Mandarin call's states.
+enum MandarinCallCopy {
+    static let couldntStart = "Couldn't start the call."
+    static let noProfile = "The Mandarin profile isn't set up on this server."
+    static let reviewMissing = "Review didn't arrive"
+}
+
+/// One day's Mandarin card in four steps: recall due phrases (Got it / Again), prep (chunks said
+/// aloud and a first telling of the day's story), a voice call with Mom or Dad (or the typed answer
+/// instead), and after: the call's review. Recalls and answers count only once the server has them; a
+/// failure leaves the step where it was.
 @MainActor
 @Observable
 final class MandarinPractice {
-    enum Step: String, CaseIterable { case fix, recall, talk }
+    enum Step: String, CaseIterable { case recall, prep, call, after }
 
     enum Answering: Equatable {
         case idle
@@ -127,6 +151,10 @@ final class MandarinPractice {
     private(set) var callError: String?
     /// The latest progress the server reported: after an answer or a recall, else the deck's.
     private(set) var progress: DeckMandarinProgress?
+    /// The Mandarin call: starting it, why it couldn't start, and its review request.
+    private(set) var isStartingCall = false
+    private(set) var startCallError: String?
+    private(set) var reviewing: Answering = .idle
 
     @ObservationIgnored private let server: URL
     @ObservationIgnored private let client: (any MandarinPracticeClient)?
@@ -142,28 +170,27 @@ final class MandarinPractice {
         self.store = store
         let record = store.record(for: server, date: date) ?? MandarinPracticeRecord()
         self.record = record
-        progress = record.result?.progress ?? card.progress
-        step = .talk
-        step = firstOpenStep
+        progress = record.review?.progress ?? record.result?.progress ?? card.progress
+        step = .call
+        // A call kept without its review opens on After, which asks for it.
+        step = record.callSessionID != nil && record.review == nil ? .after : firstOpenStep
     }
 
-    /// The steps this card has: a fix only after an answer with feedback, a recall only with phrases due.
+    /// The steps this card has: recall only with phrases due, prep only with chunks (cards built
+    /// before the call have none), after only once a call has ended with a session.
     var steps: [Step] {
         Step.allCases.filter { step in
             switch step {
-            case .fix: card.yesterday != nil
             case .recall: !card.recall.isEmpty
-            case .talk: true
+            case .prep: !card.chunks.isEmpty
+            case .call: true
+            case .after: record.review != nil || record.callSessionID != nil
             }
         }
     }
 
-    var fixes: [DeckMandarinFeedback.Fix] { card.yesterday?.fixes ?? [] }
-
-    /// The fix on screen; nil once they've all been seen (or yesterday had none).
-    var currentFix: DeckMandarinFeedback.Fix? {
-        fixes.indices.contains(record.fixesSeen) ? fixes[record.fixesSeen] : nil
-    }
+    /// Who calls: "Dad" on his days, else "Mom" (a call has one voice, so the parents' day is Mom's).
+    var speakerName: String { card.speaker == "dad" ? "Dad" : "Mom" }
 
     /// The phrase to recall now: the first one not answered yet.
     var currentRecall: DeckPhrase? { card.recall.first { record.recalled[$0.hanzi] == nil } }
@@ -172,17 +199,121 @@ final class MandarinPractice {
 
     func isDone(_ step: Step) -> Bool {
         switch step {
-        case .fix: record.fixesSeen >= max(fixes.count, 1)
         case .recall: currentRecall == nil
-        case .talk: record.result != nil
+        case .prep: card.chunks.allSatisfy { record.saidChunks.contains($0.hanzi) } && record.telling != nil
+        case .call: record.callSessionID != nil || record.review != nil || record.result != nil
+        case .after: (record.review?.moments.indices ?? 0..<0).allSatisfy { record.revealed.contains($0) }
+                && record.review != nil
         }
     }
 
-    /// Moves past the fix on screen (or yesterday's natural version when there were no fixes).
-    func nextFix() {
-        record.fixesSeen += 1
+    // MARK: Prep
+
+    func markSaid(_ hanzi: String) {
+        guard !record.saidChunks.contains(hanzi) else { return }
+        record.saidChunks.append(hanzi)
         save()
-        if isDone(.fix) { step = firstOpenStep }
+        if isDone(.prep) { step = firstOpenStep }
+    }
+
+    /// The first telling of the day's story: counted here at once, then saved on the server for the
+    /// call's comparison. A failed save is let go; the review then has no telling to compare.
+    func tell(_ text: String) async {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        record.telling = text
+        save()
+        if isDone(.prep) { step = firstOpenStep }
+        try? await client?.telling(MandarinTellingRequest(date: date, text: text))
+    }
+
+    // MARK: The call
+
+    /// Opens the call on the `mandarin` profile: the opener enters the profile, then this asks the
+    /// server for the brief. A server that refuses gets nil back, so the opener switches back.
+    func startCall(open: OpenMockCallAction) async {
+        guard let client, !isStartingCall else { return }
+        isStartingCall = true
+        startCallError = nil
+        defer { isStartingCall = false }
+        let date = date
+        let title = card.title ?? ""
+        do {
+            try await open(profile: MandarinCall.profile) { [weak self] in
+                do {
+                    let start = try await client.callStart(MandarinCallStartRequest(date: date))
+                    return PrepMockStart(mockID: MandarinCall.id(date: date), level: "", brief: start.brief,
+                                         profile: start.profile, title: title)
+                } catch {
+                    self?.startCallError = Self.isMissingProfile(error) ? MandarinCallCopy.noProfile : MandarinCallCopy.couldntStart
+                    return nil
+                }
+            }
+        } catch {
+            startCallError = Self.isMissingProfile(error) ? MandarinCallCopy.noProfile : MandarinCallCopy.couldntStart
+        }
+    }
+
+    private static func isMissingProfile(_ error: Error) -> Bool {
+        if (error as? PrepMockProfileError)?.isMissing == true { return true }
+        if case .http(409, _)? = error as? APIError { return true }
+        return false
+    }
+
+    /// "Type it instead": the call step shows the typed answer, as before the call existed.
+    func typeInstead() {
+        record.isTyping = true
+        save()
+    }
+
+    // MARK: After
+
+    /// Asks for the review of a call that ended with a session, once it is kept. A review with
+    /// nothing in it isn't kept, so Retry asks again; a call where he never spoke goes back to the call.
+    func reviewIfNeeded() async {
+        if record.callSessionID == nil, let saved = store.record(for: server, date: date), let session = saved.callSessionID {
+            record.callSessionID = session
+            record.callWaitMS = saved.callWaitMS
+        }
+        guard let client, let sessionID = record.callSessionID, record.review == nil, reviewing != .waiting else { return }
+        reviewing = .waiting
+        step = .after
+        do {
+            let review = try await client.callReview(
+                MandarinCallReviewRequest(date: date, sessionID: sessionID, waitMS: record.callWaitMS))
+            if review.fluency?.turns == 0 {
+                record.callSessionID = nil
+                record.callWaitMS = []
+                save()
+                reviewing = .idle
+                step = firstOpenStep
+                return
+            }
+            guard !review.moments.isEmpty || !review.naturalTurns.isEmpty else {
+                reviewing = .failed(MandarinCallCopy.reviewMissing)
+                return
+            }
+            record.review = review
+            progress = review.progress ?? progress
+            save()
+            reviewing = .idle
+        } catch {
+            reviewing = .failed(MandarinCallCopy.reviewMissing)
+        }
+    }
+
+    /// What he said again for a Try again moment.
+    func retry(_ index: Int, text: String) {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        record.retries[index] = text
+        save()
+    }
+
+    func reveal(_ index: Int) {
+        guard !record.revealed.contains(index) else { return }
+        record.revealed.append(index)
+        save()
     }
 
     func recall(_ phrase: DeckPhrase, got: Bool) async {
@@ -274,7 +405,7 @@ final class MandarinPractice {
         await submit(text, question: lastAttempt?.question)
     }
 
-    private var firstOpenStep: Step { steps.first { !isDone($0) } ?? .talk }
+    private var firstOpenStep: Step { steps.first { !isDone($0) } ?? steps.last ?? .call }
 
     private func save() { store.setRecord(record, for: server, date: date) }
 }

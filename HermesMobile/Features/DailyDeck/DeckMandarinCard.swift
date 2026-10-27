@@ -24,9 +24,10 @@ struct DeckMandarinCard<Answer: View>: View {
         VStack(alignment: .leading, spacing: 16) {
             stepBar.padding(.trailing, 30)
             switch practice.step {
-            case .fix: fixStep
             case .recall: recallStep
-            case .talk: talkStep
+            case .prep: EmptyView()
+            case .call: talkStep
+            case .after: EmptyView()
             }
         }
         .onDisappear { speaker.stop() }
@@ -61,64 +62,11 @@ struct DeckMandarinCard<Answer: View>: View {
 
     private func title(_ step: MandarinPractice.Step) -> String {
         switch step {
-        case .fix: "Fix"
         case .recall: "Recall \(card.recall.count)"
-        case .talk: "Talk"
+        case .prep: "Prep"
+        case .call: "Call"
+        case .after: "After"
         }
-    }
-
-    // MARK: Fix
-
-    @ViewBuilder
-    private var fixStep: some View {
-        let yesterday = card.yesterday
-        if let fix = practice.currentFix {
-            let key = "fix:\(fix.said)"
-            heading("Say it the natural way",
-                    detail: practice.fixes.count > 1 ? "\((practice.fixes.firstIndex(of: fix) ?? 0) + 1) of \(practice.fixes.count)" : nil)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(slip(in: yesterday?.said ?? fix.said, fix.said))
-                    .font(AppFont.body())
-                    .fixedSize(horizontal: false, vertical: true)
-                if let en = fix.en {
-                    Text(verbatim: "You meant: \(en)")
-                        .font(AppFont.footnote())
-                        .foregroundStyle(Color.hxTextSecondary)
-                }
-            }
-            if revealed.contains(key) {
-                takeaway("Fix", fix.natural, pinyin: fix.naturalPinyin, note: fix.why)
-                actions(primary: ("Next", "arrow.right", { change { practice.nextFix() } }))
-            } else {
-                actions(primary: ("Show me", "eye", { change { _ = revealed.insert(key) } }))
-            }
-        } else if practice.fixes.isEmpty, let yesterday {
-            heading("Yesterday, said naturally", detail: nil)
-            if let said = yesterday.said {
-                Text(verbatim: said).font(AppFont.body()).foregroundStyle(Color.hxTextSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            takeaway("Natural", yesterday.natural, pinyin: yesterday.naturalPinyin, note: nil)
-            if !practice.isDone(.fix) {
-                actions(primary: ("Next", "arrow.right", { change { practice.nextFix() } }))
-            }
-        } else {
-            heading("Yesterday's fixes", detail: nil)
-            ForEach(practice.fixes, id: \.self) { fix in
-                takeaway("Fix", fix.natural, pinyin: fix.naturalPinyin, note: [fix.said + " → " + fix.natural, fix.why]
-                    .compactMap { $0 }.joined(separator: "\n"))
-            }
-        }
-    }
-
-    /// His sentence with the slip underlined in the card's ink.
-    private func slip(in said: String, _ slip: String) -> AttributedString {
-        var text = AttributedString(said)
-        if let range = text.range(of: slip) {
-            text[range].underlineStyle = .single
-            text[range].foregroundColor = palette.ink
-        }
-        return text
     }
 
     // MARK: Recall
