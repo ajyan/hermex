@@ -62,8 +62,8 @@ struct DeckCheck: Decodable, Equatable {
 struct DeckCard: Decodable, Equatable, Identifiable {
     enum CardType: Equatable {
         case headline, prompt, decision, reflect, item, sleep, goal, changes, ask, dinner, meals, section, close
-        /// A season front's divider (`front`), and a one-tap question with options (`choice`: "Yesterday's one").
-        case front, choice
+        /// A season front's divider: where it stands, its week as dots, and its one thing today.
+        case front
         /// The weekly review's cards (`WeeklyReviewModels.swift`): the cover of moments, last week's
         /// intention, one card per value, next week's intention, and the note to the future.
         case cover, lastIntention, value, intention, keepsakes
@@ -85,7 +85,6 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case "section": self = .section
             case "close": self = .close
             case "front": self = .front
-            case "choice": self = .choice
             case "cover": self = .cover
             case "keepsakes": self = .keepsakes
             case "last_intention": self = .lastIntention
@@ -180,9 +179,16 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     /// A dinner card's night ("2026-10-26"), the dinner it asks about.
     let date: String?
     /// A dinner card's choices: the week's dinners not yet logged, then "other" and "out". The pick
-    /// files as the answer's `action`, 👍/👎 as `rating` 2/1, and a cooking note as `text`. A `choice`
-    /// card's answers, and the close card's three actions for today's one thing, file the same way.
+    /// files as the answer's `action`, 👍/👎 as `rating` 2/1, and a cooking note as `text`. The close
+    /// card's three actions for today's one thing, and the headline's Done / Partly / Not today for
+    /// yesterday's, file the same way.
     let options: [DeckSleepTag]
+    /// A front divider's (and the week divider's) week: a row of day dots per daily commitment, pips for a count.
+    let weekRows: [DeckFrontRow]
+    /// A front divider's one thing to do today (wire `today`): "Outreach: Anthropic, from Today's Ask".
+    let todayAction: String?
+    /// The headline's pick from yesterday's close card (wire `yesterday_one`), asked whether it happened.
+    let yesterdayOne: DeckYesterdayOne?
     /// The season front a card belongs to ("ai", "fatherhood", "living-well", "relationships", or "tail"
     /// for "Also"); on a `front` divider, the front it opens.
     let front: String?
@@ -232,7 +238,13 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         }
     }
 
-    /// What VoiceOver reads for a `section` divider: "This week, Being a father, <the question>", then the intention line when it has one.
+    /// The front a `section` divider opens, by name ("Landing the AI role"), from its kicker "This week · <front>".
+    var frontName: String? {
+        guard type == .section, let kicker = lines.first, let dot = kicker.range(of: " · ") else { return nil }
+        return String(kicker[dot.upperBound...])
+    }
+
+        /// What VoiceOver reads for a `section` divider: "This week, Being a father, <the question>", then the intention line when it has one.
     /// `lines[0]` is "This week · <area>"; the question is the title.
     var sectionSpokenLabel: String { sectionSpokenLabel(question: title) }
 
@@ -282,14 +294,13 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     /// Whether answering this card means typing (prompt and reflect cards, and a sleep or goal card's note).
     var takesText: Bool {
         (type == .prompt && selfRatings == nil) || type == .reflect || type == .sleep || type == .goal || type == .dinner
-            || type == .choice
     }
 
     /// Whether "Not for Me" applies: material the brief chose, not the deck's own pages.
     var takesFeedback: Bool {
         switch type {
         case .prompt, .reflect, .item, .unknown: true
-        case .headline, .decision, .sleep, .goal, .changes, .ask, .dinner, .meals, .section, .close, .front, .choice: false
+        case .headline, .decision, .sleep, .goal, .changes, .ask, .dinner, .meals, .section, .close, .front: false
         case .cover, .lastIntention, .value, .intention, .keepsakes: false
         }
     }
@@ -299,7 +310,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
         case phrases, recall, yesterday, pattern, progress, questionPinyin, questionEn, rows, week
         case chapter, weekNumber, range, noteFromPast
-        case piece, learned, variant, date, options, meals, front, fronts, frontReason
+        case piece, learned, variant, date, options, meals, front, fronts, frontReason, weekRows, yesterdayOne
+        case todayAction = "today"
         case moments, spares, ended, text, ifThen, name, fact, changes, intention
         case valueID = "value"
         case itemKind = "kind"
@@ -389,6 +401,9 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         front = (try? c.decodeIfPresent(String.self, forKey: .front)).flatMap { $0.isEmpty ? nil : $0 }
         fronts = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .fronts)) ?? []).compactMap(\.value)
         frontReason = (try? c.decodeIfPresent(String.self, forKey: .frontReason)).flatMap { $0.isEmpty ? nil : $0 }
+        weekRows = ((try? c.decodeIfPresent([Lossy<DeckFrontRow>].self, forKey: .weekRows)) ?? []).compactMap(\.value)
+        todayAction = (try? c.decodeIfPresent(String.self, forKey: .todayAction)).flatMap { $0.isEmpty ? nil : $0 }
+        yesterdayOne = try? c.decodeIfPresent(DeckYesterdayOne.self, forKey: .yesterdayOne)
         let ref = try? c.decodeIfPresent(Ref.self, forKey: .ref)
         link = ref?.link.flatMap { $0.isEmpty ? nil : $0 }
         pool = ref?.pool.flatMap { $0.isEmpty ? nil : $0 }
@@ -445,6 +460,8 @@ struct DeckSleepCoach: Decodable, Equatable {
 struct DeckSleepTag: Decodable, Equatable, Identifiable {
     let id: String
     let label: String
+    /// On the close card's actions, the front the action serves ("ai", "fatherhood", …).
+    var front: String? = nil
 }
 
 /// The Sunday meals card's plan (the vault's `tools/meals.py`): one slot per night, each a ranked
@@ -913,6 +930,13 @@ enum DeckPage: Identifiable, Equatable {
     }
 }
 
+/// One group of the opener's list: the cards before any divider (Today), or a front's, under its divider.
+struct DeckAct {
+    let name: String
+    let divider: DeckCard?
+    var pages: [DeckPage]
+}
+
 /// The answers file the agent saves verbatim and files with `brain brief file`.
 /// A self-rating card's scores as its answer text, "Consistency: 8, intensity: 6, …": the same
 /// line the vault files under the question, and read back from text typed before the picker.
@@ -1163,7 +1187,7 @@ struct DeckCardText: Equatable {
             // for older builds. A theme's summary is its `context`.
             let drawn = !card.entries.isEmpty || !card.points.isEmpty || !card.meters.isEmpty || card.piece != nil
             detail = card.context ?? (drawn ? nil : (card.body ?? (card.title == nil ? nil : card.fallback)))
-        case .sleep, .dinner, .choice:
+        case .sleep, .dinner:
             // The question leads; the numbers show after the rating so they don't decide it.
             lead = card.question
             leadIsQuestion = true
