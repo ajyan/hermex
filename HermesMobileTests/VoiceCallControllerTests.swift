@@ -300,7 +300,7 @@ final class VoiceCallControllerTests: XCTestCase {
     func testLanguageCarriesLocaleVoiceAndLines() {
         XCTAssertEqual(VoiceCallLanguage.mandarin.locale.identifier, "zh-CN")
         XCTAssertEqual(VoiceCallLanguage.english.locale.identifier, "en-US")
-        XCTAssertEqual(VoiceCallLanguage.mandarin.serverVoice, "zf_xiaobei")
+        XCTAssertEqual(VoiceCallLanguage.mandarin.serverVoice, "zm_yunxi")
         XCTAssertNil(VoiceCallLanguage.english.serverVoice)
         XCTAssertEqual(VoiceCallLanguage.mandarin.appleVoiceLanguage, "zh-CN")
         XCTAssertFalse(VoiceCallLanguage.mandarin.speaksStatusLines)

@@ -65,7 +65,7 @@ enum VoiceCallLanguage: Equatable, Sendable {
     var serverVoice: String? {
         switch self {
         case .english: nil
-        case .mandarin: "zf_xiaobei"
+        case .mandarin: "zm_yunxi"
         }
     }
 
