@@ -103,7 +103,7 @@ struct DeckCardView: View {
                 case .value: WeekValueCard(card: card, palette: palette, viewModel: viewModel)
                 case .intention: WeekIntentionCard(card: card, palette: palette, viewModel: viewModel)
                 case .keepsakes: WeekKeepsakesCard(card: card, palette: palette, viewModel: viewModel)
-                default: reading
+                default: if isJobCard { jobReading } else { reading }
                 }
                 // Reaching the end of the card counts toward the style learner's usage (`DeckSignals`). A short card's
                 // end is in view while it is still the next card under the stack, so it's checked again on arrival.
@@ -127,11 +127,14 @@ struct DeckCardView: View {
         .moreBelowHint(fill: palette.paper, mark: palette.ink)
         .swipeUpForFeedback(mark: palette.ink, action: feedback)
         .overlay(alignment: .topTrailing) {
-            Image(systemName: palette.symbol)
-                .font(.system(.body, weight: .medium))
-                .foregroundStyle(palette.ink.opacity(0.35))
-                .padding(18)
-                .accessibilityHidden(true)
+            // A card that names its kind in its first line doesn't wear the corner mark too.
+            if !showsKindLabel {
+                Image(systemName: palette.symbol)
+                    .font(.system(.body, weight: .medium))
+                    .foregroundStyle(palette.ink.opacity(0.35))
+                    .padding(18)
+                    .accessibilityHidden(true)
+            }
         }
         .foregroundStyle(palette.ink)
         .tint(palette.ink)
@@ -196,19 +199,7 @@ struct DeckCardView: View {
                 .foregroundStyle(palette.ink)
                 .padding(.top, 12)
         }
-        // Secondary buttons in the card's paper, so "Write a reflection" stays the one filled button: a Piece
-        // card's map first, then a diagram of its topic when there is one.
-        ForEach(Array(viewModel.diagrams(for: card).enumerated()), id: \.element.id) { index, diagram in
-            Button {
-                viewModel.opened(diagram.isMap ? "map" : "diagram", on: card.id)
-                openDiagram = diagram
-            } label: { OpenDiagramLabel(paper: palette.colors, isMap: diagram.isMap) }
-            .buttonStyle(.plain)
-            .padding(.top, index == 0 ? 18 : 10)
-            .accessibilityLabel(Text(verbatim: diagram.isMap ? "Open the map" : "Open the diagram: \(diagram.title ?? "interactive")"))
-            .accessibilityHint(Text(verbatim: diagram.isMap ? "Opens the piece's parts and argument, step by step"
-                                    : "Opens an interactive diagram"))
-        }
+        diagramButtons
         if !card.isMandarin, let detail = text.detail {
             Text(inlineMarkdown(detail))
                 .font(AppFont.body())
@@ -245,6 +236,151 @@ struct DeckCardView: View {
                 .padding(.top, 16)
         }
         DeckFootnote(card: card, palette: palette)
+    }
+
+    /// Secondary buttons in the card's paper, so "Write a reflection" stays the one filled button: a Piece
+    /// card's map first, then a diagram of its topic when there is one.
+    private var diagramButtons: some View {
+        ForEach(Array(viewModel.diagrams(for: card).enumerated()), id: \.element.id) { index, diagram in
+            Button {
+                viewModel.opened(diagram.isMap ? "map" : "diagram", on: card.id)
+                openDiagram = diagram
+            } label: { OpenDiagramLabel(paper: palette.colors, isMap: diagram.isMap) }
+            .buttonStyle(.plain)
+            .padding(.top, index == 0 ? 18 : 10)
+            .accessibilityLabel(Text(verbatim: diagram.isMap ? "Open the map" : "Open the diagram: \(diagram.title ?? "interactive")"))
+            .accessibilityHint(Text(verbatim: diagram.isMap ? "Opens the piece's parts and argument, step by step"
+                                    : "Opens an interactive diagram"))
+        }
+    }
+
+    // MARK: Deck by job
+
+    /// A deck by job's card drawn by the card anatomy (`jobReading`): every act card but the Mandarin card,
+    /// whose own view stays. Sleep, goals, meals, the Ask and follow-ups keep their views by type.
+    private var isJobCard: Bool { card.act != nil && !card.isMandarin }
+
+    /// Whether the card names its kind in its first line rather than in the corner.
+    private var showsKindLabel: Bool {
+        switch card.type {
+        case .close: DeckAct.isByJob(viewModel.visiblePages) && !card.weekRows.isEmpty
+        case .prompt, .reflect, .item, .unknown: isJobCard
+        default: false
+        }
+    }
+
+    /// An act card, top to bottom: its kind label, its title, its body, and the one ask. No reason
+    /// footnote and no `lines` subtitles; a letter's countdown sits in its kind label.
+    @ViewBuilder
+    private var jobReading: some View {
+        let idea = DeckAct.ideaPosition(of: card, in: viewModel.visiblePages)
+        DeckKindLabel(symbol: palette.symbol, text: card.kindLabel(palette, idea: idea, advisor: viewModel.deck?.advisor),
+                      ink: palette.ink)
+        if idea != nil, let week = card.weekQuestion {
+            Text(verbatim: "This week: \(week)")
+                .font(AppFont.footnote())
+                .foregroundStyle(palette.ink.opacity(0.75))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 4)
+        }
+        let text = DeckCardText(card)
+        let isYearAgo = card.itemKind == "on_this_day"
+        let title = card.asksInTitle ? (viewModel.question(for: card) ?? text.lead)
+            : card.act == "ideas" || isYearAgo ? (card.title ?? text.lead) : text.lead
+        if let title {
+            Text(inlineMarkdown(title))
+                .font(isYearAgo ? AppFont.serif(style: .title2) : AppFont.display(style: .title2, weight: .bold))
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 14)
+                .textSelection(.enabled)
+                .id(title)
+                .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+                .accessibilityAddTraits(.isHeader)
+        }
+        jobBody(text, isYearAgo: isYearAgo)
+        diagramButtons
+        if let piece = card.piece {
+            PieceArgument(piece: piece, palette: palette).padding(.top, 22)
+        }
+        let question = card.asksInTitle ? nil : viewModel.question(for: card).flatMap { $0 == title ? nil : $0 }
+        if question != nil || card.selfRatings != nil || card.takesText {
+            jobAsk(question)
+        }
+    }
+
+    /// An act card's one ask under a hairline: its question (when the title isn't it), then the answer.
+    private func jobAsk(_ question: String?) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if let question {
+                Text(verbatim: question)
+                    .font(AppFont.display(style: .headline, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .id(question)
+                    .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+            }
+            if let traits = card.selfRatings {
+                selfRatings(traits)
+            } else if card.takesText {
+                reflection(DeckCopy.invitation(for: card))
+            }
+        }
+        .padding(.top, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .top) { Rectangle().fill(palette.ink.opacity(0.15)).frame(height: 0.5) }
+        .padding(.top, 24)
+    }
+
+    /// An act card's body: an idea's source, gist, quotes and parts; a check-in's or letter's thread
+    /// (else the check-in's message); a year-ago entry's later words; anything else its attribution and detail.
+    @ViewBuilder
+    private func jobBody(_ text: DeckCardText, isYearAgo: Bool) -> some View {
+        if card.act == "ideas" {
+            DeckIdeaBody(card: card, palette: palette)
+        } else if let thread = card.thread {
+            DeckThreadView(thread: thread, palette: palette).padding(.top, 18)
+        } else if card.type == .prompt {
+            if let context = card.context, context != viewModel.question(for: card) {
+                Text(inlineMarkdown(context))
+                    .font(AppFont.body())
+                    .lineSpacing(3)
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 18)
+                    .textSelection(.enabled)
+            }
+        } else if isYearAgo {
+            if let later = card.body, later != card.title {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(verbatim: "Later that day")
+                        .font(AppFont.footnote(weight: .semibold))
+                        .foregroundStyle(palette.ink.opacity(0.75))
+                    Text(inlineMarkdown(later))
+                        .font(AppFont.serif(style: .body))
+                        .lineSpacing(3)
+                        .foregroundStyle(Color.hxTextPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                }
+                .padding(.top, 18)
+            }
+        } else {
+            if let attribution = text.attribution {
+                Text(verbatim: attribution)
+                    .font(AppFont.subheadline())
+                    .foregroundStyle(palette.ink.opacity(0.75))
+                    .padding(.top, 6)
+            }
+            if let detail = text.detail {
+                Text(inlineMarkdown(detail))
+                    .font(AppFont.body())
+                    .lineSpacing(3)
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 18)
+                    .textSelection(.enabled)
+            }
+        }
     }
 
     /// The Mandarin card's answer goes for feedback as soon as its sheet closes; an unchanged answer
@@ -435,6 +571,50 @@ struct DeckCardView: View {
 
     @ViewBuilder
     private var opener: some View {
+        let pages = viewModel.visiblePages
+        if DeckAct.isByJob(pages) { jobOpener(pages) } else { frontOpener }
+    }
+
+    /// A deck by job's opener: the day's tag lines, the date, yesterday's one, today's one, then each
+    /// act's cards ("Ideas · 2 cards"). No recap and no front rows; the close shows where you stand.
+    @ViewBuilder
+    private func jobOpener(_ pages: [DeckPage]) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            if card.headlineTags.isEmpty {
+                ForEach(card.lines, id: \.self) { line in
+                    Text(verbatim: line).font(AppFont.footnote())
+                }
+            } else {
+                DeckTagLines(tags: card.headlineTags)
+            }
+            ForEach(card.learned) { rule in
+                learnedRow(rule)
+            }
+        }
+        .foregroundStyle(palette.ink)
+        .padding(.trailing, 24)
+        Text(verbatim: card.title ?? "Today")
+            .font(AppFont.display(style: .largeTitle, weight: .semibold))
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 14)
+            .accessibilityAddTraits(.isHeader)
+        if let one = card.yesterdayOne {
+            DeckYesterdayLine(card: card, one: one, palette: palette, viewModel: viewModel).padding(.top, 18)
+        }
+        if let one = card.todayOne {
+            DeckTodayOnePanel(one: one, palette: palette).padding(.top, 18)
+        }
+        ForEach(Array(Self.acts(pages).enumerated()), id: \.offset) { index, group in
+            act(group.name, group.pages).padding(.top, index == 0 ? 22 : 16)
+        }
+        Text(verbatim: "Swipe to begin")
+            .font(AppFont.footnote())
+            .foregroundStyle(palette.ink)
+            .padding(.top, 16)
+    }
+
+    @ViewBuilder
+    private var frontOpener: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(card.lines, id: \.self) { line in
                 Text(verbatim: line).font(AppFont.footnote())
@@ -519,7 +699,9 @@ struct DeckCardView: View {
     /// are Today, the week's `section` opens its front's group (its kicker, "This week · Body"),
     /// and each `front` divider opens one under its title ("Becoming a dad", "Also"). The opener,
     /// the dividers and the close card are not listed, and a group with no cards is left out.
+    /// A deck by job groups by act instead (`DeckAct.byJob`).
     static func acts(_ pages: [DeckPage]) -> [DeckAct] {
+        if DeckAct.isByJob(pages) { return DeckAct.byJob(pages) }
         var groups = [DeckAct(name: "Today", divider: nil, pages: [])]
         for page in pages {
             if case .card(let card) = page {
@@ -661,6 +843,38 @@ struct DeckCardView: View {
 
     @ViewBuilder
     private var close: some View {
+        if showsKindLabel { jobClose } else { plainClose }
+    }
+
+    /// A deck by job's close: where you stand this week as one grid, today's one thing, then filing.
+    @ViewBuilder
+    private var jobClose: some View {
+        let day = DailyDeckPaths.date(day: viewModel.date)?.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+        DeckKindLabel(symbol: palette.symbol, text: day.map { "Close · \($0)" } ?? "Close", ink: palette.ink)
+        Text(verbatim: "Where you stand this week")
+            .font(AppFont.display(style: .title2, weight: .bold))
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 14)
+            .accessibilityAddTraits(.isHeader)
+        DeckWeekGrid(rows: card.weekRows, palette: palette, deckDate: viewModel.date).padding(.top, 18)
+        Text(verbatim: "Tap a ringed + to log yesterday or add one.")
+            .font(AppFont.footnote())
+            .foregroundStyle(palette.ink.opacity(0.75))
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 12)
+        if !card.options.isEmpty {
+            DeckTodaysOne(card: card, palette: palette, viewModel: viewModel).padding(.top, 24)
+        }
+        if let variantCard = viewModel.variantCard {
+            DeckVariantPick(card: variantCard, viewModel: viewModel, palette: palette)
+                .padding(.top, 24)
+        }
+        closeStatus(seal: false)
+        fileButton(seal: false)
+    }
+
+    @ViewBuilder
+    private var plainClose: some View {
         let count = viewModel.answeredCount
         let filed = viewModel.isFiled && !viewModel.hasChanges
         let seal = viewModel.isSealedWeekly
@@ -672,6 +886,22 @@ struct DeckCardView: View {
                 .foregroundStyle(palette.ink)
                 .padding(.top, 4)
         }
+        closeStatus(seal: seal)
+        if !card.options.isEmpty, !seal {
+            DeckTodaysOne(card: card, palette: palette, viewModel: viewModel).padding(.top, 24)
+        }
+        if let variantCard = viewModel.variantCard, !seal {
+            DeckVariantPick(card: variantCard, viewModel: viewModel, palette: palette)
+                .padding(.top, 24)
+        }
+        fileButton(seal: seal)
+    }
+
+    /// What filing does (or did), and anything that failed.
+    @ViewBuilder
+    private func closeStatus(seal: Bool) -> some View {
+        let count = viewModel.answeredCount
+        let filed = viewModel.isFiled && !viewModel.hasChanges
         Text(verbatim: filed
              ? viewModel.filedNote?.summary ?? (seal ? "Sealed in your journal. Edit any card and seal again to update it."
                                                 : "In your journal. Edit any card and file again to update it.")
@@ -701,13 +931,12 @@ struct DeckCardView: View {
         if case .failed(let message) = viewModel.filing {
             Text(verbatim: message).font(AppFont.footnote()).foregroundStyle(Color.hxDanger).padding(.top, 12)
         }
-        if !card.options.isEmpty, !seal {
-            DeckTodaysOne(card: card, palette: palette, viewModel: viewModel).padding(.top, 24)
-        }
-        if let variantCard = viewModel.variantCard, !seal {
-            DeckVariantPick(card: variantCard, viewModel: viewModel, palette: palette)
-                .padding(.top, 24)
-        }
+    }
+
+    /// File It (Seal the week on a weekly review), then Rate earlier cards on today's morning deck.
+    @ViewBuilder
+    private func fileButton(seal: Bool) -> some View {
+        let filed = viewModel.isFiled && !viewModel.hasChanges
         Button(action: file) {
             HStack {
                 if viewModel.filing == .filing { ProgressView().tint(seal ? Color.hxOnAccent : palette.onInk) }
@@ -1301,7 +1530,7 @@ private struct AnswerBox: View {
 }
 
 /// Saved notes carry *emphasis* and **bold**; show it rather than the asterisks.
-private func inlineMarkdown(_ text: String) -> AttributedString {
+func inlineMarkdown(_ text: String) -> AttributedString {
     (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
         ?? AttributedString(text)
 }
@@ -1382,13 +1611,17 @@ struct DeckAheadRow: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// The card's own title, else its question, else what kind of card it is.
+    /// The card's own title (a year-ago card's day), else its question, else what kind of card it is.
     static func title(_ page: DeckPage) -> String {
         switch page {
         case .followUps(let cards):
             return cards.count == 1 ? "1 follow-up" : "\(cards.count) follow-ups"
         case .card(let card):
-            return [card.title, card.question].compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            // A year-ago card's title is his own opening words; its row names the day instead.
+            if let day = card.dateLabel { return day }
+            // A letter's title is only "To her"; its row names today's prompt.
+            let first = card.isLetter && card.act != nil ? [card.question, card.title] : [card.title, card.question]
+            return first.compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .first { !$0.isEmpty } ?? DeckPalette.of(card).name
         }
     }
