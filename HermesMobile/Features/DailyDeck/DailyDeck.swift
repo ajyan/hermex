@@ -214,6 +214,26 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     /// nil on every card that isn't one of the week's sources.
     let weekVariant: Int?
 
+    // Deck by job (vault 2026-10-27): every card but the headline and close names its act. A deck with
+    // no `act` anywhere is an older deck and renders as before.
+
+    /// The job this card belongs to: `today`, `ideas`, `writing`, `body`, or `people` (`DeckAct.order`).
+    let act: String?
+    /// The headline's tag lines, each with its kind of mark (wire `tags`, `{icon, text}`); a sleep card's
+    /// `tags` decode into `tags` instead.
+    let headlineTags: [DeckTag]
+    /// The headline's pick for today, with yesterday's own words behind it when there are some.
+    let todayOne: DeckTodayOne?
+    /// An idea card's one-sentence gist, its verbatim quotes, its labelled parts, and the week's question it serves.
+    let gist: String?
+    let quotes: [DeckPiece.Quote]
+    let parts: [DeckPart]
+    let weekQuestion: String?
+    /// A check-in's or letter's thread: yesterday's words it picks up from.
+    let thread: DeckThread?
+    /// A year-ago card's day, "Tue, Oct 28, 2025".
+    let dateLabel: String?
+
     /// The Brain page the card's source opens, by the vault folder its link lives in.
     var sourceRoute: BrainRoute? { link.flatMap(Self.brainRoute(forLink:)) }
 
@@ -319,6 +339,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         case piece, learned, variant, date, options, meals, front, fronts, frontReason, weekRows, yesterdayOne
         case todayAction = "today"
         case moments, spares, ended, text, ifThen, name, fact, changes, intention
+        case act, todayOne, gist, quotes, parts, weekQuestion, thread, dateLabel
         case valueID = "value"
         case itemKind = "kind"
     }
@@ -413,10 +434,64 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         weekRows = ((try? c.decodeIfPresent([Lossy<DeckFrontRow>].self, forKey: .weekRows)) ?? []).compactMap(\.value)
         todayAction = (try? c.decodeIfPresent(String.self, forKey: .todayAction)).flatMap { $0.isEmpty ? nil : $0 }
         yesterdayOne = try? c.decodeIfPresent(DeckYesterdayOne.self, forKey: .yesterdayOne)
+        act = (try? c.decodeIfPresent(String.self, forKey: .act)).flatMap { $0.isEmpty ? nil : $0 }
+        headlineTags = ((try? c.decodeIfPresent([Lossy<DeckTag>].self, forKey: .tags)) ?? []).compactMap(\.value)
+        todayOne = try? c.decodeIfPresent(DeckTodayOne.self, forKey: .todayOne)
+        gist = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .gist))
+        quotes = ((try? c.decodeIfPresent([Lossy<DeckPiece.Quote>].self, forKey: .quotes)) ?? []).compactMap(\.value)
+            .filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        parts = ((try? c.decodeIfPresent([Lossy<DeckPart>].self, forKey: .parts)) ?? []).compactMap(\.value)
+        weekQuestion = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .weekQuestion))
+        thread = (try? c.decodeIfPresent(DeckThread.self, forKey: .thread)).flatMap { $0.quote.isEmpty ? nil : $0 }
+        dateLabel = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .dateLabel))
         let ref = try? c.decodeIfPresent(Ref.self, forKey: .ref)
         link = ref?.link.flatMap { $0.isEmpty ? nil : $0 }
         pool = ref?.pool.flatMap { $0.isEmpty ? nil : $0 }
     }
+
+    private static func nonEmpty(_ text: String?) -> String? {
+        guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return text
+    }
+}
+
+/// One of the headline's tag lines: what it is about (`advisor`, `race`, `due`, `birthday`, `fixes`) and its words.
+struct DeckTag: Decodable, Equatable, Hashable {
+    let icon: String?
+    let text: String
+
+    /// The tag's mark; an icon the app doesn't know yet gets a plain dot.
+    var symbol: String {
+        switch icon {
+        case "advisor": "bubble.left"
+        case "race": "flag"
+        case "due": "figure.and.child.holdinghands"
+        case "birthday": "gift"
+        case "fixes": "wrench.and.screwdriver"
+        case "calendar": "calendar"
+        default: "smallcircle.filled.circle"
+        }
+    }
+}
+
+/// The headline's one thing for today, its front, and yesterday's words that led to it.
+struct DeckTodayOne: Decodable, Equatable {
+    let label: String
+    let front: String?
+    let quote: String?
+}
+
+/// One labelled part of an idea ("The loop", "text in, text out; your code runs the tools.").
+struct DeckPart: Decodable, Equatable, Hashable {
+    let label: String
+    let text: String
+}
+
+/// Yesterday's words a check-in or letter picks up from: a small label, the quote, and who said it where.
+struct DeckThread: Decodable, Equatable {
+    let label: String?
+    let quote: String
+    let at: String?
 }
 
 /// Last night from the user's watch, already written by the brief: `headline` is hours against need
@@ -986,11 +1061,48 @@ enum DeckPage: Identifiable, Equatable {
     }
 }
 
-/// One group of the opener's list: the cards before any divider (Today), or a front's, under its divider.
+/// One group of the opener's list: the cards before any divider (Today), or a front's, under its divider;
+/// in a deck by job, one job's cards.
 struct DeckAct {
     let name: String
     let divider: DeckCard?
     var pages: [DeckPage]
+
+    /// A deck by job's acts, in the order they ship, with their names on the opener.
+    static let order: [(id: String, name: String)] = [
+        ("today", "Today"), ("ideas", "Ideas"), ("writing", "Writing"), ("body", "Body"), ("people", "People"),
+    ]
+
+    /// Whether these pages come from a deck by job: any card names its act.
+    static func isByJob(_ pages: [DeckPage]) -> Bool { pages.contains { $0.act != nil } }
+
+    /// A deck by job's pages grouped by act in `order`; a page with no act joins Today, an act the app
+    /// doesn't know follows the known ones. The opener and close are not listed, nor an empty act.
+    static func byJob(_ pages: [DeckPage]) -> [DeckAct] {
+        var groups = order.map { DeckAct(name: $0.name, divider: nil, pages: []) }
+        var ids = order.map(\.id)
+        for page in pages {
+            if case .card(let card) = page, card.type == .headline || card.type == .close { continue }
+            let act = page.act ?? "today"
+            if let index = ids.firstIndex(of: act) {
+                groups[index].pages.append(page)
+            } else {
+                ids.append(act)
+                groups.append(DeckAct(name: act.prefix(1).uppercased() + act.dropFirst(), divider: nil, pages: [page]))
+            }
+        }
+        return groups.filter { !$0.pages.isEmpty }
+    }
+}
+
+extension DeckPage {
+    /// The page's act in a deck by job: its card's, or the first follow-up's.
+    var act: String? {
+        switch self {
+        case .card(let card): card.act
+        case .followUps(let cards): cards.first(where: { $0.act != nil })?.act
+        }
+    }
 }
 
 /// The answers file the agent saves verbatim and files with `brain brief file`.

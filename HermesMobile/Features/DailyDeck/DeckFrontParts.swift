@@ -13,10 +13,13 @@ struct DeckFrontRow: Decodable, Equatable, Identifiable {
     let target: Int
     let goal: String?
     let commitment: String?
+    /// In a deck by job's close, the front the row serves ("ai") and its name ("Landing the AI role").
+    let front: String?
+    let frontName: String?
 
     var id: String { [goal, commitment, label].compactMap { $0 }.joined(separator: "/") }
 
-    private enum CodingKeys: String, CodingKey { case label, kind, days, done, target, goal, commitment }
+    private enum CodingKeys: String, CodingKey { case label, kind, days, done, target, goal, commitment, front, frontName }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -27,6 +30,8 @@ struct DeckFrontRow: Decodable, Equatable, Identifiable {
         target = (try? c.decodeIfPresent(Int.self, forKey: .target)) ?? 0
         goal = (try? c.decodeIfPresent(String.self, forKey: .goal)).flatMap { $0.isEmpty ? nil : $0 }
         commitment = (try? c.decodeIfPresent(String.self, forKey: .commitment)).flatMap { $0.isEmpty ? nil : $0 }
+        front = (try? c.decodeIfPresent(String.self, forKey: .front)).flatMap { $0.isEmpty ? nil : $0 }
+        frontName = (try? c.decodeIfPresent(String.self, forKey: .frontName)).flatMap { $0.isEmpty ? nil : $0 }
     }
 }
 
@@ -57,6 +62,8 @@ enum DeckDots {
 struct DeckDot: View {
     let state: String
     let ink: Color
+    /// The fixed column the dot sits centered in.
+    var column: CGFloat = DeckDots.column
 
     var body: some View {
         ZStack {
@@ -80,13 +87,13 @@ struct DeckDot: View {
             }
         }
         .frame(width: DeckDots.dot, height: DeckDots.dot)
-        .frame(width: DeckDots.column)
+        .frame(width: column)
     }
 }
 
 /// A front row: its label and a quiet count over the dots. A goal commitment's yesterday dot checks in
 /// live (tap for Done, hold for the 2-minute version, Skip or Missed), and a counted row's next pip adds
-/// one; both only on today's deck, through the goal card's model.
+/// one; both only on today's deck, through the goal card's model (`DeckRowCheckIn`).
 struct DeckFrontRowView: View {
     let row: DeckFrontRow
     let palette: DeckPalette
@@ -95,7 +102,7 @@ struct DeckFrontRowView: View {
     @Environment(GoalCheckInCardViewModel.self) private var model: GoalCheckInCardViewModel?
 
     var body: some View {
-        let live = liveCommitment
+        let checkIn = DeckRowCheckIn(row: row, ink: palette.ink, deckDate: deckDate, model: model)
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 Text(verbatim: row.label)
@@ -103,23 +110,75 @@ struct DeckFrontRowView: View {
                     .foregroundStyle(Color.hxTextPrimary)
                     .lineLimit(1)
                 Spacer(minLength: 8)
-                Text(verbatim: countText(live))
+                Text(verbatim: checkIn.countText)
                     .font(AppFont.caption())
                     .foregroundStyle(Color.hxTextSecondary)
                     .monospacedDigit()
             }
             switch row.kind {
-            case .days: days(live)
-            case .pips: pips(live)
+            case .days: days(checkIn)
+            case .pips: pips(checkIn)
             }
         }
         .accessibilityElement(children: .contain)
     }
 
-    // MARK: Live goal state
+    static func liveState(_ status: GoalStatus?, isToday: Bool, deckState: String) -> String {
+        DeckRowCheckIn.liveState(status, isToday: isToday, deckState: deckState)
+    }
 
+    private func days(_ checkIn: DeckRowCheckIn) -> some View {
+        HStack(spacing: 0) {
+            ForEach(Array(row.days.prefix(7).enumerated()), id: \.offset) { index, day in
+                VStack(spacing: 3) {
+                    checkIn.dot(day)
+                    Text(verbatim: DeckDots.weekdays[index])
+                        .font(AppFont.caption2())
+                        .foregroundStyle(Color.hxTextSecondary)
+                        .frame(width: DeckDots.column)
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: checkIn.spokenWeek))
+        .accessibilityActions { checkIn.yesterdayActions }
+    }
+
+    private func pips(_ checkIn: DeckRowCheckIn) -> some View {
+        let done = checkIn.pipsDone
+        return HStack(spacing: 0) {
+            ForEach(0..<max(row.target, done), id: \.self) { index in
+                DeckDot(state: index < done ? "done" : "missed", ink: palette.ink)
+            }
+            checkIn.addButton()
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text(verbatim: checkIn.spokenCount))
+    }
+}
+
+/// A front row's live check-in on today's deck, shared by a divider's row (`DeckFrontRowView`) and the
+/// close's week grid (`DeckWeekGrid`): the row's dots as the server has them now, yesterday's dot as a
+/// check-in (tap for Done, hold for the 2-minute version, Skip or Missed), and + to add one to a count.
+/// Off today's deck, or without the goal card's model, it shows the deck's own states and checks nothing in.
+@MainActor
+struct DeckRowCheckIn {
+    typealias Live = (slug: String, row: GoalCommitmentProgress, home: GoalsHome)
+
+    let row: DeckFrontRow
+    let ink: Color
+    let model: GoalCheckInCardViewModel?
     /// The goal commitment as the server has it now, on today's deck; nil otherwise.
-    private var liveCommitment: (slug: String, row: GoalCommitmentProgress, home: GoalsHome)? {
+    let live: Live?
+
+    init(row: DeckFrontRow, ink: Color, deckDate: String, model: GoalCheckInCardViewModel?) {
+        self.row = row
+        self.ink = ink
+        self.model = model
+        live = Self.live(row: row, deckDate: deckDate, model: model)
+    }
+
+    private static func live(row: DeckFrontRow, deckDate: String, model: GoalCheckInCardViewModel?) -> Live? {
         guard let model, model.isLive(for: deckDate), case .loaded(let home) = model.state,
               let slug = row.goal, let id = row.commitment,
               let goal = home.goals.first(where: { $0.slug == slug }),
@@ -128,12 +187,16 @@ struct DeckFrontRowView: View {
         return (slug, commitment, home)
     }
 
-    private func countText(_ live: (slug: String, row: GoalCommitmentProgress, home: GoalsHome)?) -> String {
-        let done = live.map { $0.row.done + $0.row.min } ?? row.done
-        return row.target > 0 ? "\(done) of \(row.target)" : "\(done) this week"
-    }
+    /// How many are done this week, the 2-minute versions included.
+    var done: Int { live.map { $0.row.done + $0.row.min } ?? row.done }
 
-    private func state(_ day: DeckDay, _ live: (slug: String, row: GoalCommitmentProgress, home: GoalsHome)?) -> String {
+    /// "3 of 6", or "2 this week" when the row has no target.
+    var countText: String { row.target > 0 ? "\(done) of \(row.target)" : "\(done) this week" }
+
+    /// The grid's count column: "3 of 6", or "2" when the row has no target.
+    var shortCountText: String { row.target > 0 ? "\(done) of \(row.target)" : "\(done)" }
+
+    func state(_ day: DeckDay) -> String {
         guard let live, day.date == live.home.yesterday || day.date == live.home.today else { return day.state }
         let status = live.row.effectiveStatus(day.date, today: live.home.today, yesterday: live.home.yesterday)
         return Self.liveState(status, isToday: day.date == live.home.today, deckState: day.state)
@@ -141,7 +204,7 @@ struct DeckFrontRowView: View {
 
     /// Today's or yesterday's dot from the server's check-in: yesterday with none is still `ask` (he logs last
     /// night the next morning), never missed until he says so.
-    static func liveState(_ status: GoalStatus?, isToday: Bool, deckState: String) -> String {
+    nonisolated static func liveState(_ status: GoalStatus?, isToday: Bool, deckState: String) -> String {
         switch status {
         case .done, .min: return "done"
         case .skip: return "skip"
@@ -152,26 +215,10 @@ struct DeckFrontRowView: View {
 
     // MARK: Day dots
 
-    private func days(_ live: (slug: String, row: GoalCommitmentProgress, home: GoalsHome)?) -> some View {
-        HStack(spacing: 0) {
-            ForEach(Array(row.days.prefix(7).enumerated()), id: \.offset) { index, day in
-                VStack(spacing: 3) {
-                    dayDot(day, live)
-                    Text(verbatim: DeckDots.weekdays[index])
-                        .font(AppFont.caption2())
-                        .foregroundStyle(Color.hxTextSecondary)
-                        .frame(width: DeckDots.column)
-                }
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: spokenWeek(live)))
-        .accessibilityActions { yesterdayActions(live) }
-    }
-
+    /// One day's dot, in a fixed column; yesterday's checks in when the row is live.
     @ViewBuilder
-    private func dayDot(_ day: DeckDay, _ live: (slug: String, row: GoalCommitmentProgress, home: GoalsHome)?) -> some View {
-        let shown = state(day, live)
+    func dot(_ day: DeckDay) -> some View {
+        let shown = state(day)
         if let live, day.date == live.home.yesterday {
             let key = GoalCheckInCardViewModel.key(live.slug, live.row.id)
             let explicit = live.row.yesterday
@@ -181,24 +228,25 @@ struct DeckFrontRowView: View {
                 }
                 if explicit != nil { Button("Clear", role: .destructive) { checkIn(live, .clear) } }
             } label: {
-                DeckDot(state: shown, ink: palette.ink)
+                DeckDot(state: shown, ink: ink)
                     .contentShape(Rectangle())
             } primaryAction: {
                 checkIn(live, explicit == nil ? .done : .clear)
             }
             .disabled(model?.pending.contains(key) == true)
         } else {
-            DeckDot(state: shown, ink: palette.ink)
+            DeckDot(state: shown, ink: ink)
         }
     }
 
-    private func checkIn(_ live: (slug: String, row: GoalCommitmentProgress, home: GoalsHome), _ status: GoalStatus) {
+    private func checkIn(_ live: Live, _ status: GoalStatus) {
         guard let model else { return }
         Task { await model.checkIn(slug: live.slug, commitment: live.row.id, status: status) }
     }
 
+    /// The row's VoiceOver action for yesterday's check-in.
     @ViewBuilder
-    private func yesterdayActions(_ live: (slug: String, row: GoalCommitmentProgress, home: GoalsHome)?) -> some View {
+    var yesterdayActions: some View {
         if let live {
             Button(live.row.yesterday == nil ? "Mark yesterday done" : "Clear yesterday") {
                 checkIn(live, live.row.yesterday == nil ? .done : .clear)
@@ -206,43 +254,41 @@ struct DeckFrontRowView: View {
         }
     }
 
-    private func spokenWeek(_ live: (slug: String, row: GoalCommitmentProgress, home: GoalsHome)?) -> String {
+    var spokenWeek: String {
         let names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-        let done = row.days.prefix(7).enumerated().filter { state($0.element, live) == "done" }.map { names[$0.offset] }
-        let head = "\(row.label), \(countText(live)) this week"
+        let done = row.days.prefix(7).enumerated().filter { state($0.element) == "done" }.map { names[$0.offset] }
+        let head = "\(row.label), \(countText) this week"
         let week = done.isEmpty ? "\(head), none yet" : "\(head), done \(done.joined(separator: ", "))"
-        let asking = row.days.prefix(7).contains { state($0, live) == "ask" }
+        let asking = row.days.prefix(7).contains { state($0) == "ask" }
         return asking ? "\(week), yesterday not logged yet" : week
     }
 
     // MARK: Pips
 
-    private func pips(_ live: (slug: String, row: GoalCommitmentProgress, home: GoalsHome)?) -> some View {
-        let done = live.map { $0.row.done } ?? row.done
-        let count = max(row.target, done)
-        return HStack(spacing: 0) {
-            ForEach(0..<count, id: \.self) { index in
-                DeckDot(state: index < done ? "done" : "missed", ink: palette.ink)
+    /// A counted row's pips filled so far (the 2-minute versions don't count here).
+    var pipsDone: Int { live.map { $0.row.done } ?? row.done }
+
+    var spokenCount: String { "\(row.label), \(pipsDone) of \(row.target) this week" }
+
+    /// + to add one to a counted row, in a dot column `column` wide; nothing when the row isn't live.
+    @ViewBuilder
+    func addButton(column: CGFloat = DeckDots.column) -> some View {
+        if let live {
+            let key = GoalCheckInCardViewModel.key(live.slug, live.row.id)
+            Button {
+                guard let model else { return }
+                Task { await model.addItem(slug: live.slug, commitment: live.row.id, note: nil) }
+            } label: {
+                Image(systemName: "plus")
+                    .font(AppFont.caption(weight: .semibold))
+                    .foregroundStyle(ink)
+                    .frame(width: column, height: DeckDots.dot)
+                    .contentShape(Rectangle())
             }
-            if let live {
-                let key = GoalCheckInCardViewModel.key(live.slug, live.row.id)
-                Button {
-                    guard let model else { return }
-                    Task { await model.addItem(slug: live.slug, commitment: live.row.id, note: nil) }
-                } label: {
-                    Image(systemName: "plus")
-                        .font(AppFont.caption(weight: .semibold))
-                        .foregroundStyle(palette.ink)
-                        .frame(width: DeckDots.column, height: DeckDots.dot)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .disabled(model?.pending.contains(key) == true)
-                .accessibilityLabel(Text(verbatim: "Add one \(row.label.lowercased())"))
-            }
+            .buttonStyle(.plain)
+            .disabled(model?.pending.contains(key) == true)
+            .accessibilityLabel(Text(verbatim: "Add one \(row.label.lowercased())"))
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(Text(verbatim: "\(row.label), \(done) of \(row.target) this week"))
     }
 }
 

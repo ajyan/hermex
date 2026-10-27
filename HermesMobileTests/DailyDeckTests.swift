@@ -636,6 +636,149 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(acts.map(\.pages.count), [3, 2])
     }
 
+    /// A deck by job (vault 2026-10-27): every card but the headline and close names its act.
+    private static let jobDeckJSON = #"""
+    {"date":"2026-10-28","kind":"morning","advisor":"Roger Federer","cards":[
+      {"id":"open","type":"headline","title":"Wed, Oct 28","lines":["Check-in: Roger Federer"],"recap":"Old line.",
+       "tags":[{"icon":"advisor","text":"Check-in: Roger Federer"},{"icon":"race","text":"NYC Marathon: Sunday · 4 days"},
+               {"icon":"due","text":"She’s due Jan 16 · 80 days"},{"icon":"comet","text":"Something new"},{"text":7}],
+       "today_one":{"label":"Draft one interview story","front":"ai","quote":"…rather than at least getting my own stories right."},
+       "yesterday_one":{"label":"Letter to her","front":"fatherhood"},
+       "options":[{"id":"done","label":"Done"},{"id":"partly","label":"Partly"},{"id":"not","label":"Not today"}]},
+      {"id":"ask","type":"ask","act":"today"},
+      {"id":"week-0-1","type":"reflect","kind":"video","act":"ideas","title":"Make the loop you have trustworthy",
+       "source":"Marina Wyss · AI Agents Are Not Complicated","week_question":"What do I actually believe about building with AI?",
+       "gist":"An agent is a simple loop.","body":"An agent is a simple loop.","reason":"fits the week",
+       "quotes":[{"text":"Over 10 steps, 95% per step works out to about 60%.","at":"Marina Wyss"},{"text":"  "},{"at":"x"}],
+       "parts":[{"label":"The loop","text":"text in, text out"},{"label":"Evals","text":"20–50 real failed tasks"},{"label":"x"}],
+       "question":"Is she right that evals matter more?"},
+      {"id":"week-0-2","type":"reflect","kind":"video","act":"ideas","title":"Code is cheap now","question":"Q?"},
+      {"id":"advisor","type":"prompt","act":"writing","voice":"Roger Federer","context":"Old message.",
+       "question":"Which story will you get match-ready today?",
+       "thread":{"label":"Picking up from yesterday","quote":"I haven’t put all my efforts in yet.","at":"You, to David Goggins, Tue"}},
+      {"id":"letter","type":"prompt","kind":"letter","act":"writing","lines":["80 days to go","Due Jan 16"],
+       "question":"Tell her about your dad.","thread":{"label":"Yesterday's letter","quote":"…her father’s work ethic."}},
+      {"id":"year-ago","type":"reflect","kind":"on_this_day","act":"writing","title":"Feeling better after a good night.",
+       "body":"Flying to Denver on Thursday.","date_label":"Tue, Oct 28, 2025","question":"What did that rhythm protect?"},
+      {"id":"sleep","type":"sleep","act":"body"},
+      {"id":"f1","type":"decision","act":"people","title":"Douglas Fisher"},
+      {"id":"close","type":"close","question":"Your one thing today",
+       "options":[{"id":"ai-1","label":"Draft one interview story","front":"ai"}],
+       "week_rows":[
+         {"label":"Prep practice","kind":"days","done":1,"target":6,"front":"ai","front_name":"Landing the AI role",
+          "days":[{"date":"2026-10-26","state":"done"},{"date":"2026-10-27","state":"ask"},{"date":"2026-10-28","state":"today"}]},
+         {"label":"Outreach","kind":"pips","done":0,"target":5,"front":"ai","front_name":"Landing the AI role"},
+         {"label":"Nightly stretch","kind":"days","done":0,"target":6,"front":"living-well","front_name":"Body"},
+         {"label":"Morning stretch with a much longer label than fits","kind":"days","front":"living-well","front_name":"Body"},
+         {"label":"Applications","kind":"pips","target":5,"front":"ai","front_name":"Landing the AI role"}]}]}
+    """#
+
+    func testJobDeckDecodesItsNewFields() throws {
+        let deck = try DailyDeck.decode(Self.jobDeckJSON)
+        let cards = Dictionary(uniqueKeysWithValues: deck.cards.map { ($0.id, $0) })
+        let open = try XCTUnwrap(cards["open"])
+        XCTAssertEqual(open.headlineTags.map(\.text), ["Check-in: Roger Federer", "NYC Marathon: Sunday · 4 days",
+                                                       "She’s due Jan 16 · 80 days", "Something new"], "a tag without text drops alone")
+        XCTAssertEqual(open.headlineTags.map(\.symbol), ["bubble.left", "flag", "figure.and.child.holdinghands", "smallcircle.filled.circle"])
+        XCTAssertTrue(open.tags.isEmpty, "the headline's tags are not a sleep card's")
+        XCTAssertEqual(open.todayOne, DeckTodayOne(label: "Draft one interview story", front: "ai",
+                                                   quote: "…rather than at least getting my own stories right."))
+        XCTAssertNil(open.act)
+
+        let idea = try XCTUnwrap(cards["week-0-1"])
+        XCTAssertEqual(idea.act, "ideas")
+        XCTAssertEqual(idea.weekQuestion, "What do I actually believe about building with AI?")
+        XCTAssertEqual(idea.gist, "An agent is a simple loop.")
+        XCTAssertEqual(idea.quotes, [DeckPiece.Quote(text: "Over 10 steps, 95% per step works out to about 60%.", at: "Marina Wyss")],
+                       "a blank or textless quote drops")
+        XCTAssertEqual(idea.parts.map(\.label), ["The loop", "Evals"], "a part without text drops")
+        XCTAssertEqual(DeckPalette.of(idea).name, "Video")
+
+        let advisor = try XCTUnwrap(cards["advisor"])
+        XCTAssertEqual(advisor.thread, DeckThread(label: "Picking up from yesterday", quote: "I haven’t put all my efforts in yet.",
+                                                  at: "You, to David Goggins, Tue"))
+        XCTAssertNil(cards["letter"]?.thread?.at)
+        XCTAssertEqual(cards["year-ago"]?.dateLabel, "Tue, Oct 28, 2025")
+
+        let close = try XCTUnwrap(cards["close"])
+        XCTAssertEqual(close.weekRows.map(\.front), ["ai", "ai", "living-well", "living-well", "ai"])
+        XCTAssertEqual(close.weekRows.first?.frontName, "Landing the AI role")
+    }
+
+    func testJobDeckGroupsTheOpenerByAct() throws {
+        let deck = try DailyDeck.decode(Self.jobDeckJSON)
+        let pages = DeckPage.pages(for: deck.cards)
+        XCTAssertTrue(DeckAct.isByJob(pages))
+        let acts = DeckCardView.acts(pages)
+        XCTAssertEqual(acts.map(\.name), ["Today", "Ideas", "Writing", "Body", "People"])
+        XCTAssertEqual(acts.map { $0.pages.map(\.id) },
+                       [["ask"], ["week-0-1", "week-0-2"], ["advisor", "letter", "year-ago"], ["sleep"], ["followups-f1"]])
+        XCTAssertTrue(acts.allSatisfy { $0.divider == nil }, "a deck by job has no front groups")
+        XCTAssertEqual(DeckAheadRow.title(pages.first { $0.id == "year-ago" }!), "Tue, Oct 28, 2025", "a year-ago row names its day")
+
+        // An act with no cards is left out, in the fixed order whatever order the cards ship in.
+        let shuffled = try DailyDeck.decode(#"""
+        {"date":"d","kind":"morning","cards":[{"id":"open","type":"headline"},
+          {"id":"s","type":"sleep","act":"body"},{"id":"i","type":"reflect","act":"ideas"},{"id":"x","type":"reflect","act":"later"},
+          {"id":"n","type":"reflect"},{"id":"close","type":"close"}]}
+        """#)
+        let shuffledActs = DeckCardView.acts(DeckPage.pages(for: shuffled.cards))
+        XCTAssertEqual(shuffledActs.map(\.name), ["Today", "Ideas", "Body", "Later"])
+        XCTAssertEqual(shuffledActs.map { $0.pages.map(\.id) }, [["n"], ["i"], ["s"], ["x"]])
+        XCTAssertFalse(DeckAct.isByJob(DeckPage.pages(for: try DailyDeck.decode(Self.deckJSON).cards)), "an older deck isn't by job")
+    }
+
+    func testJobCardKindLabels() throws {
+        let deck = try DailyDeck.decode(Self.jobDeckJSON)
+        let pages = DeckPage.pages(for: deck.cards)
+        let cards = Dictionary(uniqueKeysWithValues: deck.cards.map { ($0.id, $0) })
+        let label = { (id: String) -> String in
+            let card = cards[id]!
+            return card.kindLabel(DeckPalette.of(card), idea: DeckAct.ideaPosition(of: card, in: pages), advisor: deck.advisor)
+        }
+        XCTAssertEqual(label("week-0-1"), "Video · Idea 1 of 2")
+        XCTAssertEqual(label("week-0-2"), "Video · Idea 2 of 2")
+        XCTAssertEqual(label("advisor"), "Check-in · Roger Federer")
+        XCTAssertEqual(label("letter"), "Letter to her · 80 days to go")
+        XCTAssertEqual(label("year-ago"), "A year ago · Tue, Oct 28, 2025")
+        XCTAssertNil(DeckAct.ideaPosition(of: cards["advisor"]!, in: pages))
+        XCTAssertEqual(DeckCard.quoted("words"), "“words”")
+        XCTAssertEqual(DeckCard.quoted("“words”"), "“words”", "words already in quotes aren't quoted twice")
+    }
+
+    /// The close's grid: the day and count columns are fixed, so a label of any length leaves every dot under its letter.
+    func testCloseGridKeepsDotsInFixedColumns() throws {
+        let deck = try DailyDeck.decode(Self.jobDeckJSON)
+        let rows = try XCTUnwrap(deck.cards.last).weekRows
+        XCTAssertEqual(DeckWeekGridLayout.dayColumn, DeckDots.column)
+        XCTAssertGreaterThan(DeckWeekGridLayout.dayColumn, DeckDots.dot)
+        XCTAssertEqual(DeckWeekGridLayout.trailingWidth,
+                       DeckWeekGridLayout.dayColumn * 7 + DeckWeekGridLayout.countColumn)
+        // Every row of a card is the same width; where a dot sits depends on that and the day alone.
+        for day in 0..<7 {
+            XCTAssertEqual(DeckWeekGridLayout.dotCenter(day: day, rowWidth: 342),
+                           342 - DeckWeekGridLayout.trailingWidth + DeckDots.column * (CGFloat(day) + 0.5))
+        }
+        XCTAssertEqual(DeckWeekGridLayout.dotCenter(day: 6, rowWidth: 342) + DeckDots.column / 2 + DeckWeekGridLayout.countColumn, 342)
+
+        let days = DeckWeekGridLayout.groups(rows, kind: .days)
+        XCTAssertEqual(days.map(\.name), ["Landing the AI role", "Body"])
+        XCTAssertEqual(days.map { $0.rows.map(\.label) },
+                       [["Prep practice"], ["Nightly stretch", "Morning stretch with a much longer label than fits"]])
+        let counts = DeckWeekGridLayout.groups(rows, kind: .pips)
+        XCTAssertEqual(counts.map(\.name), ["Landing the AI role"])
+        XCTAssertEqual(counts.first?.rows.map(\.label), ["Outreach", "Applications"], "counts sit apart, not under the day letters")
+
+        XCTAssertEqual(DeckWeekGridLayout.pipColumn(pips: 5, addsOne: true), DeckDots.column)
+        XCTAssertEqual(DeckWeekGridLayout.pipColumn(pips: 13, addsOne: true), DeckDots.column / 2,
+                       "a long count shares the day columns' width instead of pushing the count column")
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/New_York")!
+        XCTAssertEqual(DeckWeekGridLayout.weekdayIndex(of: "2026-10-28", calendar: calendar), 2, "Wednesday")
+        XCTAssertEqual(DeckWeekGridLayout.weekdayIndex(of: "2026-11-01", calendar: calendar), 6, "Sunday")
+        XCTAssertNil(DeckWeekGridLayout.weekdayIndex(of: "d", calendar: calendar))
+    }
+
     private static let weekDeckJSON = #"""
     {"date":"2026-10-04","kind":"morning","cards":[
       {"id":"open","type":"headline","title":"Today"},
