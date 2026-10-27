@@ -2867,3 +2867,61 @@ extension DailyDeckTests {
         XCTAssertEqual(model.answer(for: plan)?.action, "accepted")
     }
 }
+
+/// The Mandarin call's id, its finish, and what it keeps out of the Prep mock path.
+@MainActor
+final class MandarinCallTests: XCTestCase {
+    private var events: [String] = []
+
+    private func finisher(stillOnChat: Bool = true) -> MandarinCallFinisher {
+        MandarinCallFinisher(
+            leave: { self.events.append("leave") },
+            record: { date, session, waits in self.events.append("record:\(date):\(session):\(waits)") },
+            isStillOnCallChat: { stillOnChat },
+            showDeck: { self.events.append("deck") }
+        )
+    }
+
+    func testMandarinCallIDRoundTrips() {
+        XCTAssertEqual(MandarinCall.id(date: "2026-10-27"), "mandarin:2026-10-27")
+        XCTAssertEqual(MandarinCall.date(fromCallID: MandarinCall.id(date: "2026-10-27")), "2026-10-27")
+        XCTAssertNil(MandarinCall.date(fromCallID: "mock-123"))
+        XCTAssertNil(MandarinCall.date(fromCallID: "mandarin:soon"))
+        XCTAssertNil(MandarinCall.date(fromCallID: nil))
+        XCTAssertEqual(MandarinCall.language(forCallID: "mandarin:2026-10-27"), .mandarin)
+        XCTAssertEqual(MandarinCall.language(forCallID: "mock-123"), .english)
+        XCTAssertEqual(MandarinCall.language(forCallID: nil), .english)
+    }
+
+    func testMandarinFinisherRecordsAndShowsTheDeck() async {
+        await finisher().finish(MockCallEnd(mockID: "mandarin:2026-10-27", grade: nil, sessionID: "s1", waitMS: [900]),
+                                date: "2026-10-27")
+        XCTAssertEqual(events, ["leave", "record:2026-10-27:s1:[900]", "deck"])
+    }
+
+    func testMandarinFinisherWithoutSessionRecordsNothing() async {
+        await finisher().finish(MockCallEnd(mockID: "mandarin:2026-10-27", grade: nil), date: "2026-10-27")
+        XCTAssertEqual(events, ["leave", "deck"])
+    }
+
+    func testMandarinFinisherOffTheChatDoesNotNavigate() async {
+        await finisher(stillOnChat: false).finish(
+            MockCallEnd(mockID: "mandarin:2026-10-27", grade: nil, sessionID: "s1", waitMS: []), date: "2026-10-27")
+        XCTAssertEqual(events, ["leave", "record:2026-10-27:s1:[]"])
+    }
+
+    func testMandarinCallProgressIsNotSavedAsAMock() {
+        XCTAssertFalse(PrepMockInFlight.shouldSave(mockID: "mandarin:2026-10-27"))
+        XCTAssertTrue(PrepMockInFlight.shouldSave(mockID: "m1"))
+    }
+
+    func testRecordCallStoresSessionAndWaits() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "MandarinCallTests.\(UUID().uuidString)"))
+        let store = MandarinPracticeStore(defaults: defaults)
+        let server = URL(string: "https://hermes.example")!
+        store.recordCall(server: server, date: "2026-10-27", sessionID: "s1", waitMS: [900])
+        let record = try XCTUnwrap(store.record(for: server, date: "2026-10-27"))
+        XCTAssertEqual(record.callSessionID, "s1")
+        XCTAssertEqual(record.callWaitMS, [900])
+    }
+}

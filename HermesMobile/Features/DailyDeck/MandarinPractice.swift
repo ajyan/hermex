@@ -54,6 +54,9 @@ struct MandarinPracticeRecord: Codable, Equatable {
     /// The family call: three things to say per relative ("mom", "dad"), and what came back after it.
     var callPrep: [String: [MandarinCallItem]] = [:]
     var callPhrases: [MandarinCallItem] = []
+    /// The Mandarin call: its session and the waits before each answer, kept when it ends.
+    var callSessionID: String?
+    var callWaitMS: [Int] = []
 
     init() {}
 
@@ -65,6 +68,8 @@ struct MandarinPracticeRecord: Codable, Equatable {
         result = try? c.decodeIfPresent(MandarinAnswerResponse.self, forKey: .result)
         callPrep = (try? c.decodeIfPresent([String: [MandarinCallItem]].self, forKey: .callPrep)) ?? [:]
         callPhrases = (try? c.decodeIfPresent([MandarinCallItem].self, forKey: .callPhrases)) ?? []
+        callSessionID = try? c.decodeIfPresent(String.self, forKey: .callSessionID)
+        callWaitMS = (try? c.decodeIfPresent([Int].self, forKey: .callWaitMS)) ?? []
     }
 }
 
@@ -85,6 +90,14 @@ struct MandarinPracticeStore {
         all[date] = try? JSONEncoder().encode(record)
         for stale in all.keys.sorted(by: >).dropFirst(Self.days) { all[stale] = nil }
         defaults.set(all, forKey: key(server))
+    }
+
+    /// Keeps a finished Mandarin call on its day's record, for the card to ask for its review.
+    func recordCall(server: URL, date: String, sessionID: String, waitMS: [Int]) {
+        var saved = record(for: server, date: date) ?? MandarinPracticeRecord()
+        saved.callSessionID = sessionID
+        saved.callWaitMS = waitMS
+        setRecord(saved, for: server, date: date)
     }
 }
 

@@ -519,7 +519,7 @@ struct ChatShellView: View {
     private var mainStack: some View {
         brainRouteOpener.handler = { navigation.path.append(.brainRoute($0)) }
         draftChatOpener.handler = { selectDestination(PendingNewChatRoute(initialDraft: $0)) }
-        mockCallOpener.handler = { try await openMockCall($0) }
+        mockCallOpener.handler = { try await openMockCall(profile: $0, $1) }
         brainRouteOpener.homeHandler = { navigation.showBrainHome() }
         return NavigationStack(path: $navigation.path) {
             rootView
@@ -571,7 +571,7 @@ struct ChatShellView: View {
                 startsCall: route.startsCall,
                 openingTurn: route.openingTurn,
                 mockID: route.mockID,
-                onMockCallProgress: { mockInFlight.save($0) },
+                onMockCallProgress: { if PrepMockInFlight.shouldSave(mockID: $0.mockID) { mockInFlight.save($0) } },
                 onMockCallEnded: finishMockCall,
                 callRequest: callRequest,
                 server: server,
@@ -1498,8 +1498,9 @@ struct ChatShellView: View {
     /// turn (sent as soon as the call connects) reaches the server under it, and only then is the mock
     /// started; a new chat in that profile opens straight into the call. A failed switch throws to the
     /// brief, which shows why, and starts and opens nothing. An earlier mock still waiting to send its
-    /// grade sends it first, before the new mock takes its place.
-    private func openMockCall(_ start: @escaping OpenMockCallAction.Start) async throws {
+    /// grade sends it first, before the new mock takes its place. The Mandarin call comes the same way
+    /// with `profile` "mandarin", and is never remembered as a mock in flight.
+    private func openMockCall(profile profileName: String, _ start: @escaping OpenMockCallAction.Start) async throws {
         let profile = mockProfile
         let inFlight = mockInFlight
         let client = APIClientPrepAdapter(apiClient: APIClient(baseURL: server))
@@ -1508,7 +1509,7 @@ struct ChatShellView: View {
         let opener = PrepMockCallOpener(
             enter: { try await profile.enter($0, fallback: fallback) },
             leave: { _ = await profile.leave() },
-            remember: { inFlight.save($0) },
+            remember: { if PrepMockInFlight.shouldSave(mockID: $0.mockID) { inFlight.save($0) } },
             openChat: { mock in
                 selectDestination(PendingNewChatRoute(
                     profileName: mock.profile,
@@ -1518,13 +1519,31 @@ struct ChatShellView: View {
                 ))
             }
         )
-        try await opener.open(start)
+        try await opener.open(profile: profileName, start)
     }
 
     /// The voice mock's call ended: `PrepMockCallFinisher` switches back, asks for the grade, and
     /// swaps the mock's chat for Prep with the result on top.
     private func finishMockCall(_ end: MockCallEnd) {
         let revision = navigation.rootRevision
+        if let date = MandarinCall.date(fromCallID: end.mockID) {
+            let profile = mockProfile
+            let server = server
+            let finisher = MandarinCallFinisher(
+                leave: {
+                    await profile.leave()
+                    await viewModel.loadActiveProfile()
+                },
+                record: { MandarinPracticeStore().recordCall(server: server, date: $0, sessionID: $1, waitMS: $2) },
+                isStillOnCallChat: { navigation.rootRevision == revision },
+                showDeck: {
+                    selectDestination(PendingNewChatRoute())
+                    navigation.showOnly(.dailyDeck)
+                }
+            )
+            Task { await finisher.finish(end, date: date) }
+            return
+        }
         let apiClient = APIClient(baseURL: server)
         let profile = mockProfile
         let inFlight = mockInFlight
