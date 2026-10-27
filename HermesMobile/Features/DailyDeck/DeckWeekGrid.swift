@@ -1,15 +1,15 @@
 import SwiftUI
 
-/// The close's week in a deck by job, laid out as one grid: a flexible label column, seven fixed day
-/// columns under the weekday letters, and a fixed count column. Every width but the label's is fixed,
-/// so a long label wraps inside its column and can never move a dot out from under its letter.
+/// The close's week in a deck by job, laid out as one grid: a flexible label column (the count sits under
+/// the label, so the label keeps its room) and seven fixed day columns under the weekday letters. Every
+/// width but the label's is fixed, so a long label wraps inside its column and can never move a dot out
+/// from under its letter.
 enum DeckWeekGridLayout {
     static let dayColumn: CGFloat = DeckDots.column
     static let dayCount = 7
-    static let countColumn: CGFloat = 44
 
-    /// The day and count columns together: the same in every row, whatever its label.
-    static var trailingWidth: CGFloat { dayColumn * CGFloat(dayCount) + countColumn }
+    /// The day columns together: the same in every row, whatever its label.
+    static var trailingWidth: CGFloat { dayColumn * CGFloat(dayCount) }
 
     /// Where day `index`'s dot is centered, from the leading edge of a row `rowWidth` wide. The label
     /// takes what's left of the row, so it never enters this.
@@ -90,7 +90,6 @@ struct DeckWeekGrid: View {
                     .foregroundStyle(palette.ink.opacity(index == today ? 1 : 0.75))
                     .frame(width: DeckWeekGridLayout.dayColumn)
             }
-            Color.clear.frame(width: DeckWeekGridLayout.countColumn, height: 1)
         }
         .accessibilityHidden(true)
     }
@@ -125,12 +124,20 @@ private struct DeckWeekGridRow: View {
     var body: some View {
         let checkIn = DeckRowCheckIn(row: row, ink: palette.ink, deckDate: deckDate, model: model)
         HStack(spacing: 0) {
-            Text(verbatim: row.label)
-                .font(AppFont.subheadline(weight: .semibold))
-                .foregroundStyle(Color.hxTextPrimary)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.trailing, 6)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(verbatim: row.label)
+                    .font(AppFont.subheadline(weight: .semibold))
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .lineLimit(2)
+                Text(verbatim: checkIn.shortCountText)
+                    .font(AppFont.caption())
+                    .foregroundStyle(palette.ink.opacity(0.75))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .accessibilityHidden(true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.trailing, 6)
             Group {
                 switch row.kind {
                 case .days: days(checkIn)
@@ -138,14 +145,6 @@ private struct DeckWeekGridRow: View {
                 }
             }
             .frame(width: DeckWeekGridLayout.dayColumn * CGFloat(DeckWeekGridLayout.dayCount), alignment: .leading)
-            Text(verbatim: checkIn.shortCountText)
-                .font(AppFont.caption())
-                .foregroundStyle(palette.ink.opacity(0.75))
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .frame(width: DeckWeekGridLayout.countColumn, alignment: .trailing)
-                .accessibilityHidden(true)
         }
         .frame(minHeight: 24)
         .accessibilityElement(children: .contain)

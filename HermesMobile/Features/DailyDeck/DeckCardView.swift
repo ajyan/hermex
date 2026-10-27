@@ -1619,7 +1619,9 @@ struct DeckAheadRow: View {
         case .card(let card):
             // A year-ago card's title is his own opening words; its row names the day instead.
             if let day = card.dateLabel { return day }
-            return [card.title, card.question].compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            // A letter's title is only "To her"; its row names today's prompt.
+            let first = card.isLetter && card.act != nil ? [card.question, card.title] : [card.title, card.question]
+            return first.compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .first { !$0.isEmpty } ?? DeckPalette.of(card).name
         }
     }

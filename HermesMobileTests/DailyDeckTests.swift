@@ -752,14 +752,14 @@ final class DailyDeckTests: XCTestCase {
         let rows = try XCTUnwrap(deck.cards.last).weekRows
         XCTAssertEqual(DeckWeekGridLayout.dayColumn, DeckDots.column)
         XCTAssertGreaterThan(DeckWeekGridLayout.dayColumn, DeckDots.dot)
-        XCTAssertEqual(DeckWeekGridLayout.trailingWidth,
-                       DeckWeekGridLayout.dayColumn * 7 + DeckWeekGridLayout.countColumn)
+        XCTAssertEqual(DeckWeekGridLayout.trailingWidth, DeckWeekGridLayout.dayColumn * 7,
+                       "the count sits under the label, so only the day columns are fixed")
         // Every row of a card is the same width; where a dot sits depends on that and the day alone.
         for day in 0..<7 {
             XCTAssertEqual(DeckWeekGridLayout.dotCenter(day: day, rowWidth: 342),
                            342 - DeckWeekGridLayout.trailingWidth + DeckDots.column * (CGFloat(day) + 0.5))
         }
-        XCTAssertEqual(DeckWeekGridLayout.dotCenter(day: 6, rowWidth: 342) + DeckDots.column / 2 + DeckWeekGridLayout.countColumn, 342)
+        XCTAssertEqual(DeckWeekGridLayout.dotCenter(day: 6, rowWidth: 342) + DeckDots.column / 2, 342)
 
         let days = DeckWeekGridLayout.groups(rows, kind: .days)
         XCTAssertEqual(days.map(\.name), ["Landing the AI role", "Body"])
