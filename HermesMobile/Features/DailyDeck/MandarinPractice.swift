@@ -7,6 +7,9 @@ protocol MandarinPracticeClient: Sendable {
     func recall(_ request: MandarinRecallRequest) async throws -> MandarinRecallResponse
     func callPrep(_ request: MandarinCallPrepRequest) async throws -> MandarinCallResponse
     func callAfter(_ request: MandarinCallAfterRequest) async throws -> MandarinCallResponse
+    func telling(_ request: MandarinTellingRequest) async throws
+    func callStart(_ request: MandarinCallStartRequest) async throws -> MandarinCallStart
+    func callReview(_ request: MandarinCallReviewRequest) async throws -> MandarinCallReview
 }
 
 struct APIClientMandarinAdapter: MandarinPracticeClient {
@@ -26,6 +29,18 @@ struct APIClientMandarinAdapter: MandarinPracticeClient {
 
     func callAfter(_ request: MandarinCallAfterRequest) async throws -> MandarinCallResponse {
         try await apiClient.mandarinCallAfter(request)
+    }
+
+    func telling(_ request: MandarinTellingRequest) async throws {
+        try await apiClient.tellMandarin(request)
+    }
+
+    func callStart(_ request: MandarinCallStartRequest) async throws -> MandarinCallStart {
+        try await apiClient.mandarinCallStart(request)
+    }
+
+    func callReview(_ request: MandarinCallReviewRequest) async throws -> MandarinCallReview {
+        try await apiClient.mandarinCallReview(request)
     }
 }
 

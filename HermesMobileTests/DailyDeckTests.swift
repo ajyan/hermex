@@ -1284,6 +1284,65 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(card.questionEn, "How is your running going?")
     }
 
+    func testMandarinCardDecodesChunksBeatsAndSpeaker() throws {
+        let card = try DailyDeck.decode(#"""
+        {"date":"d","kind":"morning","cards":[{"id":"m","type":"prompt","kind":"mandarin","question":"你好吗？",
+         "chunks":[{"hanzi":"其实","pinyin":"qí shí","en":"actually","kind":"connector"},{"pinyin":"no characters"}],
+         "beats":["Ran 20 miles"],"speaker":"dad"}]}
+        """#).cards[0]
+        XCTAssertEqual(card.chunks.count, 1)
+        XCTAssertEqual(card.chunks.first?.kind, "connector")
+        XCTAssertEqual(card.beats, ["Ran 20 miles"])
+        XCTAssertEqual(card.speaker, "dad")
+    }
+
+    func testOldMandarinCardDecodesWithoutChunks() throws {
+        let card = try DailyDeck.decode(Self.mandarinDeckJSON).cards[0]
+        XCTAssertEqual(card.chunks, [])
+        XCTAssertEqual(card.beats, [])
+        XCTAssertNil(card.speaker)
+    }
+
+    private static func clientDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return decoder
+    }
+
+    func testCallReviewDecodesSnakeCase() throws {
+        let review = try Self.clientDecoder().decode(MandarinCallReview.self, from: Data(#"""
+        {"moments":[{"said":"我那个 marathon","natural":"我要跑马拉松","natural_pinyin":"wǒ yào","en":"I'm running","why":"Say it in Mandarin."}],
+         "natural_turns":[{"said":"我很忙","natural":"我最近挺忙的"}],"chunks_used":["其实"],"chunks_missed":["对吧"],
+         "fluency":{"english":1,"restarts":0,"chars_per_turn":6.5,"wait_ms_p50":1200,"turns":4},
+         "telling":{"english":3},"progress":{"phrases":40,"call_week":{"english":1.5,"wait_ms_p50":1300}}}
+        """#.utf8))
+        XCTAssertEqual(review.moments.first?.naturalPinyin, "wǒ yào")
+        XCTAssertEqual(review.naturalTurns.first?.natural, "我最近挺忙的")
+        XCTAssertEqual(review.chunksUsed, ["其实"])
+        XCTAssertEqual(review.chunksMissed, ["对吧"])
+        XCTAssertEqual(review.fluency?.waitMsP50, 1200)
+        XCTAssertEqual(review.fluency?.charsPerTurn, 6.5)
+        XCTAssertEqual(review.telling?.english, 3)
+        XCTAssertEqual(review.progress?.callWeek?.waitMsP50, 1300)
+    }
+
+    func testCallReviewRequestEncodesSnakeCase() throws {
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let json = try JSONSerialization.jsonObject(with: try encoder.encode(
+            MandarinCallReviewRequest(date: "2026-10-27", sessionID: "s1", waitMS: [900]))) as? [String: Any]
+        XCTAssertEqual(Set(json.map { Array($0.keys) } ?? []), ["date", "session_id", "wait_ms"])
+    }
+
+    func testCallReviewWithBadMomentKeepsTheRest() throws {
+        let review = try Self.clientDecoder().decode(MandarinCallReview.self, from: Data(#"""
+        {"moments":[{"said":"x"},{"said":"休息早一点休息","natural":"早点休息"}]}
+        """#.utf8))
+        XCTAssertEqual(review.moments.map(\.natural), ["早点休息"])
+        XCTAssertEqual(review.naturalTurns, [])
+        XCTAssertNil(review.fluency)
+    }
+
     func testMandarinFieldsAreOptional() throws {
         let card = try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"m","type":"prompt","kind":"mandarin","question":"你好吗？","yesterday":{"said":"x"}}]}"#).cards[0]
         XCTAssertTrue(card.isMandarin)
@@ -2456,6 +2515,28 @@ private final class FakeMandarinClient: MandarinPracticeClient, @unchecked Senda
     func callAfter(_ request: MandarinCallAfterRequest) async throws -> MandarinCallResponse {
         afters.append(request)
         return try callResult.get()
+    }
+
+    var tellings: [MandarinTellingRequest] = []
+    var starts: [MandarinCallStartRequest] = []
+    var reviews: [MandarinCallReviewRequest] = []
+    var tellingFails = false
+    var startResult: Result<MandarinCallStart, Error> = .failure(URLError(.notConnectedToInternet))
+    var reviewResults: [Result<MandarinCallReview, Error>] = []
+
+    func telling(_ request: MandarinTellingRequest) async throws {
+        tellings.append(request)
+        if tellingFails { throw URLError(.notConnectedToInternet) }
+    }
+
+    func callStart(_ request: MandarinCallStartRequest) async throws -> MandarinCallStart {
+        starts.append(request)
+        return try startResult.get()
+    }
+
+    func callReview(_ request: MandarinCallReviewRequest) async throws -> MandarinCallReview {
+        reviews.append(request)
+        return try (reviewResults.isEmpty ? .success(MandarinCallReview()) : reviewResults.removeFirst()).get()
     }
 }
 
