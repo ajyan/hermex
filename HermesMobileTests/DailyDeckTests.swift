@@ -615,6 +615,16 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertGreaterThan(DeckDots.column, DeckDots.dot, "every dot sits centered in a fixed column")
     }
 
+    func testAnUnloggedYesterdayAsksRatherThanReadingAsMissed() {
+        XCTAssertEqual(DeckFrontRowView.liveState(nil, isToday: false, deckState: "missed"), "ask")
+        XCTAssertEqual(DeckFrontRowView.liveState(.clear, isToday: false, deckState: "ask"), "ask")
+        XCTAssertEqual(DeckFrontRowView.liveState(.miss, isToday: false, deckState: "ask"), "missed")
+        XCTAssertEqual(DeckFrontRowView.liveState(.min, isToday: false, deckState: "ask"), "done")
+        XCTAssertEqual(DeckFrontRowView.liveState(.skip, isToday: false, deckState: "ask"), "skip")
+        XCTAssertEqual(DeckFrontRowView.liveState(nil, isToday: true, deckState: "today"), "today")
+        XCTAssertEqual(DeckFrontRowView.liveState(nil, isToday: false, deckState: "off"), "off")
+    }
+
     func testOpenerCountsThreeTodayAndTwoThisWeek() throws {
         let deck = try DailyDeck.decode(#"""
         {"date":"d","kind":"morning","cards":[
