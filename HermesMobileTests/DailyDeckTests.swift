@@ -2894,6 +2894,22 @@ final class MandarinPracticeTests: XCTestCase {
                        "1 phrase")
         XCTAssertNil(MandarinProgressLine.text(DeckMandarinProgress(phrases: nil, usedWeek: nil, englishNow: nil, englishBefore: nil)))
     }
+
+    func testFluencyLines() {
+        let call = MandarinFluency(english: 3, restarts: 1, charsPerTurn: 14.2, waitMsP50: 1400, turns: 6)
+        XCTAssertEqual(MandarinFluencyLine.text(call), "Wait 1.4 s · English 3 · Restarts 1 · 14 characters a turn")
+        XCTAssertNil(MandarinFluencyLine.text(nil))
+        XCTAssertEqual(MandarinFluencyLine.text(MandarinFluency(english: 3, restarts: 1, charsPerTurn: 14.2, waitMsP50: nil, turns: 6)),
+                       "English 3 · Restarts 1 · 14 characters a turn")
+        let before = MandarinFluency(english: 5, restarts: 2, charsPerTurn: 11, waitMsP50: 2100, turns: nil)
+        XCTAssertEqual(MandarinFluencyLine.lastWeek(DeckMandarinProgress(callBefore: before)),
+                       "Last week: wait 2.1 s · English 5 · Restarts 2 · 11 characters a turn")
+        XCTAssertNil(MandarinFluencyLine.lastWeek(DeckMandarinProgress(phrases: 3)))
+        XCTAssertEqual(MandarinFluencyLine.telling(MandarinFluency(english: 4, restarts: 0, charsPerTurn: 20, waitMsP50: nil, turns: 1),
+                                                   call: MandarinFluency(english: 2, restarts: 0, charsPerTurn: 9, waitMsP50: 900, turns: 5)),
+                       "First telling: English 4 → on the call 2")
+        XCTAssertNil(MandarinFluencyLine.telling(nil, call: call))
+    }
 }
 
 // MARK: - Meals
