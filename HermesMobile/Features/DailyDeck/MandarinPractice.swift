@@ -108,9 +108,15 @@ struct MandarinPracticeStore {
         defaults.set(all, forKey: key(server))
     }
 
-    /// Keeps a finished Mandarin call on its day's record, for the card to ask for its review.
+    /// Keeps a finished Mandarin call on its day's record, for the card to ask for its review. A new
+    /// call the same day replaces the last one's review, retries and reveals.
     func recordCall(server: URL, date: String, sessionID: String, waitMS: [Int]) {
         var saved = record(for: server, date: date) ?? MandarinPracticeRecord()
+        if saved.callSessionID != sessionID {
+            saved.review = nil
+            saved.retries = [:]
+            saved.revealed = []
+        }
         saved.callSessionID = sessionID
         saved.callWaitMS = waitMS
         setRecord(saved, for: server, date: date)
@@ -266,14 +272,25 @@ final class MandarinPractice {
         save()
     }
 
+    /// Back from typing to the call.
+    func callInstead() {
+        record.isTyping = false
+        save()
+    }
+
     // MARK: After
 
     /// Asks for the review of a call that ended with a session, once it is kept. A review with
     /// nothing in it isn't kept, so Retry asks again; a call where he never spoke goes back to the call.
     func reviewIfNeeded() async {
-        if record.callSessionID == nil, let saved = store.record(for: server, date: date), let session = saved.callSessionID {
+        // A call recorded after this card was built (or a later call the same day) is the one to review.
+        if let saved = store.record(for: server, date: date), let session = saved.callSessionID,
+           session != record.callSessionID {
             record.callSessionID = session
             record.callWaitMS = saved.callWaitMS
+            record.review = saved.review
+            record.retries = saved.retries
+            record.revealed = saved.revealed
         }
         guard let client, let sessionID = record.callSessionID, record.review == nil, reviewing != .waiting else { return }
         reviewing = .waiting

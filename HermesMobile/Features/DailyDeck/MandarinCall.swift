@@ -22,7 +22,8 @@ enum MandarinCall {
 }
 
 /// What the shell does when a Mandarin call ends, in order: switch back to the previous profile,
-/// keep the call's session and answer waits on the day's card (when the call has a session), then,
+/// keep the call's session and answer waits on the day's card (only when the parent answered, so a
+/// call hung up before that leaves the card on Call with nothing to review), then,
 /// if the call's chat is still on screen, replace it with a fresh chat and show the deck, where the
 /// card asks for the review.
 @MainActor
@@ -35,7 +36,7 @@ struct MandarinCallFinisher {
 
     func finish(_ end: MockCallEnd, date: String) async {
         await leave()
-        if let sessionID = end.sessionID { record(date, sessionID, end.waitMS) }
+        if let grade = end.grade { record(date, grade.sessionID, end.waitMS) }
         guard isStillOnCallChat() else { return }
         showDeck()
     }

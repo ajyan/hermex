@@ -340,6 +340,14 @@ struct DeckMandarinCard<Answer: View>: View {
                             speaker: speaker)
         }
         answer()
+        if practice.record.isTyping, openMockCall.isAvailable {
+            Button { change { practice.callInstead() } } label: {
+                Text(verbatim: "Call \(practice.speakerName) instead")
+                    .font(AppFont.footnote(weight: .semibold))
+                    .foregroundStyle(palette.ink)
+            }
+            .buttonStyle(.plain)
+        }
         takeaways
         if let progress = practice.progress, let line = MandarinProgressLine.text(progress) {
             Text(verbatim: line)

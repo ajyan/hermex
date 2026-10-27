@@ -2821,6 +2821,32 @@ final class MandarinPracticeTests: XCTestCase {
         XCTAssertTrue(practice.isDone(.call))
     }
 
+    func testASecondCallTheSameDayIsReviewedAfresh() async throws {
+        let client = FakeMandarinClient()
+        client.reviewResults = [.success(review(moments: 2)), .success(review(moments: 1))]
+        recordCall(session: "s1")
+        let first = practice(try card(Self.callCardJSON), client: client)
+        await first.reviewIfNeeded()
+        first.reveal(0)
+        first.retry(0, text: "早点休息")
+        recordCall(session: "s2")
+        await first.reviewIfNeeded()
+        XCTAssertEqual(client.reviews.map(\.sessionID), ["s1", "s2"])
+        XCTAssertEqual(first.record.review?.moments.count, 1)
+        XCTAssertEqual(first.record.revealed, [], "the new call's moments start hidden")
+        XCTAssertEqual(first.record.retries, [:])
+        let rebuilt = practice(try card(Self.callCardJSON), client: client)
+        XCTAssertEqual(rebuilt.record.review?.moments.count, 1)
+    }
+
+    func testTypingCanGoBackToTheCall() throws {
+        let practice = practice(try card(Self.callCardJSON), client: FakeMandarinClient())
+        practice.typeInstead()
+        XCTAssertTrue(practice.record.isTyping)
+        practice.callInstead()
+        XCTAssertFalse(practice.record.isTyping)
+    }
+
     func testAfterIsDoneWhenEveryMomentIsRevealed() async throws {
         let client = FakeMandarinClient()
         client.reviewResults = [.success(review(moments: 2))]
@@ -3080,8 +3106,10 @@ final class MandarinCallTests: XCTestCase {
         XCTAssertEqual(MandarinCall.language(forCallID: nil), .english)
     }
 
+    private let grade = MockCallGrade(mockID: "mandarin:2026-10-27", sessionID: "s1", turnMS: [1200])
+
     func testMandarinFinisherRecordsAndShowsTheDeck() async {
-        await finisher().finish(MockCallEnd(mockID: "mandarin:2026-10-27", grade: nil, sessionID: "s1", waitMS: [900]),
+        await finisher().finish(MockCallEnd(mockID: "mandarin:2026-10-27", grade: grade, sessionID: "s1", waitMS: [900]),
                                 date: "2026-10-27")
         XCTAssertEqual(events, ["leave", "record:2026-10-27:s1:[900]", "deck"])
     }
@@ -3091,9 +3119,15 @@ final class MandarinCallTests: XCTestCase {
         XCTAssertEqual(events, ["leave", "deck"])
     }
 
+    func testMandarinFinisherRecordsNothingWhenTheParentNeverAnswered() async {
+        await finisher().finish(MockCallEnd(mockID: "mandarin:2026-10-27", grade: nil, sessionID: "s1", waitMS: []),
+                                date: "2026-10-27")
+        XCTAssertEqual(events, ["leave", "deck"], "no review to ask for: the card stays on Call")
+    }
+
     func testMandarinFinisherOffTheChatDoesNotNavigate() async {
         await finisher(stillOnChat: false).finish(
-            MockCallEnd(mockID: "mandarin:2026-10-27", grade: nil, sessionID: "s1", waitMS: []), date: "2026-10-27")
+            MockCallEnd(mockID: "mandarin:2026-10-27", grade: grade, sessionID: "s1", waitMS: []), date: "2026-10-27")
         XCTAssertEqual(events, ["leave", "record:2026-10-27:s1:[]"])
     }
 
