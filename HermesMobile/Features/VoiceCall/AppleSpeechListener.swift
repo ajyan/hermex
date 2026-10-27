@@ -1,7 +1,7 @@
 import AVFoundation
 import Speech
 
-/// Mic capture and on-device English recognition for a call: `SpeechAnalyzer`
+/// Mic capture and on-device recognition in the call's language for a call: `SpeechAnalyzer`
 /// with `DictationTranscriber` on iOS 26+, on-device `SFSpeechRecognizer` below.
 /// Both are biased toward the server's vocabulary (contact names, dictionary
 /// words), which arrives while the call connects. Start it after the call's
@@ -12,8 +12,7 @@ final class AppleSpeechListener: SpeechListening {
     var onFinal: ((String) -> Void)?
     var onVoiceActivity: ((Bool, TimeInterval) -> Void)?
 
-    static let locale = Locale(identifier: "en-US")
-
+    private let locale: Locale
     private let engine = AVAudioEngine()
     private var recognizer: CallRecognizer?
     private let levels: VoiceCallAudioLevels?
@@ -24,10 +23,12 @@ final class AppleSpeechListener: SpeechListening {
     /// `levels` receives mic loudness for the call visual. `vocabulary` loads the
     /// names and words to expect; recognition starts without waiting for it.
     init(
+        locale: Locale = VoiceCallLanguage.english.locale,
         levels: VoiceCallAudioLevels? = nil,
         vocabulary: @escaping () async -> [String] = { [] },
         log: @escaping (String) -> Void = { _ in }
     ) {
+        self.locale = locale
         self.levels = levels
         self.vocabulary = vocabulary
         self.log = log
@@ -50,10 +51,10 @@ final class AppleSpeechListener: SpeechListening {
         let recognizer: CallRecognizer
         do {
             if #available(iOS 26, *) {
-                recognizer = try await AnalyzerRecognizer.make(locale: Self.locale, log: log)
+                recognizer = try await AnalyzerRecognizer.make(locale: locale, log: log)
                 log("listener: SpeechAnalyzer ready \(elapsed())")
             } else {
-                recognizer = try SFRecognizer(locale: Self.locale, log: log)
+                recognizer = try SFRecognizer(locale: locale, log: log)
                 log("listener: SFSpeechRecognizer ready \(elapsed())")
             }
         } catch {
