@@ -1284,6 +1284,65 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(card.questionEn, "How is your running going?")
     }
 
+    func testMandarinCardDecodesChunksBeatsAndSpeaker() throws {
+        let card = try DailyDeck.decode(#"""
+        {"date":"d","kind":"morning","cards":[{"id":"m","type":"prompt","kind":"mandarin","question":"你好吗？",
+         "chunks":[{"hanzi":"其实","pinyin":"qí shí","en":"actually","kind":"connector"},{"pinyin":"no characters"}],
+         "beats":["Ran 20 miles"],"speaker":"dad"}]}
+        """#).cards[0]
+        XCTAssertEqual(card.chunks.count, 1)
+        XCTAssertEqual(card.chunks.first?.kind, "connector")
+        XCTAssertEqual(card.beats, ["Ran 20 miles"])
+        XCTAssertEqual(card.speaker, "dad")
+    }
+
+    func testOldMandarinCardDecodesWithoutChunks() throws {
+        let card = try DailyDeck.decode(Self.mandarinDeckJSON).cards[0]
+        XCTAssertEqual(card.chunks, [])
+        XCTAssertEqual(card.beats, [])
+        XCTAssertNil(card.speaker)
+    }
+
+    private static func clientDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return decoder
+    }
+
+    func testCallReviewDecodesSnakeCase() throws {
+        let review = try Self.clientDecoder().decode(MandarinCallReview.self, from: Data(#"""
+        {"moments":[{"said":"我那个 marathon","natural":"我要跑马拉松","natural_pinyin":"wǒ yào","en":"I'm running","why":"Say it in Mandarin."}],
+         "natural_turns":[{"said":"我很忙","natural":"我最近挺忙的"}],"chunks_used":["其实"],"chunks_missed":["对吧"],
+         "fluency":{"english":1,"restarts":0,"chars_per_turn":6.5,"wait_ms_p50":1200,"turns":4},
+         "telling":{"english":3},"progress":{"phrases":40,"call_week":{"english":1.5,"wait_ms_p50":1300}}}
+        """#.utf8))
+        XCTAssertEqual(review.moments.first?.naturalPinyin, "wǒ yào")
+        XCTAssertEqual(review.naturalTurns.first?.natural, "我最近挺忙的")
+        XCTAssertEqual(review.chunksUsed, ["其实"])
+        XCTAssertEqual(review.chunksMissed, ["对吧"])
+        XCTAssertEqual(review.fluency?.waitMsP50, 1200)
+        XCTAssertEqual(review.fluency?.charsPerTurn, 6.5)
+        XCTAssertEqual(review.telling?.english, 3)
+        XCTAssertEqual(review.progress?.callWeek?.waitMsP50, 1300)
+    }
+
+    func testCallReviewRequestEncodesSnakeCase() throws {
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let json = try JSONSerialization.jsonObject(with: try encoder.encode(
+            MandarinCallReviewRequest(date: "2026-10-27", sessionID: "s1", waitMS: [900]))) as? [String: Any]
+        XCTAssertEqual(Set(json.map { Array($0.keys) } ?? []), ["date", "session_id", "wait_ms"])
+    }
+
+    func testCallReviewWithBadMomentKeepsTheRest() throws {
+        let review = try Self.clientDecoder().decode(MandarinCallReview.self, from: Data(#"""
+        {"moments":[{"said":"x"},{"said":"休息早一点休息","natural":"早点休息"}]}
+        """#.utf8))
+        XCTAssertEqual(review.moments.map(\.natural), ["早点休息"])
+        XCTAssertEqual(review.naturalTurns, [])
+        XCTAssertNil(review.fluency)
+    }
+
     func testMandarinFieldsAreOptional() throws {
         let card = try DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"m","type":"prompt","kind":"mandarin","question":"你好吗？","yesterday":{"said":"x"}}]}"#).cards[0]
         XCTAssertTrue(card.isMandarin)
@@ -2457,6 +2516,28 @@ private final class FakeMandarinClient: MandarinPracticeClient, @unchecked Senda
         afters.append(request)
         return try callResult.get()
     }
+
+    var tellings: [MandarinTellingRequest] = []
+    var starts: [MandarinCallStartRequest] = []
+    var reviews: [MandarinCallReviewRequest] = []
+    var tellingFails = false
+    var startResult: Result<MandarinCallStart, Error> = .failure(URLError(.notConnectedToInternet))
+    var reviewResults: [Result<MandarinCallReview, Error>] = []
+
+    func telling(_ request: MandarinTellingRequest) async throws {
+        tellings.append(request)
+        if tellingFails { throw URLError(.notConnectedToInternet) }
+    }
+
+    func callStart(_ request: MandarinCallStartRequest) async throws -> MandarinCallStart {
+        starts.append(request)
+        return try startResult.get()
+    }
+
+    func callReview(_ request: MandarinCallReviewRequest) async throws -> MandarinCallReview {
+        reviews.append(request)
+        return try (reviewResults.isEmpty ? .success(MandarinCallReview()) : reviewResults.removeFirst()).get()
+    }
 }
 
 @MainActor
@@ -2505,19 +2586,16 @@ final class MandarinPracticeTests: XCTestCase {
         XCTAssertEqual(card.yesterday?.pattern?.pattern, "因为…所以…")
     }
 
-    func testStepsStartAtTheFixAndMoveOnAsEachIsDone() async throws {
+    func testStepsStartAtRecallAndMoveOnAsEachIsDone() async throws {
         let client = FakeMandarinClient()
         let practice = practice(try card(), client: client)
-        XCTAssertEqual(practice.steps, [.fix, .recall, .talk])
-        XCTAssertEqual(practice.step, .fix)
-        XCTAssertEqual(practice.currentFix?.said, "休息早一点")
-        practice.nextFix()
+        XCTAssertEqual(practice.steps, [.recall, .call])
         XCTAssertEqual(practice.step, .recall)
         await practice.recall(try XCTUnwrap(practice.currentRecall), got: true)
         XCTAssertEqual(practice.currentRecall?.hanzi, "紧张")
         XCTAssertEqual(practice.progress?.phrases, 9, "a recall brings the server's progress back")
         await practice.recall(try XCTUnwrap(practice.currentRecall), got: false)
-        XCTAssertEqual(practice.step, .talk)
+        XCTAssertEqual(practice.step, .call)
         XCTAssertEqual(client.recalls.map(\.got), [true, false])
         XCTAssertEqual(practice.record.recalled, ["宝宝一月份出生。": true, "紧张": false])
     }
@@ -2543,7 +2621,7 @@ final class MandarinPracticeTests: XCTestCase {
         XCTAssertEqual(practice.result, feedback)
         XCTAssertEqual(practice.answering, .idle)
         XCTAssertEqual(practice.progress?.phrases, 38)
-        XCTAssertTrue(practice.isDone(.talk))
+        XCTAssertTrue(practice.isDone(.call))
         await practice.submit("我最近面试了三家公司，有一点anxious，可是还不错", question: nil)
         XCTAssertEqual(client.answers.count, 1, "the same answer isn't sent twice")
         await practice.submit("我最近面试了三家公司。", question: "你好吗？")
@@ -2568,21 +2646,221 @@ final class MandarinPracticeTests: XCTestCase {
     func testThePracticeResumesForTheSameServerAndDayOnly() async throws {
         let card = try card()
         let first = practice(card, client: FakeMandarinClient())
-        first.nextFix()
         await first.recall(try XCTUnwrap(first.currentRecall), got: true)
         let again = practice(card, client: FakeMandarinClient())
         XCTAssertEqual(again.step, .recall)
         XCTAssertEqual(again.currentRecall?.hanzi, "紧张")
         let other = MandarinPractice(card: card, date: "2026-10-25", server: URL(string: "https://other.example")!,
                                      client: nil, store: MandarinPracticeStore(defaults: defaults))
-        XCTAssertEqual(other.step, .fix, "another server starts fresh")
+        XCTAssertEqual(other.currentRecall?.hanzi, "宝宝一月份出生。", "another server starts fresh")
     }
 
-    func testACardWithoutYesterdayOrRecallStartsAtTalk() throws {
+    func testACardWithoutRecallOrChunksStartsAtTheCall() throws {
         let card = try card(#"{"date":"d","kind":"morning","cards":[{"id":"m","type":"prompt","kind":"mandarin","question":"你好吗？"}]}"#)
         let practice = practice(card, client: nil)
-        XCTAssertEqual(practice.steps, [.talk])
-        XCTAssertEqual(practice.step, .talk)
+        XCTAssertEqual(practice.steps, [.call])
+        XCTAssertEqual(practice.step, .call)
+    }
+
+    // MARK: Prep, the call, and after
+
+    private static let callCardJSON = """
+    {"date": "2026-10-25", "kind": "morning", "cards": [
+      {"id": "mandarin", "type": "prompt", "kind": "mandarin", "title": "Dad asks about the job search",
+       "question": "你找工作找得怎么样了？", "speaker": "dad",
+       "chunks": [{"hanzi": "其实", "en": "actually", "kind": "connector"}, {"hanzi": "真的啊", "en": "really?", "kind": "reaction"}],
+       "beats": ["Three interviews this week"]}
+    ]}
+    """
+
+    private func review(moments: Int, turns: Int = 2) -> MandarinCallReview {
+        MandarinCallReview(
+            moments: (0..<moments).map { .init(said: "said \($0)", natural: "自然\($0)", naturalPinyin: nil, en: nil, why: "why") },
+            naturalTurns: [.init(said: "我很忙", natural: "我最近挺忙的", naturalPinyin: nil)],
+            fluency: MandarinFluency(english: 1, restarts: 0, charsPerTurn: 6, waitMsP50: 1200, turns: turns))
+    }
+
+    private func recordCall(session: String = "s1") {
+        MandarinPracticeStore(defaults: defaults).recordCall(server: server, date: "2026-10-25", sessionID: session, waitMS: [900])
+    }
+
+    func testOldCardWithoutChunksDecodesAndSkipsPrep() throws {
+        let practice = practice(try card(), client: nil)
+        XCTAssertEqual(practice.steps, [.recall, .call])
+        XCTAssertEqual(practice.speakerName, "Mom")
+    }
+
+    func testPrepIsDoneAfterEveryChunkAndATelling() async throws {
+        let client = FakeMandarinClient()
+        let practice = practice(try card(Self.callCardJSON), client: client)
+        XCTAssertEqual(practice.steps, [.prep, .call])
+        XCTAssertEqual(practice.step, .prep)
+        XCTAssertEqual(practice.speakerName, "Dad")
+        practice.markSaid("其实")
+        practice.markSaid("真的啊")
+        XCTAssertFalse(practice.isDone(.prep), "the first telling is part of prep")
+        client.tellingFails = true
+        await practice.tell("  我这个星期面试了三次  ")
+        XCTAssertTrue(practice.isDone(.prep), "a failed save still counts the telling here")
+        XCTAssertEqual(practice.record.telling, "我这个星期面试了三次")
+        XCTAssertEqual(client.tellings.map(\.text), ["我这个星期面试了三次"])
+        XCTAssertEqual(practice.step, .call)
+    }
+
+    func testCallEndedWithoutSessionStaysOnCall() async throws {
+        let client = FakeMandarinClient()
+        let practice = practice(try card(Self.callCardJSON), client: client)
+        await practice.reviewIfNeeded()
+        XCTAssertEqual(practice.steps, [.prep, .call])
+        XCTAssertEqual(practice.reviewing, .idle)
+        XCTAssertTrue(client.reviews.isEmpty)
+    }
+
+    func testRecordedCallReviewsOnLoad() async throws {
+        let client = FakeMandarinClient()
+        client.reviewResults = [.success(review(moments: 2))]
+        recordCall()
+        let practice = practice(try card(Self.callCardJSON), client: client)
+        XCTAssertEqual(practice.step, .after)
+        await practice.reviewIfNeeded()
+        XCTAssertEqual(client.reviews.map(\.sessionID), ["s1"])
+        XCTAssertEqual(client.reviews.first?.waitMS, [900])
+        XCTAssertEqual(practice.record.review?.moments.count, 2)
+        XCTAssertEqual(practice.step, .after)
+        await practice.reviewIfNeeded()
+        XCTAssertEqual(client.reviews.count, 1, "a stored review isn't asked for again")
+    }
+
+    func testACallFinishedWhileTheCardWasOpenIsReviewed() async throws {
+        let client = FakeMandarinClient()
+        client.reviewResults = [.success(review(moments: 1))]
+        let practice = practice(try card(Self.callCardJSON), client: client)
+        recordCall()
+        await practice.reviewIfNeeded()
+        XCTAssertEqual(client.reviews.count, 1)
+        XCTAssertEqual(practice.step, .after)
+    }
+
+    func testFailedReviewShowsRetryAndRetrySucceeds() async throws {
+        let client = FakeMandarinClient()
+        client.reviewResults = [.failure(URLError(.timedOut)), .success(review(moments: 1))]
+        recordCall()
+        let practice = practice(try card(Self.callCardJSON), client: client)
+        await practice.reviewIfNeeded()
+        XCTAssertEqual(practice.reviewing, .failed("Review didn't arrive"))
+        XCTAssertNil(practice.record.review)
+        await practice.reviewIfNeeded()
+        XCTAssertEqual(practice.reviewing, .idle)
+        XCTAssertEqual(practice.record.review?.moments.count, 1)
+    }
+
+    func testAnEmptyReviewIsNotKeptAndOffersRetry() async throws {
+        let client = FakeMandarinClient()
+        client.reviewResults = [.success(MandarinCallReview(fluency: MandarinFluency(english: 0, restarts: 0, charsPerTurn: 5, waitMsP50: nil, turns: 3)))]
+        recordCall()
+        let practice = practice(try card(Self.callCardJSON), client: client)
+        await practice.reviewIfNeeded()
+        XCTAssertEqual(practice.reviewing, .failed("Review didn't arrive"), "never an empty Takeaways block")
+        XCTAssertNil(practice.record.review)
+    }
+
+    func testACallWhereHeNeverSpokeGoesBackToTheCall() async throws {
+        let client = FakeMandarinClient()
+        client.reviewResults = [.success(MandarinCallReview(fluency: MandarinFluency(english: 0, restarts: 0, charsPerTurn: 0, waitMsP50: nil, turns: 0)))]
+        recordCall()
+        let practice = practice(try card(Self.callCardJSON), client: client)
+        await practice.reviewIfNeeded()
+        XCTAssertNil(practice.record.callSessionID)
+        XCTAssertEqual(practice.steps, [.prep, .call])
+        XCTAssertEqual(practice.reviewing, .idle)
+    }
+
+    func testStartCallServerRefusalShowsWhy() async throws {
+        let client = FakeMandarinClient()
+        client.startResult = .failure(APIError.http(statusCode: 404, body: #"{"error":"no_card"}"#))
+        let practice = practice(try card(Self.callCardJSON), client: client)
+        var started: PrepMockStart?? = .none
+        let action = OpenMockCallAction()
+        action.handler = { profile, start in
+            XCTAssertEqual(profile, "mandarin")
+            started = .some(await start())
+        }
+        await practice.startCall(open: action)
+        XCTAssertEqual(started, .some(nil), "the opener gets nil and switches back")
+        XCTAssertEqual(practice.startCallError, "Couldn't start the call.")
+        XCTAssertFalse(practice.isStartingCall)
+    }
+
+    func testStartCallOpensWithTheBriefUnderTheDaysID() async throws {
+        let client = FakeMandarinClient()
+        client.startResult = .success(MandarinCallStart(brief: "[mandarin brief] x", speaker: "dad", profile: "mandarin"))
+        let practice = practice(try card(Self.callCardJSON), client: client)
+        var opened: PrepMockStart?
+        let action = OpenMockCallAction()
+        action.handler = { _, start in opened = await start() }
+        await practice.startCall(open: action)
+        XCTAssertEqual(opened?.mockID, "mandarin:2026-10-25")
+        XCTAssertEqual(opened?.brief, "[mandarin brief] x")
+        XCTAssertEqual(opened?.profile, "mandarin")
+        XCTAssertEqual(client.starts.map(\.date), ["2026-10-25"])
+        XCTAssertNil(practice.startCallError)
+    }
+
+    func testStartCallMissingProfileFallsBackToTyping() async throws {
+        let client = FakeMandarinClient()
+        let practice = practice(try card(Self.callCardJSON), client: client)
+        let action = OpenMockCallAction()
+        action.handler = { _, _ in throw PrepMockProfileError.missing }
+        await practice.startCall(open: action)
+        XCTAssertEqual(practice.startCallError, "The Mandarin profile isn't set up on this server.")
+        XCTAssertFalse(practice.record.isTyping)
+        practice.typeInstead()
+        XCTAssertTrue(practice.record.isTyping)
+        await practice.submit("我很好", question: nil)
+        XCTAssertEqual(client.answers.map(\.text), ["我很好"])
+        XCTAssertTrue(practice.isDone(.call))
+    }
+
+    func testASecondCallTheSameDayIsReviewedAfresh() async throws {
+        let client = FakeMandarinClient()
+        client.reviewResults = [.success(review(moments: 2)), .success(review(moments: 1))]
+        recordCall(session: "s1")
+        let first = practice(try card(Self.callCardJSON), client: client)
+        await first.reviewIfNeeded()
+        first.reveal(0)
+        first.retry(0, text: "早点休息")
+        recordCall(session: "s2")
+        await first.reviewIfNeeded()
+        XCTAssertEqual(client.reviews.map(\.sessionID), ["s1", "s2"])
+        XCTAssertEqual(first.record.review?.moments.count, 1)
+        XCTAssertEqual(first.record.revealed, [], "the new call's moments start hidden")
+        XCTAssertEqual(first.record.retries, [:])
+        let rebuilt = practice(try card(Self.callCardJSON), client: client)
+        XCTAssertEqual(rebuilt.record.review?.moments.count, 1)
+    }
+
+    func testTypingCanGoBackToTheCall() throws {
+        let practice = practice(try card(Self.callCardJSON), client: FakeMandarinClient())
+        practice.typeInstead()
+        XCTAssertTrue(practice.record.isTyping)
+        practice.callInstead()
+        XCTAssertFalse(practice.record.isTyping)
+    }
+
+    func testAfterIsDoneWhenEveryMomentIsRevealed() async throws {
+        let client = FakeMandarinClient()
+        client.reviewResults = [.success(review(moments: 2))]
+        recordCall()
+        let practice = practice(try card(Self.callCardJSON), client: client)
+        await practice.reviewIfNeeded()
+        practice.retry(0, text: "早点休息")
+        XCTAssertEqual(practice.record.retries[0], "早点休息")
+        practice.reveal(0)
+        XCTAssertFalse(practice.isDone(.after))
+        practice.reveal(1)
+        XCTAssertTrue(practice.isDone(.after))
+        let again = self.practice(try card(Self.callCardJSON), client: client)
+        XCTAssertEqual(again.record.revealed, [0, 1], "the card resumes where he left it")
     }
 
     func testCallPrepIsAskedOncePerRelativeAndKept() async throws {
@@ -2641,6 +2919,22 @@ final class MandarinPracticeTests: XCTestCase {
         XCTAssertEqual(MandarinProgressLine.text(DeckMandarinProgress(phrases: 1, usedWeek: nil, englishNow: nil, englishBefore: nil)),
                        "1 phrase")
         XCTAssertNil(MandarinProgressLine.text(DeckMandarinProgress(phrases: nil, usedWeek: nil, englishNow: nil, englishBefore: nil)))
+    }
+
+    func testFluencyLines() {
+        let call = MandarinFluency(english: 3, restarts: 1, charsPerTurn: 14.2, waitMsP50: 1400, turns: 6)
+        XCTAssertEqual(MandarinFluencyLine.text(call), "Wait 1.4 s · English 3 · Restarts 1 · 14 characters a turn")
+        XCTAssertNil(MandarinFluencyLine.text(nil))
+        XCTAssertEqual(MandarinFluencyLine.text(MandarinFluency(english: 3, restarts: 1, charsPerTurn: 14.2, waitMsP50: nil, turns: 6)),
+                       "English 3 · Restarts 1 · 14 characters a turn")
+        let before = MandarinFluency(english: 5, restarts: 2, charsPerTurn: 11, waitMsP50: 2100, turns: nil)
+        XCTAssertEqual(MandarinFluencyLine.lastWeek(DeckMandarinProgress(callBefore: before)),
+                       "Last week: wait 2.1 s · English 5 · Restarts 2 · 11 characters a turn")
+        XCTAssertNil(MandarinFluencyLine.lastWeek(DeckMandarinProgress(phrases: 3)))
+        XCTAssertEqual(MandarinFluencyLine.telling(MandarinFluency(english: 4, restarts: 0, charsPerTurn: 20, waitMsP50: nil, turns: 1),
+                                                   call: MandarinFluency(english: 2, restarts: 0, charsPerTurn: 9, waitMsP50: 900, turns: 5)),
+                       "First telling: English 4 → on the call 2")
+        XCTAssertNil(MandarinFluencyLine.telling(nil, call: call))
     }
 }
 
@@ -2784,5 +3078,71 @@ extension DailyDeckTests {
         let plan = try XCTUnwrap(model.cards.first { $0.type == .meals })
         model.markAccepted(plan)
         XCTAssertEqual(model.answer(for: plan)?.action, "accepted")
+    }
+}
+
+/// The Mandarin call's id, its finish, and what it keeps out of the Prep mock path.
+@MainActor
+final class MandarinCallTests: XCTestCase {
+    private var events: [String] = []
+
+    private func finisher(stillOnChat: Bool = true) -> MandarinCallFinisher {
+        MandarinCallFinisher(
+            leave: { self.events.append("leave") },
+            record: { date, session, waits in self.events.append("record:\(date):\(session):\(waits)") },
+            isStillOnCallChat: { stillOnChat },
+            showDeck: { self.events.append("deck") }
+        )
+    }
+
+    func testMandarinCallIDRoundTrips() {
+        XCTAssertEqual(MandarinCall.id(date: "2026-10-27"), "mandarin:2026-10-27")
+        XCTAssertEqual(MandarinCall.date(fromCallID: MandarinCall.id(date: "2026-10-27")), "2026-10-27")
+        XCTAssertNil(MandarinCall.date(fromCallID: "mock-123"))
+        XCTAssertNil(MandarinCall.date(fromCallID: "mandarin:soon"))
+        XCTAssertNil(MandarinCall.date(fromCallID: nil))
+        XCTAssertEqual(MandarinCall.language(forCallID: "mandarin:2026-10-27"), .mandarin)
+        XCTAssertEqual(MandarinCall.language(forCallID: "mock-123"), .english)
+        XCTAssertEqual(MandarinCall.language(forCallID: nil), .english)
+    }
+
+    private let grade = MockCallGrade(mockID: "mandarin:2026-10-27", sessionID: "s1", turnMS: [1200])
+
+    func testMandarinFinisherRecordsAndShowsTheDeck() async {
+        await finisher().finish(MockCallEnd(mockID: "mandarin:2026-10-27", grade: grade, sessionID: "s1", waitMS: [900]),
+                                date: "2026-10-27")
+        XCTAssertEqual(events, ["leave", "record:2026-10-27:s1:[900]", "deck"])
+    }
+
+    func testMandarinFinisherWithoutSessionRecordsNothing() async {
+        await finisher().finish(MockCallEnd(mockID: "mandarin:2026-10-27", grade: nil), date: "2026-10-27")
+        XCTAssertEqual(events, ["leave", "deck"])
+    }
+
+    func testMandarinFinisherRecordsNothingWhenTheParentNeverAnswered() async {
+        await finisher().finish(MockCallEnd(mockID: "mandarin:2026-10-27", grade: nil, sessionID: "s1", waitMS: []),
+                                date: "2026-10-27")
+        XCTAssertEqual(events, ["leave", "deck"], "no review to ask for: the card stays on Call")
+    }
+
+    func testMandarinFinisherOffTheChatDoesNotNavigate() async {
+        await finisher(stillOnChat: false).finish(
+            MockCallEnd(mockID: "mandarin:2026-10-27", grade: grade, sessionID: "s1", waitMS: []), date: "2026-10-27")
+        XCTAssertEqual(events, ["leave", "record:2026-10-27:s1:[]"])
+    }
+
+    func testMandarinCallProgressIsNotSavedAsAMock() {
+        XCTAssertFalse(PrepMockInFlight.shouldSave(mockID: "mandarin:2026-10-27"))
+        XCTAssertTrue(PrepMockInFlight.shouldSave(mockID: "m1"))
+    }
+
+    func testRecordCallStoresSessionAndWaits() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "MandarinCallTests.\(UUID().uuidString)"))
+        let store = MandarinPracticeStore(defaults: defaults)
+        let server = URL(string: "https://hermes.example")!
+        store.recordCall(server: server, date: "2026-10-27", sessionID: "s1", waitMS: [900])
+        let record = try XCTUnwrap(store.record(for: server, date: "2026-10-27"))
+        XCTAssertEqual(record.callSessionID, "s1")
+        XCTAssertEqual(record.callWaitMS, [900])
     }
 }

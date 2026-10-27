@@ -1,21 +1,24 @@
 import CryptoKit
 import SwiftUI
 
-/// Opens a voice mock from Prep: a new chat in the mock's profile, already in a call, with the brief
-/// as its opening turn. A reference, like `OpenDraftChatAction`: the shell keeps one instance and
+/// Opens a voice mock from Prep (or the Daily Deck's Mandarin call, on the `mandarin` profile): a new
+/// chat in the mock's profile, already in a call, with the brief as its opening turn. A reference, like `OpenDraftChatAction`: the shell keeps one instance and
 /// refreshes `handler`, so readers never see a new value. The handler gets the mock's start (nil when
 /// it failed) and calls it only once the profile is active (`PrepMockCallOpener`); it returns once the
 /// chat is open, and throws, having started nothing, when the profile couldn't be made active.
 final class OpenMockCallAction {
     typealias Start = @MainActor () async -> PrepMockStart?
 
-    var handler: (@MainActor (@escaping Start) async throws -> Void)?
+    /// Gets the profile to enter before `start` runs, then the start.
+    var handler: (@MainActor (String, @escaping Start) async throws -> Void)?
 
     /// True when a shell is listening; without one, Start call hides.
     var isAvailable: Bool { handler != nil }
 
     @MainActor
-    func callAsFunction(_ start: @escaping Start) async throws { try await handler?(start) }
+    func callAsFunction(profile: String = PrepMockStart.interviewerProfile, _ start: @escaping Start) async throws {
+        try await handler?(profile, start)
+    }
 }
 
 struct OpenMockCallKey: EnvironmentKey {
@@ -48,10 +51,20 @@ struct MockCallGrade: Hashable, Sendable {
 }
 
 /// The end of a voice mock's call: which mock, and its grade request, or nil when there is nothing
-/// to grade (no session, or the interviewer never answered).
+/// to grade (no session, or the interviewer never answered). The session and the user's answer waits
+/// ride along for the Mandarin call's review.
 struct MockCallEnd: Equatable, Sendable {
     let mockID: String
     let grade: MockCallGrade?
+    let sessionID: String?
+    let waitMS: [Int]
+
+    init(mockID: String, grade: MockCallGrade?, sessionID: String? = nil, waitMS: [Int] = []) {
+        self.mockID = mockID
+        self.grade = grade
+        self.sessionID = sessionID
+        self.waitMS = waitMS
+    }
 }
 
 /// A chat opened for a voice mock: its first call opens with the brief, and when that call ends it
@@ -68,13 +81,15 @@ struct MockCallState: Equatable {
     }
 
     /// Ends the mock's call, once, with its grade request (`MockCallGrade.of`).
-    mutating func callEnded(sessionID: String?, turnMS: [Int]) -> MockCallEnd? {
+    mutating func callEnded(sessionID: String?, turnMS: [Int], waitMS: [Int] = []) -> MockCallEnd? {
         defer {
             mockID = nil
             openingTurn = nil
         }
         guard let mockID else { return nil }
-        return MockCallEnd(mockID: mockID, grade: MockCallGrade.of(mockID: mockID, sessionID: sessionID, turnMS: turnMS))
+        let session = sessionID?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return MockCallEnd(mockID: mockID, grade: MockCallGrade.of(mockID: mockID, sessionID: sessionID, turnMS: turnMS),
+                           sessionID: session?.isEmpty == false ? session : nil, waitMS: waitMS)
     }
 }
 
@@ -113,6 +128,10 @@ struct PrepMockInFlight: Codable, Equatable, Sendable {
         self.sessionID = sessionID
         self.turnMS = turnMS
     }
+
+    /// Whether a call's progress belongs in `PrepMockInFlightStore`: a Mandarin call is not a mock,
+    /// and must never be sent to the grader on recovery.
+    static func shouldSave(mockID: String) -> Bool { MandarinCall.date(fromCallID: mockID) == nil }
 }
 
 /// The in-flight voice mock, saved per configured server next to `PrepMockReturnStore` and keyed the
@@ -233,10 +252,10 @@ struct PrepMockCallOpener {
     var remember: @MainActor (PrepMockInFlight) -> Void
     var openChat: @MainActor (PrepMockStart) -> Void
 
-    func open(_ start: OpenMockCallAction.Start) async throws {
-        try await enter(PrepMockStart.interviewerProfile)
+    func open(profile: String = PrepMockStart.interviewerProfile, _ start: OpenMockCallAction.Start) async throws {
+        try await enter(profile)
         guard let mock = await start() else { return await leave() }
-        if mock.profile != PrepMockStart.interviewerProfile {
+        if mock.profile != profile {
             do {
                 try await enter(mock.profile)
             } catch {

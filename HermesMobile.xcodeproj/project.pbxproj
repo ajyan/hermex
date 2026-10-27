@@ -723,6 +723,7 @@
 		754960F45562E3D0663233FC /* DailyAskModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 446FC64957B2A7BF327BEA73 /* DailyAskModels.swift */; };
 		2D040393A5D1598FA7E58E97 /* DeckMandarinCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E500908D2992BBA8212DC303 /* DeckMandarinCard.swift */; };
 		B912D5B858D5BD7FD2B98267 /* MandarinCallSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0ECF7E2B4622F71B57A4236 /* MandarinCallSheet.swift */; };
+		9860F0DA1E49DD34B16D104E /* MandarinCall.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6ADC53FE18883F97807AE6E2 /* MandarinCall.swift */; };
 		7996C4637483EC2F9FFB5D8F /* MandarinPractice.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E40E9A114A449B71C984B6 /* MandarinPractice.swift */; };
 		1D1690542CB14BFC98AD9520 /* DeckUsageTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 207F26B7DB7C4F0BAF86AD12 /* DeckUsageTracker.swift */; };
 		70D8A76A4B70437EB3ABB465 /* DeckVariantPick.swift in Sources */ = {isa = PBXBuildFile; fileRef = 724D31DFBB984CEDA6184201 /* DeckVariantPick.swift */; };
@@ -1564,6 +1565,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		446FC64957B2A7BF327BEA73 /* DailyAskModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyAskModels.swift; sourceTree = "<group>"; };
 		E500908D2992BBA8212DC303 /* DeckMandarinCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckMandarinCard.swift; sourceTree = "<group>"; };
 		A0ECF7E2B4622F71B57A4236 /* MandarinCallSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MandarinCallSheet.swift; sourceTree = "<group>"; };
+		6ADC53FE18883F97807AE6E2 /* MandarinCall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MandarinCall.swift; sourceTree = "<group>"; };
 		A9E40E9A114A449B71C984B6 /* MandarinPractice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MandarinPractice.swift; sourceTree = "<group>"; };
 		207F26B7DB7C4F0BAF86AD12 /* DeckUsageTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckUsageTracker.swift; sourceTree = "<group>"; };
 		724D31DFBB984CEDA6184201 /* DeckVariantPick.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckVariantPick.swift; sourceTree = "<group>"; };
@@ -2754,6 +2756,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				446FC64957B2A7BF327BEA73 /* DailyAskModels.swift */,
 				E500908D2992BBA8212DC303 /* DeckMandarinCard.swift */,
 				A0ECF7E2B4622F71B57A4236 /* MandarinCallSheet.swift */,
+				6ADC53FE18883F97807AE6E2 /* MandarinCall.swift */,
 				A9E40E9A114A449B71C984B6 /* MandarinPractice.swift */,
 				207F26B7DB7C4F0BAF86AD12 /* DeckUsageTracker.swift */,
 				724D31DFBB984CEDA6184201 /* DeckVariantPick.swift */,
@@ -3071,6 +3074,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				754960F45562E3D0663233FC /* DailyAskModels.swift in Sources */,
 				2D040393A5D1598FA7E58E97 /* DeckMandarinCard.swift in Sources */,
 				B912D5B858D5BD7FD2B98267 /* MandarinCallSheet.swift in Sources */,
+				9860F0DA1E49DD34B16D104E /* MandarinCall.swift in Sources */,
 				7996C4637483EC2F9FFB5D8F /* MandarinPractice.swift in Sources */,
 				1D1690542CB14BFC98AD9520 /* DeckUsageTracker.swift in Sources */,
 				70D8A76A4B70437EB3ABB465 /* DeckVariantPick.swift in Sources */,

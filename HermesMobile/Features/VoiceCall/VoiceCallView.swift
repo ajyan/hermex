@@ -91,12 +91,15 @@ struct VoiceCallSummary: Equatable {
     /// Milliseconds each turn waited for its first reply text. A turn that never
     /// got reply text records no sample.
     let turnMS: [Int]
+    /// Milliseconds from the end of each spoken reply to the user starting to answer.
+    var answerWaitMS: [Int] = []
 }
 
 /// The full-screen call with Atlas on one chat. It owns the call controller and
 /// feeds it the chat's stream state; closing it leaves the chat on screen.
 struct VoiceCallView: View {
     let chat: ChatViewModel
+    let language: VoiceCallLanguage
     let openingTurn: String?
     /// The turn times so far, each time a turn is timed (a voice mock saves them as it goes).
     let onTurnTimed: (([Int]) -> Void)?
@@ -115,9 +118,10 @@ struct VoiceCallView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(chat: ChatViewModel, openingTurn: String? = nil, onTurnTimed: (([Int]) -> Void)? = nil,
-         onDismiss: @escaping (VoiceCallSummary) -> Void) {
+    init(chat: ChatViewModel, language: VoiceCallLanguage = .english, openingTurn: String? = nil,
+         onTurnTimed: (([Int]) -> Void)? = nil, onDismiss: @escaping (VoiceCallSummary) -> Void) {
         self.chat = chat
+        self.language = language
         self.openingTurn = openingTurn
         self.onTurnTimed = onTurnTimed
         self.onDismiss = onDismiss
@@ -127,7 +131,8 @@ struct VoiceCallView: View {
     private func onClose() {
         guard !didReport else { return }
         didReport = true
-        onDismiss(VoiceCallSummary(turnMS: controller?.turnLatenciesMS ?? []))
+        onDismiss(VoiceCallSummary(turnMS: controller?.turnLatenciesMS ?? [],
+                                   answerWaitMS: controller?.answerWaitsMS ?? []))
     }
 
     var body: some View {
@@ -214,6 +219,7 @@ struct VoiceCallView: View {
         VoiceCallDiagnostics.beginCall()
         let controller = VoiceCallController(
             listener: AppleSpeechListener(
+                locale: language.locale,
                 levels: levels,
                 vocabulary: { [client = chat.client] in await client.voiceVocabulary() },
                 log: VoiceCallDiagnostics.write
@@ -222,6 +228,7 @@ struct VoiceCallView: View {
             chat: chat,
             bridge: CallSystemBridge(),
             openingTurn: openingTurn,
+            speaksStatusLines: language.speaksStatusLines,
             log: VoiceCallDiagnostics.write
         )
         self.controller = controller
@@ -237,13 +244,20 @@ struct VoiceCallView: View {
         }
     }
 
+    /// The server voice when the user chose it, or always on a call whose language names one
+    /// (Mandarin); the on-device voice in the call's language is the fallback.
     private func makeSpeaker() -> SpeechSpeaking {
-        let apple = AppleSpeechSpeaker(levels: levels, log: VoiceCallDiagnostics.write)
-        guard usesServerVoice else { return apple }
-        VoiceCallDiagnostics.write("speaker: server voice (openai engine)")
+        let apple = AppleSpeechSpeaker(
+            voice: VoiceSelection.installedVoice(language: language.appleVoiceLanguage),
+            levels: levels,
+            log: VoiceCallDiagnostics.write
+        )
+        let voice = language.serverVoice
+        guard usesServerVoice || voice != nil else { return apple }
+        VoiceCallDiagnostics.write("speaker: server voice (openai engine\(voice.map { ", \($0)" } ?? ""))")
         let client = chat.client
         return ServerSpeechSpeaker(
-            synthesize: { text in try await client.synthesizeSpeech(text: text, voice: nil, engine: .openai) },
+            synthesize: { text in try await client.synthesizeSpeech(text: text, voice: voice, engine: .openai) },
             fallback: apple,
             levels: levels,
             log: VoiceCallDiagnostics.write

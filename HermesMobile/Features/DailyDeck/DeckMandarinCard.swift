@@ -2,10 +2,11 @@ import AVFoundation
 import Speech
 import SwiftUI
 
-/// The Mandarin practice card in four steps, chosen from its step bar: Fix yesterday's slips, Recall
-/// the phrasebook's due phrases, Talk (the question, today's pattern, the phrases to work in, and
-/// the answer), then the takeaways that come back seconds after answering. `answer` is the deck's
-/// own answer button (or his words once written).
+/// The Mandarin practice card in four steps, chosen from its step bar: Recall the phrasebook's due
+/// phrases, Prep (chunks said aloud, then a first telling of the day's story), the Call with Mom or
+/// Dad (or "Type it instead": the question, today's pattern, the phrases to work in, the answer and
+/// its takeaways), then After: Try again on two moments, the call's takeaways and its fluency.
+/// `answer` is the deck's own answer button (or his words once written).
 struct DeckMandarinCard<Answer: View>: View {
     let card: DeckCard
     let palette: DeckPalette
@@ -18,19 +19,25 @@ struct DeckMandarinCard<Answer: View>: View {
     /// Fixes and recall phrases whose answer is showing.
     @State private var revealed: Set<String> = []
     @State private var isCalling = false
+    /// What the Mandarin dictation sheet is for: the first telling, or saying a moment again.
+    @State private var speaking: MandarinSpeakTarget?
+    @Environment(\.openMockCall) private var openMockCall
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             stepBar.padding(.trailing, 30)
             switch practice.step {
-            case .fix: fixStep
             case .recall: recallStep
-            case .talk: talkStep
+            case .prep: prepStep
+            case .call: callStep
+            case .after: afterStep
             }
         }
         .onDisappear { speaker.stop() }
+        .task { await practice.reviewIfNeeded() }
         .sheet(isPresented: $isCalling) { MandarinCallSheet(practice: practice, palette: palette) }
+        .sheet(item: $speaking) { target in speakSheet(target) }
     }
 
     // MARK: Step bar
@@ -61,64 +68,11 @@ struct DeckMandarinCard<Answer: View>: View {
 
     private func title(_ step: MandarinPractice.Step) -> String {
         switch step {
-        case .fix: "Fix"
         case .recall: "Recall \(card.recall.count)"
-        case .talk: "Talk"
+        case .prep: "Prep"
+        case .call: "Call"
+        case .after: "After"
         }
-    }
-
-    // MARK: Fix
-
-    @ViewBuilder
-    private var fixStep: some View {
-        let yesterday = card.yesterday
-        if let fix = practice.currentFix {
-            let key = "fix:\(fix.said)"
-            heading("Say it the natural way",
-                    detail: practice.fixes.count > 1 ? "\((practice.fixes.firstIndex(of: fix) ?? 0) + 1) of \(practice.fixes.count)" : nil)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(slip(in: yesterday?.said ?? fix.said, fix.said))
-                    .font(AppFont.body())
-                    .fixedSize(horizontal: false, vertical: true)
-                if let en = fix.en {
-                    Text(verbatim: "You meant: \(en)")
-                        .font(AppFont.footnote())
-                        .foregroundStyle(Color.hxTextSecondary)
-                }
-            }
-            if revealed.contains(key) {
-                takeaway("Fix", fix.natural, pinyin: fix.naturalPinyin, note: fix.why)
-                actions(primary: ("Next", "arrow.right", { change { practice.nextFix() } }))
-            } else {
-                actions(primary: ("Show me", "eye", { change { _ = revealed.insert(key) } }))
-            }
-        } else if practice.fixes.isEmpty, let yesterday {
-            heading("Yesterday, said naturally", detail: nil)
-            if let said = yesterday.said {
-                Text(verbatim: said).font(AppFont.body()).foregroundStyle(Color.hxTextSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            takeaway("Natural", yesterday.natural, pinyin: yesterday.naturalPinyin, note: nil)
-            if !practice.isDone(.fix) {
-                actions(primary: ("Next", "arrow.right", { change { practice.nextFix() } }))
-            }
-        } else {
-            heading("Yesterday's fixes", detail: nil)
-            ForEach(practice.fixes, id: \.self) { fix in
-                takeaway("Fix", fix.natural, pinyin: fix.naturalPinyin, note: [fix.said + " → " + fix.natural, fix.why]
-                    .compactMap { $0 }.joined(separator: "\n"))
-            }
-        }
-    }
-
-    /// His sentence with the slip underlined in the card's ink.
-    private func slip(in said: String, _ slip: String) -> AttributedString {
-        var text = AttributedString(said)
-        if let range = text.range(of: slip) {
-            text[range].underlineStyle = .single
-            text[range].foregroundColor = palette.ink
-        }
-        return text
     }
 
     // MARK: Recall
@@ -169,6 +123,200 @@ struct DeckMandarinCard<Answer: View>: View {
         }
     }
 
+    // MARK: Prep
+
+    @ViewBuilder
+    private var prepStep: some View {
+        heading("Say each one out loud, twice", detail: "Then tell today's story once.")
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(card.chunks, id: \.hanzi) { chunk in chunkRow(chunk) }
+        }
+        if !card.beats.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(verbatim: "Today's story")
+                    .font(AppFont.caption(weight: .semibold))
+                    .foregroundStyle(palette.ink)
+                ForEach(card.beats, id: \.self) { beat in
+                    Text(verbatim: "· " + beat)
+                        .font(AppFont.footnote())
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        if let telling = practice.record.telling {
+            takeaway("First telling", telling, pinyin: nil, note: nil, play: false)
+        }
+        actions(primary: (practice.record.telling == nil ? "Tell it once" : "Tell it again", "mic",
+                          { speaker.stop(); speaking = .telling }))
+    }
+
+    private func chunkRow(_ chunk: DeckChunk) -> some View {
+        let said = practice.record.saidChunks.contains(chunk.hanzi)
+        return HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: chunk.hanzi).font(AppFont.display(style: .title3, weight: .semibold))
+                if let pinyin = chunk.pinyin {
+                    Text(verbatim: pinyin).font(AppFont.footnote(weight: .medium)).foregroundStyle(palette.ink)
+                }
+                if let en = chunk.en {
+                    Text(verbatim: en).font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
+                }
+            }
+            .accessibilityElement(children: .combine)
+            Spacer(minLength: 0)
+            Button { speaker.toggle(chunk.hanzi) } label: {
+                Image(systemName: speaker.speaking == chunk.hanzi ? "stop.fill" : "play.fill")
+                    .font(AppFont.caption(weight: .semibold))
+                    .foregroundStyle(palette.ink)
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(verbatim: "Play \(chunk.hanzi)"))
+            Button { change { practice.markSaid(chunk.hanzi) } } label: {
+                HXChip(paper: palette.colors, symbol: said ? "checkmark" : nil, label: "Said it")
+            }
+            .buttonStyle(.plain)
+            .disabled(said)
+            .accessibilityValue(Text(verbatim: said ? "Done" : ""))
+        }
+        .padding(.vertical, 8)
+    }
+
+    // MARK: Call
+
+    @ViewBuilder
+    private var callStep: some View {
+        if practice.record.isTyping {
+            talkStep
+        } else {
+            if let situation = card.title {
+                Text(verbatim: situation)
+                    .font(AppFont.footnote(weight: .semibold))
+                    .foregroundStyle(palette.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let asked {
+                let line = card.mandarinQuestion(asked: asked)
+                takeaway("\(practice.speakerName) asks", line.hanzi, pinyin: line.pinyin, note: line.english)
+            }
+            if openMockCall.isAvailable {
+                actions(primary: ("Call \(practice.speakerName)", "phone.fill", {
+                            speaker.stop()
+                            Task { await practice.startCall(open: openMockCall) }
+                        }),
+                        secondary: ("Type it instead", "keyboard", { change { practice.typeInstead() } }),
+                        busy: practice.isStartingCall)
+            } else {
+                actions(primary: ("Type it instead", "keyboard", { change { practice.typeInstead() } }))
+            }
+            if let error = practice.startCallError {
+                Text(verbatim: error)
+                    .font(AppFont.footnote())
+                    .foregroundStyle(Color.hxTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            familyCallButton
+        }
+    }
+
+    // MARK: After
+
+    @ViewBuilder
+    private var afterStep: some View {
+        switch practice.reviewing {
+        case .waiting:
+            HStack(spacing: 10) {
+                ProgressView()
+                Text(verbatim: "Reviewing your call…").font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
+            }
+        case let .failed(message):
+            HStack(spacing: 12) {
+                Text(verbatim: message).font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
+                Spacer(minLength: 0)
+                Button { Task { await practice.reviewIfNeeded() } } label: {
+                    Text(verbatim: "Retry").font(AppFont.footnote(weight: .semibold)).foregroundStyle(palette.ink)
+                }
+                .buttonStyle(.plain)
+            }
+        case .idle:
+            if let review = practice.record.review { reviewBlocks(review) }
+        }
+    }
+
+    @ViewBuilder
+    private func reviewBlocks(_ review: MandarinCallReview) -> some View {
+        if !review.moments.isEmpty {
+            heading("Try again", detail: "Say it again your way, then see the natural way.")
+            ForEach(Array(review.moments.enumerated()), id: \.offset) { index, moment in
+                momentRow(index, moment)
+            }
+        }
+        Text(verbatim: "Takeaways")
+            .font(AppFont.footnote(weight: .semibold))
+            .foregroundStyle(palette.ink)
+            .padding(.top, 4)
+        ForEach(review.naturalTurns, id: \.self) { turn in
+            takeaway("Natural", turn.natural, pinyin: turn.naturalPinyin, note: "You said: " + turn.said)
+        }
+        if !review.chunksUsed.isEmpty || !review.chunksMissed.isEmpty {
+            Text(verbatim: (review.chunksUsed.map { "✓ " + $0 } + review.chunksMissed.map { "○ " + $0 }).joined(separator: "  "))
+                .font(AppFont.footnote())
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityLabel(Text(verbatim: "Used " + review.chunksUsed.joined(separator: ", ")
+                                         + ". Missed " + review.chunksMissed.joined(separator: ", ")))
+        }
+        ForEach([MandarinFluencyLine.text(review.fluency),
+                 MandarinFluencyLine.telling(review.telling, call: review.fluency),
+                 MandarinFluencyLine.lastWeek(practice.progress)].compactMap { $0 }, id: \.self) { line in
+            Text(verbatim: line)
+                .font(AppFont.footnote())
+                .foregroundStyle(Color.hxTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder
+    private func momentRow(_ index: Int, _ moment: MandarinCallReview.Moment) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(verbatim: moment.said)
+                .font(AppFont.body())
+                .fixedSize(horizontal: false, vertical: true)
+            if let again = practice.record.retries[index] {
+                Text(verbatim: "Again: " + again)
+                    .font(AppFont.footnote())
+                    .foregroundStyle(Color.hxTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        if practice.record.revealed.contains(index) {
+            takeaway("Natural", moment.natural, pinyin: moment.naturalPinyin,
+                     note: [moment.en, moment.why].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: "\n"))
+        } else {
+            actions(primary: ("Show the natural way", "eye", { change { practice.reveal(index) } }),
+                    secondary: ("Say it again", "mic", { speaker.stop(); speaking = .retry(index) }))
+        }
+    }
+
+    // MARK: Dictation
+
+    @ViewBuilder
+    private func speakSheet(_ target: MandarinSpeakTarget) -> some View {
+        switch target {
+        case .telling:
+            MandarinSpeakSheet(prompt: "Tell today's story in Mandarin", detail: card.beats.map { "· " + $0 }.joined(separator: "\n"),
+                               initial: practice.record.telling ?? "", palette: palette) { text in
+                Task { await practice.tell(text) }
+            }
+        case .retry(let index):
+            let moments = practice.record.review?.moments ?? []
+            let moment = moments.indices.contains(index) ? moments[index] : nil
+            MandarinSpeakSheet(prompt: moment?.en ?? "Say it again", detail: moment?.said,
+                               initial: practice.record.retries[index] ?? "", palette: palette) { text in
+                practice.retry(index, text: text)
+            }
+        }
+    }
+
     // MARK: Talk and takeaways
 
     @ViewBuilder
@@ -192,6 +340,14 @@ struct DeckMandarinCard<Answer: View>: View {
                             speaker: speaker)
         }
         answer()
+        if practice.record.isTyping, openMockCall.isAvailable {
+            Button { change { practice.callInstead() } } label: {
+                Text(verbatim: "Call \(practice.speakerName) instead")
+                    .font(AppFont.footnote(weight: .semibold))
+                    .foregroundStyle(palette.ink)
+            }
+            .buttonStyle(.plain)
+        }
         takeaways
         if let progress = practice.progress, let line = MandarinProgressLine.text(progress) {
             Text(verbatim: line)
@@ -199,6 +355,11 @@ struct DeckMandarinCard<Answer: View>: View {
                 .foregroundStyle(Color.hxTextSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        familyCallButton
+    }
+
+    /// The real call with his parents: three things to say before, and what he couldn't say after.
+    private var familyCallButton: some View {
         Button { speaker.stop(); isCalling = true } label: {
             Label { Text(verbatim: "Calling Mom or Dad?") } icon: { Image(systemName: "phone") }
                 .font(AppFont.subheadline(weight: .semibold))
@@ -323,6 +484,138 @@ extension DeckCard {
     func mandarinQuestion(asked: String) -> (hanzi: String, pinyin: String?, english: String?) {
         guard asked == question else { return (asked, nil, nil) }
         return (asked, questionPinyin, questionEn)
+    }
+}
+
+/// What the card's Mandarin dictation sheet is for.
+enum MandarinSpeakTarget: Identifiable, Hashable {
+    case telling
+    case retry(Int)
+
+    var id: String {
+        switch self {
+        case .telling: "telling"
+        case .retry(let index): "retry:\(index)"
+        }
+    }
+}
+
+/// Speaking Mandarin into the card: the prompt on the card's paper, on-device zh-CN dictation (or
+/// typing), and Done hands back the words.
+struct MandarinSpeakSheet: View {
+    let prompt: String
+    let detail: String?
+    let initial: String
+    let palette: DeckPalette
+    let onDone: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var isFocused: Bool
+    @State private var text = ""
+    @State private var voiceInput = ComposerVoiceInputController(fixedLocale: MandarinDictation.locale)
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(verbatim: prompt)
+                    .font(AppFont.display(style: .title3, weight: .semibold))
+                    .foregroundStyle(palette.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let detail, !detail.isEmpty {
+                    Text(verbatim: detail)
+                        .font(AppFont.footnote())
+                        .foregroundStyle(Color.hxTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                TextEditor(text: $text)
+                    .font(AppFont.body())
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .scrollContentBackground(.hidden)
+                    .focused($isFocused)
+                    .overlay(alignment: .topLeading) {
+                        if text.isEmpty {
+                            Text(verbatim: "Say it out loud in Mandarin, or type")
+                                .font(AppFont.body())
+                                .foregroundStyle(Color.hxTextSecondary)
+                                .padding(.top, 8)
+                                .padding(.leading, 5)
+                                .allowsHitTesting(false)
+                        }
+                    }
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background(palette.paper.ignoresSafeArea())
+            .safeAreaInset(edge: .bottom) {
+                if let message = MandarinDictation.isAvailable
+                    ? voiceInput.errorMessage
+                    : "To speak, add Chinese (Simplified) dictation in Settings › General › Keyboard." {
+                    Text(verbatim: message)
+                        .font(AppFont.footnote())
+                        .foregroundStyle(Color.hxTextSecondary)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .toolbar {
+                if MandarinDictation.isAvailable {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            _ = voiceInput.scheduleToggle(currentDraft: text) { text = $0 }
+                        } label: {
+                            Image(systemName: voiceInput.state == .idle ? "mic" : "stop.circle.fill")
+                        }
+                        .accessibilityLabel(Text(verbatim: voiceInput.state == .idle ? "Speak in Mandarin" : "Stop dictation"))
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        voiceInput.stopKeepingTranscript()
+                        let words = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !words.isEmpty { onDone(words) }
+                        dismiss()
+                    } label: { Text(verbatim: "Done") }
+                }
+            }
+            .toolbarBackground(palette.paper, for: .navigationBar)
+        }
+        .tint(palette.ink)
+        .onAppear {
+            text = initial
+            isFocused = true
+        }
+        .onDisappear { voiceInput.stopKeepingTranscript() }
+        .presentationDragIndicator(.visible)
+    }
+}
+
+/// The Mandarin call's fluency lines: "Wait 1.4 s · English 3 · Restarts 1 · 14 characters a turn",
+/// last week's the same way, and the first telling against the call.
+enum MandarinFluencyLine {
+    static func text(_ fluency: MandarinFluency?) -> String? {
+        guard let fluency else { return nil }
+        let parts = [fluency.waitMsP50.map { "Wait \(seconds($0)) s" },
+                     fluency.english.map { "English \(number($0))" },
+                     fluency.restarts.map { "Restarts \(number($0))" },
+                     fluency.charsPerTurn.map { "\(Int($0.rounded())) characters a turn" }].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    static func lastWeek(_ progress: DeckMandarinProgress?) -> String? {
+        guard let line = text(progress?.callBefore) else { return nil }
+        return "Last week: " + (line.hasPrefix("Wait") ? "w" + line.dropFirst() : line)
+    }
+
+    static func telling(_ telling: MandarinFluency?, call: MandarinFluency?) -> String? {
+        guard let before = telling?.english, let after = call?.english else { return nil }
+        return "First telling: English \(number(before)) → on the call \(number(after))"
+    }
+
+    private static func seconds(_ ms: Double) -> String { String(format: "%.1f", ms / 1000) }
+
+    private static func number(_ value: Double) -> String {
+        value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
     }
 }
 
