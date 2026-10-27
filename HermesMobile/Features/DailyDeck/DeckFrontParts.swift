@@ -30,7 +30,8 @@ struct DeckFrontRow: Decodable, Equatable, Identifiable {
     }
 }
 
-/// One day of a front row: `done`, `today` (not yet), `ahead`, `missed`, `skip`, or `off` (not due).
+/// One day of a front row: `done`, `today` (not yet), `ask` (yesterday, not checked in yet), `ahead`, `missed`,
+/// `skip`, or `off` (not due).
 struct DeckDay: Decodable, Equatable {
     let date: String
     let state: String
@@ -50,8 +51,9 @@ enum DeckDots {
     static let weekdays = ["M", "T", "W", "T", "F", "S", "S"]
 }
 
-/// One dot. `ink` is the card's ink; a done day is filled, today ringed, a missed day a faint ring,
-/// a skipped day half-filled, a day ahead dashed, a day it isn't due a small mark.
+/// One dot. `ink` is the card's ink; a done day is filled, today ringed, yesterday waiting on its check-in
+/// ringed with a plus, a missed day a faint ring, a skipped day half-filled, a day ahead dashed, a day it
+/// isn't due a small mark.
 struct DeckDot: View {
     let state: String
     let ink: Color
@@ -65,6 +67,10 @@ struct DeckDot: View {
                 Circle().fill(ink.opacity(0.35))
             case "today":
                 Circle().strokeBorder(ink, lineWidth: 1.75)
+            case "ask":
+                Circle().strokeBorder(ink, lineWidth: 1.75)
+                Capsule().fill(ink).frame(width: 7, height: 1.75)
+                Capsule().fill(ink).frame(width: 1.75, height: 7)
             case "ahead":
                 Circle().strokeBorder(ink.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
             case "off":
@@ -130,11 +136,17 @@ struct DeckFrontRowView: View {
     private func state(_ day: DeckDay, _ live: (slug: String, row: GoalCommitmentProgress, home: GoalsHome)?) -> String {
         guard let live, day.date == live.home.yesterday || day.date == live.home.today else { return day.state }
         let status = live.row.effectiveStatus(day.date, today: live.home.today, yesterday: live.home.yesterday)
+        return Self.liveState(status, isToday: day.date == live.home.today, deckState: day.state)
+    }
+
+    /// Today's or yesterday's dot from the server's check-in: yesterday with none is still `ask` (he logs last
+    /// night the next morning), never missed until he says so.
+    static func liveState(_ status: GoalStatus?, isToday: Bool, deckState: String) -> String {
         switch status {
         case .done, .min: return "done"
         case .skip: return "skip"
         case .miss: return "missed"
-        default: return day.date == live.home.today ? "today" : (day.state == "off" ? "off" : "missed")
+        default: return isToday ? "today" : (deckState == "off" ? "off" : "ask")
         }
     }
 
@@ -198,7 +210,9 @@ struct DeckFrontRowView: View {
         let names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
         let done = row.days.prefix(7).enumerated().filter { state($0.element, live) == "done" }.map { names[$0.offset] }
         let head = "\(row.label), \(countText(live)) this week"
-        return done.isEmpty ? "\(head), none yet" : "\(head), done \(done.joined(separator: ", "))"
+        let week = done.isEmpty ? "\(head), none yet" : "\(head), done \(done.joined(separator: ", "))"
+        let asking = row.days.prefix(7).contains { state($0, live) == "ask" }
+        return asking ? "\(week), yesterday not logged yet" : week
     }
 
     // MARK: Pips
