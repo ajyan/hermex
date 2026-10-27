@@ -358,18 +358,22 @@ struct WeekRecord: Decodable, Equatable {
 struct DeckIntentionLine: Decodable, Equatable {
     let text: String
     let ifThen: String?
+    /// A line of at most eight words written from `text`, for the week's divider ("Make a real plan for sleep").
+    let short: String?
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         text = try c.decode(String.self, forKey: .text)
         ifThen = try? c.decodeIfPresent(String.self, forKey: .ifThen)
+        short = (try? c.decodeIfPresent(String.self, forKey: .short)).flatMap { $0.isEmpty ? nil : $0 }
     }
 
-    private enum CodingKeys: String, CodingKey { case text, ifThen }
+    private enum CodingKeys: String, CodingKey { case text, ifThen, short }
 
-    init(text: String, ifThen: String? = nil) {
+    init(text: String, ifThen: String? = nil, short: String? = nil) {
         self.text = text
         self.ifThen = ifThen
+        self.short = short
     }
 
     /// "Your intention: Send five asks · If it is 9am, then I write."

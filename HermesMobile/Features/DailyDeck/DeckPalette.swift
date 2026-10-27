@@ -42,14 +42,21 @@ struct DeckPalette: Equatable {
                                           shortName: "Question", isNeutralCard: true)
     /// A season front's divider: the neutral opener paper with the front's own symbol.
     static func front(_ slug: String?) -> DeckPalette {
-        let (symbol, name, short) = [
-            "ai": ("briefcase", "Landing the AI role", "AI role"), "fatherhood": ("heart", "Becoming a dad", "Dad"),
-            "living-well": ("figure.run", "Body", "Body"), "relationships": ("person.2", "People", "People"),
-        ][slug ?? ""] ?? ("tray", "Also", "Also")
+        let (symbol, name, short) = fronts[slug ?? ""] ?? ("tray", "Also", "Also")
         return DeckPalette(.opener, symbol: symbol, name: name, shortName: short, isNeutralCard: true)
     }
-    static let yesterdayOne = DeckPalette(.opener, symbol: "checkmark.circle", name: "Yesterday's one",
-                                          shortName: "Yesterday", isNeutralCard: true)
+
+    /// The week's divider: the This week paper, wearing the symbol of the front it leads with.
+    static func section(front name: String?) -> DeckPalette {
+        guard let symbol = fronts.values.first(where: { $0.name == name })?.symbol else { return section }
+        return DeckPalette(.opener, symbol: symbol, name: "This week", shortName: "This week", isNeutralCard: true)
+    }
+
+    /// The season's fronts (the vault's views.AREAS): slug → symbol, name, short name.
+    private static let fronts: [String: (symbol: String, name: String, short: String)] = [
+        "ai": ("briefcase", "Landing the AI role", "AI role"), "fatherhood": ("heart", "Becoming a dad", "Dad"),
+        "living-well": ("figure.run", "Body", "Body"), "relationships": ("person.2", "People", "People"),
+    ]
     static let quote = DeckPalette(.quote, symbol: "quote.opening", name: "Quote", shortName: "Quote")
     static let book = DeckPalette(.book, symbol: "book.closed", name: "Book highlight", shortName: "Book")
     static let wiki = DeckPalette(.wiki, symbol: "leaf", name: "From your wiki", shortName: "Wiki")
@@ -103,9 +110,8 @@ struct DeckPalette: Equatable {
     static func of(_ card: DeckCard) -> DeckPalette {
         switch card.type {
         case .headline: return .opener
-        case .section: return .section
+        case .section: return .section(front: card.frontName)
         case .front: return .front(card.front)
-        case .choice: return .yesterdayOne
         case .close: return .quote
         case .prompt where card.chapter != nil: return .week
         case .prompt: return card.isMandarin ? .mandarin : card.isLetter ? .letter : card.isDream ? .dream : .advisor

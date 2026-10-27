@@ -557,38 +557,62 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(plain[0].pages.count, 5)
     }
 
-    /// The deck arranged by season front (vault deck_fronts, 2026-10-26): a group per divider on the
-    /// opener, front dividers and "Yesterday's one" decode, and today's one thing rides on the close.
+    /// The five-minute deck arranged by season front (vault deck_fronts, 2026-10-26): the opener carries
+    /// yesterday's one thing and a group per divider; a divider carries its week as dots and its one thing.
     func testFrontDeckGroupsTheOpenerAndDecodesItsCards() throws {
         let deck = try DailyDeck.decode(#"""
         {"date":"d","kind":"morning","cards":[
-          {"id":"open","type":"headline","title":"Today"},
-          {"id":"yesterday-one","type":"choice","title":"Yesterday's one","body":"Text Evan","question":"Did it happen?",
-           "options":[{"id":"done","label":"Done"},{"id":"not","label":"Not today"}]},
-          {"id":"week","type":"section","title":"Q","lines":["This week · Landing the AI role"],"week":{"area":"ai","variant":0}},
+          {"id":"open","type":"headline","title":"Today","yesterday_one":{"label":"Reach out: Evan Leonard","front":"relationships"},
+           "options":[{"id":"done","label":"Done"},{"id":"partly","label":"Partly"},{"id":"not","label":"Not today"}]},
+          {"id":"advisor","type":"prompt","voice":"Dad"},
+          {"id":"week","type":"section","title":"Q","lines":["This week · Landing the AI role"],"week":{"area":"ai","variant":0},
+           "intention":{"text":"Get my sleep in a good place and make a real plan","short":"Make a real plan for sleep"},
+           "today":"Outreach: Anthropic, from Today's Ask",
+           "week_rows":[{"label":"Outreach","kind":"pips","done":1,"target":5,"goal":"land-ai-role","commitment":"outreach"}]},
           {"id":"ask","type":"ask"},
-          {"id":"front-fatherhood","type":"front","front":"fatherhood","title":"Becoming a dad","lines":["81 days to go"]},
-          {"id":"letter","type":"prompt","kind":"letter"},
+          {"id":"front-living-well","type":"front","front":"living-well","title":"Body","lines":["Cross the finish line · in 5 days"],
+           "today":"Nightly stretch: 30 s knee hugs",
+           "week_rows":[{"label":"Nightly stretch","kind":"days","done":1,"target":6,"goal":"run","commitment":"stretch",
+             "days":[{"date":"2026-10-26","state":"done"},{"date":"2026-10-27","state":"today"},{"date":"2026-10-28","state":"ahead"},
+                     {"date":"2026-10-29","state":"ahead"},{"date":"2026-10-30","state":"ahead"},{"date":"2026-10-31","state":"ahead"},
+                     {"date":"2026-11-01","state":"ahead"}]}]},
+          {"id":"sleep","type":"sleep"},
           {"id":"front-tail","type":"front","front":"tail","title":"Also","lines":["Outside this season's fronts"]},
           {"id":"year-ago","type":"reflect","kind":"on_this_day"},
           {"id":"close","type":"close","question":"Your one thing today",
-           "options":[{"id":"ai-1","label":"Reach out to Anthropic"},{"id":"fatherhood-2","label":"Write today's letter to her"}]}]}
+           "options":[{"id":"ai-1","label":"Outreach: Anthropic","front":"ai"},{"id":"living-well-2","label":"Nightly stretch","front":"living-well"}]}]}
         """#)
         let acts = DeckCardView.acts(DeckPage.pages(for: deck.cards))
-        XCTAssertEqual(acts.map(\.name), ["Today", "This week · Landing the AI role", "Becoming a dad", "Also"])
-        XCTAssertEqual(acts.map { $0.pages.map(\.id) }, [["yesterday-one"], ["ask"], ["letter"], ["year-ago"]])
+        XCTAssertEqual(acts.map(\.name), ["Today", "Landing the AI role", "Body", "Also"])
+        XCTAssertEqual(acts.map { $0.pages.map(\.id) }, [["advisor"], ["ask"], ["sleep"], ["year-ago"]])
+        XCTAssertEqual(acts.map { $0.divider?.id }, [nil, "week", "front-living-well", "front-tail"])
         let cards = Dictionary(uniqueKeysWithValues: deck.cards.map { ($0.id, $0) })
-        XCTAssertEqual(cards["front-fatherhood"]?.type, .front)
-        XCTAssertEqual(cards["front-fatherhood"]?.front, "fatherhood")
-        XCTAssertEqual(DeckPalette.of(cards["front-fatherhood"]!).name, "Becoming a dad")
+        XCTAssertEqual(cards["open"]?.yesterdayOne, DeckYesterdayOne(label: "Reach out: Evan Leonard", front: "relationships"))
+        XCTAssertEqual(cards["open"]?.options.map(\.label), ["Done", "Partly", "Not today"])
+        let body = try XCTUnwrap(cards["front-living-well"])
+        XCTAssertEqual(body.type, .front)
+        XCTAssertEqual(DeckPalette.of(body).name, "Body")
+        XCTAssertEqual(DeckPalette.of(body).symbol, "figure.run")
+        XCTAssertEqual(body.todayAction, "Nightly stretch: 30 s knee hugs")
+        let stretch = try XCTUnwrap(body.weekRows.first)
+        XCTAssertEqual(stretch.kind, .days)
+        XCTAssertEqual(stretch.days.map(\.state), ["done", "today", "ahead", "ahead", "ahead", "ahead", "ahead"])
+        XCTAssertEqual(stretch.goal, "run")
+        XCTAssertEqual(stretch.commitment, "stretch")
+        let week = try XCTUnwrap(cards["week"])
+        XCTAssertEqual(week.frontName, "Landing the AI role")
+        XCTAssertEqual(week.intention?.short, "Make a real plan for sleep")
+        XCTAssertEqual(week.weekRows.first?.kind, .pips)
+        XCTAssertEqual(week.weekRows.first?.done, 1)
+        XCTAssertEqual(cards["close"]?.options.map(\.front), ["ai", "living-well"])
         XCTAssertEqual(DeckPalette.of(cards["front-tail"]!).name, "Also")
-        let check = try XCTUnwrap(cards["yesterday-one"])
-        XCTAssertEqual(check.type, .choice)
-        XCTAssertEqual(check.options.map(\.label), ["Done", "Not today"])
-        XCTAssertTrue(check.takesText, "a note can go with the tap")
-        XCTAssertEqual(DeckCardText(check).lead, "Did it happen?")
-        XCTAssertEqual(cards["close"]?.options.map(\.id), ["ai-1", "fatherhood-2"])
         XCTAssertFalse(cards["front-tail"]!.takesFeedback)
+    }
+
+    /// The dots that show a front's week share one column grid, so day dots and pips line up.
+    func testDayDotsAndPipsShareOneColumnGrid() {
+        XCTAssertEqual(DeckDots.weekdays.count, 7)
+        XCTAssertGreaterThan(DeckDots.column, DeckDots.dot, "every dot sits centered in a fixed column")
     }
 
     func testOpenerCountsThreeTodayAndTwoThisWeek() throws {
