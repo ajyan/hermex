@@ -46,7 +46,7 @@ struct BodyWeekDots: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: title))
-        .accessibilityValue(Text(verbatim: Self.summary(states)))
+        .accessibilityValue(Text(verbatim: BodyHomeCopy.doneDays(states)))
     }
 
     private var weekdays: some View {
@@ -64,11 +64,5 @@ struct BodyWeekDots: View {
 
     private func state(at index: Int) -> BodyDayState {
         index < states.count ? states[index] : .unknown
-    }
-
-    /// "3 of 7 days" for VoiceOver, since the dots carry no text.
-    static func summary(_ states: [BodyDayState]) -> String {
-        let done = states.filter { $0 == .done }.count
-        return done == 1 ? "1 day done this week" : "\(done) days done this week"
     }
 }

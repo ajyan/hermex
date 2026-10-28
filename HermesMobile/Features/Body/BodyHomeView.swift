@@ -6,8 +6,11 @@ struct BodyHomeView: View {
     @State private var viewModel: BodyHomeViewModel
     @State private var showsSleep = false
     private let client: BodyDataClient
+    /// Pushes a screen on the shell's stack (the Other day menu's buttons).
+    private let onOpen: (ShellPushDestination) -> Void
 
-    init(server: URL, onAPIError: @escaping (Error) -> Void) {
+    init(server: URL, onAPIError: @escaping (Error) -> Void, onOpen: @escaping (ShellPushDestination) -> Void) {
+        self.onOpen = onOpen
         let client = APIClientBodyAdapter(apiClient: APIClient(baseURL: server))
         self.client = client
         _viewModel = State(initialValue: BodyHomeViewModel(client: client, onAPIError: onAPIError))
@@ -24,6 +27,7 @@ struct BodyHomeView: View {
                     ToolbarItem(placement: .topBarTrailing) {
                         NavigationLink(value: ShellPushDestination.bodyPlan) {
                             Label { Text(verbatim: "Plan") } icon: { Image(systemName: "pencil") }
+                                .labelStyle(.titleAndIcon)
                         }
                         .accessibilityHint(Text(verbatim: "Edits the training plan"))
                     }
@@ -63,7 +67,7 @@ struct BodyHomeView: View {
                 VStack(alignment: .leading, spacing: BrainStyle.l) {
                     proposalSlot(home.proposals)
                     upNext(home)
-                    thisWeek(home.week)
+                    thisWeek(home)
                     if let sleep = home.sleep { sleepRow(sleep) }
                     if !home.lifts.isEmpty { lifts(home.lifts) }
                     if !home.sessions.isEmpty { sessions(home.sessions) }
@@ -86,10 +90,13 @@ struct BodyHomeView: View {
     // MARK: Up next
 
     private func upNext(_ home: BodyHome) -> some View {
-        HXCard(.glow(paper), title: home.next?.label ?? "Body", titleStyle: .title, spacing: 12) {
-            Text(verbatim: "Up next")
-                .font(AppFont.caption(weight: .semibold))
-                .foregroundStyle(paper.glow)
+        HXCard(.glow(paper), title: home.next?.label ?? idleLine(home),
+               titleStyle: home.next == nil ? .title3 : .title, spacing: 12) {
+            if home.next != nil {
+                Text(verbatim: "Up next")
+                    .font(AppFont.caption(weight: .semibold))
+                    .foregroundStyle(paper.glow)
+            }
         } content: {
             if let next = home.next {
                 VStack(spacing: 7) {
@@ -113,10 +120,6 @@ struct BodyHomeView: View {
                         .font(AppFont.footnote())
                         .foregroundStyle(paper.glow)
                 }
-            } else {
-                Text(verbatim: idleLine(home))
-                    .font(AppFont.subheadline())
-                    .foregroundStyle(Color.hxTextSecondary)
             }
         } footer: {
             if let next = home.next {
@@ -124,6 +127,7 @@ struct BodyHomeView: View {
                     NavigationLink(value: ShellPushDestination.bodyWorkout(nil)) {
                         Text(verbatim: "Start \(next.label)")
                             .font(AppFont.display(style: .headline, weight: .semibold))
+                            .foregroundStyle(paper.onGlow)
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
@@ -147,9 +151,7 @@ struct BodyHomeView: View {
     private func otherDayMenu(than day: String) -> some View {
         Menu {
             ForEach(BodyHomeCopy.otherDays(than: day), id: \.self) { other in
-                NavigationLink(value: ShellPushDestination.bodyWorkout(other)) {
-                    Text(verbatim: other.capitalized)
-                }
+                Button(other.capitalized) { onOpen(.bodyWorkout(other)) }
             }
         } label: {
             Text(verbatim: "Other day")
@@ -165,11 +167,14 @@ struct BodyHomeView: View {
 
     // MARK: This week
 
-    private func thisWeek(_ week: BodyWeek) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private func thisWeek(_ home: BodyHome) -> some View {
+        let week = home.week
+        return VStack(alignment: .leading, spacing: 8) {
             HXSectionHeader(title: "This week")
             VStack(alignment: .leading, spacing: 12) {
-                BodyWeekDots(title: "Lifted", states: week.lifted, showsWeekdays: true)
+                BodyWeekDots(
+                    title: "Lifted", subtitle: BodyHomeCopy.liftedLabels(week: week, sessions: home.sessions),
+                    states: week.lifted, showsWeekdays: true)
                 BodyWeekDots(title: "Ran", subtitle: "From Garmin", states: week.ran)
             }
             .padding(.horizontal, 14)
@@ -253,7 +258,7 @@ struct BodyHomeView: View {
                     .font(AppFont.subheadline(weight: .semibold))
                     .foregroundStyle(Color.hxTextPrimary)
                 if lift.up {
-                    Text(verbatim: "↑ up").foregroundStyle(paper.glow)
+                    Text(verbatim: lift.upFromLabel.map { "↑ from \($0)" } ?? "↑ up").foregroundStyle(paper.glow)
                 } else if let goal = lift.goalReps, !goal.isEmpty {
                     Text(verbatim: BodyHomeCopy.goalLabel(goal)).foregroundStyle(Color.hxTextSecondary)
                 } else {
@@ -266,7 +271,8 @@ struct BodyHomeView: View {
         .padding(.vertical, 11)
         .frame(minHeight: 44)
         .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: BodyHomeCopy.liftSummary(lift)))
     }
 
     /// One dot per work set of the last session: filled when it was done at the top of its range.
@@ -283,6 +289,12 @@ struct BodyHomeView: View {
     }
 
     // MARK: Sessions
+
+    /// A lift that went up reads in the training glow; a rough night's note in the `notes` glow.
+    private func detailColor(_ session: BodySessionSummary) -> Color {
+        if session.highlight != nil { return paper.glow }
+        return session.trimmed ? HermexPaper.notes.glow : Color.hxTextSecondary
+    }
 
     private func sessions(_ sessions: [BodySessionSummary]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -303,7 +315,7 @@ struct BodyHomeView: View {
                         if let detail = session.highlight ?? session.note {
                             Text(verbatim: detail)
                                 .font(AppFont.caption())
-                                .foregroundStyle(session.highlight == nil ? Color.hxTextSecondary : paper.glow)
+                                .foregroundStyle(detailColor(session))
                                 .multilineTextAlignment(.trailing)
                                 .lineLimit(2)
                         }

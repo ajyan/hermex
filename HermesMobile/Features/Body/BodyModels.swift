@@ -599,8 +599,14 @@ struct BodyHomeLift: Decodable, Hashable, Sendable, Identifiable {
     let up: Bool
     let dots: [Bool]
     let goalReps: [Int]?
+    /// The weight this lift went up from, when `up`.
+    let upFrom: Double?
+    /// The lift's unit (`lb`, `lb_each`, ...) when the server sends it; `upFromLabel` derives it otherwise.
+    let unit: String?
 
-    private enum CodingKeys: String, CodingKey { case id, name, day, weightLabel = "weight_label", up, dots, goalReps = "goal_reps" }
+    private enum CodingKeys: String, CodingKey {
+        case id, name, day, weightLabel = "weight_label", up, dots, goalReps = "goal_reps", upFrom = "up_from", unit
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -611,6 +617,15 @@ struct BodyHomeLift: Decodable, Hashable, Sendable, Identifiable {
         up = c.bool(.up)
         dots = (try? c.decodeIfPresent([Bool].self, forKey: .dots)) ?? []
         goalReps = c.optional([Int].self, .goalReps)
+        upFrom = c.optional(Double.self, .upFrom)
+        unit = c.optional(String.self, .unit)
+    }
+
+    /// "145 lb" or "42.5s": what this lift went up from, or nil when the server didn't say.
+    var upFromLabel: String? {
+        guard let upFrom else { return nil }
+        let resolved = unit ?? (weightLabel.hasSuffix(" lb") ? "lb" : weightLabel.hasSuffix("s") ? "lb_each" : "lb")
+        return BodyFormat.weightLabel(unit: resolved, weight: upFrom)
     }
 }
 

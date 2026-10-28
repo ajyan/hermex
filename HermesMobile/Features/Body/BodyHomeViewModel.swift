@@ -55,10 +55,12 @@ final class BodyHomeViewModel {
         do {
             _ = try await client.decide(proposalID: proposal.id, accept: accept)
         } catch {
-            guard !bodyIsCancellation(error) else { return }
-            onAPIError(error)
+            // Roll back even when cancelled, so a dismissed screen never loses the proposal.
+            if !bodyIsCancellation(error) {
+                onAPIError(error)
+                decideError = "Couldn't save that. Try again."
+            }
             restore(proposal, at: index)
-            decideError = "Couldn't save that. Try again."
             return
         }
         if accept { await load() }
@@ -136,6 +138,35 @@ enum BodyHomeCopy {
         if let minutes = session.minutes { parts.append("\(minutes) min") }
         if session.trimmed { parts.append("one set dropped") }
         return parts.joined(separator: " · ")
+    }
+
+    /// The weekday names for the done days of a Monday-first week row: "Monday and Wednesday",
+    /// or "none yet this week". What VoiceOver reads in place of the dots.
+    static func doneDays(_ states: [BodyDayState]) -> String {
+        let names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        let done = states.prefix(7).enumerated().filter { $0.element == .done }.map { names[$0.offset] }
+        return done.isEmpty ? "none yet this week" : ListFormatter.localizedString(byJoining: done)
+    }
+
+    /// The labels of the workouts finished this week, in day order: "Push, Legs"; nil when none.
+    static func liftedLabels(week: BodyWeek, sessions: [BodySessionSummary]) -> String? {
+        let labels = week.days.compactMap { day in sessions.first { $0.date == day }?.label }
+        return labels.isEmpty ? nil : labels.joined(separator: ", ")
+    }
+
+    /// What a lift row says for VoiceOver, since its dots are drawn: "Incline bench, 150 lb, up from
+    /// 145 lb. Last time 4 of 4 sets hit the top of the range."
+    static func liftSummary(_ lift: BodyHomeLift) -> String {
+        var parts = [lift.name, lift.weightLabel]
+        if lift.up { parts.append(lift.upFromLabel.map { "up from \($0)" } ?? "going up") }
+        var text = parts.joined(separator: ", ")
+        if !lift.dots.isEmpty {
+            let hit = lift.dots.filter { $0 }.count
+            text += lift.goalReps == nil
+                ? ". Last time \(hit) of \(lift.dots.count) sets hit the top of the range"
+                : ". Last time \(hit) of \(lift.dots.count) sets at goal"
+        }
+        return text
     }
 
     /// "Goal 8·7·6·6" for a lift measured against a rep goal.

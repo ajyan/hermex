@@ -660,7 +660,7 @@ struct ChatShellView: View {
         case .money:
             MoneyView(server: server)
         case .body:
-            BodyHomeView(server: server, onAPIError: authManager.handleAPIError)
+            BodyHomeView(server: server, onAPIError: authManager.handleAPIError, onOpen: { navigation.push($0) })
                 .adaptiveSecondaryNavigationTitle()
         case .bodyLift:
             // Task 11 replaces this placeholder with the lift's history.
