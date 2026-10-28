@@ -240,6 +240,10 @@ final class WorkoutViewModelTests: XCTestCase {
         XCTAssertEqual(sets[5].weight, 155)
         XCTAssertEqual(sets[0].weight, 90, "warm-up sets keep theirs")
 
+        vm.setWeight(nil, exercise: 0, set: 4)
+        XCTAssertNil(exercise(vm, 0).sets[4].weight)
+        XCTAssertEqual(exercise(vm, 0).sets[5].weight, 155, "a cleared weight never carries forward")
+
         vm.setReps(7, exercise: 0, set: 3)
         XCTAssertEqual(exercise(vm, 0).sets[3].reps, 7)
         XCTAssertEqual(exercise(vm, 0).sets[4].reps, 8, "reps change one set only")
@@ -296,43 +300,44 @@ final class WorkoutViewModelTests: XCTestCase {
 
     func testMoveHingeToEnd() async throws {
         let json = #"""
-        {"id":"2026-11-30-legs","day":"legs","phase":"build","resumed":false,"offers":{"sleep":null,"hinge":true},
+        {"id":"2026-11-30-legs","day":"legs","phase":"build","resumed":false,"offers":{"sleep":null,"hinge":true,"hinge_minutes":40},
          "exercises":[
+          {"id":"curl-up","name":"Curl-up","section":"warmup","unit":"bw","target":{"hold_s":10},"sets":[{"kind":"work","hold_s":10}]},
           {"id":"goblet-squat","name":"Goblet squat","section":"main","big":true,"sets":[{"kind":"work","weight":53,"reps":12}]},
-          {"id":"db-rdl","name":"DB Romanian deadlift","section":"main","big":true,"unit":"lb_each","sets":[{"kind":"work","weight":35,"reps":10}]},
+          {"id":"db-rdl","name":"DB Romanian deadlift","section":"main","big":true,"hinge":true,"unit":"lb_each","sets":[{"kind":"work","weight":35,"reps":10}]},
           {"id":"split-squat","name":"Bulgarian split squat","section":"main","big":true,"sets":[{"kind":"work","weight":35,"reps":8}]},
           {"id":"pallof-press","name":"Pallof press","section":"superset","unit":"cable","sets":[{"kind":"work","reps":10}]},
           {"id":"wall-sit","name":"Wall sit","section":"finisher","unit":"bw","target":{"hold_s":45},"sets":[{"kind":"work","hold_s":45}]}
          ]}
         """#
-        let plan = #"""
-        {"rotation":["push","legs","pull"],"days":{"legs":[
-          {"id":"goblet-squat","name":"Goblet squat","section":"main","sets":4,"reps":[10,12]},
-          {"id":"db-rdl","name":"DB Romanian deadlift","section":"main","sets":3,"reps":[10,10],"hinge":true}
-        ]}}
-        """#
         let client = FakeWorkoutClient()
         client.prescriptionResult = .success(try PrepDecoding.decode(BodyPrescription.self, from: Data(json.utf8)))
-        client.planResult = .success(try PrepDecoding.decode(BodyPlan.self, from: Data(plan.utf8)))
         let vm = try await loadedVM(client, day: "legs")
         XCTAssertEqual(vm.hingeBanner, .asking)
         XCTAssertEqual(vm.hingeNames, ["DB Romanian deadlift"])
+        XCTAssertEqual(vm.hingeMinutes, 40)
         XCTAssertEqual(vm.sleepBanner, .hidden)
+        XCTAssertEqual(client.log, ["prescription:legs"], "the hinge flag comes with each lift: no plan call")
+        XCTAssertEqual(WorkoutCopy.hingeTitle(minutes: 40), "You woke 40 min ago.")
+        XCTAssertEqual(WorkoutCopy.hingeTitle(minutes: nil), "You woke under an hour ago.")
+        XCTAssertEqual(WorkoutCopy.hingeQuestion(vm.hingeNames), "Move RDLs to the end?")
 
-        vm.toggle(exercise: 0, set: 0) // the squat: a big lift, so it waits on reps left
-        vm.open(exercise: 2)
+        vm.toggle(exercise: 1, set: 0) // the squat: a big lift, so it waits on reps left
+        vm.open(exercise: 3)
         vm.moveHinge()
         let moved = try XCTUnwrap(session(vm))
-        XCTAssertEqual(moved.exercises.map(\.id), ["goblet-squat", "split-squat", "db-rdl", "pallof-press", "wall-sit"])
+        XCTAssertEqual(moved.exercises.map(\.id),
+                       ["curl-up", "goblet-squat", "split-squat", "db-rdl", "pallof-press", "wall-sit"])
         XCTAssertTrue(moved.movedHinge)
-        XCTAssertEqual(vm.current, 1, "the open lift stays open where it moved to")
+        XCTAssertEqual(vm.current, 2, "the open lift stays open where it moved to")
         XCTAssertEqual(vm.hingeBanner, .done)
 
         vm.undoMoveHinge()
         let undone = try XCTUnwrap(session(vm))
-        XCTAssertEqual(undone.exercises.map(\.id), ["goblet-squat", "db-rdl", "split-squat", "pallof-press", "wall-sit"])
+        XCTAssertEqual(undone.exercises.map(\.id),
+                       ["curl-up", "goblet-squat", "db-rdl", "split-squat", "pallof-press", "wall-sit"])
         XCTAssertFalse(undone.movedHinge)
-        XCTAssertEqual(vm.current, 2)
+        XCTAssertEqual(vm.current, 3)
         XCTAssertEqual(vm.hingeBanner, .hidden)
     }
 
@@ -420,6 +425,85 @@ final class WorkoutViewModelTests: XCTestCase {
         XCTAssertEqual(vm.saveStatus, .saved)
         XCTAssertEqual(client.saved.count, 2)
         XCTAssertEqual(client.saved[1].exercises[0].sets.prefix(2).map(\.done), [true, true])
+    }
+
+    func testTickingAWorkSetWithdrawsTheSleepOffer() async throws {
+        let (vm, _) = try await pushVM()
+        vm.toggle(exercise: 0, set: 0) // a warm-up set: the offer stays
+        XCTAssertEqual(vm.sleepBanner, .asking)
+        vm.toggle(exercise: 1, set: 2) // a work set: too late to drop one
+        XCTAssertEqual(vm.sleepBanner, .hidden)
+        let before = try XCTUnwrap(session(vm))
+        vm.acceptSleepOffer()
+        XCTAssertEqual(session(vm), before, "a ticked set is never dropped")
+        XCTAssertFalse(try XCTUnwrap(session(vm)).trimmed)
+    }
+
+    func testWarmupAndFinisherKeepEverySetWhenDropping() async throws {
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: BodyModelsTests.fixture("prescription.json")) as? [String: Any])
+        var exercises = try XCTUnwrap(json["exercises"] as? [[String: Any]])
+        exercises.insert([
+            "id": "band-pull-apart", "name": "Band pull-apart", "section": "warmup", "unit": "band",
+            "target": ["reps": [15, 15]],
+            "sets": [["kind": "work", "reps": 15, "done": false], ["kind": "work", "reps": 15, "done": false]],
+        ], at: 0)
+        json["exercises"] = exercises
+        let client = FakeWorkoutClient()
+        client.prescriptionResult = .success(try PrepDecoding.decode(
+            BodyPrescription.self, from: JSONSerialization.data(withJSONObject: json)))
+        let vm = try await loadedVM(client)
+        XCTAssertEqual(exercise(vm, 0).section, .warmup)
+        XCTAssertEqual(WorkoutCopy.sectionTitle(.warmup), "Warm-up")
+
+        vm.acceptSleepOffer()
+        XCTAssertEqual(session(vm)?.exercises.map { $0.sets.count }, [2, 5, 2, 2, 2, 2, 1, 3])
+    }
+
+    func testFinishedSessionStopsSaving() async throws {
+        let (vm, client) = try await pushVM()
+        client.saveResults = [.failure(APIError.http(statusCode: 409, body: #"{"error":"session is finished"}"#))]
+        vm.toggle(exercise: 0, set: 0)
+        await vm.idle()
+        XCTAssertEqual(vm.saveStatus, .finished)
+
+        vm.toggle(exercise: 0, set: 1)
+        await vm.idle()
+        vm.saveNow()
+        await vm.idle()
+        XCTAssertEqual(client.saved.count, 1, "a finished workout is never saved again")
+        XCTAssertEqual(vm.saveStatus, .finished)
+    }
+
+    func testDeletingAMiddleSetKeepsTheOthersIdentity() async throws {
+        let (vm, _) = try await pushVM()
+        let before = exercise(vm, 0).sets.map(\.uid)
+        XCTAssertEqual(Set(before).count, before.count, "every set has its own identity")
+        vm.toggle(exercise: 0, set: 2) // a tick keeps identity too
+        vm.deleteSet(exercise: 0, set: 3)
+        var expected = before
+        expected.remove(at: 3)
+        XCTAssertEqual(exercise(vm, 0).sets.map(\.uid), expected)
+
+        vm.addSet(exercise: 0)
+        let added = try XCTUnwrap(exercise(vm, 0).sets.last?.uid)
+        XCTAssertFalse(before.contains(added), "an added set is a new row")
+    }
+
+    func testWeightEditorStartsFromLastTime() throws {
+        let json = #"""
+        {"id":"lat-pulldown","name":"Lat pulldown","section":"main","unit":"lb","target":{"reps":[10,12]},
+         "last":[{"weight":90,"reps":12},{"weight":95,"reps":10}],
+         "sets":[{"kind":"work","weight":null,"reps":12},{"kind":"work","weight":null,"reps":12},{"kind":"work","weight":null,"reps":12}]}
+        """#
+        let lift = try PrepDecoding.decode(BodyExercise.self, from: Data(json.utf8))
+        XCTAssertEqual(WorkoutCopy.startingWeight(lift, set: 0), 90)
+        XCTAssertEqual(WorkoutCopy.startingWeight(lift, set: 1), 95)
+        XCTAssertEqual(WorkoutCopy.startingWeight(lift, set: 2), 95, "past last time's sets, its heaviest")
+        let fresh = try PrepDecoding.decode(BodyExercise.self, from: Data(
+            #"{"id":"x","unit":"lb","sets":[{"kind":"work","weight":null}]}"#.utf8))
+        XCTAssertNil(WorkoutCopy.startingWeight(fresh, set: 0))
+        let prescribed = try pushPrescription().exercises[0]
+        XCTAssertEqual(WorkoutCopy.startingWeight(prescribed, set: 3), 150, "a set with a weight starts from it")
     }
 
     // MARK: Copy

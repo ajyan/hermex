@@ -11,7 +11,9 @@ private func workoutIsCancellation(_ error: Error) -> Bool {
 @MainActor
 @Observable
 final class WorkoutViewModel {
-    enum SaveStatus: Equatable { case saved, saving, failed }
+    /// `finished`: the server answered 409, so this workout was already finished elsewhere and
+    /// nothing more is sent.
+    enum SaveStatus: Equatable { case saved, saving, failed, finished }
     /// A banner's offer: waiting for an answer, taken (showing Undo), or gone.
     enum Banner: Equatable { case hidden, asking, done }
 
@@ -27,6 +29,8 @@ final class WorkoutViewModel {
     /// The hinge lifts the morning offer would move, by name.
     private(set) var hingeNames: [String] = []
     private(set) var hingeBanner: Banner = .hidden
+    /// How long ago he woke, for the hinge offer's copy.
+    private(set) var hingeMinutes: Int?
 
     /// The day asked for (push, legs, pull), or nil for the next in the rotation.
     let day: String?
@@ -74,13 +78,8 @@ final class WorkoutViewModel {
         defer { isLoading = false }
         do {
             let prescription = try await client.prescription(day: day)
-            var hinge: Set<String> = []
-            if prescription.offers.hinge, !prescription.resumed, !prescription.movedHinge,
-               let plan = try? await client.plan() {
-                hinge = Set((plan.days[prescription.day] ?? []).filter(\.hinge).map(\.id))
-            }
             guard !Task.isCancelled else { return }
-            apply(prescription, hingeIDs: hinge)
+            apply(prescription)
         } catch {
             guard !workoutIsCancellation(error), !Task.isCancelled else { return }
             onAPIError(error)
@@ -88,7 +87,7 @@ final class WorkoutViewModel {
         }
     }
 
-    private func apply(_ prescription: BodyPrescription, hingeIDs: Set<String>) {
+    private func apply(_ prescription: BodyPrescription) {
         let session = BodySession(
             id: prescription.id, day: prescription.day, phase: prescription.phase, deload: prescription.deload,
             exercises: prescription.exercises, trimmed: prescription.trimmed, movedHinge: prescription.movedHinge)
@@ -97,10 +96,11 @@ final class WorkoutViewModel {
             sleepOffer = offer
             sleepBanner = .asking
         }
-        let hinged = session.exercises.filter { hingeIDs.contains($0.id) && $0.section == .main }
-        if !hinged.isEmpty {
-            self.hingeIDs = hingeIDs
+        let hinged = session.exercises.filter { $0.hinge && $0.section == .main }
+        if prescription.offers.hinge, !prescription.resumed, !prescription.movedHinge, !hinged.isEmpty {
+            hingeIDs = Set(hinged.map(\.id))
             hingeNames = hinged.map(\.name)
+            hingeMinutes = prescription.offers.hingeMinutes
             hingeBanner = .asking
         }
         state = .loaded(session)
@@ -118,6 +118,10 @@ final class WorkoutViewModel {
             session.exercises[e].sets[s].done.toggle()
             completed = !wasComplete && Self.isComplete(session.exercises[e])
         }
+        // Once a work set is ticked, it's too late to drop one.
+        if sleepBanner == .asking, lift.sets[s].kind == .work, self.lift(e)?.sets[s].done == true {
+            sleepBanner = .hidden
+        }
         if completed {
             if lift.big { effortPrompt = e } else { advance(from: e) }
         } else if effortPrompt == e, !Self.isComplete(self.lift(e) ?? lift) {
@@ -125,14 +129,15 @@ final class WorkoutViewModel {
         }
     }
 
-    /// Sets one set's weight; the lift's later unticked work sets follow it.
+    /// Sets one set's weight, committed from the weight editor; the lift's later unticked work sets
+    /// follow a new weight, but never a cleared one.
     func setWeight(_ weight: Double?, exercise e: Int, set s: Int) {
         guard let lift = lift(e), lift.sets.indices.contains(s) else { return }
         let value = weight.map { max(0, $0) }
         mutate { session in
             let kind = session.exercises[e].sets[s].kind
             session.exercises[e].sets[s].weight = value
-            guard kind == .work else { return }
+            guard kind == .work, value != nil else { return }
             for j in session.exercises[e].sets.indices where j > s {
                 let later = session.exercises[e].sets[j]
                 if later.kind == .work, !later.done { session.exercises[e].sets[j].weight = value }
@@ -156,8 +161,8 @@ final class WorkoutViewModel {
     /// Adds a work set copying the lift's last one, unticked.
     func addSet(exercise e: Int) {
         guard let lift = lift(e) else { return }
-        var set = lift.sets.last { $0.kind == .work } ?? BodySet()
-        set.done = false
+        let last = lift.sets.last { $0.kind == .work } ?? BodySet()
+        let set = BodySet(kind: .work, weight: last.weight, reps: last.reps, holdS: last.holdS, distanceYd: last.distanceYd)
         mutate { $0.exercises[e].sets.append(set) }
         if effortPrompt == e { effortPrompt = nil }
     }
@@ -204,14 +209,15 @@ final class WorkoutViewModel {
     // MARK: Offers
 
     /// "Drop a set": the last work set of every main, superset and optional lift that has more than
-    /// one. Warm-up sets and the finisher stay.
+    /// one. The warm-up, the finisher, warm-up sets and ticked sets stay.
     func acceptSleepOffer() {
         guard sleepBanner == .asking else { return }
         var dropped: [String: BodySet] = [:]
         mutate { session in
-            for i in session.exercises.indices where session.exercises[i].section != .finisher {
+            for i in session.exercises.indices where session.exercises[i].section.isTrimmable {
                 let lift = session.exercises[i]
-                guard lift.workSets.count > 1, let last = lift.sets.lastIndex(where: { $0.kind == .work }) else { continue }
+                guard lift.workSets.count > 1, let last = lift.sets.lastIndex(where: { $0.kind == .work }),
+                      !lift.sets[last].done else { continue }
                 dropped[lift.id] = session.exercises[i].sets.remove(at: last)
             }
             session.trimmed = true
@@ -312,6 +318,7 @@ final class WorkoutViewModel {
         guard case .loaded(var session) = state else { return }
         change(&session)
         state = .loaded(session)
+        guard saveStatus != .finished else { return }
         generation += 1
         saveStatus = .saving
         debounceTask?.cancel()
@@ -327,6 +334,7 @@ final class WorkoutViewModel {
     }
 
     private func enqueueSend(retryingFailure: Bool) {
+        guard saveStatus != .finished else { return }
         let previous = sendTask
         sendTask = Task {
             await previous?.value
@@ -337,7 +345,7 @@ final class WorkoutViewModel {
     /// Saves the newest session if it hasn't gone yet. A response reports only when nothing changed
     /// while it was out; the server's copy never replaces local state.
     private func sendNewest(retryingFailure: Bool) async {
-        guard case .loaded(let snapshot) = state else { return }
+        guard case .loaded(let snapshot) = state, saveStatus != .finished else { return }
         guard generation > sentGeneration || (retryingFailure && saveStatus == .failed) else { return }
         let token = generation
         sentGeneration = token
@@ -346,6 +354,10 @@ final class WorkoutViewModel {
             _ = try await client.save(snapshot)
             guard token == generation else { return }
             saveStatus = .saved
+        } catch let error as APIError where error.isConflict {
+            // Finished elsewhere (another device, or a finish whose answer was lost): stop for good.
+            debounceTask?.cancel()
+            saveStatus = .finished
         } catch {
             guard token == generation, !workoutIsCancellation(error) else { return }
             onAPIError(error)
@@ -368,6 +380,13 @@ final class WorkoutViewModel {
 
     private static func firstUnfinished(in exercises: [BodyExercise], after e: Int) -> Int? {
         exercises.indices.first { $0 > e && !isComplete(exercises[$0]) }
+    }
+}
+
+private extension APIError {
+    var isConflict: Bool {
+        if case .http(409, _) = self { return true }
+        return false
     }
 }
 

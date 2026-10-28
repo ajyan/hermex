@@ -72,9 +72,12 @@ enum BodyDayState: String, Hashable, Sendable, Decodable {
     }
 }
 
-/// Where a lift sits in a day. An unknown section reads as `main`.
+/// Where a lift sits in a day: the warm-up comes first. An unknown section reads as `main`.
 enum BodySection: String, Hashable, Sendable, Codable {
-    case main, superset, optional, finisher
+    case warmup, main, superset, optional, finisher
+
+    /// The sections a rough night or a deload trims; the warm-up and finisher never change.
+    var isTrimmable: Bool { [.main, .superset, .optional].contains(self) }
 
     init(from decoder: Decoder) throws {
         self = BodySection(rawValue: (try? decoder.singleValueContainer().decode(String.self)) ?? "") ?? .main
@@ -102,8 +105,11 @@ enum BodyCondition: String, Hashable, Sendable, Codable, CaseIterable {
 // MARK: - The workout document
 
 /// One set of one lift. A weight is nil for bodyweight, band and cable lifts, and for a lift
-/// (Lat pulldown) that has no weight yet: the workout lets him type one in.
+/// (Lat pulldown) that has no weight yet: the workout lets him type one in. `uid` is the set's
+/// identity on this phone (a row id): it is never sent and doesn't take part in equality.
 struct BodySet: Codable, Hashable, Sendable {
+    let uid = UUID()
+
     enum Kind: String, Hashable, Sendable, Codable {
         case warm, work
 
@@ -141,6 +147,20 @@ struct BodySet: Codable, Hashable, Sendable {
         holdS = c.optional(Int.self, .holdS)
         distanceYd = c.optional(Int.self, .distanceYd)
         done = c.bool(.done)
+    }
+
+    static func == (lhs: BodySet, rhs: BodySet) -> Bool {
+        lhs.kind == rhs.kind && lhs.weight == rhs.weight && lhs.reps == rhs.reps && lhs.holdS == rhs.holdS
+            && lhs.distanceYd == rhs.distanceYd && lhs.done == rhs.done
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(kind)
+        hasher.combine(weight)
+        hasher.combine(reps)
+        hasher.combine(holdS)
+        hasher.combine(distanceYd)
+        hasher.combine(done)
     }
 }
 
@@ -186,12 +206,13 @@ struct BodyLastSet: Codable, Hashable, Sendable {
 
 /// One lift in a workout. `weightLabel` and `up` come from the server's prescription (a bump
 /// is already applied); `last` is what he did last time; `repsLeft` is his answer to "how many
-/// more could you have done?" on a big lift.
+/// more could you have done?" on a big lift. `hinge` marks a lift the morning offer can move.
 struct BodyExercise: Codable, Hashable, Sendable, Identifiable {
     let id: String
     var name: String
     var section: BodySection
     var big: Bool
+    var hinge: Bool
     var unit: String
     var perSide: Bool
     var target: BodyTarget
@@ -205,7 +226,7 @@ struct BodyExercise: Codable, Hashable, Sendable, Identifiable {
     var note: String?
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, section, big, unit, perSide = "per_side", target, weightLabel = "weight_label",
+        case id, name, section, big, hinge, unit, perSide = "per_side", target, weightLabel = "weight_label",
              up, upFrom = "up_from", goalReps = "goal_reps", last, sets, repsLeft = "reps_left", note
     }
 
@@ -215,6 +236,7 @@ struct BodyExercise: Codable, Hashable, Sendable, Identifiable {
         name = c.string(.name)
         section = c.optional(BodySection.self, .section) ?? .main
         big = c.bool(.big)
+        hinge = c.bool(.hinge)
         unit = c.optional(String.self, .unit) ?? "lb"
         perSide = c.bool(.perSide)
         target = c.optional(BodyTarget.self, .target) ?? BodyTarget()
@@ -379,18 +401,22 @@ struct BodyOffers: Decodable, Hashable, Sendable {
     let sleep: BodySleepOffer?
     /// He woke under an hour ago and the day has a hinge lift.
     let hinge: Bool
+    /// How long ago he woke, when the hinge offer stands.
+    let hingeMinutes: Int?
 
-    private enum CodingKeys: String, CodingKey { case sleep, hinge }
+    private enum CodingKeys: String, CodingKey { case sleep, hinge, hingeMinutes = "hinge_minutes" }
 
-    init(sleep: BodySleepOffer? = nil, hinge: Bool = false) {
+    init(sleep: BodySleepOffer? = nil, hinge: Bool = false, hingeMinutes: Int? = nil) {
         self.sleep = sleep
         self.hinge = hinge
+        self.hingeMinutes = hingeMinutes
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         sleep = c.optional(BodySleepOffer.self, .sleep)
         hinge = c.bool(.hinge)
+        hingeMinutes = c.optional(Int.self, .hingeMinutes)
     }
 }
 

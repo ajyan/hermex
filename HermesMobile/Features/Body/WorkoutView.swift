@@ -24,12 +24,27 @@ struct WorkoutView: View {
             .task { await viewModel.load() }
             .onDisappear { viewModel.saveNow() }
             .onChange(of: scenePhase) { _, phase in
-                if phase != .active { viewModel.saveNow() }
+                if phase == .background {
+                    saveInBackground()
+                } else if phase != .active {
+                    viewModel.saveNow()
+                }
             }
             .navigationDestination(isPresented: $showsFinish) {
                 // Task 10 replaces this placeholder with WorkoutFinishView(viewModel:).
                 Text(verbatim: "The finish check is coming").hxNavigationTitle("Finish")
             }
+    }
+
+    /// Sends what's waiting while iOS gives the app a little time in the background.
+    private func saveInBackground() {
+        let background = WorkoutBackgroundSave()
+        background.begin()
+        viewModel.saveNow()
+        Task { [viewModel] in
+            await viewModel.idle()
+            background.end()
+        }
     }
 
     private var title: String {
@@ -38,6 +53,7 @@ struct WorkoutView: View {
 
     private var subtitle: String? {
         if viewModel.saveStatus == .failed { return "Not saved" }
+        if viewModel.saveStatus == .finished { return "Already finished" }
         guard let session = viewModel.session else { return nil }
         return WorkoutCopy.phaseLabel(session.phase, deload: session.deload)
     }
@@ -80,6 +96,7 @@ struct WorkoutView: View {
         ScrollViewReader { proxy in
             List {
                 if viewModel.saveStatus == .failed { notSavedRow.workoutPlainRow() }
+                if viewModel.saveStatus == .finished { finishedRow.workoutPlainRow() }
                 if viewModel.sleepBanner != .hidden { sleepBanner.workoutPlainRow() }
                 if viewModel.hingeBanner != .hidden { hingeBanner.workoutPlainRow() }
                 ForEach(Array(session.exercises.enumerated()), id: \.element.id) { index, lift in
@@ -120,14 +137,14 @@ struct WorkoutView: View {
                 .equatable()
                 .workoutCardRow(.top)
                 .id(lift.id)
-            ForEach(lift.sets.indices.map { WorkoutSetID(lift: lift.id, index: $0) }) { id in
-                WorkoutSetRow(lift: lift, exercise: index, index: id.index, viewModel: viewModel)
+            ForEach(Array(lift.sets.enumerated()), id: \.element.uid) { setIndex, _ in
+                WorkoutSetRow(lift: lift, exercise: index, index: setIndex, viewModel: viewModel)
                     .equatable()
                     .workoutCardRow(.middle)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        if WorkoutViewModel.canDelete(set: id.index, of: lift) {
+                        if WorkoutViewModel.canDelete(set: setIndex, of: lift) {
                             Button(role: .destructive) {
-                                viewModel.deleteSet(exercise: index, set: id.index)
+                                viewModel.deleteSet(exercise: index, set: setIndex)
                             } label: {
                                 Label { Text(verbatim: "Delete") } icon: { Image(systemName: "trash") }
                             }
@@ -164,6 +181,13 @@ struct WorkoutView: View {
             .buttonStyle(.borderless)
             .frame(minHeight: 44)
         }
+    }
+
+    private var finishedRow: some View {
+        Text(verbatim: "This workout was already finished. Changes here aren't saved.")
+            .font(AppFont.footnote())
+            .foregroundStyle(Color.hxTextSecondary)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
     }
 
     @ViewBuilder
@@ -211,7 +235,7 @@ struct WorkoutView: View {
                         .foregroundStyle(notes.glow)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(verbatim: "You woke under an hour ago")
+                        Text(verbatim: WorkoutCopy.hingeTitle(minutes: viewModel.hingeMinutes))
                             .font(AppFont.display(style: .headline, weight: .semibold))
                             .foregroundStyle(notes.glow)
                         Text(verbatim: WorkoutCopy.hingeQuestion(viewModel.hingeNames))
@@ -398,9 +422,21 @@ struct WorkoutCardFooter: View, Equatable {
     }
 }
 
-/// A set's row identity: the lift's id and the set's place in it.
-private struct WorkoutSetID: Hashable, Identifiable {
-    let lift: String
-    let index: Int
-    var id: Self { self }
+/// A background task held while the last changes save, ended when they have or when iOS
+/// runs out of time.
+@MainActor
+private final class WorkoutBackgroundSave {
+    private var id: UIBackgroundTaskIdentifier = .invalid
+
+    func begin() {
+        id = UIApplication.shared.beginBackgroundTask(withName: "Save workout") { [weak self] in
+            MainActor.assumeIsolated { self?.end() }
+        }
+    }
+
+    func end() {
+        guard id != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(id)
+        id = .invalid
+    }
 }

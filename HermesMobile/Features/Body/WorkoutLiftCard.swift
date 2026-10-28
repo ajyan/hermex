@@ -109,6 +109,7 @@ enum WorkoutCopy {
 
     static func sectionTitle(_ section: BodySection) -> String {
         switch section {
+        case .warmup: "Warm-up"
         case .main: "Main"
         case .superset: "Superset"
         case .optional: "Optional"
@@ -139,9 +140,27 @@ enum WorkoutCopy {
         return parts.isEmpty ? "Rough night" : "Rough night: " + parts.joined(separator: ", ")
     }
 
-    /// "Move DB Romanian deadlift to the end?"
+    /// "You woke 40 min ago."; "under an hour" when the server didn't say.
+    static func hingeTitle(minutes: Int?) -> String {
+        guard let minutes else { return "You woke under an hour ago." }
+        return "You woke \(minutes) min ago."
+    }
+
+    /// "Move RDLs to the end?"; other hinge lifts by name.
     static func hingeQuestion(_ names: [String]) -> String {
-        "Move \(ListFormatter.localizedString(byJoining: names)) to the end?"
+        let rdl = !names.isEmpty && names.allSatisfy { $0.localizedCaseInsensitiveContains("Romanian deadlift") }
+        return "Move \(rdl ? "RDLs" : ListFormatter.localizedString(byJoining: names)) to the end?"
+    }
+
+    /// Where the weight editor starts: the set's weight, else last time's weight for this set, else
+    /// last time's heaviest. Nil when the lift has never had one.
+    static func startingWeight(_ lift: BodyExercise, set s: Int) -> Double? {
+        guard lift.sets.indices.contains(s) else { return nil }
+        if let weight = lift.sets[s].weight { return weight }
+        if let i = workIndex(lift, set: s), lift.last.indices.contains(i), let weight = lift.last[i].weight {
+            return weight
+        }
+        return lift.last.compactMap(\.weight).max()
     }
 
     /// The phase subtitle: "Build", "Re-entry · Deload".
@@ -222,9 +241,20 @@ struct WorkoutFoldedRow: View, Equatable {
 
 // MARK: - Open lift
 
+/// The set columns' widths, growing with Dynamic Type so the pills keep their numbers readable.
+struct WorkoutColumns: DynamicProperty {
+    @ScaledMetric(relativeTo: .body) var tag = WorkoutLayout.tagWidth
+    @ScaledMetric(relativeTo: .body) var weight = WorkoutLayout.weightWidth
+    @ScaledMetric(relativeTo: .body) var count = WorkoutLayout.countWidth
+    @ScaledMetric(relativeTo: .body) var check = WorkoutLayout.checkSize
+}
+
 /// The open card's top: the name, the target and last time, why it went up, and the column labels.
 struct WorkoutCardHeader: View, Equatable {
     let lift: BodyExercise
+    private var columns = WorkoutColumns()
+
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.lift == rhs.lift }
 
     private var paper: HermexPaper { .training }
 
@@ -251,11 +281,11 @@ struct WorkoutCardHeader: View, Equatable {
             }
             .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: WorkoutLayout.columnSpacing) {
-                Text(verbatim: "Set").frame(width: WorkoutLayout.tagWidth, alignment: .leading)
+                Text(verbatim: "Set").frame(width: columns.tag, alignment: .leading)
                 Text(verbatim: "Last time").frame(maxWidth: .infinity, alignment: .leading)
-                Text(verbatim: WorkoutCopy.weightHeader(lift)).frame(width: WorkoutLayout.weightWidth)
-                Text(verbatim: WorkoutCopy.countHeader(BodyMeasure(lift))).frame(width: WorkoutLayout.countWidth)
-                Color.clear.frame(width: WorkoutLayout.checkSize, height: 1)
+                Text(verbatim: WorkoutCopy.weightHeader(lift)).frame(width: columns.weight)
+                Text(verbatim: WorkoutCopy.countHeader(BodyMeasure(lift))).frame(width: columns.count)
+                Color.clear.frame(width: columns.check, height: 1)
             }
             .font(AppFont.caption2(weight: .bold))
             .foregroundStyle(paper.glow)
@@ -266,7 +296,8 @@ struct WorkoutCardHeader: View, Equatable {
     }
 }
 
-/// One set: its tag, last time, the weight and count pills, and the 44 pt check.
+/// One set: its tag, last time, the weight and count pills, and the 44 pt check. The row is
+/// identified by the set's `uid`, so deleting a set takes its row (and any open editor) with it.
 struct WorkoutSetRow: View, Equatable {
     let lift: BodyExercise
     let exercise: Int
@@ -276,16 +307,18 @@ struct WorkoutSetRow: View, Equatable {
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.exercise == rhs.exercise && lhs.index == rhs.index && lhs.row == rhs.row
             && lhs.tag == rhs.tag && lhs.lastTime == rhs.lastTime && lhs.lift.unit == rhs.lift.unit
-            && lhs.lift.target == rhs.lift.target
+            && lhs.lift.target == rhs.lift.target && lhs.startingWeight == rhs.startingWeight
     }
 
     private enum Field { case weight, count }
     @State private var editing: Field?
+    private var columns = WorkoutColumns()
 
     private var paper: HermexPaper { .training }
     private var row: BodySet { lift.sets[index] }
     private var tag: String { WorkoutCopy.tag(lift, set: index) }
     private var lastTime: String { WorkoutCopy.lastTime(lift, workIndex: WorkoutCopy.workIndex(lift, set: index)) }
+    private var startingWeight: Double? { WorkoutCopy.startingWeight(lift, set: index) }
     private var measure: BodyMeasure { BodyMeasure(lift) }
     private var isWarm: Bool { row.kind == .warm }
     private var setName: String { isWarm ? "Warm-up set" : "Set \(tag)" }
@@ -296,7 +329,7 @@ struct WorkoutSetRow: View, Equatable {
                 Text(verbatim: tag)
                     .font(AppFont.subheadline(weight: .bold))
                     .foregroundStyle(isWarm ? Color.hxTextSecondary : paper.glow)
-                    .frame(width: WorkoutLayout.tagWidth, alignment: .leading)
+                    .frame(width: columns.tag, alignment: .leading)
                 Text(verbatim: lastTime)
                     .font(AppFont.subheadline())
                     .monospacedDigit()
@@ -307,11 +340,11 @@ struct WorkoutSetRow: View, Equatable {
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text(verbatim: "\(setName), last time \(lastTime)"))
-            weightPill
+            if WorkoutCopy.isWeighted(lift) { weightPill } else { weightLabel }
             countPill
             check
         }
-        .frame(minHeight: 44)
+        .frame(minHeight: 48)
         .opacity(row.done ? 0.75 : 1)
     }
 
@@ -320,21 +353,25 @@ struct WorkoutSetRow: View, Equatable {
             .map { lift.unit == "lb_each" ? String($0.dropLast()) : $0 } ?? "—"
     }
 
+    /// Bodyweight, band and cable lifts have nothing to change: the label in the pill's place.
+    private var weightLabel: some View {
+        pill(weightText, secondary: true, width: columns.weight)
+            .accessibilityLabel(Text(verbatim: "\(setName), \(BodyFormat.weightLabel(unit: lift.unit, weight: nil))"))
+    }
+
     private var weightPill: some View {
-        let weighted = WorkoutCopy.isWeighted(lift)
-        return Button { editing = .weight } label: {
-            pill(weightText, secondary: !weighted, width: WorkoutLayout.weightWidth)
+        Button { editing = .weight } label: {
+            pill(weightText, secondary: false, width: columns.weight)
         }
         .buttonStyle(.plain)
-        .disabled(!weighted)
-        .accessibilityLabel(Text(verbatim: weighted
-            ? "\(setName) weight, \(row.weight.map { "\(BodyFormat.number($0)) pounds" } ?? "not set")"
-            : "\(setName), \(BodyFormat.weightLabel(unit: lift.unit, weight: nil))"))
-        .accessibilityHint(Text(verbatim: weighted ? "Changes the weight" : ""))
+        .accessibilityLabel(Text(verbatim:
+            "\(setName) weight, \(row.weight.map { "\(BodyFormat.number($0)) pounds" } ?? "not set")"))
+        .accessibilityHint(Text(verbatim: "Changes the weight"))
         .popover(isPresented: binding(.weight)) {
             WorkoutNumberEditor(
                 title: lift.unit == "lb_each" ? "Pounds a dumbbell" : "Pounds",
-                step: lift.unit == "lb_each" ? 2.5 : 5, isInteger: false, initial: row.weight
+                step: lift.unit == "lb_each" ? 2.5 : 5, isInteger: false,
+                current: row.weight, start: startingWeight
             ) { viewModel.setWeight($0, exercise: exercise, set: index) }
             .presentationCompactAdaptation(.popover)
         }
@@ -343,16 +380,17 @@ struct WorkoutSetRow: View, Equatable {
     private var countPill: some View {
         Button { editing = .count } label: {
             pill(WorkoutCopy.count(measure.count(row), measure).replacingOccurrences(of: " ", with: "\u{00A0}"),
-                 secondary: false, width: WorkoutLayout.countWidth)
+                 secondary: false, width: columns.count)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(verbatim: "\(setName) \(WorkoutCopy.countHeader(measure).lowercased()), "
             + WorkoutCopy.count(measure.count(row), measure)))
         .accessibilityHint(Text(verbatim: "Changes the count"))
         .popover(isPresented: binding(.count)) {
+            let count = measure.count(row).map(Double.init)
             WorkoutNumberEditor(
                 title: measure == .reps ? "Reps" : measure == .hold ? "Seconds" : "Yards",
-                step: measure == .reps ? 1 : 5, isInteger: true, initial: measure.count(row).map(Double.init)
+                step: measure == .reps ? 1 : 5, isInteger: true, current: count, start: count
             ) { viewModel.setReps($0.map { Int($0.rounded()) }, exercise: exercise, set: index) }
             .presentationCompactAdaptation(.popover)
         }
@@ -363,7 +401,7 @@ struct WorkoutSetRow: View, Equatable {
             Image(systemName: "checkmark")
                 .font(AppFont.headline(weight: .bold))
                 .foregroundStyle(row.done ? paper.onGlow : Color.hxTextSecondary)
-                .frame(width: WorkoutLayout.checkSize, height: WorkoutLayout.checkSize)
+                .frame(width: columns.check, height: columns.check)
                 .background(row.done ? paper.glow : Color.clear,
                             in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
@@ -373,9 +411,9 @@ struct WorkoutSetRow: View, Equatable {
         .buttonStyle(.plain)
         .sensoryFeedback(.success, trigger: row.done) { old, new in !old && new }
         .accessibilityLabel(Text(verbatim: row.done ? "\(setName) done" : "Mark \(setName.lowercased()) done"))
-        .accessibilityHint(Text(verbatim: row.done ? "Unmarks it" : ""))
     }
 
+    /// A 44 pt tall number box, as wide as its column.
     private func pill(_ text: String, secondary: Bool, width: CGFloat) -> some View {
         Text(verbatim: text)
             .font(AppFont.body(weight: .semibold))
@@ -384,7 +422,8 @@ struct WorkoutSetRow: View, Equatable {
             .minimumScaleFactor(0.5)
             .foregroundStyle(secondary ? Color.hxTextSecondary : Color.hxTextPrimary)
             .padding(.horizontal, 4)
-            .frame(width: width, height: 36)
+            .frame(width: width)
+            .frame(minHeight: 44)
             .background(Color.hxCanvas, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                 .strokeBorder(Color.hxSeparator, lineWidth: 0.5))
@@ -395,20 +434,25 @@ struct WorkoutSetRow: View, Equatable {
     }
 }
 
-/// The small editor a pill opens: steppers either side of a number he can also type.
+/// The small editor a pill opens: steppers either side of a number he can also type. It starts
+/// from `start` (for an empty weight, last time's) and commits once, when it closes, and only if
+/// the number changed from `current`; a field that doesn't parse commits nothing.
 struct WorkoutNumberEditor: View {
     let title: String
     let step: Double
     let isInteger: Bool
+    let current: Double?
     let commit: (Double?) -> Void
     @State private var text: String
 
-    init(title: String, step: Double, isInteger: Bool, initial: Double?, commit: @escaping (Double?) -> Void) {
+    init(title: String, step: Double, isInteger: Bool, current: Double?, start: Double?,
+         commit: @escaping (Double?) -> Void) {
         self.title = title
         self.step = step
         self.isInteger = isInteger
+        self.current = current
         self.commit = commit
-        _text = State(initialValue: initial.map(BodyFormat.number) ?? "")
+        _text = State(initialValue: start.map(BodyFormat.number) ?? "")
     }
 
     var body: some View {
@@ -428,9 +472,15 @@ struct WorkoutNumberEditor: View {
             }
         }
         .padding(16)
-        .onChange(of: text) { _, new in
-            let trimmed = new.trimmingCharacters(in: .whitespaces)
-            if trimmed.isEmpty { commit(nil) } else if let value = Double(trimmed) { commit(value) }
+        .onDisappear(perform: commitIfChanged)
+    }
+
+    private func commitIfChanged() {
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty {
+            if current != nil { commit(nil) }
+        } else if let value = Double(trimmed), value != current {
+            commit(value)
         }
     }
 
