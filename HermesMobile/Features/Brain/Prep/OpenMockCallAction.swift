@@ -51,37 +51,43 @@ struct MockCallGrade: Hashable, Sendable {
 }
 
 /// The end of a voice mock's call: which mock, and its grade request, or nil when there is nothing
-/// to grade (no session, or the interviewer never answered). The session and the user's answer waits
-/// ride along for the Mandarin call's review.
+/// to grade (no session, or the interviewer never answered). The session rides along for the Mandarin
+/// call's review.
 struct MockCallEnd: Equatable, Sendable {
     let mockID: String
     let grade: MockCallGrade?
     let sessionID: String?
-    let waitMS: [Int]
 
-    init(mockID: String, grade: MockCallGrade?, sessionID: String? = nil, waitMS: [Int] = []) {
+    init(mockID: String, grade: MockCallGrade?, sessionID: String? = nil) {
         self.mockID = mockID
         self.grade = grade
         self.sessionID = sessionID
-        self.waitMS = waitMS
     }
 }
 
 /// A chat opened for a voice mock: its first call opens with the brief, and when that call ends it
 /// reports the end once. Later calls on the same chat are ordinary calls. A chat that isn't a mock
-/// has neither and never reports.
+/// has neither and never reports. The Mandarin card's typed chat (`startsCall` false) sends the brief
+/// as text instead, and reports its end from Done.
 struct MockCallState: Equatable {
     private(set) var mockID: String?
     /// The brief, until the mock's call has ended.
     private(set) var openingTurn: String?
+    let startsCall: Bool
 
-    init(mockID: String?, openingTurn: String?) {
+    init(mockID: String?, openingTurn: String?, startsCall: Bool = true) {
         self.mockID = mockID
         self.openingTurn = openingTurn
+        self.startsCall = startsCall
+    }
+
+    /// A typed Mandarin chat: the brief goes out as the chat's first message.
+    var sendsBriefAsText: Bool {
+        !startsCall && openingTurn != nil && MandarinCall.date(fromCallID: mockID) != nil
     }
 
     /// Ends the mock's call, once, with its grade request (`MockCallGrade.of`).
-    mutating func callEnded(sessionID: String?, turnMS: [Int], waitMS: [Int] = []) -> MockCallEnd? {
+    mutating func callEnded(sessionID: String?, turnMS: [Int]) -> MockCallEnd? {
         defer {
             mockID = nil
             openingTurn = nil
@@ -89,7 +95,13 @@ struct MockCallState: Equatable {
         guard let mockID else { return nil }
         let session = sessionID?.trimmingCharacters(in: .whitespacesAndNewlines)
         return MockCallEnd(mockID: mockID, grade: MockCallGrade.of(mockID: mockID, sessionID: sessionID, turnMS: turnMS),
-                           sessionID: session?.isEmpty == false ? session : nil, waitMS: waitMS)
+                           sessionID: session?.isEmpty == false ? session : nil)
+    }
+
+    /// Ends a typed chat from Done, once: its "grade" exists only when Mom or Dad replied, so a chat
+    /// nobody answered records nothing.
+    mutating func typedEnded(sessionID: String?, replies: Int) -> MockCallEnd? {
+        callEnded(sessionID: sessionID, turnMS: Array(repeating: 0, count: max(replies, 0)))
     }
 }
 

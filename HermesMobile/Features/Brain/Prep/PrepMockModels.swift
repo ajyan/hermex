@@ -187,13 +187,17 @@ struct PrepMockStart: Decodable, Hashable, Sendable {
     let brief: String
     let profile: String
     let title: String
+    /// False for the Mandarin card's typed chat: the chat opens with the brief sent as text, not in a
+    /// call. Never decoded; a mock from the server always starts a call.
+    var startsCall = true
 
-    init(mockID: String, level: String, brief: String, profile: String, title: String) {
+    init(mockID: String, level: String, brief: String, profile: String, title: String, startsCall: Bool = true) {
         self.mockID = mockID
         self.level = level
         self.brief = brief
         self.profile = profile
         self.title = title
+        self.startsCall = startsCall
     }
 
     private enum CodingKeys: String, CodingKey {
