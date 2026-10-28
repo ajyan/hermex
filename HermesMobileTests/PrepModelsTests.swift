@@ -873,7 +873,7 @@ final class PrepDialogueModelTests: XCTestCase {
         let cards = try XCTUnwrap(lesson.cards)
         XCTAssertNil(cards.picture, "one step is not a flow")
         XCTAssertNil(cards.inYourWork)
-        XCTAssertEqual(PrepLessonCardKind.cards(for: cards), [.theCase, .idea, .lockIn])
+        XCTAssertEqual(PrepLessonCardKind.cards(for: cards), [.theCase, .point(0), .lockIn])
         XCTAssertEqual(lesson.recall?.questionID, "u1.l1.q2")
         XCTAssertEqual(lesson.recall?.isQuestion, true)
     }
@@ -885,8 +885,24 @@ final class PrepDialogueModelTests: XCTestCase {
                    "picture": {"steps": ["read", "think", "answer"]}, "in_your_work": {"text": "At work."}}}
         """#.utf8))
         let cards = try XCTUnwrap(lesson.cards)
-        XCTAssertEqual(PrepLessonCardKind.cards(for: cards), [.theCase, .idea, .work, .lockIn],
+        XCTAssertEqual(PrepLessonCardKind.cards(for: cards), [.theCase, .point(0), .work, .lockIn],
                        "Lock it in closes every lesson, after In your work")
+    }
+
+    func testEachIdeaPointGetsItsOwnCardWithItsExample() throws {
+        let lesson = try PrepDecoding.decode(PrepLesson.self, from: Data(#"""
+        {"id": "u4.l2", "title": "Why the RSP changed", "idea_md": "Idea",
+         "cards": {"case": {"headline": "H", "body": "B", "ask": "A?"},
+                   "idea": [{"lead": "Collective action:", "text": "Risk depends on everyone.", "example": "A lab pausing alone."},
+                            {"lead": "Arguments, not lists:", "text": "Argue the risk is contained."},
+                            {"lead": "ASL labels now:", "text": "Labels describe protections.", "example": "  "}]}}
+        """#.utf8))
+        let cards = try XCTUnwrap(lesson.cards)
+        XCTAssertEqual(PrepLessonCardKind.cards(for: cards), [.theCase, .point(0), .point(1), .point(2), .lockIn])
+        XCTAssertEqual(cards.idea[0].example, "A lab pausing alone.")
+        XCTAssertNil(cards.idea[1].example, "a lesson without examples still decodes")
+        XCTAssertEqual(PrepLessonCardKind.point(1).title, "Point 2")
+        XCTAssertEqual(PrepCopy.cardPageLabel(page: .point(2), in: PrepLessonCardKind.cards(for: cards)), "Card 4 of 5, Point 3")
     }
 
     func testIdeaLeadDropsTheAuthoredColon() {
@@ -920,7 +936,7 @@ final class PrepDialogueModelTests: XCTestCase {
          "diagram": {"topic": "recall-vs-rank-miss", "title": "Recall vs rank miss"}}
         """#.utf8))
         let cards = try XCTUnwrap(lesson.cards)
-        XCTAssertEqual(PrepLessonCardKind.cards(for: cards), [.theCase, .idea, .code, .lockIn])
+        XCTAssertEqual(PrepLessonCardKind.cards(for: cards), [.theCase, .point(0), .code, .lockIn])
         XCTAssertEqual(cards.code?.body, "def hit(r, k):\n    return r < k")
         XCTAssertEqual(cards.code?.caption, "Two questions.")
         XCTAssertEqual(lesson.diagram?.topic, "recall-vs-rank-miss")

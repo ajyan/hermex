@@ -299,6 +299,8 @@ struct PrepLessonCards: Decodable, Hashable, Sendable {
     struct Bullet: Decodable, Hashable, Sendable {
         let lead: String
         let text: String
+        /// A concrete instance of the point, usually continuing the case; shown on the point's own card.
+        var example: String?
     }
 
     struct Picture: Decodable, Hashable, Sendable {
