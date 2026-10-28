@@ -224,17 +224,15 @@ enum Endpoint {
     /// The week's photo (this user's webui fork): POST a raw JPEG or DELETE, `?week_ending=YYYY-MM-DD`.
     case briefPhoto(weekEnding: String)
     /// The Daily Deck's Mandarin card, live (`api/vault_mandarin.py` on this user's webui fork):
-    /// POST `{date, text, question?}` for instant feedback, POST `{date, hanzi, got}` for a recall.
-    case mandarinAnswer
+    /// POST `{date, hanzi, got}` for a recall.
     case mandarinRecall
-    /// The family call: POST `{date, who}` for three things to say, POST `{date, text}` for what he couldn't.
-    case mandarinCallPrep
-    case mandarinCallAfter
-    /// The Mandarin voice call: POST `{date, text}` for the first telling, `{date}` for the brief
-    /// and profile, `{date, session_id, wait_ms}` for the review.
-    case mandarinTelling
+    /// The Mandarin call with Mom or Dad: POST `{date}` for the brief and profile, `{date, session_id}`
+    /// for the review, `{date, session_id, index, said}` for one pattern practice answer, and `{}` for
+    /// the phrasebook.
     case mandarinCallStart
     case mandarinCallReview
+    case mandarinPatternCheck
+    case mandarinPhrasebook
 
     var path: String {
         switch self {
@@ -590,20 +588,16 @@ enum Endpoint {
             return "/api/brief/intention"
         case .briefPhoto:
             return "/api/brief/photo"
-        case .mandarinAnswer:
-            return "/api/mandarin/answer"
         case .mandarinRecall:
             return "/api/mandarin/recall"
-        case .mandarinCallPrep:
-            return "/api/mandarin/call/prep"
-        case .mandarinCallAfter:
-            return "/api/mandarin/call/after"
-        case .mandarinTelling:
-            return "/api/mandarin/telling"
         case .mandarinCallStart:
             return "/api/mandarin/call/start"
         case .mandarinCallReview:
             return "/api/mandarin/call/review"
+        case .mandarinPatternCheck:
+            return "/api/mandarin/pattern/check"
+        case .mandarinPhrasebook:
+            return "/api/mandarin/phrasebook"
         }
     }
 

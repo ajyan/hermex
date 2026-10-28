@@ -1513,7 +1513,7 @@ struct ChatShellView: View {
             openChat: { mock in
                 selectDestination(PendingNewChatRoute(
                     profileName: mock.profile,
-                    startsCall: true,
+                    startsCall: mock.startsCall,
                     openingTurn: mock.brief,
                     mockID: mock.mockID
                 ))
@@ -1534,7 +1534,7 @@ struct ChatShellView: View {
                     await profile.leave()
                     await viewModel.loadActiveProfile()
                 },
-                record: { MandarinPracticeStore().recordCall(server: server, date: $0, sessionID: $1, waitMS: $2) },
+                record: { MandarinPracticeStore().recordCall(server: server, date: $0, sessionID: $1) },
                 isStillOnCallChat: { navigation.rootRevision == revision },
                 showDeck: {
                     selectDestination(PendingNewChatRoute())
