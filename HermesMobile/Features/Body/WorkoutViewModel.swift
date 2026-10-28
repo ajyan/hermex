@@ -31,6 +31,9 @@ final class WorkoutViewModel {
     private(set) var hingeBanner: Banner = .hidden
     /// How long ago he woke, for the hinge offer's copy.
     private(set) var hingeMinutes: Int?
+    /// Why the last `finish` didn't go through; cleared by the next one.
+    private(set) var finishError: String?
+    private(set) var isFinishing = false
 
     /// The day asked for (push, legs, pull), or nil for the next in the rotation.
     let day: String?
@@ -362,6 +365,47 @@ final class WorkoutViewModel {
             guard token == generation, !workoutIsCancellation(error) else { return }
             onAPIError(error)
             saveStatus = .failed
+        }
+    }
+
+    // MARK: Finishing
+
+    /// Sends the last sets, then closes the workout with the how-was-it check. Nil means it didn't
+    /// go through and the workout stays open (`finishError` says why). After it succeeds nothing
+    /// is saved again, because the server answers a finished session with 409.
+    func finish(check: BodyCheck) async -> BodyFinishResult? {
+        guard let id = session?.id, !isFinishing else { return nil }
+        isFinishing = true
+        finishError = nil
+        defer { isFinishing = false }
+        saveNow()
+        await idle()
+        switch saveStatus {
+        case .failed:
+            finishError = "Couldn't save your sets first. Check the connection and try again."
+            return nil
+        case .finished:
+            finishError = "This workout was already finished."
+            return nil
+        case .saved, .saving:
+            break
+        }
+        do {
+            let result = try await client.finish(id: id, check: check)
+            debounceTask?.cancel()
+            saveStatus = .finished
+            return result
+        } catch {
+            guard !workoutIsCancellation(error) else { return nil }
+            if (error as? APIError)?.isConflict == true {
+                debounceTask?.cancel()
+                saveStatus = .finished
+                finishError = "This workout was already finished."
+            } else {
+                onAPIError(error)
+                finishError = (error as? APIError)?.serverMessage ?? error.localizedDescription
+            }
+            return nil
         }
     }
 

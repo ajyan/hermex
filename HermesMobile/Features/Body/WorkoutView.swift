@@ -7,11 +7,16 @@ import SwiftUI
 struct WorkoutView: View {
     @State private var viewModel: WorkoutViewModel
     @State private var showsFinish = false
+    private let client: BodyDataClient
+    private let onAPIError: (Error) -> Void
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(day: String?, server: URL, onAPIError: @escaping (Error) -> Void) {
         let client = APIClientBodyAdapter(apiClient: APIClient(baseURL: server))
+        self.client = client
+        self.onAPIError = onAPIError
         _viewModel = State(initialValue: WorkoutViewModel(client: client, day: day, onAPIError: onAPIError))
     }
 
@@ -31,8 +36,8 @@ struct WorkoutView: View {
                 }
             }
             .navigationDestination(isPresented: $showsFinish) {
-                // Task 10 replaces this placeholder with WorkoutFinishView(viewModel:).
-                Text(verbatim: "The finish check is coming").hxNavigationTitle("Finish")
+                // Done leaves the workout too: it is closed, and Body home is where he lands.
+                WorkoutFinishView(workout: viewModel, client: client, onAPIError: onAPIError) { dismiss() }
             }
     }
 
