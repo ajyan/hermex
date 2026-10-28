@@ -662,12 +662,11 @@ struct ChatShellView: View {
         case .body:
             BodyHomeView(server: server, onAPIError: authManager.handleAPIError, onOpen: { navigation.push($0) })
                 .adaptiveSecondaryNavigationTitle()
-        case .bodyLift:
-            // Task 11 replaces this placeholder with the lift's history.
-            Text(verbatim: "Lift history is coming").hxNavigationTitle("Lift")
+        case .bodyLift(let id):
+            LiftProgressView(id: id, server: server, onAPIError: authManager.handleAPIError)
+                .id(id)
         case .bodyPlan:
-            // Task 11 replaces this placeholder with the plan editor.
-            Text(verbatim: "The plan editor is coming").hxNavigationTitle("Plan")
+            PlanEditView(server: server, onAPIError: authManager.handleAPIError)
         case .bodyWorkout(let day):
             WorkoutView(day: day, server: server, onAPIError: authManager.handleAPIError)
                 .id(day ?? "next")
