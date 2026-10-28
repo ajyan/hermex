@@ -21,9 +21,11 @@ struct DeckVariantPick: View {
                 let previews = variant.previews
                 faceButton("a", previews.a)
                 faceButton("b", previews.b)
-                Text(verbatim: "Tap your pick again to clear it.")
-                    .font(AppFont.footnote())
-                    .foregroundStyle(Color.hxTextSecondary)
+                if viewModel.signals.pick?.card == card.id, !viewModel.isFiled || viewModel.hasChanges {
+                    Text(verbatim: "Tap your pick again to clear it.")
+                        .font(AppFont.footnote())
+                        .foregroundStyle(Color.hxTextSecondary)
+                }
             }
         }
     }

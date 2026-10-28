@@ -903,8 +903,7 @@ struct DeckCardView: View {
         let count = viewModel.answeredCount
         let filed = viewModel.isFiled && !viewModel.hasChanges
         Text(verbatim: filed
-             ? viewModel.filedNote?.summary ?? (seal ? "Sealed in your journal. Edit any card and seal again to update it."
-                                                : "In your journal. Edit any card and file again to update it.")
+             ? DeckCopy.filedLine(seal: seal)
              : viewModel.isFiled
              ? (seal ? "Sealing again replaces this week's page with these answers."
                      : "Filing again updates the journal: changed answers replace what was filed, new ones are added, nothing is deleted.")

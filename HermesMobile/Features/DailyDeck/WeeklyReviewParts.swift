@@ -335,6 +335,12 @@ enum DeckCopy {
         return filed ? "Filed" : count == 1 ? "1 reflection" : "\(count) reflections"
     }
 
+    /// Under the close heading once the deck is filed. The heading already says it worked, so this only says
+    /// where the answers went; the server's own summary (count and journal path) stays out of the card.
+    static func filedLine(seal: Bool) -> String {
+        seal ? "Sealed in your journal." : "In your journal."
+    }
+
     /// The header's word for a filed deck: a sealed weekly review is sealed; "Edited" once changed since.
     static func filedStatus(seal: Bool, edited: Bool) -> String {
         edited ? "Edited" : seal ? "Sealed" : "Filed"
