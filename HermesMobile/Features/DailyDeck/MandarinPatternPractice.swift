@@ -3,7 +3,7 @@ import SwiftUI
 /// Practicing the day's pattern: three prompts from his week, one at a time. He says each in Mandarin
 /// (zh-CN dictation or typing); right gets "That works" and another natural way, close shows where the
 /// pattern goes and asks for one more try, off shows the natural way. Answered prompts stay above the
-/// current one. Closes on its own once all three are done.
+/// current one; once all three are done the last result stays on screen until Done.
 struct MandarinPatternPractice: View {
     let practice: MandarinPractice
     let palette: DeckPalette
@@ -46,6 +46,15 @@ struct MandarinPatternPractice: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(practice.checking == .waiting)
+                    } else if practice.isPracticeDone {
+                        Button { dismiss() } label: {
+                            Label { Text(verbatim: "Done") } icon: { Image(systemName: "checkmark") }
+                                .font(AppFont.body(weight: .semibold))
+                                .foregroundStyle(palette.onInk)
+                                .frame(maxWidth: .infinity, minHeight: 46)
+                                .background(palette.ink, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
                     }
                     Text(verbatim: MandarinCardCopy.nextCall(practice.card.speaker))
                         .font(AppFont.footnote())
@@ -69,7 +78,6 @@ struct MandarinPatternPractice: View {
         }
         .tint(palette.ink)
         .onDisappear { speaker.stop() }
-        .onChange(of: practice.isPracticeDone) { _, done in if done { dismiss() } }
     }
 
     @ViewBuilder

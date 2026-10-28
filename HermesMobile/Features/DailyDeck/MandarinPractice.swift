@@ -40,10 +40,20 @@ struct APIClientMandarinAdapter: MandarinPracticeClient {
 /// Kept per server and day, so the card resumes. Keys from the earlier designs still decode, and are
 /// ignored.
 struct MandarinPracticeRecord: Codable, Equatable {
+    /// A reviewed call set aside by a newer one, until the newer one's review arrives: a call where
+    /// he never spoke gives it back.
+    struct Kept: Codable, Equatable {
+        var callSessionID: String
+        var review: MandarinCallReview
+        var practice: [Int: MandarinPatternCheck]
+        var practiceRetried: [Int]
+    }
+
     var callSessionID: String?
     var review: MandarinCallReview?
     var practice: [Int: MandarinPatternCheck] = [:]
     var practiceRetried: [Int] = []
+    var previous: Kept?
 
     init() {}
 
@@ -53,6 +63,7 @@ struct MandarinPracticeRecord: Codable, Equatable {
         review = try? c.decodeIfPresent(MandarinCallReview.self, forKey: .review)
         practice = (try? c.decodeIfPresent([Int: MandarinPatternCheck].self, forKey: .practice)) ?? [:]
         practiceRetried = (try? c.decodeIfPresent([Int].self, forKey: .practiceRetried)) ?? []
+        previous = try? c.decodeIfPresent(Kept.self, forKey: .previous)
     }
 }
 
@@ -76,10 +87,15 @@ struct MandarinPracticeStore {
     }
 
     /// Keeps a finished Mandarin call (or typed chat) on its day's record, for the card to ask for its
-    /// review. A new session the same day replaces the last one's review and practice.
+    /// review. A new session the same day replaces the last one's review and practice, keeping a
+    /// reviewed one aside in case the new call turns out empty.
     func recordCall(server: URL, date: String, sessionID: String) {
         var saved = record(for: server, date: date) ?? MandarinPracticeRecord()
         if saved.callSessionID != sessionID {
+            if let session = saved.callSessionID, let review = saved.review {
+                saved.previous = .init(callSessionID: session, review: review, practice: saved.practice,
+                                       practiceRetried: saved.practiceRetried)
+            }
             saved.review = nil
             saved.practice = [:]
             saved.practiceRetried = []
@@ -231,7 +247,15 @@ final class MandarinPractice {
         do {
             let review = try await client.callReview(MandarinCallReviewRequest(date: date, sessionID: sessionID))
             if review.turns == 0 {
-                record.callSessionID = nil
+                if let kept = record.previous {
+                    record.callSessionID = kept.callSessionID
+                    record.review = kept.review
+                    record.practice = kept.practice
+                    record.practiceRetried = kept.practiceRetried
+                } else {
+                    record.callSessionID = nil
+                }
+                record.previous = nil
                 save()
                 reviewing = .idle
                 return
@@ -241,6 +265,7 @@ final class MandarinPractice {
                 return
             }
             record.review = review
+            record.previous = nil
             save()
             reviewing = .idle
         } catch {

@@ -187,6 +187,11 @@ struct ChatShellView: View {
             .environment(dailyAsk)
             .task { await feedbackAvailability.check() }
             .task { await recoverMockProfileIfNeeded() }
+            // Leaving a mock's chat another way than its end (a typed Mandarin chat left without Done)
+            // puts the profile back now, not at the next launch or foreground.
+            .onChange(of: navigation.isOnMockChat) { wasOn, isOn in
+                if wasOn, !isOn { Task { await recoverMockProfileIfNeeded() } }
+            }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background {
                     wasBackgrounded = true

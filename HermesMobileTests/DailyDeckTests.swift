@@ -2815,6 +2815,23 @@ final class MandarinPracticeTests: XCTestCase {
         XCTAssertEqual(rebuilt.record.review?.reached.count, 1)
     }
 
+    func testASecondCallWhereHeNeverSpokeKeepsTheFirstAfter() async throws {
+        let client = FakeMandarinClient()
+        client.reviewResults = [.success(review(words: 2)), .success(MandarinCallReview(turns: 0))]
+        recordCall(session: "s1")
+        let practice = practice(try card(), client: client)
+        await practice.reviewIfNeeded()
+        await practice.check("我是周五去的")
+        recordCall(session: "s2")
+        await practice.reviewIfNeeded()
+        XCTAssertEqual(client.reviews.map(\.sessionID), ["s1", "s2"])
+        XCTAssertEqual(practice.state, .after)
+        XCTAssertEqual(practice.record.callSessionID, "s1", "the empty call gives the first call's After back")
+        XCTAssertEqual(practice.record.review?.reached.count, 2)
+        XCTAssertNotNil(practice.record.practice[0])
+        XCTAssertEqual(self.practice(try card(), client: client).record.callSessionID, "s1")
+    }
+
     func testThePracticeResumesForTheSameServerAndDayOnly() async throws {
         let client = FakeMandarinClient()
         client.reviewResults = [.success(review())]
