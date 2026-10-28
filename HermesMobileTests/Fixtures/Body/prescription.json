@@ -1,0 +1,341 @@
+{
+  "id": "2026-11-30-push",
+  "day": "push",
+  "phase": "build",
+  "deload": false,
+  "resumed": false,
+  "offers": {
+    "sleep": {
+      "hours": 5.2,
+      "quality": 2
+    },
+    "hinge": false
+  },
+  "exercises": [
+    {
+      "id": "incline-bench",
+      "name": "Incline bench",
+      "section": "main",
+      "big": true,
+      "unit": "lb",
+      "per_side": false,
+      "target": {
+        "reps": [
+          6,
+          8
+        ]
+      },
+      "weight_label": "150 lb",
+      "up": true,
+      "up_from": 145.0,
+      "goal_reps": null,
+      "last": [
+        {
+          "weight": 145,
+          "reps": 8
+        },
+        {
+          "weight": 145,
+          "reps": 8
+        },
+        {
+          "weight": 145,
+          "reps": 8
+        },
+        {
+          "weight": 145,
+          "reps": 8
+        }
+      ],
+      "sets": [
+        {
+          "kind": "warm",
+          "weight": 90,
+          "reps": 8,
+          "done": false
+        },
+        {
+          "kind": "warm",
+          "weight": 125,
+          "reps": 4,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 150.0,
+          "reps": 8,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 150.0,
+          "reps": 8,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 150.0,
+          "reps": 8,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 150.0,
+          "reps": 8,
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "strict-press",
+      "name": "Strict press",
+      "section": "main",
+      "big": true,
+      "unit": "lb",
+      "per_side": false,
+      "target": {
+        "reps": [
+          6,
+          8
+        ]
+      },
+      "weight_label": "75 lb",
+      "up": false,
+      "up_from": null,
+      "goal_reps": null,
+      "last": [
+        {
+          "weight": 75,
+          "reps": 8
+        },
+        {
+          "weight": 75,
+          "reps": 7
+        },
+        {
+          "weight": 75,
+          "reps": 6
+        }
+      ],
+      "sets": [
+        {
+          "kind": "work",
+          "weight": 75.0,
+          "reps": 8,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 75.0,
+          "reps": 8,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 75.0,
+          "reps": 8,
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "db-bench",
+      "name": "DB bench",
+      "section": "main",
+      "big": false,
+      "unit": "lb_each",
+      "per_side": false,
+      "target": {
+        "reps": [
+          10,
+          10
+        ]
+      },
+      "weight_label": "42.5s",
+      "up": true,
+      "up_from": 40.0,
+      "goal_reps": null,
+      "last": [
+        {
+          "weight": 40,
+          "reps": 10
+        },
+        {
+          "weight": 40,
+          "reps": 10
+        },
+        {
+          "weight": 40,
+          "reps": 10
+        }
+      ],
+      "sets": [
+        {
+          "kind": "work",
+          "weight": 42.5,
+          "reps": 10,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 42.5,
+          "reps": 10,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 42.5,
+          "reps": 10,
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "bench-dips",
+      "name": "Bench dips",
+      "section": "superset",
+      "big": false,
+      "unit": "bw",
+      "per_side": false,
+      "target": {
+        "reps": [
+          10,
+          12
+        ]
+      },
+      "weight_label": "BW",
+      "up": false,
+      "up_from": null,
+      "goal_reps": null,
+      "last": [],
+      "sets": [
+        {
+          "kind": "work",
+          "weight": null,
+          "reps": 12,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": null,
+          "reps": 12,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": null,
+          "reps": 12,
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "lateral-raise",
+      "name": "Lateral raise",
+      "section": "superset",
+      "big": false,
+      "unit": "lb_each",
+      "per_side": false,
+      "target": {
+        "reps": [
+          12,
+          15
+        ]
+      },
+      "weight_label": "15s",
+      "up": false,
+      "up_from": null,
+      "goal_reps": null,
+      "last": [],
+      "sets": [
+        {
+          "kind": "work",
+          "weight": 15.0,
+          "reps": 15,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 15.0,
+          "reps": 15,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 15.0,
+          "reps": 15,
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "chest-fly",
+      "name": "Machine chest fly",
+      "section": "optional",
+      "big": false,
+      "unit": "lb",
+      "per_side": false,
+      "target": {
+        "reps": [
+          12,
+          15
+        ]
+      },
+      "weight_label": "120 lb",
+      "up": false,
+      "up_from": null,
+      "goal_reps": null,
+      "last": [],
+      "sets": [
+        {
+          "kind": "work",
+          "weight": 120.0,
+          "reps": 15,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 120.0,
+          "reps": 15,
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "suitcase-carry",
+      "name": "Suitcase carry",
+      "section": "finisher",
+      "big": false,
+      "unit": "lb",
+      "per_side": true,
+      "target": {
+        "distance_yd": 40
+      },
+      "weight_label": "50 lb",
+      "up": false,
+      "up_from": null,
+      "goal_reps": null,
+      "last": [],
+      "sets": [
+        {
+          "kind": "work",
+          "weight": 50.0,
+          "distance_yd": 40,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 50.0,
+          "distance_yd": 40,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 50.0,
+          "distance_yd": 40,
+          "done": false
+        }
+      ]
+    }
+  ]
+}

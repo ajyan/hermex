@@ -89,6 +89,8 @@ extension HermexPaper {
     static let feedback = HermexPaper.notes
     /// Meals: the Daily Brief's dinner and week-of-dinners cards.
     static let meal = HermexPaper.kitchen
+    /// Body: workouts, lifts, Baki's notes and proposals.
+    static let training = HermexPaper.body
 
     static func forTool(_ kind: ToolCallSummaryFormatter.Kind) -> HermexPaper {
         switch kind {

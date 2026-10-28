@@ -1,0 +1,32 @@
+[
+  {
+    "id": "2026-11-27-pull",
+    "day": "pull",
+    "label": "Pull",
+    "date": "2026-11-27",
+    "minutes": 52,
+    "trimmed": true,
+    "highlight": null,
+    "note": "Left shoulder blade"
+  },
+  {
+    "id": "2026-11-25-legs",
+    "day": "legs",
+    "label": "Legs",
+    "date": "2026-11-25",
+    "minutes": 52,
+    "trimmed": false,
+    "highlight": null,
+    "note": null
+  },
+  {
+    "id": "2026-11-23-push",
+    "day": "push",
+    "label": "Push",
+    "date": "2026-11-23",
+    "minutes": 52,
+    "trimmed": false,
+    "highlight": null,
+    "note": "Felt strong"
+  }
+]

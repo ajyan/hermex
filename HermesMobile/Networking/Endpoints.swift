@@ -211,6 +211,20 @@ enum Endpoint {
     case goalReflection
     /// Today's job-search Ask (`api/vault_jobs.py`): GET today's three roles and lock state, POST an action.
     case jobsAsk
+    /// Body, the lifting tracker (`api/vault_body.py` on this user's webui fork, over the vault's
+    /// `tools/gym.py`): GET home, GET `prescription?day=`, GET `session?id=` or POST a session
+    /// document to save it, POST `session/finish {id, check}`, GET `sessions?before=` (a bare
+    /// array), GET `lift?id=`, GET or POST `plan`, POST `proposal {id, decision}` with decision
+    /// `accept` or `skip`, and GET `sleep` (404 when there is no history).
+    case bodyHome
+    case bodyPrescription(day: String?)
+    case bodySession(id: String?)
+    case bodySessionFinish
+    case bodySessions(before: String?)
+    case bodyLift(id: String)
+    case bodyPlan
+    case bodyProposal
+    case bodySleep
     /// The week's dinners (`api/vault_meals.py` on this user's webui fork): GET a week's accepted plan
     /// (`?week=<monday>`), POST `{week, picks: [{dish, veg}], backup?}` to accept one.
     case mealsWeek(week: String)
@@ -580,6 +594,24 @@ enum Endpoint {
             return "/api/goals/reflection"
         case .jobsAsk:
             return "/api/jobs/ask"
+        case .bodyHome:
+            return "/api/body/home"
+        case .bodyPrescription:
+            return "/api/body/prescription"
+        case .bodySession:
+            return "/api/body/session"
+        case .bodySessionFinish:
+            return "/api/body/session/finish"
+        case .bodySessions:
+            return "/api/body/sessions"
+        case .bodyLift:
+            return "/api/body/lift"
+        case .bodyPlan:
+            return "/api/body/plan"
+        case .bodyProposal:
+            return "/api/body/proposal"
+        case .bodySleep:
+            return "/api/body/sleep"
         case .mealsWeek:
             return "/api/meals/week"
         case .mealsAccept:
@@ -830,6 +862,14 @@ enum Endpoint {
             return [URLQueryItem(name: "slug", value: slug)]
         case let .briefPhoto(weekEnding):
             return [URLQueryItem(name: "week_ending", value: weekEnding)]
+        case let .bodyPrescription(day):
+            return day.map { [URLQueryItem(name: "day", value: $0)] } ?? []
+        case let .bodySession(id):
+            return id.map { [URLQueryItem(name: "id", value: $0)] } ?? []
+        case let .bodySessions(before):
+            return before.map { [URLQueryItem(name: "before", value: $0)] } ?? []
+        case let .bodyLift(id):
+            return [URLQueryItem(name: "id", value: id)]
         case let .mealsWeek(week):
             return [URLQueryItem(name: "week", value: week)]
         case let .labels(feature, item):

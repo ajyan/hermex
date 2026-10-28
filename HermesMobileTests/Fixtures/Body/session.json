@@ -1,0 +1,115 @@
+{
+  "id": "2026-11-23-push",
+  "day": "push",
+  "phase": "build",
+  "started": "2026-11-23T07:00:00",
+  "finished": "2026-11-23T07:52:00",
+  "trimmed": false,
+  "moved_hinge": false,
+  "exercises": [
+    {
+      "id": "incline-bench",
+      "name": "Incline bench",
+      "section": "main",
+      "big": true,
+      "unit": "lb",
+      "sets": [
+        {
+          "kind": "work",
+          "weight": 145,
+          "reps": 8,
+          "done": true
+        },
+        {
+          "kind": "work",
+          "weight": 145,
+          "reps": 8,
+          "done": true
+        },
+        {
+          "kind": "work",
+          "weight": 145,
+          "reps": 8,
+          "done": true
+        },
+        {
+          "kind": "work",
+          "weight": 145,
+          "reps": 8,
+          "done": true
+        }
+      ],
+      "reps_left": 1
+    },
+    {
+      "id": "strict-press",
+      "name": "Strict press",
+      "section": "main",
+      "big": true,
+      "unit": "lb",
+      "sets": [
+        {
+          "kind": "work",
+          "weight": 75,
+          "reps": 8,
+          "done": true
+        },
+        {
+          "kind": "work",
+          "weight": 75,
+          "reps": 7,
+          "done": true
+        },
+        {
+          "kind": "work",
+          "weight": 75,
+          "reps": 6,
+          "done": true
+        }
+      ],
+      "reps_left": 0
+    },
+    {
+      "id": "db-bench",
+      "name": "DB bench",
+      "section": "main",
+      "big": false,
+      "unit": "lb_each",
+      "sets": [
+        {
+          "kind": "work",
+          "weight": 40,
+          "reps": 10,
+          "done": true
+        },
+        {
+          "kind": "work",
+          "weight": 40,
+          "reps": 10,
+          "done": true
+        },
+        {
+          "kind": "work",
+          "weight": 40,
+          "reps": 10,
+          "done": true
+        }
+      ]
+    }
+  ],
+  "check": {
+    "effort": "solid",
+    "back": "fine",
+    "shoulders": "fine",
+    "pain": null,
+    "note": "Felt strong"
+  },
+  "coach_note": {
+    "headline": "Incline is ready to move",
+    "body": [
+      "All four sets hit eight with one in reserve.",
+      "Next time is 150."
+    ],
+    "written_at": "2026-11-23T08:10:00"
+  }
+}

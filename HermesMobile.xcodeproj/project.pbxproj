@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B0D700000000000000000002 /* BodyModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000001 /* BodyModels.swift */; };
+		B0D700000000000000000004 /* BodyDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000003 /* BodyDataClient.swift */; };
+		B0D700000000000000000007 /* BodyModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000006 /* BodyModelsTests.swift */; };
 		C7E5A1000000000000000001 /* IncomingURLRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7E5A1000000000000000011 /* IncomingURLRoute.swift */; };
 		C7E5A1000000000000000002 /* IncomingURLRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7E5A1000000000000000012 /* IncomingURLRouteTests.swift */; };
 		C0FFEE500000000000000003 /* MoneyModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE500000000000000002 /* MoneyModels.swift */; };
@@ -855,6 +858,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		B0D700000000000000000001 /* BodyModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyModels.swift; sourceTree = "<group>"; };
+		B0D700000000000000000003 /* BodyDataClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyDataClient.swift; sourceTree = "<group>"; };
+		B0D700000000000000000006 /* BodyModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyModelsTests.swift; sourceTree = "<group>"; };
 		C7E5A1000000000000000011 /* IncomingURLRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomingURLRoute.swift; sourceTree = "<group>"; };
 		C7E5A1000000000000000012 /* IncomingURLRouteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomingURLRouteTests.swift; sourceTree = "<group>"; };
 		C0FFEE500000000000000002 /* MoneyModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyModels.swift; sourceTree = "<group>"; };
@@ -1709,6 +1715,15 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 			path = Money;
 			sourceTree = "<group>";
 		};
+		B0D700000000000000000005 /* Body */ = {
+			isa = PBXGroup;
+			children = (
+				B0D700000000000000000003 /* BodyDataClient.swift */,
+				B0D700000000000000000001 /* BodyModels.swift */,
+			);
+			path = Body;
+			sourceTree = "<group>";
+		};
 		B1A1C0DE00000000000F0001 /* Goals */ = {
 			isa = PBXGroup;
 			children = (
@@ -1845,6 +1860,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		1A2B3C4D5E6F700000000034 /* HermesMobileTests */ = {
 			isa = PBXGroup;
 			children = (
+				B0D700000000000000000006 /* BodyModelsTests.swift */,
 				C0FFEE50000000000000000E /* MoneyModelsTests.swift */,
 				C0FFEE500000000000000010 /* MoneyViewModelTests.swift */,
 				3A997D807C262D12E5491E89 /* DailyDeckTests.swift */,
@@ -2202,6 +2218,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 			children = (
 				B1A1C0DE0000000000000003 /* Brain */,
 				FEEDB0DE00000000000000A0 /* Feedback */,
+				B0D700000000000000000005 /* Body */,
 				B1A1C0DE00000000000F0001 /* Goals */,
 				C0FFEE500000000000000001 /* Money */,
 				12A06408B1B8DA1A340CBD38 /* DailyDeck */,
@@ -3136,6 +3153,8 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				A0DEB2E8294CD05546F5B4B7 /* DeckWeekCommitment.swift in Sources */,
 				A0DE0016FAAC7A19A48B2C72 /* GoalCommitmentRow.swift in Sources */,
 				A0DE0015FAAC7A19A48B2C62 /* GoalItemRow.swift in Sources */,
+				B0D700000000000000000004 /* BodyDataClient.swift in Sources */,
+				B0D700000000000000000002 /* BodyModels.swift in Sources */,
 				B1A1C0DE00000000000F0005 /* GoalsDataClient.swift in Sources */,
 				A045000000000000000000A1 /* GoalsWidgetSync.swift in Sources */,
 				B1A1C0DE00000000000F0003 /* GoalsModels.swift in Sources */,
@@ -3584,6 +3603,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B0D700000000000000000007 /* BodyModelsTests.swift in Sources */,
 				C0FFEE50000000000000000F /* MoneyModelsTests.swift in Sources */,
 				C0FFEE500000000000000011 /* MoneyViewModelTests.swift in Sources */,
 				2A8CB7ACCDBA9BBE34E57FDC /* DailyDeckTests.swift in Sources */,
