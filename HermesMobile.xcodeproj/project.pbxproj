@@ -23,6 +23,7 @@
 		B0D700000000000000000021 /* PlanEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000020 /* PlanEditView.swift */; };
 		B0D700000000000000000023 /* PlanEditViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000022 /* PlanEditViewModel.swift */; };
 		B0D700000000000000000029 /* PlanEditViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000028 /* PlanEditViewModelTests.swift */; };
+		B0D700000000000000000025 /* CoachProposalCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000024 /* CoachProposalCard.swift */; };
 		B0D700000000000000000002 /* BodyModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000001 /* BodyModels.swift */; };
 		B0D700000000000000000004 /* BodyDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000003 /* BodyDataClient.swift */; };
 		B0D700000000000000000007 /* BodyModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000006 /* BodyModelsTests.swift */; };
@@ -890,6 +891,7 @@
 		B0D700000000000000000020 /* PlanEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanEditView.swift; sourceTree = "<group>"; };
 		B0D700000000000000000022 /* PlanEditViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanEditViewModel.swift; sourceTree = "<group>"; };
 		B0D700000000000000000028 /* PlanEditViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanEditViewModelTests.swift; sourceTree = "<group>"; };
+		B0D700000000000000000024 /* CoachProposalCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachProposalCard.swift; sourceTree = "<group>"; };
 		B0D700000000000000000001 /* BodyModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyModels.swift; sourceTree = "<group>"; };
 		B0D700000000000000000003 /* BodyDataClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyDataClient.swift; sourceTree = "<group>"; };
 		B0D700000000000000000006 /* BodyModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyModelsTests.swift; sourceTree = "<group>"; };
@@ -1755,6 +1757,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				B0D70000000000000000000B /* BodyHomeViewModel.swift */,
 				B0D700000000000000000009 /* BodyHomeView.swift */,
 				B0D700000000000000000001 /* BodyModels.swift */,
+				B0D700000000000000000024 /* CoachProposalCard.swift */,
 				B0D700000000000000000022 /* PlanEditViewModel.swift */,
 				B0D700000000000000000020 /* PlanEditView.swift */,
 				B0D70000000000000000001E /* LiftProgressViewModel.swift */,
@@ -3206,6 +3209,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				B0D70000000000000000000A /* BodyHomeViewModel.swift in Sources */,
 				B0D700000000000000000008 /* BodyHomeView.swift in Sources */,
 				B0D700000000000000000002 /* BodyModels.swift in Sources */,
+				B0D700000000000000000025 /* CoachProposalCard.swift in Sources */,
 				B0D700000000000000000023 /* PlanEditViewModel.swift in Sources */,
 				B0D700000000000000000021 /* PlanEditView.swift in Sources */,
 				B0D70000000000000000001F /* LiftProgressViewModel.swift in Sources */,

@@ -182,17 +182,19 @@ struct WorkoutFinishView: View {
         if let note = viewModel.coachNote {
             coachCard(note)
         } else {
-            VStack(alignment: .leading, spacing: 14) {
-                Text(verbatim: "The coach's note will be here shortly.")
-                    .font(AppFont.subheadline())
-                    .foregroundStyle(Color.hxTextSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(HXCard<EmptyView, EmptyView, EmptyView>.padding)
-                    .hxCard()
-                doneButton
-            }
+            Text(verbatim: "The coach's note will be here shortly.")
+                .font(AppFont.subheadline())
+                .foregroundStyle(Color.hxTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(HXCard<EmptyView, EmptyView, EmptyView>.padding)
+                .hxCard()
         }
+        // What the rules raised from this workout; undecided ones wait on Body home.
+        BodyProposalCards(proposals: viewModel.proposals, deciding: viewModel.deciding, error: viewModel.decideError) { proposal, accept in
+            Task { await viewModel.decide(proposal, accept: accept) }
+        }
+        if viewModel.coachNote == nil { doneButton }
     }
 
     private func coachCard(_ note: BodyCoachNote) -> some View {
@@ -208,7 +210,7 @@ struct WorkoutFinishView: View {
         } footer: {
             HStack(spacing: 8) {
                 if openDraftChat.isAvailable {
-                    Button { openDraftChat("Baki, ") } label: { Text(verbatim: "Ask Baki") }
+                    Button { openDraftChat(BodyAskBaki.draft) } label: { Text(verbatim: "Ask Baki") }
                         .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
                 }
                 Button(action: onDone) { Text(verbatim: "Done") }

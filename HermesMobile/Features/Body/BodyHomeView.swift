@@ -5,6 +5,7 @@ import SwiftUI
 struct BodyHomeView: View {
     @State private var viewModel: BodyHomeViewModel
     @State private var showsSleep = false
+    @Environment(\.openDraftChat) private var openDraftChat
     private let client: BodyDataClient
     /// Pushes a screen on the shell's stack (the Other day menu's buttons).
     private let onOpen: (ShellPushDestination) -> Void
@@ -71,6 +72,7 @@ struct BodyHomeView: View {
                     if let sleep = home.sleep { sleepRow(sleep) }
                     if !home.lifts.isEmpty { lifts(home.lifts) }
                     if !home.sessions.isEmpty { sessions(home.sessions) }
+                    askBaki
                 }
                 .padding(BrainStyle.l)
                 .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
@@ -81,10 +83,50 @@ struct BodyHomeView: View {
 
     // MARK: Proposals
 
-    /// Baki's pending proposals sit above Up next. Task 12 fills this slot with the proposal card.
-    @ViewBuilder
+    /// Baki's pending proposals sit above Up next.
     private func proposalSlot(_ proposals: [BodyProposal]) -> some View {
-        EmptyView()
+        BodyProposalCards(proposals: proposals, deciding: viewModel.deciding, error: viewModel.decideError) { proposal, accept in
+            Task { await viewModel.decide(proposal, accept: accept) }
+        }
+    }
+
+    // MARK: Ask Baki
+
+    /// Opens a new chat with "Baki, " in the composer; hidden when no chat can open.
+    @ViewBuilder
+    private var askBaki: some View {
+        if openDraftChat.isAvailable {
+            Button { openDraftChat(BodyAskBaki.draft) } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "person.fill")
+                        .font(AppFont.subheadline(weight: .semibold))
+                        .foregroundStyle(paper.glow)
+                        .frame(width: 30, height: 30)
+                        .background(paper.wash, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(verbatim: "Ask Baki")
+                            .font(AppFont.subheadline(weight: .semibold))
+                            .foregroundStyle(Color.hxTextPrimary)
+                        Text(verbatim: "About a lift, your plan, or how you feel")
+                            .font(AppFont.caption())
+                            .foregroundStyle(Color.hxTextSecondary)
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.right")
+                        .font(AppFont.caption())
+                        .foregroundStyle(Color.hxTextSecondary)
+                        .accessibilityHidden(true)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .hxCard()
+            .accessibilityHint(Text(verbatim: "Starts a chat with Baki"))
+        }
     }
 
     // MARK: Up next

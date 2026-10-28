@@ -301,4 +301,10 @@ final class WorkoutFinishTests: XCTestCase {
         XCTAssertEqual(WorkoutFinishCopy.title(day: "push"), "Push done")
         XCTAssertEqual(WorkoutFinishCopy.kicker(day: "legs"), "Baki · after Legs")
     }
+
+    func testAskBakiDrafts() {
+        XCTAssertEqual(BodyAskBaki.draft, "Baki, ")
+        XCTAssertEqual(BodyAskBaki.draft(about: "Strict press: 70 lb for 3 × 8"),
+                       "Baki, about \"Strict press: 70 lb for 3 × 8\": ")
+    }
 }
