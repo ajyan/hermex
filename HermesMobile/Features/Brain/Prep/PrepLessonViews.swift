@@ -37,7 +37,7 @@ struct PrepLessonBody: View {
                 }
             }
             if let cards = lesson.cards {
-                PrepLessonCardsView(title: lesson.title, cards: cards, ideaMD: lesson.ideaMD)
+                PrepLessonCardsView(title: lesson.title, cards: cards)
                 if let diagram = lesson.diagram {
                     PrepLessonDiagramButton(diagram: diagram)
                 }
