@@ -146,6 +146,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
             }
         }
         drawerRow("Goals", systemImage: "flag.checkered", paper: .book) { onOpen(.goals) }
+        drawerRow("Body", systemImage: "figure.strengthtraining.traditional", paper: .training) { onOpen(.body) }
         drawerRow("Money", systemImage: "chart.line.uptrend.xyaxis", paper: .money) { onOpen(.money) }
         if sectionVisibility.feedback {
             drawerRow("Feedback", systemImage: "message", paper: .feedback) { onOpen(.feedback) }

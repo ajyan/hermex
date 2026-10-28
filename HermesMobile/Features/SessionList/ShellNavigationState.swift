@@ -29,6 +29,14 @@ enum ShellPushDestination: Hashable {
     case money
     /// The in-app feedback inbox, from the drawer.
     case feedback
+    /// Body home, from the drawer.
+    case body
+    /// One lift's history, by lift id.
+    case bodyLift(String)
+    /// The training plan editor.
+    case bodyPlan
+    /// A workout: the given day (push, legs, pull), or the next in the rotation when nil.
+    case bodyWorkout(String?)
     case settings(SettingsScrollAnchor?)
 }
 
@@ -263,7 +271,7 @@ extension ShellPushDestination {
         switch self {
         case .brain, .brainRoute: true
         case .projects, .project, .tasks, .kanban, .dailyDeck, .goals, .goal, .finishedGoal, .finishedGoals, .money,
-             .feedback, .settings: false
+             .feedback, .body, .bodyLift, .bodyPlan, .bodyWorkout, .settings: false
         }
     }
 
@@ -274,7 +282,7 @@ extension ShellPushDestination {
         switch self {
         case .goal, .finishedGoal, .brainRoute: true
         case .projects, .project, .tasks, .kanban, .dailyDeck, .brain, .goals, .finishedGoals, .money, .feedback,
-             .settings: false
+             .body, .bodyLift, .bodyPlan, .bodyWorkout, .settings: false
         }
     }
 }

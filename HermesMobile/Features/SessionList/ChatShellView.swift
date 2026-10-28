@@ -659,6 +659,18 @@ struct ChatShellView: View {
             GoalsFinishedListView(server: server, onAPIError: authManager.handleAPIError)
         case .money:
             MoneyView(server: server)
+        case .body:
+            BodyHomeView(server: server, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
+        case .bodyLift:
+            // Task 11 replaces this placeholder with the lift's history.
+            Text(verbatim: "Lift history is coming").hxNavigationTitle("Lift")
+        case .bodyPlan:
+            // Task 11 replaces this placeholder with the plan editor.
+            Text(verbatim: "The plan editor is coming").hxNavigationTitle("Plan")
+        case .bodyWorkout:
+            // Task 9 replaces this placeholder with the workout screen.
+            Text(verbatim: "The workout screen is coming").hxNavigationTitle("Workout")
         case .feedback:
             FeedbackInboxView(client: feedbackAvailability.client)
         case .brainRoute(let route):

@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B0D70000000000000000000E /* BodyHomeViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D70000000000000000000F /* BodyHomeViewModelTests.swift */; };
+		B0D70000000000000000000C /* BodyWeekDots.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D70000000000000000000D /* BodyWeekDots.swift */; };
+		B0D70000000000000000000A /* BodyHomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D70000000000000000000B /* BodyHomeViewModel.swift */; };
+		B0D700000000000000000008 /* BodyHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000009 /* BodyHomeView.swift */; };
 		B0D700000000000000000002 /* BodyModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000001 /* BodyModels.swift */; };
 		B0D700000000000000000004 /* BodyDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000003 /* BodyDataClient.swift */; };
 		B0D700000000000000000007 /* BodyModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000006 /* BodyModelsTests.swift */; };
@@ -858,6 +862,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		B0D70000000000000000000F /* BodyHomeViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyHomeViewModelTests.swift; sourceTree = "<group>"; };
+		B0D70000000000000000000D /* BodyWeekDots.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyWeekDots.swift; sourceTree = "<group>"; };
+		B0D70000000000000000000B /* BodyHomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyHomeViewModel.swift; sourceTree = "<group>"; };
+		B0D700000000000000000009 /* BodyHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyHomeView.swift; sourceTree = "<group>"; };
 		B0D700000000000000000001 /* BodyModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyModels.swift; sourceTree = "<group>"; };
 		B0D700000000000000000003 /* BodyDataClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyDataClient.swift; sourceTree = "<group>"; };
 		B0D700000000000000000006 /* BodyModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyModelsTests.swift; sourceTree = "<group>"; };
@@ -1719,6 +1727,9 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 			isa = PBXGroup;
 			children = (
 				B0D700000000000000000003 /* BodyDataClient.swift */,
+				B0D70000000000000000000D /* BodyWeekDots.swift */,
+				B0D70000000000000000000B /* BodyHomeViewModel.swift */,
+				B0D700000000000000000009 /* BodyHomeView.swift */,
 				B0D700000000000000000001 /* BodyModels.swift */,
 			);
 			path = Body;
@@ -1861,6 +1872,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 			isa = PBXGroup;
 			children = (
 				B0D700000000000000000006 /* BodyModelsTests.swift */,
+				B0D70000000000000000000F /* BodyHomeViewModelTests.swift */,
 				C0FFEE50000000000000000E /* MoneyModelsTests.swift */,
 				C0FFEE500000000000000010 /* MoneyViewModelTests.swift */,
 				3A997D807C262D12E5491E89 /* DailyDeckTests.swift */,
@@ -3154,6 +3166,9 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				A0DE0016FAAC7A19A48B2C72 /* GoalCommitmentRow.swift in Sources */,
 				A0DE0015FAAC7A19A48B2C62 /* GoalItemRow.swift in Sources */,
 				B0D700000000000000000004 /* BodyDataClient.swift in Sources */,
+				B0D70000000000000000000C /* BodyWeekDots.swift in Sources */,
+				B0D70000000000000000000A /* BodyHomeViewModel.swift in Sources */,
+				B0D700000000000000000008 /* BodyHomeView.swift in Sources */,
 				B0D700000000000000000002 /* BodyModels.swift in Sources */,
 				B1A1C0DE00000000000F0005 /* GoalsDataClient.swift in Sources */,
 				A045000000000000000000A1 /* GoalsWidgetSync.swift in Sources */,
@@ -3604,6 +3619,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 			buildActionMask = 2147483647;
 			files = (
 				B0D700000000000000000007 /* BodyModelsTests.swift in Sources */,
+				B0D70000000000000000000E /* BodyHomeViewModelTests.swift in Sources */,
 				C0FFEE50000000000000000F /* MoneyModelsTests.swift in Sources */,
 				C0FFEE500000000000000011 /* MoneyViewModelTests.swift in Sources */,
 				2A8CB7ACCDBA9BBE34E57FDC /* DailyDeckTests.swift in Sources */,
