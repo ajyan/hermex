@@ -16,8 +16,6 @@ struct DailyDeckView: View {
     /// The week just sealed, shown as its page over the deck.
     @State private var sealedWeek: SealedWeek?
     @AppStorage(DailyBriefReminder.enabledKey) private var notifies = false
-    @AppStorage(WindDownReminder.enabledKey) private var windsDown = true
-    @AppStorage(WindDownReminder.minuteKey) private var windDownMinute: Int?
     /// Good/not-good labels on reflect cards; shown only where the server has labels.
     @State private var labels: LabelsViewModel
     /// Earlier cards to rate, offered on today's closing card; shares `labels`.
@@ -91,13 +89,6 @@ struct DailyDeckView: View {
                         Toggle(isOn: Binding(get: { notifies }, set: { on in Task { await DailyBriefReminder.setEnabled(on) } })) {
                             Label { Text(verbatim: "Notify Me at 8:00") } icon: { Image(systemName: "bell") }
                         }
-                        if let windDownMinute {
-                            Toggle(isOn: Binding(get: { windsDown }, set: { on in Task { await WindDownReminder.setEnabled(on) } })) {
-                                Label { Text(verbatim: "Wind Down at \(WindDownReminder.clock(windDownMinute))") } icon: {
-                                    Image(systemName: "moon")
-                                }
-                            }
-                        }
                         Button { Task { await viewModel.load() } } label: {
                             Label { Text(verbatim: "Reload") } icon: { Image(systemName: "arrow.clockwise") }
                         }
@@ -121,8 +112,6 @@ struct DailyDeckView: View {
                     await viewModel.load()
                 }
                 await DailyBriefReminder.enableOnFirstOpen()
-                // Tonight's wind-down time follows the latest nights.
-                await WindDownReminder.update(from: try? await viewModel.sleepHistory())
             }
             .onChange(of: DailyBriefLaunch.shared.pending) { _, request in
                 guard request != nil, viewModel.workspace != nil, let review = DailyBriefLaunch.take() else { return }

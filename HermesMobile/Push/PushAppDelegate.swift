@@ -56,7 +56,7 @@ final class PushAppDelegate: NSObject, UIApplicationDelegate, UNUserNotification
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         let userInfo = notification.request.content.userInfo
-        if DailyBriefReminder.isDailyBrief(userInfo) || WindDownReminder.isWindDown(userInfo) {
+        if DailyBriefReminder.isDailyBrief(userInfo) {
             completionHandler([.banner, .list, .sound])
             return
         }
@@ -74,9 +74,7 @@ final class PushAppDelegate: NSObject, UIApplicationDelegate, UNUserNotification
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        // A wind-down tap only opens the app.
-        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
-              !WindDownReminder.isWindDown(response.notification.request.content.userInfo) else {
+        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier else {
             completionHandler()
             return
         }
