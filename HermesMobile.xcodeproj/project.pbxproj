@@ -14,6 +14,8 @@
 		B0D700000000000000000010 /* WorkoutViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000011 /* WorkoutViewModel.swift */; };
 		B0D700000000000000000016 /* WorkoutViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000017 /* WorkoutViewModelTests.swift */; };
 		B0D700000000000000000012 /* WorkoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000013 /* WorkoutView.swift */; };
+		B0D70000000000000000002A /* WeekTrainingCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D70000000000000000002B /* WeekTrainingCard.swift */; };
+		B0D70000000000000000002C /* WeekTrainingCardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D70000000000000000002D /* WeekTrainingCardTests.swift */; };
 		B0D700000000000000000014 /* WorkoutLiftCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000015 /* WorkoutLiftCard.swift */; };
 		B0D700000000000000000019 /* WorkoutFinishView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000018 /* WorkoutFinishView.swift */; };
 		B0D70000000000000000001B /* WorkoutFinishViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D70000000000000000001A /* WorkoutFinishViewModel.swift */; };
@@ -882,6 +884,8 @@
 		B0D700000000000000000011 /* WorkoutViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutViewModel.swift; sourceTree = "<group>"; };
 		B0D700000000000000000017 /* WorkoutViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutViewModelTests.swift; sourceTree = "<group>"; };
 		B0D700000000000000000013 /* WorkoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutView.swift; sourceTree = "<group>"; };
+		B0D70000000000000000002B /* WeekTrainingCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekTrainingCard.swift; sourceTree = "<group>"; };
+		B0D70000000000000000002D /* WeekTrainingCardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekTrainingCardTests.swift; sourceTree = "<group>"; };
 		B0D700000000000000000015 /* WorkoutLiftCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutLiftCard.swift; sourceTree = "<group>"; };
 		B0D700000000000000000018 /* WorkoutFinishView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutFinishView.swift; sourceTree = "<group>"; };
 		B0D70000000000000000001A /* WorkoutFinishViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutFinishViewModel.swift; sourceTree = "<group>"; };
@@ -1911,6 +1915,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				B0D70000000000000000000F /* BodyHomeViewModelTests.swift */,
 				B0D700000000000000000017 /* WorkoutViewModelTests.swift */,
 				B0D700000000000000000028 /* PlanEditViewModelTests.swift */,
+				B0D70000000000000000002D /* WeekTrainingCardTests.swift */,
 				B0D700000000000000000026 /* WorkoutFinishTests.swift */,
 				C0FFEE50000000000000000E /* MoneyModelsTests.swift */,
 				C0FFEE500000000000000010 /* MoneyViewModelTests.swift */,
@@ -2838,6 +2843,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				DF731B7D5B2E4AD896C240AC /* DeckSignals.swift */,
 				E37274D150867377E64E0C1F /* WeeklyReviewModels.swift */,
 				73791819BE9CF33A7A9059E7 /* WeeklyReviewCards+Steer.swift */,
+				B0D70000000000000000002B /* WeekTrainingCard.swift */,
 				9997FD4AEDC0DB41AE844E37 /* WeeklyReviewParts.swift */,
 				42439F008D2F7358721B7C24 /* WeeklyReviewCards.swift */,
 				A2E9BF54142DCC84C129F3E6 /* WeeklyReviewCards+V3.swift */,
@@ -3158,6 +3164,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				37EB45042A484497AB073D39 /* DeckSignals.swift in Sources */,
 				70129E19A23FD14699C6646F /* WeeklyReviewModels.swift in Sources */,
 				EDD3F6BF454B243AAEBD30EC /* WeeklyReviewCards+Steer.swift in Sources */,
+				B0D70000000000000000002A /* WeekTrainingCard.swift in Sources */,
 				C11A0C0DE0000000000F0B01 /* WeekPhoto.swift in Sources */,
 				C11A0C0DE0000000000F0B02 /* WeeksModel.swift in Sources */,
 				C11A0C0DE0000000000F0B03 /* WeekPageView.swift in Sources */,
@@ -3671,6 +3678,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				B0D70000000000000000000E /* BodyHomeViewModelTests.swift in Sources */,
 				B0D700000000000000000016 /* WorkoutViewModelTests.swift in Sources */,
 				B0D700000000000000000029 /* PlanEditViewModelTests.swift in Sources */,
+				B0D70000000000000000002C /* WeekTrainingCardTests.swift in Sources */,
 				B0D700000000000000000027 /* WorkoutFinishTests.swift in Sources */,
 				C0FFEE50000000000000000F /* MoneyModelsTests.swift in Sources */,
 				C0FFEE500000000000000011 /* MoneyViewModelTests.swift in Sources */,

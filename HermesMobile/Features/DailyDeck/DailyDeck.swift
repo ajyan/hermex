@@ -67,6 +67,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         /// The weekly review's cards (`WeeklyReviewModels.swift`): the cover of moments, last week's
         /// intention, one card per value, next week's intention, and the note to the future.
         case cover, lastIntention, value, intention, keepsakes
+        /// The Sunday review's training card: Baki's read of the week's lifting and his proposals.
+        case training
         case unknown(String)
 
         init(_ raw: String) {
@@ -90,6 +92,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case "last_intention": self = .lastIntention
             case "value": self = .value
             case "intention": self = .intention
+            case "training": self = .training
             default: self = .unknown(raw)
             }
         }
@@ -159,6 +162,10 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let variant: DeckVariant?
     /// A weekly card's chapter ("remember", "reflect", "values", "steer"); the cover and close have none.
     let chapter: String?
+    /// A training card's headline, its short bullets, and Baki's proposals for next week.
+    let headline: String?
+    let bullets: [String]
+    let proposals: [BodyProposal]
     /// The cover's week number, date range ("Oct 19–25"), and the note a year-ago self left.
     let weekNumber: Int?
     let range: String?
@@ -326,7 +333,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         switch type {
         case .prompt, .reflect, .item, .unknown: true
         case .headline, .decision, .sleep, .goal, .changes, .ask, .dinner, .meals, .section, .close, .front: false
-        case .cover, .lastIntention, .value, .intention, .keepsakes: false
+        case .cover, .lastIntention, .value, .intention, .keepsakes, .training: false
         }
     }
 
@@ -335,7 +342,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
         case phrases, recall, yesterday, pattern, progress, questionPinyin, questionEn, rows, week
         case chunks, beats, speaker
-        case chapter, weekNumber, range, noteFromPast
+        case chapter, weekNumber, range, noteFromPast, headline, bullets, proposals
         case piece, learned, variant, date, options, meals, front, fronts, frontReason, weekRows, yesterdayOne
         case todayAction = "today"
         case moments, spares, ended, text, ifThen, name, fact, changes, intention
@@ -410,6 +417,10 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         variant = try? c.decodeIfPresent(DeckVariant.self, forKey: .variant)
         weekVariant = (try? c.decodeIfPresent(Week.self, forKey: .week))?.variant
         chapter = try? c.decodeIfPresent(String.self, forKey: .chapter)
+        headline = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .headline))
+        bullets = ((try? c.decodeIfPresent([Lossy<String>].self, forKey: .bullets)) ?? []).compactMap(\.value)
+        proposals = ((try? c.decodeIfPresent([Lossy<BodyProposal>].self, forKey: .proposals)) ?? []).compactMap(\.value)
+            .filter { !$0.id.isEmpty }
         weekNumber = try? c.decodeIfPresent(Int.self, forKey: .weekNumber)
         range = try? c.decodeIfPresent(String.self, forKey: .range)
         noteFromPast = try? c.decodeIfPresent(DeckPastNote.self, forKey: .noteFromPast)
@@ -1371,6 +1382,8 @@ struct DeckCardText: Equatable {
             attribution = card.name
         case .intention:
             lead = card.title
+        case .training:
+            lead = card.headline
         case .goal, .changes, .ask, .meals:
             // The check-ins, the week's fixes and the Ask are drawn (`DeckGoalCard`, `DeckChangesCard`,
             // `DeckAskCard`).

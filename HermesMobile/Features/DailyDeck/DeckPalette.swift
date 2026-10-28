@@ -66,6 +66,8 @@ struct DeckPalette: Equatable {
     static let past = DeckPalette(.past, symbol: "clock.arrow.circlepath", name: "A year ago", shortName: "A year ago")
     /// A past journal entry picked for the week's question: the journal's paper, named for the journal.
     static let journal = DeckPalette(.past, symbol: "book.pages", name: "Your journal", shortName: "Journal")
+    /// Baki's Sunday training card, on the Body paper.
+    static let training = DeckPalette(.training, symbol: "figure.strengthtraining.traditional", name: "Training", shortName: "Training")
     static let sleep = DeckPalette(.notes, symbol: "moon.zzz", name: "Sleep", shortName: "Sleep")
     static let advisor = DeckPalette(.advisor, symbol: "bubble.left", name: "Check-in", shortName: "Check-in")
     /// The Dad card is the Dad advisor's, so it wears the advisor paper with its own mark.
@@ -125,6 +127,7 @@ struct DeckPalette: Equatable {
         case .decision: return card.isViewTake ? .weekQuestion : .followUps
         case .changes: return .changes
         case .cover, .lastIntention, .value, .intention, .keepsakes: return .week
+        case .training: return .training
         case .item, .unknown:
             switch card.itemKind {
             case "theme": return .theme

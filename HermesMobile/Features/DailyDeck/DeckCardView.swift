@@ -103,6 +103,7 @@ struct DeckCardView: View {
                 case .value: WeekValueCard(card: card, palette: palette, viewModel: viewModel)
                 case .intention: WeekIntentionCard(card: card, palette: palette, viewModel: viewModel)
                 case .keepsakes: WeekKeepsakesCard(card: card, palette: palette, viewModel: viewModel)
+                case .training: WeekTrainingCard(card: card, palette: palette, model: viewModel.training)
                 default: if isJobCard { jobReading } else { reading }
                 }
                 // Reaching the end of the card counts toward the style learner's usage (`DeckSignals`). A short card's
@@ -265,6 +266,7 @@ struct DeckCardView: View {
         switch card.type {
         case .close: DeckAct.isByJob(viewModel.visiblePages) && !card.weekRows.isEmpty
         case .prompt, .reflect, .item, .unknown: isJobCard
+        case .training: true
         default: false
         }
     }
