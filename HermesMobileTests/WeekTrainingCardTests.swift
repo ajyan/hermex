@@ -5,15 +5,21 @@ private final class FakeTrainingClient: BodyDataClient, @unchecked Sendable {
     private let lock = NSLock()
     private var _log: [String] = []
     var fails = false
+    var failure: Error = URLError(.badServerResponse)
+    var homeProposals: [BodyProposal]?
     var log: [String] { lock.withLock { _log } }
 
     func decide(proposalID: String, accept: Bool) async throws -> BodyProposal {
         lock.withLock { _log.append("decide:\(proposalID):\(accept ? "accept" : "skip")") }
-        if fails { throw URLError(.badServerResponse) }
+        if fails { throw failure }
         return try WeekTrainingCardTests.proposal(id: proposalID, status: accept ? "accepted" : "skipped")
     }
 
-    func home() async throws -> BodyHome { throw URLError(.unsupportedURL) }
+    func home() async throws -> BodyHome {
+        guard let homeProposals else { throw URLError(.notConnectedToInternet) }
+        let base = try PrepDecoding.decode(BodyHome.self, from: BodyModelsTests.fixture("home.json"))
+        return base.with(proposals: homeProposals)
+    }
     func prescription(day: String?) async throws -> BodyPrescription { throw URLError(.unsupportedURL) }
     func save(_ session: BodySession) async throws -> BodySession { throw URLError(.unsupportedURL) }
     func finish(id: String, check: BodyCheck) async throws -> BodyFinishResult { throw URLError(.unsupportedURL) }
@@ -98,5 +104,35 @@ final class WeekTrainingCardTests: XCTestCase {
         XCTAssertFalse(model.canDecide)
         await model.decide(proposal, accept: true)
         XCTAssertEqual(model.visible([proposal]).map(\.id), ["p1"])
+    }
+
+    func testReconcileHidesProposalsNoLongerPendingOnServer() async throws {
+        let client = FakeTrainingClient()
+        client.homeProposals = [try Self.proposal(id: "p2")]
+        let model = WeekTrainingModel(client: client)
+        let p1 = try Self.proposal(id: "p1"), p2 = try Self.proposal(id: "p2")
+        XCTAssertEqual(model.visible([p1, p2]).map(\.id), ["p1", "p2"], "before the read, the deck's own list shows")
+        await model.reconcile()
+        XCTAssertEqual(model.visible([p1, p2]).map(\.id), ["p2"])
+    }
+
+    func testFailedReconcileLeavesTheDeckList() async throws {
+        let model = WeekTrainingModel(client: FakeTrainingClient())
+        let p1 = try Self.proposal(id: "p1")
+        await model.reconcile()
+        XCTAssertEqual(model.visible([p1]).map(\.id), ["p1"])
+    }
+
+    func testAlreadyDecidedStaysHiddenWithoutAnError() async throws {
+        for status in [404, 409] {
+            let client = FakeTrainingClient()
+            client.fails = true
+            client.failure = APIError.http(statusCode: status, body: nil)
+            let model = WeekTrainingModel(client: client)
+            let proposal = try Self.proposal(id: "p1")
+            await model.decide(proposal, accept: true)
+            XCTAssertTrue(model.visible([proposal]).isEmpty, "HTTP \(status)")
+            XCTAssertNil(model.error, "HTTP \(status)")
+        }
     }
 }

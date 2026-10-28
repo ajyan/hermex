@@ -13,6 +13,9 @@ final class WeekTrainingModel {
     private(set) var deciding: Set<String> = []
     /// Why the last decision didn't take; cleared by the next one.
     private(set) var error: String?
+    /// The ids Body home still lists as pending, once read; nil until then. The deck file never changes
+    /// after Sunday, so this is what tells a proposal decided earlier (or on the Body tab) from a new one.
+    private(set) var pendingOnServer: Set<String>?
 
     @ObservationIgnored private let client: (any BodyDataClient)?
 
@@ -22,7 +25,13 @@ final class WeekTrainingModel {
 
     /// The proposals still waiting on an answer.
     func visible(_ proposals: [BodyProposal]) -> [BodyProposal] {
-        proposals.filter { $0.isPending && !decided.contains($0.id) }
+        proposals.filter { $0.isPending && !decided.contains($0.id) && pendingOnServer?.contains($0.id) ?? true }
+    }
+
+    /// Reads which proposals are still pending on the server. A failed read leaves the card as the deck wrote it.
+    func reconcile() async {
+        guard let client, let home = try? await client.home() else { return }
+        pendingOnServer = Set(home.proposals.map(\.id))
     }
 
     func decide(_ proposal: BodyProposal, accept: Bool) async {
@@ -34,10 +43,14 @@ final class WeekTrainingModel {
         do {
             _ = try await client.decide(proposalID: proposal.id, accept: accept)
         } catch {
+            // The server no longer has it pending (404) or it was already decided (409): it stays hidden.
+            if case APIError.http(let status, _) = error, status == 404 || status == 409 { return }
             // Roll back even when cancelled, so a dismissed screen never loses the proposal.
             decided.remove(proposal.id)
             if !(error is CancellationError), (error as? URLError)?.code != .cancelled {
-                self.error = "Couldn't save that. Try again."
+                let message = "Couldn't save that. Try again."
+                self.error = message
+                AccessibilityNotification.Announcement(message).post()
             }
         }
     }
@@ -95,6 +108,7 @@ struct WeekTrainingCard: View {
             }
             DeckFootnote(card: card, palette: palette)
         }
+        .task(id: card.id) { await model.reconcile() }
     }
 
     private func row(_ proposal: BodyProposal) -> some View {
