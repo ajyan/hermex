@@ -33,7 +33,9 @@ struct DeckAskCard: View {
 
 /// The Ask itself, shared by the Deck card and the Prep gate: the week's counts, three role rows
 /// (one open at a time) with the drafted note or opener and the decision card's buttons, Skip today
-/// with a reason, and a Pass sheet whose Company and Title choices become filter rules. Keyed by
+/// with a reason, Applied elsewhere (a recruiter or startup application, counted toward the week),
+/// Steer (a standing note that lifts matching titles on the next Ask), and a Pass sheet whose Company
+/// and Title choices become filter rules. Keyed by
 /// the Ask's day, so what was typed or opened yesterday never carries into today's Ask.
 struct DailyAskBody: View {
     let model: DailyAskModel
@@ -51,6 +53,14 @@ struct DailyAskBody: View {
             return "Reached out to \(who)\(outcome.company ?? "them") — Prep is open"
         default: return "Skipped: \(outcome.reason ?? "")"
         }
+    }
+
+    /// The longest steer the server keeps.
+    static let steerLimit = 120
+
+    static func loggedLine(_ logged: DailyAskElsewhere) -> String {
+        guard let via = logged.via, !via.isEmpty else { return "Logged \(logged.company)" }
+        return "Logged \(logged.company), via \(via)"
     }
 
     static func neverMissTwiceLine(_ ask: DailyAsk) -> String? {
@@ -73,8 +83,12 @@ private struct DailyAskForm: View {
     /// Rows switched to the other way in ("Reach out instead" / "Apply instead").
     @State private var flipped: Set<String> = []
     @State private var names: [String: String] = [:]
-    @State private var isSkipping = false
+    /// The one inline form open below the roles.
+    @State private var panel: Panel?
     @State private var skipReason = ""
+    @State private var elsewhereCompany = ""
+    @State private var elsewhereVia = ""
+    @State private var steerNote = ""
     @State private var passing: DailyAskRole?
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -100,8 +114,20 @@ private struct DailyAskForm: View {
                     if index > 0 { Divider().padding(.vertical, 4) } else { Spacer().frame(height: 16) }
                     row(role)
                 }
-                skip.padding(.top, 20)
             }
+            ForEach(Array((ask.elsewhere ?? []).enumerated()), id: \.offset) { index, logged in
+                Text(verbatim: DailyAskBody.loggedLine(logged))
+                    .font(AppFont.subheadline())
+                    .foregroundStyle(.secondary)
+                    .padding(.top, index == 0 ? 16 : 4)
+            }
+            if let steer = ask.steer {
+                Text(verbatim: "Steering toward: \(steer)")
+                    .font(AppFont.subheadline())
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 12)
+            }
+            moreActions.padding(.top, 20)
             if let error = model.error {
                 Text(verbatim: error).font(AppFont.footnote()).foregroundStyle(Color.hxDanger).padding(.top, 12)
             }
@@ -228,16 +254,21 @@ private struct DailyAskForm: View {
         .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
+    private enum Panel { case skip, elsewhere, steer }
+
+    /// Skip today (only before today's action), Applied elsewhere (weekdays), and Steer, each opening
+    /// its form inline below.
     @ViewBuilder
-    private var skip: some View {
-        ChoiceButton(title: "Skip today", isSelected: isSkipping) { isSkipping.toggle() }
-        if isSkipping {
+    private var moreActions: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) { panelButtons }
+            VStack(alignment: .leading, spacing: 8) { panelButtons }
+        }
+        switch panel {
+        case .skip:
+            let reason = skipReason.trimmingCharacters(in: .whitespacesAndNewlines)
             HStack(spacing: 8) {
-                TextField(text: $skipReason, axis: .vertical) { Text(verbatim: "Why are you skipping?") }
-                    .font(AppFont.body())
-                    .padding(10)
-                    .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                let reason = skipReason.trimmingCharacters(in: .whitespacesAndNewlines)
+                field("Why are you skipping?", text: $skipReason)
                 ChoiceButton(title: "Skip", isSelected: !reason.isEmpty) {
                     guard !reason.isEmpty else { return }
                     Task { await model.act(.skip(reason: reason)) }
@@ -245,7 +276,79 @@ private struct DailyAskForm: View {
                 .disabled(reason.isEmpty)
             }
             .padding(.top, 10)
+        case .elsewhere:
+            let company = elsewhereCompany.trimmingCharacters(in: .whitespacesAndNewlines)
+            let via = elsewhereVia.trimmingCharacters(in: .whitespacesAndNewlines)
+            VStack(alignment: .leading, spacing: 8) {
+                field("Company", text: $elsewhereCompany)
+                field("Via (recruiter, LinkedIn…), optional", text: $elsewhereVia)
+                ChoiceButton(title: "Log", isSelected: !company.isEmpty) {
+                    guard !company.isEmpty else { return }
+                    Task {
+                        if await model.act(.elsewhere(company: company, via: via.isEmpty ? nil : via)) {
+                            elsewhereCompany = ""
+                            elsewhereVia = ""
+                            panel = nil
+                        }
+                    }
+                }
+                .disabled(company.isEmpty)
+            }
+            .padding(.top, 10)
+        case .steer:
+            let note = String(steerNote.trimmingCharacters(in: .whitespacesAndNewlines).prefix(DailyAskBody.steerLimit))
+            VStack(alignment: .leading, spacing: 8) {
+                field("What to see more of, e.g. AI engineer roles", text: $steerNote)
+                Text(verbatim: "Roles whose titles match move up on the next Ask.")
+                    .font(AppFont.footnote())
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    ChoiceButton(title: "Save", isSelected: !note.isEmpty) {
+                        guard !note.isEmpty else { return }
+                        Task { if await model.act(.steer(note: note)) { panel = nil } }
+                    }
+                    .disabled(note.isEmpty || note == ask.steer)
+                    if ask.steer != nil {
+                        ChoiceButton(title: "Clear", isSelected: false) {
+                            Task {
+                                if await model.act(.steer(note: "")) {
+                                    steerNote = ""
+                                    panel = nil
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.top, 10)
+        case nil:
+            EmptyView()
         }
+    }
+
+    @ViewBuilder
+    private var panelButtons: some View {
+        if ask.outcome == nil, ask.weekday != false {
+            ChoiceButton(title: "Skip today", isSelected: panel == .skip) { toggle(.skip) }
+        }
+        if ask.weekday != false {
+            ChoiceButton(title: "Applied elsewhere", isSelected: panel == .elsewhere) { toggle(.elsewhere) }
+        }
+        ChoiceButton(title: ask.steer == nil ? "Steer" : "Edit steer", isSelected: panel == .steer) {
+            if panel != .steer { steerNote = ask.steer ?? "" }
+            toggle(.steer)
+        }
+    }
+
+    private func toggle(_ next: Panel) {
+        panel = panel == next ? nil : next
+    }
+
+    private func field(_ prompt: String, text: Binding<String>) -> some View {
+        TextField(text: text, axis: .vertical) { Text(verbatim: prompt) }
+            .font(AppFont.body())
+            .padding(10)
+            .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 

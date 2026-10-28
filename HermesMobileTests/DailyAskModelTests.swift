@@ -154,6 +154,46 @@ final class DailyAskModelTests: XCTestCase {
         XCTAssertNil(client.requests[2].role)
     }
 
+    func testElsewhereAndSteerBodies() async throws {
+        let client = FakeDailyAskClient()
+        client.askResults = [.success(try Self.ask())]
+        client.actResults = [.success(try Self.ask())]
+        let model = await loaded(client)
+        await model.act(.elsewhere(company: "Acme AI", via: "LinkedIn recruiter"))
+        await model.act(.elsewhere(company: "Beta", via: nil))
+        await model.act(.steer(note: "AI engineer roles"))
+        await model.act(.steer(note: ""))
+        XCTAssertEqual(client.requests.map(\.action), ["elsewhere", "elsewhere", "steer", "steer"])
+        XCTAssertEqual(client.requests[0].company, "Acme AI")
+        XCTAssertEqual(client.requests[0].via, "LinkedIn recruiter")
+        XCTAssertNil(client.requests[1].via)
+        XCTAssertNil(client.requests[0].role)
+        XCTAssertEqual(client.requests[2].note, "AI engineer roles")
+        XCTAssertEqual(client.requests[3].note, "")
+    }
+
+    func testClearingTheSteerSendsAnEmptyNote() throws {
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let data = try encoder.encode(DailyAskAction.steer(note: "").request(asOf: "2026-10-19"))
+        let object = try JSONSerialization.jsonObject(with: data) as! [String: String]
+        XCTAssertEqual(object, ["as_of": "2026-10-19", "action": "steer", "note": ""])
+    }
+
+    func testDecodesSteerAndElsewhere() throws {
+        let ask = try Self.ask {
+            $0["steer"] = "AI engineer roles"
+            $0["elsewhere"] = [["company": "Acme AI", "via": "LinkedIn"], ["company": "Beta", "via": NSNull()], ["via": "x"]]
+        }
+        XCTAssertEqual(ask.steer, "AI engineer roles")
+        XCTAssertEqual(ask.elsewhere, [DailyAskElsewhere(company: "Acme AI", via: "LinkedIn"), DailyAskElsewhere(company: "Beta", via: nil)])
+        XCTAssertEqual(DailyAskBody.loggedLine(ask.elsewhere![0]), "Logged Acme AI, via LinkedIn")
+        XCTAssertEqual(DailyAskBody.loggedLine(ask.elsewhere![1]), "Logged Beta")
+        let plain = try Self.ask { $0["steer"] = NSNull() }
+        XCTAssertNil(plain.steer)
+        XCTAssertNil(plain.elsewhere)
+    }
+
     func testRequestEncodesSnakeCaseAndDropsNils() throws {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase  // as APIClient encodes bodies

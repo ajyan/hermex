@@ -16,12 +16,16 @@ struct DailyAsk: Decodable, Equatable, Sendable {
     let previous: String?
     let locked: Bool?
     let week: DailyAskWeek?
+    /// The standing note that lifts matching titles on the next Ask, if one is set.
+    let steer: String?
+    /// Applications made outside the Ask and logged today.
+    let elsewhere: [DailyAskElsewhere]?
 
     var isReachFirst: Bool { lead == "reach" }
     var needsNeverMissTwice: Bool { previous == "skipped" || previous == "missed" }
 
     private enum CodingKeys: String, CodingKey {
-        case today, weekday, roles, lead, outcome, previous, locked, week
+        case today, weekday, roles, lead, outcome, previous, locked, week, steer, elsewhere
     }
 
     /// `roles` drops a role that fails to decode, so one bad role never fails the Ask (which
@@ -36,6 +40,9 @@ struct DailyAsk: Decodable, Equatable, Sendable {
         previous = try c.decodeIfPresent(String.self, forKey: .previous)
         locked = try c.decodeIfPresent(Bool.self, forKey: .locked)
         week = try c.decodeIfPresent(DailyAskWeek.self, forKey: .week)
+        let note = try? c.decodeIfPresent(String.self, forKey: .steer)
+        steer = note?.isEmpty == false ? note : nil
+        elsewhere = (try? c.decodeIfPresent([PrepLossy<DailyAskElsewhere>].self, forKey: .elsewhere))?.compactMap(\.value)
     }
 }
 
@@ -72,6 +79,12 @@ struct DailyAskOutcome: Decodable, Equatable, Sendable {
     let name: String?
 }
 
+/// An application logged with "Applied elsewhere": a recruiter, LinkedIn or a startup outside the Ask.
+struct DailyAskElsewhere: Decodable, Equatable, Sendable {
+    let company: String
+    let via: String?
+}
+
 struct DailyAskWeek: Decodable, Equatable, Sendable {
     let applications: DailyAskCount?
     let outreach: DailyAskCount?
@@ -91,6 +104,9 @@ struct DailyAskRequest: Encodable, Equatable, Sendable {
     let reason: String?
     let name: String?
     let rule: String?
+    var note: String?
+    var company: String?
+    var via: String?
 }
 
 enum DailyAskAction: Equatable, Sendable {
@@ -99,6 +115,10 @@ enum DailyAskAction: Equatable, Sendable {
     /// `rule`: company, title, level, location, comp or other. Company and Title become filter rules.
     case pass(role: String, reason: String, rule: String)
     case skip(reason: String)
+    /// Counts toward this week's applications without being today's Ask.
+    case elsewhere(company: String, via: String?)
+    /// "" clears the steer.
+    case steer(note: String)
 
     func request(asOf: String) -> DailyAskRequest {
         switch self {
@@ -110,6 +130,11 @@ enum DailyAskAction: Equatable, Sendable {
             return DailyAskRequest(asOf: asOf, action: "pass", role: role, reason: reason, name: nil, rule: rule)
         case .skip(let reason):
             return DailyAskRequest(asOf: asOf, action: "skip", role: nil, reason: reason, name: nil, rule: nil)
+        case .elsewhere(let company, let via):
+            return DailyAskRequest(asOf: asOf, action: "elsewhere", role: nil, reason: nil, name: nil, rule: nil,
+                                   company: company, via: via)
+        case .steer(let note):
+            return DailyAskRequest(asOf: asOf, action: "steer", role: nil, reason: nil, name: nil, rule: nil, note: note)
         }
     }
 }
