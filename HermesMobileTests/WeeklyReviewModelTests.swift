@@ -969,6 +969,15 @@ final class WeeklyReviewModelTests: XCTestCase {
         XCTAssertEqual(DeckCopy.filedStatus(seal: true, edited: true), "Edited")
     }
 
+    func testFiledLineSaysWhereNotTheFilePath() {
+        XCTAssertEqual(DeckCopy.filedLine(seal: false), "In your journal.")
+        XCTAssertEqual(DeckCopy.filedLine(seal: true), "Sealed in your journal.")
+        for seal in [false, true] {
+            XCTAssertFalse(DeckCopy.filedLine(seal: seal).contains("journal/"))
+            XCTAssertFalse(DeckCopy.filedLine(seal: seal).contains(".md"))
+        }
+    }
+
     func testTheOneThingAsksForTheOneThing() throws {
         let cards = try DailyDeck.decode(#"""
         {"date":"2026-10-18","kind":"weekly","cards":[
