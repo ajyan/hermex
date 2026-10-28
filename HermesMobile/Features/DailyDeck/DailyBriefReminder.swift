@@ -127,7 +127,8 @@ enum DailyBriefReminder {
         let center = UNUserNotificationCenter.current()
         let pending = await center.pendingNotificationRequests().map(\.identifier)
             .filter { $0.hasPrefix(userInfoKey + ".") }  // every Daily Brief id, including the old repeating "dailyBrief.ready"
-        center.removePendingNotificationRequests(withIdentifiers: pending)
+        // "windDown.daily" was the removed repeating wind-down notification, still queued on phones that had it.
+        center.removePendingNotificationRequests(withIdentifiers: pending + ["windDown.daily"])
         guard isEnabled(defaults) else { return }
         for item in plan(now: now, filedOn: defaults.string(forKey: filedOnKey)) {
             let content = UNMutableNotificationContent()
