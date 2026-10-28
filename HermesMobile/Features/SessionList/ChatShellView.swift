@@ -668,9 +668,9 @@ struct ChatShellView: View {
         case .bodyPlan:
             // Task 11 replaces this placeholder with the plan editor.
             Text(verbatim: "The plan editor is coming").hxNavigationTitle("Plan")
-        case .bodyWorkout:
-            // Task 9 replaces this placeholder with the workout screen.
-            Text(verbatim: "The workout screen is coming").hxNavigationTitle("Workout")
+        case .bodyWorkout(let day):
+            WorkoutView(day: day, server: server, onAPIError: authManager.handleAPIError)
+                .id(day ?? "next")
         case .feedback:
             FeedbackInboxView(client: feedbackAvailability.client)
         case .brainRoute(let route):
