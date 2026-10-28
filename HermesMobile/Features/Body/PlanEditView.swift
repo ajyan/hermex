@@ -6,7 +6,7 @@ import SwiftUI
 /// shows at the top while his edits stay.
 struct PlanEditView: View {
     @State private var viewModel: PlanEditViewModel
-    @State private var day = ""
+    @State private var selectedDay = ""
     @State private var openID: String?
     @State private var removal: Removal?
     @State private var isAdding = false
@@ -26,6 +26,9 @@ struct PlanEditView: View {
     }
 
     private var paper: HermexPaper { .training }
+
+    /// The day on screen: his pick, or the default until the plan has loaded.
+    private var day: String { viewModel.resolvedDay(selectedDay) }
 
     var body: some View {
         content
@@ -50,10 +53,7 @@ struct PlanEditView: View {
                     Button { Self.endEditing() } label: { Text(verbatim: "Done") }
                 }
             }
-            .task {
-                await viewModel.load()
-                if day.isEmpty { day = viewModel.dayKeys.first { $0 != "warmup" } ?? viewModel.dayKeys.first ?? "" }
-            }
+            .task { await viewModel.load() }
             .confirmationDialog("Discard your changes?", isPresented: $confirmsDiscard, titleVisibility: .visible) {
                 Button("Discard changes", role: .destructive) { dismiss() }
                 Button("Keep editing", role: .cancel) {}
@@ -104,13 +104,13 @@ struct PlanEditView: View {
         case .loaded:
             VStack(spacing: 0) {
                 if let error = viewModel.saveError { errorBanner(error) }
-                Picker(selection: $day) {
+                Picker(selection: Binding(get: { day }, set: { selectedDay = $0 })) {
                     ForEach(viewModel.dayKeys, id: \.self) { Text(verbatim: PlanEditCopy.dayTitle($0)).tag($0) }
                 } label: { Text(verbatim: "Day") }
                 .pickerStyle(.segmented)
                 .padding(.horizontal, BrainStyle.l)
                 .padding(.vertical, 8)
-                .onChange(of: day) { openID = nil }
+                .onChange(of: selectedDay) { openID = nil }
                 list
             }
         }
@@ -190,7 +190,8 @@ struct PlanEditView: View {
         let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
         let section: BodySection = day == "warmup" ? (viewModel.exercises(day: day).first?.section ?? .warmup) : .main
-        openID = viewModel.add(day: day, exercise: .draft(name: name, section: section))
+        guard let id = viewModel.add(day: day, exercise: .draft(name: name, section: section)) else { return }
+        openID = id
     }
 
     private func save() {
@@ -371,12 +372,7 @@ private struct PlanExerciseRow: View {
             if let detail {
                 Text(verbatim: detail).font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
             }
-            TextField(value: value, format: .number) { Text(verbatim: title) }
-                .keyboardType(.decimalPad)
-                .multilineTextAlignment(.trailing)
-                .font(AppFont.body(weight: .semibold))
-                .monospacedDigit()
-                .frame(width: 72)
+            PlanNumberField(title: title, value: value)
             Text(verbatim: suffix).font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
         }
         .frame(minHeight: 44)
@@ -398,5 +394,33 @@ private struct PlanExerciseRow: View {
     private func toggleRow(_ title: String, isOn: Binding<Bool>) -> some View {
         Toggle(isOn: isOn) { Text(verbatim: title).font(AppFont.body()) }
             .frame(minHeight: 44)
+    }
+}
+
+/// A weight typed into the plan. It parses as he types, so a typed-only change reaches the plan
+/// (and Save) without waiting for the field to lose focus; text that isn't a number leaves the
+/// last good value in place.
+private struct PlanNumberField: View {
+    let title: String
+    @Binding var value: Double?
+    @State private var text: String
+
+    init(title: String, value: Binding<Double?>) {
+        self.title = title
+        _value = value
+        _text = State(initialValue: value.wrappedValue.map(BodyFormat.number) ?? "")
+    }
+
+    var body: some View {
+        TextField(text: $text) { Text(verbatim: title) }
+            .keyboardType(.decimalPad)
+            .multilineTextAlignment(.trailing)
+            .font(AppFont.body(weight: .semibold))
+            .monospacedDigit()
+            .frame(width: 72)
+            .onChange(of: text) { _, newText in
+                let parsed = PlanEditCopy.parseWeight(newText)
+                if parsed.isValid, parsed.value != value { value = parsed.value }
+            }
     }
 }

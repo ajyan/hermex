@@ -62,18 +62,24 @@ struct CoachProposalCard: View {
 
     @ViewBuilder
     private var actionButtons: some View {
-        Button(action: use) { Text(verbatim: "Use") }
+        Button(action: use) { Text(verbatim: "Use").bodyTapHeight() }
             .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
             .accessibilityLabel(Text(verbatim: "Use: \(proposal.title)"))
-        Button(action: notNow) { Text(verbatim: "Not now") }
+        Button(action: notNow) { Text(verbatim: "Not now").bodyTapHeight() }
             .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
             .accessibilityLabel(Text(verbatim: "Not now: \(proposal.title)"))
         if let ask {
-            Button(action: ask) { Text(verbatim: "Ask") }
+            Button(action: ask) { Text(verbatim: "Ask").bodyTapHeight() }
                 .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
                 .accessibilityLabel(Text(verbatim: "Ask Baki about: \(proposal.title)"))
         }
     }
+}
+
+extension View {
+    /// Lifts a `ChatDecisionButtonStyle` label to a 44 pt button. The style adds 9 pt above and below
+    /// its label and a 40 pt floor, so a 26 pt label is 44 pt tall in all.
+    func bodyTapHeight() -> some View { frame(minHeight: 26) }
 }
 
 /// What "Ask Baki" starts a chat with: the composer is filled in, never sent.

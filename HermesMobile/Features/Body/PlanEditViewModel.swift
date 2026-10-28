@@ -35,6 +35,13 @@ final class PlanEditViewModel {
 
     func exercises(day: String) -> [BodyPlanExercise] { plan.days[day] ?? [] }
 
+    /// The day the editor opens on: the first workout day, else the warm-up.
+    var defaultDay: String { dayKeys.first { $0 != "warmup" } ?? dayKeys.first ?? "" }
+
+    /// `selected` when it is a day in the plan, else the default, so the screen never edits a day
+    /// that isn't there (before the first load, or after a retry).
+    func resolvedDay(_ selected: String) -> String { dayKeys.contains(selected) ? selected : defaultDay }
+
     // MARK: Load
 
     /// Loads the plan once; edits already on screen are never replaced.
@@ -74,9 +81,11 @@ final class PlanEditViewModel {
     }
 
     /// Adds `exercise` to the end of a day under a new id made from its name, unique across the
-    /// whole plan (the server rejects a repeated id). Returns the id.
+    /// whole plan (the server rejects a repeated id). Returns the id, or nil when `day` isn't a day
+    /// in the plan.
     @discardableResult
-    func add(day: String, exercise: BodyPlanExercise) -> String {
+    func add(day: String, exercise: BodyPlanExercise) -> String? {
+        guard plan.days[day] != nil else { return nil }
         let id = uniqueID(for: exercise.name)
         let added = exercise.withID(id)
         edit { plan in
@@ -222,6 +231,15 @@ enum PlanEditCopy {
     }
 
     static let units = ["lb", "lb_each", "bw", "band", "cable"]
+
+    /// What a typed weight means: a number (nil when the field is empty), or not a weight at all.
+    /// A comma works as the decimal point; negatives are not weights.
+    static func parseWeight(_ text: String) -> (isValid: Bool, value: Double?) {
+        let trimmed = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
+        if trimmed.isEmpty { return (true, nil) }
+        guard let value = Double(trimmed), value >= 0, value.isFinite else { return (false, nil) }
+        return (true, value)
+    }
 
     /// True when the unit has a number to type.
     static func hasWeight(_ unit: String) -> Bool { unit == "lb" || unit == "lb_each" }

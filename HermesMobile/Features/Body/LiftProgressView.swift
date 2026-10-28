@@ -135,7 +135,7 @@ struct LiftProgressView: View {
                     .hxCard()
             } else {
                 VStack(spacing: 0) {
-                    ForEach(Array(lift.sessions.enumerated()), id: \.offset) { offset, session in
+                    ForEach(Array(lift.sessions.enumerated()), id: \.element.date) { offset, session in
                         if offset > 0 { Divider().padding(.leading, 14) }
                         sessionRow(session)
                     }

@@ -145,6 +145,55 @@ final class PlanEditViewModelTests: XCTestCase {
         XCTAssertNil(vm.plan.phases["nonexistent"])
     }
 
+    func testTheEditorNeverEditsADayThatIsNotInThePlan() async throws {
+        let client = FakePlanClient()
+        client.planResult = .success(try plan())
+        let vm = PlanEditViewModel(client: client)
+        XCTAssertEqual(vm.resolvedDay(""), "", "nothing to resolve before the plan loads")
+        await vm.load()
+        XCTAssertEqual(vm.defaultDay, "push", "the first workout day, not the warm-up")
+        XCTAssertEqual(vm.resolvedDay(""), "push")
+        XCTAssertEqual(vm.resolvedDay("nope"), "push")
+        XCTAssertEqual(vm.resolvedDay("legs"), "legs")
+        XCTAssertNil(vm.add(day: "", exercise: .draft(name: "Ghost")))
+        XCTAssertNil(vm.add(day: "nope", exercise: .draft(name: "Ghost")))
+        XCTAssertNil(vm.plan.days[""])
+        XCTAssertFalse(vm.dirty)
+    }
+
+    func testDefaultDayAfterAFailedFirstLoadAndRetry() async throws {
+        let client = FakePlanClient()
+        client.planResult = .failure(URLError(.notConnectedToInternet))
+        let vm = PlanEditViewModel(client: client)
+        await vm.load()
+        XCTAssertEqual(vm.resolvedDay(""), "")
+        client.planResult = .success(try plan())
+        await vm.load()
+        XCTAssertEqual(vm.phase, .loaded)
+        XCTAssertEqual(vm.resolvedDay(""), "push")
+    }
+
+    func testATypedWeightMakesThePlanDirty() async throws {
+        let vm = try await loaded()
+        let typed = PlanEditCopy.parseWeight("147.5")
+        XCTAssertTrue(typed.isValid)
+        vm.update(day: "push", id: "incline-bench") { $0.load.build = typed.value }
+        XCTAssertTrue(vm.dirty)
+        XCTAssertEqual(vm.exercises(day: "push").first?.load.build, 147.5)
+        let cleared = PlanEditCopy.parseWeight("  ")
+        XCTAssertTrue(cleared.isValid)
+        XCTAssertNil(cleared.value)
+    }
+
+    func testParseWeight() {
+        XCTAssertEqual(PlanEditCopy.parseWeight("42,5").value, 42.5)
+        XCTAssertEqual(PlanEditCopy.parseWeight("150").value, 150)
+        XCTAssertFalse(PlanEditCopy.parseWeight("4x").isValid)
+        XCTAssertFalse(PlanEditCopy.parseWeight("-5").isValid)
+        XCTAssertFalse(PlanEditCopy.parseWeight("nan").isValid)
+        XCTAssertFalse(PlanEditCopy.parseWeight("inf").isValid)
+    }
+
     // MARK: Save
 
     func testSaveSendsWholePlan() async throws {

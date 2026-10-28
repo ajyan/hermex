@@ -82,6 +82,14 @@ final class WorkoutFinishViewModel {
         phase = .saving
         saveError = nil
         guard let result = await workout.finish(check: check) else {
+            if workout.saveStatus == .finished {
+                // Already finished elsewhere: nothing to save, so go on to Baki's note.
+                finishedID = workout.session?.id
+                saveError = nil
+                phase = .saved
+                await refreshNote()
+                return
+            }
             phase = .asking
             saveError = workout.finishError ?? "Couldn't save the workout. Try again."
             return
@@ -147,9 +155,13 @@ enum WorkoutFinishCopy {
 
     /// The server's naive local timestamp, "2026-11-23T07:52:00".
     private static func date(_ stamp: String) -> Date? {
+        stampFormatter.date(from: String(stamp.prefix(19)))
+    }
+
+    private static let stampFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-        return formatter.date(from: String(stamp.prefix(19)))
-    }
+        return formatter
+    }()
 }

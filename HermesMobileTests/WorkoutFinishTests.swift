@@ -218,6 +218,18 @@ final class WorkoutFinishTests: XCTestCase {
         XCTAssertFalse(client.log.contains { $0.hasPrefix("finish") })
     }
 
+    func testAlreadyFinishedMovesOnToTheSavedState() async throws {
+        let client = FakeFinishClient()
+        client.finishResult = .failure(APIError.http(statusCode: 409, body: #"{"error":"session is finished"}"#))
+        client.sessionResults = [.success(try finishedSession(note: "The jump held."))]
+        let (vm, _) = try await finishVM(client)
+        await vm.save()
+        XCTAssertEqual(vm.phase, .saved, "nothing left to save, so Save must not stay enabled")
+        XCTAssertFalse(vm.canSave)
+        XCTAssertNil(vm.saveError)
+        XCTAssertEqual(vm.coachNote?.headline, "The jump held.", "the note is read for the workout that was already finished")
+    }
+
     func testSaveFailureReturnsToTheForm() async throws {
         let client = FakeFinishClient()
         client.finishResult = .failure(URLError(.notConnectedToInternet))

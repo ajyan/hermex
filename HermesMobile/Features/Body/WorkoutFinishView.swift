@@ -32,8 +32,9 @@ struct WorkoutFinishView: View {
         .refreshable { await viewModel.refreshNote() }
         .hxNavigationTitle(WorkoutFinishCopy.title(day: viewModel.day), subtitle: viewModel.summary)
         .background(Color.hxCanvas.ignoresSafeArea())
-        // The workout is closed once saved; Done is the only way on.
-        .navigationBarBackButtonHidden(viewModel.phase == .saved)
+        // Once he saves, the workout is closed and Done is the only way on; while it saves, Back would
+        // leave a request in flight.
+        .navigationBarBackButtonHidden(viewModel.phase != .asking)
         .task { await viewModel.refreshNote() }
     }
 
@@ -80,7 +81,7 @@ struct WorkoutFinishView: View {
         HStack(spacing: 6) {
             ForEach(options, id: \.0) { value, title in
                 let isSelected = selection.wrappedValue == value
-                Button { selection.wrappedValue = value } label: { Text(verbatim: title) }
+                Button { selection.wrappedValue = value } label: { Text(verbatim: title).bodyTapHeight() }
                     .buttonStyle(ChatDecisionButtonStyle(emphasis: isSelected ? .primary : .secondary))
                     .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
@@ -165,7 +166,8 @@ struct WorkoutFinishView: View {
                 }
             }
             .font(AppFont.display(style: .headline, weight: .semibold))
-            .foregroundStyle(paper.onGlow)
+            // A disabled prominent button dims its fill, so the label drops the on-glow color to stay readable.
+            .foregroundStyle(viewModel.canSave ? paper.onGlow : Color.hxTextSecondary)
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.borderedProminent)
