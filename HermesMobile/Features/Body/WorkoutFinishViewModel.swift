@@ -27,12 +27,14 @@ final class WorkoutFinishViewModel {
     private(set) var proposals: [BodyProposal] = []
     private(set) var decideError: String?
     private(set) var deciding: Set<String> = []
+    /// The workout as the server closed it, with its start and finish stamps; the summary's
+    /// minutes come from it. The live session never carries `started`.
+    private(set) var finishedSession: BodySession?
 
     @ObservationIgnored private let workout: WorkoutViewModel
     @ObservationIgnored private let client: BodyDataClient
     @ObservationIgnored private let onAPIError: (Error) -> Void
     @ObservationIgnored private var finishedID: String?
-    @ObservationIgnored private var finishedAt: String?
 
     init(workout: WorkoutViewModel, client: BodyDataClient, onAPIError: @escaping (Error) -> Void = { _ in }) {
         self.workout = workout
@@ -63,8 +65,8 @@ final class WorkoutFinishViewModel {
 
     /// "52 min · 11 lifts · 2 went up", from the finished session once saved and from now before.
     var summary: String? {
-        guard let session = workout.session else { return nil }
-        return WorkoutFinishCopy.summary(session, finished: finishedAt, now: Date())
+        guard let session = finishedSession ?? workout.session else { return nil }
+        return WorkoutFinishCopy.summary(session, now: Date())
     }
 
     /// Moves the pain score one step. The first tap from no score starts at 5.
@@ -95,7 +97,7 @@ final class WorkoutFinishViewModel {
             return
         }
         finishedID = result.session.id
-        finishedAt = result.session.finished
+        finishedSession = result.session
         coachNote = result.session.coachNote
         proposals = result.proposals.filter(\.isPending)
         phase = .saved
@@ -106,6 +108,8 @@ final class WorkoutFinishViewModel {
     func refreshNote() async {
         guard phase == .saved, let id = finishedID else { return }
         guard let session = try? await client.session(id: id), !Task.isCancelled else { return }
+        // A workout finished elsewhere (409) has no finish stamp until it is read back.
+        if session.finished != nil { finishedSession = session }
         if let note = session.coachNote { coachNote = note }
     }
 

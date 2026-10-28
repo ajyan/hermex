@@ -230,6 +230,28 @@ final class WorkoutFinishTests: XCTestCase {
         XCTAssertEqual(vm.coachNote?.headline, "The jump held.", "the note is read for the workout that was already finished")
     }
 
+    func testAlreadyFinishedSummaryUsesTheServersFinishStamp() async throws {
+        var closed = try finishedSession()
+        closed.started = "2026-11-23T07:00:00"
+        closed.finished = "2026-11-23T07:52:00"
+        let client = FakeFinishClient()
+        client.finishResult = .failure(APIError.http(statusCode: 409, body: nil))
+        client.sessionResults = [.success(closed)]
+        let (vm, _) = try await finishVM(client)
+        await vm.save()
+        XCTAssertEqual(vm.phase, .saved)
+        // Days later the minutes are still the 52 he trained, not the time since.
+        XCTAssertTrue(vm.summary?.hasPrefix("52 min · ") == true, vm.summary ?? "nil")
+    }
+
+    func testSavedSummaryUsesTheFinishedSession() async throws {
+        let client = FakeFinishClient()
+        client.finishResult = .success(try result())   // the fixture session: 07:00 to 07:52
+        let (vm, _) = try await finishVM(client)       // the live session has no start
+        await vm.save()
+        XCTAssertTrue(vm.summary?.hasPrefix("52 min · ") == true, vm.summary ?? "nil")
+    }
+
     func testSaveFailureReturnsToTheForm() async throws {
         let client = FakeFinishClient()
         client.finishResult = .failure(URLError(.notConnectedToInternet))
