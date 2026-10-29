@@ -91,8 +91,6 @@ final class VoiceCallController {
     private(set) var currentTool: String?
     /// Milliseconds each sent turn waited for its first reply text, in call order.
     private(set) var turnLatenciesMS: [Int] = []
-    /// Milliseconds from the end of each spoken reply to the user starting to answer.
-    private(set) var answerWaitsMS: [Int] = []
     private(set) var isMuted = false
     private(set) var startError: VoiceCallStartError?
     /// True once the system call is gone: the call screen can close.
@@ -146,10 +144,6 @@ final class VoiceCallController {
     @ObservationIgnored private var transcriptChangedAt: TimeInterval?
     /// When `listening` began, for the no-speech prompt.
     @ObservationIgnored private var listeningSince: TimeInterval?
-    /// When the last spoken reply finished, until the user starts answering it.
-    @ObservationIgnored private var answerWaitSince: TimeInterval?
-    /// False on a Mandarin call: the English status lines stay silent.
-    @ObservationIgnored private let speaksStatusLines: Bool
     /// "I didn't catch that" prompts since the user last spoke; a forgotten call hangs up after a few.
     @ObservationIgnored private var unansweredNoSpeechPrompts = 0
 
@@ -194,7 +188,6 @@ final class VoiceCallController {
         chat: VoiceCallChatDriving,
         bridge: CallSystemBridging,
         openingTurn: String? = nil,
-        speaksStatusLines: Bool = true,
         now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
         clock: @escaping () -> Date = Date.init,
         suppressThinkingCue: @escaping @MainActor () -> Bool = { UIAccessibility.isReduceMotionEnabled },
@@ -203,7 +196,6 @@ final class VoiceCallController {
     ) {
         self.log = log
         self.pendingOpeningTurn = openingTurn
-        self.speaksStatusLines = speaksStatusLines
         self.listener = listener
         self.speaker = speaker
         self.chat = chat
@@ -393,9 +385,7 @@ final class VoiceCallController {
                 if waited >= nextHoldOnAt {
                     // A long silence on a call reads as a dropped line; say it's still coming.
                     setCue(false)
-                    if speaksStatusLines {
-                        say(holdOnLinesSaid == 0 ? VoiceCallPhrases.holdOn : VoiceCallPhrases.stillWorking)
-                    }
+                    say(holdOnLinesSaid == 0 ? VoiceCallPhrases.holdOn : VoiceCallPhrases.stillWorking)
                     holdOnLinesSaid += 1
                     nextHoldOnAt = waited + VoiceCallTiming.stillWorkingInterval
                 } else if waited >= VoiceCallTiming.thinkingCueDelay, !speaker.isSpeaking, !suppressThinkingCue() {
@@ -547,10 +537,6 @@ final class VoiceCallController {
         switch turnDetector.observe(isSpeech: isSpeech, at: time) {
         case .speechStarted:
             turnStartedAt = time
-            if let answerWaitSince {
-                answerWaitsMS.append(Int(((time - answerWaitSince) * 1000).rounded()))
-                self.answerWaitSince = nil
-            }
             log("turn started")
             discardFinals = false
             awaitingFinalSince = nil
@@ -660,15 +646,10 @@ final class VoiceCallController {
     private func announceNoSpeech() {
         guard unansweredNoSpeechPrompts < VoiceCallTiming.noSpeechPromptsBeforeHangUp else {
             log("no speech after \(unansweredNoSpeechPrompts) prompts; hanging up")
-            tearDown(endSystemCall: true, message: speaksStatusLines ? VoiceCallPhrases.hangingUpNoSpeech : nil)
+            tearDown(endSystemCall: true, message: VoiceCallPhrases.hangingUpNoSpeech)
             return
         }
         unansweredNoSpeechPrompts += 1
-        guard speaksStatusLines else {
-            log("no speech heard; waiting again")
-            listeningSince = now()
-            return
-        }
         log("no speech heard; prompting")
         listeningSince = nil
         spokenWords = []
@@ -811,7 +792,6 @@ final class VoiceCallController {
             beginApprovalListening(seed: nil)
         case .speaking where runFinished:
             finishReply()
-            answerWaitSince = now()
         default:
             break
         }

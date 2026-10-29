@@ -244,11 +244,6 @@ enum Endpoint {
     /// The family call: POST `{date, who}` for three things to say, POST `{date, text}` for what he couldn't.
     case mandarinCallPrep
     case mandarinCallAfter
-    /// The Mandarin voice call: POST `{date, text}` for the first telling, `{date}` for the brief
-    /// and profile, `{date, session_id, wait_ms}` for the review.
-    case mandarinTelling
-    case mandarinCallStart
-    case mandarinCallReview
 
     var path: String {
         switch self {
@@ -630,12 +625,6 @@ enum Endpoint {
             return "/api/mandarin/call/prep"
         case .mandarinCallAfter:
             return "/api/mandarin/call/after"
-        case .mandarinTelling:
-            return "/api/mandarin/telling"
-        case .mandarinCallStart:
-            return "/api/mandarin/call/start"
-        case .mandarinCallReview:
-            return "/api/mandarin/call/review"
         }
     }
 

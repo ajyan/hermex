@@ -1042,11 +1042,9 @@ struct ChatView: View {
                     onMockCallEnded?(end)
                 }
             }) {
-                VoiceCallView(chat: viewModel, language: MandarinCall.language(forCallID: mockCall.mockID),
-                              openingTurn: mockCall.openingTurn, onTurnTimed: reportMockProgress) { summary in
+                VoiceCallView(chat: viewModel, openingTurn: mockCall.openingTurn, onTurnTimed: reportMockProgress) { summary in
                     isVoiceCallPresented = false
-                    if let end = mockCall.callEnded(sessionID: session.sessionId, turnMS: summary.turnMS,
-                                                    waitMS: summary.answerWaitMS) {
+                    if let end = mockCall.callEnded(sessionID: session.sessionId, turnMS: summary.turnMS) {
                         endedMockCall = end
                     }
                 }

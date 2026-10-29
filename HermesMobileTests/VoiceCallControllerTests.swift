@@ -226,14 +226,13 @@ final class VoiceCallControllerTests: XCTestCase {
     }
 
     /// A controller wired to the same fakes, with an opening turn.
-    private func makeController(openingTurn: String?, speaksStatusLines: Bool = true) -> VoiceCallController {
+    private func makeController(openingTurn: String?) -> VoiceCallController {
         VoiceCallController(
             listener: listener,
             speaker: speaker,
             chat: chat,
             bridge: bridge,
             openingTurn: openingTurn,
-            speaksStatusLines: speaksStatusLines,
             now: { [unowned self] in clock },
             clock: { Self.callTime },
             suppressThinkingCue: { [unowned self] in suppressCue },
@@ -243,69 +242,6 @@ final class VoiceCallControllerTests: XCTestCase {
     }
 
     // MARK: - Tests
-
-    func testAnswerWaitIsMeasuredFromReplyEndToSpeechStart() async {
-        await controller.start()
-        await say("hello")
-        update(text: "Hi Andrew. How")
-        update(text: "Hi Andrew. How are you?", streaming: false)
-        clock = 10
-        speaker.drain()
-        XCTAssertEqual(controller.state, .listening)
-        clock = 11.4
-        await say("good")
-        XCTAssertEqual(controller.answerWaitsMS, [1400])
-
-        update(text: "Great. What")
-        update(text: "Great. What did you eat?", streaming: false)
-        clock = 20
-        speaker.drain()
-        clock = 20.2
-        await say("noodles")
-        XCTAssertEqual(controller.answerWaitsMS, [1400, 200])
-    }
-
-    func testOpeningTurnHasNoAnswerWait() async {
-        await controller.start()
-        await say("hello")
-        XCTAssertEqual(controller.answerWaitsMS, [])
-    }
-
-    func testMandarinCallSaysNoHoldOnLines() async {
-        controller = makeController(openingTurn: nil, speaksStatusLines: false)
-        await controller.start()
-        await say("你好")
-        XCTAssertEqual(controller.state, .thinking)
-        clock += VoiceCallTiming.holdOnDelay + VoiceCallTiming.stillWorkingInterval
-        controller.tick()
-        XCTAssertEqual(speaker.spoken, [])
-        XCTAssertEqual(controller.state, .thinking)
-    }
-
-    func testMandarinCallHangsUpSilentlyWhenNobodySpeaks() async {
-        controller = makeController(openingTurn: nil, speaksStatusLines: false)
-        await controller.start()
-        for _ in 0..<VoiceCallTiming.noSpeechPromptsBeforeHangUp {
-            clock += VoiceCallTiming.noSpeechTimeout
-            controller.tick()
-            XCTAssertEqual(controller.state, .listening)
-        }
-        clock += VoiceCallTiming.noSpeechTimeout
-        controller.tick()
-        XCTAssertEqual(speaker.spoken, [])
-        XCTAssertTrue(controller.isFinished)
-        XCTAssertEqual(bridge.endCount, 1)
-    }
-
-    func testLanguageCarriesLocaleVoiceAndLines() {
-        XCTAssertEqual(VoiceCallLanguage.mandarin.locale.identifier, "zh-CN")
-        XCTAssertEqual(VoiceCallLanguage.english.locale.identifier, "en-US")
-        XCTAssertEqual(VoiceCallLanguage.mandarin.serverVoice, "zf_xiaobei")
-        XCTAssertNil(VoiceCallLanguage.english.serverVoice)
-        XCTAssertEqual(VoiceCallLanguage.mandarin.appleVoiceLanguage, "zh-CN")
-        XCTAssertFalse(VoiceCallLanguage.mandarin.speaksStatusLines)
-        XCTAssertTrue(VoiceCallLanguage.english.speaksStatusLines)
-    }
 
     func testOpeningTurnSentOnceAfterListening() async {
         controller = makeController(openingTurn: "[mock brief] Interview me for the role.")

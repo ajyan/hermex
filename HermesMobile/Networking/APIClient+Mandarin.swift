@@ -91,82 +91,6 @@ struct MandarinCallResponse: Decodable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey { case items, phrases, progress }
 }
 
-/// The Mandarin call: his first telling of the day's story, the call's brief, and its review.
-struct MandarinTellingRequest: Encodable, Sendable {
-    let date: String
-    let text: String
-}
-
-struct MandarinCallStartRequest: Encodable, Sendable {
-    let date: String
-}
-
-/// The `[mandarin brief]` opening turn, who calls ("mom" or "dad"), and the Hermes profile to call on.
-struct MandarinCallStart: Decodable, Equatable, Sendable {
-    let brief: String
-    let speaker: String?
-    let profile: String
-}
-
-/// Encodes as `session_id` and `wait_ms` through the client's snake-case encoder.
-struct MandarinCallReviewRequest: Encodable, Sendable {
-    let date: String
-    let sessionID: String
-    let waitMS: [Int]
-}
-
-/// After the call: moments to say again, his best turns said natively, the chunks he used and
-/// missed, and fluency for the call and for his first telling. Bad entries drop; the rest stay.
-struct MandarinCallReview: Codable, Equatable, Sendable {
-    struct Moment: Codable, Equatable, Hashable, Sendable {
-        let said: String
-        let natural: String
-        let naturalPinyin: String?
-        let en: String?
-        let why: String?
-    }
-
-    struct Turn: Codable, Equatable, Hashable, Sendable {
-        let said: String
-        let natural: String
-        let naturalPinyin: String?
-    }
-
-    let moments: [Moment]
-    let naturalTurns: [Turn]
-    let chunksUsed: [String]
-    let chunksMissed: [String]
-    let fluency: MandarinFluency?
-    let telling: MandarinFluency?
-    let progress: DeckMandarinProgress?
-
-    init(moments: [Moment] = [], naturalTurns: [Turn] = [], chunksUsed: [String] = [], chunksMissed: [String] = [],
-         fluency: MandarinFluency? = nil, telling: MandarinFluency? = nil, progress: DeckMandarinProgress? = nil) {
-        self.moments = moments
-        self.naturalTurns = naturalTurns
-        self.chunksUsed = chunksUsed
-        self.chunksMissed = chunksMissed
-        self.fluency = fluency
-        self.telling = telling
-        self.progress = progress
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        moments = ((try? c.decodeIfPresent([Lossy<Moment>].self, forKey: .moments)) ?? []).compactMap(\.value)
-        naturalTurns = ((try? c.decodeIfPresent([Lossy<Turn>].self, forKey: .naturalTurns)) ?? []).compactMap(\.value)
-        chunksUsed = ((try? c.decodeIfPresent([Lossy<String>].self, forKey: .chunksUsed)) ?? []).compactMap(\.value)
-        chunksMissed = ((try? c.decodeIfPresent([Lossy<String>].self, forKey: .chunksMissed)) ?? []).compactMap(\.value)
-        fluency = try? c.decodeIfPresent(MandarinFluency.self, forKey: .fluency)
-        telling = try? c.decodeIfPresent(MandarinFluency.self, forKey: .telling)
-        progress = try? c.decodeIfPresent(DeckMandarinProgress.self, forKey: .progress)
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case moments, naturalTurns, chunksUsed, chunksMissed, fluency, telling, progress
-    }
-}
-
 extension APIClient {
     /// Waits up to 90 s: the server gives the local model 75 s before it answers without feedback.
     func answerMandarin(_ request: MandarinAnswerRequest) async throws -> MandarinAnswerResponse {
@@ -183,18 +107,5 @@ extension APIClient {
 
     func mandarinCallAfter(_ request: MandarinCallAfterRequest) async throws -> MandarinCallResponse {
         try await send(endpoint: .mandarinCallAfter, method: "POST", body: request, timeout: 90)
-    }
-
-    func tellMandarin(_ request: MandarinTellingRequest) async throws {
-        _ = try await sendData(endpoint: .mandarinTelling, method: "POST", body: request)
-    }
-
-    func mandarinCallStart(_ request: MandarinCallStartRequest) async throws -> MandarinCallStart {
-        try decode(MandarinCallStart.self, from: try await sendData(endpoint: .mandarinCallStart, method: "POST", body: request))
-    }
-
-    /// Waits up to 90 s, like an answer: the review is one local-model call.
-    func mandarinCallReview(_ request: MandarinCallReviewRequest) async throws -> MandarinCallReview {
-        try await send(endpoint: .mandarinCallReview, method: "POST", body: request, timeout: 90)
     }
 }

@@ -49,38 +49,6 @@ protocol CallSystemBridging: AnyObject {
     func setMuted(_ muted: Bool)
 }
 
-/// The language a call is held in. English is the Atlas call; Mandarin is the
-/// Daily Deck's practice call with Mom or Dad.
-enum VoiceCallLanguage: Equatable, Sendable {
-    case english, mandarin
-
-    var locale: Locale {
-        switch self {
-        case .english: Locale(identifier: "en-US")
-        case .mandarin: Locale(identifier: "zh-CN")
-        }
-    }
-
-    /// The server (Kokoro) voice the call asks for; nil keeps the server's configured voice.
-    var serverVoice: String? {
-        switch self {
-        case .english: nil
-        case .mandarin: "zf_xiaobei"
-        }
-    }
-
-    /// The on-device voice's language. A region tag, so Mandarin never picks a zh-TW or zh-HK voice.
-    var appleVoiceLanguage: String {
-        switch self {
-        case .english: "en"
-        case .mandarin: "zh-CN"
-        }
-    }
-
-    /// Whether the call speaks its English status lines ("One moment", "I didn't catch that").
-    var speaksStatusLines: Bool { self == .english }
-}
-
 enum VoiceCallStartError: Error, Equatable {
     case permissionDenied
     case recognitionUnavailable(language: String)
