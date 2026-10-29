@@ -87,11 +87,11 @@ struct ShellNavigationState: Equatable {
     }
 
     /// The profile a mock's chat keeps active: a voice mock's for as long as it is the root (its call
-    /// may still be live), a typed Mandarin chat's only while it is on screen, so the chat list or a
-    /// screen opened on top (the Daily Brief) reads under the user's own profile.
+    /// may still be live), a typed Mandarin chat's only while nothing is pushed over it, so a screen
+    /// opened on top (the Daily Brief) reads under the user's own profile.
     var heldMockProfile: String? {
         guard case .newChat(let route) = root, route.mockID != nil else { return nil }
-        return route.startsCall || (path.isEmpty && !isDrawerOpen) ? route.profileName : nil
+        return route.startsCall || path.isEmpty ? route.profileName : nil
     }
 
     mutating func select(_ session: SessionSummary) {

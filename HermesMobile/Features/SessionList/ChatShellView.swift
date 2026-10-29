@@ -1579,16 +1579,14 @@ struct ChatShellView: View {
     /// grade it never got, then switch back. The drawer's profile is reloaded, and a bare new chat
     /// (one that carries nothing) is replaced so it isn't left in the interviewer profile. A new chat
     /// carrying a draft, attachments, a profile, a project or a call stays: the cookie is already back.
-    @discardableResult
-    private func recoverMockProfileIfNeeded() async -> Bool {
-        guard navigation.heldMockProfile == nil else { return false }
+    private func recoverMockProfileIfNeeded() async {
+        guard navigation.heldMockProfile == nil else { return }
         let client = APIClientPrepAdapter(apiClient: APIClient(baseURL: server))
         await mockInFlight.recover { try await $0.post(to: client) }
         let profile = mockProfile
-        guard profile.store.profile != nil, navigation.heldMockProfile == nil, await profile.leave() else { return false }
+        guard profile.store.profile != nil, navigation.heldMockProfile == nil, await profile.leave() else { return }
         await viewModel.loadActiveProfile()
         if navigation.isOnBareNewChat { selectDestination(PendingNewChatRoute()) }
-        return true
     }
 
     /// Follows `heldMockProfile`: takes the mock's profile again when its chat is back on screen,
@@ -1600,8 +1598,8 @@ struct ChatShellView: View {
             await previous?.value
             if let held, navigation.heldMockProfile == held {
                 try? await mockProfile.enter(held, fallback: viewModel.activeProfileName)
-            } else if await recoverMockProfileIfNeeded() {
-                await loadSessions() // the open chat list was read under the mock's profile
+            } else {
+                await recoverMockProfileIfNeeded()
             }
         }
     }
