@@ -489,12 +489,13 @@ final class DailyDeckViewModel {
     }
 
     /// A session to read `briefs/` through (today's, whichever deck is shown) and the names
-    /// in it (nil when the folder is missing). A session the server lost is replaced once.
+    /// in it (nil when the folder is missing). A session the server lost, or one made under
+    /// another profile, is replaced once.
     private func sessionAndBriefs(workspace: String) async throws -> (String, [String]?) {
         if let stored = store.session(for: server, date: today) {
             do {
                 return (stored, try await briefNames(sessionID: stored))
-            } catch let error as APIError where error.isVanishedSession {
+            } catch let error as APIError where error.isUnusableSession {
                 // Fall through to a fresh session.
             }
         }

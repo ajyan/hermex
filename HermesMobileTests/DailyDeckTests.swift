@@ -339,6 +339,23 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(store.session(for: server, date: "2026-10-04"), "new-1")
     }
 
+    /// Today's session made under another profile (opened while a Mandarin chat had switched it)
+    /// answers 409 `session_profile_mismatch` once the profile is back; it is replaced like a lost one.
+    @MainActor
+    func testReplacesTodaysSessionWhenItBelongsToAnotherProfile() async {
+        store.setWorkspace("/vault", for: server)
+        store.setSession("mandarin-made", for: server, date: "2026-10-04")
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.deckJSON)
+        client.otherProfile = ["mandarin-made"]
+        let viewModel = makeViewModel(client)
+
+        await viewModel.load()
+
+        XCTAssertEqual(viewModel.state, .ready)
+        XCTAssertEqual(client.listedSessions, ["mandarin-made", "new-1"])
+        XCTAssertEqual(store.session(for: server, date: "2026-10-04"), "new-1")
+    }
+
     @MainActor
     func testMissingFolderOrDeckIsNoDeck() async {
         store.setWorkspace("/vault", for: server)
@@ -2300,6 +2317,7 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     let names: [String]?
     let deck: String
     var vanished: Set<String> = []
+    var otherProfile: Set<String> = []
     var sendError: Error?
     /// The server filer's answer; nil (the default) is a server without one.
     var filer: Result<BriefFileResponse?, Error> = .success(nil)
@@ -2360,6 +2378,9 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
         if path != DailyDeckPaths.directory { throw APIError.http(statusCode: 404, body: #"{"error": "Not a directory"}"#) }
         listedSessions.append(sessionID)
         if vanished.contains(sessionID) { throw APIError.http(statusCode: 404, body: #"{"error": "Session not found"}"#) }
+        if otherProfile.contains(sessionID) {
+            throw APIError.http(statusCode: 409, body: #"{"error": "Session belongs to a different profile", "code": "session_profile_mismatch"}"#)
+        }
         guard let names else { throw APIError.http(statusCode: 404, body: #"{"error": "Not a directory"}"#) }
         return names
     }

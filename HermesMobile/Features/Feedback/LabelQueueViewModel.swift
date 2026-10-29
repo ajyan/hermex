@@ -129,7 +129,7 @@ final class LabelQueueViewModel {
         let names: [String]
         do {
             names = try await deckClient.entryNames(sessionID: sessionID, path: DailyDeckPaths.directory)
-        } catch let error as APIError where error.isVanishedSession {
+        } catch let error as APIError where error.isUnusableSession {
             return nil
         } catch let error as APIError where error.isNotFound {
             return [] // No `briefs/` yet: nothing to label.

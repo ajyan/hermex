@@ -136,6 +136,13 @@ extension APIError {
         return Self.isVanishedSession(statusCode: statusCode, body: body)
     }
 
+    /// A stored reading session this client can't use any more: the server lost it (404), or it
+    /// belongs to another profile than the active one (409 `session_profile_mismatch`).
+    var isUnusableSession: Bool {
+        guard case let .http(statusCode, _) = self else { return false }
+        return isVanishedSession || (statusCode == 409 && serverCode == "session_profile_mismatch")
+    }
+
     var isNotFound: Bool {
         guard case let .http(statusCode, _) = self else { return false }
         return statusCode == 404
