@@ -215,6 +215,7 @@ struct DeckMandarinCard<Answer: View>: View {
                     .foregroundStyle(Color.hxTextSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            familyCallButton
         }
     }
 

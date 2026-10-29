@@ -239,8 +239,6 @@ struct VoiceCallView: View {
             startMessage = String(localized: "On-device speech recognition for \(name) isn't installed.")
         case .callDidNotConnect:
             startMessage = String(localized: "The call couldn't connect. Try again.")
-        case .otherCallActive:
-            startMessage = String(localized: "Another call is using the line. End it, then try again.")
         case .permissionDenied, nil:
             break
         }

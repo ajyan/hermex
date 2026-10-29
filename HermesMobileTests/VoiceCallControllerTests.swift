@@ -1,4 +1,3 @@
-import CallKit
 import XCTest
 @testable import HermesMobile
 
@@ -132,11 +131,9 @@ private final class FakeBridge: CallSystemBridging {
     /// When set, `startCall` waits here, like a call whose audio never activates.
     var pendingStart: CheckedContinuation<Void, Error>?
     var holdsStart = false
-    var startFailure: Error?
 
     func startCall() async throws {
         startCount += 1
-        if let startFailure { throw startFailure }
         guard holdsStart else { return }
         try await withCheckedThrowingContinuation { pendingStart = $0 }
     }
@@ -906,22 +903,6 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(controller.startError, .permissionDenied)
         XCTAssertEqual(controller.state, .ended(nil))
         XCTAssertEqual(bridge.endCount, 1)
-    }
-
-    func testRefusedSystemCallShowsAReasonInsteadOfClosing() async {
-        bridge.startFailure = CXErrorCodeRequestTransactionError(.maximumCallGroupsReached)
-        await controller.start()
-        XCTAssertEqual(controller.startError, .otherCallActive)
-        XCTAssertEqual(controller.state, .ended(nil))
-        XCTAssertEqual(listener.startCount, 0)
-    }
-
-    func testStartErrorMapping() {
-        XCTAssertEqual(VoiceCallController.startError(for: VoiceCallStartError.permissionDenied), .permissionDenied)
-        XCTAssertNil(VoiceCallController.startError(for: CallSystemBridge.BridgeError.ended))
-        XCTAssertNil(VoiceCallController.startError(for: CancellationError()))
-        XCTAssertEqual(VoiceCallController.startError(for: CXErrorCodeRequestTransactionError(.unknown)), .callDidNotConnect)
-        XCTAssertEqual(VoiceCallController.startError(for: URLError(.timedOut)), .callDidNotConnect)
     }
 
     func testCallThatNeverConnectsEndsAfterTimeout() async {

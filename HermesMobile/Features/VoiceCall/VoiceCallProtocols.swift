@@ -86,6 +86,4 @@ enum VoiceCallStartError: Error, Equatable {
     case recognitionUnavailable(language: String)
     /// The system call never connected its audio.
     case callDidNotConnect
-    /// CallKit refused the call because another call (a phone or FaceTime call) holds the line.
-    case otherCallActive
 }

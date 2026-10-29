@@ -1,4 +1,3 @@
-import CallKit
 import Foundation
 import Observation
 import UIKit
@@ -246,21 +245,9 @@ final class VoiceCallController {
             sendOpeningTurnIfReady()
         } catch {
             log("start failed: \(error)")
-            if startError == nil { startError = Self.startError(for: error) }
+            if startError == nil { startError = error as? VoiceCallStartError }
             tearDown(endSystemCall: true, message: nil)
         }
-    }
-
-    /// The reason a failed start shows on the call screen. A call that ended while connecting
-    /// (the user hung up) shows none; a start CallKit refused, or any other failure, says so
-    /// rather than closing the screen as if the call had worked.
-    static func startError(for error: Error) -> VoiceCallStartError? {
-        if let error = error as? VoiceCallStartError { return error }
-        if error is CallSystemBridge.BridgeError || error is CancellationError { return nil }
-        if let error = error as? CXErrorCodeRequestTransactionError, error.code == .maximumCallGroupsReached {
-            return .otherCallActive
-        }
-        return .callDidNotConnect
     }
 
     /// Ends the call. A run still streaming is left to finish on the server.
