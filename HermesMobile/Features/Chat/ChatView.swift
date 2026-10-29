@@ -318,8 +318,6 @@ struct ChatView: View {
     @State private var isVoiceCallPresented = false
     @State private var isFileBrowserPresented = false
     @State private var didAutoStartCall = false
-    /// A typed Mandarin chat's brief went out (it is sent once, on first appear).
-    @State private var didSendBrief = false
     @State private var mockCall: MockCallState
     /// The mock call's end, from hang-up until the call screen has gone.
     @State private var endedMockCall: MockCallEnd?
@@ -451,7 +449,7 @@ struct ChatView: View {
         self.startsCall = startsCall
         self.onMockCallProgress = onMockCallProgress
         self.onMockCallEnded = onMockCallEnded
-        _mockCall = State(initialValue: MockCallState(mockID: mockID, openingTurn: openingTurn, startsCall: startsCall))
+        _mockCall = State(initialValue: MockCallState(mockID: mockID, openingTurn: openingTurn))
         self.callRequest = callRequest
         self.draftStore = draftStore ?? .shared
         let resolvedDraftAttachmentStore = draftAttachmentStore ?? ChatDraftAttachmentStore.shared
@@ -680,15 +678,6 @@ struct ChatView: View {
             return String(localized: "Read-only")
         }
         return nil
-    }
-
-    /// The Mandarin card's typed chat with Mom or Dad, until Done ends it.
-    private var isTypedMandarinChat: Bool { !startsCall && MandarinCall.date(fromCallID: mockCall.mockID) != nil }
-
-    /// Done on a typed Mandarin chat: reports its end once, recorded only when Mom or Dad replied.
-    private func finishTypedMandarinChat() {
-        let replies = viewModel.messages.filter { $0.role == "assistant" }.count
-        if let end = mockCall.typedEnded(sessionID: session.sessionId, replies: replies) { onMockCallEnded?(end) }
     }
 
     /// Saves a voice mock's session and turn times so far while its call runs, so a call cut short
@@ -979,12 +968,6 @@ struct ChatView: View {
     private var chatContent: some View {
         chatLifecycle
             .toolbar {
-                if isTypedMandarinChat {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button { finishTypedMandarinChat() } label: { Text(verbatim: "Done") }
-                            .accessibilityHint(Text(verbatim: "Ends the chat and shows its review"))
-                    }
-                }
                 ToolbarItem(placement: .principal) {
                     Button {
                         isTitleRenamePresented = true
@@ -1062,7 +1045,8 @@ struct ChatView: View {
                 VoiceCallView(chat: viewModel, language: MandarinCall.language(forCallID: mockCall.mockID),
                               openingTurn: mockCall.openingTurn, onTurnTimed: reportMockProgress) { summary in
                     isVoiceCallPresented = false
-                    if let end = mockCall.callEnded(sessionID: session.sessionId, turnMS: summary.turnMS) {
+                    if let end = mockCall.callEnded(sessionID: session.sessionId, turnMS: summary.turnMS,
+                                                    waitMS: summary.answerWaitMS) {
                         endedMockCall = end
                     }
                 }
@@ -1073,11 +1057,6 @@ struct ChatView: View {
                 didAutoStartCall = true
                 VoiceCallDiagnostics.write("call opened automatically for a new chat")
                 isVoiceCallPresented = true
-            }
-            .task {
-                guard mockCall.sendsBriefAsText, !didSendBrief, let brief = mockCall.openingTurn else { return }
-                didSendBrief = true
-                if await viewModel.sendMessage(brief, modelContext: modelContext) { onConversationStarted() }
             }
             .sheet(item: $attachmentPreviewItem) { item in
                 ChatAttachmentPreviewView(
@@ -1949,12 +1928,8 @@ struct ChatView: View {
         return message.role == "user" && message.attachments?.isEmpty == false
     }
 
-    /// The chat's messages, minus a Mandarin chat's opening brief (always its first message).
     private var transcriptMessages: [TranscriptMessage] {
-        let messages = viewModel.displayedTranscriptMessages
-        guard let first = messages.first, first.message.role == "user",
-              ChatMessageFilter.isHiddenBrief(first.message.content ?? "") else { return messages }
-        return Array(messages.dropFirst())
+        viewModel.displayedTranscriptMessages
     }
 
     private var displayedTranscriptMessages: [TranscriptMessage] {

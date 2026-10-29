@@ -139,15 +139,18 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let goals: [String]
     /// A Mandarin card's three new phrases to work into the answer.
     let phrases: [DeckPhrase]
+    /// A Mandarin card's phrasebook phrases due today, to recall from their English (Got it / Again).
+    let recall: [DeckPhrase]
     /// A Mandarin card's feedback on the last answer filed.
     let yesterday: DeckMandarinFeedback?
-    /// A Mandarin card's sentence pattern for the day (cards built before 2026-10-28 only).
+    /// A Mandarin card's sentence pattern for the day, and the learner's progress as the deck was built.
     let pattern: DeckMandarinPattern?
-    /// A Mandarin card's caller ("mom" or "dad"), how many phrasebook phrases the call brings back,
-    /// and Monday to Sunday of this week, true on a day with a reviewed call (all empty on old cards).
+    let progress: DeckMandarinProgress?
+    /// A Mandarin card's chunks to say aloud before the call (connector, reaction and topic words),
+    /// the story beats to tell, and who calls ("mom" or "dad"; nil on cards built before the call).
+    let chunks: [DeckChunk]
+    let beats: [String]
     let speaker: String?
-    let mandarinDue: Int
-    let mandarinWeek: [Bool]
     /// A Mandarin card's question (in `question`, as characters) in pinyin and in English.
     let questionPinyin: String?
     let questionEn: String?
@@ -337,8 +340,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     private enum CodingKeys: String, CodingKey {
         case id, type, title, body, source, lines, question, context, voice, why, draft, actions, fallback
         case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
-        case phrases, yesterday, pattern, questionPinyin, questionEn, rows, week
-        case speaker, due
+        case phrases, recall, yesterday, pattern, progress, questionPinyin, questionEn, rows, week
+        case chunks, beats, speaker
         case chapter, weekNumber, range, noteFromPast, headline, bullets, proposals
         case piece, learned, variant, date, options, meals, front, fronts, frontReason, weekRows, yesterdayOne
         case todayAction = "today"
@@ -400,11 +403,13 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         tags = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .tags)) ?? []).compactMap(\.value)
         goals = (try? c.decodeIfPresent([String].self, forKey: .goals)) ?? []
         phrases = ((try? c.decodeIfPresent([Lossy<DeckPhrase>].self, forKey: .phrases)) ?? []).compactMap(\.value)
+        recall = ((try? c.decodeIfPresent([Lossy<DeckPhrase>].self, forKey: .recall)) ?? []).compactMap(\.value)
         yesterday = try? c.decodeIfPresent(DeckMandarinFeedback.self, forKey: .yesterday)
         pattern = try? c.decodeIfPresent(DeckMandarinPattern.self, forKey: .pattern)
+        progress = try? c.decodeIfPresent(DeckMandarinProgress.self, forKey: .progress)
+        chunks = ((try? c.decodeIfPresent([Lossy<DeckChunk>].self, forKey: .chunks)) ?? []).compactMap(\.value)
+        beats = ((try? c.decodeIfPresent([Lossy<String>].self, forKey: .beats)) ?? []).compactMap(\.value)
         speaker = try? c.decodeIfPresent(String.self, forKey: .speaker)
-        mandarinDue = (itemKind == "mandarin" ? try? c.decodeIfPresent(Int.self, forKey: .due) : nil) ?? 0
-        mandarinWeek = (itemKind == "mandarin" ? try? c.decodeIfPresent([Bool].self, forKey: .week) : nil) ?? []
         questionPinyin = try? c.decodeIfPresent(String.self, forKey: .questionPinyin)
         questionEn = try? c.decodeIfPresent(String.self, forKey: .questionEn)
         rows = ((try? c.decodeIfPresent([Lossy<DeckChangeRow>].self, forKey: .rows)) ?? []).compactMap(\.value)
@@ -769,7 +774,7 @@ struct DeckChangeRow: Decodable, Equatable, Identifiable {
 /// Decodes one item, or nothing when it is malformed, so a bad item never costs the list.
 /// A Mandarin phrase: characters, pinyin over them, English on tap. `source` says where a recall
 /// phrase came from: "lesson", "fix" (a correction to his answer), or "gap" (a word he said in English).
-struct DeckPhrase: Codable, Equatable, Hashable, Sendable {
+struct DeckPhrase: Codable, Equatable, Hashable {
     let hanzi: String
     let pinyin: String?
     let en: String?
@@ -791,6 +796,15 @@ struct DeckPhrase: Codable, Equatable, Hashable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey { case hanzi, pinyin, en, source }
+}
+
+/// A chunk to say aloud before the call: characters, pinyin, English, and its kind
+/// ("connector", "reaction" or "topic").
+struct DeckChunk: Codable, Equatable, Hashable {
+    let hanzi: String
+    let pinyin: String?
+    let en: String?
+    let kind: String?
 }
 
 /// The local model's feedback on a Mandarin answer: what he said and a more natural way to say it,
@@ -846,6 +860,53 @@ struct DeckMandarinPattern: Codable, Equatable {
     let name: String
     let form: String?
     let en: String?
+}
+
+/// Phrases in the book, how many he used in this week's answers, English words per answer this
+/// week and the week before (nil without answers), and the Mandarin calls' fluency averaged over
+/// this week and the week before (nil without a reviewed call).
+struct DeckMandarinProgress: Codable, Equatable {
+    let phrases: Int?
+    let usedWeek: Int?
+    let englishNow: Double?
+    let englishBefore: Double?
+    let callWeek: MandarinFluency?
+    let callBefore: MandarinFluency?
+
+    init(phrases: Int? = nil, usedWeek: Int? = nil, englishNow: Double? = nil, englishBefore: Double? = nil,
+         callWeek: MandarinFluency? = nil, callBefore: MandarinFluency? = nil) {
+        self.phrases = phrases
+        self.usedWeek = usedWeek
+        self.englishNow = englishNow
+        self.englishBefore = englishBefore
+        self.callWeek = callWeek
+        self.callBefore = callBefore
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        phrases = try? c.decodeIfPresent(Int.self, forKey: .phrases)
+        usedWeek = try? c.decodeIfPresent(Int.self, forKey: .usedWeek)
+        englishNow = try? c.decodeIfPresent(Double.self, forKey: .englishNow)
+        englishBefore = try? c.decodeIfPresent(Double.self, forKey: .englishBefore)
+        callWeek = try? c.decodeIfPresent(MandarinFluency.self, forKey: .callWeek)
+        callBefore = try? c.decodeIfPresent(MandarinFluency.self, forKey: .callBefore)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case phrases, usedWeek, englishNow, englishBefore, callWeek, callBefore
+    }
+}
+
+/// A Mandarin call's fluency, computed by the vault from what he said: English words, restarts,
+/// characters per turn, and the median wait before he started answering. Doubles, because the
+/// weekly numbers are averages.
+struct MandarinFluency: Codable, Equatable {
+    let english: Double?
+    let restarts: Double?
+    let charsPerTurn: Double?
+    let waitMsP50: Double?
+    let turns: Int?
 }
 
 struct Lossy<Value: Decodable>: Decodable {

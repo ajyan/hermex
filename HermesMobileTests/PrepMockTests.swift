@@ -335,10 +335,11 @@ final class PrepMockTests: APIClientTestCase {
                                     "chat:mandarin:2026-10-27:mandarin"])
     }
 
-    func testCallEndCarriesTheSession() {
+    func testCallEndCarriesTheSessionAndAnswerWaits() {
         var call = MockCallState(mockID: "mandarin:2026-10-27", openingTurn: "[mandarin brief] x")
-        let end = call.callEnded(sessionID: "s1", turnMS: [])
+        let end = call.callEnded(sessionID: "s1", turnMS: [], waitMS: [900])
         XCTAssertEqual(end?.sessionID, "s1")
+        XCTAssertEqual(end?.waitMS, [900])
         XCTAssertNil(end?.grade)
     }
 

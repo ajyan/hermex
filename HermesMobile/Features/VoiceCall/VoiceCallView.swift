@@ -91,6 +91,8 @@ struct VoiceCallSummary: Equatable {
     /// Milliseconds each turn waited for its first reply text. A turn that never
     /// got reply text records no sample.
     let turnMS: [Int]
+    /// Milliseconds from the end of each spoken reply to the user starting to answer.
+    var answerWaitMS: [Int] = []
 }
 
 /// The full-screen call with Atlas on one chat. It owns the call controller and
@@ -129,7 +131,8 @@ struct VoiceCallView: View {
     private func onClose() {
         guard !didReport else { return }
         didReport = true
-        onDismiss(VoiceCallSummary(turnMS: controller?.turnLatenciesMS ?? []))
+        onDismiss(VoiceCallSummary(turnMS: controller?.turnLatenciesMS ?? [],
+                                   answerWaitMS: controller?.answerWaitsMS ?? []))
     }
 
     var body: some View {

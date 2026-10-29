@@ -187,11 +187,6 @@ struct ChatShellView: View {
             .environment(dailyAsk)
             .task { await feedbackAvailability.check() }
             .task { await recoverMockProfileIfNeeded() }
-            // Leaving a mock's chat another way than its end (a typed Mandarin chat left without Done)
-            // puts the profile back now, not at the next launch or foreground.
-            .onChange(of: navigation.isOnMockChat) { wasOn, isOn in
-                if wasOn, !isOn { Task { await recoverMockProfileIfNeeded() } }
-            }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background {
                     wasBackgrounded = true
@@ -1529,7 +1524,7 @@ struct ChatShellView: View {
             openChat: { mock in
                 selectDestination(PendingNewChatRoute(
                     profileName: mock.profile,
-                    startsCall: mock.startsCall,
+                    startsCall: true,
                     openingTurn: mock.brief,
                     mockID: mock.mockID
                 ))
@@ -1550,7 +1545,7 @@ struct ChatShellView: View {
                     await profile.leave()
                     await viewModel.loadActiveProfile()
                 },
-                record: { MandarinPracticeStore().recordCall(server: server, date: $0, sessionID: $1) },
+                record: { MandarinPracticeStore().recordCall(server: server, date: $0, sessionID: $1, waitMS: $2) },
                 isStillOnCallChat: { navigation.rootRevision == revision },
                 showDeck: {
                     selectDestination(PendingNewChatRoute())
