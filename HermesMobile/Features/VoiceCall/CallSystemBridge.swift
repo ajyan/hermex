@@ -40,11 +40,7 @@ final class CallSystemBridge: NSObject, CallSystemBridging, CXProviderDelegate {
     }
 
     func startCall() async throws {
-        // CallKit still holds a call this app left behind (the app was closed mid-call) after a
-        // relaunch, when `liveCallIDs` no longer knows it; it fills the one call group and the
-        // next start fails. Ending a call another app owns is a no-op for this provider.
-        let observed = controller.callObserver.calls.filter { !$0.hasEnded }.map(\.uuid)
-        for stale in Self.liveCallIDs.union(observed) {
+        for stale in Self.liveCallIDs {
             provider.reportCall(with: stale, endedAt: nil, reason: .remoteEnded)
         }
         let id = UUID()

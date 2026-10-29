@@ -159,7 +159,7 @@ final class PrepMockTests: APIClientTestCase {
         let viewModel = PrepMockViewModel(client: client)
         let opener = OpenMockCallAction()
         var opened: [PrepMockStart] = []
-        opener.handler = { _, start in if let mock = await start() { opened.append(mock) } }
+        opener.handler = { start in if let mock = await start() { opened.append(mock) } }
 
         await viewModel.startCall(kind: .design, open: opener)
 
@@ -174,7 +174,7 @@ final class PrepMockTests: APIClientTestCase {
         let viewModel = PrepMockViewModel(client: client)
         let opener = OpenMockCallAction()
         var opened: [PrepMockStart] = []
-        opener.handler = { _, start in if let mock = await start() { opened.append(mock) } }
+        opener.handler = { start in if let mock = await start() { opened.append(mock) } }
 
         await viewModel.startCall(kind: .behavioral, open: opener)
 
@@ -223,7 +223,7 @@ final class PrepMockTests: APIClientTestCase {
         client.startResult = .success(designStart)
         let viewModel = PrepMockViewModel(client: client)
         let opener = OpenMockCallAction()
-        opener.handler = { _, start in _ = await start() }
+        opener.handler = { start in _ = await start() }
         await viewModel.load()
 
         XCTAssertEqual(viewModel.level(for: .design), "D2", "defaults to the current level")
@@ -275,7 +275,7 @@ final class PrepMockTests: APIClientTestCase {
         client.startResult = .success(designStart)
         let viewModel = PrepStoryPageViewModel(id: "s9", client: client)
         let opener = OpenMockCallAction()
-        opener.handler = { _, start in _ = await start() }
+        opener.handler = { start in _ = await start() }
         await viewModel.load()
         await viewModel.startMock(open: opener)
 
@@ -322,26 +322,6 @@ final class PrepMockTests: APIClientTestCase {
         XCTAssertEqual(log.events, ["enter:interviewer"], "no orphan started mock on the server")
     }
 
-    func testOpenerEntersTheProfileItIsGiven() async throws {
-        let log = FinishLog()
-
-        try await opener(log: log).open(profile: "mandarin") {
-            log.append("start")
-            return PrepMockStart(mockID: "mandarin:2026-10-27", level: "", brief: "[mandarin brief] x",
-                                 profile: "mandarin", title: "Call Mom")
-        }
-
-        XCTAssertEqual(log.events, ["enter:mandarin", "start", "remember:mandarin:2026-10-27",
-                                    "chat:mandarin:2026-10-27:mandarin"])
-    }
-
-    func testCallEndCarriesTheSession() {
-        var call = MockCallState(mockID: "mandarin:2026-10-27", openingTurn: "[mandarin brief] x")
-        let end = call.callEnded(sessionID: "s1", turnMS: [])
-        XCTAssertEqual(end?.sessionID, "s1")
-        XCTAssertNil(end?.grade)
-    }
-
     func testOpenerSwitchesBackWhenTheMockCantStart() async throws {
         let log = FinishLog()
 
@@ -359,7 +339,7 @@ final class PrepMockTests: APIClientTestCase {
         let viewModel = PrepMockViewModel(client: client)
         let log = FinishLog()
         let action = OpenMockCallAction()
-        action.handler = { profile, start in try await self.opener(log: log, enterFails: true).open(profile: profile, start) }
+        action.handler = { start in try await self.opener(log: log, enterFails: true).open(start) }
 
         await viewModel.startCall(kind: .design, open: action)
 
@@ -377,7 +357,7 @@ final class PrepMockTests: APIClientTestCase {
         let second = call.callEnded(sessionID: "sess-1", turnMS: [500])
 
         let grade = MockCallGrade(mockID: "m1", sessionID: "sess-1", turnMS: [900, 300])
-        XCTAssertEqual(first, MockCallEnd(mockID: "m1", grade: grade, sessionID: "sess-1"))
+        XCTAssertEqual(first, MockCallEnd(mockID: "m1", grade: grade))
         XCTAssertNil(second, "a second call on the same chat is an ordinary call")
         XCTAssertNil(call.openingTurn, "the brief opens only the mock's own call")
 
@@ -398,7 +378,7 @@ final class PrepMockTests: APIClientTestCase {
 
     func testNoGradeWhenTheInterviewerNeverAnswered() {
         var call = MockCallState(mockID: "m1", openingTurn: "brief")
-        XCTAssertEqual(call.callEnded(sessionID: "sess-1", turnMS: []), MockCallEnd(mockID: "m1", grade: nil, sessionID: "sess-1"),
+        XCTAssertEqual(call.callEnded(sessionID: "sess-1", turnMS: []), MockCallEnd(mockID: "m1", grade: nil),
                        "the end still reports, so the profile switches back, but nothing is graded")
     }
 
@@ -462,7 +442,7 @@ final class PrepMockTests: APIClientTestCase {
         client.startResult = .success(designStart)
         let viewModel = PrepMockViewModel(client: client)
         let opener = OpenMockCallAction()
-        opener.handler = { _, _ in throw PrepMockProfileError(detail: "unknown profile") }
+        opener.handler = { _ in throw PrepMockProfileError(detail: "unknown profile") }
 
         await viewModel.startCall(kind: .design, open: opener)
 
@@ -802,36 +782,6 @@ final class PrepMockTests: APIClientTestCase {
     }
 
     // MARK: Recovering the profile
-
-    func testATypedMandarinChatHoldsItsProfileOnlyWhileOnScreen() {
-        var navigation = ShellNavigationState()
-        navigation.select(PendingNewChatRoute(profileName: "mandarin", openingTurn: "brief", mockID: "mandarin:2026-10-29"))
-        XCTAssertEqual(navigation.heldMockProfile, "mandarin")
-
-        navigation.push(.dailyDeck)
-        XCTAssertNil(navigation.heldMockProfile, "the Daily Brief opened over it gets the profile back")
-
-        navigation.path.removeAll()
-        XCTAssertEqual(navigation.heldMockProfile, "mandarin", "back on the chat, it takes the profile again")
-
-        navigation.isDrawerOpen = true
-        XCTAssertNil(navigation.heldMockProfile, "the chat list shows the user's own chats")
-        navigation.isDrawerOpen = false
-        XCTAssertEqual(navigation.heldMockProfile, "mandarin")
-
-        navigation.select(PendingNewChatRoute())
-        XCTAssertNil(navigation.heldMockProfile)
-    }
-
-    func testAVoiceMockHoldsItsProfileWhileItIsTheRoot() {
-        var navigation = ShellNavigationState()
-        navigation.select(PendingNewChatRoute(profileName: "interviewer", startsCall: true, openingTurn: "brief", mockID: "m1"))
-        navigation.push(.brain)
-        XCTAssertEqual(navigation.heldMockProfile, "interviewer", "its call may still be live")
-
-        navigation.select(PendingNewChatRoute(profileName: "work"))
-        XCTAssertNil(navigation.heldMockProfile, "a pinned profile isn't a mock's")
-    }
 
     func testRecoveryReplacesOnlyABareNewChat() {
         var navigation = ShellNavigationState()

@@ -1,24 +1,21 @@
 import CryptoKit
 import SwiftUI
 
-/// Opens a voice mock from Prep (or the Daily Deck's Mandarin call, on the `mandarin` profile): a new
-/// chat in the mock's profile, already in a call, with the brief as its opening turn. A reference, like `OpenDraftChatAction`: the shell keeps one instance and
+/// Opens a voice mock from Prep: a new chat in the mock's profile, already in a call, with the brief
+/// as its opening turn. A reference, like `OpenDraftChatAction`: the shell keeps one instance and
 /// refreshes `handler`, so readers never see a new value. The handler gets the mock's start (nil when
 /// it failed) and calls it only once the profile is active (`PrepMockCallOpener`); it returns once the
 /// chat is open, and throws, having started nothing, when the profile couldn't be made active.
 final class OpenMockCallAction {
     typealias Start = @MainActor () async -> PrepMockStart?
 
-    /// Gets the profile to enter before `start` runs, then the start.
-    var handler: (@MainActor (String, @escaping Start) async throws -> Void)?
+    var handler: (@MainActor (@escaping Start) async throws -> Void)?
 
     /// True when a shell is listening; without one, Start call hides.
     var isAvailable: Bool { handler != nil }
 
     @MainActor
-    func callAsFunction(profile: String = PrepMockStart.interviewerProfile, _ start: @escaping Start) async throws {
-        try await handler?(profile, start)
-    }
+    func callAsFunction(_ start: @escaping Start) async throws { try await handler?(start) }
 }
 
 struct OpenMockCallKey: EnvironmentKey {
@@ -51,39 +48,23 @@ struct MockCallGrade: Hashable, Sendable {
 }
 
 /// The end of a voice mock's call: which mock, and its grade request, or nil when there is nothing
-/// to grade (no session, or the interviewer never answered). The session rides along for the Mandarin
-/// call's review.
+/// to grade (no session, or the interviewer never answered).
 struct MockCallEnd: Equatable, Sendable {
     let mockID: String
     let grade: MockCallGrade?
-    let sessionID: String?
-
-    init(mockID: String, grade: MockCallGrade?, sessionID: String? = nil) {
-        self.mockID = mockID
-        self.grade = grade
-        self.sessionID = sessionID
-    }
 }
 
 /// A chat opened for a voice mock: its first call opens with the brief, and when that call ends it
 /// reports the end once. Later calls on the same chat are ordinary calls. A chat that isn't a mock
-/// has neither and never reports. The Mandarin card's typed chat (`startsCall` false) sends the brief
-/// as text instead, and reports its end from Done.
+/// has neither and never reports.
 struct MockCallState: Equatable {
     private(set) var mockID: String?
     /// The brief, until the mock's call has ended.
     private(set) var openingTurn: String?
-    let startsCall: Bool
 
-    init(mockID: String?, openingTurn: String?, startsCall: Bool = true) {
+    init(mockID: String?, openingTurn: String?) {
         self.mockID = mockID
         self.openingTurn = openingTurn
-        self.startsCall = startsCall
-    }
-
-    /// A typed Mandarin chat: the brief goes out as the chat's first message.
-    var sendsBriefAsText: Bool {
-        !startsCall && openingTurn != nil && MandarinCall.date(fromCallID: mockID) != nil
     }
 
     /// Ends the mock's call, once, with its grade request (`MockCallGrade.of`).
@@ -93,15 +74,7 @@ struct MockCallState: Equatable {
             openingTurn = nil
         }
         guard let mockID else { return nil }
-        let session = sessionID?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return MockCallEnd(mockID: mockID, grade: MockCallGrade.of(mockID: mockID, sessionID: sessionID, turnMS: turnMS),
-                           sessionID: session?.isEmpty == false ? session : nil)
-    }
-
-    /// Ends a typed chat from Done, once: its "grade" exists only when Mom or Dad replied, so a chat
-    /// nobody answered records nothing.
-    mutating func typedEnded(sessionID: String?, replies: Int) -> MockCallEnd? {
-        callEnded(sessionID: sessionID, turnMS: Array(repeating: 0, count: max(replies, 0)))
+        return MockCallEnd(mockID: mockID, grade: MockCallGrade.of(mockID: mockID, sessionID: sessionID, turnMS: turnMS))
     }
 }
 
@@ -140,10 +113,6 @@ struct PrepMockInFlight: Codable, Equatable, Sendable {
         self.sessionID = sessionID
         self.turnMS = turnMS
     }
-
-    /// Whether a call's progress belongs in `PrepMockInFlightStore`: a Mandarin call is not a mock,
-    /// and must never be sent to the grader on recovery.
-    static func shouldSave(mockID: String) -> Bool { MandarinCall.date(fromCallID: mockID) == nil }
 }
 
 /// The in-flight voice mock, saved per configured server next to `PrepMockReturnStore` and keyed the
@@ -264,10 +233,10 @@ struct PrepMockCallOpener {
     var remember: @MainActor (PrepMockInFlight) -> Void
     var openChat: @MainActor (PrepMockStart) -> Void
 
-    func open(profile: String = PrepMockStart.interviewerProfile, _ start: OpenMockCallAction.Start) async throws {
-        try await enter(profile)
+    func open(_ start: OpenMockCallAction.Start) async throws {
+        try await enter(PrepMockStart.interviewerProfile)
         guard let mock = await start() else { return await leave() }
-        if mock.profile != profile {
+        if mock.profile != PrepMockStart.interviewerProfile {
             do {
                 try await enter(mock.profile)
             } catch {

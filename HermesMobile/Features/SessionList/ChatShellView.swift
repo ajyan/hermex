@@ -72,7 +72,6 @@ struct ChatShellView: View {
 
     @Environment(\.scenePhase) private var scenePhase
     @State private var wasBackgrounded = false
-    @State private var mockProfileSync: Task<Void, Never>?
     /// Bumped by the top-bar call button; the chat on screen starts a call when it changes.
     @State private var callRequest = 0
     @State private var foregroundRefresh = SessionListForegroundRefresh()
@@ -188,9 +187,6 @@ struct ChatShellView: View {
             .environment(dailyAsk)
             .task { await feedbackAvailability.check() }
             .task { await recoverMockProfileIfNeeded() }
-            // Leaving a mock's chat another way than its end (a typed Mandarin chat left without Done,
-            // or a screen opened over it) puts the profile back now; coming back to it takes it again.
-            .onChange(of: navigation.heldMockProfile) { _, held in syncMockProfile(holding: held) }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background {
                     wasBackgrounded = true
@@ -523,7 +519,7 @@ struct ChatShellView: View {
     private var mainStack: some View {
         brainRouteOpener.handler = { navigation.path.append(.brainRoute($0)) }
         draftChatOpener.handler = { selectDestination(PendingNewChatRoute(initialDraft: $0)) }
-        mockCallOpener.handler = { try await openMockCall(profile: $0, $1) }
+        mockCallOpener.handler = { try await openMockCall($0) }
         brainRouteOpener.homeHandler = { navigation.showBrainHome() }
         return NavigationStack(path: $navigation.path) {
             rootView
@@ -575,7 +571,7 @@ struct ChatShellView: View {
                 startsCall: route.startsCall,
                 openingTurn: route.openingTurn,
                 mockID: route.mockID,
-                onMockCallProgress: { if PrepMockInFlight.shouldSave(mockID: $0.mockID) { mockInFlight.save($0) } },
+                onMockCallProgress: { mockInFlight.save($0) },
                 onMockCallEnded: finishMockCall,
                 callRequest: callRequest,
                 server: server,
@@ -1513,9 +1509,8 @@ struct ChatShellView: View {
     /// turn (sent as soon as the call connects) reaches the server under it, and only then is the mock
     /// started; a new chat in that profile opens straight into the call. A failed switch throws to the
     /// brief, which shows why, and starts and opens nothing. An earlier mock still waiting to send its
-    /// grade sends it first, before the new mock takes its place. The Mandarin call comes the same way
-    /// with `profile` "mandarin", and is never remembered as a mock in flight.
-    private func openMockCall(profile profileName: String, _ start: @escaping OpenMockCallAction.Start) async throws {
+    /// grade sends it first, before the new mock takes its place.
+    private func openMockCall(_ start: @escaping OpenMockCallAction.Start) async throws {
         let profile = mockProfile
         let inFlight = mockInFlight
         let client = APIClientPrepAdapter(apiClient: APIClient(baseURL: server))
@@ -1524,41 +1519,23 @@ struct ChatShellView: View {
         let opener = PrepMockCallOpener(
             enter: { try await profile.enter($0, fallback: fallback) },
             leave: { _ = await profile.leave() },
-            remember: { if PrepMockInFlight.shouldSave(mockID: $0.mockID) { inFlight.save($0) } },
+            remember: { inFlight.save($0) },
             openChat: { mock in
                 selectDestination(PendingNewChatRoute(
                     profileName: mock.profile,
-                    startsCall: mock.startsCall,
+                    startsCall: true,
                     openingTurn: mock.brief,
                     mockID: mock.mockID
                 ))
             }
         )
-        try await opener.open(profile: profileName, start)
+        try await opener.open(start)
     }
 
     /// The voice mock's call ended: `PrepMockCallFinisher` switches back, asks for the grade, and
     /// swaps the mock's chat for Prep with the result on top.
     private func finishMockCall(_ end: MockCallEnd) {
         let revision = navigation.rootRevision
-        if let date = MandarinCall.date(fromCallID: end.mockID) {
-            let profile = mockProfile
-            let server = server
-            let finisher = MandarinCallFinisher(
-                leave: {
-                    await profile.leave()
-                    await viewModel.loadActiveProfile()
-                },
-                record: { MandarinPracticeStore().recordCall(server: server, date: $0, sessionID: $1) },
-                isStillOnCallChat: { navigation.rootRevision == revision },
-                showDeck: {
-                    selectDestination(PendingNewChatRoute())
-                    navigation.showOnly(.dailyDeck)
-                }
-            )
-            Task { await finisher.finish(end, date: date) }
-            return
-        }
         let apiClient = APIClient(baseURL: server)
         let profile = mockProfile
         let inFlight = mockInFlight
@@ -1579,31 +1556,14 @@ struct ChatShellView: View {
     /// grade it never got, then switch back. The drawer's profile is reloaded, and a bare new chat
     /// (one that carries nothing) is replaced so it isn't left in the interviewer profile. A new chat
     /// carrying a draft, attachments, a profile, a project or a call stays: the cookie is already back.
-    @discardableResult
-    private func recoverMockProfileIfNeeded() async -> Bool {
-        guard navigation.heldMockProfile == nil else { return false }
+    private func recoverMockProfileIfNeeded() async {
+        guard !navigation.isOnMockChat else { return }
         let client = APIClientPrepAdapter(apiClient: APIClient(baseURL: server))
         await mockInFlight.recover { try await $0.post(to: client) }
         let profile = mockProfile
-        guard profile.store.profile != nil, navigation.heldMockProfile == nil, await profile.leave() else { return false }
+        guard profile.store.profile != nil, !navigation.isOnMockChat, await profile.leave() else { return }
         await viewModel.loadActiveProfile()
         if navigation.isOnBareNewChat { selectDestination(PendingNewChatRoute()) }
-        return true
-    }
-
-    /// Follows `heldMockProfile`: takes the mock's profile again when its chat is back on screen,
-    /// else puts the user's own back. Each switch waits for the one before, so a quick there-and-back
-    /// ends on the profile that matches the screen.
-    private func syncMockProfile(holding held: String?) {
-        let previous = mockProfileSync
-        mockProfileSync = Task {
-            await previous?.value
-            if let held, navigation.heldMockProfile == held {
-                try? await mockProfile.enter(held, fallback: viewModel.activeProfileName)
-            } else if await recoverMockProfileIfNeeded() {
-                await loadSessions() // the open chat list was read under the mock's profile
-            }
-        }
     }
 
     private func selectSession(_ session: SessionSummary) {

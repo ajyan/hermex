@@ -1,4 +1,3 @@
-import CallKit
 import XCTest
 @testable import HermesMobile
 
@@ -132,11 +131,9 @@ private final class FakeBridge: CallSystemBridging {
     /// When set, `startCall` waits here, like a call whose audio never activates.
     var pendingStart: CheckedContinuation<Void, Error>?
     var holdsStart = false
-    var startFailure: Error?
 
     func startCall() async throws {
         startCount += 1
-        if let startFailure { throw startFailure }
         guard holdsStart else { return }
         try await withCheckedThrowingContinuation { pendingStart = $0 }
     }
@@ -229,14 +226,13 @@ final class VoiceCallControllerTests: XCTestCase {
     }
 
     /// A controller wired to the same fakes, with an opening turn.
-    private func makeController(openingTurn: String?, speaksStatusLines: Bool = true) -> VoiceCallController {
+    private func makeController(openingTurn: String?) -> VoiceCallController {
         VoiceCallController(
             listener: listener,
             speaker: speaker,
             chat: chat,
             bridge: bridge,
             openingTurn: openingTurn,
-            speaksStatusLines: speaksStatusLines,
             now: { [unowned self] in clock },
             clock: { Self.callTime },
             suppressThinkingCue: { [unowned self] in suppressCue },
@@ -246,42 +242,6 @@ final class VoiceCallControllerTests: XCTestCase {
     }
 
     // MARK: - Tests
-
-    func testMandarinCallSaysNoHoldOnLines() async {
-        controller = makeController(openingTurn: nil, speaksStatusLines: false)
-        await controller.start()
-        await say("你好")
-        XCTAssertEqual(controller.state, .thinking)
-        clock += VoiceCallTiming.holdOnDelay + VoiceCallTiming.stillWorkingInterval
-        controller.tick()
-        XCTAssertEqual(speaker.spoken, [])
-        XCTAssertEqual(controller.state, .thinking)
-    }
-
-    func testMandarinCallHangsUpSilentlyWhenNobodySpeaks() async {
-        controller = makeController(openingTurn: nil, speaksStatusLines: false)
-        await controller.start()
-        for _ in 0..<VoiceCallTiming.noSpeechPromptsBeforeHangUp {
-            clock += VoiceCallTiming.noSpeechTimeout
-            controller.tick()
-            XCTAssertEqual(controller.state, .listening)
-        }
-        clock += VoiceCallTiming.noSpeechTimeout
-        controller.tick()
-        XCTAssertEqual(speaker.spoken, [])
-        XCTAssertTrue(controller.isFinished)
-        XCTAssertEqual(bridge.endCount, 1)
-    }
-
-    func testLanguageCarriesLocaleVoiceAndLines() {
-        XCTAssertEqual(VoiceCallLanguage.mandarin.locale.identifier, "zh-CN")
-        XCTAssertEqual(VoiceCallLanguage.english.locale.identifier, "en-US")
-        XCTAssertEqual(VoiceCallLanguage.mandarin.serverVoice, "zm_yunxi")
-        XCTAssertNil(VoiceCallLanguage.english.serverVoice)
-        XCTAssertEqual(VoiceCallLanguage.mandarin.appleVoiceLanguage, "zh-CN")
-        XCTAssertFalse(VoiceCallLanguage.mandarin.speaksStatusLines)
-        XCTAssertTrue(VoiceCallLanguage.english.speaksStatusLines)
-    }
 
     func testOpeningTurnSentOnceAfterListening() async {
         controller = makeController(openingTurn: "[mock brief] Interview me for the role.")
@@ -879,22 +839,6 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(controller.startError, .permissionDenied)
         XCTAssertEqual(controller.state, .ended(nil))
         XCTAssertEqual(bridge.endCount, 1)
-    }
-
-    func testRefusedSystemCallShowsAReasonInsteadOfClosing() async {
-        bridge.startFailure = CXErrorCodeRequestTransactionError(.maximumCallGroupsReached)
-        await controller.start()
-        XCTAssertEqual(controller.startError, .otherCallActive)
-        XCTAssertEqual(controller.state, .ended(nil))
-        XCTAssertEqual(listener.startCount, 0)
-    }
-
-    func testStartErrorMapping() {
-        XCTAssertEqual(VoiceCallController.startError(for: VoiceCallStartError.permissionDenied), .permissionDenied)
-        XCTAssertNil(VoiceCallController.startError(for: CallSystemBridge.BridgeError.ended))
-        XCTAssertNil(VoiceCallController.startError(for: CancellationError()))
-        XCTAssertEqual(VoiceCallController.startError(for: CXErrorCodeRequestTransactionError(.unknown)), .callDidNotConnect)
-        XCTAssertEqual(VoiceCallController.startError(for: URLError(.timedOut)), .callDidNotConnect)
     }
 
     func testCallThatNeverConnectsEndsAfterTimeout() async {

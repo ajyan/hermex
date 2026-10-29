@@ -139,15 +139,13 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let goals: [String]
     /// A Mandarin card's three new phrases to work into the answer.
     let phrases: [DeckPhrase]
+    /// A Mandarin card's phrasebook phrases due today, to recall from their English (Got it / Again).
+    let recall: [DeckPhrase]
     /// A Mandarin card's feedback on the last answer filed.
     let yesterday: DeckMandarinFeedback?
-    /// A Mandarin card's sentence pattern for the day (cards built before 2026-10-28 only).
+    /// A Mandarin card's sentence pattern for the day, and the learner's progress as the deck was built.
     let pattern: DeckMandarinPattern?
-    /// A Mandarin card's caller ("mom" or "dad"), how many phrasebook phrases the call brings back,
-    /// and Monday to Sunday of this week, true on a day with a reviewed call (all empty on old cards).
-    let speaker: String?
-    let mandarinDue: Int
-    let mandarinWeek: [Bool]
+    let progress: DeckMandarinProgress?
     /// A Mandarin card's question (in `question`, as characters) in pinyin and in English.
     let questionPinyin: String?
     let questionEn: String?
@@ -337,8 +335,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     private enum CodingKeys: String, CodingKey {
         case id, type, title, body, source, lines, question, context, voice, why, draft, actions, fallback
         case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
-        case phrases, yesterday, pattern, questionPinyin, questionEn, rows, week
-        case speaker, due
+        case phrases, recall, yesterday, pattern, progress, questionPinyin, questionEn, rows, week
         case chapter, weekNumber, range, noteFromPast, headline, bullets, proposals
         case piece, learned, variant, date, options, meals, front, fronts, frontReason, weekRows, yesterdayOne
         case todayAction = "today"
@@ -400,11 +397,10 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         tags = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .tags)) ?? []).compactMap(\.value)
         goals = (try? c.decodeIfPresent([String].self, forKey: .goals)) ?? []
         phrases = ((try? c.decodeIfPresent([Lossy<DeckPhrase>].self, forKey: .phrases)) ?? []).compactMap(\.value)
+        recall = ((try? c.decodeIfPresent([Lossy<DeckPhrase>].self, forKey: .recall)) ?? []).compactMap(\.value)
         yesterday = try? c.decodeIfPresent(DeckMandarinFeedback.self, forKey: .yesterday)
         pattern = try? c.decodeIfPresent(DeckMandarinPattern.self, forKey: .pattern)
-        speaker = try? c.decodeIfPresent(String.self, forKey: .speaker)
-        mandarinDue = (itemKind == "mandarin" ? try? c.decodeIfPresent(Int.self, forKey: .due) : nil) ?? 0
-        mandarinWeek = (itemKind == "mandarin" ? try? c.decodeIfPresent([Bool].self, forKey: .week) : nil) ?? []
+        progress = try? c.decodeIfPresent(DeckMandarinProgress.self, forKey: .progress)
         questionPinyin = try? c.decodeIfPresent(String.self, forKey: .questionPinyin)
         questionEn = try? c.decodeIfPresent(String.self, forKey: .questionEn)
         rows = ((try? c.decodeIfPresent([Lossy<DeckChangeRow>].self, forKey: .rows)) ?? []).compactMap(\.value)
@@ -769,7 +765,7 @@ struct DeckChangeRow: Decodable, Equatable, Identifiable {
 /// Decodes one item, or nothing when it is malformed, so a bad item never costs the list.
 /// A Mandarin phrase: characters, pinyin over them, English on tap. `source` says where a recall
 /// phrase came from: "lesson", "fix" (a correction to his answer), or "gap" (a word he said in English).
-struct DeckPhrase: Codable, Equatable, Hashable, Sendable {
+struct DeckPhrase: Codable, Equatable, Hashable {
     let hanzi: String
     let pinyin: String?
     let en: String?
@@ -846,6 +842,15 @@ struct DeckMandarinPattern: Codable, Equatable {
     let name: String
     let form: String?
     let en: String?
+}
+
+/// Phrases in the book, how many he used in this week's answers, and English words per answer this
+/// week and the week before (nil without answers).
+struct DeckMandarinProgress: Codable, Equatable {
+    let phrases: Int?
+    let usedWeek: Int?
+    let englishNow: Double?
+    let englishBefore: Double?
 }
 
 struct Lossy<Value: Decodable>: Decodable {

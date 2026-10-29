@@ -1,4 +1,3 @@
-import CallKit
 import Foundation
 import Observation
 import UIKit
@@ -145,8 +144,6 @@ final class VoiceCallController {
     @ObservationIgnored private var transcriptChangedAt: TimeInterval?
     /// When `listening` began, for the no-speech prompt.
     @ObservationIgnored private var listeningSince: TimeInterval?
-    /// False on a Mandarin call: the English status lines stay silent.
-    @ObservationIgnored private let speaksStatusLines: Bool
     /// "I didn't catch that" prompts since the user last spoke; a forgotten call hangs up after a few.
     @ObservationIgnored private var unansweredNoSpeechPrompts = 0
 
@@ -191,7 +188,6 @@ final class VoiceCallController {
         chat: VoiceCallChatDriving,
         bridge: CallSystemBridging,
         openingTurn: String? = nil,
-        speaksStatusLines: Bool = true,
         now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
         clock: @escaping () -> Date = Date.init,
         suppressThinkingCue: @escaping @MainActor () -> Bool = { UIAccessibility.isReduceMotionEnabled },
@@ -200,7 +196,6 @@ final class VoiceCallController {
     ) {
         self.log = log
         self.pendingOpeningTurn = openingTurn
-        self.speaksStatusLines = speaksStatusLines
         self.listener = listener
         self.speaker = speaker
         self.chat = chat
@@ -242,21 +237,9 @@ final class VoiceCallController {
             sendOpeningTurnIfReady()
         } catch {
             log("start failed: \(error)")
-            if startError == nil { startError = Self.startError(for: error) }
+            if startError == nil { startError = error as? VoiceCallStartError }
             tearDown(endSystemCall: true, message: nil)
         }
-    }
-
-    /// The reason a failed start shows on the call screen. A call that ended while connecting
-    /// (the user hung up) shows none; a start CallKit refused, or any other failure, says so
-    /// rather than closing the screen as if the call had worked.
-    static func startError(for error: Error) -> VoiceCallStartError? {
-        if let error = error as? VoiceCallStartError { return error }
-        if error is CallSystemBridge.BridgeError || error is CancellationError { return nil }
-        if let error = error as? CXErrorCodeRequestTransactionError, error.code == .maximumCallGroupsReached {
-            return .otherCallActive
-        }
-        return .callDidNotConnect
     }
 
     /// Ends the call. A run still streaming is left to finish on the server.
@@ -402,9 +385,7 @@ final class VoiceCallController {
                 if waited >= nextHoldOnAt {
                     // A long silence on a call reads as a dropped line; say it's still coming.
                     setCue(false)
-                    if speaksStatusLines {
-                        say(holdOnLinesSaid == 0 ? VoiceCallPhrases.holdOn : VoiceCallPhrases.stillWorking)
-                    }
+                    say(holdOnLinesSaid == 0 ? VoiceCallPhrases.holdOn : VoiceCallPhrases.stillWorking)
                     holdOnLinesSaid += 1
                     nextHoldOnAt = waited + VoiceCallTiming.stillWorkingInterval
                 } else if waited >= VoiceCallTiming.thinkingCueDelay, !speaker.isSpeaking, !suppressThinkingCue() {
@@ -665,15 +646,10 @@ final class VoiceCallController {
     private func announceNoSpeech() {
         guard unansweredNoSpeechPrompts < VoiceCallTiming.noSpeechPromptsBeforeHangUp else {
             log("no speech after \(unansweredNoSpeechPrompts) prompts; hanging up")
-            tearDown(endSystemCall: true, message: speaksStatusLines ? VoiceCallPhrases.hangingUpNoSpeech : nil)
+            tearDown(endSystemCall: true, message: VoiceCallPhrases.hangingUpNoSpeech)
             return
         }
         unansweredNoSpeechPrompts += 1
-        guard speaksStatusLines else {
-            log("no speech heard; waiting again")
-            listeningSince = now()
-            return
-        }
         log("no speech heard; prompting")
         listeningSince = nil
         spokenWords = []
