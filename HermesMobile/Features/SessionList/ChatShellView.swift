@@ -72,7 +72,6 @@ struct ChatShellView: View {
 
     @Environment(\.scenePhase) private var scenePhase
     @State private var wasBackgrounded = false
-    @State private var mockProfileSync: Task<Void, Never>?
     /// Bumped by the top-bar call button; the chat on screen starts a call when it changes.
     @State private var callRequest = 0
     @State private var foregroundRefresh = SessionListForegroundRefresh()
@@ -188,9 +187,11 @@ struct ChatShellView: View {
             .environment(dailyAsk)
             .task { await feedbackAvailability.check() }
             .task { await recoverMockProfileIfNeeded() }
-            // Leaving a mock's chat another way than its end (a typed Mandarin chat left without Done,
-            // or a screen opened over it) puts the profile back now; coming back to it takes it again.
-            .onChange(of: navigation.heldMockProfile) { _, held in syncMockProfile(holding: held) }
+            // Leaving a mock's chat another way than its end (a typed Mandarin chat left without Done)
+            // puts the profile back now, not at the next launch or foreground.
+            .onChange(of: navigation.isOnMockChat) { wasOn, isOn in
+                if wasOn, !isOn { Task { await recoverMockProfileIfNeeded() } }
+            }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background {
                     wasBackgrounded = true
@@ -1580,28 +1581,13 @@ struct ChatShellView: View {
     /// (one that carries nothing) is replaced so it isn't left in the interviewer profile. A new chat
     /// carrying a draft, attachments, a profile, a project or a call stays: the cookie is already back.
     private func recoverMockProfileIfNeeded() async {
-        guard navigation.heldMockProfile == nil else { return }
+        guard !navigation.isOnMockChat else { return }
         let client = APIClientPrepAdapter(apiClient: APIClient(baseURL: server))
         await mockInFlight.recover { try await $0.post(to: client) }
         let profile = mockProfile
-        guard profile.store.profile != nil, navigation.heldMockProfile == nil, await profile.leave() else { return }
+        guard profile.store.profile != nil, !navigation.isOnMockChat, await profile.leave() else { return }
         await viewModel.loadActiveProfile()
         if navigation.isOnBareNewChat { selectDestination(PendingNewChatRoute()) }
-    }
-
-    /// Follows `heldMockProfile`: takes the mock's profile again when its chat is back on screen,
-    /// else puts the user's own back. Each switch waits for the one before, so a quick there-and-back
-    /// ends on the profile that matches the screen.
-    private func syncMockProfile(holding held: String?) {
-        let previous = mockProfileSync
-        mockProfileSync = Task {
-            await previous?.value
-            if let held, navigation.heldMockProfile == held {
-                try? await mockProfile.enter(held, fallback: viewModel.activeProfileName)
-            } else {
-                await recoverMockProfileIfNeeded()
-            }
-        }
     }
 
     private func selectSession(_ session: SessionSummary) {

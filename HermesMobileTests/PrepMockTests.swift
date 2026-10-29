@@ -803,31 +803,6 @@ final class PrepMockTests: APIClientTestCase {
 
     // MARK: Recovering the profile
 
-    func testATypedMandarinChatHoldsItsProfileOnlyWhileOnScreen() {
-        var navigation = ShellNavigationState()
-        navigation.select(PendingNewChatRoute(profileName: "mandarin", openingTurn: "brief", mockID: "mandarin:2026-10-29"))
-        XCTAssertEqual(navigation.heldMockProfile, "mandarin")
-
-        navigation.push(.dailyDeck)
-        XCTAssertNil(navigation.heldMockProfile, "the Daily Brief opened over it gets the profile back")
-
-        navigation.path.removeAll()
-        XCTAssertEqual(navigation.heldMockProfile, "mandarin", "back on the chat, it takes the profile again")
-
-        navigation.select(PendingNewChatRoute())
-        XCTAssertNil(navigation.heldMockProfile)
-    }
-
-    func testAVoiceMockHoldsItsProfileWhileItIsTheRoot() {
-        var navigation = ShellNavigationState()
-        navigation.select(PendingNewChatRoute(profileName: "interviewer", startsCall: true, openingTurn: "brief", mockID: "m1"))
-        navigation.push(.brain)
-        XCTAssertEqual(navigation.heldMockProfile, "interviewer", "its call may still be live")
-
-        navigation.select(PendingNewChatRoute(profileName: "work"))
-        XCTAssertNil(navigation.heldMockProfile, "a pinned profile isn't a mock's")
-    }
-
     func testRecoveryReplacesOnlyABareNewChat() {
         var navigation = ShellNavigationState()
         navigation.select(PendingNewChatRoute())
