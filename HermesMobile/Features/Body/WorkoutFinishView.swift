@@ -35,7 +35,8 @@ struct WorkoutFinishView: View {
         // Once he saves, the workout is closed and Done is the only way on; while it saves, Back would
         // leave a request in flight.
         .navigationBarBackButtonHidden(viewModel.phase != .asking)
-        .task { await viewModel.refreshNote() }
+        // Once saved, waits for Baki's note; leaving the screen cancels the wait.
+        .task(id: viewModel.phase) { await viewModel.awaitNote() }
     }
 
     // MARK: The check

@@ -1,15 +1,14 @@
 import SwiftUI
 
 extension BodyDayState {
-    /// The `DeckDot` state this day wears: done filled, today ringed, ahead dashed, a rest day a
-    /// faint ring, and a day the server didn't classify a small mark.
+    /// The `DeckDot` state this day wears, as on the deck's Lifted row: done filled, today ringed,
+    /// ahead dashed, and a past day without a workout (or one the server didn't classify) a small mark.
     var deckDotState: String {
         switch self {
         case .done: "done"
         case .today: "today"
         case .ahead: "ahead"
-        case .off: "missed"
-        case .unknown: "off"
+        case .off, .unknown: "off"
         }
     }
 }
@@ -46,7 +45,7 @@ struct BodyWeekDots: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: title))
-        .accessibilityValue(Text(verbatim: BodyHomeCopy.doneDays(states)))
+        .accessibilityValue(Text(verbatim: BodyHomeCopy.weekValue(states, subtitle: subtitle)))
     }
 
     private var weekdays: some View {

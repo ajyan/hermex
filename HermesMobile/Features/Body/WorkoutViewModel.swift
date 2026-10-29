@@ -121,8 +121,10 @@ final class WorkoutViewModel {
             session.exercises[e].sets[s].done.toggle()
             completed = !wasComplete && Self.isComplete(session.exercises[e])
         }
-        // Once a work set is ticked, it's too late to drop one.
-        if sleepBanner == .asking, lift.sets[s].kind == .work, self.lift(e)?.sets[s].done == true {
+        // Once a work set the offer would drop from is ticked, it's too late to drop one; the warm-up
+        // lifts come first and never count.
+        if sleepBanner == .asking, lift.section.isTrimmable, lift.sets[s].kind == .work,
+           self.lift(e)?.sets[s].done == true {
             sleepBanner = .hidden
         }
         if completed {
@@ -378,6 +380,8 @@ final class WorkoutViewModel {
         isFinishing = true
         finishError = nil
         defer { isFinishing = false }
+        // An untouched fresh workout has never been saved, and finishing needs the session on the server.
+        if generation == 0, sentGeneration == 0 { generation = 1 }
         saveNow()
         await idle()
         switch saveStatus {

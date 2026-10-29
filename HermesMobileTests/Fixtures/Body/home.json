@@ -34,18 +34,18 @@
       "2026-12-06"
     ],
     "lifted": [
+      "off",
+      "off",
       "today",
-      "ahead",
-      "ahead",
       "ahead",
       "ahead",
       "ahead",
       "ahead"
     ],
     "ran": [
+      "off",
+      "done",
       "today",
-      "ahead",
-      "ahead",
       "ahead",
       "ahead",
       "ahead",
@@ -55,8 +55,8 @@
   "sleep": {
     "hours": 5.2,
     "quality": 2,
-    "bed": "2026-11-29T23:10",
-    "wake": "2026-11-30T06:30"
+    "bed": "2026-12-01T23:10",
+    "wake": "2026-12-02T06:30"
   },
   "lifts": [
     {
@@ -65,6 +65,7 @@
       "day": "push",
       "weight_label": "150 lb",
       "up": true,
+      "up_from": 145.0,
       "dots": [
         true,
         true,
@@ -79,6 +80,7 @@
       "day": "push",
       "weight_label": "75 lb",
       "up": false,
+      "up_from": null,
       "dots": [
         true,
         false,
@@ -92,6 +94,7 @@
       "day": "push",
       "weight_label": "42.5s",
       "up": true,
+      "up_from": 40.0,
       "dots": [
         true,
         true,
@@ -105,7 +108,12 @@
       "day": "push",
       "weight_label": "BW",
       "up": false,
-      "dots": [],
+      "up_from": null,
+      "dots": [
+        true,
+        true,
+        true
+      ],
       "goal_reps": null
     },
     {
@@ -114,7 +122,12 @@
       "day": "push",
       "weight_label": "15s",
       "up": false,
-      "dots": [],
+      "up_from": null,
+      "dots": [
+        true,
+        true,
+        true
+      ],
       "goal_reps": null
     },
     {
@@ -123,7 +136,11 @@
       "day": "push",
       "weight_label": "120 lb",
       "up": false,
-      "dots": [],
+      "up_from": null,
+      "dots": [
+        false,
+        false
+      ],
       "goal_reps": null
     },
     {
@@ -132,20 +149,26 @@
       "day": "push",
       "weight_label": "50 lb",
       "up": false,
-      "dots": [],
+      "up_from": null,
+      "dots": [
+        true,
+        true,
+        true
+      ],
       "goal_reps": null
     },
     {
       "id": "goblet-squat",
       "name": "Goblet squat",
       "day": "legs",
-      "weight_label": "58 lb",
-      "up": true,
+      "weight_label": "53 lb",
+      "up": false,
+      "up_from": null,
       "dots": [
         true,
-        true,
-        true,
-        true
+        false,
+        false,
+        false
       ],
       "goal_reps": null
     },
@@ -155,6 +178,7 @@
       "day": "legs",
       "weight_label": "37.5s",
       "up": true,
+      "up_from": 35.0,
       "dots": [
         true,
         true,
@@ -166,9 +190,14 @@
       "id": "split-squat",
       "name": "Reverse lunge",
       "day": "legs",
-      "weight_label": "35s",
-      "up": false,
-      "dots": [],
+      "weight_label": "37.5s",
+      "up": true,
+      "up_from": 35.0,
+      "dots": [
+        true,
+        true,
+        true
+      ],
       "goal_reps": null
     },
     {
@@ -177,7 +206,12 @@
       "day": "legs",
       "weight_label": "BW",
       "up": false,
-      "dots": [],
+      "up_from": null,
+      "dots": [
+        true,
+        true,
+        true
+      ],
       "goal_reps": null
     },
     {
@@ -186,7 +220,11 @@
       "day": "legs",
       "weight_label": "Light cable",
       "up": false,
-      "dots": [],
+      "up_from": null,
+      "dots": [
+        true,
+        true
+      ],
       "goal_reps": null
     },
     {
@@ -195,6 +233,7 @@
       "day": "legs",
       "weight_label": "BW",
       "up": false,
+      "up_from": null,
       "dots": [
         true,
         true,
@@ -208,10 +247,10 @@
       "day": "pull",
       "weight_label": "BW",
       "up": false,
+      "up_from": null,
       "dots": [
-        true,
-        true,
-        true,
+        false,
+        false,
         false
       ],
       "goal_reps": [
@@ -227,8 +266,8 @@
       "day": "pull",
       "weight_label": "\u2014",
       "up": false,
+      "up_from": null,
       "dots": [
-        false,
         false
       ],
       "goal_reps": null
@@ -239,7 +278,11 @@
       "day": "pull",
       "weight_label": "35s",
       "up": false,
-      "dots": [],
+      "up_from": null,
+      "dots": [
+        true,
+        true
+      ],
       "goal_reps": null
     },
     {
@@ -248,7 +291,11 @@
       "day": "pull",
       "weight_label": "40 lb",
       "up": false,
-      "dots": [],
+      "up_from": null,
+      "dots": [
+        true,
+        true
+      ],
       "goal_reps": null
     },
     {
@@ -257,7 +304,11 @@
       "day": "pull",
       "weight_label": "15s",
       "up": false,
-      "dots": [],
+      "up_from": null,
+      "dots": [
+        true,
+        true
+      ],
       "goal_reps": null
     },
     {
@@ -266,6 +317,7 @@
       "day": "pull",
       "weight_label": "50s",
       "up": false,
+      "up_from": null,
       "dots": [
         true,
         true,
@@ -310,7 +362,7 @@
   "proposals": [
     {
       "id": "2026-11-29-reset-strict-press",
-      "created": "2026-11-29T20:00:00",
+      "created": "2026-11-29T09:00:00",
       "kind": "reset",
       "lift": "strict-press",
       "change": {
@@ -318,8 +370,8 @@
       },
       "title": "Strict press: 70 lb for 3 \u00d7 8",
       "why": [
-        "Stuck at 75 \u00d7 8/7/6 for three Push days",
-        "One rep short on the last set"
+        "Stuck at 75 \u00d7 8/7/6",
+        "Dropping 10% and rebuilding usually breaks a stall in 2\u20133 weeks"
       ],
       "rule": "Stall rule: no gain in 3 sessions \u2192 reset 10% and rebuild.",
       "status": "pending",

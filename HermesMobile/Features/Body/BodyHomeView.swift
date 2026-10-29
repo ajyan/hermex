@@ -165,18 +165,12 @@ struct BodyHomeView: View {
             }
         } footer: {
             if let next = home.next {
-                HStack(spacing: 10) {
-                    NavigationLink(value: ShellPushDestination.bodyWorkout(nil)) {
-                        Text(verbatim: "Start \(next.label)")
-                            .font(AppFont.display(style: .headline, weight: .semibold))
-                            .foregroundStyle(paper.onGlow)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .buttonBorderShape(.capsule)
-                    .controlSize(.large)
-                    .tint(paper.glow)
-                    otherDayMenu(than: next.day)
+                let others = BodyHomeCopy.otherDays(
+                    than: next.day, sessions: home.sessions, today: BodyHomeCopy.localDay(.now))
+                // Side by side when they fit; stacked at large text sizes.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 10) { startButtons(next, others: others) }
+                    VStack(spacing: 10) { startButtons(next, others: others) }
                 }
                 .padding(.top, 4)
             }
@@ -190,9 +184,25 @@ struct BodyHomeView: View {
         return "Nothing is scheduled."
     }
 
-    private func otherDayMenu(than day: String) -> some View {
+    /// Start, and the Other day menu when a day is left to switch to.
+    @ViewBuilder
+    private func startButtons(_ next: BodyNext, others: [String]) -> some View {
+        NavigationLink(value: ShellPushDestination.bodyWorkout(nil)) {
+            Text(verbatim: "Start \(next.label)")
+                .font(AppFont.display(style: .headline, weight: .semibold))
+                .foregroundStyle(paper.onGlow)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .buttonBorderShape(.capsule)
+        .controlSize(.large)
+        .tint(paper.glow)
+        if !others.isEmpty { otherDayMenu(others) }
+    }
+
+    private func otherDayMenu(_ days: [String]) -> some View {
         Menu {
-            ForEach(BodyHomeCopy.otherDays(than: day), id: \.self) { other in
+            ForEach(days, id: \.self) { other in
                 Button(other.capitalized) { onOpen(.bodyWorkout(other)) }
             }
         } label: {

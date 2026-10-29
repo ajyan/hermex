@@ -83,7 +83,7 @@ Named in `Config/HermexStyle.swift`; `HermexPaper.forTool(_:)` maps tool kinds.
 | Meals: the Daily Brief's "Last night's dinner?" and Sunday "This week's dinners" cards | `.meal` (`DeckPalette.dinner`, `DeckPalette.meals`) | `kitchen` |
 | Workouts, lifts, coach notes and proposals | `.training` | `body` |
 | Feedback inbox | `.feedback` | `notes` |
-| Drawer sections: Daily Brief, Brain, People, Goals, Money, Feedback | `opener`, `.knowledge`, `BrainModuleID.people.paper`, `book`, `.money`, `.feedback` | |
+| Drawer sections: Daily Brief, Brain, People, Goals, Body, Money, Feedback | `opener`, `.knowledge`, `BrainModuleID.people.paper`, `book`, `.training`, `.money`, `.feedback` | |
 
 Add a new kind of object here and in the code together. A failed tool step keeps its color and adds an `hxDanger` mark; the color never turns red.
 

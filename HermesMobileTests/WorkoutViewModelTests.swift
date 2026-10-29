@@ -54,9 +54,11 @@ private final class FakeWorkoutClient: BodyDataClient, @unchecked Sendable {
 
 @MainActor
 final class WorkoutViewModelTests: XCTestCase {
-    // The push fixture: 0 incline bench (big, 2 warm + 4 work), 1 strict press (big, 3), 2 DB bench (3),
-    // 3 bench dips (superset, BW, 3), 4 lateral raise (superset, 3), 5 chest fly (optional, 2),
-    // 6 suitcase carry (finisher, 3). Last night was rough, so it offers to drop a set.
+    // The push fixture: the warm-up leads (0 curl-up, 1 side plank, 2 bird dog: 3 holds each; 3 band
+    // pull-apart: 2), then 4 incline bench (big, 2 warm + 4 work), 5 strict press (big, 3), 6 DB bench (3),
+    // 7 bench dips (superset, BW, 3), 8 lateral raise (superset, 3), 9 chest fly (optional, 2),
+    // 10 suitcase carry (finisher, 3). Last night was rough, so it offers to drop a set.
+    private let curlUp = 0, incline = 4, press = 5, dbBench = 6, dips = 7, carry = 10
 
     private func pushPrescription() throws -> BodyPrescription {
         try PrepDecoding.decode(BodyPrescription.self, from: BodyModelsTests.fixture("prescription.json"))
@@ -100,18 +102,19 @@ final class WorkoutViewModelTests: XCTestCase {
     func testLoadBuildsSessionFromPrescription() async throws {
         let (vm, client) = try await pushVM()
         let s = try XCTUnwrap(session(vm))
-        XCTAssertEqual(s.id, "2026-11-30-push")
+        XCTAssertEqual(s.id, "2026-12-02-push")
         XCTAssertEqual(s.day, "push")
         XCTAssertEqual(s.phase, "build")
         XCTAssertFalse(s.trimmed)
         XCTAssertFalse(s.movedHinge)
         XCTAssertNil(s.finished)
         XCTAssertEqual(s.exercises.map(\.id), [
+            "curl-up", "side-plank", "bird-dog", "band-pull-apart",
             "incline-bench", "strict-press", "db-bench", "bench-dips", "lateral-raise", "chest-fly", "suitcase-carry",
         ])
-        XCTAssertEqual(s.exercises[0].sets.map(\.kind), [.warm, .warm, .work, .work, .work, .work])
-        XCTAssertEqual(s.exercises[2].sets.first?.weight, 42.5)
-        XCTAssertEqual(vm.current, 0)
+        XCTAssertEqual(s.exercises[incline].sets.map(\.kind), [.warm, .warm, .work, .work, .work, .work])
+        XCTAssertEqual(s.exercises[dbBench].sets.first?.weight, 42.5)
+        XCTAssertEqual(vm.current, curlUp, "the warm-up opens first")
         XCTAssertNil(vm.effortPrompt)
         XCTAssertEqual(vm.saveStatus, .saved)
         XCTAssertEqual(vm.sleepBanner, .asking)
@@ -126,12 +129,12 @@ final class WorkoutViewModelTests: XCTestCase {
         json["trimmed"] = true
         json.removeValue(forKey: "offers") // a resumed session is the saved document: it has no offers
         var exercises = try XCTUnwrap(json["exercises"] as? [[String: Any]])
-        for i in 0..<2 {
+        for i in 0...press { // the warm-up, incline and strict press
             var sets = try XCTUnwrap(exercises[i]["sets"] as? [[String: Any]])
             for j in sets.indices { sets[j]["done"] = true }
             exercises[i]["sets"] = sets
         }
-        exercises[0]["reps_left"] = 2
+        exercises[incline]["reps_left"] = 2
         json["exercises"] = exercises
         let client = FakeWorkoutClient()
         client.prescriptionResult = .success(try PrepDecoding.decode(
@@ -139,11 +142,11 @@ final class WorkoutViewModelTests: XCTestCase {
 
         let vm = try await loadedVM(client)
         let s = try XCTUnwrap(session(vm))
-        XCTAssertTrue(s.exercises[0].sets.allSatisfy(\.done))
-        XCTAssertTrue(s.exercises[1].sets.allSatisfy(\.done))
-        XCTAssertEqual(s.exercises[0].repsLeft, 2)
+        XCTAssertTrue(s.exercises[incline].sets.allSatisfy(\.done))
+        XCTAssertTrue(s.exercises[press].sets.allSatisfy(\.done))
+        XCTAssertEqual(s.exercises[incline].repsLeft, 2)
         XCTAssertTrue(s.trimmed)
-        XCTAssertEqual(vm.current, 2, "the first unfinished lift opens")
+        XCTAssertEqual(vm.current, dbBench, "the first unfinished lift opens")
         XCTAssertEqual(vm.sleepBanner, .hidden, "a resumed workout never asks about last night again")
     }
 
@@ -160,47 +163,52 @@ final class WorkoutViewModelTests: XCTestCase {
 
     func testToggleLastSetAdvances() async throws {
         let (vm, _) = try await pushVM()
-        vm.open(exercise: 2) // DB bench, not a big lift
-        vm.toggle(exercise: 2, set: 0)
-        vm.toggle(exercise: 2, set: 1)
-        XCTAssertEqual(vm.current, 2, "a set short of the last keeps the lift open")
-        vm.toggle(exercise: 2, set: 2)
-        XCTAssertEqual(vm.current, 3, "the last set opens the next lift")
-        XCTAssertTrue(exercise(vm, 2).sets.allSatisfy(\.done))
+        vm.open(exercise: dbBench) // not a big lift
+        vm.toggle(exercise: dbBench, set: 0)
+        vm.toggle(exercise: dbBench, set: 1)
+        XCTAssertEqual(vm.current, dbBench, "a set short of the last keeps the lift open")
+        vm.toggle(exercise: dbBench, set: 2)
+        XCTAssertEqual(vm.current, dips, "the last set opens the next lift")
+        XCTAssertTrue(exercise(vm, dbBench).sets.allSatisfy(\.done))
 
         // Unticking and reticking a set of a finished lift opens the next unfinished one, wrapping to the start.
-        vm.toggle(exercise: 2, set: 2)
-        XCTAssertFalse(exercise(vm, 2).sets[2].done)
-        vm.toggle(exercise: 2, set: 2)
-        XCTAssertEqual(vm.current, 3)
-        for i in 3..<7 { tickAllWork(vm, i) }
-        XCTAssertEqual(vm.current, 0, "past the last lift, the first unfinished one opens")
+        vm.toggle(exercise: dbBench, set: 2)
+        XCTAssertFalse(exercise(vm, dbBench).sets[2].done)
+        vm.toggle(exercise: dbBench, set: 2)
+        XCTAssertEqual(vm.current, dips)
+        for i in dips...carry { tickAllWork(vm, i) }
+        XCTAssertEqual(vm.current, curlUp, "past the last lift, the first unfinished one opens")
+
+        // Finishing the warm-up opens the first lift not yet done.
+        for i in curlUp..<incline { tickAllWork(vm, i) }
+        XCTAssertEqual(vm.current, incline)
     }
 
     func testBigLiftAsksRepsLeftBeforeAdvancing() async throws {
         let (vm, _) = try await pushVM()
-        vm.toggle(exercise: 0, set: 0) // a warm-up set never asks
+        vm.open(exercise: incline)
+        vm.toggle(exercise: incline, set: 0) // a warm-up set never asks
         XCTAssertNil(vm.effortPrompt)
-        tickAllWork(vm, 0)
-        XCTAssertEqual(vm.effortPrompt, 0)
-        XCTAssertEqual(vm.current, 0, "the lift stays open for the effort tap")
+        tickAllWork(vm, incline)
+        XCTAssertEqual(vm.effortPrompt, incline)
+        XCTAssertEqual(vm.current, incline, "the lift stays open for the effort tap")
 
         vm.setRepsLeft(1)
         XCTAssertNil(vm.effortPrompt)
-        XCTAssertEqual(exercise(vm, 0).repsLeft, 1)
-        XCTAssertEqual(vm.current, 1)
+        XCTAssertEqual(exercise(vm, incline).repsLeft, 1)
+        XCTAssertEqual(vm.current, press)
 
         // Unticking the last set while the question waits takes the question away.
-        tickAllWork(vm, 1)
-        XCTAssertEqual(vm.effortPrompt, 1)
-        vm.toggle(exercise: 1, set: 2)
+        tickAllWork(vm, press)
+        XCTAssertEqual(vm.effortPrompt, press)
+        vm.toggle(exercise: press, set: 2)
         XCTAssertNil(vm.effortPrompt)
-        XCTAssertEqual(vm.current, 1)
+        XCTAssertEqual(vm.current, press)
     }
 
     func testAccessoryNeverAsksRepsLeft() async throws {
         let (vm, _) = try await pushVM()
-        for i in [2, 3, 6] {
+        for i in [curlUp, dbBench, dips, carry] {
             vm.open(exercise: i)
             tickAllWork(vm, i)
             XCTAssertNil(vm.effortPrompt, "\(exercise(vm, i).id) is not a big lift")
@@ -212,56 +220,63 @@ final class WorkoutViewModelTests: XCTestCase {
 
     func testAddAndRemoveSet() async throws {
         let (vm, _) = try await pushVM()
-        vm.setReps(9, exercise: 2, set: 2)
-        vm.addSet(exercise: 2)
-        var sets = exercise(vm, 2).sets
+        vm.setReps(9, exercise: dbBench, set: 2)
+        vm.addSet(exercise: dbBench)
+        var sets = exercise(vm, dbBench).sets
         XCTAssertEqual(sets.count, 4)
         XCTAssertEqual(sets[3], BodySet(kind: .work, weight: 42.5, reps: 9, done: false), "a new set copies the last one")
 
-        vm.removeSet(exercise: 2)
-        XCTAssertEqual(exercise(vm, 2).sets.count, 3)
+        vm.removeSet(exercise: dbBench)
+        XCTAssertEqual(exercise(vm, dbBench).sets.count, 3)
 
-        vm.deleteSet(exercise: 0, set: 0) // a warm-up set
-        sets = exercise(vm, 0).sets
+        vm.deleteSet(exercise: incline, set: 0) // a warm-up set
+        sets = exercise(vm, incline).sets
         XCTAssertEqual(sets.map(\.kind), [.warm, .work, .work, .work, .work])
 
-        vm.addSet(exercise: 6) // a carry copies its distance
-        XCTAssertEqual(exercise(vm, 6).sets.last, BodySet(kind: .work, weight: 50, distanceYd: 40, done: false))
+        vm.addSet(exercise: carry) // a carry copies its distance
+        XCTAssertEqual(exercise(vm, carry).sets.last, BodySet(kind: .work, weight: 50, distanceYd: 40, done: false))
+
+        vm.addSet(exercise: curlUp) // a hold copies its seconds
+        XCTAssertEqual(exercise(vm, curlUp).sets.last, BodySet(kind: .work, holdS: 10, done: false))
     }
 
     func testWeightAndRepsEditsLandOnTheirSet() async throws {
         let (vm, _) = try await pushVM()
-        vm.toggle(exercise: 0, set: 2)
-        vm.setWeight(155, exercise: 0, set: 3)
-        let sets = exercise(vm, 0).sets
+        vm.toggle(exercise: incline, set: 2)
+        vm.setWeight(155, exercise: incline, set: 3)
+        let sets = exercise(vm, incline).sets
         XCTAssertEqual(sets[2].weight, 150, "a done set keeps its weight")
         XCTAssertEqual(sets[3].weight, 155)
         XCTAssertEqual(sets[4].weight, 155, "later open sets follow a weight change")
         XCTAssertEqual(sets[5].weight, 155)
         XCTAssertEqual(sets[0].weight, 90, "warm-up sets keep theirs")
 
-        vm.setWeight(nil, exercise: 0, set: 4)
-        XCTAssertNil(exercise(vm, 0).sets[4].weight)
-        XCTAssertEqual(exercise(vm, 0).sets[5].weight, 155, "a cleared weight never carries forward")
+        vm.setWeight(nil, exercise: incline, set: 4)
+        XCTAssertNil(exercise(vm, incline).sets[4].weight)
+        XCTAssertEqual(exercise(vm, incline).sets[5].weight, 155, "a cleared weight never carries forward")
 
-        vm.setReps(7, exercise: 0, set: 3)
-        XCTAssertEqual(exercise(vm, 0).sets[3].reps, 7)
-        XCTAssertEqual(exercise(vm, 0).sets[4].reps, 8, "reps change one set only")
+        vm.setReps(7, exercise: incline, set: 3)
+        XCTAssertEqual(exercise(vm, incline).sets[3].reps, 7)
+        XCTAssertEqual(exercise(vm, incline).sets[4].reps, 8, "reps change one set only")
 
-        vm.setReps(35, exercise: 6, set: 0) // a carry logs yards
-        XCTAssertEqual(exercise(vm, 6).sets[0].distanceYd, 35)
-        XCTAssertNil(exercise(vm, 6).sets[0].reps)
+        vm.setReps(35, exercise: carry, set: 0) // a carry logs yards
+        XCTAssertEqual(exercise(vm, carry).sets[0].distanceYd, 35)
+        XCTAssertNil(exercise(vm, carry).sets[0].reps)
+
+        vm.setReps(20, exercise: curlUp, set: 0) // a warm-up hold logs seconds
+        XCTAssertEqual(exercise(vm, curlUp).sets[0].holdS, 20)
+        XCTAssertNil(exercise(vm, curlUp).sets[0].reps)
     }
 
     func testRemoveNeverDropsBelowOneWorkSet() async throws {
         let (vm, _) = try await pushVM()
-        for _ in 0..<5 { vm.removeSet(exercise: 1) }
-        XCTAssertEqual(exercise(vm, 1).sets.count, 1)
-        vm.deleteSet(exercise: 1, set: 0)
-        XCTAssertEqual(exercise(vm, 1).sets.count, 1, "the last work set can't be deleted")
+        for _ in 0..<5 { vm.removeSet(exercise: press) }
+        XCTAssertEqual(exercise(vm, press).sets.count, 1)
+        vm.deleteSet(exercise: press, set: 0)
+        XCTAssertEqual(exercise(vm, press).sets.count, 1, "the last work set can't be deleted")
 
-        for _ in 0..<5 { vm.removeSet(exercise: 0) }
-        XCTAssertEqual(exercise(vm, 0).sets.map(\.kind), [.warm, .warm, .work], "warm-up sets never count toward the floor")
+        for _ in 0..<5 { vm.removeSet(exercise: incline) }
+        XCTAssertEqual(exercise(vm, incline).sets.map(\.kind), [.warm, .warm, .work], "warm-up sets never count toward the floor")
     }
 
     // MARK: Offers
@@ -273,18 +288,19 @@ final class WorkoutViewModelTests: XCTestCase {
         let after = try XCTUnwrap(session(vm))
         XCTAssertTrue(after.trimmed)
         XCTAssertEqual(vm.sleepBanner, .done)
-        XCTAssertEqual(after.exercises.map { $0.sets.count }, [5, 2, 2, 2, 2, 1, 3])
-        XCTAssertEqual(after.exercises[0].sets.filter { $0.kind == .warm }.count, 2, "warm-up sets stay")
+        XCTAssertEqual(after.exercises.map { $0.sets.count }, [3, 3, 3, 2, 5, 2, 2, 2, 2, 1, 3],
+                       "the warm-up lifts and the finisher keep every set")
+        XCTAssertEqual(after.exercises[incline].sets.filter { $0.kind == .warm }.count, 2, "warm-up sets stay")
 
-        vm.toggle(exercise: 0, set: 0)
+        vm.toggle(exercise: incline, set: 0)
         vm.undoSleepOffer()
         let undone = try XCTUnwrap(session(vm))
         XCTAssertFalse(undone.trimmed)
         XCTAssertEqual(vm.sleepBanner, .hidden)
         XCTAssertEqual(undone.exercises.map { $0.sets.count }, before.exercises.map { $0.sets.count })
-        XCTAssertTrue(undone.exercises[0].sets[0].done, "Undo keeps the taps made since")
+        XCTAssertTrue(undone.exercises[incline].sets[0].done, "Undo keeps the taps made since")
         var expected = before.exercises
-        expected[0].sets[0].done = true
+        expected[incline].sets[0].done = true
         XCTAssertEqual(undone.exercises, expected)
     }
 
@@ -351,23 +367,23 @@ final class WorkoutViewModelTests: XCTestCase {
         client.saveGates[0] = firstGate
         var starts = started.makeAsyncIterator()
 
-        vm.toggle(exercise: 0, set: 0)
-        vm.toggle(exercise: 0, set: 1)
+        vm.toggle(exercise: incline, set: 0)
+        vm.toggle(exercise: incline, set: 1)
         XCTAssertEqual(vm.saveStatus, .saving)
         _ = await starts.next()
         XCTAssertEqual(client.saved.count, 1, "taps in one burst send one save")
-        XCTAssertEqual(client.saved[0].exercises[0].sets.prefix(2).map(\.done), [true, true])
+        XCTAssertEqual(client.saved[0].exercises[incline].sets.prefix(2).map(\.done), [true, true])
 
         // Taps while a save is out wait for it, then go as one save of the newest state.
-        vm.toggle(exercise: 0, set: 2)
-        vm.setReps(6, exercise: 0, set: 2)
+        vm.toggle(exercise: incline, set: 2)
+        vm.setReps(6, exercise: incline, set: 2)
         vm.setRepsLeft(2) // no question waiting: ignored
         release.yield()
         await vm.idle()
 
         XCTAssertEqual(client.saved.count, 2)
         XCTAssertEqual(client.log, ["prescription:next", "save0:start", "save0:end", "save1:start", "save1:end"])
-        let newest = client.saved[1].exercises[0].sets[2]
+        let newest = client.saved[1].exercises[incline].sets[2]
         XCTAssertTrue(newest.done)
         XCTAssertEqual(newest.reps, 6)
         XCTAssertEqual(client.saved[1], session(vm))
@@ -384,14 +400,14 @@ final class WorkoutViewModelTests: XCTestCase {
         client.saveResults = [.failure(URLError(.timedOut))]
         var starts = started.makeAsyncIterator()
 
-        vm.toggle(exercise: 0, set: 0)
+        vm.toggle(exercise: incline, set: 0)
         _ = await starts.next()
-        vm.toggle(exercise: 0, set: 1)
+        vm.toggle(exercise: incline, set: 1)
         release.yield()
         await vm.idle()
 
         let local = try XCTUnwrap(session(vm))
-        XCTAssertEqual(local.exercises[0].sets.prefix(2).map(\.done), [true, true])
+        XCTAssertEqual(local.exercises[incline].sets.prefix(2).map(\.done), [true, true])
         XCTAssertEqual(vm.saveStatus, .saved, "an older save's failure never marks the newer state unsaved")
         XCTAssertEqual(client.saved.last, local)
 
@@ -399,39 +415,41 @@ final class WorkoutViewModelTests: XCTestCase {
         let (secondGate, releaseSecond) = gate()
         client.saveGates[2] = secondGate
         var stale = local
-        stale.exercises[0].sets[2].done = false
-        stale.started = "2026-11-30T07:00:00"
+        stale.exercises[incline].sets[2].done = false
+        stale.started = "2026-12-02T07:05:00"
         client.saveResults += [.success(stale)]
-        vm.toggle(exercise: 0, set: 2)
+        vm.toggle(exercise: incline, set: 2)
         _ = await starts.next()
-        vm.toggle(exercise: 0, set: 3)
+        vm.toggle(exercise: incline, set: 3)
         releaseSecond.yield()
         await vm.idle()
         let newest = try XCTUnwrap(session(vm))
-        XCTAssertEqual(newest.exercises[0].sets[2...3].map(\.done), [true, true])
-        XCTAssertEqual(client.saved.last?.exercises[0].sets[3].done, true)
+        XCTAssertEqual(newest.exercises[incline].sets[2...3].map(\.done), [true, true])
+        XCTAssertEqual(client.saved.last?.exercises[incline].sets[3].done, true)
     }
 
     func testFailedSaveKeepsLocalStateAndRetries() async throws {
         let (vm, client) = try await pushVM()
         client.saveResults = [.failure(URLError(.notConnectedToInternet))]
-        vm.toggle(exercise: 0, set: 0)
+        vm.toggle(exercise: incline, set: 0)
         await vm.idle()
         XCTAssertEqual(vm.saveStatus, .failed)
-        XCTAssertTrue(exercise(vm, 0).sets[0].done, "a failed save keeps the tap")
+        XCTAssertTrue(exercise(vm, incline).sets[0].done, "a failed save keeps the tap")
 
-        vm.toggle(exercise: 0, set: 1)
+        vm.toggle(exercise: incline, set: 1)
         await vm.idle()
         XCTAssertEqual(vm.saveStatus, .saved)
         XCTAssertEqual(client.saved.count, 2)
-        XCTAssertEqual(client.saved[1].exercises[0].sets.prefix(2).map(\.done), [true, true])
+        XCTAssertEqual(client.saved[1].exercises[incline].sets.prefix(2).map(\.done), [true, true])
     }
 
     func testTickingAWorkSetWithdrawsTheSleepOffer() async throws {
         let (vm, _) = try await pushVM()
-        vm.toggle(exercise: 0, set: 0) // a warm-up set: the offer stays
+        tickAllWork(vm, curlUp) // the warm-up lifts come first: the offer stays
         XCTAssertEqual(vm.sleepBanner, .asking)
-        vm.toggle(exercise: 1, set: 2) // a work set: too late to drop one
+        vm.toggle(exercise: incline, set: 0) // a lift's warm-up set: the offer stays
+        XCTAssertEqual(vm.sleepBanner, .asking)
+        vm.toggle(exercise: press, set: 2) // a work set: too late to drop one
         XCTAssertEqual(vm.sleepBanner, .hidden)
         let before = try XCTUnwrap(session(vm))
         vm.acceptSleepOffer()
@@ -440,23 +458,16 @@ final class WorkoutViewModelTests: XCTestCase {
     }
 
     func testWarmupAndFinisherKeepEverySetWhenDropping() async throws {
-        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: BodyModelsTests.fixture("prescription.json")) as? [String: Any])
-        var exercises = try XCTUnwrap(json["exercises"] as? [[String: Any]])
-        exercises.insert([
-            "id": "band-pull-apart", "name": "Band pull-apart", "section": "warmup", "unit": "band",
-            "target": ["reps": [15, 15]],
-            "sets": [["kind": "work", "reps": 15, "done": false], ["kind": "work", "reps": 15, "done": false]],
-        ], at: 0)
-        json["exercises"] = exercises
-        let client = FakeWorkoutClient()
-        client.prescriptionResult = .success(try PrepDecoding.decode(
-            BodyPrescription.self, from: JSONSerialization.data(withJSONObject: json)))
-        let vm = try await loadedVM(client)
-        XCTAssertEqual(exercise(vm, 0).section, .warmup)
+        let (vm, _) = try await pushVM()
+        XCTAssertEqual(exercise(vm, curlUp).section, .warmup)
         XCTAssertEqual(WorkoutCopy.sectionTitle(.warmup), "Warm-up")
+        let before = try XCTUnwrap(session(vm))
 
         vm.acceptSleepOffer()
-        XCTAssertEqual(session(vm)?.exercises.map { $0.sets.count }, [2, 5, 2, 2, 2, 2, 1, 3])
+        let after = try XCTUnwrap(session(vm))
+        for i in [0, 1, 2, 3, carry] {
+            XCTAssertEqual(after.exercises[i].sets, before.exercises[i].sets, "\(after.exercises[i].id) keeps every set")
+        }
     }
 
     func testFinishedSessionStopsSaving() async throws {
@@ -476,16 +487,16 @@ final class WorkoutViewModelTests: XCTestCase {
 
     func testDeletingAMiddleSetKeepsTheOthersIdentity() async throws {
         let (vm, _) = try await pushVM()
-        let before = exercise(vm, 0).sets.map(\.uid)
+        let before = exercise(vm, incline).sets.map(\.uid)
         XCTAssertEqual(Set(before).count, before.count, "every set has its own identity")
-        vm.toggle(exercise: 0, set: 2) // a tick keeps identity too
-        vm.deleteSet(exercise: 0, set: 3)
+        vm.toggle(exercise: incline, set: 2) // a tick keeps identity too
+        vm.deleteSet(exercise: incline, set: 3)
         var expected = before
         expected.remove(at: 3)
-        XCTAssertEqual(exercise(vm, 0).sets.map(\.uid), expected)
+        XCTAssertEqual(exercise(vm, incline).sets.map(\.uid), expected)
 
-        vm.addSet(exercise: 0)
-        let added = try XCTUnwrap(exercise(vm, 0).sets.last?.uid)
+        vm.addSet(exercise: incline)
+        let added = try XCTUnwrap(exercise(vm, incline).sets.last?.uid)
         XCTAssertFalse(before.contains(added), "an added set is a new row")
     }
 
@@ -502,7 +513,7 @@ final class WorkoutViewModelTests: XCTestCase {
         let fresh = try PrepDecoding.decode(BodyExercise.self, from: Data(
             #"{"id":"x","unit":"lb","sets":[{"kind":"work","weight":null}]}"#.utf8))
         XCTAssertNil(WorkoutCopy.startingWeight(fresh, set: 0))
-        let prescribed = try pushPrescription().exercises[0]
+        let prescribed = try pushPrescription().exercises[incline]
         XCTAssertEqual(WorkoutCopy.startingWeight(prescribed, set: 3), 150, "a set with a weight starts from it")
     }
 
@@ -510,7 +521,10 @@ final class WorkoutViewModelTests: XCTestCase {
 
     func testCopyReadsLikeTheBoard() throws {
         let lifts = try pushPrescription().exercises
-        let incline = lifts[0], dbBench = lifts[2], dips = lifts[3], carry = lifts[6]
+        let incline = lifts[self.incline], dbBench = lifts[self.dbBench], dips = lifts[self.dips], carry = lifts[self.carry]
+        let curlUp = lifts[self.curlUp], bandPullApart = lifts[3]
+        XCTAssertEqual(WorkoutCopy.planLine(curlUp), "3 × 10 s · BW")
+        XCTAssertEqual(WorkoutCopy.planLine(bandPullApart), "2 × 15 · Band")
         XCTAssertEqual(WorkoutCopy.planLine(incline), "4 × 6–8 · 150")
         XCTAssertEqual(WorkoutCopy.planLine(dbBench), "3 × 10 · 42.5s")
         XCTAssertEqual(WorkoutCopy.planLine(dips), "3 × 10–12 · BW")
@@ -522,7 +536,8 @@ final class WorkoutViewModelTests: XCTestCase {
         XCTAssertEqual(incline.sets.indices.map { WorkoutCopy.tag(incline, set: $0) }, ["W", "W", "1", "2", "3", "4"])
         XCTAssertEqual(WorkoutCopy.lastTime(incline, workIndex: WorkoutCopy.workIndex(incline, set: 0)), "—")
         XCTAssertEqual(WorkoutCopy.lastTime(incline, workIndex: WorkoutCopy.workIndex(incline, set: 2)), "145 × 8")
-        XCTAssertEqual(WorkoutCopy.lastTime(dips, workIndex: 0), "—")
+        XCTAssertEqual(WorkoutCopy.lastTime(dips, workIndex: 0), "BW × 12")
+        XCTAssertEqual(WorkoutCopy.lastTime(curlUp, workIndex: 0), "10 s")
         XCTAssertEqual(WorkoutCopy.sleepTitle(try XCTUnwrap(try pushPrescription().offers.sleep)), "Rough night: 5h 12m, rated 2")
         XCTAssertEqual(WorkoutCopy.phaseLabel("reentry", deload: false), "Re-entry")
         XCTAssertEqual(WorkoutCopy.phaseLabel("newborn", deload: true), "Newborn mode · Deload")

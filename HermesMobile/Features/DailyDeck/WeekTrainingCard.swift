@@ -43,8 +43,7 @@ final class WeekTrainingModel {
         do {
             _ = try await client.decide(proposalID: proposal.id, accept: accept)
         } catch {
-            // The server no longer has it pending (404) or it was already decided (409): it stays hidden.
-            if case APIError.http(let status, _) = error, status == 404 || status == 409 { return }
+            if BodyProposal.isAlreadyDecided(error) { return }
             // Roll back even when cancelled, so a dismissed screen never loses the proposal.
             decided.remove(proposal.id)
             if !(error is CancellationError), (error as? URLError)?.code != .cancelled {

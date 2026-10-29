@@ -24,7 +24,7 @@
       {
         "id": "curl-up",
         "name": "Curl-up",
-        "section": "main",
+        "section": "warmup",
         "sets": 3,
         "hold_s": 10,
         "load": {
@@ -37,7 +37,7 @@
       {
         "id": "side-plank",
         "name": "Side plank",
-        "section": "main",
+        "section": "warmup",
         "sets": 3,
         "hold_s": 10,
         "per_side": true,
@@ -51,7 +51,7 @@
       {
         "id": "bird-dog",
         "name": "Bird dog",
-        "section": "main",
+        "section": "warmup",
         "sets": 3,
         "hold_s": 10,
         "per_side": true,
@@ -65,7 +65,7 @@
       {
         "id": "band-pull-apart",
         "name": "Band pull-apart",
-        "section": "main",
+        "section": "warmup",
         "sets": 2,
         "reps": [
           15,

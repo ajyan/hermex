@@ -35,11 +35,18 @@ final class WorkoutFinishViewModel {
     @ObservationIgnored private let client: BodyDataClient
     @ObservationIgnored private let onAPIError: (Error) -> Void
     @ObservationIgnored private var finishedID: String?
+    /// When to read the session again for Baki's note, counted from the save.
+    @ObservationIgnored private let noteDelays: [Duration]
+    @ObservationIgnored private let sleep: @Sendable (Duration) async throws -> Void
 
-    init(workout: WorkoutViewModel, client: BodyDataClient, onAPIError: @escaping (Error) -> Void = { _ in }) {
+    init(workout: WorkoutViewModel, client: BodyDataClient, onAPIError: @escaping (Error) -> Void = { _ in },
+         noteDelays: [Duration] = [.seconds(10), .seconds(30), .seconds(90)],
+         sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) {
         self.workout = workout
         self.client = client
         self.onAPIError = onAPIError
+        self.noteDelays = noteDelays
+        self.sleep = sleep
     }
 
     var day: String { workout.session?.day ?? workout.day ?? "" }
@@ -103,8 +110,22 @@ final class WorkoutFinishViewModel {
         phase = .saved
     }
 
+    /// After saving, reads the session again about 10 s, 30 s and 90 s after the save, stopping as
+    /// soon as Baki's note is there. The view runs it in `.task(id: phase)`, so leaving cancels it.
+    func awaitNote() async {
+        guard phase == .saved else { return }
+        var waited: Duration = .zero
+        for delay in noteDelays {
+            guard coachNote == nil else { return }
+            do { try await sleep(delay - waited) } catch { return }
+            waited = delay
+            guard !Task.isCancelled else { return }
+            await refreshNote()
+        }
+    }
+
     /// Reads the finished session again for Baki's note, which the server writes a little after the
-    /// save. A failed read changes nothing; the next appear or pull to refresh tries again.
+    /// save. A failed read changes nothing; the next scheduled read or pull to refresh tries again.
     func refreshNote() async {
         guard phase == .saved, let id = finishedID else { return }
         guard let session = try? await client.session(id: id), !Task.isCancelled else { return }
@@ -113,7 +134,8 @@ final class WorkoutFinishViewModel {
         if let note = session.coachNote { coachNote = note }
     }
 
-    /// Accepts or skips a proposal. It leaves the list at once and returns if the server says no.
+    /// Accepts or skips a proposal. It leaves the list at once and returns if the server says no;
+    /// one the server already decided (404, 409) stays gone.
     func decide(_ proposal: BodyProposal, accept: Bool) async {
         guard let index = proposals.firstIndex(where: { $0.id == proposal.id }),
               !deciding.contains(proposal.id) else { return }
@@ -124,6 +146,7 @@ final class WorkoutFinishViewModel {
         do {
             _ = try await client.decide(proposalID: proposal.id, accept: accept)
         } catch {
+            if BodyProposal.isAlreadyDecided(error) { return }
             if !(error is CancellationError), (error as? URLError)?.code != .cancelled {
                 onAPIError(error)
                 decideError = "Couldn't save that. Try again."

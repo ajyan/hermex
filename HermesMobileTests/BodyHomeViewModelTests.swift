@@ -162,6 +162,20 @@ final class BodyHomeViewModelTests: XCTestCase {
         XCTAssertNil(vm.decideError)
     }
 
+    func testDecidingAnAlreadyDecidedProposalKeepsItHidden() async throws {
+        for status in [404, 409] {
+            let client = FakeBodyClient()
+            client.homeResults = [.success(try home())]
+            client.decideResults = [.failure(APIError.http(statusCode: status, body: nil))]
+            let vm = BodyHomeViewModel(client: client)
+            await vm.load()
+            await vm.decide(try XCTUnwrap(loaded(vm)?.proposals.first), accept: true)
+            XCTAssertEqual(loaded(vm)?.proposals.map(\.id), ["p2"], "\(status): already decided, so it stays gone")
+            XCTAssertNil(vm.decideError, "\(status)")
+            XCTAssertTrue(vm.deciding.isEmpty)
+        }
+    }
+
     func testDecideRollsBackOnFailure() async throws {
         let client = FakeBodyClient()
         client.homeResults = [.success(try home(proposals: 3))]
@@ -238,9 +252,34 @@ final class BodyHomeCopyTests: XCTestCase {
         XCTAssertEqual(BodyHomeCopy.otherDays(than: "legs"), ["push", "pull"])
     }
 
+    func testOtherDaysLeaveOutWhatWasFinishedToday() throws {
+        func summary(_ day: String, _ date: String) throws -> BodySessionSummary {
+            try PrepDecoding.decode(BodySessionSummary.self, from: Data(
+                #"{"id":"\#(date)-\#(day)","day":"\#(day)","label":"\#(day.capitalized)","date":"\#(date)"}"#.utf8))
+        }
+        // Push finished this morning, so Legs is next; Pull was yesterday and can still be done today.
+        let sessions = [try summary("push", "2026-11-30"), try summary("pull", "2026-11-29")]
+        XCTAssertEqual(BodyHomeCopy.otherDays(than: "legs", sessions: sessions, today: "2026-11-30"), ["pull"])
+        XCTAssertEqual(BodyHomeCopy.otherDays(than: "legs", sessions: sessions, today: "2026-12-01"), ["push", "pull"])
+        let both = sessions + [try summary("pull", "2026-11-30")]
+        XCTAssertEqual(BodyHomeCopy.otherDays(than: "legs", sessions: both, today: "2026-11-30"), [])
+    }
+
+    func testLocalDayIsTheCalendarDay() throws {
+        let date = try XCTUnwrap(Calendar.current.date(from: DateComponents(year: 2026, month: 3, day: 7, hour: 23, minute: 50)))
+        XCTAssertEqual(BodyHomeCopy.localDay(date), "2026-03-07")
+    }
+
     func testDayStatesMapToDeckDots() {
+        // A past day without a workout wears the deck's "off" mark, as on the deck's Lifted row; never "missed".
         XCTAssertEqual(
             [BodyDayState.done, .off, .today, .ahead, .unknown].map(\.deckDotState),
-            ["done", "missed", "today", "ahead", "off"])
+            ["done", "off", "today", "ahead", "off"])
+    }
+
+    func testWeekValueReadsTheSubtitleToo() {
+        XCTAssertEqual(BodyHomeCopy.weekValue([.done, .off, .done, .today], subtitle: "Push, Legs"),
+                       "Monday and Wednesday. Push, Legs")
+        XCTAssertEqual(BodyHomeCopy.weekValue([.today], subtitle: nil), "none yet this week")
     }
 }

@@ -75,10 +75,11 @@ final class WorkoutFinishTests: XCTestCase {
         return try PrepDecoding.decode(BodySession.self, from: data)
     }
 
+    /// The finish fixture: today's push closed, 07:05 to 07:58, with `proposals` raised.
     private func result(proposals: [BodyProposal] = []) throws -> BodyFinishResult {
-        var session = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: BodyModelsTests.fixture("session.json")) as? [String: Any])
-        session["coach_note"] = nil
+        let finish = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: BodyModelsTests.fixture("finish.json")) as? [String: Any])
+        let session = try XCTUnwrap(finish["session"])
         let rows = try proposals.map { p in
             ["id": p.id, "kind": p.kind, "title": p.title, "why": p.why, "rule": p.rule, "status": p.status] as [String: Any]
         }
@@ -105,21 +106,32 @@ final class WorkoutFinishTests: XCTestCase {
         let client = FakeFinishClient()
         client.finishResult = .success(try result(proposals: [proposal("p1")]))
         let vm = try await workout(client)
-        vm.toggle(exercise: 0, set: 2)
+        vm.toggle(exercise: 4, set: 2) // incline bench, after the warm-up
 
         let check = BodyCheck(effort: .grinder, back: .tight, shoulders: .pain,
                               pain: BodyPain(score: 6, lift: "strict-press"), note: "Left side")
         let finished = await vm.finish(check: check)
 
         XCTAssertEqual(finished?.proposals.map(\.id), ["p1"])
-        XCTAssertEqual(finished?.session.id, "2026-11-23-push")
+        XCTAssertEqual(finished?.session.id, "2026-12-02-push")
         XCTAssertEqual(client.checks, [check])
-        XCTAssertEqual(client.log, ["prescription", "save", "finish:2026-11-30-push"],
+        XCTAssertEqual(client.log, ["prescription", "save", "finish:2026-12-02-push"],
                        "the latest sets are saved before the workout is finished")
         XCTAssertEqual(vm.saveStatus, .finished)
-        vm.toggle(exercise: 0, set: 3)
+        vm.toggle(exercise: 4, set: 3)
         await vm.idle()
         XCTAssertEqual(client.log.filter { $0 == "save" }.count, 1, "a finished workout never saves again")
+    }
+
+    func testFinishingAnUntouchedWorkoutSavesItFirst() async throws {
+        let client = FakeFinishClient()
+        client.finishResult = .success(try result())
+        let vm = try await workout(client)
+        let finished = await vm.finish(check: BodyCheck())
+        XCTAssertNotNil(finished)
+        XCTAssertNil(vm.finishError)
+        XCTAssertEqual(client.log, ["prescription", "save", "finish:2026-12-02-push"],
+                       "a fresh prescription is saved before it is finished, so the server has the session")
     }
 
     func testFinishFailureKeepsTheWorkoutOpen() async throws {
@@ -246,10 +258,10 @@ final class WorkoutFinishTests: XCTestCase {
 
     func testSavedSummaryUsesTheFinishedSession() async throws {
         let client = FakeFinishClient()
-        client.finishResult = .success(try result())   // the fixture session: 07:00 to 07:52
+        client.finishResult = .success(try result())   // the fixture session: 07:05 to 07:58
         let (vm, _) = try await finishVM(client)       // the live session has no start
         await vm.save()
-        XCTAssertTrue(vm.summary?.hasPrefix("52 min · ") == true, vm.summary ?? "nil")
+        XCTAssertTrue(vm.summary?.hasPrefix("53 min · ") == true, vm.summary ?? "nil")
     }
 
     func testSaveFailureReturnsToTheForm() async throws {
@@ -282,6 +294,49 @@ final class WorkoutFinishTests: XCTestCase {
         XCTAssertEqual(vm.coachNote?.body, ["One.", "Two."])
     }
 
+    func testNoteIsReadAgainUntilItArrives() async throws {
+        let client = FakeFinishClient()
+        client.finishResult = .success(try result())
+        client.sessionResults = [.success(try finishedSession()), .success(try finishedSession(note: "The jump held."))]
+        let sleeps = SleepRecorder()
+        let workout = try await workout(client)
+        let vm = WorkoutFinishViewModel(workout: workout, client: client, sleep: { await sleeps.record($0) })
+
+        await vm.awaitNote()
+        XCTAssertTrue(sleeps.waits.isEmpty, "nothing to wait for before saving")
+
+        await vm.save()
+        await vm.awaitNote()
+        XCTAssertEqual(vm.coachNote?.headline, "The jump held.")
+        XCTAssertEqual(client.log.filter { $0.hasPrefix("session:") }.count, 2, "no third read once the note is in")
+        XCTAssertEqual(sleeps.waits, [.seconds(10), .seconds(20)], "reads at 10 s and 30 s after the save")
+    }
+
+    func testNoteWaitStopsAfterThreeReads() async throws {
+        let client = FakeFinishClient()
+        client.finishResult = .success(try result())
+        client.sessionResults = [.success(try finishedSession())]
+        let sleeps = SleepRecorder()
+        let workout = try await workout(client)
+        let vm = WorkoutFinishViewModel(workout: workout, client: client, sleep: { await sleeps.record($0) })
+        await vm.save()
+        await vm.awaitNote()
+        XCTAssertNil(vm.coachNote)
+        XCTAssertEqual(client.log.filter { $0.hasPrefix("session:") }.count, 3)
+        XCTAssertEqual(sleeps.waits, [.seconds(10), .seconds(20), .seconds(60)])
+    }
+
+    func testCancelledNoteWaitReadsNothing() async throws {
+        let client = FakeFinishClient()
+        client.finishResult = .success(try result())
+        client.sessionResults = [.success(try finishedSession(note: "The jump held."))]
+        let workout = try await workout(client)
+        let vm = WorkoutFinishViewModel(workout: workout, client: client, sleep: { _ in throw CancellationError() })
+        await vm.save()
+        await vm.awaitNote()
+        XCTAssertFalse(client.log.contains { $0.hasPrefix("session:") }, "leaving the screen stops the wait")
+    }
+
     func testRefreshFailureKeepsWaiting() async throws {
         let client = FakeFinishClient()
         client.finishResult = .success(try result())
@@ -310,19 +365,30 @@ final class WorkoutFinishTests: XCTestCase {
         XCTAssertNotNil(vm.decideError)
     }
 
+    func testDecidingAnAlreadyDecidedProposalKeepsItHidden() async throws {
+        for status in [404, 409] {
+            let client = FakeFinishClient()
+            client.finishResult = .success(try result(proposals: [proposal("p1"), proposal("p2")]))
+            let (vm, _) = try await finishVM(client)
+            await vm.save()
+            client.decideResult = .failure(APIError.http(statusCode: status, body: nil))
+            await vm.decide(vm.proposals[0], accept: true)
+            XCTAssertEqual(vm.proposals.map(\.id), ["p2"], "\(status): already decided, so it stays gone")
+            XCTAssertNil(vm.decideError, "\(status)")
+        }
+    }
+
     // MARK: Copy
 
     func testSummaryReadsLikeTheBoard() throws {
         var session = try finishedSession()
         session.started = "2026-11-23T07:00:00"
         session.finished = "2026-11-23T07:52:00"
-        // The fixture has 11 lifts' worth in the real push day; here count what is in it.
-        let lifts = session.exercises.filter { $0.sets.contains(where: \.done) }.count
-        let up = session.exercises.filter { $0.up && $0.sets.contains(where: \.done) }.count
-        let text = WorkoutFinishCopy.summary(session, now: Date())
-        XCTAssertTrue(text.hasPrefix("52 min · "), text)
-        XCTAssertTrue(text.contains(lifts == 1 ? "1 lift" : "\(lifts) lifts"), text)
-        XCTAssertTrue(text.hasSuffix("\(up) went up"), text)
+        // The push day: four warm-up lifts and seven lifts, all done; the warm-up isn't counted.
+        XCTAssertEqual(session.exercises.filter { $0.sets.contains(where: \.done) }.count, 11)
+        XCTAssertEqual(WorkoutFinishCopy.summary(session, now: Date()), "52 min · 7 lifts · 0 went up")
+        let today = try result().session   // today's push: incline and DB bench went up
+        XCTAssertEqual(WorkoutFinishCopy.summary(today, now: Date()), "53 min · 7 lifts · 2 went up")
     }
 
     func testSummaryWithoutAStartLeavesOutTheMinutes() throws {
@@ -341,4 +407,12 @@ final class WorkoutFinishTests: XCTestCase {
         XCTAssertEqual(BodyAskBaki.draft(about: "Strict press: 70 lb for 3 × 8"),
                        "Baki, about \"Strict press: 70 lb for 3 × 8\": ")
     }
+}
+
+/// Records the waits `WorkoutFinishViewModel` asks for, returning at once.
+private final class SleepRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _waits: [Duration] = []
+    var waits: [Duration] { lock.withLock { _waits } }
+    func record(_ duration: Duration) async { lock.withLock { _waits.append(duration) } }
 }

@@ -504,6 +504,13 @@ struct BodyProposal: Decodable, Hashable, Sendable, Identifiable {
     }
 
     var isPending: Bool { status == "pending" }
+
+    /// The server no longer has the proposal pending (404) or it was already decided (409), so a
+    /// decision that fails this way leaves it hidden instead of putting it back.
+    static func isAlreadyDecided(_ error: Error) -> Bool {
+        if case APIError.http(let status, _) = error { return status == 404 || status == 409 }
+        return false
+    }
 }
 
 /// The answer to finishing a workout: the closed session and any proposals the rules raised.

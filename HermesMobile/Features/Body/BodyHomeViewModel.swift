@@ -43,8 +43,8 @@ final class BodyHomeViewModel {
     }
 
     /// Accepts or skips a proposal. It leaves the list at once and comes back where it was if the
-    /// server doesn't take the decision. An accepted proposal can change a lift's weight, so a
-    /// successful accept reloads home.
+    /// server doesn't take the decision; one the server already decided (404, 409) stays gone. An
+    /// accepted proposal can change a lift's weight, so a successful accept reloads home.
     func decide(_ proposal: BodyProposal, accept: Bool) async {
         guard case .loaded(let before) = state, !deciding.contains(proposal.id),
               let index = before.proposals.firstIndex(where: { $0.id == proposal.id }) else { return }
@@ -55,6 +55,7 @@ final class BodyHomeViewModel {
         do {
             _ = try await client.decide(proposalID: proposal.id, accept: accept)
         } catch {
+            if BodyProposal.isAlreadyDecided(error) { return }
             // Roll back even when cancelled, so a dismissed screen never loses the proposal.
             if !bodyIsCancellation(error) {
                 onAPIError(error)
@@ -174,9 +175,23 @@ enum BodyHomeCopy {
         "Goal " + reps.map(String.init).joined(separator: "·")
     }
 
-    /// The other two days of the Push/Legs/Pull rotation, for the Other day menu.
-    static func otherDays(than day: String) -> [String] {
-        ["push", "legs", "pull"].filter { $0 != day }
+    /// The other days of the Push/Legs/Pull rotation for the Other day menu, leaving out any already
+    /// finished `today` ("2026-11-30"): the server would answer a second one with 409.
+    static func otherDays(than day: String, sessions: [BodySessionSummary] = [], today: String = "") -> [String] {
+        let finishedToday = Set(sessions.filter { $0.date == today }.map(\.day))
+        return ["push", "legs", "pull"].filter { $0 != day && !finishedToday.contains($0) }
+    }
+
+    /// The phone's calendar day as the server writes dates, "2026-11-30".
+    static func localDay(_ date: Date) -> String {
+        let parts = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
+
+    /// What VoiceOver reads for a week row's dots: the done days, then the row's subtitle
+    /// ("Monday and Wednesday. Push, Legs").
+    static func weekValue(_ states: [BodyDayState], subtitle: String?) -> String {
+        [doneDays(states), subtitle].compactMap { $0 }.joined(separator: ". ")
     }
 
     private static let parser: DateFormatter = {
