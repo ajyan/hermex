@@ -1,0 +1,425 @@
+{
+  "phases": {
+    "recover": {
+      "start": "2026-11-02",
+      "end": "2026-11-08"
+    },
+    "reentry": {
+      "start": "2026-11-09"
+    },
+    "build": {
+      "start": "2026-11-23"
+    },
+    "newborn": {
+      "start": "2026-12-28"
+    }
+  },
+  "rotation": [
+    "push",
+    "legs",
+    "pull"
+  ],
+  "days": {
+    "warmup": [
+      {
+        "id": "curl-up",
+        "name": "Curl-up",
+        "section": "warmup",
+        "sets": 3,
+        "hold_s": 10,
+        "load": {
+          "unit": "bw",
+          "build": null,
+          "reentry": null,
+          "increment": null
+        }
+      },
+      {
+        "id": "side-plank",
+        "name": "Side plank",
+        "section": "warmup",
+        "sets": 3,
+        "hold_s": 10,
+        "per_side": true,
+        "load": {
+          "unit": "bw",
+          "build": null,
+          "reentry": null,
+          "increment": null
+        }
+      },
+      {
+        "id": "bird-dog",
+        "name": "Bird dog",
+        "section": "warmup",
+        "sets": 3,
+        "hold_s": 10,
+        "per_side": true,
+        "load": {
+          "unit": "bw",
+          "build": null,
+          "reentry": null,
+          "increment": null
+        }
+      },
+      {
+        "id": "band-pull-apart",
+        "name": "Band pull-apart",
+        "section": "warmup",
+        "sets": 2,
+        "reps": [
+          15,
+          15
+        ],
+        "load": {
+          "unit": "band",
+          "build": null,
+          "reentry": null,
+          "increment": null
+        }
+      }
+    ],
+    "push": [
+      {
+        "id": "incline-bench",
+        "name": "Incline bench",
+        "section": "main",
+        "sets": 4,
+        "reps": [
+          6,
+          8
+        ],
+        "big": true,
+        "newborn": true,
+        "ramp_sets": 2,
+        "load": {
+          "unit": "lb",
+          "build": 145,
+          "reentry": 115,
+          "increment": 5
+        }
+      },
+      {
+        "id": "strict-press",
+        "name": "Strict press",
+        "section": "main",
+        "sets": 3,
+        "reps": [
+          6,
+          8
+        ],
+        "big": true,
+        "newborn": true,
+        "load": {
+          "unit": "lb",
+          "build": 75,
+          "reentry": 60,
+          "increment": 5
+        }
+      },
+      {
+        "id": "db-bench",
+        "name": "DB bench",
+        "section": "main",
+        "sets": 3,
+        "reps": [
+          10,
+          10
+        ],
+        "load": {
+          "unit": "lb_each",
+          "build": 40,
+          "reentry": 35,
+          "increment": 2.5
+        }
+      },
+      {
+        "id": "bench-dips",
+        "name": "Bench dips",
+        "section": "superset",
+        "sets": 3,
+        "reps": [
+          10,
+          12
+        ],
+        "newborn": true,
+        "load": {
+          "unit": "bw",
+          "build": null,
+          "reentry": null,
+          "increment": null
+        }
+      },
+      {
+        "id": "lateral-raise",
+        "name": "Lateral raise",
+        "section": "superset",
+        "sets": 3,
+        "reps": [
+          12,
+          15
+        ],
+        "newborn": true,
+        "load": {
+          "unit": "lb_each",
+          "build": 15,
+          "reentry": 12.5,
+          "increment": 2.5
+        }
+      },
+      {
+        "id": "chest-fly",
+        "name": "Machine chest fly",
+        "section": "optional",
+        "sets": 2,
+        "reps": [
+          12,
+          15
+        ],
+        "load": {
+          "unit": "lb",
+          "build": 120,
+          "reentry": 100,
+          "increment": 5
+        }
+      },
+      {
+        "id": "suitcase-carry",
+        "name": "Suitcase carry",
+        "section": "finisher",
+        "sets": 3,
+        "distance_yd": 40,
+        "per_side": true,
+        "newborn": true,
+        "load": {
+          "unit": "lb",
+          "build": 50,
+          "reentry": 40,
+          "increment": 5
+        }
+      }
+    ],
+    "legs": [
+      {
+        "id": "goblet-squat",
+        "name": "Goblet squat",
+        "section": "main",
+        "sets": 4,
+        "reps": [
+          10,
+          12
+        ],
+        "big": true,
+        "newborn": true,
+        "ramp_sets": 2,
+        "load": {
+          "unit": "lb",
+          "build": 53,
+          "reentry": 45,
+          "increment": 5
+        }
+      },
+      {
+        "id": "db-rdl",
+        "name": "DB Romanian deadlift",
+        "section": "main",
+        "sets": 3,
+        "reps": [
+          10,
+          10
+        ],
+        "big": true,
+        "newborn": true,
+        "hinge": true,
+        "alternates": [
+          "Hip thrust",
+          "Back extension"
+        ],
+        "load": {
+          "unit": "lb_each",
+          "build": 35,
+          "reentry": 30,
+          "increment": 2.5
+        }
+      },
+      {
+        "id": "split-squat",
+        "name": "Bulgarian split squat",
+        "section": "main",
+        "sets": 3,
+        "reps": [
+          8,
+          8
+        ],
+        "per_side": true,
+        "big": true,
+        "newborn": true,
+        "alternate_weekly": "Reverse lunge",
+        "load": {
+          "unit": "lb_each",
+          "build": 35,
+          "reentry": 25,
+          "increment": 2.5
+        }
+      },
+      {
+        "id": "sl-glute-bridge",
+        "name": "Single-leg glute bridge",
+        "section": "main",
+        "sets": 3,
+        "reps": [
+          12,
+          12
+        ],
+        "per_side": true,
+        "load": {
+          "unit": "bw",
+          "build": null,
+          "reentry": null,
+          "increment": null
+        }
+      },
+      {
+        "id": "pallof-press",
+        "name": "Pallof press",
+        "section": "superset",
+        "sets": 2,
+        "reps": [
+          10,
+          10
+        ],
+        "per_side": true,
+        "newborn": true,
+        "load": {
+          "unit": "cable",
+          "build": null,
+          "reentry": null,
+          "increment": null
+        }
+      },
+      {
+        "id": "wall-sit",
+        "name": "Wall sit",
+        "section": "finisher",
+        "sets": 3,
+        "hold_s": 45,
+        "newborn": true,
+        "load": {
+          "unit": "bw",
+          "build": null,
+          "reentry": null,
+          "increment": null
+        }
+      }
+    ],
+    "pull": [
+      {
+        "id": "pull-ups",
+        "name": "Pull-ups",
+        "section": "main",
+        "sets": 4,
+        "reps": [
+          1,
+          8
+        ],
+        "big": true,
+        "newborn": true,
+        "ramp_sets": 0,
+        "goal_reps": [
+          8,
+          7,
+          6,
+          6
+        ],
+        "load": {
+          "unit": "bw",
+          "build": null,
+          "reentry": null,
+          "increment": null
+        }
+      },
+      {
+        "id": "lat-pulldown",
+        "name": "Lat pulldown",
+        "section": "main",
+        "sets": 2,
+        "reps": [
+          10,
+          12
+        ],
+        "load": {
+          "unit": "lb",
+          "build": null,
+          "reentry": null,
+          "increment": 5
+        }
+      },
+      {
+        "id": "db-row",
+        "name": "Chest-supported incline DB row",
+        "section": "main",
+        "sets": 3,
+        "reps": [
+          10,
+          10
+        ],
+        "big": true,
+        "newborn": true,
+        "load": {
+          "unit": "lb_each",
+          "build": 35,
+          "reentry": 30,
+          "increment": 2.5
+        }
+      },
+      {
+        "id": "face-pull",
+        "name": "Face pull",
+        "section": "superset",
+        "sets": 3,
+        "reps": [
+          15,
+          15
+        ],
+        "newborn": true,
+        "load": {
+          "unit": "lb",
+          "build": 40,
+          "reentry": 35,
+          "increment": 5
+        }
+      },
+      {
+        "id": "hammer-curl",
+        "name": "Hammer curl",
+        "section": "superset",
+        "sets": 3,
+        "reps": [
+          10,
+          12
+        ],
+        "newborn": true,
+        "load": {
+          "unit": "lb_each",
+          "build": 15,
+          "reentry": 15,
+          "increment": 2.5
+        }
+      },
+      {
+        "id": "farmer-carry",
+        "name": "Farmer carry",
+        "section": "finisher",
+        "sets": 4,
+        "distance_yd": 40,
+        "newborn": true,
+        "load": {
+          "unit": "lb_each",
+          "build": 50,
+          "reentry": 40,
+          "increment": 5
+        }
+      }
+    ]
+  }
+}

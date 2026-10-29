@@ -118,11 +118,14 @@ final class DailyDeckViewModel {
     private let mandarin: (any MandarinPracticeClient)?
     /// Each day's Mandarin practice, kept while this screen lives so a sheet and the card share it.
     @ObservationIgnored private var mandarinPractices: [String: MandarinPractice] = [:]
+    /// Baki's proposals on the Sunday training card: Use and Not now go to the Body API.
+    let training: WeekTrainingModel
     private let now: () -> Date
 
     init(server: URL, client: any DailyDeckDataClient, store: DailyDeckStore = DailyDeckStore(),
          feedback: (any FeedbackDataClient)? = nil, mandarin: (any MandarinPracticeClient)? = nil,
-         now: @escaping () -> Date = Date.init) {
+         body: (any BodyDataClient)? = nil, now: @escaping () -> Date = Date.init) {
+        self.training = WeekTrainingModel(client: body)
         self.server = server
         self.client = client
         self.store = store
@@ -138,7 +141,8 @@ final class DailyDeckViewModel {
         let apiClient = APIClient(baseURL: server)
         self.init(server: server, client: APIClientDailyDeckAdapter(apiClient: apiClient),
                   feedback: APIClientFeedbackAdapter(apiClient: apiClient),
-                  mandarin: APIClientMandarinAdapter(apiClient: apiClient))
+                  mandarin: APIClientMandarinAdapter(apiClient: apiClient),
+                  body: APIClientBodyAdapter(apiClient: apiClient))
     }
 
     /// The Mandarin card's practice for the deck on screen; the same object until the card changes.

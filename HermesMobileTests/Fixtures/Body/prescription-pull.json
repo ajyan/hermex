@@ -1,0 +1,520 @@
+{
+  "id": "2026-12-02-pull",
+  "day": "pull",
+  "phase": "build",
+  "deload": false,
+  "resumed": false,
+  "offers": {
+    "sleep": {
+      "hours": 5.2,
+      "quality": 2
+    },
+    "hinge": false,
+    "hinge_minutes": null
+  },
+  "exercises": [
+    {
+      "id": "curl-up",
+      "name": "Curl-up",
+      "section": "warmup",
+      "big": false,
+      "hinge": false,
+      "unit": "bw",
+      "per_side": false,
+      "target": {
+        "hold_s": 10
+      },
+      "weight_label": "BW",
+      "up": false,
+      "up_from": null,
+      "goal_reps": null,
+      "last": [
+        {
+          "weight": null,
+          "hold_s": 10
+        },
+        {
+          "weight": null,
+          "hold_s": 10
+        },
+        {
+          "weight": null,
+          "hold_s": 10
+        }
+      ],
+      "sets": [
+        {
+          "kind": "work",
+          "weight": null,
+          "hold_s": 10,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": null,
+          "hold_s": 10,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": null,
+          "hold_s": 10,
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "side-plank",
+      "name": "Side plank",
+      "section": "warmup",
+      "big": false,
+      "hinge": false,
+      "unit": "bw",
+      "per_side": true,
+      "target": {
+        "hold_s": 10
+      },
+      "weight_label": "BW",
+      "up": false,
+      "up_from": null,
+      "goal_reps": null,
+      "last": [
+        {
+          "weight": null,
+          "hold_s": 10
+        },
+        {
+          "weight": null,
+          "hold_s": 10
+        },
+        {
+          "weight": null,
+          "hold_s": 10
+        }
+      ],
+      "sets": [
+        {
+          "kind": "work",
+          "weight": null,
+          "hold_s": 10,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": null,
+          "hold_s": 10,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": null,
+          "hold_s": 10,
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "bird-dog",
+      "name": "Bird dog",
+      "section": "warmup",
+      "big": false,
+      "hinge": false,
+      "unit": "bw",
+      "per_side": true,
+      "target": {
+        "hold_s": 10
+      },
+      "weight_label": "BW",
+      "up": false,
+      "up_from": null,
+      "goal_reps": null,
+      "last": [
+        {
+          "weight": null,
+          "hold_s": 10
+        },
+        {
+          "weight": null,
+          "hold_s": 10
+        },
+        {
+          "weight": null,
+          "hold_s": 10
+        }
+      ],
+      "sets": [
+        {
+          "kind": "work",
+          "weight": null,
+          "hold_s": 10,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": null,
+          "hold_s": 10,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": null,
+          "hold_s": 10,
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "band-pull-apart",
+      "name": "Band pull-apart",
+      "section": "warmup",
+      "big": false,
+      "hinge": false,
+      "unit": "band",
+      "per_side": false,
+      "target": {
+        "reps": [
+          15,
+          15
+        ]
+      },
+      "weight_label": "Band",
+      "up": false,
+      "up_from": null,
+      "goal_reps": null,
+      "last": [
+        {
+          "weight": null,
+          "reps": 15
+        },
+        {
+          "weight": null,
+          "reps": 15
+        }
+      ],
+      "sets": [
+        {
+          "kind": "work",
+          "weight": null,
+          "reps": 15,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": null,
+          "reps": 15,
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "pull-ups",
+      "name": "Pull-ups",
+      "section": "main",
+      "big": true,
+      "hinge": false,
+      "unit": "bw",
+      "per_side": false,
+      "target": {
+        "reps": [
+          1,
+          8
+        ]
+      },
+      "weight_label": "BW",
+      "up": false,
+      "up_from": null,
+      "goal_reps": [
+        8,
+        7,
+        6,
+        6
+      ],
+      "last": [
+        {
+          "weight": null,
+          "reps": 7
+        },
+        {
+          "weight": null,
+          "reps": 6
+        },
+        {
+          "weight": null,
+          "reps": 5
+        }
+      ],
+      "sets": [
+        {
+          "kind": "work",
+          "weight": null,
+          "reps": 8,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": null,
+          "reps": 7,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": null,
+          "reps": 6,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": null,
+          "reps": 6,
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "lat-pulldown",
+      "name": "Lat pulldown",
+      "section": "main",
+      "big": false,
+      "hinge": false,
+      "unit": "lb",
+      "per_side": false,
+      "target": {
+        "reps": [
+          10,
+          12
+        ]
+      },
+      "weight_label": "\u2014",
+      "up": false,
+      "up_from": null,
+      "goal_reps": null,
+      "last": [
+        {
+          "weight": null,
+          "reps": 12
+        }
+      ],
+      "sets": [
+        {
+          "kind": "work",
+          "weight": null,
+          "reps": 12,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": null,
+          "reps": 12,
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "db-row",
+      "name": "Chest-supported incline DB row",
+      "section": "main",
+      "big": true,
+      "hinge": false,
+      "unit": "lb_each",
+      "per_side": false,
+      "target": {
+        "reps": [
+          10,
+          10
+        ]
+      },
+      "weight_label": "35s",
+      "up": false,
+      "up_from": null,
+      "goal_reps": null,
+      "last": [
+        {
+          "weight": 35.0,
+          "reps": 10
+        },
+        {
+          "weight": 35.0,
+          "reps": 10
+        }
+      ],
+      "sets": [
+        {
+          "kind": "work",
+          "weight": 35.0,
+          "reps": 10,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 35.0,
+          "reps": 10,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 35.0,
+          "reps": 10,
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "face-pull",
+      "name": "Face pull",
+      "section": "superset",
+      "big": false,
+      "hinge": false,
+      "unit": "lb",
+      "per_side": false,
+      "target": {
+        "reps": [
+          15,
+          15
+        ]
+      },
+      "weight_label": "40 lb",
+      "up": false,
+      "up_from": null,
+      "goal_reps": null,
+      "last": [
+        {
+          "weight": 40.0,
+          "reps": 15
+        },
+        {
+          "weight": 40.0,
+          "reps": 15
+        }
+      ],
+      "sets": [
+        {
+          "kind": "work",
+          "weight": 40.0,
+          "reps": 15,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 40.0,
+          "reps": 15,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 40.0,
+          "reps": 15,
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "hammer-curl",
+      "name": "Hammer curl",
+      "section": "superset",
+      "big": false,
+      "hinge": false,
+      "unit": "lb_each",
+      "per_side": false,
+      "target": {
+        "reps": [
+          10,
+          12
+        ]
+      },
+      "weight_label": "15s",
+      "up": false,
+      "up_from": null,
+      "goal_reps": null,
+      "last": [
+        {
+          "weight": 15.0,
+          "reps": 12
+        },
+        {
+          "weight": 15.0,
+          "reps": 12
+        }
+      ],
+      "sets": [
+        {
+          "kind": "work",
+          "weight": 15.0,
+          "reps": 12,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 15.0,
+          "reps": 12,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 15.0,
+          "reps": 12,
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "farmer-carry",
+      "name": "Farmer carry",
+      "section": "finisher",
+      "big": false,
+      "hinge": false,
+      "unit": "lb_each",
+      "per_side": false,
+      "target": {
+        "distance_yd": 40
+      },
+      "weight_label": "50s",
+      "up": false,
+      "up_from": null,
+      "goal_reps": null,
+      "last": [
+        {
+          "weight": 50.0,
+          "distance_yd": 40
+        },
+        {
+          "weight": 50.0,
+          "distance_yd": 40
+        },
+        {
+          "weight": 50.0,
+          "distance_yd": 40
+        },
+        {
+          "weight": 50.0,
+          "distance_yd": 40
+        }
+      ],
+      "sets": [
+        {
+          "kind": "work",
+          "weight": 50.0,
+          "distance_yd": 40,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 50.0,
+          "distance_yd": 40,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 50.0,
+          "distance_yd": 40,
+          "done": false
+        },
+        {
+          "kind": "work",
+          "weight": 50.0,
+          "distance_yd": 40,
+          "done": false
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,382 @@
+{
+  "phase": "build",
+  "phase_label": "Build \u00b7 6 weeks to January",
+  "starts": null,
+  "next": {
+    "day": "push",
+    "label": "Push",
+    "preview": [
+      {
+        "name": "Incline bench",
+        "weight_label": "150 lb",
+        "up": true
+      },
+      {
+        "name": "Strict press",
+        "weight_label": "75 lb",
+        "up": false
+      },
+      {
+        "name": "DB bench",
+        "weight_label": "42.5s",
+        "up": true
+      }
+    ]
+  },
+  "week": {
+    "days": [
+      "2026-11-30",
+      "2026-12-01",
+      "2026-12-02",
+      "2026-12-03",
+      "2026-12-04",
+      "2026-12-05",
+      "2026-12-06"
+    ],
+    "lifted": [
+      "off",
+      "off",
+      "today",
+      "ahead",
+      "ahead",
+      "ahead",
+      "ahead"
+    ],
+    "ran": [
+      "off",
+      "done",
+      "today",
+      "ahead",
+      "ahead",
+      "ahead",
+      "ahead"
+    ]
+  },
+  "sleep": {
+    "hours": 5.2,
+    "quality": 2,
+    "bed": "2026-12-01T23:10",
+    "wake": "2026-12-02T06:30"
+  },
+  "lifts": [
+    {
+      "id": "incline-bench",
+      "name": "Incline bench",
+      "day": "push",
+      "weight_label": "150 lb",
+      "up": true,
+      "up_from": 145.0,
+      "dots": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "goal_reps": null
+    },
+    {
+      "id": "strict-press",
+      "name": "Strict press",
+      "day": "push",
+      "weight_label": "75 lb",
+      "up": false,
+      "up_from": null,
+      "dots": [
+        true,
+        false,
+        false
+      ],
+      "goal_reps": null
+    },
+    {
+      "id": "db-bench",
+      "name": "DB bench",
+      "day": "push",
+      "weight_label": "42.5s",
+      "up": true,
+      "up_from": 40.0,
+      "dots": [
+        true,
+        true,
+        true
+      ],
+      "goal_reps": null
+    },
+    {
+      "id": "bench-dips",
+      "name": "Bench dips",
+      "day": "push",
+      "weight_label": "BW",
+      "up": false,
+      "up_from": null,
+      "dots": [
+        true,
+        true,
+        true
+      ],
+      "goal_reps": null
+    },
+    {
+      "id": "lateral-raise",
+      "name": "Lateral raise",
+      "day": "push",
+      "weight_label": "15s",
+      "up": false,
+      "up_from": null,
+      "dots": [
+        true,
+        true,
+        true
+      ],
+      "goal_reps": null
+    },
+    {
+      "id": "chest-fly",
+      "name": "Machine chest fly",
+      "day": "push",
+      "weight_label": "120 lb",
+      "up": false,
+      "up_from": null,
+      "dots": [
+        false,
+        false
+      ],
+      "goal_reps": null
+    },
+    {
+      "id": "suitcase-carry",
+      "name": "Suitcase carry",
+      "day": "push",
+      "weight_label": "50 lb",
+      "up": false,
+      "up_from": null,
+      "dots": [
+        true,
+        true,
+        true
+      ],
+      "goal_reps": null
+    },
+    {
+      "id": "goblet-squat",
+      "name": "Goblet squat",
+      "day": "legs",
+      "weight_label": "53 lb",
+      "up": false,
+      "up_from": null,
+      "dots": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "goal_reps": null
+    },
+    {
+      "id": "db-rdl",
+      "name": "DB Romanian deadlift",
+      "day": "legs",
+      "weight_label": "37.5s",
+      "up": true,
+      "up_from": 35.0,
+      "dots": [
+        true,
+        true,
+        true
+      ],
+      "goal_reps": null
+    },
+    {
+      "id": "split-squat",
+      "name": "Reverse lunge",
+      "day": "legs",
+      "weight_label": "37.5s",
+      "up": true,
+      "up_from": 35.0,
+      "dots": [
+        true,
+        true,
+        true
+      ],
+      "goal_reps": null
+    },
+    {
+      "id": "sl-glute-bridge",
+      "name": "Single-leg glute bridge",
+      "day": "legs",
+      "weight_label": "BW",
+      "up": false,
+      "up_from": null,
+      "dots": [
+        true,
+        true,
+        true
+      ],
+      "goal_reps": null
+    },
+    {
+      "id": "pallof-press",
+      "name": "Pallof press",
+      "day": "legs",
+      "weight_label": "Light cable",
+      "up": false,
+      "up_from": null,
+      "dots": [
+        true,
+        true
+      ],
+      "goal_reps": null
+    },
+    {
+      "id": "wall-sit",
+      "name": "Wall sit",
+      "day": "legs",
+      "weight_label": "BW",
+      "up": false,
+      "up_from": null,
+      "dots": [
+        true,
+        true,
+        true
+      ],
+      "goal_reps": null
+    },
+    {
+      "id": "pull-ups",
+      "name": "Pull-ups",
+      "day": "pull",
+      "weight_label": "BW",
+      "up": false,
+      "up_from": null,
+      "dots": [
+        false,
+        false,
+        false
+      ],
+      "goal_reps": [
+        8,
+        7,
+        6,
+        6
+      ]
+    },
+    {
+      "id": "lat-pulldown",
+      "name": "Lat pulldown",
+      "day": "pull",
+      "weight_label": "\u2014",
+      "up": false,
+      "up_from": null,
+      "dots": [
+        false
+      ],
+      "goal_reps": null
+    },
+    {
+      "id": "db-row",
+      "name": "Chest-supported incline DB row",
+      "day": "pull",
+      "weight_label": "35s",
+      "up": false,
+      "up_from": null,
+      "dots": [
+        true,
+        true
+      ],
+      "goal_reps": null
+    },
+    {
+      "id": "face-pull",
+      "name": "Face pull",
+      "day": "pull",
+      "weight_label": "40 lb",
+      "up": false,
+      "up_from": null,
+      "dots": [
+        true,
+        true
+      ],
+      "goal_reps": null
+    },
+    {
+      "id": "hammer-curl",
+      "name": "Hammer curl",
+      "day": "pull",
+      "weight_label": "15s",
+      "up": false,
+      "up_from": null,
+      "dots": [
+        true,
+        true
+      ],
+      "goal_reps": null
+    },
+    {
+      "id": "farmer-carry",
+      "name": "Farmer carry",
+      "day": "pull",
+      "weight_label": "50s",
+      "up": false,
+      "up_from": null,
+      "dots": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "goal_reps": null
+    }
+  ],
+  "sessions": [
+    {
+      "id": "2026-11-27-pull",
+      "day": "pull",
+      "label": "Pull",
+      "date": "2026-11-27",
+      "minutes": 52,
+      "trimmed": true,
+      "highlight": null,
+      "note": "Left shoulder blade"
+    },
+    {
+      "id": "2026-11-25-legs",
+      "day": "legs",
+      "label": "Legs",
+      "date": "2026-11-25",
+      "minutes": 52,
+      "trimmed": false,
+      "highlight": null,
+      "note": null
+    },
+    {
+      "id": "2026-11-23-push",
+      "day": "push",
+      "label": "Push",
+      "date": "2026-11-23",
+      "minutes": 52,
+      "trimmed": false,
+      "highlight": null,
+      "note": "Felt strong"
+    }
+  ],
+  "proposals": [
+    {
+      "id": "2026-11-29-reset-strict-press",
+      "created": "2026-11-29T09:00:00",
+      "kind": "reset",
+      "lift": "strict-press",
+      "change": {
+        "weight": 70.0
+      },
+      "title": "Strict press: 70 lb for 3 \u00d7 8",
+      "why": [
+        "Stuck at 75 \u00d7 8/7/6",
+        "Dropping 10% and rebuilding usually breaks a stall in 2\u20133 weeks"
+      ],
+      "rule": "Stall rule: no gain in 3 sessions \u2192 reset 10% and rebuild.",
+      "status": "pending",
+      "decided_at": null
+    }
+  ],
+  "gaps": []
+}

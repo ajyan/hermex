@@ -1,0 +1,26 @@
+{
+  "id": "incline-bench",
+  "name": "Incline bench",
+  "unit": "lb",
+  "weight_label": "150 lb",
+  "up": true,
+  "series": [
+    {
+      "date": "2026-11-23",
+      "weight": 145.0
+    }
+  ],
+  "sessions": [
+    {
+      "date": "2026-11-23",
+      "weight_label": "145 lb",
+      "reps": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "note": null
+    }
+  ]
+}

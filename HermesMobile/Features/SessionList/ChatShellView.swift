@@ -664,6 +664,17 @@ struct ChatShellView: View {
             GoalsFinishedListView(server: server, onAPIError: authManager.handleAPIError)
         case .money:
             MoneyView(server: server)
+        case .body:
+            BodyHomeView(server: server, onAPIError: authManager.handleAPIError, onOpen: { navigation.push($0) })
+                .adaptiveSecondaryNavigationTitle()
+        case .bodyLift(let id):
+            LiftProgressView(id: id, server: server, onAPIError: authManager.handleAPIError)
+                .id(id)
+        case .bodyPlan:
+            PlanEditView(server: server, onAPIError: authManager.handleAPIError)
+        case .bodyWorkout(let day):
+            WorkoutView(day: day, server: server, onAPIError: authManager.handleAPIError)
+                .id(day ?? "next")
         case .feedback:
             FeedbackInboxView(client: feedbackAvailability.client)
         case .brainRoute(let route):
