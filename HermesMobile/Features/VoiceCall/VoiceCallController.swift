@@ -92,8 +92,6 @@ final class VoiceCallController {
     private(set) var currentTool: String?
     /// Milliseconds each sent turn waited for its first reply text, in call order.
     private(set) var turnLatenciesMS: [Int] = []
-    /// Milliseconds from the end of each spoken reply to the user starting to answer.
-    private(set) var answerWaitsMS: [Int] = []
     private(set) var isMuted = false
     private(set) var startError: VoiceCallStartError?
     /// True once the system call is gone: the call screen can close.
@@ -147,8 +145,6 @@ final class VoiceCallController {
     @ObservationIgnored private var transcriptChangedAt: TimeInterval?
     /// When `listening` began, for the no-speech prompt.
     @ObservationIgnored private var listeningSince: TimeInterval?
-    /// When the last spoken reply finished, until the user starts answering it.
-    @ObservationIgnored private var answerWaitSince: TimeInterval?
     /// False on a Mandarin call: the English status lines stay silent.
     @ObservationIgnored private let speaksStatusLines: Bool
     /// "I didn't catch that" prompts since the user last spoke; a forgotten call hangs up after a few.
@@ -560,10 +556,6 @@ final class VoiceCallController {
         switch turnDetector.observe(isSpeech: isSpeech, at: time) {
         case .speechStarted:
             turnStartedAt = time
-            if let answerWaitSince {
-                answerWaitsMS.append(Int(((time - answerWaitSince) * 1000).rounded()))
-                self.answerWaitSince = nil
-            }
             log("turn started")
             discardFinals = false
             awaitingFinalSince = nil
@@ -824,7 +816,6 @@ final class VoiceCallController {
             beginApprovalListening(seed: nil)
         case .speaking where runFinished:
             finishReply()
-            answerWaitSince = now()
         default:
             break
         }
