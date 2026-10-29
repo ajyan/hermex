@@ -814,6 +814,11 @@ final class PrepMockTests: APIClientTestCase {
         navigation.path.removeAll()
         XCTAssertEqual(navigation.heldMockProfile, "mandarin", "back on the chat, it takes the profile again")
 
+        navigation.isDrawerOpen = true
+        XCTAssertNil(navigation.heldMockProfile, "the chat list shows the user's own chats")
+        navigation.isDrawerOpen = false
+        XCTAssertEqual(navigation.heldMockProfile, "mandarin")
+
         navigation.select(PendingNewChatRoute())
         XCTAssertNil(navigation.heldMockProfile)
     }
