@@ -3,7 +3,7 @@ import Speech
 import SwiftUI
 
 /// The Mandarin practice card in four steps, chosen from its step bar: Fix yesterday's slips, Recall
-/// the phrasebook's due phrases, Talk (the question, today's pattern, the phrases to work in, and
+/// the phrasebook's due phrases, Talk (the question, a transition, a feeling and an everyday cue, and
 /// the answer), then the takeaways that come back seconds after answering. `answer` is the deck's
 /// own answer button (or his words once written).
 struct DeckMandarinCard<Answer: View>: View {
@@ -99,6 +99,7 @@ struct DeckMandarinCard<Answer: View>: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             takeaway("Natural", yesterday.natural, pinyin: yesterday.naturalPinyin, note: nil)
+            if let flow = yesterday.flow { flowTakeaway(flow) }
             if !practice.isDone(.fix) {
                 actions(primary: ("Next", "arrow.right", { change { practice.nextFix() } }))
             }
@@ -108,6 +109,7 @@ struct DeckMandarinCard<Answer: View>: View {
                 takeaway("Fix", fix.natural, pinyin: fix.naturalPinyin, note: [fix.said + " → " + fix.natural, fix.why]
                     .compactMap { $0 }.joined(separator: "\n"))
             }
+            if let flow = yesterday?.flow { flowTakeaway(flow) }
         }
     }
 
@@ -165,7 +167,8 @@ struct DeckMandarinCard<Answer: View>: View {
         switch phrase.source {
         case "gap": "Your word"
         case "fix": "Your fix"
-        default: "Phrase"
+        case "flow": "Transition"
+        default: phrase.kindLabel ?? "Phrase"
         }
     }
 
@@ -182,6 +185,12 @@ struct DeckMandarinCard<Answer: View>: View {
         if let asked {
             let line = card.mandarinQuestion(asked: asked)
             takeaway("Question", line.hanzi, pinyin: line.pinyin, note: line.english)
+        }
+        if card.mandarinTellsAStory {
+            Text(verbatim: "Tell it in three beats: what happened → how you felt → what's next")
+                .font(AppFont.footnote())
+                .foregroundStyle(Color.hxTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         if let pattern = card.pattern {
             takeaway("Today's pattern", pattern.form ?? pattern.name, pinyin: nil,
@@ -248,9 +257,18 @@ struct DeckMandarinCard<Answer: View>: View {
             takeaway("Fix", fix.natural, pinyin: fix.naturalPinyin,
                      note: [fix.said + " → " + fix.natural, fix.why].compactMap { $0 }.joined(separator: "\n"))
         }
-        if let pattern = feedback.pattern {
+        if let flow = feedback.flow {
+            flowTakeaway(flow)
+        } else if let pattern = feedback.pattern {
             takeaway("Pattern", pattern.pattern, pinyin: nil, note: pattern.en, play: false)
         }
+    }
+
+    /// The flow note: his two sentences joined, and the transition that joins them.
+    private func flowTakeaway(_ flow: DeckMandarinFeedback.Flow) -> some View {
+        let word = flow.transition + (flow.en.map { " (\($0))" } ?? "")
+        return takeaway("Flow", flow.joined, pinyin: flow.joinedPinyin,
+                        note: [word, flow.why].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · "))
     }
 
     private func retryLine(_ message: String) -> some View {
@@ -377,8 +395,9 @@ struct MandarinTakeaway: View {
     }
 }
 
-/// The day's phrases as English cues: tap one to peek at the Mandarin. A phrase he used in his
-/// answer gets a check. Shown on the card and above the answer while he dictates.
+/// The day's phrases as English cues, each labeled by kind: tap one to peek at the Mandarin, an example
+/// from his life and a one-line note. A phrase he used in his answer gets a check. Shown on the card
+/// and above the answer while he dictates.
 struct MandarinCueList: View {
     let phrases: [DeckPhrase]
     let used: Set<String>
@@ -403,14 +422,30 @@ struct MandarinCueList: View {
                         .foregroundStyle(isUsed ? palette.ink : Color.hxTextSecondary)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
+                        if let kind = phrase.kindLabel {
+                            Text(verbatim: kind).font(AppFont.caption(weight: .semibold)).foregroundStyle(palette.ink)
+                        }
                         if let en = phrase.en { Text(verbatim: en).font(AppFont.subheadline()) }
                         if isPeeking {
                             Text(verbatim: phrase.hanzi).font(AppFont.body(weight: .semibold))
                             if let pinyin = phrase.pinyin {
                                 Text(verbatim: pinyin).font(AppFont.footnote()).foregroundStyle(palette.ink)
                             }
+                            if let example = phrase.example {
+                                Text(verbatim: example).font(AppFont.subheadline()).padding(.top, 4)
+                                if let pinyin = phrase.examplePinyin {
+                                    Text(verbatim: pinyin).font(AppFont.footnote()).foregroundStyle(palette.ink)
+                                }
+                                if let en = phrase.exampleEn {
+                                    Text(verbatim: en).font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
+                                }
+                            }
+                            if let note = phrase.note {
+                                Text(verbatim: note).font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
+                            }
                         }
                     }
+                    .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
                     if isPeeking, let speaker {
                         Button { speaker.toggle(phrase.hanzi) } label: {
@@ -431,7 +466,8 @@ struct MandarinCueList: View {
                     }
                 }
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(Text(verbatim: [phrase.en, isPeeking ? phrase.hanzi : nil].compactMap { $0 }.joined(separator: ". ")))
+                .accessibilityLabel(Text(verbatim: [phrase.kindLabel, phrase.en, isPeeking ? phrase.hanzi : nil,
+                                                    isPeeking ? phrase.example : nil].compactMap { $0 }.joined(separator: ". ")))
                 .accessibilityValue(Text(verbatim: isUsed ? "Used" : ""))
                 .accessibilityHint(Text(verbatim: isPeeking ? "" : "Shows the Mandarin"))
                 .accessibilityAddTraits(.isButton)
