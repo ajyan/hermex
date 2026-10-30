@@ -4,29 +4,32 @@ import SwiftUI
 // mic), its graded result, and up to two follow-up probes. Like every run card they are `.knowledge`
 // glow cards; the mic is a control, so it alone wears Nous blue. Only the sample telling is serif.
 
-/// Tap to talk: on-device dictation into the answer, written through `update` as it is heard.
-/// Capture stops when the answer is sent, the card goes away, or the app leaves the foreground.
+/// Tap to talk: on-device dictation into the answer, punctuated as it is heard and tidied on Stop,
+/// with "Original" to put back the raw words. Capture stops when the answer is sent, the card goes
+/// away, or the app leaves the foreground.
 struct PrepStoryMicButton: View {
-    let draft: String
+    @Binding var text: String
     let isSubmitting: Bool
     /// The first tap that starts listening, before any words arrive.
     var onStart: () -> Void = {}
-    let update: (String) -> Void
-    @State private var voiceInput = ComposerVoiceInputController()
-    @Environment(\.scenePhase) private var scenePhase
+    @State private var dictation = DictationModel()
 
-    private var isListening: Bool { voiceInput.isListening }
+    private var isListening: Bool { dictation.voiceInput.isListening }
 
     var body: some View {
         VStack(alignment: .leading, spacing: BrainStyle.xs) {
             Button {
-                if voiceInput.state == .idle { onStart() }
-                voiceInput.scheduleToggle(currentDraft: draft, updateDraft: update)
+                if dictation.voiceInput.state == .idle { onStart() }
+                dictation.toggle($text)
             } label: {
                 Label {
-                    Text(verbatim: isListening ? "Stop" : "Tap to talk")
+                    Text(verbatim: dictation.isTidying ? "Tidying…" : isListening ? "Stop" : "Tap to talk")
                 } icon: {
-                    Image(systemName: isListening ? "stop.circle.fill" : "mic.fill")
+                    if dictation.isTidying {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: isListening ? "stop.circle.fill" : "mic.fill")
+                    }
                 }
                 .font(AppFont.body(weight: .semibold))
                 .foregroundStyle(Color.accentColor)
@@ -35,22 +38,21 @@ struct PrepStoryMicButton: View {
                 .overlay(Capsule().strokeBorder(Color.hxSeparator, lineWidth: 0.5))
             }
             .buttonStyle(.plain)
-            .disabled(isSubmitting || voiceInput.isRequestingPermission)
-            .accessibilityLabel(Text(verbatim: isListening ? "Stop dictation" : "Tap to talk"))
-            if let message = voiceInput.errorMessage {
+            .disabled(isSubmitting || dictation.isTidying || dictation.voiceInput.isRequestingPermission)
+            .accessibilityLabel(Text(verbatim: dictation.isTidying ? "Tidying your words"
+                : isListening ? "Stop dictation" : "Tap to talk"))
+            .accessibilityHint(Text(verbatim: isListening ? "" : DictationCopy.micHint))
+            if dictation.canUndoTidy {
+                DictationOriginalButton(dictation: dictation)
+            }
+            if let message = dictation.voiceInput.errorMessage {
                 Text(verbatim: message)
                     .font(BrainStyle.meta)
                     .foregroundStyle(Color.hxTextSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .onChange(of: isSubmitting) { _, submitting in
-            if submitting { voiceInput.stopBeforeSubmittingDraft() }
-        }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active { voiceInput.resume() } else { voiceInput.suspend() }
-        }
-        .onDisappear { voiceInput.stopBeforeSubmittingDraft() }
+        .dictationLifecycle(dictation, text: text, isSubmitting: isSubmitting)
     }
 }
 
@@ -164,7 +166,7 @@ struct PrepStoryTellCard: View {
                     .transition(.opacity)
             }
             PrepStoryAnswerField(placeholder: "Tell it out loud, or type", text: $draft, isSubmitting: isSubmitting)
-            PrepStoryMicButton(draft: draft, isSubmitting: isSubmitting, onStart: startClock) { draft = $0 }
+            PrepStoryMicButton(text: $draft, isSubmitting: isSubmitting, onStart: startClock)
             if !script.isEmpty {
                 Button {
                     showsScript.toggle()
@@ -205,7 +207,7 @@ struct PrepProbeCard: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
             PrepStoryAnswerField(placeholder: "Answer out loud, or type", text: $draft, isSubmitting: isSubmitting)
-            PrepStoryMicButton(draft: draft, isSubmitting: isSubmitting) { draft = $0 }
+            PrepStoryMicButton(text: $draft, isSubmitting: isSubmitting)
         }
     }
 }

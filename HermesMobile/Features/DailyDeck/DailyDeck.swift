@@ -311,6 +311,9 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     /// filed to the vault's Mandarin log, which writes the feedback shown on the next one.
     var isMandarin: Bool { type == .prompt && itemKind == "mandarin" }
 
+    /// A Mandarin card with cues asks for a short story: what happened, how he felt, what's next.
+    var mandarinTellsAStory: Bool { isMandarin && phrases.contains { $0.kind != nil } }
+
     /// The Looking back card: a question about a story, a friend, a time of his life, or something to let go.
     /// Its answer is filed to the vault's past/ folder, not the journal.
     var isPast: Bool { type == .prompt && itemKind == "past" }
@@ -779,33 +782,66 @@ struct DeckChangeRow: Decodable, Equatable, Identifiable {
 
 /// Decodes one item, or nothing when it is malformed, so a bad item never costs the list.
 /// A Mandarin phrase: characters, pinyin over them, English on tap. `source` says where a recall
-/// phrase came from: "lesson", "fix" (a correction to his answer), or "gap" (a word he said in English).
+/// phrase came from: "chunk" (a cue), "lesson", "fix" (a correction to his answer), "gap" (a word he
+/// said in English), or "flow" (a transition feedback suggested). A cue has a `kind` (transition,
+/// feeling, everyday), a one-line `note`, and the model's example sentence from his life.
 struct DeckPhrase: Codable, Equatable, Hashable {
     let hanzi: String
     let pinyin: String?
     let en: String?
     let source: String?
+    let kind: String?
+    let note: String?
+    let example: String?
+    let examplePinyin: String?
+    let exampleEn: String?
 
-    init(hanzi: String, pinyin: String? = nil, en: String? = nil, source: String? = nil) {
+    init(hanzi: String, pinyin: String? = nil, en: String? = nil, source: String? = nil, kind: String? = nil) {
         self.hanzi = hanzi
         self.pinyin = pinyin
         self.en = en
         self.source = source
+        self.kind = kind
+        note = nil
+        example = nil
+        examplePinyin = nil
+        exampleEn = nil
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        func text(_ key: CodingKeys) -> String? {
+            (try? c.decodeIfPresent(String.self, forKey: key)).flatMap { $0.isEmpty ? nil : $0 }
+        }
         hanzi = try c.decode(String.self, forKey: .hanzi)
-        pinyin = try? c.decodeIfPresent(String.self, forKey: .pinyin)
-        en = (try? c.decodeIfPresent(String.self, forKey: .en)).flatMap { $0.isEmpty ? nil : $0 }
-        source = try? c.decodeIfPresent(String.self, forKey: .source)
+        pinyin = text(.pinyin)
+        en = text(.en)
+        source = text(.source)
+        kind = text(.kind)
+        note = text(.note)
+        example = text(.example)
+        examplePinyin = text(.examplePinyin)
+        exampleEn = text(.exampleEn)
     }
 
-    private enum CodingKeys: String, CodingKey { case hanzi, pinyin, en, source }
+    /// "Transition", "Feeling" or "Everyday" for a cue; nil for an older card's phrase.
+    var kindLabel: String? {
+        switch kind {
+        case "transition": "Transition"
+        case "feeling": "Feeling"
+        case "everyday": "Everyday"
+        default: nil
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case hanzi, pinyin, en, source, kind, note, example, examplePinyin, exampleEn
+    }
 }
 
 /// The local model's feedback on a Mandarin answer: what he said and a more natural way to say it,
-/// up to two fixes, the Mandarin for English he used, one grammar pattern, and all of it as `notes`
+/// up to two fixes, the Mandarin for English he used, a flow note (older feedback: one grammar
+/// pattern), and all of it as `notes`
 /// lines. A block without `natural` doesn't decode, so nothing half-shows.
 struct DeckMandarinFeedback: Codable, Equatable {
     /// His words → what a native speaker would say: the meaning in English and why.
@@ -830,6 +866,15 @@ struct DeckMandarinFeedback: Codable, Equatable {
         let en: String?
     }
 
+    /// A transition that would have joined two of his sentences, and those sentences joined by it.
+    struct Flow: Codable, Equatable {
+        let transition: String
+        let en: String?
+        let joined: String
+        let joinedPinyin: String?
+        let why: String?
+    }
+
     let said: String?
     let natural: String
     let naturalPinyin: String?
@@ -837,6 +882,7 @@ struct DeckMandarinFeedback: Codable, Equatable {
     let fixes: [Fix]
     let gaps: [Gap]
     let pattern: Pattern?
+    let flow: Flow?
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -847,9 +893,10 @@ struct DeckMandarinFeedback: Codable, Equatable {
         fixes = ((try? c.decodeIfPresent([Lossy<Fix>].self, forKey: .fixes)) ?? []).compactMap(\.value)
         gaps = ((try? c.decodeIfPresent([Lossy<Gap>].self, forKey: .gaps)) ?? []).compactMap(\.value)
         pattern = try? c.decodeIfPresent(Pattern.self, forKey: .pattern)
+        flow = try? c.decodeIfPresent(Flow.self, forKey: .flow)
     }
 
-    private enum CodingKeys: String, CodingKey { case said, natural, naturalPinyin, notes, fixes, gaps, pattern }
+    private enum CodingKeys: String, CodingKey { case said, natural, naturalPinyin, notes, fixes, gaps, pattern, flow }
 }
 
 /// The day's sentence pattern (the vault's mandarin/patterns.json): its name, an example, what it does.

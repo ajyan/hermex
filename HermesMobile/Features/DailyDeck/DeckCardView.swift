@@ -852,12 +852,16 @@ struct DeckCardView: View {
         .accessibilityHint(Text(verbatim: "Shows another question for this week"))
         let note = viewModel.answer(for: card)?.text ?? ""
         if hasAskedNewQuestion || viewModel.answer(for: card)?.question != nil || !note.isEmpty {
-            TextField(text: Binding(get: { note }, set: { viewModel.setNote($0, for: card) })) {
+            // Reads the model, not `note`: dictation holds the binding across renders.
+            let noteBinding = Binding(get: { viewModel.answer(for: card)?.text ?? "" },
+                                      set: { viewModel.setNote($0, for: card) })
+            TextField(text: noteBinding) {
                 Text(verbatim: "Why? (optional)")
             }
             .font(AppFont.body())
             .submitLabel(.done)
-            .padding(.horizontal, 16)
+            .padding(.leading, 16)
+            .withDictation(noteBinding)
             .frame(minHeight: 46)
             .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
             .padding(.top, 10)
@@ -1301,6 +1305,8 @@ private struct ReflectionSheet: View {
                         }
                         .accessibilityLabel(Text(verbatim: voiceInput.state == .idle ? "Speak in Mandarin" : "Stop dictation"))
                     }
+                } else if !card.isMandarin {
+                    ToolbarItem(placement: .topBarLeading) { DictationMicButton(text: $text) }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
@@ -1406,13 +1412,14 @@ private struct FollowUpRow: View {
                     .foregroundStyle(.secondary)
                     if preview.editable {
                         // The words Text sends: tap to change them before Messages opens.
-                        TextField(text: Binding(get: { editedText ?? preview.text }, set: { editedText = $0 }),
-                                  axis: .vertical) {
+                        let message = Binding(get: { editedText ?? preview.text }, set: { editedText = $0 })
+                        TextField(text: message, axis: .vertical) {
                             Text(verbatim: "Your message")
                         }
                         .font(AppFont.body())
                         .focused($isEditingText)
                         .accessibilityLabel(Text(verbatim: "Message to send"))
+                        .withDictation(message)
                     } else {
                         Text(verbatim: preview.text).font(AppFont.body())
                     }
@@ -1538,6 +1545,7 @@ private struct AnswerBox: View {
         .font(AppFont.body())
         .padding(12)
         .frame(maxWidth: .infinity, minHeight: minHeight, maxHeight: .infinity, alignment: .topLeading)
+        .withDictation(textBinding)
         .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .onTapGesture { isFocused = true }
