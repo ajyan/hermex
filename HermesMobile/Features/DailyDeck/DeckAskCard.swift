@@ -93,6 +93,13 @@ private struct DailyAskForm: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// Every action closes the keyboard first, so a field typed in never strands it over the card.
+    @discardableResult
+    private func act(_ action: DailyAskAction) async -> Bool {
+        HXKeyboard.dismiss()
+        return await model.act(action)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
@@ -136,7 +143,7 @@ private struct DailyAskForm: View {
         .sheet(item: $passing) { role in
             // Closes only once the server saved the Pass, so a failure keeps the typed reason.
             DailyAskPassSheet(role: role, model: model) { reason, rule in
-                if await model.act(.pass(role: role.id, reason: reason, rule: rule)) { passing = nil }
+                if await act(.pass(role: role.id, reason: reason, rule: rule)) { passing = nil }
             }
         }
     }
@@ -204,14 +211,14 @@ private struct DailyAskForm: View {
             }
             ChoiceButton(title: "Sent", isSelected: false) {
                 let name = names[role.id]?.trimmingCharacters(in: .whitespacesAndNewlines)
-                Task { await model.act(.sent(role: role.id, name: name?.isEmpty == false ? name : nil)) }
+                Task { await act(.sent(role: role.id, name: name?.isEmpty == false ? name : nil)) }
             }
             ChoiceButton(title: "Apply instead", isSelected: false) { flip(role) }
         } else {
             if let link = role.url.flatMap(URL.init(string:)) {
                 ChoiceButton(title: "Open posting", isSelected: false) { openURL(link) }
             }
-            ChoiceButton(title: "Applied", isSelected: false) { Task { await model.act(.applied(role: role.id)) } }
+            ChoiceButton(title: "Applied", isSelected: false) { Task { await act(.applied(role: role.id)) } }
             ChoiceButton(title: "Reach out instead", isSelected: false) { flip(role) }
         }
         ChoiceButton(title: "Pass", isSelected: false) { passing = role }
@@ -271,7 +278,7 @@ private struct DailyAskForm: View {
                 field("Why are you skipping?", text: $skipReason)
                 ChoiceButton(title: "Skip", isSelected: !reason.isEmpty) {
                     guard !reason.isEmpty else { return }
-                    Task { await model.act(.skip(reason: reason)) }
+                    Task { await act(.skip(reason: reason)) }
                 }
                 .disabled(reason.isEmpty)
             }
@@ -285,7 +292,7 @@ private struct DailyAskForm: View {
                 ChoiceButton(title: "Log", isSelected: !company.isEmpty) {
                     guard !company.isEmpty else { return }
                     Task {
-                        if await model.act(.elsewhere(company: company, via: via.isEmpty ? nil : via)) {
+                        if await act(.elsewhere(company: company, via: via.isEmpty ? nil : via)) {
                             elsewhereCompany = ""
                             elsewhereVia = ""
                             panel = nil
@@ -305,13 +312,13 @@ private struct DailyAskForm: View {
                 HStack(spacing: 8) {
                     ChoiceButton(title: "Save", isSelected: !note.isEmpty) {
                         guard !note.isEmpty else { return }
-                        Task { if await model.act(.steer(note: note)) { panel = nil } }
+                        Task { if await act(.steer(note: note)) { panel = nil } }
                     }
                     .disabled(note.isEmpty || note == ask.steer)
                     if ask.steer != nil {
                         ChoiceButton(title: "Clear", isSelected: false) {
                             Task {
-                                if await model.act(.steer(note: "")) {
+                                if await act(.steer(note: "")) {
                                     steerNote = ""
                                     panel = nil
                                 }

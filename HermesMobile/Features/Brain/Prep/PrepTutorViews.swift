@@ -9,6 +9,8 @@ import SwiftUI
 struct PrepTutorDialogueView: View {
     let prompt: String
     let kicker: String
+    /// "Follow-up 1 of 3" over the conversation, once the tutor has asked one.
+    let followup: String?
     let firstAnswer: String
     let state: PrepDialogueState?
     /// The tutor's turn so far while it streams ("" before its first words), else nil.
@@ -30,6 +32,11 @@ struct PrepTutorDialogueView: View {
                 .accessibilityAddTraits(.isHeader)
         }
         VStack(alignment: .leading, spacing: BrainStyle.m) {
+            if let followup {
+                Text(verbatim: followup)
+                    .font(BrainStyle.meta)
+                    .foregroundStyle(HermexPaper.knowledge.glow)
+            }
             if !firstAnswer.isEmpty {
                 PrepBubble(text: firstAnswer, isTutor: false)
             }

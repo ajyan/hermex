@@ -657,7 +657,7 @@ struct PrepApproachGradeView: View {
         if !grade.strongAnswer.isEmpty {
             PrepNoteCard {
                 HXSectionHeader(title: "What a strong answer says")
-                Text(verbatim: grade.strongAnswer)
+                Text(inlineMarkdown(grade.strongAnswer))
                     .brainText(.rowTitle)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -728,7 +728,7 @@ struct PrepJudgmentGradeView: View {
         if !grade.strongAnswer.isEmpty {
             PrepNoteCard {
                 HXSectionHeader(title: "What a strong answer says")
-                Text(verbatim: grade.strongAnswer)
+                Text(inlineMarkdown(grade.strongAnswer))
                     .brainText(.rowTitle)
                     .fixedSize(horizontal: false, vertical: true)
             }

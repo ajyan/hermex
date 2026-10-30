@@ -108,6 +108,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let lines: [String]
     let question: String?
     let context: String?
+    /// Who speaks the `context` when it isn't the card's own voice: the day's advisor on the letter.
+    let contextFrom: String?
     let voice: String?
     let why: String?
     let draft: DeckDraft?
@@ -350,7 +352,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, type, title, body, source, lines, question, context, voice, why, draft, actions, fallback
+        case id, type, title, body, source, lines, question, context, contextFrom, voice, why, draft, actions, fallback
         case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
         case phrases, recall, yesterday, pattern, progress, questionPinyin, questionEn, rows, week
         case chapter, weekNumber, range, noteFromPast, headline, bullets, proposals
@@ -396,6 +398,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         lines = (try? c.decodeIfPresent([String].self, forKey: .lines)) ?? []
         question = try? c.decodeIfPresent(String.self, forKey: .question)
         context = try? c.decodeIfPresent(String.self, forKey: .context)
+        contextFrom = (try? c.decodeIfPresent(String.self, forKey: .contextFrom)).flatMap { $0.isEmpty ? nil : $0 }
         voice = try? c.decodeIfPresent(String.self, forKey: .voice)
         why = try? c.decodeIfPresent(String.self, forKey: .why)
         draft = try? c.decodeIfPresent(DeckDraft.self, forKey: .draft)
@@ -499,6 +502,8 @@ struct DeckTodayOne: Decodable, Equatable {
     let label: String
     let front: String?
     let quote: String?
+    /// Who said the quote and when ("You, to Brené Brown, Thu"); older decks have none.
+    var at: String?
 }
 
 /// One labelled part of an idea ("The loop", "text in, text out; your code runs the tools.").

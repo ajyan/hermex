@@ -336,28 +336,37 @@ struct DeckCardView: View {
         .padding(.top, 24)
     }
 
-    /// An act card's body: an idea's source, gist, quotes and parts; a check-in's or letter's thread
-    /// (else the check-in's message); a year-ago entry's later words; anything else its attribution and detail.
+    /// An act card's body: an idea's source, gist, quotes and parts; a check-in's or letter's thread, then
+    /// the message that leads into its question (under its speaker when that isn't the card's voice); a
+    /// year-ago entry's later words; anything else its attribution and detail.
     @ViewBuilder
     private func jobBody(_ text: DeckCardText, isYearAgo: Bool) -> some View {
         if card.act == "ideas" {
             DeckIdeaBody(card: card, palette: palette)
-        } else if let thread = card.thread {
-            DeckThreadView(thread: thread, palette: palette).padding(.top, 18)
-        } else if card.type == .prompt {
-            if let context = card.context, context != viewModel.question(for: card) {
-                Text(inlineMarkdown(context))
-                    .font(AppFont.body())
-                    .lineSpacing(3)
-                    .foregroundStyle(Color.hxTextPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 18)
-                    .textSelection(.enabled)
+        } else if card.thread != nil || card.type == .prompt {
+            if let thread = card.thread {
+                DeckThreadView(thread: thread, palette: palette).padding(.top, 18)
+            }
+            if card.type == .prompt, let context = card.context, context != viewModel.question(for: card) {
+                VStack(alignment: .leading, spacing: 6) {
+                    if let from = card.contextFrom {
+                        Text(verbatim: from)
+                            .font(AppFont.footnote(weight: .semibold))
+                            .foregroundStyle(palette.ink.opacity(0.75))
+                    }
+                    Text(inlineMarkdown(context))
+                        .font(AppFont.body())
+                        .lineSpacing(3)
+                        .foregroundStyle(Color.hxTextPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                }
+                .padding(.top, 18)
             }
         } else if isYearAgo {
             if let later = card.body, later != card.title {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(verbatim: "Later that day")
+                    Text(verbatim: "That day")
                         .font(AppFont.footnote(weight: .semibold))
                         .foregroundStyle(palette.ink.opacity(0.75))
                     Text(inlineMarkdown(later))
@@ -1557,12 +1566,6 @@ private struct AnswerBox: View {
             set: { viewModel.setText($0, for: card) }
         )
     }
-}
-
-/// Saved notes carry *emphasis* and **bold**; show it rather than the asterisks.
-func inlineMarkdown(_ text: String) -> AttributedString {
-    (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
-        ?? AttributedString(text)
 }
 
 /// A capsule toggle for follow-up choices.

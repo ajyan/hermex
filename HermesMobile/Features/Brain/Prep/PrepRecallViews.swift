@@ -140,7 +140,7 @@ struct PrepRecallResultView: View {
                 .accessibilityAddTraits(showsWorked ? .isSelected : [])
                 .accessibilityHint(Text(verbatim: showsWorked ? "Hides the worked answer" : "Shows a worked answer"))
                 if showsWorked {
-                    Text(verbatim: result.strongAnswer)
+                    Text(inlineMarkdown(result.strongAnswer))
                         .font(AppFont.body())
                         .foregroundStyle(Color.hxTextPrimary)
                         .fixedSize(horizontal: false, vertical: true)

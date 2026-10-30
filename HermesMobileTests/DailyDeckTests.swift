@@ -690,6 +690,24 @@ final class DailyDeckTests: XCTestCase {
          {"label":"Applications","kind":"pips","target":5,"front":"ai","front_name":"Landing the AI role"}]}]}
     """#
 
+    func testLetterCarriesTheAdvisorsCommentAndTodayOneSaysWhoSaidIt() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"2026-10-31","kind":"morning","cards":[
+          {"id":"open","type":"headline","title":"Sat, Oct 31",
+           "today_one":{"label":"Draft star stories bullets","front":"ai",
+                        "quote":"Done will look like having bullets for the different star stories.","at":"You, to Brené Brown, Fri"}},
+          {"id":"letter","type":"prompt","kind":"letter","act":"writing","question":"Tell her about your dad.",
+           "context":"Yesterday you promised her every single day. Say what that looks like on an ordinary one.",
+           "context_from":"Brené Brown"},
+          {"id":"advisor","type":"prompt","act":"writing","voice":"Brené Brown","context":"A story is vulnerable.","context_from":""}]}
+        """#)
+        let cards = Dictionary(uniqueKeysWithValues: deck.cards.map { ($0.id, $0) })
+        XCTAssertEqual(cards["open"]?.todayOne?.at, "You, to Brené Brown, Fri")
+        XCTAssertEqual(cards["letter"]?.contextFrom, "Brené Brown")
+        XCTAssertNil(cards["letter"]?.thread)
+        XCTAssertNil(cards["advisor"]?.contextFrom, "a blank speaker is no speaker")
+    }
+
     func testJobDeckDecodesItsNewFields() throws {
         let deck = try DailyDeck.decode(Self.jobDeckJSON)
         let cards = Dictionary(uniqueKeysWithValues: deck.cards.map { ($0.id, $0) })

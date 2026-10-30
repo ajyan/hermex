@@ -160,7 +160,7 @@ struct PrepStoryTellCard: View {
                 }
             }
             if showsScript && !script.isEmpty {
-                Text(verbatim: script)
+                Text(inlineMarkdown(script))
                     .brainText(.quote)
                     .fixedSize(horizontal: false, vertical: true)
                     .transition(.opacity)
@@ -259,7 +259,7 @@ struct PrepStoryResultView: View {
         if !result.isUngraded, !sayIt.isEmpty {
             VStack(alignment: .leading, spacing: BrainStyle.s) {
                 BrainSectionHeader(title: "How you'd say it")
-                Text(Self.markdown(sayIt))
+                Text(inlineMarkdown(sayIt))
                     .brainText(.quote)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -268,12 +268,6 @@ struct PrepStoryResultView: View {
                     .hxCard()
             }
         }
-    }
-
-    /// Inline Markdown (bold, italics) with line breaks kept; plain text if it doesn't parse.
-    private static func markdown(_ text: String) -> AttributedString {
-        (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
-            ?? AttributedString(text)
     }
 }
 
