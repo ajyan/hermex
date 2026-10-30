@@ -363,7 +363,7 @@ struct DeckCardView: View {
         } else if isYearAgo {
             if let later = card.body, later != card.title {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(verbatim: "Later that day")
+                    Text(verbatim: "That day")
                         .font(AppFont.footnote(weight: .semibold))
                         .foregroundStyle(palette.ink.opacity(0.75))
                     Text(inlineMarkdown(later))
