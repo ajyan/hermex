@@ -1105,9 +1105,10 @@ enum PrepCopy {
         }
     }
 
-    /// The tutor screen's kicker: "Follow-up 1 of 3", or the question's type before the first one.
-    static func followupLine(_ state: PrepDialogueState?, type: String) -> String {
-        guard let state, state.followups > 0 || state.awaitingReply else { return questionKicker(type) }
+    /// The tutor screen's count over the conversation, "Follow-up 1 of 3"; nil before the first follow-up.
+    /// It never labels the question card, which keeps its type: the question is the course's, not the tutor's.
+    static func followupLine(_ state: PrepDialogueState?) -> String? {
+        guard let state, state.followups > 0 || state.awaitingReply else { return nil }
         return "Follow-up \(min(state.max, state.followups + (state.awaitingReply ? 1 : 0))) of \(state.max)"
     }
 

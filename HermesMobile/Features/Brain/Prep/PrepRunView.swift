@@ -206,7 +206,8 @@ struct PrepRunView: View {
             scaffold(rep, hasAction: true, followsLatest: true) {
                 PrepTutorDialogueView(
                     prompt: rep.item.lesson?.recall?.prompt ?? "",
-                    kicker: PrepCopy.followupLine(result.dialogue, type: rep.item.lesson?.recall?.type ?? ""),
+                    kicker: PrepCopy.questionKicker(rep.item.lesson?.recall?.type ?? ""),
+                    followup: PrepCopy.followupLine(result.dialogue),
                     firstAnswer: viewModel.firstAnswer, state: result.dialogue,
                     streaming: viewModel.tutorStreaming, pendingReply: viewModel.pendingReply,
                     error: viewModel.tutorError) { Task { await viewModel.retryTutor() } }

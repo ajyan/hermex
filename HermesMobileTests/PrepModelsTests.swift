@@ -860,7 +860,8 @@ final class PrepDialogueModelTests: XCTestCase {
         XCTAssertEqual(state.max, 3)
         XCTAssertEqual(state.turns.count, 2, "a turn missing fields decodes empty, never crashes")
         XCTAssertFalse(state.awaitingReply)
-        XCTAssertEqual(PrepCopy.followupLine(state, type: "diagnose"), "Follow-up 1 of 3")
+        XCTAssertEqual(PrepCopy.followupLine(state), "Follow-up 1 of 3")
+        XCTAssertNil(PrepCopy.followupLine(nil), "no count before the tutor's first follow-up")
     }
 
     func testLessonCardsDecodeAndSkipMissingPictureAndWork() throws {
