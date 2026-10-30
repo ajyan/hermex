@@ -43,6 +43,8 @@ struct PrepGate<Content: View>: View {
                 content
             }
         }
+        // Every Prep screen answers in text fields, multi-line ones included.
+        .hxKeyboardDoneButton()
         .task { await model?.load() }
     }
 }

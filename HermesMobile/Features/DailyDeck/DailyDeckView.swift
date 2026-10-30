@@ -104,6 +104,7 @@ struct DailyDeckView: View {
                     .accessibilityLabel(Text(verbatim: "More"))
                 }
             }
+            .hxKeyboardDoneButton()
             .feedbackContext(feedbackContext)
             .task {
                 if let review = DailyBriefLaunch.take() {

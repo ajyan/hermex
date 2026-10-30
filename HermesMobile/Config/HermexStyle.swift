@@ -305,6 +305,24 @@ extension View {
                 }
             }
     }
+
+    /// A Done button above the keyboard for every text field on the screen. Apply it once per
+    /// navigation destination: a multi-line field's Return adds a line, so this is its way out.
+    func hxKeyboardDoneButton() -> some View {
+        toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button { HXKeyboard.dismiss() } label: { Text(verbatim: "Done") }
+            }
+        }
+    }
+}
+
+enum HXKeyboard {
+    /// Closes the keyboard, whichever field holds it.
+    static func dismiss() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
 }
 
 /// A capsule naming one thing in its paper's glow: symbol, label, and an optional trailing

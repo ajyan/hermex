@@ -48,11 +48,8 @@ struct PlanEditView: View {
                             .disabled(!viewModel.dirty || viewModel.isSaving)
                     }
                 }
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button { Self.endEditing() } label: { Text(verbatim: "Done") }
-                }
             }
+            .hxKeyboardDoneButton()
             .task { await viewModel.load() }
             .confirmationDialog("Discard your changes?", isPresented: $confirmsDiscard, titleVisibility: .visible) {
                 Button("Discard changes", role: .destructive) { dismiss() }
@@ -78,10 +75,6 @@ struct PlanEditView: View {
             } message: {
                 Text(verbatim: "It goes at the end of \(PlanEditCopy.dayTitle(day)). Set its sets and weights after.")
             }
-    }
-
-    private static func endEditing() {
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
     // MARK: Content
