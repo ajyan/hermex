@@ -254,8 +254,8 @@ final class TranscriptMediaVisibilityTests: XCTestCase {
     func testOffscreenMediaWaitsUntilItScrollsIntoView() async throws {
         let log = MediaLoadLog()
         let transcript = MediaTranscript(log: log, top: Self.mediaMessages("near"), bottom: Self.mediaMessages("far"))
-        let near = ["/u/near.png", "/u/near.m4a", "/tmp/media/near-shot.png", "https://cdn.example/media/near-probe"]
-        let far = ["/u/far.png", "/u/far.m4a", "/tmp/media/far-shot.png", "https://cdn.example/media/far-probe"]
+        let near = ["/u/near.png", "/tmp/media/near-shot.png", "https://cdn.example/media/near-probe"]
+        let far = ["/u/far.png", "/tmp/media/far-shot.png", "https://cdn.example/media/far-probe"]
         let nearLoads = near.map { log.expect($0) }
         let (window, scroll) = try await show(transcript)
         defer { window.isHidden = true; window.rootViewController = nil }
@@ -279,73 +279,52 @@ final class TranscriptMediaVisibilityTests: XCTestCase {
 
     func testScrollingAwayKeepsAnAdmittedLoadAndRemountRetries() async throws {
         let log = MediaLoadLog()
-        log.heldPath = "/u/near.m4a"
+        log.heldPath = "/u/near.png"
         let transcript = MediaTranscript(log: log, top: Self.mediaMessages("near"), bottom: [])
-        let started = log.expect("/u/near.m4a")
+        let started = log.expect("/u/near.png")
         let (window, scroll) = try await show(transcript)
         defer { window.isHidden = true; window.rootViewController = nil }
         await fulfillment(of: [started], timeout: 5)
 
         scrollToBottom(scroll)
         await renderVisibleRows(window)
-        let finished = log.expectFinish("/u/near.m4a")
+        let finished = log.expectFinish("/u/near.png")
         log.releaseHeldLoads()
         await fulfillment(of: [finished], timeout: 5)
-        XCTAssertEqual(log.cancelled["/u/near.m4a", default: 0], 0, "Scrolling away must not cancel an admitted load")
+        XCTAssertEqual(log.cancelled["/u/near.png", default: 0], 0, "Scrolling away must not cancel an admitted load")
 
         // Removing the row cancels its held load, and mounting it again retries.
         scroll.setContentOffset(CGPoint(x: 0, y: -scroll.adjustedContentInset.top), animated: false)
         await renderVisibleRows(window)
-        let restarted = log.expect("/u/near.m4a")
+        let restarted = log.expect("/u/near.png")
         transcript.showsTop = false
         await renderVisibleRows(window)
         transcript.showsTop = true
         await renderVisibleRows(window)
         await fulfillment(of: [restarted], timeout: 5)
-        let cancelled = log.expectFinish("/u/near.m4a")
+        let cancelled = log.expectFinish("/u/near.png")
         transcript.showsTop = false
         await renderVisibleRows(window)
         await fulfillment(of: [cancelled], timeout: 5)
-        XCTAssertEqual(log.cancelled["/u/near.m4a"], 1)
+        XCTAssertEqual(log.cancelled["/u/near.png"], 1)
 
-        let retried = log.expect("/u/near.m4a")
-        let retryFinished = log.expectFinish("/u/near.m4a")
+        let retried = log.expect("/u/near.png")
+        let retryFinished = log.expectFinish("/u/near.png")
         transcript.showsTop = true
         await renderVisibleRows(window)
         await fulfillment(of: [retried], timeout: 5)
         log.releaseHeldLoads()
         await fulfillment(of: [retryFinished], timeout: 5)
-        XCTAssertEqual(log.cancelled["/u/near.m4a"], 1, "The remounted row's load must run to completion")
+        XCTAssertEqual(log.cancelled["/u/near.png"], 1, "The remounted row's load must run to completion")
     }
 
-    func testDetachedAudioWaitsForItsLoadKeyAfterScrollingIn() async throws {
-        let log = MediaLoadLog()
-        let transcript = MediaTranscript(log: log, top: [], bottom: Self.mediaMessages("far"))
-        transcript.audioLoadKey = nil
-        let (window, scroll) = try await show(transcript)
-        defer { window.isHidden = true; window.rootViewController = nil }
-
-        let image = log.expect("/u/far.png")
-        scrollToBottom(scroll)
-        await renderVisibleRows(window)
-        await fulfillment(of: [image], timeout: 5)
-        await render(window)
-        XCTAssertEqual(log.calls["/u/far.m4a", default: 0], 0, "A detached chat's audio waits for the attach")
-
-        let audio = log.expect("/u/far.m4a")
-        transcript.audioLoadKey = 1
-        await renderVisibleRows(window)
-        await fulfillment(of: [audio], timeout: 5)
-    }
-
-    /// A user message with an image and an audio attachment, then a settled
+    /// A user message with an image attachment, then a settled
     /// reply showing a MEDIA image and an extensionless remote MEDIA URL, which
     /// the reply probes through its data loader to learn what it is.
     private static func mediaMessages(_ name: String) -> [ChatMessage] {
         [
             ChatMessage(role: "user", content: "", timestamp: 1, messageId: "\(name)-user", attachments: [
-                MessageAttachment(name: "\(name).png", path: "/u/\(name).png", mime: "image/png", isImage: true),
-                MessageAttachment(name: "\(name).m4a", path: "/u/\(name).m4a", mime: "audio/mp4")
+                MessageAttachment(name: "\(name).png", path: "/u/\(name).png", mime: "image/png", isImage: true)
             ]),
             ChatMessage(role: "assistant", content: "Here: ![Shot](/tmp/media/\(name)-shot.png) MEDIA:https://cdn.example/media/\(name)-probe", timestamp: 1, messageId: "\(name)-reply")
         ]
@@ -434,7 +413,6 @@ private final class MediaTranscript {
     let bottom: [ChatMessage]
     let namespace = "https://webui.example|visibility-\(UUID().uuidString)"
     var showsTop = true
-    var audioLoadKey: Int? = 0
 
     init(log: MediaLoadLog, top: [ChatMessage], bottom: [ChatMessage]) {
         self.log = log
@@ -468,7 +446,6 @@ private struct MediaTranscriptView: View {
         return MessageBubbleView(
             message: message,
             loadAttachmentImage: { await log.load($0) },
-            attachmentAudio: AttachmentAudioSource(load: { await log.load($0) }, isHost: false, loadKey: transcript.audioLoadKey),
             loadTranscriptMediaImage: { await log.load($0.rawReference) },
             loadTranscriptMediaData: { await log.load($0.rawReference) },
             transcriptMediaCacheNamespace: transcript.namespace

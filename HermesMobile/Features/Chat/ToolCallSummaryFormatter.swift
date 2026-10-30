@@ -82,6 +82,7 @@ enum ToolCallSummaryFormatter {
 
         if let clarify = ClarifyResult(toolCall: toolCall), let first = clarify.exchanges.first {
             return ToolCallLogRow(
+                kind: toolKind,
                 icon: "questionmark.bubble",
                 summary: String(localized: "Asked \(clarify.exchanges.count) questions"),
                 detail: compacted("\(first.question) · \(first.answerText ?? String(localized: "No answer"))"),

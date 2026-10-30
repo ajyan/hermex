@@ -529,6 +529,7 @@ final class ChatViewModel {
     }
     let client: APIClient
     private let streamCoordinator: ChatStreamCoordinator
+    private let drafts: ChatDraftStore
     private let pendingActionCoordinator: ChatPendingActionCoordinator
     private let attachmentCoordinator: ChatAttachmentCoordinator
     private let btwStreamClient: SSEStreamingClient
@@ -686,6 +687,7 @@ final class ChatViewModel {
             draftAttachmentStore: draftAttachmentStore,
             draftStore: draftStore
         )
+        self.drafts = draftStore ?? .shared
         self.btwStreamClient = btwStreamClient ?? SSEClient()
         self.liveActivityManager = resolvedLiveActivityManager
         self.showsLiveActivityResponseExcerpts = showsLiveActivityResponseExcerpts

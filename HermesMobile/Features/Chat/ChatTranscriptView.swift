@@ -606,7 +606,7 @@ struct StreamingFollowTrigger: View {
     }
 }
 
-private struct ChatTranscriptMessageBlock: View, Equatable {
+struct ChatTranscriptMessageBlock: View, Equatable {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let transcriptMessage: TranscriptMessage

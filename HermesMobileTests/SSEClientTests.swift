@@ -214,13 +214,14 @@ final class SSEClientTests: XCTestCase {
         client.stop()
     }
 
-    /// A tunnel or server that closes a quiet stream cleanly must reach the
-    /// consumer too, so it can resume instead of waiting on a dead stream.
+    /// A tunnel or server that closes a quiet stream cleanly must reach a
+    /// consumer that owns its reconnect (the chat stream), so it can resume
+    /// instead of waiting on a dead stream.
     func testSSEClientReportsTransportErrorWhenServerClosesStream() async {
         DelayedSSEURLProtocol.configure(chunks: [DelayedSSEChunk(text: ": heartbeat\n\n", delayNanoseconds: 0)])
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [DelayedSSEURLProtocol.self]
-        let client = SSEClient(urlSessionConfiguration: configuration)
+        let client = SSEClient(urlSessionConfiguration: configuration, reconnectsAfterServerClose: false)
         let transportError = expectation(description: "server close reported as transportError")
 
         client.start(url: URL(string: "https://example.test/api/chat/stream?stream_id=stream-123")!) { event in

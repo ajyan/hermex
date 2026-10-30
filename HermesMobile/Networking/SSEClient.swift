@@ -60,7 +60,13 @@ final class SSEClient: SSEStreamingClient {
             }
         )
         var config = EventSource.Config(handler: handler, url: url)
-        config.connectionErrorHandler = { [handler] error in
+        config.connectionErrorHandler = { [handler, reconnectsAfterServerClose] error in
+            // A clean server close (LDSwiftEventSource 3.4 reports it here) is not a
+            // failure: the library reopens it, or `onClosed` reports it to a caller
+            // that owns the reconnect.
+            if error is StreamClosedByServerError {
+                return reconnectsAfterServerClose ? .proceed : .shutdown
+            }
             // Reconnection is owned by the consumers (chat stream resume, approval and
             // clarify fallback polling), so the library must not retry on its own.
             // LDSwiftEventSource skips `handler.onError` when this returns `.shutdown`
@@ -443,6 +449,8 @@ private final class SSEEventHandler: EventHandler {
     }
 
     func onError(error: Error) {
+        // `.proceed` on a clean close lands here too; the library reopens it.
+        guard !(error is StreamClosedByServerError) else { return }
         Task { @MainActor in
             onEvent(.transportError(error.localizedDescription))
         }
