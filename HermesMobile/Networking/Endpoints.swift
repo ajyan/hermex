@@ -241,6 +241,8 @@ enum Endpoint {
     /// POST `{date, text, question?}` for instant feedback, POST `{date, hanzi, got}` for a recall.
     case mandarinAnswer
     case mandarinRecall
+    /// Make it yours: POST `{date, hanzi, text}`, his own sentences from a cue's example, checked.
+    case mandarinVersions
     /// The family call: POST `{date, who}` for three things to say, POST `{date, text}` for what he couldn't.
     case mandarinCallPrep
     case mandarinCallAfter
@@ -621,6 +623,8 @@ enum Endpoint {
             return "/api/mandarin/answer"
         case .mandarinRecall:
             return "/api/mandarin/recall"
+        case .mandarinVersions:
+            return "/api/mandarin/versions"
         case .mandarinCallPrep:
             return "/api/mandarin/call/prep"
         case .mandarinCallAfter:

@@ -2684,6 +2684,14 @@ private final class FakeMandarinClient: MandarinPracticeClient, @unchecked Senda
         return try JSONDecoder().decode(MandarinRecallResponse.self, from: Data(#"{"ok":true,"progress":{"phrases":9}}"#.utf8))
     }
 
+    var checks: [MandarinVersionsRequest] = []
+    var versionsResult: Result<MandarinVersionsResponse, Error> = .success(MandarinVersionsResponse(versions: []))
+
+    func versions(_ request: MandarinVersionsRequest) async throws -> MandarinVersionsResponse {
+        checks.append(request)
+        return try versionsResult.get()
+    }
+
     var preps: [MandarinCallPrepRequest] = []
     var afters: [MandarinCallAfterRequest] = []
     var callResult: Result<MandarinCallResponse, Error> = .success(MandarinCallResponse(items: []))
@@ -2771,6 +2779,69 @@ final class MandarinPracticeTests: XCTestCase {
         XCTAssertEqual(flow.transition, "不过")
         XCTAssertEqual(flow.joinedPinyin, "Wǒ hěn lèi, bú guò hěn kāi xīn.")
         XCTAssertFalse(try self.card().mandarinTellsAStory, "cards before cues keep the plain question")
+    }
+
+    private static let cuesJSON = """
+    {"date": "2026-10-31", "kind": "morning", "cards": [
+      {"id": "mandarin", "type": "prompt", "kind": "mandarin", "question": "你最近怎么样？",
+       "phrases": [{"hanzi": "然后", "en": "and then", "kind": "transition", "example": "我先吃饭，然后去跑步。",
+                    "example_pinyin": "Wǒ xiān chī fàn, rán hòu qù pǎo bù.", "example_en": "I eat, then go running."},
+                   {"hanzi": "有点累", "en": "a bit tired", "kind": "feeling", "example": "今天有点累。"},
+                   {"hanzi": "还不错", "en": "Not bad"}]}
+    ]}
+    """
+
+    private static var snakeDecoder: JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return decoder
+    }
+
+    func testMakeItYoursComesBeforeTalkForCuesWithAnExample() async throws {
+        let client = FakeMandarinClient()
+        client.versionsResult = .success(try Self.snakeDecoder.decode(MandarinVersionsResponse.self, from: Data("""
+        {"versions": [{"said": "我先上班，然后去跑步。"},
+                      {"said": "我先跑步了五公里", "natural": "我先跑了五公里", "natural_pinyin": "Wǒ xiān pǎo le wǔ gōng lǐ",
+                       "why": "Distance goes after the verb."}, {"bad": 1}],
+         "used": false}
+        """.utf8)))
+        let practice = practice(try card(Self.cuesJSON), client: client)
+        XCTAssertEqual(practice.steps, [.yours, .talk])
+        XCTAssertEqual(practice.step, .yours)
+        XCTAssertEqual(practice.yoursCues.map(\.hanzi), ["然后", "有点累"], "a cue without an example has nothing to make yours")
+        let cue = try XCTUnwrap(practice.currentCue)
+        let checkedOK = await practice.checkVersions(of: cue, "  我先上班，然后去跑步。我先跑步了五公里  ")
+        XCTAssertTrue(checkedOK)
+        XCTAssertEqual(client.checks.first?.text, "我先上班，然后去跑步。我先跑步了五公里")
+        XCTAssertEqual(client.checks.first?.hanzi, "然后")
+        let checked = try XCTUnwrap(practice.record.versions["然后"])
+        XCTAssertEqual(checked.versions.map(\.natural), [nil, "我先跑了五公里"], "an unreadable version is dropped")
+        XCTAssertFalse(checked.used)
+        XCTAssertEqual(practice.currentCue, cue, "checking doesn't move on; Next does")
+        practice.nextCue()
+        XCTAssertEqual(practice.currentCue?.hanzi, "有点累")
+        practice.nextCue()
+        XCTAssertTrue(practice.isDone(.yours))
+        XCTAssertEqual(practice.step, .talk)
+        let resumed = self.practice(try card(Self.cuesJSON), client: client)
+        XCTAssertEqual(resumed.record.versions["然后"], checked, "the checked versions come back with the day")
+        XCTAssertEqual(resumed.step, .talk)
+    }
+
+    func testAnEmptyOrFailedCheckKeepsNothingAndSaysTryAgain() async throws {
+        let client = FakeMandarinClient()
+        let practice = practice(try card(Self.cuesJSON), client: client)
+        let cue = try XCTUnwrap(practice.currentCue)
+        let empty = await practice.checkVersions(of: cue, "然后我去跑步")
+        XCTAssertFalse(empty)
+        XCTAssertNil(practice.record.versions["然后"])
+        XCTAssertNotNil(practice.versionsError)
+        client.versionsResult = .failure(URLError(.notConnectedToInternet))
+        let failed = await practice.checkVersions(of: cue, "然后我去跑步")
+        let blank = await practice.checkVersions(of: cue, "   ")
+        XCTAssertFalse(failed || blank)
+        XCTAssertEqual(client.checks.count, 2, "nothing said, nothing sent")
+        XCTAssertEqual(practice.currentCue, cue)
     }
 
     func testStepsStartAtTheFixAndMoveOnAsEachIsDone() async throws {

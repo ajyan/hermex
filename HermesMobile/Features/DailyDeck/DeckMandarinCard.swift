@@ -2,9 +2,10 @@ import AVFoundation
 import Speech
 import SwiftUI
 
-/// The Mandarin practice card in four steps, chosen from its step bar: Fix yesterday's slips, Recall
-/// the phrasebook's due phrases, Talk (the question, a transition, a feeling and an everyday cue, and
-/// the answer), then the takeaways that come back seconds after answering. `answer` is the deck's
+/// The Mandarin practice card in steps, chosen from its step bar: Fix yesterday's slips, Recall the
+/// phrasebook's due phrases, make each cue Yours (say its example, then two versions about his week,
+/// checked), Talk (the question, a transition, a feeling and an everyday cue, and the answer), then
+/// the takeaways that come back seconds after answering. `answer` is the deck's
 /// own answer button (or his words once written).
 struct DeckMandarinCard<Answer: View>: View {
     let card: DeckCard
@@ -18,6 +19,8 @@ struct DeckMandarinCard<Answer: View>: View {
     /// Fixes and recall phrases whose answer is showing.
     @State private var revealed: Set<String> = []
     @State private var isCalling = false
+    /// The cue whose versions he is saying, in the dictation sheet.
+    @State private var makingYours: DeckPhrase?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -26,11 +29,17 @@ struct DeckMandarinCard<Answer: View>: View {
             switch practice.step {
             case .fix: fixStep
             case .recall: recallStep
+            case .yours: yoursStep
             case .talk: talkStep
             }
         }
         .onDisappear { speaker.stop() }
         .sheet(isPresented: $isCalling) { MandarinCallSheet(practice: practice, palette: palette) }
+        .sheet(item: $makingYours) { cue in
+            MandarinVersionsSheet(cue: cue, palette: palette) { text in
+                Task { await practice.checkVersions(of: cue, text) }
+            }
+        }
     }
 
     // MARK: Step bar
@@ -63,6 +72,7 @@ struct DeckMandarinCard<Answer: View>: View {
         switch step {
         case .fix: "Fix"
         case .recall: "Recall \(card.recall.count)"
+        case .yours: "Yours"
         case .talk: "Talk"
         }
     }
@@ -169,6 +179,73 @@ struct DeckMandarinCard<Answer: View>: View {
         case "fix": "Your fix"
         case "flow": "Transition"
         default: phrase.kindLabel ?? "Phrase"
+        }
+    }
+
+    // MARK: Make it yours
+
+    @ViewBuilder
+    private var yoursStep: some View {
+        let cues = practice.yoursCues
+        if let cue = practice.currentCue, let example = cue.example {
+            heading("Make it yours",
+                    detail: cues.count > 1 ? "\((cues.firstIndex(of: cue) ?? 0) + 1) of \(cues.count)" : nil)
+            takeaway([cue.kindLabel, cue.hanzi].compactMap { $0 }.joined(separator: " · "), example,
+                     pinyin: cue.examplePinyin, note: cue.exampleEn)
+            Text(verbatim: "Say it out loud. Then two of your own about this week, changing a word or two.")
+                .font(AppFont.footnote())
+                .foregroundStyle(Color.hxTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let checked = practice.record.versions[cue.hanzi] {
+                versionsBlock(checked, cue: cue)
+                actions(primary: ("Next", "arrow.right", { change { practice.nextCue() } }),
+                        secondary: ("Say more", "mic", { speaker.stop(); makingYours = cue }))
+            } else {
+                actions(primary: ("Say yours", "mic", { speaker.stop(); makingYours = cue }),
+                        secondary: ("Skip", "forward", { change { practice.nextCue() } }),
+                        busy: practice.checkingCue == cue.hanzi)
+            }
+            if practice.checkingCue == cue.hanzi {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text(verbatim: "Checking…").font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
+                }
+            } else if let error = practice.versionsError {
+                Text(verbatim: error).font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
+            }
+        } else {
+            heading("All yours", detail: "Now use them in Talk.")
+            ForEach(cues.filter { practice.record.versions[$0.hanzi] != nil }, id: \.hanzi) { cue in
+                Text(verbatim: [cue.kindLabel, cue.hanzi].compactMap { $0 }.joined(separator: " · "))
+                    .font(AppFont.footnote(weight: .semibold))
+                    .foregroundStyle(palette.ink)
+                    .padding(.top, 4)
+                if let checked = practice.record.versions[cue.hanzi] { versionsBlock(checked, cue: cue) }
+            }
+        }
+    }
+
+    /// His versions: a fine one as he said it, one that needs it as the natural way and why.
+    @ViewBuilder
+    private func versionsBlock(_ checked: MandarinVersionsResponse, cue: DeckPhrase) -> some View {
+        ForEach(checked.versions, id: \.self) { version in
+            if let natural = version.natural {
+                takeaway("Better", natural, pinyin: version.naturalPinyin,
+                         note: [version.said + " → " + natural, version.why].compactMap { $0 }.joined(separator: "\n"))
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "checkmark").font(AppFont.footnote(weight: .bold)).foregroundStyle(palette.ink)
+                        .accessibilityHidden(true)
+                    Text(verbatim: version.said).font(AppFont.body()).fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityValue(Text(verbatim: "Natural"))
+            }
+        }
+        if !checked.used {
+            Text(verbatim: "These didn't use \(cue.hanzi). Say one that does.")
+                .font(AppFont.footnote())
+                .foregroundStyle(Color.hxTextSecondary)
         }
     }
 
@@ -564,6 +641,91 @@ private final class MandarinSpeakerDelegate: NSObject, AVSpeechSynthesizerDelega
     private func report(_ utterance: AVSpeechUtterance) {
         let id = ObjectIdentifier(utterance)
         Task { @MainActor [onDone] in onDone(id) }
+    }
+}
+
+/// Make it yours: the cue's example on top, his versions by zh-CN dictation (or typed) below. Done
+/// sends them for checking; closing with nothing said sends nothing.
+struct MandarinVersionsSheet: View {
+    let cue: DeckPhrase
+    let palette: DeckPalette
+    let onDone: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var isFocused: Bool
+    @State private var text = ""
+    @State private var voiceInput = ComposerVoiceInputController(fixedLocale: MandarinDictation.locale)
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(verbatim: cue.example ?? cue.hanzi)
+                        .font(AppFont.display(style: .title3, weight: .semibold))
+                        .foregroundStyle(palette.ink)
+                    if let en = cue.exampleEn {
+                        Text(verbatim: en).font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
+                    }
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                TextEditor(text: $text)
+                    .font(AppFont.body())
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .scrollContentBackground(.hidden)
+                    .focused($isFocused)
+                    .overlay(alignment: .topLeading) {
+                        if text.isEmpty {
+                            Text(verbatim: "Two sentences with \(cue.hanzi) about your week")
+                                .font(AppFont.body())
+                                .foregroundStyle(Color.hxTextSecondary)
+                                .padding(.top, 8)
+                                .padding(.leading, 5)
+                                .allowsHitTesting(false)
+                        }
+                    }
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background(palette.paper.ignoresSafeArea())
+            .safeAreaInset(edge: .bottom) {
+                if let message = MandarinDictation.isAvailable
+                    ? voiceInput.errorMessage
+                    : "To answer by voice, add Chinese (Simplified) dictation in Settings › General › Keyboard." {
+                    Text(verbatim: message)
+                        .font(AppFont.footnote())
+                        .foregroundStyle(Color.hxTextSecondary)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .toolbar {
+                if MandarinDictation.isAvailable {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            _ = voiceInput.scheduleToggle(currentDraft: text) { text = $0 }
+                        } label: {
+                            Image(systemName: voiceInput.state == .idle ? "mic" : "stop.circle.fill")
+                        }
+                        .accessibilityLabel(Text(verbatim: voiceInput.state == .idle ? "Speak in Mandarin" : "Stop dictation"))
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        voiceInput.stopKeepingTranscript()
+                        dismiss()
+                    } label: { Text(verbatim: "Done") }
+                }
+            }
+            .toolbarBackground(palette.paper, for: .navigationBar)
+        }
+        .tint(palette.ink)
+        .onAppear { isFocused = true }
+        .onDisappear {
+            voiceInput.stopKeepingTranscript()
+            onDone(text)
+        }
+        .presentationDragIndicator(.visible)
     }
 }
 
