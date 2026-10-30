@@ -16,3 +16,14 @@ struct TranscribeResponse: Codable {
 struct VoiceVocabularyResponse: Decodable {
     let terms: [String]?
 }
+
+/// `POST /api/dictation/tidy`: `{ok, text}`, or `{error}` when the local model is unavailable.
+struct DictationTidyResponse: Decodable {
+    let ok: Bool?
+    let text: String?
+    let error: String?
+}
+
+struct DictationTidyRequest: Encodable {
+    let text: String
+}

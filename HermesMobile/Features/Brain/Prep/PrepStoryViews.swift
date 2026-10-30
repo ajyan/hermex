@@ -13,6 +13,7 @@ struct PrepStoryMicButton: View {
     /// The first tap that starts listening, before any words arrive.
     var onStart: () -> Void = {}
     @State private var dictation = DictationModel()
+    @Environment(\.dictationServer) private var server
 
     private var isListening: Bool { dictation.voiceInput.isListening }
 
@@ -20,6 +21,7 @@ struct PrepStoryMicButton: View {
         VStack(alignment: .leading, spacing: BrainStyle.xs) {
             Button {
                 if dictation.voiceInput.state == .idle { onStart() }
+                dictation.server = server
                 dictation.toggle($text)
             } label: {
                 Label {

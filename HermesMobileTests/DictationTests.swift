@@ -63,7 +63,7 @@ final class DictationModelTests: XCTestCase {
     private func model(_ polisher: FakePolisher?) -> DictationModel {
         DictationModel(
             voiceInput: ComposerVoiceInputController(mayRecord: { false }),
-            polisher: { polisher }
+            polisher: { _ in polisher }
         )
     }
 
@@ -135,5 +135,54 @@ final class DictationModelTests: XCTestCase {
         await dictation.tidy()
 
         XCTAssertEqual(box.text, "we should ship it on friday")
+    }
+}
+
+@MainActor
+final class LocalModelDictationPolisherTests: XCTestCase {
+    private struct Fixed: DictationPolishing {
+        let text: String
+        func polish(_ text: String) async throws -> String { self.text }
+    }
+
+    private struct Down: Error {}
+
+    func testTheLocalModelAnswerWins() async throws {
+        let polisher = LocalModelDictationPolisher(fallback: Fixed(text: "on device")) { _, _ in "local model" }
+        let tidied = try await polisher.polish("we should ship it")
+        XCTAssertEqual(tidied, "local model")
+    }
+
+    func testAFailedServerFallsBackToTheDevice() async throws {
+        let polisher = LocalModelDictationPolisher(fallback: Fixed(text: "on device")) { _, _ in throw Down() }
+        let tidied = try await polisher.polish("we should ship it")
+        XCTAssertEqual(tidied, "on device")
+    }
+
+    func testAMissedDeadlineFallsBackToTheDevice() async throws {
+        let polisher = LocalModelDictationPolisher(fallback: Fixed(text: "on device"), deadline: { _ in 0 }) { _, _ in
+            try await Task.sleep(for: .seconds(60))
+            return "too late"
+        }
+        let tidied = try await polisher.polish("we should ship it")
+        XCTAssertEqual(tidied, "on device")
+    }
+
+    func testWithoutADeviceModelTheServerErrorSurfaces() async {
+        let polisher = LocalModelDictationPolisher(fallback: nil) { _, _ in throw Down() }
+        do {
+            _ = try await polisher.polish("we should ship it")
+            XCTFail("expected the server error")
+        } catch {
+            XCTAssertTrue(error is Down)
+        }
+    }
+
+    func testTheDeadlineGrowsWithThePassageUpToACap() {
+        XCTAssertEqual(DictationPolisher.serverDeadline(for: "one two three"), 4.15, accuracy: 0.001)
+        let long = Array(repeating: "word", count: 300).joined(separator: " ")
+        XCTAssertEqual(DictationPolisher.serverDeadline(for: long), 19, accuracy: 0.001)
+        let huge = Array(repeating: "word", count: 2_000).joined(separator: " ")
+        XCTAssertEqual(DictationPolisher.serverDeadline(for: huge), 45)
     }
 }
