@@ -55,6 +55,8 @@ final class ComposerVoiceInputController {
     private let microphonePermission: () async -> Bool
     /// The one language to dictate in (the Mandarin card's zh-CN); nil follows the user's languages.
     private let fixedLocale: Locale?
+    /// Whether on-device recognition writes commas and periods (`addsPunctuation`); off for the chat composer.
+    private let punctuates: Bool
     private let mayRecord: @MainActor () -> Bool
     private let logger = Logger.hermesVoiceInput
 
@@ -68,6 +70,7 @@ final class ComposerVoiceInputController {
         serverRecorder: (any ComposerServerRecording)? = nil,
         recordingLease: (any ComposerRecordingLease)? = nil,
         fixedLocale: Locale? = nil,
+        punctuates: Bool = false,
         mayRecord: @escaping @MainActor () -> Bool = {
             ComposerVoiceInputStartPolicy.canStart(
                 appIsActive: UIApplication.shared.applicationState == .active,
@@ -78,6 +81,7 @@ final class ComposerVoiceInputController {
         self.audioEngineFactory = audioEngineFactory
         self.microphonePermission = microphonePermission
         self.fixedLocale = fixedLocale
+        self.punctuates = punctuates
         if fixedLocale != nil { providerPreference = .onDeviceOnly }
         self.mayRecord = mayRecord
         self.serverRecorder = serverRecorder ?? ComposerServerAudioRecorder()
@@ -620,6 +624,7 @@ final class ComposerVoiceInputController {
                 let request = SFSpeechURLRecognitionRequest(url: recordingURL)
                 request.requiresOnDeviceRecognition = true
                 request.shouldReportPartialResults = false
+                request.addsPunctuation = punctuates
 
                 let resumeBox = SpeechRecognitionContinuationBox()
                 recognitionTask = speechRecognizer.recognitionTask(with: request) { [weak self] result, error in
@@ -691,6 +696,7 @@ final class ComposerVoiceInputController {
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         request.requiresOnDeviceRecognition = true
+        request.addsPunctuation = punctuates
         recognitionRequest = request
 
         let audioEngine = audioEngineFactory()

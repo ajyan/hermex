@@ -29,6 +29,7 @@ struct DeckFeedbackSheet: View {
                     .font(AppFont.body())
                     .lineLimit(1...4)
                     .padding(12)
+                    .withDictation($note)
                     .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                 VStack(spacing: 0) {

@@ -43,7 +43,7 @@ struct PrepRecallCard: View {
                 .overlay(RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous)
                     .strokeBorder(Color.hxSeparator, lineWidth: 0.5))
                 .accessibilityLabel(Text(verbatim: "Your answer"))
-            PrepStoryMicButton(draft: draft, isSubmitting: isSubmitting) { draft = $0 }
+            PrepStoryMicButton(text: $draft, isSubmitting: isSubmitting)
         }
         Button(action: dontKnow) {
             Text(verbatim: "I don't know, show me")

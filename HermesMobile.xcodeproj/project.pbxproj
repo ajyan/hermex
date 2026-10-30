@@ -154,6 +154,8 @@
 		B5A1000000000000000000A0 /* ServerRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5A1000000000000000000A1 /* ServerRegistryTests.swift */; };
 		C0DE512E0000000000000202 /* InsightsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE512E0000000000000201 /* InsightsModels.swift */; };
 		C0DE512E0000000000000204 /* SectionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE512E0000000000000203 /* SectionCard.swift */; };
+		D1C7A7000000000000000002 /* Dictation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C7A7000000000000000001 /* Dictation.swift */; };
+		D1C7A7000000000000000004 /* DictationMicButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C7A7000000000000000003 /* DictationMicButton.swift */; };
 		C08650000000000000000002 /* ActionToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = C08650000000000000000001 /* ActionToast.swift */; };
 		879A00000000000000000002 /* QuickLookFilePreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 879A00000000000000000001 /* QuickLookFilePreview.swift */; };
 		C0DE512E00000000000002206 /* UsageChartData.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE512E00000000000002205 /* UsageChartData.swift */; };
@@ -617,6 +619,7 @@
 		75D7C575386EE8C6D442A967 /* SlashCommandRanker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19468599B2A57CAFAF8A3357 /* SlashCommandRanker.swift */; };
 		5927FF7204918E46CCE7387C /* SlashAutocompleteRanking.swift in Sources */ = {isa = PBXBuildFile; fileRef = A82A2A58F08883E396B94B1C /* SlashAutocompleteRanking.swift */; };
 		A710739233F64F4FA4C2B700 /* ComposerVoiceInputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A710739233F64F4FA4C2B710 /* ComposerVoiceInputController.swift */; };
+		D1C7A7000000000000000006 /* DictationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C7A7000000000000000005 /* DictationTests.swift */; };
 		A710739233F64F4FA4C2B701 /* ComposerVoiceDraftComposerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A710739233F64F4FA4C2B711 /* ComposerVoiceDraftComposerTests.swift */; };
 		B53F3F24A5C24D9E8E54A810 /* SlashCommandExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D1CE5F12B9E4D4D9E5A01C1 /* SlashCommandExecutor.swift */; };
 		C0CAM000000000000000B001 /* CameraPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0CAM000000000000000B002 /* CameraPickerView.swift */; };
@@ -1419,6 +1422,8 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		116F88CF04387ACD8E12245A /* ActivityPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityPresentationTests.swift; sourceTree = "<group>"; };
 		C0DE512E0000000000000201 /* InsightsModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InsightsModels.swift; sourceTree = "<group>"; };
 		C0DE512E0000000000000203 /* SectionCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SectionCard.swift; sourceTree = "<group>"; };
+		D1C7A7000000000000000001 /* Dictation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dictation.swift; sourceTree = "<group>"; };
+		D1C7A7000000000000000003 /* DictationMicButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationMicButton.swift; sourceTree = "<group>"; };
 		C08650000000000000000001 /* ActionToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionToast.swift; sourceTree = "<group>"; };
 		879A00000000000000000001 /* QuickLookFilePreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickLookFilePreview.swift; sourceTree = "<group>"; };
 		C0DE512E00000000000002205 /* UsageChartData.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UsageChartData.swift; sourceTree = "<group>"; };
@@ -1433,6 +1438,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		26AB000000000000000000F3 /* APIClientProvidersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientProvidersTests.swift; sourceTree = "<group>"; };
 		26AB000000000000000000F4 /* ProvidersViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProvidersViewModelTests.swift; sourceTree = "<group>"; };
 		A710739233F64F4FA4C2B710 /* ComposerVoiceInputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerVoiceInputController.swift; sourceTree = "<group>"; };
+		D1C7A7000000000000000005 /* DictationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationTests.swift; sourceTree = "<group>"; };
 		A710739233F64F4FA4C2B711 /* ComposerVoiceDraftComposerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerVoiceDraftComposerTests.swift; sourceTree = "<group>"; };
 		B5A100000000000000000010 /* SharedDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedDraftStore.swift; sourceTree = "<group>"; };
 		B5A100000000000000000011 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
@@ -2130,6 +2136,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				A1C0F1000000000000000005 /* ComposerChipTests.swift */,
 				6809B8F1391248A4AA77C453 /* SlashCommandExecutorTests.swift */,
 				A710739233F64F4FA4C2B711 /* ComposerVoiceDraftComposerTests.swift */,
+				D1C7A7000000000000000005 /* DictationTests.swift */,
 				C5A0D8F5502048B6B9258B00 /* InsightsViewModelTests.swift */,
 				C0415A0000000000000004 /* ProviderLimitCardTests.swift */,
 				C0415A0000000000000003 /* APIClientProviderQuotaTests.swift */,
@@ -2391,6 +2398,8 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C0366000000000000000004 /* ModelPickerConfiguration.swift */,
 				C0DE512E0000000000000203 /* SectionCard.swift */,
 				C08650000000000000000001 /* ActionToast.swift */,
+				D1C7A7000000000000000003 /* DictationMicButton.swift */,
+				D1C7A7000000000000000001 /* Dictation.swift */,
 				879A00000000000000000001 /* QuickLookFilePreview.swift */,
 			);
 			path = Shared;
@@ -3646,6 +3655,8 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C0DE512E0000000000000202 /* InsightsModels.swift in Sources */,
 				C0DE512E0000000000000204 /* SectionCard.swift in Sources */,
 				C08650000000000000000002 /* ActionToast.swift in Sources */,
+				D1C7A7000000000000000004 /* DictationMicButton.swift in Sources */,
+				D1C7A7000000000000000002 /* Dictation.swift in Sources */,
 				879A00000000000000000002 /* QuickLookFilePreview.swift in Sources */,
 				C0DE512E00000000000002206 /* UsageChartData.swift in Sources */,
 				C0DE512E00000000000002208 /* UsageChartCard.swift in Sources */,
@@ -3885,6 +3896,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				A1C0F1000000000000000006 /* ComposerChipTests.swift in Sources */,
 				0D82B28493C6401D98DA9C0E /* SlashCommandExecutorTests.swift in Sources */,
 				A710739233F64F4FA4C2B701 /* ComposerVoiceDraftComposerTests.swift in Sources */,
+				D1C7A7000000000000000006 /* DictationTests.swift in Sources */,
 				C5A0D8F5502048B6B9258B01 /* InsightsViewModelTests.swift in Sources */,
 				C0415B0000000000000004 /* ProviderLimitCardTests.swift in Sources */,
 				C0415B0000000000000003 /* APIClientProviderQuotaTests.swift in Sources */,
