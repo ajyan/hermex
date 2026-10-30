@@ -790,7 +790,9 @@ struct DeckChangeRow: Decodable, Equatable, Identifiable {
 /// phrase came from: "chunk" (a cue), "lesson", "fix" (a correction to his answer), "gap" (a word he
 /// said in English), or "flow" (a transition feedback suggested). A cue has a `kind` (transition,
 /// feeling, everyday), a one-line `note`, and the model's example sentence from his life.
-struct DeckPhrase: Codable, Equatable, Hashable {
+struct DeckPhrase: Codable, Equatable, Hashable, Identifiable {
+    var id: String { hanzi }
+
     let hanzi: String
     let pinyin: String?
     let en: String?

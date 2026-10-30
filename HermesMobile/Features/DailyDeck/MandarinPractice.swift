@@ -5,6 +5,7 @@ import Observation
 protocol MandarinPracticeClient: Sendable {
     func answer(_ request: MandarinAnswerRequest) async throws -> MandarinAnswerResponse
     func recall(_ request: MandarinRecallRequest) async throws -> MandarinRecallResponse
+    func versions(_ request: MandarinVersionsRequest) async throws -> MandarinVersionsResponse
     func callPrep(_ request: MandarinCallPrepRequest) async throws -> MandarinCallResponse
     func callAfter(_ request: MandarinCallAfterRequest) async throws -> MandarinCallResponse
 }
@@ -20,6 +21,10 @@ struct APIClientMandarinAdapter: MandarinPracticeClient {
         try await apiClient.recallMandarin(request)
     }
 
+    func versions(_ request: MandarinVersionsRequest) async throws -> MandarinVersionsResponse {
+        try await apiClient.checkMandarinVersions(request)
+    }
+
     func callPrep(_ request: MandarinCallPrepRequest) async throws -> MandarinCallResponse {
         try await apiClient.mandarinCallPrep(request)
     }
@@ -30,10 +35,13 @@ struct APIClientMandarinAdapter: MandarinPracticeClient {
 }
 
 /// What he has done on a day's Mandarin card: fixes stepped through, phrases recalled (Got it is
-/// true), and the answer the feedback is for. Kept per server and day, so the card resumes.
+/// true), cues made his own (and their checked versions), and the answer the feedback is for. Kept per server and day, so the card resumes.
 struct MandarinPracticeRecord: Codable, Equatable {
     var fixesSeen = 0
     var recalled: [String: Bool] = [:]
+    /// Make it yours, by cue: the checked versions, and the cues he has moved past.
+    var versions: [String: MandarinVersionsResponse] = [:]
+    var madeYours: Set<String> = []
     var answeredText: String?
     var result: MandarinAnswerResponse?
     /// The family call: three things to say per relative ("mom", "dad"), and what came back after it.
@@ -46,6 +54,8 @@ struct MandarinPracticeRecord: Codable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         fixesSeen = (try? c.decodeIfPresent(Int.self, forKey: .fixesSeen)) ?? 0
         recalled = (try? c.decodeIfPresent([String: Bool].self, forKey: .recalled)) ?? [:]
+        versions = (try? c.decodeIfPresent([String: MandarinVersionsResponse].self, forKey: .versions)) ?? [:]
+        madeYours = (try? c.decodeIfPresent(Set<String>.self, forKey: .madeYours)) ?? []
         answeredText = try? c.decodeIfPresent(String.self, forKey: .answeredText)
         result = try? c.decodeIfPresent(MandarinAnswerResponse.self, forKey: .result)
         callPrep = (try? c.decodeIfPresent([String: [MandarinCallItem]].self, forKey: .callPrep)) ?? [:]
@@ -73,13 +83,14 @@ struct MandarinPracticeStore {
     }
 }
 
-/// One day's Mandarin card in four steps: fix yesterday's slips, recall due phrases (Got it / Again),
-/// talk (answer the question, cues on hand), and the takeaways that come back seconds after answering.
+/// One day's Mandarin card: fix yesterday's slips, recall due phrases (Got it / Again), make each cue
+/// yours (say its example, then two versions about his week, checked), talk (answer the question,
+/// cues on hand), and the takeaways that come back seconds after answering.
 /// Recalls and answers count only once the server has them; a failure leaves the step where it was.
 @MainActor
 @Observable
 final class MandarinPractice {
-    enum Step: String, CaseIterable { case fix, recall, talk }
+    enum Step: String, CaseIterable { case fix, recall, yours, talk }
 
     enum Answering: Equatable {
         case idle
@@ -94,6 +105,9 @@ final class MandarinPractice {
     private(set) var answering: Answering = .idle
     private(set) var isSavingRecall = false
     private(set) var recallError: String?
+    /// The cue whose versions are being checked, and the last check's error.
+    private(set) var checkingCue: String?
+    private(set) var versionsError: String?
     /// The family call's request in flight ("mom", "dad", or "after"), and its last error.
     private(set) var callLoading: String?
     private(set) var callError: String?
@@ -125,6 +139,7 @@ final class MandarinPractice {
             switch step {
             case .fix: card.yesterday != nil
             case .recall: !card.recall.isEmpty
+            case .yours: !yoursCues.isEmpty
             case .talk: true
             }
         }
@@ -142,10 +157,17 @@ final class MandarinPractice {
 
     var result: MandarinAnswerResponse? { record.result }
 
+    /// The cues with an example sentence to make his own.
+    var yoursCues: [DeckPhrase] { card.phrases.filter { $0.example != nil } }
+
+    /// The cue to make his own now: the first he hasn't moved past.
+    var currentCue: DeckPhrase? { yoursCues.first { !record.madeYours.contains($0.hanzi) } }
+
     func isDone(_ step: Step) -> Bool {
         switch step {
         case .fix: record.fixesSeen >= max(fixes.count, 1)
         case .recall: currentRecall == nil
+        case .yours: currentCue == nil
         case .talk: record.result != nil
         }
     }
@@ -174,6 +196,39 @@ final class MandarinPractice {
         record.recalled[phrase.hanzi] = got
         save()
         if isDone(.recall) { step = firstOpenStep }
+    }
+
+    /// Checks his versions of a cue's example. An empty check (the model couldn't) is an error to
+    /// retry, never kept. Returns whether they were checked, so the caller keeps his words when not.
+    @discardableResult
+    func checkVersions(of cue: DeckPhrase, _ text: String) async -> Bool {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let client, !text.isEmpty, checkingCue == nil else { return false }
+        checkingCue = cue.hanzi
+        versionsError = nil
+        defer { checkingCue = nil }
+        do {
+            let response = try await client.versions(MandarinVersionsRequest(date: date, hanzi: cue.hanzi, text: text))
+            guard !response.versions.isEmpty else {
+                versionsError = "Couldn't check them. Try again."
+                return false
+            }
+            record.versions[cue.hanzi] = response
+            save()
+            return true
+        } catch {
+            versionsError = "Couldn't reach the server. Try again."
+            return false
+        }
+    }
+
+    /// Moves past the cue on screen, checked or skipped.
+    func nextCue() {
+        guard let cue = currentCue else { return }
+        record.madeYours.insert(cue.hanzi)
+        versionsError = nil
+        save()
+        if isDone(.yours) { step = firstOpenStep }
     }
 
     /// Sends the answer for feedback unless this exact text already has it. Called when the
