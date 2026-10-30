@@ -37,6 +37,17 @@ extension APIClient {
         return try decode(TranscribeResponse.self, from: responseData)
     }
 
+    /// One dictated passage rewritten as clean text by the server's local model.
+    /// Throws when the server is unreachable, lacks the route, or returns no text.
+    func tidyDictation(_ text: String, timeout: TimeInterval) async throws -> String {
+        let response: DictationTidyResponse = try await send(
+            endpoint: .dictationTidy, method: "POST", body: DictationTidyRequest(text: text), timeout: timeout)
+        guard let tidied = response.text, !tidied.isEmpty else {
+            throw APIError.http(statusCode: 502, body: response.error)
+        }
+        return tidied
+    }
+
     /// The names and words a voice call's recognizer should expect, from the server's vault.
     /// Empty on any failure, including a server without the route: the call works without it.
     func voiceVocabulary() async -> [String] {

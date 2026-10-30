@@ -155,6 +155,8 @@ enum Endpoint {
     case transcribe
     /// Names and words the voice call's recognizer should expect (fork route `api/voice_vocabulary.py`).
     case voiceVocabulary
+    /// One dictated passage tidied on the local model (fork route `api/dictation_tidy.py`).
+    case dictationTidy
     case tts
     /// The Brain module library (`api/brain_catalog.py`): module counts, item lists, one page (optionally
     /// placed in a given hub), search, the home's daily deck of bites, and the People screen's sections.
@@ -513,6 +515,8 @@ enum Endpoint {
             return "/api/transcribe"
         case .voiceVocabulary:
             return "/api/voice/vocabulary"
+        case .dictationTidy:
+            return "/api/dictation/tidy"
         case .tts:
             return "/api/tts"
         case .brainModules:

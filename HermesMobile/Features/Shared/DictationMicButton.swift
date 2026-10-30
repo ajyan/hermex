@@ -8,6 +8,7 @@ struct DictationMicButton: View {
     var isSubmitting = false
     @State private var dictation = DictationModel()
     @State private var shownError: String?
+    @Environment(\.dictationServer) private var server
 
     var body: some View {
         let voiceInput = dictation.voiceInput
@@ -15,7 +16,10 @@ struct DictationMicButton: View {
             if dictation.canUndoTidy {
                 DictationOriginalButton(dictation: dictation)
             }
-            Button { dictation.toggle($text) } label: {
+            Button {
+                dictation.server = server
+                dictation.toggle($text)
+            } label: {
                 Group {
                     if dictation.isTidying {
                         ProgressView().controlSize(.small)

@@ -4,8 +4,9 @@ import Observation
 import SwiftUI
 
 // Dictation into a text box, Wispr Flow style: the words appear punctuated as they are heard, and
-// on Stop the dictated part is tidied (grammar, fillers, paragraphs) by the on-device model, with
-// "Original" one tap away. Text typed before the dictation is never rewritten.
+// on Stop the dictated part is tidied (grammar, fillers, paragraphs) by the server's local model,
+// or the on-device model when the server is slow or away, with "Original" one tap away. Text typed
+// before the dictation is never rewritten.
 
 /// Rewrites one dictated passage. Tests inject their own; the live one is Apple's on-device model.
 protocol DictationPolishing {
@@ -22,7 +23,9 @@ final class DictationModel {
     private(set) var lastTidy: (original: String, tidied: String)?
 
     /// Looked up on Stop rather than at init: SwiftUI builds a mic's initial state on every render.
-    @ObservationIgnored private let polisher: () -> (any DictationPolishing)?
+    @ObservationIgnored private let polisher: (URL?) -> (any DictationPolishing)?
+    /// The active server, whose local model tidies first; nil tidies on-device only.
+    @ObservationIgnored var server: URL?
     @ObservationIgnored private var text: Binding<String>?
     /// The draft when dictation began; nil when nothing is waiting to be tidied.
     @ObservationIgnored private var base: String?
@@ -30,7 +33,7 @@ final class DictationModel {
 
     init(
         voiceInput: ComposerVoiceInputController? = nil,
-        polisher: @escaping () -> (any DictationPolishing)? = DictationPolisher.live
+        polisher: @escaping (URL?) -> (any DictationPolishing)? = DictationPolisher.live
     ) {
         self.voiceInput = voiceInput ?? ComposerVoiceInputController(punctuates: true)
         self.polisher = polisher
@@ -85,7 +88,7 @@ final class DictationModel {
         guard let base, let text else { return }
         self.base = nil
         let heard = text.wrappedValue
-        guard let polisher = polisher(), let split = DictationSplice.split(base: base, draft: heard),
+        guard let polisher = polisher(server), let split = DictationSplice.split(base: base, draft: heard),
               DictationSplice.isWorthTidying(split.dictated) else { return }
         isTidying = true
         defer { isTidying = false }
@@ -96,6 +99,11 @@ final class DictationModel {
         text.wrappedValue = result
         lastTidy = (heard, result)
     }
+}
+
+extension EnvironmentValues {
+    /// The active server, whose local model tidies dictation; set once over the logged-in screens.
+    @Entry var dictationServer: URL?
 }
 
 /// Finds the dictated words in a draft and decides whether a rewrite of them is safe to use.
@@ -137,11 +145,28 @@ enum DictationSplice {
     }
 }
 
-/// Apple's on-device model, when Apple Intelligence is on; nil otherwise, and dictation stays as heard.
+/// The server's local model first, then Apple's on-device model; nil when neither is there, and
+/// dictation stays as heard.
 enum DictationPolisher {
-    static func live() -> (any DictationPolishing)? {
+    static func live(server: URL?) -> (any DictationPolishing)? {
+        let onDevice = onDevice()
+        guard let server else { return onDevice }
+        let client = APIClient(baseURL: server)
+        return LocalModelDictationPolisher(fallback: onDevice) { text, timeout in
+            try await client.tidyDictation(text, timeout: timeout)
+        }
+    }
+
+    static func onDevice() -> (any DictationPolishing)? {
         guard #available(iOS 26.0, *), SystemLanguageModel.default.isAvailable else { return nil }
         return FoundationDictationPolisher()
+    }
+
+    /// How long the local model gets before the phone tidies instead: 4 s, plus time to write a
+    /// long passage (it writes about 37 tokens a second), up to 45 s.
+    static func serverDeadline(for text: String) -> TimeInterval {
+        let words = text.split(whereSeparator: { $0.isWhitespace }).count
+        return min(45, 4 + 0.05 * Double(words))
     }
 
     static let instructions = """
@@ -161,6 +186,35 @@ enum DictationPolisher {
         Dictated: so um i think we should uh move the launch to friday no wait to monday because sam is out you know
         Cleaned: I think we should move the launch to Monday, because Sam is out.
         """
+}
+
+/// Tidies on the server's local model, falling back to `fallback` when it fails or misses its deadline.
+struct LocalModelDictationPolisher: DictationPolishing {
+    let fallback: (any DictationPolishing)?
+    var deadline: (String) -> TimeInterval = DictationPolisher.serverDeadline
+    let tidy: @Sendable (String, TimeInterval) async throws -> String
+
+    private struct DeadlinePassed: Error {}
+
+    func polish(_ text: String) async throws -> String {
+        let seconds = deadline(text)
+        do {
+            return try await withThrowingTaskGroup(of: String.self) { group in
+                group.addTask { try await tidy(text, seconds + 1) }
+                group.addTask {
+                    try await Task.sleep(for: .seconds(seconds))
+                    throw DeadlinePassed()
+                }
+                defer { group.cancelAll() }
+                guard let first = try await group.next() else { throw DeadlinePassed() }
+                return first
+            }
+        } catch {
+            try Task.checkCancellation()
+            guard let fallback else { throw error }
+            return try await fallback.polish(text)
+        }
+    }
 }
 
 @available(iOS 26.0, *)

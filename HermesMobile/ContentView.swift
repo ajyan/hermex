@@ -124,6 +124,7 @@ struct ContentView: View {
                 pendingBotDestination: $pendingBotDestination,
                 pendingWebuiPush: $pendingWebuiPush
             )
+            .environment(\.dictationServer, server)
             // Switching the active server keeps us in `.loggedIn`, so without a
             // per-server identity SwiftUI would reuse the same ChatShellView (and
             // its server-bound view model), leaving stale sessions/chat on screen.
