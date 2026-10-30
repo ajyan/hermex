@@ -4,16 +4,17 @@ import Observation
 import SwiftUI
 
 // Dictation into a text box, Wispr Flow style: the words appear punctuated as they are heard, and
-// on Stop the dictated part is tidied (grammar, fillers, paragraphs) by the server's local model,
-// or the on-device model when the server is slow or away, with "Original" one tap away. Text typed
-// before the dictation is never rewritten.
+// the dictated part is tidied (grammar, fillers, paragraphs) by the server's local model, or the
+// on-device model when the server is slow or away, with "Original" one tap away. Tidying starts
+// while the speaker talks, a passage at a time, so Stop waits only on the last few words. Text
+// typed before the dictation is never rewritten.
 
 /// Rewrites one dictated passage. Tests inject their own; the live one is Apple's on-device model.
 protocol DictationPolishing {
     func polish(_ text: String) async throws -> String
 }
 
-/// One mic's state: the recognizer, the tidy step after Stop, and the way back to the raw words.
+/// One mic's state: the recognizer, the tidy as it talks and after Stop, and the way back to the raw words.
 @MainActor
 @Observable
 final class DictationModel {
@@ -22,14 +23,23 @@ final class DictationModel {
     /// The draft before and after the last tidy; set while "Original" can still put it back.
     private(set) var lastTidy: (original: String, tidied: String)?
 
-    /// Looked up on Stop rather than at init: SwiftUI builds a mic's initial state on every render.
+    /// Looked up on Start rather than at init: SwiftUI builds a mic's initial state on every render.
     @ObservationIgnored private let polisher: (URL?) -> (any DictationPolishing)?
+    @ObservationIgnored private var activePolisher: (any DictationPolishing)?
     /// The active server, whose local model tidies first; nil tidies on-device only.
     @ObservationIgnored var server: URL?
     @ObservationIgnored private var text: Binding<String>?
     /// The draft when dictation began; nil when nothing is waiting to be tidied.
     @ObservationIgnored private var base: String?
     @ObservationIgnored private var tidyTask: Task<Void, Never>?
+    /// The finished segments already handed to the model while talking, and their tidied passages in order.
+    @ObservationIgnored private var sentEarly = ""
+    @ObservationIgnored private var tidiedEarly: [String] = []
+    /// Tidies the early passages one after another, so they finish in the order they were spoken.
+    @ObservationIgnored private var earlyChain: Task<Void, Never>?
+
+    /// Words a finished stretch of speech needs before it is tidied early: enough context for a good rewrite.
+    static let earlyPassageWords = 25
 
     init(
         voiceInput: ComposerVoiceInputController? = nil,
@@ -72,32 +82,76 @@ final class DictationModel {
         base = nil
         tidyTask?.cancel()
         tidyTask = nil
+        dropEarly()
         isTidying = false
         voiceInput.stopBeforeSubmittingDraft()
     }
 
     func begin(_ text: Binding<String>) {
         tidyTask?.cancel()
+        dropEarly()
         isTidying = false
         lastTidy = nil
         self.text = text
         base = text.wrappedValue
+        activePolisher = polisher(server)
+        voiceInput.onCommittedTranscript = { [weak self] in self?.committedChanged($0) }
+    }
+
+    /// Call with every finished-segment transcript while listening: once enough new words have
+    /// settled, they are tidied now rather than after Stop.
+    func committedChanged(_ committed: String) {
+        guard base != nil, let polisher = activePolisher, committed.hasPrefix(sentEarly) else { return }
+        let passage = committed.dropFirst(sentEarly.count).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard DictationSplice.wordCount(passage) >= Self.earlyPassageWords else { return }
+        sentEarly = committed
+        let previous = earlyChain
+        earlyChain = Task { [weak self] in
+            await previous?.value
+            guard !Task.isCancelled else { return }
+            let tidied = try? await polisher.polish(passage)
+            guard let self, !Task.isCancelled else { return }
+            self.tidiedEarly.append(tidied.flatMap { DictationSplice.accepted($0, for: passage) } ?? passage)
+        }
     }
 
     func tidy() async {
         guard let base, let text else { return }
         self.base = nil
         let heard = text.wrappedValue
-        guard let polisher = polisher(server), let split = DictationSplice.split(base: base, draft: heard),
-              DictationSplice.isWorthTidying(split.dictated) else { return }
+        guard let polisher = activePolisher, let split = DictationSplice.split(base: base, draft: heard) else {
+            dropEarly()
+            return
+        }
+        // The early passages count only if the dictation still starts with them (no edit in between).
+        let early = !sentEarly.isEmpty && split.dictated.hasPrefix(sentEarly) ? sentEarly : ""
+        if early.isEmpty { dropEarly() }
+        let rest = String(split.dictated.dropFirst(early.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+        let tidiesRest = DictationSplice.isWorthTidying(rest)
+        guard !early.isEmpty || tidiesRest else { return }
+
         isTidying = true
         defer { isTidying = false }
-        guard let tidied = try? await polisher.polish(split.dictated), !Task.isCancelled,
-              text.wrappedValue == heard,
-              let accepted = DictationSplice.accepted(tidied, for: split.dictated) else { return }
-        let result = split.kept + accepted
+        var tidiedRest = rest
+        if tidiesRest, let tidied = try? await polisher.polish(rest),
+           let accepted = DictationSplice.accepted(tidied, for: rest) {
+            tidiedRest = accepted
+        }
+        await earlyChain?.value
+        let passages = (early.isEmpty ? [] : tidiedEarly) + [tidiedRest]
+        dropEarly()
+        guard !Task.isCancelled, text.wrappedValue == heard else { return }
+        let result = split.kept + passages.filter { !$0.isEmpty }.joined(separator: " ")
+        guard result != heard else { return }
         text.wrappedValue = result
         lastTidy = (heard, result)
+    }
+
+    private func dropEarly() {
+        earlyChain?.cancel()
+        earlyChain = nil
+        sentEarly = ""
+        tidiedEarly = []
     }
 }
 
@@ -140,7 +194,7 @@ enum DictationSplice {
         return text
     }
 
-    private static func wordCount(_ text: String) -> Int {
+    static func wordCount(_ text: String) -> Int {
         text.split(whereSeparator: { $0.isWhitespace }).count
     }
 }

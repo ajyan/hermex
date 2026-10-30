@@ -139,6 +139,81 @@ final class DictationModelTests: XCTestCase {
 }
 
 @MainActor
+final class DictationEarlyTidyTests: XCTestCase {
+    private final class Box { var text = "" }
+
+    /// Tidies by capitalizing every word, and records each passage it was given.
+    private final class Recorder: DictationPolishing {
+        var passages: [String] = []
+        func polish(_ text: String) async throws -> String {
+            await MainActor.run { passages.append(text) }
+            return text.capitalized
+        }
+    }
+
+    private func words(_ count: Int, _ word: String) -> String {
+        Array(repeating: word, count: count).joined(separator: " ")
+    }
+
+    private func start(_ box: Box, _ recorder: Recorder) -> DictationModel {
+        let dictation = DictationModel(
+            voiceInput: ComposerVoiceInputController(mayRecord: { false }),
+            polisher: { _ in recorder }
+        )
+        dictation.begin(Binding(get: { box.text }, set: { box.text = $0 }))
+        return dictation
+    }
+
+    func testFinishedPassagesAreTidiedWhileTalkingAndStopTidiesOnlyTheRest() async {
+        let box = Box()
+        box.text = "Earlier."
+        let recorder = Recorder()
+        let dictation = start(box, recorder)
+        let first = words(25, "one")
+        let second = words(6, "two")
+
+        dictation.committedChanged(first)
+        box.text = "Earlier. \(first) \(second)"
+        await dictation.tidy()
+
+        // The last words can reach the model before the early passage; only the assembly order matters.
+        XCTAssertEqual(recorder.passages.sorted(), [first, second].sorted())
+        XCTAssertEqual(box.text, "Earlier. \(first.capitalized) \(second.capitalized)")
+        dictation.undoTidy()
+        XCTAssertEqual(box.text, "Earlier. \(first) \(second)")
+    }
+
+    func testShortFinishedSegmentsWaitUntilTheyAddUp() async {
+        let box = Box()
+        let recorder = Recorder()
+        let dictation = start(box, recorder)
+        let a = words(10, "a"), b = words(20, "b")
+
+        dictation.committedChanged(a)
+        dictation.committedChanged("\(a) \(b)")
+        box.text = "\(a) \(b) end"
+        await dictation.tidy()
+
+        XCTAssertEqual(recorder.passages, ["\(a) \(b)"])
+        XCTAssertEqual(box.text, "\(a) \(b)".capitalized + " end")
+    }
+
+    func testAnEditOverTheEarlyWordsTidiesTheWholeDictationOnce() async {
+        let box = Box()
+        let recorder = Recorder()
+        let dictation = start(box, recorder)
+        let first = words(25, "one")
+
+        dictation.committedChanged(first)
+        box.text = "changed \(first) more words here"
+        await dictation.tidy()
+
+        XCTAssertTrue(recorder.passages.contains("changed \(first) more words here"))
+        XCTAssertEqual(box.text, "changed \(first) more words here".capitalized)
+    }
+}
+
+@MainActor
 final class LocalModelDictationPolisherTests: XCTestCase {
     private struct Fixed: DictationPolishing {
         let text: String

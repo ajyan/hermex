@@ -61,6 +61,10 @@ final class ComposerVoiceInputController {
     private let logger = Logger.hermesVoiceInput
 
     @ObservationIgnored var apiClient: APIClient?
+    /// The words of every finished utterance segment so far (never the earlier draft), each time a
+    /// segment ends during on-device dictation. Dictation tidy starts on them while the speaker talks.
+    @ObservationIgnored var onCommittedTranscript: ((String) -> Void)?
+    @ObservationIgnored private var reportedCommitted = ""
     @ObservationIgnored var providerPreference = ComposerSTTProviderPreference.defaultValue
 
     init(
@@ -214,6 +218,7 @@ final class ComposerVoiceInputController {
         cancelServerTranscription()
         discardServerRecording()
         draftUpdateSession.begin(baseDraft: currentDraft)
+        reportedCommitted = ""
         self.updateDraft = updateDraft
         state = .requestingPermission
 
@@ -741,6 +746,7 @@ final class ComposerVoiceInputController {
             let endsSegment = result.speechRecognitionMetadata != nil || result.isFinal
             if let composedDraft = draftUpdateSession.composedDraft(for: liveTranscript, endsSegment: endsSegment) {
                 updateDraft?(composedDraft)
+                reportCommitted()
             }
         }
 
@@ -759,6 +765,13 @@ final class ComposerVoiceInputController {
             state = .idle
             suppressNextRecognitionError = false
         }
+    }
+
+    private func reportCommitted() {
+        let committed = draftUpdateSession.committedTranscript
+        guard committed != reportedCommitted else { return }
+        reportedCommitted = committed
+        onCommittedTranscript?(committed)
     }
 
     private func stopAcceptingDraftUpdates() {
@@ -1148,6 +1161,9 @@ struct ComposerVoiceDraftUpdateSession {
     mutating func stopAcceptingUpdates() {
         acceptsUpdates = false
     }
+
+    /// Words from the segments that ended, joined by single spaces.
+    var committedTranscript: String { committed }
 
     /// The full draft for one recognition result. `endsSegment` comes from
     /// `SFSpeechRecognitionResult.speechRecognitionMetadata` (iOS 17+ sets it when
