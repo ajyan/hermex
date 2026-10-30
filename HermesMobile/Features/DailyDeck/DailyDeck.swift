@@ -190,6 +190,9 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     /// card's three actions for today's one thing, and the headline's Done / Partly / Not today for
     /// yesterday's, file the same way.
     let options: [DeckSleepTag]
+    /// A Looking ahead card's choices for when a message to future him comes back ("1m", "6m", "1y", "5y"),
+    /// filed as the answer's `returns`; empty on every other card.
+    let returns: [DeckSleepTag]
     /// A front divider's (and the week divider's) week: a row of day dots per daily commitment, pips for a count.
     let weekRows: [DeckFrontRow]
     /// A front divider's one thing to do today (wire `today`): "Outreach: Anthropic, from Today's Ask".
@@ -311,6 +314,17 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     /// A Mandarin card with cues asks for a short story: what happened, how he felt, what's next.
     var mandarinTellsAStory: Bool { isMandarin && phrases.contains { $0.kind != nil } }
 
+    /// The Looking back card: a question about a story, a friend, a time of his life, or something to let go.
+    /// Its answer is filed to the vault's past/ folder, not the journal.
+    var isPast: Bool { type == .prompt && itemKind == "past" }
+
+    /// The Looking ahead card: a question about who he's becoming, or a message to his future self (offering
+    /// `returns`); on the day a message comes back, the message quoted in `thread`. Filed to the vault's future/.
+    var isFuture: Bool { type == .prompt && itemKind == "future" }
+
+    /// The return a Looking ahead message gets when he doesn't pick one (the vault files a missing `returns` as this).
+    static let defaultReturn = "1y"
+
     /// One of Atlas's open questions from last night's self-review: `context` is its short title and
     /// the question follows. Its answer is filed into that night's dream log, which the next review reads.
     var isDream: Bool { type == .prompt && itemKind == "dream" }
@@ -340,7 +354,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
         case phrases, recall, yesterday, pattern, progress, questionPinyin, questionEn, rows, week
         case chapter, weekNumber, range, noteFromPast, headline, bullets, proposals
-        case piece, learned, variant, date, options, meals, front, fronts, frontReason, weekRows, yesterdayOne
+        case piece, learned, variant, date, options, returns, meals, front, fronts, frontReason, weekRows, yesterdayOne
         case todayAction = "today"
         case moments, spares, ended, text, ifThen, name, fact, changes, intention
         case act, todayOne, gist, quotes, parts, weekQuestion, thread, dateLabel
@@ -432,6 +446,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         piece = (try? c.decodeIfPresent(DeckPiece.self, forKey: .piece)).flatMap { $0.steps.isEmpty ? nil : $0 }
         date = try? c.decodeIfPresent(String.self, forKey: .date)
         options = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .options)) ?? []).compactMap(\.value)
+        returns = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .returns)) ?? []).compactMap(\.value)
         meals = (try? c.decodeIfPresent(DeckMealsPlan.self, forKey: .meals)).flatMap { $0.slots.isEmpty ? nil : $0 }
         front = (try? c.decodeIfPresent(String.self, forKey: .front)).flatMap { $0.isEmpty ? nil : $0 }
         fronts = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .fronts)) ?? []).compactMap(\.value)
@@ -943,6 +958,9 @@ struct DeckAnswer: Codable, Equatable {
     var tags: [String]?
     /// The question answered, when it isn't the card's own (regenerated, or the user's).
     var question: String?
+    /// A Looking ahead message's return (one of the card's `returns` ids); nil files as the card's default,
+    /// a year. Not an answer on its own: only the words are.
+    var returns: String?
     /// "Not for Me" on this card; a card with feedback leaves the deck.
     var feedback: DeckFeedback?
     /// The weekly cards' answers, each encoded only when set: a value card's 1–10 `scores`, the
@@ -957,7 +975,8 @@ struct DeckAnswer: Codable, Equatable {
     /// Nothing typed or chosen. Text counts as typed, spaces too, so a field bound to it keeps a
     /// leading space while editing; filing trims, and a blank text files as none.
     var isEmpty: Bool {
-        (text?.isEmpty ?? true) && action == nil && rating == nil && question == nil && feedback == nil && !hasTags && !hasWeeklyFields
+        (text?.isEmpty ?? true) && action == nil && rating == nil && question == nil && returns == nil && feedback == nil
+            && !hasTags && !hasWeeklyFields
     }
 
     private var hasWeeklyFields: Bool {

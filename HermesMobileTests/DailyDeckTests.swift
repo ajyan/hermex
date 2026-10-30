@@ -1567,6 +1567,64 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(text.attribution, "Dad")
     }
 
+    static let timeCardsJSON = #"""
+    {"date": "2026-10-04", "kind": "morning", "cards": [
+      {"id": "past", "type": "prompt", "kind": "past", "title": "Stony Brook", "files_to": "past",
+       "question": "Who were you at Stony Brook?", "alt_questions": ["What did you carry out of it?"],
+       "ref": {"topic": "era", "subject": "Stony Brook"}},
+      {"id": "future", "type": "prompt", "kind": "future", "title": "A message to future you", "files_to": "future",
+       "question": "What should future you remember?", "ref": {"topic": "message"},
+       "returns": [{"id": "1m", "label": "1 month"}, {"id": "1y", "label": "1 year"}, {"id": "5y"}]}
+    ]}
+    """#
+
+    func testLookingBackAndAheadArePromptsWithTheirOwnPapers() throws {
+        let cards = try DailyDeck.decode(Self.timeCardsJSON).cards
+        let (past, future) = (cards[0], cards[1])
+        XCTAssertTrue(past.isPast && !past.isFuture && !past.isLetter)
+        XCTAssertTrue(future.isFuture && !future.isPast)
+        XCTAssertTrue(past.takesText && future.takesText)
+        XCTAssertEqual(DeckPalette.of(past).name, "Looking back")
+        XCTAssertEqual(DeckPalette.of(past).colors, HermexPaper.past)
+        XCTAssertEqual(DeckPalette.of(future).name, "Looking ahead")
+        XCTAssertEqual(DeckPalette.of(future).colors, HermexPaper.dusk)
+        XCTAssertEqual(past.kindLabel(.of(past), advisor: "Coach"), "Looking back · Stony Brook",
+                       "the subject, not the day's advisor")
+        XCTAssertEqual(future.returns.map(\.id), ["1m", "1y"], "a return without a label is dropped")
+        XCTAssertEqual(past.returns, [])
+        XCTAssertEqual(DeckCopy.invitation(for: past), "Write it down")
+        XCTAssertEqual(DeckCopy.invitation(for: future), "Write to future you")
+        let back = try DailyDeck.decode(#"""
+        {"date": "d", "kind": "morning", "cards": [{"id": "future", "type": "prompt", "kind": "future",
+          "title": "From you, Sep 4, 2026", "question": "What would you tell the you who wrote it?",
+          "thread": {"label": "From you, Sep 4, 2026", "quote": "Keep going."}}]}
+        """#).cards[0]
+        XCTAssertEqual(back.thread?.quote, "Keep going.")
+        XCTAssertEqual(DeckCopy.invitation(for: back), "Write back")
+    }
+
+    @MainActor
+    func testAMessagesReturnDefaultsToAYearAndFilesOnlyWhenPicked() async throws {
+        store.setWorkspace("/vault", for: server)
+        let model = makeViewModel(ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.timeCardsJSON))
+        await model.load()
+        let card = try XCTUnwrap(model.cards.first { $0.isFuture })
+        XCTAssertEqual(model.returns(for: card), "1y")
+        model.setReturns("1m", for: card)
+        XCTAssertEqual(model.returns(for: card), "1m")
+        XCTAssertEqual(model.answeredCount, 0, "a return alone isn't an answer")
+        model.setText("Keep going.", for: card)
+        let deck = try DailyDeck.decode(Self.timeCardsJSON)
+        let payload = DeckAnswersPayload(deck: deck, answers: ["future": try XCTUnwrap(model.answer(for: card))], completedAt: morning)
+        let json = try XCTUnwrap(try payload.message().components(separatedBy: "```json\n").last?.components(separatedBy: "\n```").first)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+        XCTAssertEqual((object["answers"] as? [[String: Any]])?.first?["returns"] as? String, "1m")
+        model.setReturns("1y", for: card)
+        XCTAssertNil(model.answer(for: card)?.returns, "the default is stored as none")
+        model.setText("", for: card)
+        XCTAssertNil(model.answer(for: card), "no words and the default return: nothing to file")
+    }
+
     func testAtlasQuestionsFromLastNightWearTheirOwnMarkAndLeadWithTheTitle() throws {
         let json = #"""
         {"date": "2026-10-25", "kind": "morning", "cards": [

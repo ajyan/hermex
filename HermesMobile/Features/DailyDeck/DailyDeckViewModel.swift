@@ -644,6 +644,16 @@ final class DailyDeckViewModel {
         }
     }
 
+    /// When a Looking ahead message comes back: his pick, else the vault's default, a year.
+    func returns(for card: DeckCard) -> String {
+        answers[card.id]?.returns ?? DeckCard.defaultReturn
+    }
+
+    /// Picks when a Looking ahead message comes back; the default is stored as none.
+    func setReturns(_ id: String, for card: DeckCard) {
+        update(card) { $0.returns = id == DeckCard.defaultReturn ? nil : id }
+    }
+
     /// Picks one of a dinner card's options; picking it again clears it. A note stays.
     func pick(_ option: String, for card: DeckCard) {
         update(card) { $0.action = $0.action == option ? nil : option }
