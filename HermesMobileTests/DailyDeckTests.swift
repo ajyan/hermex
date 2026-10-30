@@ -2669,6 +2669,34 @@ final class MandarinPracticeTests: XCTestCase {
         XCTAssertEqual(card.yesterday?.pattern?.pattern, "因为…所以…")
     }
 
+    func testCuesDecodeTheirKindExampleAndYesterdaysFlow() throws {
+        let card = try card("""
+        {"date": "2026-10-31", "kind": "morning", "cards": [
+          {"id": "mandarin", "type": "prompt", "kind": "mandarin", "question": "你最近怎么样？",
+           "yesterday": {"said": "我很累。我很开心。", "natural": "我很累，不过很开心。",
+                         "flow": {"transition": "不过", "en": "but", "joined": "我很累，不过很开心。",
+                                  "joined_pinyin": "Wǒ hěn lèi, bú guò hěn kāi xīn.", "why": "A soft but."}},
+           "phrases": [{"hanzi": "不过", "pinyin": "Bú guò", "en": "but / though", "kind": "transition",
+                        "note": "A soft but.", "example": "很累，不过很开心。", "example_pinyin": "Hěn lèi, bú guò hěn kāi xīn.",
+                        "example_en": "Tired, but happy."},
+                       {"hanzi": "我有点担心", "en": "I'm a bit worried", "kind": "feeling"},
+                       {"hanzi": "还不错", "en": "Not bad"}]}
+        ]}
+        """)
+        let cue = card.phrases[0]
+        XCTAssertEqual(cue.kindLabel, "Transition")
+        XCTAssertEqual(cue.note, "A soft but.")
+        XCTAssertEqual(cue.example, "很累，不过很开心。")
+        XCTAssertEqual(cue.examplePinyin, "Hěn lèi, bú guò hěn kāi xīn.")
+        XCTAssertEqual(cue.exampleEn, "Tired, but happy.")
+        XCTAssertEqual(card.phrases.map(\.kindLabel), ["Transition", "Feeling", nil], "older cards' phrases have no kind")
+        XCTAssertTrue(card.mandarinTellsAStory)
+        let flow = try XCTUnwrap(card.yesterday?.flow)
+        XCTAssertEqual(flow.transition, "不过")
+        XCTAssertEqual(flow.joinedPinyin, "Wǒ hěn lèi, bú guò hěn kāi xīn.")
+        XCTAssertFalse(try self.card().mandarinTellsAStory, "cards before cues keep the plain question")
+    }
+
     func testStepsStartAtTheFixAndMoveOnAsEachIsDone() async throws {
         let client = FakeMandarinClient()
         let practice = practice(try card(), client: client)
