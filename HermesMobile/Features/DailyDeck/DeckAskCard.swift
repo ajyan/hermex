@@ -348,6 +348,7 @@ private struct DailyAskForm: View {
         TextField(text: text, axis: .vertical) { Text(verbatim: prompt) }
             .font(AppFont.body())
             .padding(10)
+            .withDictation(text)
             .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
@@ -374,6 +375,7 @@ private struct DailyAskPassSheet: View {
                 TextField(text: $reason, axis: .vertical) { Text(verbatim: "Why pass?") }
                     .font(AppFont.body())
                     .padding(10)
+                    .withDictation($reason)
                     .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 Text(verbatim: "What was wrong").font(AppFont.subheadline(weight: .semibold))
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 8)], alignment: .leading, spacing: 8) {

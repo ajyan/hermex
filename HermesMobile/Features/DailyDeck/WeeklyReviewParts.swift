@@ -300,6 +300,7 @@ struct WeekEditorSheet: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .background(palette.paper.ignoresSafeArea())
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) { DictationMicButton(text: $text) }
                 ToolbarItem(placement: .confirmationAction) {
                     Button { dismiss() } label: { Text(verbatim: "Done") }
                 }
