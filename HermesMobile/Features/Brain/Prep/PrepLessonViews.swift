@@ -227,7 +227,7 @@ struct PrepBossResultView: View {
         if !result.strongAnswer.isEmpty {
             VStack(alignment: .leading, spacing: BrainStyle.s) {
                 BrainSectionHeader(title: "Sample answer")
-                Text(verbatim: result.strongAnswer)
+                Text(inlineMarkdown(result.strongAnswer))
                     .brainText(.quote)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)

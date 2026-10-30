@@ -318,6 +318,13 @@ extension View {
     }
 }
 
+/// Saved notes and course text carry *emphasis* and **bold**; show it rather than the asterisks.
+/// Line breaks are kept; text that doesn't parse shows as written.
+func inlineMarkdown(_ text: String) -> AttributedString {
+    (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
+        ?? AttributedString(text)
+}
+
 enum HXKeyboard {
     /// Closes the keyboard, whichever field holds it.
     static func dismiss() {

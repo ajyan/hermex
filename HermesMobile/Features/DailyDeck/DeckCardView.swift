@@ -1530,12 +1530,6 @@ private struct AnswerBox: View {
     }
 }
 
-/// Saved notes carry *emphasis* and **bold**; show it rather than the asterisks.
-func inlineMarkdown(_ text: String) -> AttributedString {
-    (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
-        ?? AttributedString(text)
-}
-
 /// A capsule toggle for follow-up choices.
 /// A pill choice: the decision card's buttons, also the Daily Ask's.
 struct ChoiceButton: View {
