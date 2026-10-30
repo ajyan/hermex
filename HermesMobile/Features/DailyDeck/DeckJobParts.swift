@@ -101,7 +101,7 @@ struct DeckTodayOnePanel: View {
                     .foregroundStyle(Color.hxTextSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
-                Text(verbatim: "You, yesterday")
+                Text(verbatim: one.at ?? "You, yesterday")
                     .font(AppFont.caption())
                     .foregroundStyle(palette.ink.opacity(0.75))
             }
