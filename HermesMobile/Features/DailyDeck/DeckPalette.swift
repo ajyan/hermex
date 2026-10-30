@@ -72,6 +72,8 @@ struct DeckPalette: Equatable {
     static let advisor = DeckPalette(.advisor, symbol: "bubble.left", name: "Check-in", shortName: "Check-in")
     /// The Dad card is the Dad advisor's, so it wears the advisor paper with its own mark.
     static let letter = DeckPalette(.advisor, symbol: "heart", name: "Letter to her", shortName: "Letter")
+    static let lookingBack = DeckPalette(.past, symbol: "arrow.uturn.backward.circle", name: "Looking back", shortName: "Back")
+    static let lookingAhead = DeckPalette(.dusk, symbol: "sunrise", name: "Looking ahead", shortName: "Ahead")
     static let mandarin = DeckPalette(.mandarin, symbol: "character.bubble", name: "Mandarin practice", shortName: "Mandarin")
     static let dinner = DeckPalette(.meal, symbol: "fork.knife", name: "Last night's dinner", shortName: "Dinner")
     static let meals = DeckPalette(.meal, symbol: "basket", name: "This week's dinners", shortName: "Dinners")
@@ -116,7 +118,10 @@ struct DeckPalette: Equatable {
         case .front: return .front(card.front)
         case .close: return .quote
         case .prompt where card.chapter != nil: return .week
-        case .prompt: return card.isMandarin ? .mandarin : card.isLetter ? .letter : card.isDream ? .dream : .advisor
+        case .prompt:
+            if card.isPast { return .lookingBack }
+            if card.isFuture { return .lookingAhead }
+            return card.isMandarin ? .mandarin : card.isLetter ? .letter : card.isDream ? .dream : .advisor
         case .sleep: return .sleep
         case .goal:
             let goal = GoalPaper.palette(named: card.color ?? "", slug: card.goals.first ?? card.id)

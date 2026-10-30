@@ -326,6 +326,9 @@ struct DeckCardView: View {
             } else if card.takesText {
                 reflection(DeckCopy.invitation(for: card))
             }
+            if !card.returns.isEmpty {
+                returnsPicker
+            }
         }
         .padding(.top, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -424,6 +427,24 @@ struct DeckCardView: View {
                     .background(palette.ink, in: Capsule())
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    /// When a message to future him comes back: one chip each, the chosen one filled (a year until he picks).
+    private var returnsPicker: some View {
+        let chosen = viewModel.returns(for: card)
+        return VStack(alignment: .leading, spacing: 8) {
+            Text(verbatim: "Comes back to you in")
+                .font(AppFont.footnote(weight: .semibold))
+                .foregroundStyle(palette.ink.opacity(0.75))
+            FlowRow(spacing: 6) {
+                ForEach(card.returns) { option in
+                    ChoiceButton(title: option.label, isSelected: chosen == option.id) {
+                        viewModel.setReturns(option.id, for: card)
+                    }
+                    .accessibilityLabel(Text(verbatim: "Comes back in \(option.label)"))
+                }
+            }
         }
     }
 

@@ -6,7 +6,8 @@ import SwiftUI
 
 extension DeckCard {
     /// An act card's kind label after its symbol: the palette's name, then what this one is ("Video · Idea 1 of 2",
-    /// "Check-in · Roger Federer", "Letter to her · 80 days to go", "A year ago · Tue, Oct 28, 2025").
+    /// "Check-in · Roger Federer", "Letter to her · 80 days to go", "Looking back · Stony Brook",
+    /// "A year ago · Tue, Oct 28, 2025").
     /// `idea` is the card's place among the deck's ideas.
     func kindLabel(_ palette: DeckPalette, idea: (number: Int, of: Int)? = nil, advisor: String? = nil) -> String {
         let detail: String?
@@ -14,6 +15,8 @@ extension DeckCard {
             detail = "Idea \(idea.number) of \(idea.of)"
         } else if isLetter {
             detail = lines.first
+        } else if isPast || isFuture {
+            detail = title
         } else if type == .prompt, !isDream {
             detail = voice ?? advisor
         } else {

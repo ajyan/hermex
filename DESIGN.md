@@ -47,12 +47,12 @@ Each paper is one hue rendered as a glow that adapts to the appearance:
 | `reading` | `#FFE4D1` / `#5A2A0C` | `#9A4410` / `#F5A37A` | From your reading |
 | `notes` | `#E6DCFF` / `#33197A` | `#5B3FC4` / `#B39DFF` | From your notes, Sleep |
 | `video` | `#D2F0F4` / `#0B4650` | `#0E6D7A` / `#5CCFE0` | Video |
-| `past` | `#FFEFC2` / `#4E3A00` | `#7A5C00` / `#E8C55A` | A year ago, Your journal |
+| `past` | `#FFEFC2` / `#4E3A00` | `#7A5C00` / `#E8C55A` | A year ago, Your journal, Looking back |
 | `advisor` | `#E4EEF6` / `#14324A` | `#2E5878` / `#9DBEDD` | Check-in |
 | `plain` | `#F4F0E8` / `#2A2A28` | `#5E5646` / `#D6CDBB` | Library, follow-ups |
 | `mandarin` | `#FFDDD6` / `#5E1A0E` | `#B03A22` / `#FF9C85` | Mandarin practice |
 | `ledger` | `#EEF3D6` / `#2F3A0A` | `#4F6300` / `#C2DA6E` | (Money, not a Brief card) |
-| `dusk` | `#F3E4EE` / `#4A1F3D` | `#8C3D74` / `#E7A3CF` | The weekly review's cards |
+| `dusk` | `#F3E4EE` / `#4A1F3D` | `#8C3D74` / `#E7A3CF` | The weekly review's cards, Looking ahead |
 | `kitchen` | `#E3EEDB` / `#22381A` | `#46682F` / `#B2D49A` | Last night's dinner, This week's dinners |
 | `body` | `#D2F2EC` / `#0B4A40` | `#0B6E62` / `#4FD6BE` | (Body, not a Brief card) |
 
@@ -74,6 +74,8 @@ Named in `Config/HermexStyle.swift`; `HermexPaper.forTool(_:)` maps tool kinds.
 | Shell, code, delegation, everything else; chat source badges | `.tool` | `plain` |
 | Goal | the goal's own paper (`GoalPaper`) | any |
 | The Daily Brief's Dad card (a letter to his daughter: the countdown, then her age, over the prompt) | `DeckPalette.letter` | `advisor` (the Dad advisor's paper, with a heart mark instead of the check-in's bubble) |
+| The Daily Brief's Looking back card (a story, a friend, a time of his life, or something to let go; the subject in its kind label) | `DeckPalette.lookingBack` | `past` (A year ago's paper: both are his past) |
+| The Daily Brief's Looking ahead card (who he's becoming, or a message to future him with "Comes back to you in" chips; a message that came back quoted as its thread) | `DeckPalette.lookingAhead` | `dusk` (the chips are controls, so the chosen one is Nous blue) |
 | The Daily Brief's Mandarin practice card (phrases to hear, a question to answer out loud, yesterday's feedback) | `DeckPalette.mandarin` | `mandarin` |
 | The Daily Brief's "Atlas asks" cards (open questions from last night's self-review, a short title over one question) | `DeckPalette.dream` | `plain` (Atlas's own system cards, like What changed, with a moon mark) |
 | The week's question: the morning's This week divider, and the Sunday review's close of it (his answers, Still open / Settled) on its own page | `DeckPalette.section`, `DeckPalette.weekQuestion` | `opener`, as a neutral summary card like the opener |
