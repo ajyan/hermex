@@ -30,6 +30,11 @@ enum BrainConnectionsLayout {
         return hub.prev != nil || hub.next != nil
     }
 
+    /// The pager's second line: "4 of 14", or what went wrong with the last step.
+    static func placeLine(_ hub: BrainHubContext, failed: Bool) -> String? {
+        failed ? "Couldn't open it · try again" : position(hub)
+    }
+
     /// "4 of 14", the page's place among its hub's pages.
     static func position(_ hub: BrainHubContext) -> String? {
         guard let index = hub.index, hub.count > 0 else { return nil }
@@ -73,6 +78,7 @@ enum BrainConnectionsLayout {
 struct BrainTrail: View {
     let hub: BrainRef?
     @Environment(\.openBrainRoute) private var openBrainRoute
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         HStack(spacing: BrainStyle.xs) {
@@ -93,11 +99,12 @@ struct BrainTrail: View {
                 NavigationLink(value: ShellPushDestination.brainRoute(.page(hub.module, hub.id))) {
                     Text(verbatim: hub.title.isEmpty ? hub.id : hub.title)
                         .foregroundStyle(Color.accentColor)
-                        .lineLimit(1)
+                        // At accessibility sizes the hub's name wraps rather than cuts off.
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
                         .truncationMode(.tail)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(Text(verbatim: "In \(hub.title), open"))
+                .accessibilityLabel(Text(verbatim: "Hub: \(hub.title.isEmpty ? hub.id : hub.title)"))
             }
         }
         .font(BrainStyle.rowSubtitle)
@@ -262,6 +269,10 @@ struct BrainHubPager: View {
     let hub: BrainHubContext
     let onStep: (Int) -> Void
     var onShowPages: (() -> Void)?
+    /// The step being loaded (-1 or +1); its arrow shows a spinner meanwhile.
+    var pendingStep: Int?
+    /// The last step couldn't load; the place line says so until the next try.
+    var stepFailed = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
@@ -269,17 +280,15 @@ struct BrainHubPager: View {
             stepButton(-1, ref: hub.prev, symbol: "chevron.backward", label: "Previous")
             Button { onShowPages?() } label: {
                 VStack(spacing: 1) {
-                    // At accessibility sizes the hub's name is in the trail; the bar keeps the place.
-                    if !dynamicTypeSize.isAccessibilitySize {
-                        Text(verbatim: hub.ref.title)
-                            .font(AppFont.caption(weight: .semibold))
-                            .foregroundStyle(Color.hxTextPrimary)
-                            .lineLimit(1)
-                    }
-                    if let position = BrainConnectionsLayout.position(hub) {
-                        Text(verbatim: position)
+                    Text(verbatim: hub.ref.title)
+                        .font(AppFont.caption(weight: .semibold))
+                        .foregroundStyle(Color.hxTextPrimary)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                        .multilineTextAlignment(.center)
+                    if let place = BrainConnectionsLayout.placeLine(hub, failed: stepFailed) {
+                        Text(verbatim: place)
                             .font(AppFont.caption2())
-                            .foregroundStyle(Color.hxTextSecondary)
+                            .foregroundStyle(stepFailed ? Color.hxWarning : Color.hxTextSecondary)
                             .monospacedDigit()
                     }
                 }
@@ -301,10 +310,16 @@ struct BrainHubPager: View {
 
     private func stepButton(_ step: Int, ref: BrainRef?, symbol: String, label: String) -> some View {
         Button { onStep(step) } label: {
-            Image(systemName: symbol)
-                .font(AppFont.body(weight: .semibold))
-                .frame(minWidth: BrainStyle.minTapTarget, minHeight: BrainStyle.minTapTarget)
-                .contentShape(Rectangle())
+            Group {
+                if pendingStep == step {
+                    ProgressView()
+                } else {
+                    Image(systemName: symbol)
+                        .font(AppFont.body(weight: .semibold))
+                }
+            }
+            .frame(minWidth: BrainStyle.minTapTarget, minHeight: BrainStyle.minTapTarget)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .foregroundStyle(ref == nil ? Color.hxTextSecondary.opacity(0.4) : Color.accentColor)
