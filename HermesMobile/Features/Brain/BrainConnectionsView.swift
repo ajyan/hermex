@@ -38,9 +38,14 @@ enum BrainConnectionsLayout {
         return "\(index + 1) of \(hub.count)"
     }
 
-    /// +1 for a swipe left (next page), -1 for a swipe right (previous), nil otherwise.
-    static func swipeStep(_ translation: CGSize) -> Int? {
-        guard abs(translation.width) >= swipeDistance,
+    /// A swipe that starts this close to the screen's leading edge is the system's Back.
+    static let edgeGuard: CGFloat = 30
+
+    /// +1 for a swipe left (next page), -1 for a swipe right (previous), nil otherwise. A
+    /// swipe starting at the leading edge (`startX`, in screen points) is left to Back.
+    static func swipeStep(_ translation: CGSize, startX: CGFloat = .infinity) -> Int? {
+        guard startX >= edgeGuard,
+              abs(translation.width) >= swipeDistance,
               abs(translation.width) > abs(translation.height) * 2
         else { return nil }
         return translation.width < 0 ? 1 : -1
@@ -53,6 +58,10 @@ enum BrainConnectionsLayout {
         return snippet.range(of: needle, options: [.caseInsensitive, .diacriticInsensitive])
     }
 
+    /// A mention longer than this (usually a page's full title) is marked in the glow only,
+    /// without the wash, so it doesn't swamp the words around it.
+    static let longMention = 30
+
     /// The snippet with the mention marked in the page's paper.
     static func highlighted(_ snippet: String, mention: String, paper: HermexPaper) -> AttributedString {
         var text = AttributedString(snippet)
@@ -61,7 +70,9 @@ enum BrainConnectionsLayout {
               let upper = AttributedString.Index(range.upperBound, within: text)
         else { return text }
         text[lower..<upper].foregroundColor = paper.glow
-        text[lower..<upper].backgroundColor = paper.wash
+        if mention.count <= longMention {
+            text[lower..<upper].backgroundColor = paper.wash
+        }
         text[lower..<upper].inlinePresentationIntent = .stronglyEmphasized
         return text
     }
@@ -266,16 +277,20 @@ struct BrainHubPager: View {
     let hub: BrainHubContext
     let onStep: (Int) -> Void
     var onShowPages: (() -> Void)?
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         HStack(spacing: 0) {
             stepButton(-1, ref: hub.prev, symbol: "chevron.backward", label: "Previous")
             Button { onShowPages?() } label: {
                 VStack(spacing: 1) {
-                    Text(verbatim: hub.ref.title)
-                        .font(AppFont.caption(weight: .semibold))
-                        .foregroundStyle(Color.hxTextPrimary)
-                        .lineLimit(1)
+                    // At accessibility sizes the hub's name is in the trail; the bar keeps the place.
+                    if !dynamicTypeSize.isAccessibilitySize {
+                        Text(verbatim: hub.ref.title)
+                            .font(AppFont.caption(weight: .semibold))
+                            .foregroundStyle(Color.hxTextPrimary)
+                            .lineLimit(1)
+                    }
                     if let position = BrainConnectionsLayout.position(hub) {
                         Text(verbatim: position)
                             .font(AppFont.caption2())
@@ -293,17 +308,17 @@ struct BrainHubPager: View {
             stepButton(1, ref: hub.next, symbol: "chevron.forward", label: "Next")
         }
         .padding(.horizontal, BrainStyle.xs)
-        // Surface-tinted so the labels stay legible over body text scrolling beneath.
-        .adaptiveGlass(isInteractive: true, tint: Color.hxSurface.opacity(0.75), in: Capsule())
+        // Opaque under the glass, so body text scrolling beneath never shows through the labels.
+        .background(Color.hxSurface, in: Capsule())
+        .adaptiveGlass(isInteractive: true, tint: Color.hxSurface, in: Capsule())
         .hxShadow(.float)
-        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
     private func stepButton(_ step: Int, ref: BrainRef?, symbol: String, label: String) -> some View {
         Button { onStep(step) } label: {
             Image(systemName: symbol)
-                .font(.system(size: 16, weight: .semibold))
-                .frame(width: BrainStyle.minTapTarget, height: BrainStyle.minTapTarget)
+                .font(AppFont.body(weight: .semibold))
+                .frame(minWidth: BrainStyle.minTapTarget, minHeight: BrainStyle.minTapTarget)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

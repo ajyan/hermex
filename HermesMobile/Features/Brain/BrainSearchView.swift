@@ -144,6 +144,7 @@ struct BrainSearchResultRow: View {
     let ref: BrainRef
     private let subtitle: String?
     @ScaledMetric(relativeTo: .body) private var side = BrainStyle.searchThumbnailSize
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     init(ref: BrainRef, subtitle: String? = nil) {
         self.ref = ref
@@ -154,7 +155,9 @@ struct BrainSearchResultRow: View {
         BrainRow(
             leading: { leading },
             title: ref.title.isEmpty ? ref.id : ref.title,
-            subtitle: subtitle
+            subtitle: subtitle,
+            // At accessibility sizes the title wraps in full; two lines would cut most of it.
+            titleLineLimit: dynamicTypeSize.isAccessibilitySize ? nil : 2
         )
     }
 

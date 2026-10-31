@@ -30,6 +30,18 @@ enum BrainReaderLayout {
         return [kind, when].filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
+    /// The one reason every further-reading row shares ("Shares #mindfulness"), said once in
+    /// the header; nil when the reasons differ or are missing.
+    static func sharedReason(_ refs: [BrainRef]) -> String? {
+        guard let first = refs.first?.reason, !first.isEmpty, refs.allSatisfy({ $0.reason == first }) else { return nil }
+        return first.prefix(1).uppercased() + first.dropFirst()
+    }
+
+    /// The reader's tags as one meta line, "#habits · #self".
+    static func tagLine(_ tags: [String]) -> String {
+        displayTags(tags).map { "#\($0)" }.joined(separator: " · ")
+    }
+
     /// Reader tag chips without the ingest-channel tags every article or video carries.
     static func displayTags(_ tags: [String]) -> [String] {
         tags.filter { !["email", "youtube"].contains($0.lowercased()) }
@@ -334,9 +346,6 @@ struct BrainReaderContent: View {
                                                     : "Opens an interactive diagram"))
                     }
                 }
-                if !hubPages.isEmpty {
-                    hubPagesSection
-                }
                 if let person {
                     // Outside the body's hub swipe, so paging the timeline never pages the hub.
                     personSections(person)
@@ -350,6 +359,10 @@ struct BrainReaderContent: View {
                 }
                 .contentShape(Rectangle())
                 .simultaneousGesture(swipe, including: onStep == nil ? .subviews : .all)
+                // A hub's pages come after its own words: the first screen is the page.
+                if !hubPages.isEmpty {
+                    hubPagesSection
+                }
                 furtherReading
                 journalPaging
                 if let rating {
@@ -376,9 +389,10 @@ struct BrainReaderContent: View {
     /// A sideways swipe over the body pages through the hub. Kept off the card row, which
     /// scrolls sideways itself.
     private var swipe: some Gesture {
-        DragGesture(minimumDistance: 24)
+        DragGesture(minimumDistance: 24, coordinateSpace: .global)
             .onEnded { value in
-                if let onStep, let direction = BrainConnectionsLayout.swipeStep(value.translation) {
+                if let onStep, let direction = BrainConnectionsLayout.swipeStep(value.translation,
+                                                                                  startX: value.startLocation.x) {
                     onStep(direction)
                 }
             }
@@ -449,14 +463,12 @@ struct BrainReaderContent: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// The page's tags, display only.
+    /// The page's tags as meta text ("#habits · #self"): they don't act, so they don't look
+    /// like the list's filter chips, and they wrap at any text size.
     private var tagRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: BrainStyle.s) {
-                ForEach(BrainReaderLayout.displayTags(page.item.tags), id: \.self) { BrainTagChip(tag: $0) }
-            }
-        }
-        .scrollClipDisabled()
+        Text(verbatim: BrainReaderLayout.tagLine(page.item.tags))
+            .brainText(.meta)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// Pages that link here, each with the words around its link.
@@ -494,7 +506,8 @@ struct BrainReaderContent: View {
     private var hubPagesSection: some View {
         let shown = showsAllHubPages ? hubPages : Array(hubPages.prefix(BrainConnectionsLayout.hubPreviewCount))
         return BrainReaderRefSection(
-            title: "In this hub",
+            // A hub inside another hub: its pager walks the parent, so its own list says which.
+            title: page.hub == nil ? "In this hub" : "Pages under this one",
             count: hubPages.count,
             rows: shown.map { BrainReaderRefSection.Row(ref: $0, subtitle: $0.snippet) },
             showAllTitle: hubPages.count > shown.count ? BrainReaderLayout.showAllTitle(hubPages.count) : nil,
@@ -509,7 +522,8 @@ struct BrainReaderContent: View {
             BrainReaderRefSection(
                 title: "Further reading",
                 count: page.further.count,
-                rows: page.further.map { BrainReaderRefSection.Row(ref: $0, subtitle: $0.reason) }
+                rows: page.further.map { BrainReaderRefSection.Row(ref: $0, subtitle: $0.snippet.isEmpty ? $0.reason : $0.snippet) },
+                trailing: BrainReaderLayout.sharedReason(page.further)
             )
         }
     }
@@ -561,6 +575,8 @@ struct BrainReaderRefSection: View {
     let rows: [Row]
     var showAllTitle: String?
     var onShowAll: () -> Void = {}
+    /// A note at the header's trailing edge.
+    var trailing: String?
     /// Where a row goes; a plain page unless the section says otherwise.
     var route: (BrainRef) -> BrainRoute = { .page($0.module, $0.id) }
     /// The separator starts where the row's text does (thumbnail plus spacing).
@@ -568,7 +584,7 @@ struct BrainReaderRefSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
-            BrainSectionHeader(title: title, count: count)
+            BrainSectionHeader(title: title, count: count, trailing: trailing)
             VStack(spacing: 0) {
                 // A section's rows never reorder ("Show all" only appends), so position is a stable id.
                 ForEach(Array(rows.enumerated()), id: \.offset) { index, row in

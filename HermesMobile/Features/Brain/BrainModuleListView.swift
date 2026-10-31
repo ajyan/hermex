@@ -434,7 +434,7 @@ struct BrainModuleListView: View {
             }
             .brainListRow()
         } header: {
-            BrainSectionHeader(title: matches.isEmpty ? "No titles match" : "Pages", count: matches.isEmpty ? nil : matches.count)
+            BrainSectionHeader(title: matches.isEmpty ? "No pages match" : "Pages", count: matches.isEmpty ? nil : matches.count)
         }
     }
 
@@ -462,10 +462,14 @@ struct BrainModuleListView: View {
     /// opens the top match.
     private var wikiSearchField: some View {
         listSearchField(prompt: "Search the wiki", text: $wikiQuery) {
-            guard let list = viewModel.list,
-                  let top = BrainListLayout.wikiMatches(list.items, query: wikiQuery).first
-            else { return }
-            push(.page(.wiki, top.id))
+            let query = wikiQuery.trimmingCharacters(in: .whitespaces)
+            guard let list = viewModel.list, !query.isEmpty else { return }
+            if let top = BrainListLayout.wikiMatches(list.items, query: query).first {
+                push(.page(.wiki, top.id))
+            } else {
+                // Nothing by title or gist: Return looks inside the pages instead.
+                push(.searchAll(.wiki, query: query))
+            }
         }
     }
 
