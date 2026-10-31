@@ -454,6 +454,18 @@ final class BrainPageViewModel {
     /// Bumped by every `load()`, so an older failure never overwrites a newer success.
     private var generation = 0
 
+    /// Logs a catch-up to this person, then reloads the page so the note, "seen" and the rhythm show
+    /// it. Throws when the server didn't write it; the caller keeps the words so nothing is lost.
+    func logCatchUp(_ text: String, kind: BrainPersonLogRequest.Kind, today: Date = Date()) async throws -> BrainPersonLogResult {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let day = calendar.dateComponents([.year, .month, .day], from: today)
+        let date = String(format: "%04d-%02d-%02d", day.year ?? 0, day.month ?? 0, day.day ?? 0)
+        let result = try await client.logPerson(BrainPersonLogRequest(id: id, text: text, kind: kind, date: date))
+        await load()
+        return result
+    }
+
     func load() async {
         generation += 1
         let token = generation

@@ -83,6 +83,29 @@ final class BrainViewModelTests: XCTestCase {
         XCTAssertEqual(try BrainCache.load(BrainPage.self, server: cache.server, kind: "page", id: "p1", in: try XCTUnwrap(cache.context)), samplePage)
     }
 
+    func testLoggingACatchUpWritesItThenReloadsThePage() async throws {
+        let client = FakeBrainClient()
+        client.pageResult = .success(BrainPage(item: BrainItem(module: .people, id: "crm/contacts/Dara.md", title: "Dara"),
+                                               person: BrainPerson()))
+        let viewModel = BrainPageViewModel(module: .people, id: "crm/contacts/Dara.md", client: client,
+                                           cache: try makeCache(), onAPIError: { _ in })
+        await viewModel.load()
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = .current
+        let today = try XCTUnwrap(utc.date(from: DateComponents(year: 2026, month: 10, day: 31, hour: 23, minute: 30)))
+        _ = try await viewModel.logCatchUp("Drinks Friday?", kind: .texted, today: today)
+        XCTAssertEqual(client.logged, [BrainPersonLogRequest(id: "crm/contacts/Dara.md", text: "Drinks Friday?",
+                                                             kind: .texted, date: "2026-10-31")])
+        XCTAssertEqual(client.pageCalls.count, 2, "the page reloads with the new note")
+
+        client.logResult = .failure(URLError(.notConnectedToInternet))
+        do {
+            _ = try await viewModel.logCatchUp("Coffee", kind: .note)
+            XCTFail("a failed log throws, so the sheet keeps his words")
+        } catch {}
+        XCTAssertEqual(client.pageCalls.count, 2, "nothing written, nothing to reload")
+    }
+
     func testAPersonPageIsLaidOutOnceWhenItLoads() async throws {
         let client = FakeBrainClient()
         let person = BrainPerson(encounters: [BrainEncounter(id: "2026-10-01#1", date: "2026-10-01", title: "Dinner",
@@ -725,5 +748,12 @@ final class FakeBrainClient: BrainDataClient, @unchecked Sendable {
     var peopleHomeResult: Result<BrainPeopleHome, Error> = .success(BrainPeopleHome())
     func peopleHome() async throws -> BrainPeopleHome {
         try peopleHomeResult.get()
+    }
+    var logResult: Result<BrainPersonLogResult, Error> = .success(BrainPersonLogResult())
+    private var _logged: [BrainPersonLogRequest] = []
+    var logged: [BrainPersonLogRequest] { lock.withLock { _logged } }
+    func logPerson(_ request: BrainPersonLogRequest) async throws -> BrainPersonLogResult {
+        lock.withLock { _logged.append(request) }
+        return try logResult.get()
     }
 }

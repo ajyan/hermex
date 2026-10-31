@@ -111,6 +111,15 @@ struct BrainReaderView: View {
     /// The pager step in flight (-1 or +1), and whether the last one failed.
     @State private var pendingStep: Int?
     @State private var stepFailed = false
+    /// A person page's Log sheet, and the Messages sheet its Text button opens.
+    @State private var showsLog = false
+    @State private var texting: DeckMessage?
+    /// A text Messages reported sent that couldn't be logged: its words, for Try again.
+    @State private var unloggedText: String?
+    /// Bumped by each logged catch-up; plays the success haptic.
+    @State private var loggedCount = 0
+    @Environment(\.openDraftChat) private var openDraftChat
+    @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Good/not-good on the page; shown only where the server has labels.
     @State private var labels: LabelsViewModel
@@ -152,8 +161,34 @@ struct BrainReaderView: View {
                                   pendingStep: pendingStep, stepFailed: stepFailed)
                         .padding(.horizontal, BrainStyle.l)
                         .padding(.bottom, BrainStyle.s)
+                } else if let page = viewModel.page, let person = page.person {
+                    personActions(page: page, person: person)
+                        .padding(.horizontal, BrainStyle.l)
+                        .padding(.bottom, BrainStyle.s)
                 }
             }
+            .sheet(isPresented: $showsLog) {
+                BrainPersonLogSheet(name: viewModel.page?.item.title ?? "them") { text in
+                    _ = try await viewModel.logCatchUp(text, kind: .note)
+                    loggedCount += 1
+                }
+            }
+            .sheet(item: $texting) { message in
+                MessageComposer(message: message) { sent, body in
+                    texting = nil
+                    let words = (body ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                    if sent, !words.isEmpty { Task { await logText(words) } }
+                }
+                .ignoresSafeArea()
+            }
+            .alert(Text(verbatim: "Sent, but not logged"), isPresented: Binding(
+                get: { unloggedText != nil }, set: { if !$0 { unloggedText = nil } })) {
+                Button { if let words = unloggedText { Task { await logText(words) } } } label: { Text(verbatim: "Try again") }
+                Button(role: .cancel) { unloggedText = nil } label: { Text(verbatim: "Not now") }
+            } message: {
+                Text(verbatim: "Your text went out, but the server didn't record it on their page.")
+            }
+            .sensoryFeedback(.success, trigger: loggedCount)
             .sheet(isPresented: $showsHubPages) {
                 if let hub = viewModel.page?.hub {
                     BrainHubPagesSheet(hub: hub, currentID: viewModel.id, onPick: jump)
@@ -176,6 +211,38 @@ struct BrainReaderView: View {
     }
 
     private var labelsAvailable: Bool { availability?.labelsAvailable == true }
+
+    /// Text, Log and Ask Atlas for the person on this page.
+    private func personActions(page: BrainPage, person: BrainPerson) -> some View {
+        let name = page.item.title
+        let first = name.split(separator: " ").first.map(String.init) ?? name
+        return BrainPersonActionBar(
+            firstName: first,
+            canText: person.imessage != nil,
+            canAsk: openDraftChat.isAvailable,
+            onText: {
+                guard let handle = person.imessage else { return }
+                // He writes his own words; the note is logged only once Messages reports the text sent.
+                let message = DeckMessage(to: handle, body: nil)
+                if MessageComposer.canSend {
+                    texting = message
+                } else if let url = message.smsURL {
+                    openURL(url)  // the simulator: Messages can't report back, so nothing is logged
+                }
+            },
+            onLog: { showsLog = true },
+            onAsk: { openDraftChat("About \(name) (\(page.item.id)): ") })
+    }
+
+    private func logText(_ words: String) async {
+        do {
+            _ = try await viewModel.logCatchUp(words, kind: .texted)
+            unloggedText = nil
+            loggedCount += 1
+        } catch {
+            unloggedText = words
+        }
+    }
     private var ratingKey: LabelKey { .brainPage(module: viewModel.module, id: viewModel.id) }
 
     /// Moves to the previous (-1) or next (+1) page in the hub. The next page loads behind

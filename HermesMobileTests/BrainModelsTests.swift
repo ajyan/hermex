@@ -230,6 +230,14 @@ final class BrainModelsTests: XCTestCase {
         XCTAssertEqual(person.rhythm, [0, 1, 0, 0, 2, 0, 0, 0, 1, 0, 0, 3])
     }
 
+    func testPersonIMessageDecodesAndBlankIsNone() throws {
+        XCTAssertEqual(try appDecoder.decode(BrainPerson.self, from: Data(#"{"imessage": "+15550100100"}"#.utf8)).imessage,
+                       "+15550100100")
+        XCTAssertNil(try appDecoder.decode(BrainPerson.self, from: Data(#"{"imessage": " "}"#.utf8)).imessage)
+        XCTAssertNil(try appDecoder.decode(BrainPerson.self, from: Data("{}".utf8)).imessage)
+        XCTAssertEqual(Endpoint.brainPersonLog.path, "/api/brain/person/log")
+    }
+
     func testPersonRhythmEndDecodesAndSurvivesTheCache() throws {
         let person = try appDecoder.decode(BrainPerson.self, from: Data(#"{"rhythm_end": "2026-10"}"#.utf8))
         XCTAssertEqual(person.rhythmEnd, "2026-10")
