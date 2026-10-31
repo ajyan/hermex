@@ -406,6 +406,7 @@ struct PrepDayCompleteView: View {
 struct PrepLessonView: View {
     @State private var viewModel: PrepLessonViewModel
     @State private var didLoad = false
+    @State private var showsAnswer = false
 
     init(id: String, server: URL, onAPIError: @escaping (Error) -> Void) {
         _viewModel = State(initialValue: PrepLessonViewModel(
@@ -442,17 +443,33 @@ struct PrepLessonView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
                     PrepLessonBody(lesson: lesson)
+                    if lesson.hasRecall {
+                        PrepPracticeLink(title: "Try it now", detail: "One question on this lesson, answered out loud",
+                                         route: .lessonRun(lesson.id))
+                    }
                     if !lesson.check.prompt.isEmpty {
                         PrepNoteCard {
                             PrepCheckPrompt(check: lesson.check)
-                            if let answer = lesson.check.answer {
-                                PrepLeadText(lead: "Answer:", rest: answer)
-                            }
-                            if let explain = lesson.check.explain {
-                                Text(verbatim: explain)
-                                    .font(BrainStyle.rowTitle)
-                                    .foregroundStyle(Color.hxTextSecondary)
-                                    .fixedSize(horizontal: false, vertical: true)
+                            if showsAnswer {
+                                if let answer = lesson.check.answer {
+                                    PrepLeadText(lead: "Answer:", rest: answer)
+                                }
+                                if let explain = lesson.check.explain {
+                                    Text(verbatim: explain)
+                                        .font(BrainStyle.rowTitle)
+                                        .foregroundStyle(Color.hxTextSecondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            } else if lesson.check.answer != nil || lesson.check.explain != nil {
+                                // Answer it in your head first; the answer waits a tap.
+                                Button { showsAnswer = true } label: {
+                                    Text(verbatim: "Show the answer")
+                                        .font(BrainStyle.rowSubtitle)
+                                        .foregroundStyle(Color.accentColor)
+                                        .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
                     }

@@ -12,6 +12,8 @@ struct PrepStoryMicButton: View {
     let isSubmitting: Bool
     /// The first tap that starts listening, before any words arrive.
     var onStart: () -> Void = {}
+    /// The card's main control: a filled Nous-blue capsule, because an interview answer is spoken.
+    var prominent = true
     @State private var dictation = DictationModel()
     @Environment(\.dictationServer) private var server
 
@@ -25,7 +27,7 @@ struct PrepStoryMicButton: View {
                 dictation.toggle($text)
             } label: {
                 Label {
-                    Text(verbatim: dictation.isTidying ? "Tidying…" : isListening ? "Stop" : "Tap to talk")
+                    Text(verbatim: dictation.isTidying ? "Tidying…" : isListening ? "Listening · tap to stop" : "Tap to talk")
                 } icon: {
                     if dictation.isTidying {
                         ProgressView().controlSize(.small)
@@ -34,10 +36,11 @@ struct PrepStoryMicButton: View {
                     }
                 }
                 .font(AppFont.body(weight: .semibold))
-                .foregroundStyle(Color.accentColor)
-                .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
-                .background(Color.hxSurface, in: Capsule())
-                .overlay(Capsule().strokeBorder(Color.hxSeparator, lineWidth: 0.5))
+                .foregroundStyle(prominent ? Color.hxOnAccent : Color.accentColor)
+                .frame(maxWidth: .infinity, minHeight: prominent ? 56 : BrainStyle.minTapTarget)
+                .background(prominent ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color.hxSurface), in: Capsule())
+                .overlay(Capsule().strokeBorder(prominent ? Color.clear : Color.hxSeparator, lineWidth: 0.5))
+                .contentShape(Capsule())
             }
             .buttonStyle(.plain)
             .disabled(isSubmitting || dictation.isTidying || dictation.voiceInput.isRequestingPermission)
@@ -75,7 +78,7 @@ private struct PrepStoryAnswerField: View {
     var body: some View {
         TextField(text: $text, axis: .vertical) { Text(verbatim: placeholder) }
             .font(AppFont.body())
-            .lineLimit(4...14)
+            .lineLimit(3...14)
             .disabled(isSubmitting)
             .padding(BrainStyle.m)
             .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
@@ -107,9 +110,11 @@ private struct PrepStoryClock: View {
     }
 }
 
-/// Telling the story: the signal and the running clock (from the first mic tap or word), the story to tell and the
-/// interview prompt, its beats as cues (a label in the glow, a few words beside it), the transcript to correct and
-/// the mic. The full script waits behind "Show script". Submit is the run's pinned button.
+/// Telling the story: the signal and the running clock (once started, from the first mic tap or word), the story to
+/// tell and the interview prompt, its beats as cues (a label in the glow, a few words beside it), the mic as the
+/// card's main control, then the transcript to correct. A story told on time last rep folds its cues to their labels
+/// behind "Peek at the cues" (a hint), and the full script waits behind "Show script" once the cues are showing.
+/// Submit is the run's pinned button.
 struct PrepStoryTellCard: View {
     let prompt: String
     var title: String = ""
@@ -122,6 +127,10 @@ struct PrepStoryTellCard: View {
     @Binding var draft: String
     let isSubmitting: Bool
     let startClock: () -> Void
+    /// Cues folded to their labels until peeked (`PrepRep.cuesHidden`).
+    var cuesHidden = false
+    var peeked = false
+    var peek: () -> Void = {}
     @State private var showsScript = false
     @ScaledMetric(relativeTo: .subheadline) private var labelWidth: CGFloat = 76
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -137,8 +146,8 @@ struct PrepStoryTellCard: View {
                     TimelineView(.periodic(from: .now, by: 1)) { _ in
                         PrepStoryClock(elapsedMS: elapsedMS())
                     }
-                } else {
-                    // Not started (0:00), or held at the moment the story was sent while it is graded.
+                } else if startedAt != nil {
+                    // Held at the moment the story was sent while it is graded; nothing shows before it starts.
                     PrepStoryClock(elapsedMS: elapsedMS())
                 }
             }
@@ -153,7 +162,23 @@ struct PrepStoryTellCard: View {
                     .foregroundStyle(Color.hxTextPrimary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if !cues.isEmpty {
+            if !cues.isEmpty && cuesHidden && !peeked {
+                VStack(alignment: .leading, spacing: BrainStyle.xs) {
+                    Text(verbatim: cues.map(\.label).joined(separator: " · "))
+                        .font(BrainStyle.meta.weight(.semibold))
+                        .foregroundStyle(HermexPaper.knowledge.glow)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button(action: peek) {
+                        Text(verbatim: "Peek at the cues")
+                            .font(BrainStyle.rowSubtitle)
+                            .foregroundStyle(Color.accentColor)
+                            .frame(minHeight: BrainStyle.minTapTarget, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(Text(verbatim: "Shows each beat's cue. Counts as a hint."))
+                }
+            } else if !cues.isEmpty {
                 VStack(alignment: .leading, spacing: BrainStyle.s) {
                     ForEach(cues) { cue in
                         // At accessibility sizes the label sits over its cue, so the cue keeps the full width.
@@ -180,9 +205,9 @@ struct PrepStoryTellCard: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .transition(.opacity)
             }
-            PrepStoryAnswerField(placeholder: "Tell it out loud, or type", text: $draft, isSubmitting: isSubmitting)
             PrepStoryMicButton(text: $draft, isSubmitting: isSubmitting, onStart: startClock)
-            if !script.isEmpty {
+            PrepStoryAnswerField(placeholder: "Your words appear here. Or type.", text: $draft, isSubmitting: isSubmitting)
+            if !script.isEmpty && !(cuesHidden && !peeked) {
                 Button {
                     showsScript.toggle()
                 } label: {
@@ -221,8 +246,8 @@ struct PrepProbeCard: View {
                 .foregroundStyle(Color.hxTextPrimary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
-            PrepStoryAnswerField(placeholder: "Answer out loud, or type", text: $draft, isSubmitting: isSubmitting)
             PrepStoryMicButton(text: $draft, isSubmitting: isSubmitting)
+            PrepStoryAnswerField(placeholder: "Your words appear here. Or type.", text: $draft, isSubmitting: isSubmitting)
         }
     }
 }

@@ -278,6 +278,36 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(client.attempts.first?.drill, .boss)
     }
 
+    func testALessonRunSendsItsLessonAndEndsOnThePlainDoneScreen() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([recallLessonRep(0, drill: "recall", block: "review")], run: "lesson"))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.success(recallResult("pass", next: 1, missed: []))]
+        let vm = PrepRunViewModel(client: client, run: .lesson, unit: "u1.l0")
+        await vm.load()
+        vm.recallDraft = "Tokens are pieces of words"
+        await vm.submitRecall()
+        XCTAssertEqual(client.log.first, "today:lesson:u1.l0")
+        XCTAssertEqual(client.attempts.first?.run, .lesson)
+        XCTAssertEqual(client.attempts.first?.unit, "u1.l0")
+        XCTAssertFalse(PrepRunViewModel.isCourse(courseRun([recallLessonRep(0)], run: "gap"), kind: .gap),
+                       "a practice run is a side trip, not the day")
+    }
+
+    func testPeekingAtFoldedStoryCuesCountsAsAHint() async {
+        let client = FakePrepClient()
+        client.attemptResults = [.success(storyResult(next: 0)), .success(storyResult(next: 0))]
+        let folded = storyRep(0).replacingOccurrences(of: #""block": "story","#, with: #""block": "story", "cues_hidden": true,"#)
+        let vm = storyVM(client, reps: [folded, lessonRep(1)])
+        await vm.load()
+        guard case let .rep(rep, _) = vm.phase else { return XCTFail("expected the story rep") }
+        XCTAssertTrue(rep.cuesHidden)
+        vm.peekStoryCues()
+        vm.editStory(String(repeating: "word ", count: 160))
+        await vm.submitStory()
+        XCTAssertEqual(client.attempts.first?.hintsUsed, 1, "a peek is sent as a hint")
+    }
+
     func testTestoutRunSendsRunAndUnit() async {
         let client = FakePrepClient()
         client.todayResults = [.success(courseRun([bossRep(0)], run: "testout"))]

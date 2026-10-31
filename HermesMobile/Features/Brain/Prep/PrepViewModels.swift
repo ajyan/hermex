@@ -309,6 +309,8 @@ final class PrepRunViewModel {
     }
     /// When the telling began (the first mic tap or first non-empty edit); nil until then.
     private(set) var storyStartedAt: Date?
+    /// "Peek at the cues" on a story told from memory; sent as a hint with the telling.
+    private(set) var storyCuesPeeked = false
     /// Story titles by id, loaded only to name the story told on a wrong-story result.
     private(set) var storyTitles: [String: String] = [:]
     let runKind: PrepRunKind
@@ -657,8 +659,9 @@ final class PrepRunViewModel {
         let request = PrepAttemptRequest(
             date: run.date, index: rep.index, item: rep.item.id, drill: .story,
             answer: .choice(PrepCopy.capped(text, to: PrepCopy.storyMaxLength)),
-            elapsedMS: storyStartedAt.map { Self.milliseconds(from: $0, to: sentAt) } ?? 0, hintsUsed: 0,
-            run: runKind, unit: runKind == .testout ? unit : nil)
+            elapsedMS: storyStartedAt.map { Self.milliseconds(from: $0, to: sentAt) } ?? 0,
+            hintsUsed: storyCuesPeeked ? 1 : 0,
+            run: runKind, unit: attemptUnit)
         let token = generation
         guard let result = await post(request, token: token) else {
             if token == generation, storySubmittedAt == sentAt { storySubmittedAt = nil }
@@ -687,7 +690,7 @@ final class PrepRunViewModel {
             date: run.date, index: rep.index, item: rep.item.id, drill: .probe,
             answer: .choice(PrepCopy.cappedApproach(recallDraft.trimmingCharacters(in: .whitespacesAndNewlines))),
             elapsedMS: probeShownAt.map { Self.milliseconds(from: $0, to: now()) } ?? 0, hintsUsed: 0,
-            run: runKind, unit: runKind == .testout ? unit : nil)
+            run: runKind, unit: attemptUnit)
         request.parent = parent
         request.probe = probe.id
         storyDraftStash = StoryDraftStash(item: rep.item.id, prompt: rep.item.prompt, probe: probe.id,
@@ -707,9 +710,14 @@ final class PrepRunViewModel {
         max(0, Int(end.timeIntervalSince(start) * 1000))
     }
 
-    /// A course run teaches lessons, quizzes a boss or runs a mock; the rest are the older DSA and warm-up runs.
+    /// A course run teaches lessons, quizzes a boss or runs a mock, and ends on the day-complete screen. A story,
+    /// gap or lesson practice run is a short side trip that ends on the plain done screen, like the older DSA runs.
     static func isCourse(_ run: PrepRun, kind: PrepRunKind) -> Bool {
-        kind != .daily || run.reps.contains { [.lesson, .recall, .warmup, .boss].contains($0.drill) }
+        switch kind {
+        case .daily: run.reps.contains { [.lesson, .recall, .warmup, .boss].contains($0.drill) }
+        case .testout, .mock, .bonus: true
+        case .story, .gap, .lesson, .unknown: false
+        }
     }
 
     /// The XP an answer earned, mirroring the server's rules: 10 for a new lesson and 5 more when its
@@ -761,6 +769,16 @@ final class PrepRunViewModel {
     }
 
     /// The user closed the run: any response still in flight is dropped.
+    /// The unit, story, gap or lesson a scoped run names, sent with each answer; nil on the daily and bonus runs.
+    private var attemptUnit: String? {
+        [.testout, .gap, .lesson].contains(runKind) ? unit : nil
+    }
+
+    /// Unfold a folded story's cues; the telling then counts one hint.
+    func peekStoryCues() {
+        storyCuesPeeked = true
+    }
+
     func leave() {
         generation += 1
     }
@@ -847,6 +865,7 @@ final class PrepRunViewModel {
         shownAt = now()
         storyStartedAt = nil
         storySubmittedAt = nil
+        storyCuesPeeked = false
         storyTitles = [:]
         if rep.drill == .story, let pending = rep.pending {
             // Told earlier with probes still open: resume at the next one.
@@ -885,7 +904,7 @@ final class PrepRunViewModel {
         let request = PrepAttemptRequest(
             date: run.date, index: rep.index, item: rep.item.id, drill: rep.drill,
             answer: answer, elapsedMS: elapsed, hintsUsed: hintsShown,
-            run: runKind, unit: runKind == .testout ? unit : nil, dontKnow: dontKnow)
+            run: runKind, unit: attemptUnit, dontKnow: dontKnow)
         guard let result = await post(request, token: token) else { return }
         if rep.drill == .primer {
             // A primer has nothing to grade: advance as `continue()` would, staying
@@ -1091,6 +1110,11 @@ enum PrepCopy {
         guard let signal, !signal.isEmpty else { return nil }
         let words = { (s: String) in s.lowercased().split { !$0.isLetter }.map(String.init) }
         return Set(words(signal)).isSubset(of: Set(words(question))) ? nil : signal
+    }
+
+    /// Under "Practice this gap": how long it is. "3 questions aimed at this gap".
+    static func practiceDetail(_ reps: Int) -> String {
+        reps == 1 ? "1 question aimed at this gap" : "\(reps) questions aimed at this gap"
     }
 
     static func readyLine(ready: Int, total: Int) -> String { "\(ready) of \(total) ready" }

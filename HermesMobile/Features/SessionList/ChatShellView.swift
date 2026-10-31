@@ -816,6 +816,14 @@ struct ChatShellView: View {
             PrepGate {
                 PrepRunView(server: server, run: .story, unit: id, onAPIError: authManager.handleAPIError, ask: askAtlas)
             }
+        case .prep(.gapRun(let id)):
+            PrepGate {
+                PrepRunView(server: server, run: .gap, unit: id, onAPIError: authManager.handleAPIError, ask: askAtlas)
+            }
+        case .prep(.lessonRun(let id)):
+            PrepGate {
+                PrepRunView(server: server, run: .lesson, unit: id, onAPIError: authManager.handleAPIError, ask: askAtlas)
+            }
         case .prep(.storyPage(let id)):
             PrepGate {
                 PrepStoryPageView(id: id, server: server, onAPIError: authManager.handleAPIError, ask: askAtlas)

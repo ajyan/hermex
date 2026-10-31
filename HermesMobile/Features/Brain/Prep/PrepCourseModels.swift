@@ -51,6 +51,10 @@ enum PrepRunKind: String, Codable, Hashable, Sendable {
     case mock
     case bonus
     case story
+    /// "Practice this gap": up to three reps aimed at one gap (`unit` is the gap id).
+    case gap
+    /// "Try it now": one recall of one lesson (`unit` is the lesson id).
+    case lesson
     case unknown
 
     init(from decoder: Decoder) throws {

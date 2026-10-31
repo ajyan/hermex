@@ -310,6 +310,8 @@ struct PrepRep: Decodable, Identifiable, Hashable, Sendable {
     let minWords: Int
     /// A story rep's floor for each probe answer; 0 elsewhere.
     let probeMinWords: Int
+    /// A story told on time last rep: its beat cues stay folded to their labels behind "Peek at the cues".
+    let cuesHidden: Bool
 
     var id: Int { index }
 
@@ -317,6 +319,7 @@ struct PrepRep: Decodable, Identifiable, Hashable, Sendable {
         case index, block, drill, item, pending, label
         case minWords = "min_words"
         case probeMinWords = "probe_min_words"
+        case cuesHidden = "cues_hidden"
     }
 
     init(from decoder: Decoder) throws {
@@ -329,6 +332,7 @@ struct PrepRep: Decodable, Identifiable, Hashable, Sendable {
         label = c.optional(String.self, .label).flatMap { $0.isEmpty ? nil : $0 }
         minWords = c.int(.minWords)
         probeMinWords = c.int(.probeMinWords)
+        cuesHidden = c.optional(Bool.self, .cuesHidden) ?? false
     }
 }
 
@@ -1039,9 +1043,11 @@ struct PrepGapDetail: Decodable, Hashable, Sendable {
     let hitsTowardClose: Int
     let evidence: [PrepGapEvidence]
     let cards: [PrepGapCard]
+    /// How many reps "Practice this gap" would ask; 0 (or an older server) hides it.
+    let practice: Int
 
     private enum CodingKeys: String, CodingKey {
-        case id, label, stage, status, summary, misses, evidence, cards
+        case id, label, stage, status, summary, misses, evidence, cards, practice
         case hitsTowardClose = "hits_toward_close"
     }
 
@@ -1055,6 +1061,7 @@ struct PrepGapDetail: Decodable, Hashable, Sendable {
         misses = c.int(.misses)
         hitsTowardClose = c.int(.hitsTowardClose)
         evidence = c.lossy(PrepGapEvidence.self, .evidence)
+        practice = c.int(.practice)
         cards = c.lossy(PrepGapCard.self, .cards)
     }
 }
