@@ -427,16 +427,16 @@ struct PrepGapCallout: View {
         Label {
             Text(verbatim: text)
                 .font(BrainStyle.rowTitle)
-                .foregroundStyle(isKnownGap ? HermexPaper.knowledge.glow : Color.hxTextSecondary)
+                .foregroundStyle(isKnownGap ? HermexPaper.prep.glow : Color.hxTextSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         } icon: {
             Image(systemName: isKnownGap ? "arrow.triangle.branch" : "tray.and.arrow.down")
-                .foregroundStyle(isKnownGap ? HermexPaper.knowledge.glow : Color.hxTextSecondary)
+                .foregroundStyle(isKnownGap ? HermexPaper.prep.glow : Color.hxTextSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, BrainStyle.cardHorizontalPadding)
         .padding(.vertical, BrainStyle.cardVerticalPadding)
-        .glowSurface(HermexPaper.knowledge, cornerRadius: HXRadius.md)
+        .glowSurface(HermexPaper.prep, cornerRadius: HXRadius.md)
         .accessibilityElement(children: .combine)
     }
 }
@@ -516,7 +516,7 @@ struct PrepPrimaryButton: View {
     var isGrading = false
     let action: () -> Void
 
-    private var paper: HermexPaper { .knowledge }
+    private var paper: HermexPaper { .prep }
     private var isActive: Bool { enabled || isGrading }
 
     var body: some View {

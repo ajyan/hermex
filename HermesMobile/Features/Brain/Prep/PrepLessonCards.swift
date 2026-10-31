@@ -4,7 +4,7 @@ import SwiftUI
 // situation and a question), then one card per idea point with its worked example (2026-10-28: the case no longer
 // reveals the whole lesson, and the points no longer share one card, so nothing is said three times), "In your work"
 // when the lesson has it, and "Lock it in", which hides each idea under its lead so the user recalls it before
-// checking. Every card is a `.knowledge` run card; page dots sit below.
+// checking. Every card is a `.prep` run card; page dots sit below.
 // "Picture it" was dropped on 2026-10-20: its word chips only repeated the bullets. "In code" (a prompt, Python
 // or SQL that makes the idea concrete) sits after the idea when the lesson has one, and a lesson's vault diagram
 // opens from "Open the diagram" under the cards (`PrepLessonDiagramButton`).
@@ -54,7 +54,7 @@ struct PrepLessonCardsView: View {
                         PrepRunCard {
                             Text(verbatim: "\(offset + 1) of \(kinds.count) · \(kind.title)")
                                 .font(BrainStyle.meta)
-                                .foregroundStyle(HermexPaper.knowledge.glow)
+                                .foregroundStyle(HermexPaper.prep.glow)
                             card(kind)
                         }
                         .fixedSize(horizontal: false, vertical: true)
@@ -75,7 +75,7 @@ struct PrepLessonCardsView: View {
                 HStack(spacing: BrainStyle.s) {
                     ForEach(kinds, id: \.self) { kind in
                         Circle()
-                            .fill(kind == (page ?? .theCase) ? HermexPaper.knowledge.glow : Color.hxSeparator)
+                            .fill(kind == (page ?? .theCase) ? HermexPaper.prep.glow : Color.hxSeparator)
                             .frame(width: 7, height: 7)
                     }
                 }
@@ -93,7 +93,7 @@ struct PrepLessonCardsView: View {
         case .theCase:
             Text(verbatim: cards.theCase.headline)
                 .font(AppFont.display(style: .title3, weight: .semibold))
-                .foregroundStyle(HermexPaper.knowledge.glow)
+                .foregroundStyle(HermexPaper.prep.glow)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
             Text(verbatim: PrepCopy.caseBody(cards.theCase.body))
@@ -109,7 +109,7 @@ struct PrepLessonCardsView: View {
                 let bullet = cards.idea[index]
                 Text(verbatim: PrepCopy.ideaLead(bullet.lead))
                     .font(AppFont.display(style: .title3, weight: .semibold))
-                    .foregroundStyle(HermexPaper.knowledge.glow)
+                    .foregroundStyle(HermexPaper.prep.glow)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                 Text(verbatim: bullet.text)
@@ -178,7 +178,7 @@ struct PrepLessonCardsView: View {
             if recalled.count == cards.idea.count {
                 Text(verbatim: "Locked in.")
                     .font(BrainStyle.meta)
-                    .foregroundStyle(HermexPaper.knowledge.glow)
+                    .foregroundStyle(HermexPaper.prep.glow)
                     .transition(.opacity)
             }
         }
@@ -192,7 +192,7 @@ private struct PrepCardLabel: View {
     var body: some View {
         Text(verbatim: title)
             .font(AppFont.display(style: .subheadline, weight: .semibold))
-            .foregroundStyle(HermexPaper.knowledge.glow)
+            .foregroundStyle(HermexPaper.prep.glow)
             .accessibilityAddTraits(.isHeader)
     }
 }
@@ -207,7 +207,7 @@ private struct PrepIdeaPoint<Detail: View>: View {
         HStack(alignment: .firstTextBaseline, spacing: BrainStyle.m) {
             Text(verbatim: "\(number)")
                 .font(AppFont.display(style: .subheadline, weight: .semibold))
-                .foregroundStyle(HermexPaper.knowledge.glow)
+                .foregroundStyle(HermexPaper.prep.glow)
                 .monospacedDigit()
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: BrainStyle.xs) {
@@ -234,7 +234,7 @@ struct PrepTakeaway: View {
                     HStack(alignment: .firstTextBaseline, spacing: BrainStyle.m) {
                         Text(verbatim: "\(index + 1)")
                             .font(AppFont.body(weight: .semibold))
-                            .foregroundStyle(HermexPaper.knowledge.glow)
+                            .foregroundStyle(HermexPaper.prep.glow)
                             .monospacedDigit()
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: BrainStyle.xs) {
@@ -277,7 +277,7 @@ extension EnvironmentValues {
     }
 }
 
-/// "Open the diagram" under a lesson's cards: the Brief's secondary button in the knowledge paper, opening the
+/// "Open the diagram" under a lesson's cards: the Brief's secondary button in the Prep paper, opening the
 /// diagram in the shared `DiagramSheet`.
 struct PrepLessonDiagramButton: View {
     let diagram: PrepDiagramRef
@@ -286,7 +286,7 @@ struct PrepLessonDiagramButton: View {
 
     var body: some View {
         if loader.client != nil {
-            Button { isOpen = true } label: { OpenDiagramLabel(paper: .knowledge) }
+            Button { isOpen = true } label: { OpenDiagramLabel(paper: .prep) }
             .buttonStyle(.plain)
             .accessibilityLabel(Text(verbatim: "Open the diagram: \(diagram.title)"))
             .accessibilityHint(Text(verbatim: "Opens an interactive diagram"))
@@ -316,7 +316,7 @@ struct PrepCodeBlock: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.hxCanvas, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
-            .strokeBorder(HermexPaper.knowledge.edge, lineWidth: 1))
+            .strokeBorder(HermexPaper.prep.edge, lineWidth: 1))
         .accessibilityLabel(Text(verbatim: "Code, \(code.lang): \(code.body)"))
     }
 }

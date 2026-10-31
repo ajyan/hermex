@@ -1,6 +1,6 @@
 import SwiftUI
 
-// The recall-first run's cards (spec 2026-10-14 prep-recall §7): every card in a run is a `.knowledge`
+// The recall-first run's cards (spec 2026-10-14 prep-recall §7): every card in a run is a `.prep`
 // glow card, the primary buttons are Nous blue, missed key points are `hxWarning` with ◌, hits
 // are `hxSuccess` with ✓, and only sample answers are serif.
 
@@ -9,7 +9,7 @@ struct PrepRunCard<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        HXCard(.wash(.knowledge), spacing: BrainStyle.m) { content }
+        HXCard(.wash(.prep), spacing: BrainStyle.m) { content }
     }
 }
 
@@ -27,7 +27,7 @@ struct PrepRecallCard: View {
         PrepRunCard {
             Text(verbatim: label)
                 .font(BrainStyle.meta)
-                .foregroundStyle(HermexPaper.knowledge.glow)
+                .foregroundStyle(HermexPaper.prep.glow)
             Text(verbatim: prompt)
                 .font(AppFont.display(style: .title3))
                 .foregroundStyle(Color.hxTextPrimary)
@@ -91,7 +91,7 @@ struct PrepRecallResultView: View {
                 Text(verbatim: PrepCopy.endHeadline(hit: hits.count, total: rows.count,
                                                     followups: result.dialogue?.followups))
                     .font(AppFont.display(style: .title3))
-                    .foregroundStyle(HermexPaper.knowledge.glow)
+                    .foregroundStyle(HermexPaper.prep.glow)
                     .accessibilityAddTraits(.isHeader)
                 if isQuestion {
                     Text(verbatim: "What you reasoned through")
