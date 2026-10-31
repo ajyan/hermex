@@ -92,9 +92,9 @@ extension HermexPaper {
     /// Body: workouts, lifts, Baki's notes and proposals, and the Body value on the reviews. Cyan,
     /// since a teal read as Brain's mint beside it in the drawer.
     static let training = HermexPaper.video
-    /// Goals: the drawer row. Each goal wears its own `GoalPaper`; the module's row has a hue no
-    /// other kind uses.
-    static let goals = HermexPaper.meadow
+    /// Goals: the drawer row. Each goal wears its own `GoalPaper`; the row takes Book highlight's
+    /// pink, the one hue free in the drawer (a Book card never sits beside it).
+    static let goals = HermexPaper.book
     /// Interview prep, everywhere: its drawer row, its Brain home row, and every Prep card and screen.
     /// Orchid, its own kind: never the Brain's mint or the Mandarin card's coral.
     static let prep = HermexPaper.orchid

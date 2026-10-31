@@ -42,7 +42,7 @@ Each paper is one hue rendered as a glow that adapts to the appearance:
 |---|---|---|---|
 | `opener` | `#FFF1DC` / `#3A2410` | `#8A5200` / `#F6C77E` | Today (accents only; see the opener) |
 | `quote` | `#D9E8FF` / `#0E3264` | `#1D4FB8` / `#8DB4FF` | Quote |
-| `book` | `#FFDCE6` / `#6B1534` | `#A8335E` / `#F59AB8` | Book highlight |
+| `book` | `#FFDCE6` / `#6B1534` | `#A8335E` / `#F59AB8` | Book highlight, (Goals' drawer row) |
 | `wiki` | `#D3F2E2` / `#0E4A33` | `#137049` / `#5FD3A0` | From your wiki |
 | `reading` | `#FFE4D1` / `#5A2A0C` | `#9A4410` / `#F5A37A` | From your reading |
 | `notes` | `#E6DCFF` / `#33197A` | `#5B3FC4` / `#B39DFF` | From your notes, Sleep |
@@ -55,7 +55,6 @@ Each paper is one hue rendered as a glow that adapts to the appearance:
 | `ledger` | `#EEF3D6` / `#2F3A0A` | `#4F6300` / `#C2DA6E` | (Money, not a Brief card) |
 | `dusk` | `#F3E4EE` / `#4A1F3D` | `#8C3D74` / `#E7A3CF` | The weekly review's cards, Looking ahead |
 | `kitchen` | `#E3EEDB` / `#22381A` | `#46682F` / `#B2D49A` | Last night's dinner, This week's dinners |
-| `meadow` | `#DDF3DC` / `#173F1C` | `#2A7034` / `#7FD686` | (Goals' drawer row, not a Brief card) |
 
 ### The object key
 
@@ -90,13 +89,14 @@ Named in `Config/HermexStyle.swift`; `HermexPaper.forTool(_:)` maps tool kinds.
 | Meals: the Daily Brief's "Last night's dinner?" and Sunday "This week's dinners" cards | `.meal` (`DeckPalette.dinner`, `DeckPalette.meals`) | `kitchen` |
 | Workouts, lifts, coach notes and proposals; the Body value on the reviews | `.training` | `video` |
 | Feedback inbox | `.feedback` | `notes` |
-| Drawer sections: Daily Brief, Brain, People, Interview prep, Goals, Body, Money, Feedback | `opener`, `.knowledge`, `BrainModuleID.people.paper`, `.prep` (`orchid`, also on its Brain home row), `.goals` (`meadow`; each goal keeps its own `GoalPaper`), `.training`, `.money`, `.feedback`: each a different hue | |
+| Drawer sections: Daily Brief, Brain, People, Interview prep, Goals, Body, Money | `opener`, `.knowledge`, `BrainModuleID.people.paper`, `.prep` (`orchid`, also on its Brain home row), `.goals` (`book`, the one hue free in the drawer; each goal keeps its own `GoalPaper`), `.training`, `.money`: each a different hue. Feedback, like Tasks and Kanban, is a neutral row: a tool, not a module | |
 
 ### Shared papers
 
 These papers carry more than one kind. Each group is related (a person, saved thinking, the past, Atlas's own machinery), so a shared hue still reads as kin. A new kind takes a free hue when one is left, else joins its closest kin here.
 
 - `advisor`: the advisor's Check-in, Letter to her and letters in the Brain, a person (People pages, Catch up, From your people), memory and skill tool steps, Energy and mood.
+- `book`: Book highlight, highlights in the Brain, and the Goals drawer row (a Book card never sits beside the drawer).
 - `notes`: From your notes, Sleep, Lessons, file tool steps, the Feedback inbox, and the Daily Ask (its goal's paper).
 - `video`: Video, web tool steps, Body.
 - `past`: A year ago, Your journal, Looking back, Theme, the reviews' reflection questions.
@@ -127,7 +127,7 @@ Add a new kind of object here and in the code together. A failed tool step keeps
 - **Brain citations** (`BrainCitationChips`). Each Brain page a reply links (up to three) gets a knowledge chip under the reply, opening through the same router as the inline link. Hit areas extend 7 pt past the chip.
 - **Request cards.** Approvals and clarifications use `.glowSurface(.request, cornerRadius:, opaque: true)`: the wash over `hxSurface` (opaque because they float over transcript text), the edge, and the paper in `\.hxPaper`. Their title and symbol take the glow. Primary decision buttons fill with `glow` and `onGlow` text; secondary ones use the wash and edge.
 - **File attachments.** A tile on `.glowSurface(.file, …)`: glow icon and extension, neutral file name.
-- **Drawer.** Sections with their own paper show their icon on a 30 pt glow tile; the rest stay neutral so the colored ones stand out.
+- **Drawer.** Sections with their own paper show their icon on a solid 30 pt tile: the paper's `glow` fill with the glyph in `onGlow`, like an iOS Settings icon. A wash tile read as the same dark gray for every hue in dark mode (People and Body tiles 1.7 apart in OKLab); a solid fill keeps them apart. The rest stay neutral so the colored ones stand out.
 - **Finishing a goal** (`GoalFinishViews.swift`, `GoalRecordView.swift`, `GoalsFinishedViews.swift`). When a goal's last milestone (else its deadline) is due, its detail screen opens with **Did you finish?**, a glow card in the goal's paper (kicker "Last milestone", the milestone, Not yet secondary, I finished primary), and Goals home says "Did you finish? Open to close it" under the hero in the goal's glow. I finished waits for the server, then shows the **celebration** sheet once: a seal (the goal's wash, glow ring and checkmark, with a gold medal mark; it scales in once, and appears still under Reduce Motion), "Achieved · Sunday, Nov 1", "You're <identity>" in `AppFont.display` bold, four tiles (`GoalStatGrid`, the Sleep screen's tiles on the paper's wash), his why in serif on a glow card, **What did it take?** (a serif field that saves to the record), and See the record. The detail screen then becomes the **record**: a finisher card (glow, kicker "Achieved · Oct 10 – Nov 1" with the medal, the identity as the title, the race line, tiles), then for a Garmin goal **Race day** (pace per mile as bars, the fastest full glow, the rest at 45%; pace, heart rate, fastest mile, halves) and **Your running year** (miles a month as bars), then **The story** (a timeline on a neutral card: filled dots for milestones and the finish, hollow for the rest, the date in the glow), **Every day** (the goal calendar, finish day flagged), **What you did** (totals as rows), and **Your reflection** (a glow card, serif, Write / Edit / Save). Goals home shows achieved goals as a **Finished** shelf of small glow cards (`lg` corners, the date and medal, the name, the headline number) with See all opening **Finished goals**: lifetime tiles, then one neutral card a year of rows (icon on the paper's wash, the name, date and days, the headline). Retired goals never appear.
 - **Diagram button** (`BriefDiagrams.swift`): a technical Daily Brief card whose source has a diagram in the vault (`diagrams/index.json` matches the card's `ref.link` or `ref.pool`) shows a full-width "Open the diagram" button under the attribution: a secondary button in the card's own paper (`wash` fill, `edge` hairline, `ink` label with the connected-points symbol), so "Write a reflection" stays the card's one filled button. It opens a sheet with the live `atlas-ui` diagram in the interactive answer card (`InteractiveAnswerCard`): tap a box to see what it does, step through a request, or move a slider. The diagram uses only the injected theme variables, so it follows light and dark like a chat tool. A Brain page whose source has one (the server adds `diagram` to `/api/brain/page` from the same index) shows the same button under its title and tags, in the page's module paper. Prep lessons use it in the Prep paper. All three share `OpenDiagramLabel` and `DiagramSheet`.
 - **Piece card** (`PieceArgument` in `DeckCardView.swift`): a Daily Brief card for a long video or article that has a piece map in the vault. It stays the source's own glow card (`video`, `reading`) and reading layout: the map's headline leads, the attribution is the title and its length ("Learn RAG From Scratch · 3 hours · 15 parts"), then a full-width "Open the map" (the diagram button, `OpenDiagramLabel(isMap:)`), the gist as the detail, then **The parts**: at most three of the map's steps, the ones that add most beyond the gist, drawn like an idea card's parts (`DeckPartsList`: a bullet, the step's name bold, its claim; no "Part 3" places, which live in the map), and **In its own words**: up to three checked quotes in the serif with a quote mark and their place (`DeckQuoteRow`). The map sheet is drawn by the vault from the map file with no model call (Back/Next walks the steps over a rail of the piece's parts; a part shows its gist, points and a quote), in Nous blue because it is controls.
