@@ -253,10 +253,13 @@ struct BrainPersonLayout: Equatable {
             if let item { usedItems.insert(item) }
         }
         if let birthday = fact("Birthday", in: page) { addChip("Birthday " + (monthDay(birthday) ?? birthday)) }
+        let industry = fact("Industry", in: page)
+        var industryShown = false
         if let company = firstItem(labelled: "company"), company.text.count <= chipLimit {
             addChip(company.text, item: company.key)
-        } else {
-            addChip(fact("Industry", in: page))
+        } else if let industry, industry.count <= chipLimit {
+            addChip(industry)
+            industryShown = true
         }
         if let school = firstItem(labelled: "school") { addChip(school.text, item: school.key) }
 
@@ -274,6 +277,11 @@ struct BrainPersonLayout: Equatable {
             let label = person.profile[section].label.trimmingCharacters(in: .whitespaces)
             append(sectionTitles[key(label)] ?? sentenceCase(label),
                    items.filter { !usedItems.contains("\(section):\($0.index)") }.map(\.text))
+        }
+        // Industry that isn't a chip goes under Work, unless Work already says it.
+        if let industry, !industryShown,
+           !sections.contains(where: { $0.id == "work" && $0.items.contains { $0.caseInsensitiveCompare(industry) == .orderedSame } }) {
+            append("Work", [industry])
         }
         append("Questions", person.questions.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
 
@@ -424,12 +432,23 @@ struct BrainPersonLayout: Equatable {
         return formatter
     }()
 
-    /// "Jan 20" for an ISO day, else nil.
-    private static func monthDay(_ iso: String) -> String? {
-        guard let parts = iso.isoDayParts else { return nil }
+    /// "Jan 20" for an ISO day, or a birthday with no year (`MM-DD`, `--MM-DD`), else nil. An impossible
+    /// date ("2026-02-30") is nil rather than rolled over into March.
+    static func monthDay(_ text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        let parts: (year: Int, month: Int, day: Int)
+        if let iso = trimmed.isoDayParts {
+            parts = iso
+        } else if let match = trimmed.wholeMatch(of: #/(?:--)?(\d{2})-(\d{2})/#), let month = Int(match.1), let day = Int(match.2) {
+            parts = (2000, month, day)  // a leap year, so Feb 29 is a real birthday
+        } else {
+            return nil
+        }
         var utc = Calendar(identifier: .gregorian)
         utc.timeZone = TimeZone(identifier: "UTC") ?? .gmt
         guard let date = utc.date(from: DateComponents(year: parts.year, month: parts.month, day: parts.day)) else { return nil }
+        let check = utc.dateComponents([.year, .month, .day], from: date)
+        guard check.year == parts.year, check.month == parts.month, check.day == parts.day else { return nil }
         return monthDayFormatter.string(from: date)
     }
 

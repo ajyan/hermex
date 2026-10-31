@@ -1339,6 +1339,7 @@ private struct FollowUpRow: View {
     @State private var editedText: String?
     @FocusState private var isEditingText: Bool
     @Environment(\.openURL) private var openURL
+    @Environment(\.openBrainRoute) private var openBrainRoute
 
     private struct Compose: Identifiable {
         let id = UUID()
@@ -1420,7 +1421,15 @@ private struct FollowUpRow: View {
         }
     }
 
+    /// "Open their page" leads a person's follow-up, so their Catch up is a tap away before texting.
+    @ViewBuilder
     private func buttons(_ chosen: String?) -> some View {
+        if let route = card.sourceRoute, openBrainRoute.isAvailable {
+            ChoiceButton(title: DeckCard.openTitle(for: route), isSelected: false) {
+                viewModel.opened("source", on: card.id)
+                openBrainRoute(route)
+            }
+        }
         ForEach(card.actions) { action in
             let texted = action.message != nil && chosen == action.id
             ChoiceButton(title: texted ? "Texted" : action.label, isSelected: chosen == action.id) {

@@ -27,10 +27,22 @@ enum BrainPeopleLayout {
         let days = BrainPersonLayout.DayMath(today: today, calendar: calendar)
         let all = [
             Section(title: "Due for a catch-up", rows: home.due.map { seenRow($0, isDue: true, days: days) }),
-            Section(title: "Birthdays soon", rows: home.birthdays.map { birthdayRow($0, days: days) }),
+            Section(title: "Birthdays soon", rows: home.birthdays.compactMap { birthdayRow($0, days: days) }),
             Section(title: "Recently seen", rows: home.recent.map { seenRow($0, isDue: false, days: days) }),
         ]
         return all.filter { !$0.rows.isEmpty }
+    }
+
+    /// A due row's usual gap: "Every day", "Every 5 days", "Every 3 wk", "Every 6 mo", "Every 2 yr".
+    static func cadence(days: Int) -> (shown: String, spoken: String) {
+        let days = max(1, days)
+        switch days {
+        case 1: return ("Every day", "every day")
+        case ..<14: return ("Every \(days) days", "every \(days) days")
+        case ..<60: let w = (days + 3) / 7; return ("Every \(w) wk", "every \(w) weeks")
+        case ..<730: let m = (days + 15) / 30; return ("Every \(m) mo", m == 1 ? "every month" : "every \(m) months")
+        default: let y = (days + 182) / 365; return ("Every \(y) yr", y == 1 ? "every year" : "every \(y) years")
+        }
     }
 
     /// "today", then "6d" under two weeks, "3 wk" under 60 days, "4 mo" under two years, then "2 yr".
@@ -45,33 +57,35 @@ enum BrainPeopleLayout {
         }
     }
 
+    /// A due row leads its subtitle with their usual gap ("Every 3 wk · Dinner at Sola"), so "due" explains itself.
     private static func seenRow(_ person: BrainPersonRow, isDue: Bool, days: BrainPersonLayout.DayMath) -> Row {
         let ago = person.lastSeen.flatMap(days.daysAgo)
+        let gap = isDue ? person.cadenceDays.map(cadence(days:)) : nil
+        let detail = person.headline ?? person.subtitle
         let spoken = [
             person.title,
             person.headline,
             ago.map { "seen " + BrainPersonLayout.relative(daysAgo: $0) },
             isDue ? "due for a catch-up" : nil,
+            gap.map { "usually " + $0.spoken },
         ]
         return Row(
             id: person.id,
             title: person.title,
-            subtitle: person.headline ?? person.subtitle,
+            subtitle: [gap?.shown, detail].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "),
             trailing: ago.map(elapsed(days:)) ?? "",
             isDue: isDue,
             accessibilityLabel: spoken.compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
         )
     }
 
-    private static func birthdayRow(_ person: BrainPersonRow, days: BrainPersonLayout.DayMath) -> Row {
-        let ahead = person.nextBirthday.flatMap(days.daysAhead)
-        let trailing: String
-        let spoken: String?
-        switch ahead {
-        case .some(0): (trailing, spoken) = ("today", "birthday today")
-        case .some(1): (trailing, spoken) = ("tomorrow", "birthday tomorrow")
-        case .some(let n) where n > 1: (trailing, spoken) = ("in \(n)d", "birthday in \(n) days")
-        default: (trailing, spoken) = ("", nil)
+    /// nil once the birthday has passed: a saved or overnight copy of the home must not list it.
+    private static func birthdayRow(_ person: BrainPersonRow, days: BrainPersonLayout.DayMath) -> Row? {
+        guard let ahead = person.nextBirthday.flatMap(days.daysAhead), ahead >= 0 else { return nil }
+        let (trailing, spoken) = switch ahead {
+        case 0: ("today", "birthday today")
+        case 1: ("tomorrow", "birthday tomorrow")
+        default: ("in \(ahead)d", "birthday in \(ahead) days")
         }
         return Row(
             id: person.id,
@@ -123,6 +137,8 @@ final class BrainPeopleHomeViewModel {
     private let client: any BrainDataClient
     private let cache: BrainCacheHandle
     private let now: () -> Date
+    /// Bumped per load, so an older load that finishes last (the first load and a foreground reload) can't win.
+    private var generation = 0
     private static let cacheKind = "people-home"
 
     init(client: any BrainDataClient, cache: BrainCacheHandle, now: @escaping () -> Date = Date.init) {
@@ -131,16 +147,19 @@ final class BrainPeopleHomeViewModel {
         self.now = now
     }
 
+    /// Offline, the saved copy is shown again with today's day math, so its "6d" and birthdays move on too.
     func load() async {
+        generation += 1
+        let token = generation
         do {
             let home = try await client.peopleHome()
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, token == generation else { return }
             show(home)
             cache.store(home, kind: Self.cacheKind, id: "")
         } catch is CancellationError {
             // The screen went away.
         } catch {
-            guard !Task.isCancelled, sections.isEmpty,
+            guard !Task.isCancelled, token == generation,
                   let saved = cache.load(BrainPeopleHome.self, kind: Self.cacheKind, id: "")
             else { return }
             show(saved)
