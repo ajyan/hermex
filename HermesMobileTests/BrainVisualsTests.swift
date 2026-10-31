@@ -354,13 +354,6 @@ final class BrainConnectionsTests: XCTestCase {
         XCTAssertEqual(BrainConnectionsLayout.linkCards(hub).map(\.id), ["c"], "In this hub lists a and b")
     }
 
-    func testASwipeFromTheLeadingEdgeIsLeftToBack() {
-        let right = CGSize(width: 120, height: 10)
-        XCTAssertEqual(BrainConnectionsLayout.swipeStep(right, startX: 200), -1)
-        XCTAssertNil(BrainConnectionsLayout.swipeStep(right, startX: 12), "the edge is the system's Back")
-        XCTAssertEqual(BrainConnectionsLayout.swipeStep(CGSize(width: -120, height: 10), startX: 300), 1)
-    }
-
     func testALongMentionIsMarkedWithoutTheWash() {
         let paper = HermexPaper.wiki
         let short = BrainConnectionsLayout.highlighted("Read Virtues today", mention: "Virtues", paper: paper)
@@ -371,13 +364,13 @@ final class BrainConnectionsTests: XCTestCase {
         XCTAssertTrue(long.runs.contains { $0.foregroundColor != nil }, "still marked in the glow")
     }
 
-    func testFurtherReadingSaysASharedReasonOnce() {
-        let shared = [BrainRef(module: .wiki, id: "a", reason: "shares #mindfulness"),
-                      BrainRef(module: .wiki, id: "b", reason: "shares #mindfulness")]
-        XCTAssertEqual(BrainReaderLayout.sharedReason(shared), "Shares #mindfulness")
-        let mixed = shared + [BrainRef(module: .wiki, id: "c", reason: "source")]
-        XCTAssertNil(BrainReaderLayout.sharedReason(mixed))
-        XCTAssertNil(BrainReaderLayout.sharedReason([]))
+    func testFurtherReadingSplitsSourcesFromTaggedPages() {
+        let refs = [BrainRef(module: .wiki, id: "s", reason: "source"),
+                    BrainRef(module: .wiki, id: "t", reason: "#rome · #person"),
+                    BrainRef(module: .wiki, id: "old", reason: "shares #stoicism")]
+        let groups = BrainReaderLayout.furtherGroups(refs)
+        XCTAssertEqual(groups.sources.map(\.id), ["s"])
+        XCTAssertEqual(groups.tagged.map(\.id), ["t", "old"], "an older server's reasons still land in Also tagged")
     }
 
     func testReaderTagsReadAsOneMetaLine() {
@@ -421,13 +414,6 @@ final class BrainConnectionsTests: XCTestCase {
     func testPositionReadsAsOneBased() {
         XCTAssertEqual(BrainConnectionsLayout.position(BrainHubContext(ref: ref("hub"), index: 3, count: 14)), "4 of 14")
         XCTAssertNil(BrainConnectionsLayout.position(BrainHubContext(ref: ref("hub"), index: nil, count: 14)))
-    }
-
-    func testSwipeNeedsALongMostlySidewaysDrag() {
-        XCTAssertEqual(BrainConnectionsLayout.swipeStep(CGSize(width: -100, height: 10)), 1, "swipe left is next")
-        XCTAssertEqual(BrainConnectionsLayout.swipeStep(CGSize(width: 100, height: -10)), -1, "swipe right is previous")
-        XCTAssertNil(BrainConnectionsLayout.swipeStep(CGSize(width: -60, height: 0)), "too short")
-        XCTAssertNil(BrainConnectionsLayout.swipeStep(CGSize(width: -100, height: 60)), "too diagonal: a scroll")
     }
 
     func testMentionRangeIsTheFirstCaseInsensitiveMatch() throws {

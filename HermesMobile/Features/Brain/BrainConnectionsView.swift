@@ -4,8 +4,6 @@ import SwiftUI
 enum BrainConnectionsLayout {
     /// Linked mentions shown before "Show all N".
     static let mentionPreviewCount = 5
-    /// A horizontal drag this long, and mostly sideways, pages through the hub.
-    static let swipeDistance: CGFloat = 80
 
     /// The linked-page cards: the page's links without repeats or itself, in server order,
     /// and without what the page already shows elsewhere: its hub (the trail names it) and,
@@ -36,19 +34,6 @@ enum BrainConnectionsLayout {
     static func position(_ hub: BrainHubContext) -> String? {
         guard let index = hub.index, hub.count > 0 else { return nil }
         return "\(index + 1) of \(hub.count)"
-    }
-
-    /// A swipe that starts this close to the screen's leading edge is the system's Back.
-    static let edgeGuard: CGFloat = 30
-
-    /// +1 for a swipe left (next page), -1 for a swipe right (previous), nil otherwise. A
-    /// swipe starting at the leading edge (`startX`, in screen points) is left to Back.
-    static func swipeStep(_ translation: CGSize, startX: CGFloat = .infinity) -> Int? {
-        guard startX >= edgeGuard,
-              abs(translation.width) >= swipeDistance,
-              abs(translation.width) > abs(translation.height) * 2
-        else { return nil }
-        return translation.width < 0 ? 1 : -1
     }
 
     /// Where the mention sits in the snippet: the first case-insensitive match, or nil.
