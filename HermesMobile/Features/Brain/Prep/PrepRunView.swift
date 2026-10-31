@@ -397,9 +397,10 @@ struct PrepRunView: View {
             }
         case .judgment, .boss:
             let text = draft(for: rep).text
+            let floor = PrepWordFloor(text, floor: rep.minWords)
             PrepPrimaryButton(
-                title: "Submit",
-                enabled: PrepCopy.canSubmitJudgment(text) && !viewModel.isSubmitting,
+                title: floor.submitTitle,
+                enabled: PrepCopy.canSubmitJudgment(text) && floor.isMet && !viewModel.isSubmitting,
                 isGrading: viewModel.isSubmitting
             ) { Task { await viewModel.submitJudgment(text) } }
         case .lesson where Self.usesRecall(rep) && viewModel.lessonStage == .reading:
@@ -408,7 +409,7 @@ struct PrepRunView: View {
             }
         case .lesson where Self.usesRecall(rep), .recall where Self.usesRecall(rep):
             PrepPrimaryButton(
-                title: "Submit",
+                title: viewModel.answerFloor.submitTitle,
                 enabled: viewModel.canSubmitRecall,
                 isGrading: viewModel.isSubmitting
             ) { Task { await viewModel.submitRecall() } }
@@ -627,10 +628,10 @@ struct PrepRunView: View {
     private var storyAction: some View {
         switch viewModel.storyStage {
         case .telling:
-            PrepPrimaryButton(title: "Submit", enabled: viewModel.canSubmitStoryAnswer,
+            PrepPrimaryButton(title: viewModel.answerFloor.submitTitle, enabled: viewModel.canSubmitStoryAnswer,
                               isGrading: viewModel.isSubmitting) { Task { await viewModel.submitStory() } }
         case .probing:
-            PrepPrimaryButton(title: "Submit", enabled: viewModel.canSubmitStoryAnswer,
+            PrepPrimaryButton(title: viewModel.answerFloor.submitTitle, enabled: viewModel.canSubmitStoryAnswer,
                               isGrading: viewModel.isSubmitting) { Task { await viewModel.submitProbe() } }
         case .told, .probed:
             if let next = viewModel.nextProbe {

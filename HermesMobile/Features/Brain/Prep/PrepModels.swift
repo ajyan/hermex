@@ -352,10 +352,18 @@ struct PrepRep: Decodable, Identifiable, Hashable, Sendable {
     let pending: PrepStoryPending?
     /// Why a gap rep is here ("From your mock"); nil on every other rep.
     let label: String?
+    /// The fewest words the answer needs before the server grades it; 0 when there is no floor.
+    let minWords: Int
+    /// A story rep's floor for each probe answer; 0 elsewhere.
+    let probeMinWords: Int
 
     var id: Int { index }
 
-    private enum CodingKeys: String, CodingKey { case index, block, drill, item, pending, label }
+    private enum CodingKeys: String, CodingKey {
+        case index, block, drill, item, pending, label
+        case minWords = "min_words"
+        case probeMinWords = "probe_min_words"
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -365,7 +373,23 @@ struct PrepRep: Decodable, Identifiable, Hashable, Sendable {
         item = try c.decode(PrepItemExcerpt.self, forKey: .item)
         pending = c.optional(PrepStoryPending.self, .pending)
         label = c.optional(String.self, .label).flatMap { $0.isEmpty ? nil : $0 }
+        minWords = c.int(.minWords)
+        probeMinWords = c.int(.probeMinWords)
     }
+}
+
+/// An answer's word count against a rep's floor: Submit reads "12 of 50 words" until the floor is met.
+struct PrepWordFloor: Equatable {
+    let words: Int
+    let floor: Int
+
+    init(_ text: String, floor: Int) {
+        words = text.split(whereSeparator: \.isWhitespace).count
+        self.floor = floor
+    }
+
+    var isMet: Bool { words >= floor }
+    var submitTitle: String { isMet ? "Submit" : "\(words) of \(floor) words" }
 }
 
 /// `GET /api/tutor/today`. `index` is the first unanswered rep's stable index.
