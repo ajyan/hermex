@@ -599,11 +599,11 @@ struct DeckCardView: View {
 
     /// The day's title, a line about yesterday (on a weekly review, the week and its highlights),
     /// and the cards ahead, so you know what you're about to get.
-    /// "Learned: …" with Undo, which files the rule's id so tomorrow's deck drops it ("Undone" takes it back).
+    /// "Learned: …" with Undo (a retired question approach only informs, with none), which files the rule's id so tomorrow's deck drops it ("Undone" takes it back).
     private func learnedRow(_ rule: DeckLearned) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(verbatim: rule.line).font(AppFont.footnote())
-            if rule.isLearned {
+            if rule.offersUndo {
                 let undone = viewModel.signals.undo.contains(rule.id)
                 Button {
                     viewModel.undoLearned(rule.id)
@@ -612,7 +612,7 @@ struct DeckCardView: View {
                 }
                 .buttonStyle(.borderless)
                 .tint(Color.accentColor)
-                .accessibilityLabel(Text(verbatim: undone ? "Undone. Tap to keep the rule" : "Undo this rule"))
+                .accessibilityLabel(Text(verbatim: undone ? "Undone. Tap to keep the rule" : rule.id.hasPrefix("week.") ? "Undo this week's learning" : "Undo this rule"))
             }
         }
     }

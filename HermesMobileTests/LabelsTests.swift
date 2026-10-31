@@ -322,6 +322,22 @@ final class LabelsViewModelTests: XCTestCase {
         XCTAssertEqual(saved.map(\.reason), [nil, "clean", "readable", nil])
     }
 
+    func testBadLabelWithoutReasonShowsWhyPrompt() async {
+        let labels = LabelsViewModel(client: StubLabelsClient())
+        XCTAssertFalse(labels.asksWhy(for: key), "no label yet")
+        await labels.tap(.good, for: key)
+        XCTAssertFalse(labels.asksWhy(for: key), "good needs no reason")
+        await labels.tap(.bad, for: key)
+        XCTAssertTrue(labels.asksWhy(for: key), "a bad label with no reason asks why")
+        await labels.tapReason("clean", for: key)
+        XCTAssertFalse(labels.asksWhy(for: key), "a reason answers it")
+        await labels.tapReason("clean", for: key)
+        XCTAssertTrue(labels.asksWhy(for: key), "clearing the reason asks again")
+        let noReasons = LabelKey.brainPage(module: .wiki, id: "x")
+        await labels.tap(.bad, for: noReasons)
+        XCTAssertFalse(labels.asksWhy(for: noReasons), "a label with no chips has nothing to ask")
+    }
+
     func testAReasonNeedsAConfirmedBadLabel() async {
         let client = StubLabelsClient()
         let labels = LabelsViewModel(client: client)

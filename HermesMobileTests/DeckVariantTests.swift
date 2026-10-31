@@ -61,4 +61,34 @@ final class DeckVariantTests: XCTestCase {
         XCTAssertEqual(DeckFace(dir: "verbatim", context: nil, entries: nil, piece: piece).preview, "1. First.\n“Said it.”")
         XCTAssertEqual(DeckFace(dir: "shorter", context: "Short.", entries: nil, piece: nil).preview, "Short.")
     }
+
+    private static let questionVariant = """
+    {"dimension": "question", "approach": "own-example", "shown": "a",
+     "a": {"dir": "current", "question": "What did you notice?"},
+     "b": {"dir": "own-example", "question": "Where did this show up in your week?"}}
+    """
+
+    func testQuestionFacePreviewIsTheQuestion() throws {
+        let variant = try JSONDecoder().decode(DeckVariant.self, from: Data(Self.questionVariant.utf8))
+        XCTAssertEqual(variant.dimension, "question")
+        XCTAssertEqual(variant.a.question, "What did you notice?")
+        XCTAssertEqual(variant.a.preview, "What did you notice?")
+        XCTAssertEqual(DeckFace(dir: "current", context: "Ctx.", entries: nil, piece: nil, question: "Why?").preview, "Why?", "the question comes first")
+        XCTAssertNil(variant.a.context)
+        let old = try XCTUnwrap(DailyDeck.decode(Self.deckJSON).cards[0].variant)
+        XCTAssertNil(old.a.question, "old variants have no question and still preview their context")
+        XCTAssertEqual(old.a.preview, "One. Two. Three.")
+    }
+
+    func testVariantPreviewsShowBothQuestionsWhole() throws {
+        let variant = try JSONDecoder().decode(DeckVariant.self, from: Data(Self.questionVariant.utf8))
+        XCTAssertEqual(variant.previews.a, "What did you notice?")
+        XCTAssertEqual(variant.previews.b, "Where did this show up in your week?")
+        let same = try JSONDecoder().decode(DeckVariant.self, from: Data("""
+        {"dimension": "question", "shown": "a",
+         "a": {"dir": "current", "question": "Same?"}, "b": {"dir": "x", "question": "Same?"}}
+        """.utf8))
+        XCTAssertEqual(same.previews.a, "Same?", "a question is never trimmed to a bare ellipsis")
+        XCTAssertEqual(same.previews.b, "Same?")
+    }
 }

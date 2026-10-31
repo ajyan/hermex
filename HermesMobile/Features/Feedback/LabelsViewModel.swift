@@ -37,6 +37,10 @@ final class LabelsViewModel {
     func error(for key: LabelKey) -> String? { errors[key] }
     /// Why `key`'s ✗ is bad, once the server has it; nil when unset or not bad.
     func reason(for key: LabelKey) -> String? { reasons[key] }
+    /// Whether `key`'s ✗ should ask "Why?": confirmed bad, chips to choose from, none chosen yet.
+    func asksWhy(for key: LabelKey) -> Bool {
+        verdicts[key] == .bad && reasons[key] == nil && !LabelReason.options(for: key).isEmpty
+    }
 
     /// How many of `feature`'s items got a tapped label on `day` (`yyyy-MM-dd`); a card's label
     /// and its question's count once.
