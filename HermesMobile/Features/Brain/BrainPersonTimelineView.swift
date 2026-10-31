@@ -227,16 +227,17 @@ private struct BrainAboutSection: View {
     }
 }
 
-/// "Timeline · 1 of 8" over a swipe deck (`CardStack`) of a person's encounters and the journal
-/// days that name them, newest first, one fixed-height `BrainDeckCard` each.
+/// "Timeline" over a person's encounters and the journal days that name them, newest first, as rows
+/// on one neutral card: the kind's tile (a note, a text, a journal day), the headline on up to two
+/// lines, and when. Three show, then "Show all N". Tapping a row opens its card full screen (the
+/// review's open card), where a journal day's "Open the journal day" sits at the foot.
 struct BrainPersonTimeline: View {
     let entries: [BrainPersonLayout.Entry]
     let open: (BrainRoute) -> Void
-    /// Each card's words, parsed once per page load (`BrainPersonPage`): `CardStack` rebuilds its
-    /// top cards on every drag frame, and the reader rebuilds this view on any tap.
+    /// Each entry's words, parsed once per page load (`BrainPersonPage`).
     private let texts: [BrainPersonLayout.Entry.ID: BrainTimelineCardText]
-    @State private var index = 0
-    @ScaledMetric(relativeTo: .body) private var deckHeight: CGFloat = BrainStyle.timelineDeckHeight
+    @State private var showsAll = false
+    private static let shown = 3
 
     init(person: BrainPersonPage, open: @escaping (BrainRoute) -> Void) {
         self.entries = person.layout.timeline
@@ -245,28 +246,82 @@ struct BrainPersonTimeline: View {
     }
 
     var body: some View {
+        let visible = showsAll ? entries : Array(entries.prefix(Self.shown))
         VStack(alignment: .leading, spacing: BrainStyle.xs) {
-            HXSectionHeader(title: "Timeline", trailing: BrainPersonLayout.position(index: index, count: entries.count))
+            HXSectionHeader(title: "Timeline", trailing: entries.count > Self.shown ? "\(entries.count)" : nil)
                 .padding(.horizontal, 4)
-            CardStack(pages: entries, index: $index, tilt: { DeckStackView.tilt(ofID: $0.id) }) { entry, contentOpacity in
-                if let text = texts[entry.id] {
-                    BrainTimelineCard(entry: entry, text: text, open: open, contentOpacity: contentOpacity)
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(visible.enumerated()), id: \.element.id) { index, entry in
+                    if index > 0 {
+                        Rectangle().fill(Color.hxSeparator).frame(height: 0.5).accessibilityHidden(true)
+                    }
+                    if let text = texts[entry.id] {
+                        BrainTimelineRow(entry: entry, text: text, open: open)
+                    }
                 }
-            } edge: { entry in
-                // Far down the stack only the card's paper shows, peeking out askew.
-                let role = HXCardRole.glow(BrainTimelineCard.paper(entry))
-                role.shape
-                    .fill(role.fill)
-                    .hxShadow(.stacked)
-                    .padding(.vertical, 12)
+                if !showsAll, entries.count > Self.shown {
+                    Rectangle().fill(Color.hxSeparator).frame(height: 0.5).accessibilityHidden(true)
+                    Button { showsAll = true } label: {
+                        Text(verbatim: "Show all \(entries.count)")
+                            .font(AppFont.subheadline(weight: .medium))
+                            .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.accentColor)
+                }
             }
-            // A fixed height, cut to what fits in the reader's visible height.
-            .containerRelativeFrame(.vertical) { length, _ in
-                max(min(deckHeight, length - BrainStyle.deckViewportMargin), BrainStyle.minimumDeckHeight)
+            .padding(.horizontal, BrainStyle.cardHorizontalPadding)
+            .padding(.vertical, BrainStyle.xs)
+            .hxCard()
+        }
+    }
+}
+
+/// One timeline row: the kind's tile in its paper, the headline (serif for a journal day's own
+/// words), and when. A tap opens the entry's card full screen.
+private struct BrainTimelineRow: View {
+    let entry: BrainPersonLayout.Entry
+    let text: BrainTimelineCardText
+    let open: (BrainRoute) -> Void
+
+    var body: some View {
+        let paper = BrainTimelineCard.paper(entry)
+        HStack(alignment: .top, spacing: BrainStyle.m) {
+            BrainModuleIcon(systemName: entry.symbol, paper: paper)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(text.lead)
+                    .font(isJournal ? AppFont.serif(style: .body) : AppFont.body())
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(verbatim: entry.when).brainText(.meta)
             }
         }
-        .onChange(of: entries.count) { _, count in
-            index = min(index, max(count - 1, 0))
+        .padding(.vertical, BrainStyle.s)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: text.accessibilityLabel))
+        .accessibilityValue(Text(verbatim: text.accessibilityValue))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint(Text(verbatim: "Opens the whole entry"))
+        .opensAsFullCard(.glow(paper), action: journalID.map { id in
+            HXCardAction(title: "Open the journal day") { open(.page(.journal, id)) }
+        }) {
+            BrainTimelineCard(entry: entry, text: text, open: open, isOpen: true)
+        }
+    }
+
+    private var isJournal: Bool {
+        if case .journal = entry.kind { return true }
+        return false
+    }
+
+    /// The journal day the open card's foot button opens: the folded one, or the row's own.
+    private var journalID: String? {
+        switch entry.kind {
+        case .encounter: entry.journal?.id
+        case .journal(let mention): mention.id
         }
     }
 }
@@ -285,7 +340,7 @@ private struct BrainTimelineCardText {
     let prose: [Line]
     /// "Journal: <the day's words>" for a journal day folded into an encounter; nil otherwise.
     let footnote: AttributedString?
-    /// "Encounter · Oct 8 · 6 days ago. Gallery crawl"
+    /// "Note · Oct 8 · 6 days ago. Gallery crawl"
     let accessibilityLabel: String
     /// The notes under the lead, read after the label.
     let accessibilityValue: String
@@ -329,6 +384,8 @@ private struct BrainTimelineCard: View {
     let text: BrainTimelineCardText
     let open: (BrainRoute) -> Void
     var contentOpacity: Double = 1
+    /// Drawn inside the open card (`opensAsFullCard`), without a card surface of its own.
+    var isOpen = false
 
     static func paper(_ entry: BrainPersonLayout.Entry) -> HermexPaper {
         switch entry.kind {
@@ -350,7 +407,7 @@ private struct BrainTimelineCard: View {
         BrainDeckCard(paper: paper, footer: "Open the journal day",
                       open: journalID.map { id in { open(.page(.journal, id)) } },
                       accessibilityLabel: text.accessibilityLabel, accessibilityValue: text.accessibilityValue,
-                      footnote: text.footnote, contentOpacity: contentOpacity) {
+                      footnote: text.footnote, contentOpacity: contentOpacity, isOpen: isOpen) {
             Text(verbatim: entry.kicker)
                 .font(AppFont.footnote(weight: .semibold))
             if !entry.headline.isEmpty {
