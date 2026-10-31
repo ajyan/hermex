@@ -65,6 +65,35 @@ final class BrainViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.page, samplePage)
     }
 
+    func testAPageSavedInAHubIsNotTheCopyOpenedOutsideIt() async throws {
+        let cache = try makeCache()
+        let client = FakeBrainClient()
+        client.pageResult = .success(samplePage)
+        await BrainPageViewModel(module: .wiki, id: "p1", hub: "hubs/ai.md", client: client, cache: cache, onAPIError: { _ in }).load()
+        client.pageResult = .failure(URLError(.notConnectedToInternet))
+        let outside = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: cache, onAPIError: { _ in })
+        await outside.load()
+        XCTAssertNil(outside.page, "the hub's copy carries its trail and pager")
+        let inside = BrainPageViewModel(module: .wiki, id: "p1", hub: "hubs/ai.md", client: client, cache: cache, onAPIError: { _ in })
+        await inside.load()
+        XCTAssertEqual(inside.page, samplePage)
+    }
+
+    func testTheReviewPositionIsKeptUnderTheServersDay() async {
+        let store = makeReviewStore()
+        let client = FakeBrainClient()
+        // The phone is already on the 14th; the server is still dealing the 13th's deck.
+        client.homeResult = .success(BrainHome(bites: bites(10), batch: 0, hasMore: true, day: "2026-10-13"))
+        let viewModel = makeReviewModel(client: client, store: store)
+        await viewModel.load()
+        XCTAssertEqual(viewModel.deckDay, "2026-10-13")
+        XCTAssertFalse(viewModel.needsNewDay)
+        viewModel.reviewIndex = 5
+        XCTAssertEqual(store.position(for: reviewServer), BrainReviewPosition(day: "2026-10-13", batch: 0, index: 5))
+        await viewModel.load()
+        XCTAssertEqual(viewModel.reviewIndex, 5, "a reload lands where the server's day left off")
+    }
+
     func testPageOfflineWithoutCacheFails() async throws {
         let client = FakeBrainClient()
         client.pageResult = .failure(URLError(.notConnectedToInternet))

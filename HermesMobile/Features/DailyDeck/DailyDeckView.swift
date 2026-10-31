@@ -21,7 +21,7 @@ struct DailyDeckView: View {
     /// Earlier cards to rate, offered on today's closing card; shares `labels`.
     @State private var labelQueue: LabelQueueViewModel
     /// The goal card's live check-ins, read once per screen from the Goals API.
-    @State private var goals: GoalCheckInCardViewModel
+    @State private var goals: GoalsHomeViewModel
     /// The Ask card's live roles, read once per screen from /api/jobs/ask.
     @State private var dailyAsk: DailyAskModel
     /// The meals card's accepted week and Accept, through /api/meals.
@@ -35,7 +35,7 @@ struct DailyDeckView: View {
         _labels = State(initialValue: labels)
         _labelQueue = State(initialValue: LabelQueueViewModel(
             server: server, deckClient: APIClientDailyDeckAdapter(apiClient: APIClient(baseURL: server)), labels: labels))
-        _goals = State(initialValue: GoalCheckInCardViewModel(
+        _goals = State(initialValue: GoalsHomeViewModel(
             client: APIClientGoalsAdapter(apiClient: APIClient(baseURL: server)),
             onChange: { GoalsWidgetSync.update(server: server, home: $0) }))
         _dailyAsk = State(initialValue: DailyAskModel(client: APIClientDailyAskAdapter(apiClient: APIClient(baseURL: server))))

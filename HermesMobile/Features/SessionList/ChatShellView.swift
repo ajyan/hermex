@@ -658,9 +658,9 @@ struct ChatShellView: View {
             )
             .adaptiveSecondaryNavigationTitle()
         case .goals:
-            GoalsHomeView(server: server, onAPIError: authManager.handleAPIError) {
-                selectDestination(PendingNewChatRoute(initialDraft: GoalsCopy.newGoalDraft))
-            }
+            GoalsHomeView(server: server, onAPIError: authManager.handleAPIError,
+                          onNewGoal: { selectDestination(PendingNewChatRoute(initialDraft: GoalsCopy.newGoalDraft)) },
+                          onOpen: { navigation.push($0) })
             .adaptiveSecondaryNavigationTitle()
         case .goal(let slug):
             GoalDetailView(slug: slug, server: server, onAPIError: authManager.handleAPIError)

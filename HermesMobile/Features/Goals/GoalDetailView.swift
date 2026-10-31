@@ -138,8 +138,8 @@ struct GoalDetailView: View {
                                 tint: tint,
                                 isPending: viewModel.isPending(.commitment(row.id)),
                                 atRisk: d.summary.flags.missTwice.contains(row.id),
-                                onAdd: { note in await viewModel.addItem(commitment: row.id, note: note) },
-                                onRemoveLast: { Task { await viewModel.removeLastItem(commitment: row.id) } }
+                                recentDate: viewModel.recentItems.date(for: .commitment(row.id)),
+                                actions: viewModel.itemActions(row.id)
                             )
                         } else {
                             GoalCommitmentRow(

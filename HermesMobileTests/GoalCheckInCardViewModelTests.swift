@@ -70,9 +70,10 @@ private func home(_ json: [String: Any]) throws -> GoalsHome {
     try PrepDecoding.decode(GoalsHome.self, from: JSONSerialization.data(withJSONObject: json))
 }
 
-/// A check-in answer whose outreach row reports `done` items.
-private func itemResult(done: Int) throws -> GoalCheckInResult {
-    let json = try homeJSON(commitments: [2: ["done": done]])
+/// A check-in answer whose outreach row reports `done` items (and that many, when `listed`).
+private func itemResult(done: Int, listed: Bool = false) throws -> GoalCheckInResult {
+    let items = (0..<done).map { _ in ["date": "2026-10-14"] }
+    let json = try homeJSON(commitments: [2: listed ? ["done": done, "items": items] : ["done": done]])
     let body: [String: Any] = ["goal": (json["goals"] as! [[String: Any]])[0], "streak": ["days": 5, "at_risk": false],
                                "today": "2026-10-14", "yesterday": "2026-10-13"]
     return try PrepDecoding.decode(GoalCheckInResult.self, from: JSONSerialization.data(withJSONObject: body))
@@ -95,14 +96,14 @@ private func card(goals: [String]) throws -> DeckCard {
 final class GoalCheckInCardViewModelTests: XCTestCase {
     private let slug = "nyc-marathon-2026"
 
-    private func loaded(_ client: FakeCardGoalsClient, _ json: [String: Any]? = nil) async throws -> GoalCheckInCardViewModel {
+    private func loaded(_ client: FakeCardGoalsClient, _ json: [String: Any]? = nil) async throws -> GoalsHomeViewModel {
         client.homeResults = [.success(try home(json ?? homeJSON()))]
-        let vm = GoalCheckInCardViewModel(client: client)
+        let vm = GoalsHomeViewModel(client: client)
         await vm.load()
         return vm
     }
 
-    private func stretch(_ vm: GoalCheckInCardViewModel) -> GoalCommitmentProgress? {
+    private func stretch(_ vm: GoalsHomeViewModel) -> GoalCommitmentProgress? {
         guard case .loaded(let h) = vm.state else { return nil }
         return h.goals.first?.week.commitments.first { $0.id == "stretch-pm" }
     }
@@ -116,13 +117,22 @@ final class GoalCheckInCardViewModelTests: XCTestCase {
     func testYesterdayRowsIncludeUnscheduledAndCheckedOnly() throws {
         // Wednesday: the Saturday run wasn't due yesterday and has no check-in, so only the stretch shows.
         var goal = try home(homeJSON()).goals[0]
-        XCTAssertEqual(GoalCheckInCardViewModel.yesterdayRows(goal).map(\.id), ["stretch-pm"])
+        XCTAssertEqual(GoalsHomeViewModel.yesterdayRows(goal).map(\.id), ["stretch-pm"])
         goal = try home(homeJSON(commitments: [1: ["yesterday": "done"]])).goals[0]
-        XCTAssertEqual(GoalCheckInCardViewModel.yesterdayRows(goal).map(\.id), ["stretch-pm", "long-run"])
-        XCTAssertEqual(GoalCheckInCardViewModel.todayCues(goal).map(\.id), ["stretch-pm", "long-run"])
+        XCTAssertEqual(GoalsHomeViewModel.yesterdayRows(goal).map(\.id), ["stretch-pm", "long-run"])
+        XCTAssertEqual(GoalsHomeViewModel.todayCues(goal).map(\.id), ["stretch-pm", "long-run"])
     }
 
-    private func outreach(_ vm: GoalCheckInCardViewModel) -> GoalCommitmentProgress? {
+    func testTodayRowsAreDayRowsDueOrCheckedToday() throws {
+        // Wednesday: the stretch and the run are due; Prep isn't, and Outreach counts by +1.
+        var goal = try home(homeJSON()).goals[0]
+        XCTAssertEqual(GoalsHomeViewModel.todayRows(goal).map(\.id), ["stretch-pm", "long-run"])
+        goal = try home(homeJSON(commitments: [1: ["due_today": false], 3: ["today": "done"]])).goals[0]
+        XCTAssertEqual(GoalsHomeViewModel.todayRows(goal).map(\.id), ["stretch-pm", "prep"],
+                       "a row checked in today stays so it can be cleared")
+    }
+
+    private func outreach(_ vm: GoalsHomeViewModel) -> GoalCommitmentProgress? {
         guard case .loaded(let h) = vm.state else { return nil }
         return h.goals.first?.week.commitments.first { $0.id == "outreach" }
     }
@@ -131,8 +141,8 @@ final class GoalCheckInCardViewModelTests: XCTestCase {
         // Outreach was "due" yesterday and has a check-in, which would list it among yesterday's
         // rows if items weren't excluded; they get their own This week list instead.
         let goal = try home(homeJSON(commitments: [2: ["due_yesterday": true, "yesterday": "done"]])).goals[0]
-        XCTAssertEqual(GoalCheckInCardViewModel.yesterdayRows(goal).map(\.id), ["stretch-pm"])
-        XCTAssertEqual(GoalCheckInCardViewModel.itemRows(goal).map(\.id), ["outreach"])
+        XCTAssertEqual(GoalsHomeViewModel.yesterdayRows(goal).map(\.id), ["stretch-pm"])
+        XCTAssertEqual(GoalsHomeViewModel.itemRows(goal).map(\.id), ["outreach"])
     }
 
     func testAddItemPostsTodayAndCountsOptimistically() async throws {
@@ -192,7 +202,7 @@ final class GoalCheckInCardViewModelTests: XCTestCase {
         client.gate = (startedCont, release)
         client.checkInResults = [.success(try result(done: 3, yesterday: "done"))]
         let vm = try await loaded(client)
-        let tap = Task { await vm.checkIn(slug: slug, commitment: "stretch-pm", status: .done) }
+        let tap = Task { await vm.checkIn(slug: slug, commitment: "stretch-pm", status: .done, day: .yesterday) }
         for await _ in started { break }
         XCTAssertEqual(stretch(vm)?.yesterday, .done)
         XCTAssertEqual(stretch(vm)?.done, 1)
@@ -216,7 +226,7 @@ final class GoalCheckInCardViewModelTests: XCTestCase {
         client.gate = (startedCont, release)
         client.checkInResults = [.success(try result(done: 0, yesterday: "done"))]
         let vm = try await loaded(client, homeJSON(today: "2026-10-12", yesterday: "2026-10-11"))
-        let tap = Task { await vm.checkIn(slug: slug, commitment: "stretch-pm", status: .done) }
+        let tap = Task { await vm.checkIn(slug: slug, commitment: "stretch-pm", status: .done, day: .yesterday) }
         for await _ in started { break }
         XCTAssertEqual(stretch(vm)?.yesterday, .done)
         XCTAssertEqual(stretch(vm)?.done, 0, "last Sunday doesn't count toward this week")
@@ -242,7 +252,7 @@ final class GoalCheckInCardViewModelTests: XCTestCase {
         let json = try homeJSON(commitments: [1: ["yesterday": "done", "done": 1]])
         client.checkInResults = [.failure(URLError(.timedOut))]
         let vm = try await loaded(client, json)
-        await vm.checkIn(slug: slug, commitment: "stretch-pm", status: .done)
+        await vm.checkIn(slug: slug, commitment: "stretch-pm", status: .done, day: .yesterday)
         XCTAssertNil(stretch(vm)?.yesterday)
         XCTAssertEqual(stretch(vm)?.done, 0)
         guard case .loaded(let h) = vm.state else { return XCTFail("not loaded") }
@@ -255,7 +265,7 @@ final class GoalCheckInCardViewModelTests: XCTestCase {
         let client = FakeCardGoalsClient()
         client.checkInResults = [.failure(APIError.http(statusCode: 409, body: nil))]
         let vm = try await loaded(client)
-        await vm.checkIn(slug: slug, commitment: "stretch-pm", status: .done)
+        await vm.checkIn(slug: slug, commitment: "stretch-pm", status: .done, day: .yesterday)
         XCTAssertEqual(client.log, ["home", "checkIn", "home"])
         XCTAssertEqual(vm.error, "The day changed. Check in again.")
         XCTAssertNil(stretch(vm)?.yesterday)
@@ -266,7 +276,7 @@ final class GoalCheckInCardViewModelTests: XCTestCase {
         client.checkInResults = [.failure(APIError.http(statusCode: 409, body: nil))]
         let vm = try await loaded(client)
         client.homeResults = [.failure(URLError(.notConnectedToInternet))]
-        await vm.checkIn(slug: slug, commitment: "stretch-pm", status: .done)
+        await vm.checkIn(slug: slug, commitment: "stretch-pm", status: .done, day: .yesterday)
         XCTAssertNil(stretch(vm)?.yesterday, "nothing was saved, so nothing shows as saved")
         XCTAssertEqual(stretch(vm)?.done, 0)
         XCTAssertEqual(vm.error, "The day changed. Check in again.")
@@ -277,9 +287,9 @@ final class GoalCheckInCardViewModelTests: XCTestCase {
         client.homeResults = [.success(try home(homeJSON()))]
         client.checkInResults = [.success(try result(done: 3, yesterday: "done"))]
         var handed: [GoalsHome] = []
-        let vm = GoalCheckInCardViewModel(client: client, onChange: { handed.append($0) })
+        let vm = GoalsHomeViewModel(client: client, onChange: { handed.append($0) })
         await vm.load()
-        await vm.checkIn(slug: slug, commitment: "stretch-pm", status: .done)
+        await vm.checkIn(slug: slug, commitment: "stretch-pm", status: .done, day: .yesterday)
         XCTAssertEqual(handed.count, 1)
         XCTAssertEqual(handed.first?.goals.first?.week.commitments.first?.done, 3)
         XCTAssertEqual(handed.first?.streak.days, 5)
@@ -296,7 +306,7 @@ final class GoalCheckInCardViewModelTests: XCTestCase {
         client.gate = (startedCont, release)
         client.checkInResults = [.success(try result(done: 1, yesterday: "done"))]
         let vm = try await loaded(client, homeJSON(commitments: [0: ["id": "foot"]]))
-        let row = Task { await vm.checkIn(slug: slug, commitment: "foot", status: .done) }
+        let row = Task { await vm.checkIn(slug: slug, commitment: "foot", status: .done, day: .yesterday) }
         for await _ in started { break }
         XCTAssertTrue(vm.isPending(slug, .commitment("foot")))
         XCTAssertFalse(vm.isPending(slug, .check("foot")), "the check with the same id stays free")
@@ -308,13 +318,13 @@ final class GoalCheckInCardViewModelTests: XCTestCase {
         let vm = try await loaded(FakeCardGoalsClient())
         XCTAssertTrue(vm.isLive(for: "2026-10-14"))
         XCTAssertFalse(vm.isLive(for: "2026-10-13"), "an older deck shows its own text, not today's check-ins")
-        XCTAssertFalse(GoalCheckInCardViewModel(client: FakeCardGoalsClient()).isLive(for: "2026-10-14"))
+        XCTAssertFalse(GoalsHomeViewModel(client: FakeCardGoalsClient()).isLive(for: "2026-10-14"))
     }
 
     func testHome404IsUnavailable() async {
         let client = FakeCardGoalsClient()
         client.homeResults = [.failure(APIError.http(statusCode: 404, body: nil))]
-        let vm = GoalCheckInCardViewModel(client: client)
+        let vm = GoalsHomeViewModel(client: client)
         await vm.load()
         XCTAssertEqual(vm.state, .unavailable)
     }
@@ -327,3 +337,212 @@ final class GoalCheckInCardViewModelTests: XCTestCase {
         guard case .loaded = vm.state else { return XCTFail("a failed reload dropped the card's goals") }
     }
 }
+
+/// Goals home's one-tap check-ins (`GoalHeroCheckIn`), through the same model as the Deck card.
+@MainActor
+final class GoalsHomeCheckInTests: XCTestCase {
+    private let slug = "nyc-marathon-2026"
+
+    /// Mon Oct 12 – Sun Oct 18 as the Brief draws it, on Wednesday the 14th.
+    private func week(yesterday: String = "missed") -> [[String: Any]] {
+        let states = ["done", yesterday, "today", "ahead", "ahead", "ahead", "ahead"]
+        return states.enumerated().map { ["date": "2026-10-\(12 + $0.offset)", "state": $0.element] }
+    }
+
+    private func loaded(_ client: FakeCardGoalsClient, _ json: [String: Any]) async throws -> GoalsHomeViewModel {
+        client.homeResults = [.success(try home(json))]
+        let vm = GoalsHomeViewModel(client: client)
+        await vm.load()
+        return vm
+    }
+
+    private func stretch(_ vm: GoalsHomeViewModel) -> GoalCommitmentProgress? {
+        guard case .loaded(let h) = vm.state else { return nil }
+        return h.goals.first?.week.commitments.first { $0.id == "stretch-pm" }
+    }
+
+    private func todayResult(done: Int) throws -> GoalCheckInResult {
+        let json = try homeJSON(commitments: [0: ["done": done, "today": "done"]])
+        let body: [String: Any] = ["goal": (json["goals"] as! [[String: Any]])[0], "streak": ["days": 6, "at_risk": false],
+                                   "today": "2026-10-14", "yesterday": "2026-10-13"]
+        return try PrepDecoding.decode(GoalCheckInResult.self, from: JSONSerialization.data(withJSONObject: body))
+    }
+
+    func testTodayCheckInPostsTheServersTodayAndShowsAtOnce() async throws {
+        let client = FakeCardGoalsClient()
+        let (started, startedCont) = AsyncStream<Void>.makeStream()
+        let (release, releaseCont) = AsyncStream<Void>.makeStream()
+        client.gate = (startedCont, release)
+        client.checkInResults = [.success(try todayResult(done: 2))]
+        var handed = 0
+        client.homeResults = [.success(try home(homeJSON()))]
+        let vm = GoalsHomeViewModel(client: client, onChange: { _ in handed += 1 })
+        await vm.load()
+        let tap = Task { await vm.checkIn(slug: slug, commitment: "stretch-pm", status: .done, day: .today) }
+        for await _ in started { break }
+        XCTAssertEqual(stretch(vm)?.today, .done)
+        XCTAssertEqual(stretch(vm)?.done, 1)
+        XCTAssertNil(stretch(vm)?.yesterday)
+        releaseCont.yield()
+        await tap.value
+        XCTAssertEqual(client.checkIns, [
+            .commitment(slug: slug, date: "2026-10-14", asOf: "2026-10-14", id: "stretch-pm", status: .done),
+        ])
+        XCTAssertEqual(stretch(vm)?.done, 2, "the server's summary replaces the optimistic one")
+        XCTAssertEqual(handed, 1, "the widget gets the saved home")
+    }
+
+    func testTodayCheckInFailureRollsBack() async throws {
+        let client = FakeCardGoalsClient()
+        client.checkInResults = [.failure(URLError(.timedOut))]
+        let vm = try await loaded(client, homeJSON())
+        await vm.checkIn(slug: slug, commitment: "stretch-pm", status: .done, day: .today)
+        XCTAssertNil(stretch(vm)?.today)
+        XCTAssertEqual(stretch(vm)?.done, 0)
+        XCTAssertEqual(vm.error, "Couldn't save. Try again.")
+    }
+
+    func testTodayClearAfterConflictReloadsAndSaysSo() async throws {
+        let client = FakeCardGoalsClient()
+        client.checkInResults = [.failure(APIError.http(statusCode: 409, body: nil))]
+        let vm = try await loaded(client, homeJSON(commitments: [0: ["today": "done", "done": 1]]))
+        await vm.checkIn(slug: slug, commitment: "stretch-pm", status: .clear, day: .today)
+        XCTAssertEqual(client.log, ["home", "checkIn", "home"])
+        XCTAssertEqual(vm.error, "The day changed. Check in again.")
+        XCTAssertEqual(stretch(vm)?.today, .done, "nothing was cleared")
+    }
+
+    func testTodayIsTappableWhileDueAndYesterdayWhileItWaits() throws {
+        let tappable = { (fields: [String: Any]) throws -> Set<GoalDay> in
+            let row = try home(homeJSON(commitments: [0: fields])).goals[0].week.commitments[0]
+            return GoalHeroCheckIn.tappableDays(row, today: "2026-10-14", yesterday: "2026-10-13")
+        }
+        XCTAssertEqual(try tappable(["week_days": week()]), [.today, .yesterday], "yesterday unlogged is a ringed +")
+        XCTAssertEqual(try tappable(["week_days": week(yesterday: "off")]), [.today], "a day it wasn't due stays put")
+        XCTAssertEqual(try tappable(["week_days": week(), "yesterday": "skip"]), [.today, .yesterday],
+                       "a check-in can be cleared")
+        XCTAssertEqual(try tappable(["week_days": week(), "source": "prep.days", "source_days": ["2026-10-13"]]), [.today],
+                       "a day Prep counted shows done, not waiting")
+        XCTAssertEqual(try tappable(["week_days": week(), "due_today": false]), [.yesterday])
+        XCTAssertEqual(try tappable(["week_days": week(), "due_today": false, "today": "min"]), [.today, .yesterday])
+        XCTAssertEqual(try tappable([:]), [], "no dots from a server without week_days")
+        XCTAssertEqual(try tappable(["week_days": week(), "unit": "item"]), [], "items count by +")
+    }
+
+    func testVoiceOverActionsMirrorTheDots() async throws {
+        let client = FakeCardGoalsClient()
+        let json = try homeJSON(commitments: [0: ["week_days": week(), "yesterday": "done"], 1: ["week_days": week(yesterday: "off")]])
+        let vm = try await loaded(client, json)
+        guard case .loaded(let h) = vm.state else { return XCTFail("not loaded") }
+        let checkIn = GoalHeroCheckIn(slug: slug, home: h, model: vm)
+        XCTAssertEqual(checkIn.actions(for: h.goals[0]).map(\.label),
+                       ["Stretch done today", "Clear Stretch yesterday", "Run done today", "Add one outreach"])
+    }
+}
+
+/// The instant +1 on an item row: it counts at once, then offers Add note and Undo for a few seconds.
+@MainActor
+final class GoalQuickItemTests: XCTestCase {
+    private let slug = "nyc-marathon-2026"
+    private var clock = Date(timeIntervalSince1970: 0)
+
+    private func loaded(_ client: FakeCardGoalsClient) async throws -> GoalsHomeViewModel {
+        client.homeResults = [.success(try home(homeJSON()))]
+        let vm = GoalsHomeViewModel(client: client, recentItems: GoalRecentItemWindow(duration: 5, now: { self.clock }))
+        await vm.load()
+        return vm
+    }
+
+    private func outreach(_ vm: GoalsHomeViewModel) -> GoalCommitmentProgress? {
+        guard case .loaded(let h) = vm.state else { return nil }
+        return h.goals.first?.week.commitments.first { $0.id == "outreach" }
+    }
+
+    func testPlusOneThenUndoSendsMinusOneForTheSameDay() async throws {
+        let client = FakeCardGoalsClient()
+        client.checkInResults = [.success(try itemResult(done: 3)), .success(try itemResult(done: 2))]
+        let vm = try await loaded(client)
+        await vm.addItem(slug: slug, commitment: "outreach", note: nil)
+        XCTAssertEqual(vm.recentItemDate(slug: slug, commitment: "outreach"), "2026-10-14")
+        await vm.undoItem(slug: slug, commitment: "outreach")
+        XCTAssertEqual(client.checkIns, [
+            .item(slug: slug, date: "2026-10-14", asOf: "2026-10-14", id: "outreach", n: 1, note: nil),
+            .item(slug: slug, date: "2026-10-14", asOf: "2026-10-14", id: "outreach", n: -1, note: nil),
+        ])
+        XCTAssertEqual(outreach(vm)?.done, 2)
+        XCTAssertNil(vm.recentItemDate(slug: slug, commitment: "outreach"), "Undo ends the offer")
+    }
+
+    func testFailedPlusOneRollsBackAndOffersNoUndo() async throws {
+        let client = FakeCardGoalsClient()
+        client.checkInResults = [.failure(URLError(.timedOut))]
+        let vm = try await loaded(client)
+        await vm.addItem(slug: slug, commitment: "outreach", note: nil)
+        XCTAssertEqual(outreach(vm)?.done, 2)
+        XCTAssertEqual(outreach(vm)?.items.count, 2)
+        XCTAssertNil(vm.recentItemDate(slug: slug, commitment: "outreach"))
+        XCTAssertEqual(vm.error, "Couldn't save. Try again.")
+    }
+
+    func testUndoAfterTheWindowIsNotOfferedAndSendsNothing() async throws {
+        let client = FakeCardGoalsClient()
+        client.checkInResults = [.success(try itemResult(done: 3))]
+        let vm = try await loaded(client)
+        await vm.addItem(slug: slug, commitment: "outreach", note: nil)
+        clock = clock.addingTimeInterval(6)
+        XCTAssertNil(vm.recentItemDate(slug: slug, commitment: "outreach"))
+        await vm.undoItem(slug: slug, commitment: "outreach")
+        XCTAssertEqual(client.checkIns.count, 1, "only the +1 went out")
+        XCTAssertEqual(outreach(vm)?.done, 3)
+    }
+
+    func testAPlusOneWithANoteOffersNoUndo() async throws {
+        let client = FakeCardGoalsClient()
+        client.checkInResults = [.success(try itemResult(done: 3))]
+        let vm = try await loaded(client)
+        await vm.addItem(slug: slug, commitment: "outreach", note: "Anthropic")
+        XCTAssertNil(vm.recentItemDate(slug: slug, commitment: "outreach"))
+    }
+
+    func testAddNoteTakesTheItemBackAndCountsItWithTheNote() async throws {
+        let client = FakeCardGoalsClient()
+        let (started, startedCont) = AsyncStream<Void>.makeStream()
+        let (release, releaseCont) = AsyncStream<Void>.makeStream()
+        client.checkInResults = [.success(try itemResult(done: 3, listed: true)),
+                                 .success(try itemResult(done: 2, listed: true)),
+                                 .success(try itemResult(done: 3, listed: true))]
+        let vm = try await loaded(client)
+        await vm.addItem(slug: slug, commitment: "outreach", note: nil)
+        client.gate = (startedCont, release)
+        let date = try XCTUnwrap(vm.recentItems.take(GoalsHomeViewModel.key(slug, .commitment("outreach"))))
+        let save = Task { await vm.noteItem(slug: slug, commitment: "outreach", date: date, note: "Acme") }
+        for await _ in started { break }
+        XCTAssertEqual(outreach(vm)?.done, 3, "the count holds while the item is swapped")
+        XCTAssertEqual(outreach(vm)?.items.last?.note, "Acme")
+        releaseCont.yield()
+        releaseCont.yield()
+        let outcome = await save.value
+        XCTAssertEqual(outcome, .saved)
+        XCTAssertEqual(Array(client.checkIns.suffix(2)), [
+            .item(slug: slug, date: "2026-10-14", asOf: "2026-10-14", id: "outreach", n: -1, note: nil),
+            .item(slug: slug, date: "2026-10-14", asOf: "2026-10-14", id: "outreach", n: 1, note: "Acme"),
+        ])
+    }
+
+    func testAddNoteSaysWhichHalfFailed() async throws {
+        let client = FakeCardGoalsClient()
+        client.checkInResults = [.failure(URLError(.timedOut))]
+        let vm = try await loaded(client)
+        let unchanged = await vm.noteItem(slug: slug, commitment: "outreach", date: "2026-10-14", note: "Acme")
+        XCTAssertEqual(unchanged, .unchanged)
+        XCTAssertEqual(client.checkIns.count, 1, "no +1 after a failed -1")
+        XCTAssertEqual(outreach(vm)?.done, 2)
+        XCTAssertNil(outreach(vm)?.items.last?.note)
+
+        client.checkInResults = [.success(try itemResult(done: 1)), .failure(URLError(.timedOut))]
+        let removed = await vm.noteItem(slug: slug, commitment: "outreach", date: "2026-10-14", note: "Acme")
+        XCTAssertEqual(removed, .removed)
+        XCTAssertEqual(outreach(vm)?.done, 1, "the server took the item back")
+    }
+}
+

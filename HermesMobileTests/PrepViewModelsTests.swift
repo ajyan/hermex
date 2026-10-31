@@ -97,6 +97,9 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
         }
         return try next("override:\(attempt):\(point)", &overrideResults)
     }
+    func undoOverride(attempt: String) async throws -> PrepAttemptResult {
+        try next("undo:\(attempt)", &overrideResults)
+    }
     func mocks() async throws -> PrepMocks { try next("mocks", &mocksResults) }
     func mockStart(kind: PrepMockKind, level: String?, story: String?) async throws -> PrepMockStart {
         try next("mockStart:\(kind.rawValue)", &mockStartResults)
@@ -1010,6 +1013,37 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(result.pointTexts["p.b"], "B", "keeps the point texts")
         XCTAssertEqual(vm.lastXP, 15)
         XCTAssertEqual(client.log.last, "override:att-1:p.b")
+    }
+
+    func testUndoTakesTheOverrideBack() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([recallLessonRep(0, drill: "recall", block: "review")]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.success(recallResult("partial", next: 1))]
+        client.overrideResults = [
+            .success(decode(PrepAttemptResult.self, #"""
+            {"verdict": "pass", "attempt": "att-2", "xp": 15, "overridden": ["p.b"],
+             "grade": {"points_hit": [{"point_id": "p.a", "quote": ""}, {"point_id": "p.b", "quote": ""}], "points_missed": [], "strong_answer": "S"}}
+            """#)),
+            .success(decode(PrepAttemptResult.self, #"""
+            {"verdict": "partial", "attempt": "att-3", "xp": 10, "overridden": [],
+             "grade": {"points_hit": [{"point_id": "p.a", "quote": ""}], "points_missed": [{"point_id": "p.b", "why": ""}], "strong_answer": "S"}}
+            """#)),
+        ]
+        let vm = makeVM(client)
+        await vm.load()
+        vm.recallDraft = "x"
+        await vm.submitRecall()
+        await vm.overridePoint("p.b")
+        await vm.undoOverride()
+        guard case let .result(_, result, _) = vm.phase else { return XCTFail("phase \(vm.phase)") }
+        XCTAssertEqual(result.verdict, "partial")
+        XCTAssertEqual(result.overridden, [])
+        XCTAssertEqual(result.attemptID, "att-3")
+        XCTAssertEqual(vm.lastXP, 10)
+        XCTAssertEqual(client.log.last, "undo:att-2")
+        XCTAssertTrue(PrepKeyPointRow.offersOverride(hit: false, canOverride: true, result: result),
+                      "the answer's one I had that is free again")
     }
 
     func testDontKnowResultCannotBeOverridden() async {

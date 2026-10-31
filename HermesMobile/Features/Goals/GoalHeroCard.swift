@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// A goal on its Daily Brief paper: days left, serif title, identity, and this week as a
-/// strip of seven days. Goals home shows it compact; goal detail adds the why and lets the
-/// strip pick which day (today or yesterday) the check-ins below write to.
+/// strip of seven days. Goals home shows it compact with its commitments' dots checking in
+/// (`checkIn`); goal detail adds the why and lets the strip pick which day (today or yesterday)
+/// the check-ins below write to.
 struct GoalHeroCard: View {
     let goal: GoalSummary
     var why: String = ""
@@ -12,6 +13,8 @@ struct GoalHeroCard: View {
     /// The day the detail screen checks in for; nil leaves the strip read-only.
     var selection: (today: String, yesterday: String, selected: GoalDay)?
     var onSelect: (GoalDay) -> Void = { _ in }
+    /// Goals home's one-tap check-ins on the commitments' dots; nil leaves them read-only.
+    var checkIn: GoalHeroCheckIn?
 
     var body: some View {
         let palette = GoalPaper.palette(for: goal)
@@ -49,7 +52,7 @@ struct GoalHeroCard: View {
                 VStack(alignment: .leading, spacing: BrainStyle.s) {
                     ForEach(goal.week.commitments) { row in
                         GoalCommitmentWeek(row: row, atRisk: goal.flags.missTwice.contains(row.id), paper: palette.colors,
-                                           today: today ?? selection?.today)
+                                           today: today ?? selection?.today, checkIn: checkIn)
                     }
                 }
             }
@@ -60,13 +63,15 @@ struct GoalHeroCard: View {
 
 /// A commitment's week on the hero, laid out like a row of the Brief's week grid (`DeckWeekGrid`):
 /// its name with a small count in the flexible column, then its pips in the seven fixed day columns,
-/// and a "Don't miss twice" chip under it when the server flags it.
+/// and a "Don't miss twice" chip under it when the server flags it. With `checkIn` (Goals home),
+/// today's and yesterday's dots check in and an item row ends on a + (`GoalCheckInPipRow`).
 struct GoalCommitmentWeek: View {
     let row: GoalCommitmentProgress
     let atRisk: Bool
     let paper: HermexPaper
     /// The server's today, so today's and yesterday's dots follow a tap at once.
     var today: String?
+    var checkIn: GoalHeroCheckIn?
 
     var body: some View {
         let pips = GoalPips(row, name: GoalsCopy.shortName(row.action), today: today)
@@ -85,9 +90,13 @@ struct GoalCommitmentWeek: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.trailing, 6)
-                GoalPipRow(pips: pips, ink: paper.glow)
+                if let checkIn {
+                    GoalCheckInPipRow(row: row, pips: pips, ink: paper.glow, checkIn: checkIn)
+                } else {
+                    GoalPipRow(pips: pips, ink: paper.glow)
+                }
             }
-            .frame(minHeight: 24)
+            .frame(minHeight: checkIn == nil ? 24 : BrainStyle.minTapTarget)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text(verbatim: pips.spoken))
             if atRisk {

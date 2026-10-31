@@ -29,6 +29,14 @@ struct BrainArticleDigest: Equatable {
     /// Every other section (Connections, The question, …), in page order.
     var otherSections: [Section]
 
+    /// Ideas keep their written numbers (a review bite names one by it) unless those repeat or run
+    /// backwards ("1. 1. 1." is valid Markdown); then they count by position, so every idea is its own.
+    static func numbered(_ ideas: [Idea]) -> [Idea] {
+        let numbers = ideas.map(\.number)
+        guard zip(numbers, numbers.dropFirst()).contains(where: { $0 >= $1 }) else { return ideas }
+        return ideas.enumerated().map { Idea(number: $0.offset + 1, headline: $0.element.headline, detail: $0.element.detail) }
+    }
+
     static func parse(_ markdown: String) -> BrainArticleDigest? {
         var gist: String?
         var ideas: [Idea] = []
@@ -43,7 +51,7 @@ struct BrainArticleDigest: Equatable {
                 gist = body
             } else if key.hasPrefix("key ideas") {
                 let parsed = numberedIdeas(body)
-                if parsed.isEmpty { ideasMarkdown = body } else { ideas = parsed }
+                if parsed.isEmpty { ideasMarkdown = body } else { ideas = numbered(parsed) }
             } else if key.hasPrefix("best quotes") {
                 quotes = blockQuotes(body)
                 if quotes.isEmpty, !body.isEmpty { others.append(Section(title: title, markdown: body)) }

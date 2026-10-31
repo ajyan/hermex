@@ -435,8 +435,33 @@ final class PrepRunViewModel {
 
     /// "I had that": count one missed key point as hit, keeping the rest of the result.
     func overridePoint(_ point: String) async {
+        let client = self.client
+        await changeOverride(point) { try await client.override(attempt: $0, point: point) }
+    }
+
+    /// Undo on the point "I had that" claimed, while its result is on screen: the grade goes back to
+    /// what the grader said, and the answer's one override is free again.
+    func undoOverride() async {
+        let shown: PrepAttemptResult?
         if case let .rep(rep, _) = phase, rep.drill == .story {
-            await overrideStoryPoint(point)
+            switch storyStage {
+            case let .told(result), let .probed(result, _): shown = result
+            case .telling, .probing: shown = nil
+            }
+        } else if case let .result(_, result, _) = phase {
+            shown = result
+        } else {
+            shown = nil
+        }
+        guard let point = shown?.overridden.first else { return }
+        let client = self.client
+        await changeOverride(point) { try await client.undoOverride(attempt: $0) }
+    }
+
+    /// Sends "I had that" or its undo for `point` and lays the server's rescore over the result shown.
+    private func changeOverride(_ point: String, _ send: @escaping (String) async throws -> PrepAttemptResult) async {
+        if case let .rep(rep, _) = phase, rep.drill == .story {
+            await changeStoryOverride(point, send)
             return
         }
         guard case let .result(rep, result, index) = phase, let attempt = result.attemptID,
@@ -445,7 +470,7 @@ final class PrepRunViewModel {
         overridingPoint = point
         defer { if token == generation { overridingPoint = nil } }
         do {
-            let updated = try await client.override(attempt: attempt, point: point)
+            let updated = try await send(attempt)
             // Next may have moved on while this was in flight: merge only into the same rep's result.
             guard token == generation, case let .result(current, _, _) = phase, current.index == rep.index else { return }
             let merged = PrepAttemptResult(merging: result, override: updated)
@@ -581,9 +606,9 @@ final class PrepRunViewModel {
         storyStartedAt.map { Self.milliseconds(from: $0, to: storySubmittedAt ?? now()) } ?? 0
     }
 
-    /// "I had that" on a told story's missed beat or a probe's missed point: re-scored by the server,
+    /// "I had that" (or its undo) on a told story's beat or a probe's point: re-scored by the server,
     /// laid over the result on screen. The probe that result leads to is kept, so the rep goes on.
-    private func overrideStoryPoint(_ point: String) async {
+    private func changeStoryOverride(_ point: String, _ send: @escaping (String) async throws -> PrepAttemptResult) async {
         let shown: PrepAttemptResult
         switch storyStage {
         case let .told(result), let .probed(result, _): shown = result
@@ -595,7 +620,7 @@ final class PrepRunViewModel {
         overridingPoint = point
         defer { if token == generation { overridingPoint = nil } }
         do {
-            let updated = try await client.override(attempt: attempt, point: point)
+            let updated = try await send(attempt)
             guard token == generation, storyStage == stage else { return }
             let merged = PrepAttemptResult(merging: shown, override: updated)
             switch stage {

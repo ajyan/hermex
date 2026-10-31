@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 /// The optimistic side of a check-in: what a goal's summary looks like once the server takes a
 /// tap. Shared by the goal screen and the Daily Deck's goal card, which replay these edits through
@@ -112,4 +113,62 @@ struct GoalPendingEdits<Value, Key: Hashable> {
 
     mutating func add(_ key: Key, _ apply: @escaping (inout Value) -> Void) { edits.append((key, apply)) }
     mutating func remove(_ key: Key) { edits.removeAll { $0.key == key } }
+}
+
+/// The +1 just counted on an item row, offered "Add note · Undo" for a few seconds after the server
+/// takes it. A view model owns one; its timer only clears the offer, and `date(for:)` checks the clock
+/// too, so an Undo after the window never goes out.
+@MainActor
+@Observable
+final class GoalRecentItemWindow<Key: Hashable> {
+    private(set) var current: (key: Key, date: String)?
+    @ObservationIgnored private var deadline: Date?
+    @ObservationIgnored private var timer: Task<Void, Never>?
+    @ObservationIgnored private let duration: TimeInterval
+    @ObservationIgnored private let now: () -> Date
+
+    nonisolated init(duration: TimeInterval = 5, now: @escaping () -> Date = Date.init) {
+        self.duration = duration
+        self.now = now
+    }
+
+    /// The day the item offered for `key` was counted on; nil once the offer has passed.
+    func date(for key: Key) -> String? {
+        guard let current, current.key == key, let deadline, now() < deadline else { return nil }
+        return current.date
+    }
+
+    /// Offers Add note and Undo for the item just counted on `date`, replacing any earlier offer.
+    func open(_ key: Key, date: String) {
+        timer?.cancel()
+        current = (key, date)
+        deadline = now().addingTimeInterval(duration)
+        let duration = duration
+        timer = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(duration))
+            guard !Task.isCancelled else { return }
+            self?.close()
+        }
+    }
+
+    /// Ends the offer for `key` and returns its day, or nil when it had already passed.
+    func take(_ key: Key) -> String? {
+        guard let date = date(for: key) else { return nil }
+        close()
+        return date
+    }
+
+    func close() {
+        timer?.cancel()
+        timer = nil
+        current = nil
+        deadline = nil
+    }
+}
+
+/// What Add note did to the item just counted. The server can't edit an item's note, so the app takes
+/// the item back (-1) and counts it again with the note (+1): both landed, the -1 didn't (nothing
+/// changed), or only the -1 did (the item is off until it's counted again).
+enum GoalItemNoteOutcome: Equatable, Sendable {
+    case saved, unchanged, removed
 }

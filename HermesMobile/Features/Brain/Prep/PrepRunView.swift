@@ -50,6 +50,7 @@ struct PrepRunView: View {
     var body: some View {
         content
             .onPreferenceChange(PrepMicBusyKey.self) { micBusy = $0 }
+            .environment(\.prepUndoOverride, PrepUndoOverrideAction { Task { await viewModel.undoOverride() } })
             .environment(\.prepDiagramLoader, viewModel.diagramLoader)
             .hxNavigationTitle(title)
             .navigationBarBackButtonHidden(true)

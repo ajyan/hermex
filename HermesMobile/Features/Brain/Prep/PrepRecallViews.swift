@@ -186,6 +186,7 @@ struct PrepKeyPointRow: View {
     let overrideMissed: (String) -> Void
     /// Under a miss, the grader's one line on what was missing.
     var showsWhy = false
+    @Environment(\.prepUndoOverride) private var undoOverride
 
     private var why: String? {
         guard showsWhy, !hit else { return nil }
@@ -216,7 +217,20 @@ struct PrepKeyPointRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if result.overridden.contains(id) {
-                    Text(verbatim: "You had this").font(BrainStyle.meta).foregroundStyle(Color.hxTextSecondary)
+                    HStack(spacing: BrainStyle.s) {
+                        Text(verbatim: "You had this").font(BrainStyle.meta).foregroundStyle(Color.hxTextSecondary)
+                        if undoOverride.isAvailable {
+                            Button { undoOverride() } label: {
+                                Text(verbatim: overridingPoint == id ? "Undoing…" : "Undo")
+                                    .font(BrainStyle.meta).foregroundStyle(Color.accentColor)
+                                    .frame(minHeight: BrainStyle.minTapTarget, alignment: .leading)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(overridingPoint != nil)
+                            .accessibilityLabel(Text(verbatim: "Undo I had that: \(text)"))
+                        }
+                    }
                 }
                 if Self.offersOverride(hit: hit, canOverride: canOverride, result: result) {
                     Button { overrideMissed(id) } label: {
@@ -233,5 +247,27 @@ struct PrepKeyPointRow: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text(verbatim: "\(hit ? "Hit" : "Missed"): \(text)"))
+    }
+}
+
+/// Undo on the point an answer's "I had that" claimed. The run screen sets it while a result is
+/// shown, so every result view's key-point rows offer it without threading a closure through each.
+struct PrepUndoOverrideAction {
+    var handler: (@MainActor () -> Void)?
+
+    var isAvailable: Bool { handler != nil }
+
+    @MainActor
+    func callAsFunction() { handler?() }
+}
+
+struct PrepUndoOverrideKey: EnvironmentKey {
+    static let defaultValue = PrepUndoOverrideAction()
+}
+
+extension EnvironmentValues {
+    var prepUndoOverride: PrepUndoOverrideAction {
+        get { self[PrepUndoOverrideKey.self] }
+        set { self[PrepUndoOverrideKey.self] = newValue }
     }
 }
