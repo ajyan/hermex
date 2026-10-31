@@ -309,7 +309,7 @@ extension ShellPushDestination {
         // A run's answer is unsent until Submit, and a zoom screen can be pulled down to dismiss,
         // so run screens slide in as usual.
         case .brainRoute(.prep(.run)), .brainRoute(.prep(.testout(_))), .brainRoute(.prep(.bonus)),
-             .brainRoute(.prep(.story(_))): false
+             .brainRoute(.prep(.story(_))), .brainRoute(.prep(.gapRun(_))), .brainRoute(.prep(.lessonRun(_))): false
         case .brainRoute: true
         case .projects, .project, .tasks, .kanban, .dailyDeck, .brain, .goals, .finishedGoals, .money, .feedback,
              .body, .bodyLift, .bodyPlan, .bodyWorkout, .settings: false

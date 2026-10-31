@@ -145,7 +145,7 @@ struct PrepTutorReplyBar: View {
                     .overlay(RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous)
                         .strokeBorder(Color.hxSeparator, lineWidth: 0.5))
                     .accessibilityLabel(Text(verbatim: "Your reply"))
-                PrepStoryMicButton(text: $draft, isSubmitting: isBusy)
+                PrepStoryMicButton(text: $draft, isSubmitting: isBusy, prominent: false)  // Send leads this bar
                 PrepPrimaryButton(title: "Send", enabled: canSend, isGrading: isBusy, action: send)
             }
             Button(action: showMe) {

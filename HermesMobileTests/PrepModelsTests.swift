@@ -60,6 +60,13 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertEqual(run.reps.map(\.probeMinWords), [50, 0])
     }
 
+    func testGapDetailDecodesItsPracticeCount() throws {
+        let gap = try decode(PrepGapDetail.self, #"{"id": "g1", "label": "Strength first", "status": "open", "practice": 3}"#)
+        XCTAssertEqual(gap.practice, 3)
+        let older = try decode(PrepGapDetail.self, #"{"id": "g1", "label": "Strength first", "status": "open"}"#)
+        XCTAssertEqual(older.practice, 0, "an older server hides Practice this gap")
+    }
+
     func testWordFloorCountsWordsAndTitlesSubmit() {
         XCTAssertEqual(PrepWordFloor("  one two\nthree  ", floor: 5).submitTitle, "3 of 5 words")
         XCTAssertTrue(PrepWordFloor("one two", floor: 2).isMet)

@@ -292,6 +292,11 @@ struct PrepGapView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
                     header(gap)
+                    if gap.practice > 0 {
+                        PrepPracticeLink(title: "Practice this gap",
+                                         detail: PrepCopy.practiceDetail(gap.practice),
+                                         route: .gapRun(gap.id))
+                    }
                     if !gap.evidence.isEmpty { evidence(gap.evidence) }
                     if !gap.cards.isEmpty { cards(gap.cards) }
                     Text(verbatim: "A gap closes after you make its point on 3 different cards across 2 or more days.")
@@ -338,7 +343,7 @@ struct PrepGapView: View {
                     ForEach(Array(rows.enumerated()), id: \.offset) { offset, row in
                         if offset > 0 { PrepRowDivider() }
                         VStack(alignment: .leading, spacing: BrainStyle.xs) {
-                            Text(verbatim: [row.date, row.itemTitle].filter { !$0.isEmpty }.joined(separator: " · "))
+                            Text(verbatim: [row.date.isEmpty ? "" : BrainStyle.displayDate(row.date), row.itemTitle].filter { !$0.isEmpty }.joined(separator: " · "))
                                 .brainText(.meta)
                                 .lineLimit(2)
                             Text(verbatim: "\u{201C}\(row.quote)\u{201D}")
@@ -389,5 +394,33 @@ struct PrepShowAllButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// A full-width Nous-blue capsule that pushes a short practice run, with what it asks underneath:
+/// "Practice this gap" on a gap, "Try it now" on a lesson.
+struct PrepPracticeLink: View {
+    let title: String
+    let detail: String?
+    let route: PrepRoute
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BrainStyle.xs) {
+            NavigationLink(value: ShellPushDestination.brainRoute(.prep(route))) {
+                Text(verbatim: title)
+                    .font(AppFont.body(weight: .semibold))
+                    .foregroundStyle(Color.hxOnAccent)
+                    .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
+                    .background(Color.accentColor, in: Capsule())
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            if let detail {
+                Text(verbatim: detail)
+                    .font(BrainStyle.meta)
+                    .foregroundStyle(Color.hxTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 }

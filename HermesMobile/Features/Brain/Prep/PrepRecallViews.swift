@@ -33,7 +33,9 @@ struct PrepRecallCard: View {
                 .foregroundStyle(Color.hxTextPrimary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
-            TextField(text: $draft, axis: .vertical) { Text(verbatim: "Answer out loud or type…") }
+            // Spoken first, as in the room: the mic leads and its words land in the field to correct.
+            PrepStoryMicButton(text: $draft, isSubmitting: isSubmitting)
+            TextField(text: $draft, axis: .vertical) { Text(verbatim: "Your words appear here. Or type.") }
                 .font(AppFont.body())
                 .lineLimit(3...10)
                 .focused($typing)
@@ -43,7 +45,6 @@ struct PrepRecallCard: View {
                 .overlay(RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous)
                     .strokeBorder(Color.hxSeparator, lineWidth: 0.5))
                 .accessibilityLabel(Text(verbatim: "Your answer"))
-            PrepStoryMicButton(text: $draft, isSubmitting: isSubmitting)
         }
         Button(action: dontKnow) {
             Text(verbatim: "I don't know, show me")

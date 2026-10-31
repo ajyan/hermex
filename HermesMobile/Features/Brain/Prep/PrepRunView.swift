@@ -532,7 +532,10 @@ struct PrepRunView: View {
                 elapsedMS: { viewModel.storyElapsedMS },
                 draft: draft,
                 isSubmitting: viewModel.isSubmitting,
-                startClock: { viewModel.markStoryStarted() })
+                startClock: { viewModel.markStoryStarted() },
+                cuesHidden: rep.cuesHidden,
+                peeked: viewModel.storyCuesPeeked,
+                peek: { viewModel.peekStoryCues() })
         case .told(let result):
             PrepStoryResultView(result: result, titles: viewModel.storyTitles,
                                 overridingPoint: viewModel.overridingPoint) { point in

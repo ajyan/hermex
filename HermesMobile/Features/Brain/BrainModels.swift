@@ -792,6 +792,10 @@ enum PrepRoute: Hashable, Sendable {
     /// One voice mock's result, by mock id. `unsent` is the grade request when it never got
     /// through, for the result's Send for grading.
     case mockResult(String, unsent: MockCallGrade? = nil)
+    /// "Practice this gap": a short run aimed at one gap, by gap id.
+    case gapRun(String)
+    /// "Try it now": one recall of a lesson, by lesson id.
+    case lessonRun(String)
 }
 
 /// Opens a Brain page on the shell's stack from outside Brain (a `brain://` link in a
