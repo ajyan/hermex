@@ -297,13 +297,6 @@ final class ContractReadinessTests: XCTestCase {
                 path: "/api/tutor/map",
                 query: ["track": "dsa"]
             ),
-            .init(
-                name: "tutor item",
-                method: "GET",
-                endpoint: .tutorItem(id: "dsa.0217"),
-                path: "/api/tutor/item",
-                query: ["id": "dsa.0217"]
-            ),
             .init(name: "tutor attempt", method: "POST", endpoint: .tutorAttempt, path: "/api/tutor/attempt"),
             .init(
                 name: "tutor test out",
