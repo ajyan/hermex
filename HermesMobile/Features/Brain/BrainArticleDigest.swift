@@ -165,15 +165,19 @@ struct BrainArticleDigest: Equatable {
 /// inside markdown go through the `openURL` action the reader installs.
 struct BrainArticleDigestView: View {
     let digest: BrainArticleDigest
-    /// The idea a bite opened this page at: starts expanded and wears the article paper.
+    /// The idea a bite opened this page at: starts expanded and wears the page's paper.
     let focusIdea: Int?
+    /// The page's own paper (articles `reading`, videos their module's), for the idea numbers,
+    /// the focused idea and the takeaway.
+    let paper: HermexPaper
     @State private var expanded: Set<Int>
     @State private var showsFullGist = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(digest: BrainArticleDigest, focusIdea: Int? = nil) {
+    init(digest: BrainArticleDigest, focusIdea: Int? = nil, paper: HermexPaper = .reading) {
         self.digest = digest
         self.focusIdea = focusIdea
+        self.paper = paper
         _expanded = State(initialValue: Self.initiallyExpanded(focusIdea, in: digest))
     }
 
@@ -229,6 +233,8 @@ struct BrainArticleDigestView: View {
                         .font(BrainStyle.sectionCaption)
                         .fontWeight(.semibold)
                         .foregroundStyle(Color.accentColor)
+                        .frame(minHeight: BrainStyle.minTapTarget)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
             }
@@ -250,6 +256,8 @@ struct BrainArticleDigestView: View {
                             .font(BrainStyle.sectionCaption)
                             .fontWeight(.semibold)
                             .foregroundStyle(Color.accentColor)
+                            .frame(minHeight: BrainStyle.minTapTarget)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderless)
                 }
@@ -273,10 +281,10 @@ struct BrainArticleDigestView: View {
                     Text(verbatim: "\(idea.number)")
                         .brainText(.meta)
                         .fontWeight(.semibold)
-                        .foregroundStyle(HermexPaper.knowledge.glow)
+                        .foregroundStyle(paper.glow)
                         .monospacedDigit()
                         .frame(minWidth: 22, minHeight: 22)
-                        .background(HermexPaper.knowledge.wash, in: Circle())
+                        .background(paper.wash, in: Circle())
                     VStack(alignment: .leading, spacing: BrainStyle.xs) {
                         Text(Self.inlineMarkdown(idea.headline))
                             .font(AppFont.display(style: .body))
@@ -317,8 +325,8 @@ struct BrainArticleDigestView: View {
             // Over the card surface, which is opaque; the wash is translucent.
             if idea.number == focusIdea {
                 let shape = BrainStyle.cardShape()
-                shape.fill(HermexPaper.reading.wash).allowsHitTesting(false)
-                shape.strokeBorder(HermexPaper.reading.edge, lineWidth: 1).allowsHitTesting(false)
+                shape.fill(paper.wash).allowsHitTesting(false)
+                shape.strokeBorder(paper.edge, lineWidth: 1).allowsHitTesting(false)
             }
         }
     }
@@ -331,13 +339,13 @@ struct BrainArticleDigestView: View {
                 Image(systemName: "lightbulb")
             }
             .font(AppFont.display(style: .subheadline))
-            .foregroundStyle(HermexPaper.knowledge.glow)
+            .foregroundStyle(paper.glow)
             MarkdownRenderer(content: takeaway)
         }
         .padding(.horizontal, BrainStyle.cardHorizontalPadding)
         .padding(.vertical, BrainStyle.cardVerticalPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glowSurface(.knowledge, cornerRadius: BrainStyle.cardCorner)
+        .glowSurface(paper, cornerRadius: BrainStyle.cardCorner)
     }
 
     private var allExpanded: Bool {

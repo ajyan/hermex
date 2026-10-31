@@ -21,6 +21,12 @@ enum BrainHomeLayout {
         return index >= bites ? "Done" : "\(index + 1) of \(bites)"
     }
 
+    /// One review dot: done once swiped past, a ring on the bite up next (after the first swipe).
+    static func reviewDot(_ index: Int, at position: Int) -> String {
+        if index < position { return "done" }
+        return index == position && position > 0 ? "today" : "missed"
+    }
+
     /// The People home's due catch-ups, for Today.
     static func dueCatchUps(_ sections: [BrainPeopleLayout.Section], limit: Int = 2) -> [BrainPeopleLayout.Row] {
         Array(sections.flatMap(\.rows).filter(\.isDue).prefix(limit))
@@ -86,13 +92,17 @@ struct BrainHomeView: View {
             .hxNavigationTitle("Brain")
             .background(Color.hxCanvas.ignoresSafeArea())
             .task {
-                // Every appear refreshes quietly: shown rows stay until the response lands, and
-                // the review row catches up with swipes made on the Review screen.
+                // An appear refreshes only once the last load is a few minutes old (pull to refresh
+                // always does); the review row catches up with swipes made on the Review screen either way.
                 searchViewModel.resume()
-                await viewModel.load()
+                await viewModel.refreshIfStale()
             }
             // Alongside the modules; a server without Prep or People just never shows those rows.
-            .task { await prepViewModel.load() }
+            // Prep's row needs only to know Prep is there, so it loads once.
+            .task {
+                if case .loaded = prepViewModel.state { return }
+                await prepViewModel.load()
+            }
             .task { await dailyAsk?.load() }
             .task { await peopleHome.load() }
             .onChange(of: scenePhase) { _, phase in
@@ -241,14 +251,7 @@ struct BrainHomeView: View {
             BrainHomeCard {
                 if bites > 0 {
                     link(.review) {
-                        BrainRow(
-                            leading: { BrainModuleIcon(systemName: "rectangle.stack",
-                                                       paper: viewModel.home.bites.first?.paper ?? .reading) },
-                            title: "Review",
-                            subtitle: "\(bites) bites from what you've saved",
-                            trailing: BrainHomeLayout.reviewProgress(index: viewModel.reviewIndex, bites: bites),
-                            subtitleLineLimit: 1
-                        )
+                        reviewRow(bites: bites, paper: viewModel.home.bites.first?.paper ?? .reading)
                     }
                 }
                 ForEach(dueCatchUps) { row in
@@ -257,6 +260,29 @@ struct BrainHomeView: View {
                 }
             }
         }
+    }
+
+    /// Review with today's bites as dots: filled for the ones swiped past, a ring on the next one.
+    private func reviewRow(bites: Int, paper: HermexPaper) -> some View {
+        HStack(alignment: .center, spacing: BrainStyle.m) {
+            BrainModuleIcon(systemName: "rectangle.stack", paper: paper)
+            VStack(alignment: .leading, spacing: BrainStyle.xs) {
+                Text(verbatim: "Review").brainText(.rowTitle).lineLimit(1)
+                HStack(spacing: 0) {
+                    ForEach(0..<bites, id: \.self) { index in
+                        DeckDot(state: BrainHomeLayout.reviewDot(index, at: viewModel.reviewIndex), ink: paper.glow,
+                                column: DeckDots.dot + 4)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.vertical, BrainStyle.s)
+        .frame(minHeight: BrainStyle.minTapTarget)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "Review, \(bites) bites from what you've saved"))
+        .accessibilityValue(Text(verbatim: BrainHomeLayout.reviewProgress(index: viewModel.reviewIndex, bites: bites) ?? "Not started"))
     }
 
     /// Every module, then Interview prep.

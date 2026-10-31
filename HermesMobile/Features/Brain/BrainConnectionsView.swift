@@ -104,6 +104,7 @@ struct BrainTrail: View {
                         .truncationMode(.tail)
                 }
                 .buttonStyle(.plain)
+                .contentShape(.interaction, Rectangle().inset(by: -11))
                 .accessibilityLabel(Text(verbatim: "Hub: \(hub.title.isEmpty ? hub.id : hub.title)"))
             }
         }
