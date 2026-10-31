@@ -1,15 +1,20 @@
 import SwiftUI
 
-/// Money: net worth from the vault's snapshot, Robinhood-style. A big number, a chart you scrub,
-/// the week's market card, then accounts. Amounts open hidden and hide again whenever the screen
-/// goes away, so the app can be shown without showing them. Pushed from the drawer as `.money`.
+/// Money: net worth from the vault's snapshot. A big number, a chart you scrub, the week's
+/// market card, then accounts. Amounts open hidden, show only from the eye button, and hide
+/// again whenever the app or the screen goes away, so the app can be shown without showing them.
+/// Pushed from the drawer as `.money`.
 struct MoneyView: View {
     @State private var viewModel: MoneyViewModel
     @State private var showsMarket = false
-    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(server: URL) {
-        _viewModel = State(initialValue: MoneyViewModel(server: server))
+        self.init(viewModel: MoneyViewModel(server: server))
+    }
+
+    init(viewModel: MoneyViewModel) {
+        _viewModel = State(initialValue: viewModel)
     }
 
     var body: some View {
@@ -19,7 +24,7 @@ struct MoneyView: View {
             .toolbar {
                 if viewModel.state == .ready {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button { viewModel.toggleReveal() } label: {
+                        Button { withAnimation(reduceMotion ? nil : .snappy) { viewModel.toggleReveal() } } label: {
                             Image(systemName: viewModel.isHidden ? "eye" : "eye.slash")
                         }
                         .accessibilityLabel(Text(verbatim: viewModel.isHidden ? "Show Amounts" : "Hide Amounts"))
@@ -30,9 +35,7 @@ struct MoneyView: View {
                 MoneyMarketView(viewModel: viewModel)
             }
             .task { await viewModel.load() }
-            .onChange(of: scenePhase) { _, phase in
-                if phase != .active { viewModel.hide() }
-            }
+            .hidesMoneyOnResign(viewModel)
             .onDisappear {
                 // The market card is part of Money; anywhere else hides the amounts again.
                 if !showsMarket { viewModel.hide() }
@@ -41,7 +44,7 @@ struct MoneyView: View {
 
     private var subtitle: String? {
         guard let asOf = viewModel.snapshot?.asOf else { return nil }
-        return "Updated " + MoneyView.relativeTime(asOf)
+        return (viewModel.isFixture ? "Fixtures · " : "") + "Updated " + MoneyView.relativeTime(asOf)
     }
 
     @ViewBuilder
@@ -88,13 +91,9 @@ struct MoneyView: View {
                     .padding(.horizontal, 12)
                     .padding(.top, 8)
                 if let week = snapshot.week {
-                    if !week.indexes.isEmpty {
-                        indexChips(week.indexes)
-                            .padding(.top, 18)
-                    }
                     whyCard(week)
                         .padding(.horizontal, 16)
-                        .padding(.top, 12)
+                        .padding(.top, 18)
                 }
                 if snapshot.holdingsMissing {
                     Text(verbatim: "Add finance/sync/holdings.yaml in your vault to split out the market.")
@@ -124,16 +123,13 @@ struct MoneyView: View {
             Text(verbatim: "Net worth")
                 .font(AppFont.footnote())
                 .foregroundStyle(Color.hxTextSecondary)
-            Button { viewModel.toggleReveal() } label: {
-                Text(verbatim: MoneyFormat.amount(viewModel.displayedValue, hidden: viewModel.isHidden))
-                    .font(AppFont.display(style: .largeTitle, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(Color.hxTextPrimary)
-                    .contentTransition(.numericText())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Text(verbatim: viewModel.isHidden ? "Net worth, amount hidden" : "Net worth, \(MoneyFormat.amount(viewModel.displayedValue, hidden: false))"))
-            .accessibilityHint(Text(verbatim: viewModel.isHidden ? "Shows amounts" : "Hides amounts"))
+            // Not a button: a tap on the number is the first thing someone shown the phone does.
+            Text(verbatim: MoneyFormat.amount(viewModel.displayedValue, hidden: viewModel.isHidden))
+                .font(AppFont.display(style: .largeTitle, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(Color.hxTextPrimary)
+                .contentTransition(.numericText())
+                .accessibilityLabel(Text(verbatim: viewModel.isHidden ? "Net worth, amount hidden" : "Net worth, \(MoneyFormat.amount(viewModel.displayedValue, hidden: false))"))
             HStack(spacing: 6) {
                 Text(verbatim: "\(MoneyFormat.signed(change.amount, hidden: viewModel.isHidden)) (\(MoneyFormat.percent(change.percent)))")
                     .foregroundStyle(MoneyView.color(for: change.amount))
@@ -142,6 +138,12 @@ struct MoneyView: View {
                     .foregroundStyle(Color.hxTextSecondary)
             }
             .font(AppFont.subheadline(weight: .medium))
+            if let warning = viewModel.trustWarning {
+                Label { Text(verbatim: warning) } icon: { Image(systemName: "exclamationmark.triangle.fill") }
+                    .font(AppFont.footnote(weight: .medium))
+                    .foregroundStyle(Color.hxWarning)
+                    .padding(.top, 6)
+            }
         }
     }
 
@@ -151,44 +153,34 @@ struct MoneyView: View {
         return point.e ? "\(day) · estimated" : day
     }
 
+    /// The system segmented control, like the Sleep screen's span: a control, so it wears the
+    /// tint, never the gain or loss color.
     private var rangePicker: some View {
-        HStack(spacing: 0) {
+        Picker(selection: Binding(get: { viewModel.range }, set: { viewModel.range = $0 })) {
             ForEach(MoneyRange.allCases) { range in
-                let selected = viewModel.range == range
-                Button { viewModel.range = range } label: {
-                    Text(verbatim: range.rawValue)
-                        .font(AppFont.footnote(weight: .semibold))
-                        .foregroundStyle(selected ? Color.white : Color.hxTextSecondary)
-                        .padding(.vertical, 6)
-                        .frame(maxWidth: .infinity)
-                        .background(selected ? trendColor : Color.clear, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(selected ? .isSelected : [])
+                Text(verbatim: range.rawValue)
+                    .accessibilityLabel(Text(verbatim: range.spokenName))
+                    .tag(range)
             }
+        } label: {
+            Text(verbatim: "Range")
         }
+        .pickerStyle(.segmented)
     }
 
     // MARK: Market
 
     private func indexChips(_ indexes: [MoneyIndex]) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(indexes) { index in
-                    HStack(spacing: 4) {
-                        Text(verbatim: index.name).foregroundStyle(Color.hxTextPrimary)
-                        Text(verbatim: MoneyFormat.percent(index.returnPct)).foregroundStyle(MoneyView.color(for: index.returnPct))
-                    }
-                    .font(AppFont.caption(weight: .medium))
-                    .monospacedDigit()
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color.hxSurface, in: Capsule())
-                    .overlay(Capsule().strokeBorder(Color.hxSeparator, lineWidth: 0.5))
-                    .accessibilityElement(children: .combine)
+        FlowRow(spacing: 6) {
+            ForEach(indexes) { index in
+                HXChip(paper: .money, label: index.name) {
+                    Text(verbatim: MoneyFormat.percent(index.returnPct))
+                        .font(AppFont.caption(weight: .semibold))
+                        .foregroundStyle(MoneyView.color(for: index.returnPct))
                 }
+                .monospacedDigit()
+                .accessibilityElement(children: .combine)
             }
-            .padding(.horizontal, 16)
         }
     }
 
@@ -196,7 +188,7 @@ struct MoneyView: View {
         Button { showsMarket = true } label: {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Label { Text(verbatim: "Why it moved") } icon: { Image(systemName: "chart.line.uptrend.xyaxis") }
+                    Label { Text(verbatim: "Why it moved this week") } icon: { Image(systemName: "chart.line.uptrend.xyaxis") }
                         .font(AppFont.display(style: .subheadline, weight: .semibold))
                         .foregroundStyle(HermexPaper.money.glow)
                     Spacer()
@@ -209,6 +201,7 @@ struct MoneyView: View {
                     splitLabel("Market", week.market)
                     splitLabel("Cash flow", week.cashFlow)
                 }
+                if !week.indexes.isEmpty { indexChips(week.indexes) }
                 if let story = viewModel.market?.story, !story.isEmpty {
                     Text(verbatim: story)
                         .font(AppFont.subheadline())
@@ -241,7 +234,7 @@ struct MoneyView: View {
             VStack(spacing: 0) {
                 ForEach(Array(snapshot.accounts.enumerated()), id: \.element.id) { offset, account in
                     if offset > 0 { Divider().overlay(Color.hxSeparator).padding(.leading, 12) }
-                    accountRow(account, staleDays: snapshot.stale.first { $0.name == account.name }?.ageDays)
+                    accountRow(account, staleDays: snapshot.staleEntry(for: account)?.ageDays)
                 }
             }
             .hxCard()
@@ -259,14 +252,14 @@ struct MoneyView: View {
                 HStack(spacing: 4) {
                     if let staleDays {
                         Circle().fill(Color.hxWarning).frame(width: 6, height: 6).accessibilityHidden(true)
-                        Text(verbatim: "Updated \(Int(staleDays)) days ago")
+                        Text(verbatim: MoneyFormat.lastSynced(ageDays: staleDays))
                     } else {
                         Text(verbatim: account.subtitle)
                     }
                 }
                 .font(AppFont.caption())
                 .foregroundStyle(Color.hxTextSecondary)
-                .lineLimit(1)
+                .lineLimit(staleDays == nil ? 1 : 2)
             }
             Spacer(minLength: 4)
             MoneySparkline(values: account.spark, color: color)
@@ -303,6 +296,16 @@ struct MoneyView: View {
         Calendar.current.isDateInToday(date)
             ? date.formatted(date: .omitted, time: .shortened)
             : date.formatted(.dateTime.month(.abbreviated).day().hour().minute())
+    }
+}
+
+extension View {
+    /// Hides Money's amounts the moment the app stops being active (the app switcher, Control
+    /// Center, locking), from whichever Money screen is on top.
+    func hidesMoneyOnResign(_ viewModel: MoneyViewModel) -> some View {
+        onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            viewModel.hide()
+        }
     }
 }
 

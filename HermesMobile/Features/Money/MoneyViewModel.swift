@@ -43,13 +43,17 @@ final class MoneyViewModel {
     private(set) var scrubbed: MoneyPoint?
 
     let server: URL
+    /// Reading the synthetic fixtures (Debug only), so a screenshot can never pass for real data.
+    let isFixture: Bool
     private let client: any MoneyDataClient
     private let store: DailyDeckStore
     private let now: () -> Date
     private let today: String
 
-    init(server: URL, client: any MoneyDataClient, store: DailyDeckStore = DailyDeckStore(), now: @escaping () -> Date = Date.init) {
+    init(server: URL, client: any MoneyDataClient, store: DailyDeckStore = DailyDeckStore(),
+         now: @escaping () -> Date = Date.init, isFixture: Bool = false) {
         self.server = server
+        self.isFixture = isFixture
         self.client = client
         self.store = store
         self.now = now
@@ -63,7 +67,8 @@ final class MoneyViewModel {
             self.init(
                 server: server,
                 client: FixtureMoneyDataClient(directory: URL(fileURLWithPath: directory)),
-                store: DailyDeckStore(defaults: UserDefaults(suiteName: "money-fixtures") ?? .standard)
+                store: DailyDeckStore(defaults: UserDefaults(suiteName: "money-fixtures") ?? .standard),
+                isFixture: true
             )
             return
         }
@@ -73,10 +78,29 @@ final class MoneyViewModel {
 
     var isHidden: Bool { !isRevealed }
 
+    /// The range's points, counted back from the snapshot's last day rather than the phone's,
+    /// so "this week" is the same seven days the market card splits.
     var points: [MoneyPoint] {
         guard let snapshot else { return [] }
-        return range.points(in: snapshot.series, today: MoneyPoint.dayFormatter.date(from: today) ?? now())
+        return range.points(in: snapshot.series, today: snapshot.lastDay ?? MoneyPoint.dayFormatter.date(from: today) ?? now())
     }
+
+    /// What can't be trusted about the numbers right now: a snapshot past its daily run, or
+    /// banks whose connection is failing (counted at their last balance). Nil when all is well.
+    var trustWarning: String? {
+        guard let snapshot else { return nil }
+        var parts: [String] = []
+        if let asOf = snapshot.asOf, now().timeIntervalSince(asOf) > Self.overdueAfter {
+            parts.append("Not updated since " + asOf.formatted(.dateTime.month(.abbreviated).day()))
+        }
+        if snapshot.missing > 0 {
+            parts.append(snapshot.missing == 1 ? "1 account not syncing" : "\(snapshot.missing) accounts not syncing")
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// The money job runs every morning at 05:45, so a snapshot older than this missed a run.
+    static let overdueAfter: TimeInterval = 26 * 60 * 60
 
     /// The range's change, up to the scrubbed day while scrubbing.
     var change: MoneyChange {
