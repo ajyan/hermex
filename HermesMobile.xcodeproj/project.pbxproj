@@ -58,11 +58,12 @@
 		8E79A3B222BF417A727CCE9D /* DailyAskModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B423448EC09D605C3DA3D609 /* DailyAskModelTests.swift */; };
 		A0DE0003F6338217394AF92B /* GoalCheckInEditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE0003300540C2C75C9B4A /* GoalCheckInEditTests.swift */; };
 		B1A1C0DE00000000000F0009 /* GoalsViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */; };
-		A0DE002C9AEE2AE3608A3D16 /* GoalCheckInCardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE002C9AEE2AE3608A3D15 /* GoalCheckInCardViewModel.swift */; };
+		A0DE002C9AEE2AE3608A3D16 /* GoalsHomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE002C9AEE2AE3608A3D15 /* GoalsHomeViewModel.swift */; };
 		A0DE0014FAAC7A19A48B2C56 /* GoalCheckInEdit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE0014FAAC7A19A48B2C55 /* GoalCheckInEdit.swift */; };
 		A0DEB2E8294CD05546F5B4B7 /* DeckWeekCommitment.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE7728054A2E1F9F736820 /* DeckWeekCommitment.swift */; };
 		A0DE0016FAAC7A19A48B2C72 /* GoalCommitmentRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE0016FAAC7A19A48B2C71 /* GoalCommitmentRow.swift */; };
 		A0DE0015FAAC7A19A48B2C62 /* GoalItemRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE0015FAAC7A19A48B2C61 /* GoalItemRow.swift */; };
+		E8985049DB0F3B774626ACCB /* GoalQuickCheckIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2011490BF059EB80A4BDCB19 /* GoalQuickCheckIn.swift */; };
 		B1A1C0DE00000000000F0007 /* GoalsModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */; };
 		B1A1C0DE00000000000F0005 /* GoalsDataClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0004 /* GoalsDataClient.swift */; };
 		A045000000000000000000A1 /* GoalsWidgetSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = A045000000000000000000A0 /* GoalsWidgetSync.swift */; };
@@ -944,11 +945,12 @@
 		B423448EC09D605C3DA3D609 /* DailyAskModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyAskModelTests.swift; sourceTree = "<group>"; };
 		A0DE0003300540C2C75C9B4A /* GoalCheckInEditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCheckInEditTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsViewModels.swift; sourceTree = "<group>"; };
-		A0DE002C9AEE2AE3608A3D15 /* GoalCheckInCardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCheckInCardViewModel.swift; sourceTree = "<group>"; };
+		A0DE002C9AEE2AE3608A3D15 /* GoalsHomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsHomeViewModel.swift; sourceTree = "<group>"; };
 		A0DE0014FAAC7A19A48B2C55 /* GoalCheckInEdit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCheckInEdit.swift; sourceTree = "<group>"; };
 		A0DE7728054A2E1F9F736820 /* DeckWeekCommitment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckWeekCommitment.swift; sourceTree = "<group>"; };
 		A0DE0016FAAC7A19A48B2C71 /* GoalCommitmentRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCommitmentRow.swift; sourceTree = "<group>"; };
 		A0DE0015FAAC7A19A48B2C61 /* GoalItemRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalItemRow.swift; sourceTree = "<group>"; };
+		2011490BF059EB80A4BDCB19 /* GoalQuickCheckIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalQuickCheckIn.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0006 /* GoalsModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsModelsTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0004 /* GoalsDataClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsDataClient.swift; sourceTree = "<group>"; };
 		A045000000000000000000A0 /* GoalsWidgetSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsWidgetSync.swift; sourceTree = "<group>"; };
@@ -1814,11 +1816,12 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				A0DE00FF71B0EBD4FA4E8F15 /* GoalCalendarViews.swift */,
 				B1A1C0DE00000000000F000C /* GoalsHomeView.swift */,
 				B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */,
-				A0DE002C9AEE2AE3608A3D15 /* GoalCheckInCardViewModel.swift */,
+				A0DE002C9AEE2AE3608A3D15 /* GoalsHomeViewModel.swift */,
 				A0DE0014FAAC7A19A48B2C55 /* GoalCheckInEdit.swift */,
 				A0DE7728054A2E1F9F736820 /* DeckWeekCommitment.swift */,
 				A0DE0016FAAC7A19A48B2C71 /* GoalCommitmentRow.swift */,
 				A0DE0015FAAC7A19A48B2C61 /* GoalItemRow.swift */,
+				2011490BF059EB80A4BDCB19 /* GoalQuickCheckIn.swift */,
 				B1A1C0DE00000000000F0004 /* GoalsDataClient.swift */,
 				A045000000000000000000A0 /* GoalsWidgetSync.swift */,
 				B1A1C0DE00000000000F0002 /* GoalsModels.swift */,
@@ -3254,11 +3257,12 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				A0DE00FF71B0EBD4FA4E8F14 /* GoalCalendarViews.swift in Sources */,
 				B1A1C0DE00000000000F000D /* GoalsHomeView.swift in Sources */,
 				B1A1C0DE00000000000F0009 /* GoalsViewModels.swift in Sources */,
-				A0DE002C9AEE2AE3608A3D16 /* GoalCheckInCardViewModel.swift in Sources */,
+				A0DE002C9AEE2AE3608A3D16 /* GoalsHomeViewModel.swift in Sources */,
 				A0DE0014FAAC7A19A48B2C56 /* GoalCheckInEdit.swift in Sources */,
 				A0DEB2E8294CD05546F5B4B7 /* DeckWeekCommitment.swift in Sources */,
 				A0DE0016FAAC7A19A48B2C72 /* GoalCommitmentRow.swift in Sources */,
 				A0DE0015FAAC7A19A48B2C62 /* GoalItemRow.swift in Sources */,
+				E8985049DB0F3B774626ACCB /* GoalQuickCheckIn.swift in Sources */,
 				B0D700000000000000000004 /* BodyDataClient.swift in Sources */,
 				B0D70000000000000000000C /* BodyWeekDots.swift in Sources */,
 				B0D70000000000000000000A /* BodyHomeViewModel.swift in Sources */,

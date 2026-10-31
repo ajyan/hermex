@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The goal card's body: per goal, yesterday's commitments to check in (tap for Done, hold for
 /// the 2-minute version, Skip or Missed), today's daily checks and cues, the next milestone and any
-/// nudge. It reads live from the Goals API (`GoalCheckInCardViewModel`), so it stays true after a
+/// nudge. It reads live from the Goals API (`GoalsHomeViewModel`), so it stays true after a
 /// tap or a later reopen; the brief's `fallback` text stands in until then, or when the server
 /// can't serve goals.
 struct DeckGoalCard: View {
@@ -11,7 +11,7 @@ struct DeckGoalCard: View {
     /// The deck's day ("2026-10-15"): the card checks in only when it is the server's today.
     let deckDate: String
 
-    @Environment(GoalCheckInCardViewModel.self) private var model: GoalCheckInCardViewModel?
+    @Environment(GoalsHomeViewModel.self) private var model: GoalsHomeViewModel?
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
 
@@ -84,14 +84,14 @@ struct DeckGoalCard: View {
 private struct GoalCheckInSection: View {
     let goal: GoalSummary
     let home: GoalsHome
-    let model: GoalCheckInCardViewModel
+    let model: GoalsHomeViewModel
     let tint: GoalTint
     let palette: DeckPalette
 
     var body: some View {
-        let yesterday = GoalCheckInCardViewModel.yesterdayRows(goal)
-        let items = GoalCheckInCardViewModel.itemRows(goal)
-        let cues = GoalCheckInCardViewModel.todayCues(goal)
+        let yesterday = GoalsHomeViewModel.yesterdayRows(goal)
+        let items = GoalsHomeViewModel.itemRows(goal)
+        let cues = GoalsHomeViewModel.todayCues(goal)
         VStack(alignment: .leading, spacing: 0) {
             Text(verbatim: goal.title)
                 .font(AppFont.display(style: .title2, weight: .semibold))
@@ -109,7 +109,7 @@ private struct GoalCheckInSection: View {
                     GoalCommitmentRow(row: row, day: .yesterday, date: home.yesterday, tint: tint,
                                       isPending: model.isPending(goal.slug, .commitment(row.id)),
                                       atRisk: goal.flags.missTwice.contains(row.id)) { status in
-                        Task { await model.checkIn(slug: goal.slug, commitment: row.id, status: status) }
+                        Task { await model.checkIn(slug: goal.slug, commitment: row.id, status: status, day: .yesterday) }
                     }
                 }
             }

@@ -15,50 +15,6 @@ private func goalsKeepsContent<Value>(_ state: BrainLoadState<Value>, after erro
     return !((error as? APIError)?.isNotFound ?? false)
 }
 
-/// The Goals landing screen (and Brain's Goals row): streak, active goals, agent goals.
-@MainActor
-@Observable
-final class GoalsHomeViewModel {
-    private(set) var state: BrainLoadState<GoalsHome> = .loading
-    /// The last reload failed while goals were on screen; they stay, with this said above them.
-    private(set) var refreshFailed = false
-    @ObservationIgnored private let client: GoalsDataClient
-    @ObservationIgnored private let onAPIError: (Error) -> Void
-    @ObservationIgnored private var generation = 0
-
-    /// New goal shows only once the server has served goals: a goal written on a server
-    /// without the goals API would never appear.
-    var offersNewGoal: Bool {
-        if case .loaded = state { return true }
-        return false
-    }
-
-    init(client: GoalsDataClient, onAPIError: @escaping (Error) -> Void = { _ in }) {
-        self.client = client
-        self.onAPIError = onAPIError
-    }
-
-    func load() async {
-        generation += 1
-        let token = generation
-        do {
-            let home = try await client.home()
-            guard token == generation, !Task.isCancelled else { return }
-            state = .loaded(home)
-            refreshFailed = false
-        } catch {
-            guard token == generation, !goalsIsCancellation(error) else { return }
-            onAPIError(error)
-            if goalsKeepsContent(state, after: error) {
-                refreshFailed = true
-                return
-            }
-            refreshFailed = false
-            state = goalsFailureState(error)
-        }
-    }
-}
-
 /// Which day the detail screen's check-in buttons write to.
 enum GoalDay: Hashable, Sendable {
     case today, yesterday
