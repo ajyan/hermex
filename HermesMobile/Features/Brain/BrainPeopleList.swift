@@ -58,21 +58,28 @@ enum BrainPeopleLayout {
     }
 
     /// A due row leads its subtitle with their usual gap ("Every 3 wk · Dinner at Sola"), so "due" explains itself.
+    /// How far past their rhythm a due person is before the row says "Lapsed" instead of the rhythm
+    /// itself ("Every 8 wk" beside "13 mo" read as a rhythm still kept).
+    static let lapsedFactor = 3
+
     private static func seenRow(_ person: BrainPersonRow, isDue: Bool, days: BrainPersonLayout.DayMath) -> Row {
         let ago = person.lastSeen.flatMap(days.daysAgo)
         let gap = isDue ? person.cadenceDays.map(cadence(days:)) : nil
-        let detail = person.headline ?? person.subtitle
+        let lapsed = isDue && ago.flatMap { ago in person.cadenceDays.map { ago >= lapsedFactor * max($0, 1) } } == true
+        // A due row says why now: their Catch up's first open thread, else the newest note.
+        let detail = [isDue ? person.hook : nil, person.headline, person.subtitle]
+            .compactMap { $0?.withoutInvisibleMarks }.first { !$0.isEmpty } ?? ""
         let spoken = [
             person.title,
-            person.headline,
+            detail.isEmpty ? nil : detail,
             ago.map { "seen " + BrainPersonLayout.relative(daysAgo: $0) },
             isDue ? "due for a catch-up" : nil,
-            gap.map { "usually " + $0.spoken },
+            gap.map { (lapsed ? "lapsed, usually " : "usually ") + $0.spoken },
         ]
         return Row(
             id: person.id,
             title: person.title,
-            subtitle: [gap?.shown, detail].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "),
+            subtitle: [lapsed ? "Lapsed" : gap?.shown, detail].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "),
             trailing: ago.map(elapsed(days:)) ?? "",
             isDue: isDue,
             accessibilityLabel: spoken.compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")

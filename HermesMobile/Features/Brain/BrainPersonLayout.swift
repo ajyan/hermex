@@ -19,7 +19,7 @@ struct BrainPersonLayout: Equatable {
         let headline: String
         /// The bullets after the headline (encounters only).
         let bullets: [String]
-        /// The body's other lines (prose, `_Source:` lines, `####` subheads), joined by newlines;
+        /// The body's other lines (prose, `####` subheads; never `_Source:` lines), joined by newlines;
         /// shown as Markdown under the bullets. Empty when there are none.
         let extra: String
         /// A journal day with the encounter's date, opened from the card's footer instead of
@@ -381,8 +381,8 @@ struct BrainPersonLayout: Equatable {
     }
 
     /// The body's non-blank lines that are not bullets (a column-0 `-` or `*` and the indented
-    /// lines after it), thematic breaks, or text already `shown` (the headline, or prose lines the
-    /// server made the items), trimmed and joined by newlines.
+    /// lines after it), thematic breaks, `_Source:` lines, or text already `shown` (the headline, or
+    /// prose lines the server made the items), trimmed and joined by newlines.
     private static func extraLines(_ body: String, shown: Set<String>) -> String {
         var inBullet = false
         var lines: [String] = []
@@ -396,6 +396,8 @@ struct BrainPersonLayout: Equatable {
                 inBullet = true
             } else if inBullet && indented {
                 continue
+            } else if text.range(of: #"^_Source: .+_$"#, options: .regularExpression) != nil {
+                inBullet = false  // where the note came from ("followups touch") is the pipeline's, not his
             } else {
                 inBullet = false
                 if !shown.contains(text) { lines.append(text) }
@@ -422,7 +424,7 @@ struct BrainPersonLayout: Equatable {
 
     /// Drops one leading "- " or "* " list marker; nested lines after the first newline are kept.
     private static func stripMarker(_ text: String) -> String {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = text.withoutInvisibleMarks
         for marker in ["- ", "* "] where trimmed.hasPrefix(marker) {
             return String(trimmed.dropFirst(marker.count)).trimmingCharacters(in: .whitespaces)
         }
@@ -498,5 +500,14 @@ private extension String {
         guard trimmed.count >= 10 else { return nil }
         let head = String(trimmed.prefix(10))
         return head.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil ? head : nil
+    }
+}
+
+extension String {
+    /// Trimmed, without U+FFFC (what iOS text input leaves for a dictation or attachment placeholder)
+    /// or zero-width marks, which read as a stray leading space ("￼ Julian is coming…").
+    var withoutInvisibleMarks: String {
+        String(unicodeScalars.filter { !["\u{FFFC}", "\u{200B}", "\u{200C}", "\u{200D}", "\u{2060}", "\u{FEFF}"].contains($0) })
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
