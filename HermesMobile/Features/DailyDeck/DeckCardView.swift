@@ -1463,7 +1463,7 @@ private struct FollowUpRow: View {
         let message = DeckMessage(to: message.to, body: editedText ?? message.body)
         if MessageComposer.canSend {
             composing = Compose(action: action, message: message)
-        } else if let url = MessageComposer.smsURL(message) {
+        } else if let url = message.smsURL {
             openURL(url)
         }
     }
@@ -1476,12 +1476,6 @@ private struct MessageComposer: UIViewControllerRepresentable {
     let onFinish: (Bool) -> Void
 
     static var canSend: Bool { MFMessageComposeViewController.canSendText() }
-
-    /// `sms:` to the same recipient and words, for a device without the sheet.
-    static func smsURL(_ message: DeckMessage) -> URL? {
-        let body = message.body?.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        return URL(string: "sms:\(message.to)" + (body.isEmpty ? "" : "&body=\(body)"))
-    }
 
     func makeCoordinator() -> Coordinator { Coordinator(onFinish: onFinish) }
 

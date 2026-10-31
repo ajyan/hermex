@@ -120,6 +120,13 @@ enum BrainPeopleLayout {
             .sorted { $0.count != $1.count ? $0.count > $1.count : $0.type < $1.type }
     }
 
+    /// The filter's name: "All" with none picked, else the type's label, even once no loaded
+    /// person has it (a refresh), so the menu never says "All" over an empty list.
+    static func relationshipLabel(_ type: String?, in relationships: [Relationship]) -> String {
+        guard let type else { return "All" }
+        return relationships.first { $0.type == type }?.label ?? (type.prefix(1).uppercased() + type.dropFirst())
+    }
+
     /// `items` of one relationship type; all of them when `type` is nil.
     static func filtered(_ items: [BrainItem], relationship type: String?) -> [BrainItem] {
         guard let type else { return items }
@@ -202,7 +209,7 @@ struct BrainPeopleEveryoneHeader: View {
             if !relationships.isEmpty {
                 Menu {
                     Picker(selection: $selected) {
-                        Text(verbatim: "Everyone").tag(String?.none)
+                        Text(verbatim: "All").tag(String?.none)
                         ForEach(relationships) { relationship in
                             Text(verbatim: "\(relationship.label) (\(relationship.count))")
                                 .tag(Optional(relationship.type))
@@ -228,6 +235,6 @@ struct BrainPeopleEveryoneHeader: View {
     }
 
     private var selectedLabel: String {
-        relationships.first { $0.type == selected }?.label ?? "All"
+        BrainPeopleLayout.relationshipLabel(selected, in: relationships)
     }
 }

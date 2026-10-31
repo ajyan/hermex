@@ -1,5 +1,29 @@
 import SwiftUI
 
+/// A structured person page, laid out and its words parsed once, when the page loads
+/// (`BrainPageViewModel`). The reader re-runs its body on any tap (Show all, the diagram, a label
+/// loading); Catch up, the chips, About and the timeline only read from this.
+@MainActor
+struct BrainPersonPage {
+    let layout: BrainPersonLayout
+    fileprivate let catchUpSummary: AttributedString?
+    fileprivate let catchUpLines: [AttributedString]
+    fileprivate let chips: [String]
+    fileprivate let about: [BrainPersonAbout.Section]
+    fileprivate let timelineTexts: [BrainPersonLayout.Entry.ID: BrainTimelineCardText]
+
+    init(page: BrainPage, person: BrainPerson, today: Date, calendar: Calendar = .current) {
+        layout = BrainPersonLayout(page: page, person: person, today: today, calendar: calendar)
+        catchUpSummary = layout.catchUp?.summary.map(BrainArticleDigestView.inlineMarkdown)
+        catchUpLines = (layout.catchUp?.lines ?? []).map(BrainArticleDigestView.inlineMarkdown)
+        // Plain text: a chip is a label, not a link.
+        chips = layout.chips.map { String(BrainArticleDigestView.inlineMarkdown($0).characters) }
+        about = BrainPersonAbout.sections(layout.aboutSections)
+        timelineTexts = Dictionary(layout.timeline.map { ($0.id, BrainTimelineCardText(entry: $0)) },
+                                   uniquingKeysWith: { first, _ in first })
+    }
+}
+
 /// "Catch up": the nightly digest's recap and its lines (a near birthday, then the open
 /// threads) on a glow card in the person paper, like a Daily Brief card. Lines keep their
 /// inline Markdown, so a `brain://` link opens (in Nous blue: a link is a control, so the card
@@ -8,9 +32,9 @@ struct BrainCatchUpCard: View {
     private let summary: AttributedString?
     private let lines: [AttributedString]
 
-    init(catchUp: BrainPersonLayout.CatchUp) {
-        self.summary = catchUp.summary.map(BrainArticleDigestView.inlineMarkdown)
-        self.lines = catchUp.lines.map(BrainArticleDigestView.inlineMarkdown)
+    init(person: BrainPersonPage) {
+        self.summary = person.catchUpSummary
+        self.lines = person.catchUpLines
     }
 
     var body: some View {
@@ -63,11 +87,10 @@ struct BrainRhythmStrip: View {
 
 /// A person's key facts (at most three) as chips in the person wash.
 struct BrainProfileChips: View {
-    /// Plain text: a chip is a label, not a link.
     private let chips: [String]
 
-    init(chips: [String]) {
-        self.chips = chips.map { String(BrainArticleDigestView.inlineMarkdown($0).characters) }
+    init(person: BrainPersonPage) {
+        self.chips = person.chips
     }
 
     var body: some View {
@@ -99,8 +122,12 @@ struct BrainPersonAbout: View {
 
     private let sections: [Section]
 
-    init(sections: [BrainPersonLayout.AboutSection]) {
-        self.sections = sections.map { section in
+    init(person: BrainPersonPage) {
+        self.sections = person.about
+    }
+
+    fileprivate static func sections(_ sections: [BrainPersonLayout.AboutSection]) -> [Section] {
+        sections.map { section in
             Section(id: section.id, title: section.title, rows: section.items.map { item in
                 // Family items ("Father: Bo Test") always take the label layout; elsewhere only
                 // a bold lead-in ("**Education**: …"), so plain sentences with a colon stay whole.
@@ -205,16 +232,16 @@ private struct BrainAboutSection: View {
 struct BrainPersonTimeline: View {
     let entries: [BrainPersonLayout.Entry]
     let open: (BrainRoute) -> Void
-    /// Each card's words, parsed once here: `CardStack` rebuilds its top cards on every drag frame.
+    /// Each card's words, parsed once per page load (`BrainPersonPage`): `CardStack` rebuilds its
+    /// top cards on every drag frame, and the reader rebuilds this view on any tap.
     private let texts: [BrainPersonLayout.Entry.ID: BrainTimelineCardText]
     @State private var index = 0
     @ScaledMetric(relativeTo: .body) private var deckHeight: CGFloat = BrainStyle.timelineDeckHeight
 
-    init(entries: [BrainPersonLayout.Entry], open: @escaping (BrainRoute) -> Void) {
-        self.entries = entries
+    init(person: BrainPersonPage, open: @escaping (BrainRoute) -> Void) {
+        self.entries = person.layout.timeline
         self.open = open
-        self.texts = Dictionary(entries.map { ($0.id, BrainTimelineCardText(entry: $0)) },
-                                uniquingKeysWith: { first, _ in first })
+        self.texts = person.timelineTexts
     }
 
     var body: some View {
@@ -427,20 +454,21 @@ private struct BrainBulletList: View {
     let page = BrainPage(item: BrainItem(module: .people, id: "people/dara-quill.md", title: "Dara Quill",
                                          subtitle: "college friend"),
                          facts: [BrainFact(label: "Industry", value: "Robotics")], person: person)
-    let layout = BrainPersonLayout(page: page, person: person, today: .now)
+    let personPage = BrainPersonPage(page: page, person: person, today: .now)
+    let layout = personPage.layout
     return NavigationStack {
         ScrollView {
             VStack(alignment: .leading, spacing: BrainStyle.xl) {
                 VStack(alignment: .leading, spacing: BrainStyle.l) {
                     BrainPersonCardView(item: page.item, facts: [], subtitle: layout.subtitle)
                     BrainRhythmStrip(months: layout.rhythm, accessibilityLabel: layout.rhythmAccessibilityLabel)
-                    BrainProfileChips(chips: layout.chips)
+                    BrainProfileChips(person: personPage)
                 }
-                if let catchUp = layout.catchUp {
-                    BrainCatchUpCard(catchUp: catchUp)
+                if layout.catchUp != nil {
+                    BrainCatchUpCard(person: personPage)
                 }
-                BrainPersonTimeline(entries: layout.timeline, open: { _ in })
-                BrainPersonAbout(sections: layout.aboutSections)
+                BrainPersonTimeline(person: personPage, open: { _ in })
+                BrainPersonAbout(person: personPage)
             }
             .padding(BrainStyle.l)
         }

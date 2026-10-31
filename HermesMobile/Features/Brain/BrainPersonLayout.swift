@@ -59,8 +59,8 @@ struct BrainPersonLayout: Equatable {
     let aboutSections: [AboutSection]
     /// The recap and its lines (a birthday within 30 days, then the threads); nil when both are empty.
     let catchUp: CatchUp?
-    /// The last twelve months, oldest first, ending with today's month; empty unless the server
-    /// sent exactly twelve counts.
+    /// The last twelve months, oldest first, ending with the server's `rhythm_end` (else today's
+    /// month); empty unless the server sent exactly twelve counts.
     let rhythm: [RhythmMonth]
     /// Encounters and journal days, newest first; on one date, encounters before journal. A
     /// journal day with an encounter on its date folds into the first such encounter. Ids are unique.
@@ -73,7 +73,7 @@ struct BrainPersonLayout: Equatable {
         subtitle = Self.subtitle(page: page, person: person, days: days)
         (chips, aboutSections) = Self.chipsAndAbout(page: page, person: person)
         catchUp = Self.catchUp(person: person, days: days)
-        rhythm = Self.rhythm(person.rhythm, today: today, calendar: calendar)
+        rhythm = Self.rhythm(person.rhythm, endingIn: person.rhythmEnd, today: today, calendar: calendar)
         let journal = person.journal.filter { !$0.id.isEmpty }
         timeline = Self.timeline(encounters: person.encounters.filter { !$0.id.isEmpty }, journal: journal, days: days)
         hiddenMentionIDs = Set(journal.map(\.id))
@@ -199,9 +199,12 @@ struct BrainPersonLayout: Equatable {
         }
     }
 
-    private static func rhythm(_ counts: [Int], today: Date, calendar: Calendar) -> [RhythmMonth] {
+    /// Labelled from `end` ("2026-10", the month the server counted to), so a saved copy read
+    /// later keeps its months; an older server's page falls back to today's month.
+    private static func rhythm(_ counts: [Int], endingIn end: String?, today: Date, calendar: Calendar) -> [RhythmMonth] {
         guard counts.count == 12 else { return [] }
-        let month = calendar.component(.month, from: today)
+        let sent = end.flatMap { $0.wholeMatch(of: #/\d{4}-(\d{2})/#) }.flatMap { Int($0.1) }.flatMap { (1...12).contains($0) ? $0 : nil }
+        let month = sent ?? calendar.component(.month, from: today)
         return counts.enumerated().map { offset, count in
             // Eleven months back is `offset` 0; months are 1...12.
             let label = monthSymbols[((month - 1 + offset - 11) % 12 + 12) % 12]

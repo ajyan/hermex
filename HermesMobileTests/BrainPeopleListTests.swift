@@ -165,6 +165,15 @@ final class BrainPeopleListTests: XCTestCase {
         XCTAssertEqual(BrainPeopleLayout.filtered(people, relationship: nil).count, people.count)
     }
 
+    func testRelationshipLabelStaysHonestWhenTheTypeIsGone() {
+        let relationships = BrainPeopleLayout.relationships(people)
+        XCTAssertEqual(BrainPeopleLayout.relationshipLabel(nil, in: relationships), "All")
+        XCTAssertEqual(BrainPeopleLayout.relationshipLabel("friend", in: relationships), "Friend")
+        XCTAssertEqual(BrainPeopleLayout.relationshipLabel("mentor", in: relationships), "Mentor",
+                       "a refresh that drops every mentor still names the filter, never \"All\" over an empty list")
+        XCTAssertTrue(BrainPeopleLayout.filtered(people, relationship: "mentor").isEmpty)
+    }
+
     // MARK: View model
 
     private func makeCache() throws -> BrainCacheHandle {

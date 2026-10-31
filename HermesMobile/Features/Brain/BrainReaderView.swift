@@ -213,6 +213,7 @@ struct BrainReaderView: View {
         case .loaded(let page):
             BrainReaderContent(
                 page: page,
+                person: viewModel.person,
                 isShowingCachedCopy: viewModel.isShowingCachedCopy,
                 isMissing: viewModel.isMissing,
                 push: push,
@@ -252,8 +253,9 @@ struct BrainReaderContent: View {
     private let digest: BrainArticleDigest?
     /// Built once per page: the linked-page cards.
     private let linkCards: [BrainRef]
-    /// Built once per page: a structured person page's header, chips, About and timeline.
-    private let personLayout: BrainPersonLayout?
+    /// Built once per page load, by the view model: a structured person page's header, chips,
+    /// Catch up, About and timeline, its words already parsed.
+    private let person: BrainPersonPage?
     /// The mention sections, less the journal days a person's timeline already shows.
     private let backlinks: [BrainRef]
     private let unlinkedRefs: [BrainRef]
@@ -263,7 +265,7 @@ struct BrainReaderContent: View {
     /// The page's diagram sheet, while open.
     @State private var showsDiagram = false
 
-    init(page: BrainPage, isShowingCachedCopy: Bool, isMissing: Bool = false,
+    init(page: BrainPage, person: BrainPersonPage?, isShowingCachedCopy: Bool, isMissing: Bool = false,
          push: @escaping (BrainRoute) -> Void, onStep: ((Int) -> Void)? = nil, rating: BrainPageRating? = nil,
          focusIdea: Int? = nil) {
         self.page = page
@@ -277,8 +279,8 @@ struct BrainReaderContent: View {
         self.meta = BrainReaderLayout.metaLine(for: page.item, hubPageCount: hubPages.count)
         self.digest = BrainReaderLayout.digest(for: page)
         self.linkCards = BrainConnectionsLayout.linkCards(page)
-        let personLayout = page.person.map { BrainPersonLayout(page: page, person: $0, today: Date()) }
-        self.personLayout = personLayout
+        self.person = person
+        let personLayout = person?.layout
         self.backlinks = personLayout?.remainingMentions(page.backlinks, total: page.backlinks.count).refs
             ?? page.backlinks
         let unlinked = personLayout?.remainingMentions(page.unlinked, total: page.unlinkedCount)
@@ -304,14 +306,14 @@ struct BrainReaderContent: View {
             VStack(alignment: .leading, spacing: BrainStyle.xl) {
                 VStack(alignment: .leading, spacing: BrainStyle.l) {
                     BrainTrail(hub: page.hub?.ref)
-                    if let personLayout {
-                        BrainPersonCardView(item: page.item, facts: [], subtitle: personLayout.subtitle)
-                        if !personLayout.rhythm.isEmpty {
-                            BrainRhythmStrip(months: personLayout.rhythm,
-                                             accessibilityLabel: personLayout.rhythmAccessibilityLabel)
+                    if let person {
+                        BrainPersonCardView(item: page.item, facts: [], subtitle: person.layout.subtitle)
+                        if !person.layout.rhythm.isEmpty {
+                            BrainRhythmStrip(months: person.layout.rhythm,
+                                             accessibilityLabel: person.layout.rhythmAccessibilityLabel)
                         }
-                        if !personLayout.chips.isEmpty {
-                            BrainProfileChips(chips: personLayout.chips)
+                        if !person.layout.chips.isEmpty {
+                            BrainProfileChips(person: person)
                         }
                     } else if page.item.module == .people {
                         BrainPersonCardView(item: page.item, facts: page.facts)
@@ -335,9 +337,9 @@ struct BrainReaderContent: View {
                 if !hubPages.isEmpty {
                     hubPagesSection
                 }
-                if let personLayout {
+                if let person {
                     // Outside the body's hub swipe, so paging the timeline never pages the hub.
-                    personSections(personLayout)
+                    personSections(person)
                         .environment(\.openURL, brainLinks)
                 }
                 if !linkCards.isEmpty {
@@ -384,21 +386,21 @@ struct BrainReaderContent: View {
 
     /// A structured person page's Catch up, Timeline and About, in that order.
     @ViewBuilder
-    private func personSections(_ layout: BrainPersonLayout) -> some View {
-        if let catchUp = layout.catchUp {
-            BrainCatchUpCard(catchUp: catchUp)
+    private func personSections(_ person: BrainPersonPage) -> some View {
+        if person.layout.catchUp != nil {
+            BrainCatchUpCard(person: person)
         }
-        if !layout.timeline.isEmpty {
-            BrainPersonTimeline(entries: layout.timeline, open: push)
+        if !person.layout.timeline.isEmpty {
+            BrainPersonTimeline(person: person, open: push)
         }
-        if !layout.aboutSections.isEmpty {
-            BrainPersonAbout(sections: layout.aboutSections)
+        if !person.layout.aboutSections.isEmpty {
+            BrainPersonAbout(person: person)
         }
     }
 
     @ViewBuilder
     private var bodyAndMentions: some View {
-        if personLayout != nil, let person = page.person {
+        if self.person != nil, let person = page.person {
             if !person.other.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 MarkdownRenderer(content: person.other)
                     .environment(\.openURL, brainLinks)
