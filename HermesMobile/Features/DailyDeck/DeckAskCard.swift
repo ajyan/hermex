@@ -45,7 +45,7 @@ struct DailyAskBody: View {
         DailyAskForm(model: model, ask: ask).id(ask.today)
     }
 
-    /// An application or outreach opens Prep for the day, so the done line offers Open Prep.
+    /// An application or outreach opens Prep for the day, so the open Ask card's foot offers Open Prep.
     static func opensPrep(_ outcome: DailyAskOutcome) -> Bool {
         outcome.event == "applied" || outcome.event == "sent"
     }
@@ -96,7 +96,6 @@ private struct DailyAskForm: View {
     @State private var steerNote = ""
     @State private var passing: DailyAskRole?
     @Environment(\.openURL) private var openURL
-    @Environment(\.openBrainRoute) private var openBrainRoute
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Every action closes the keyboard first, so a field typed in never strands it over the card.
@@ -119,10 +118,6 @@ private struct DailyAskForm: View {
             }
             if let outcome = ask.outcome {
                 Text(verbatim: DailyAskBody.doneLine(outcome)).font(AppFont.body()).padding(.top, 16)
-                if DailyAskBody.opensPrep(outcome), openBrainRoute.isAvailable {
-                    ChoiceButton(title: "Open Prep", isSelected: false) { openBrainRoute(.prep(.home)) }
-                        .padding(.top, 10)
-                }
             } else {
                 if let line = DailyAskBody.neverMissTwiceLine(ask) {
                     Text(verbatim: line).font(AppFont.subheadline(weight: .semibold)).padding(.top, 12)
