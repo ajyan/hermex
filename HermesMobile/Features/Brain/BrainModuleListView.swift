@@ -180,6 +180,7 @@ struct BrainModuleListView: View {
 
     init(
         module: BrainModuleID,
+        tag: String? = nil,
         server: URL,
         modelContext: ModelContext,
         onAPIError: @escaping (Error) -> Void,
@@ -190,7 +191,7 @@ struct BrainModuleListView: View {
         let client = APIClientBrainAdapter(apiClient: APIClient(baseURL: server))
         let cache = BrainCacheHandle(server: server, context: modelContext)
         _viewModel = State(initialValue: BrainListViewModel(
-            module: module, client: client, cache: cache, onAPIError: onAPIError))
+            module: module, tag: tag, client: client, cache: cache, onAPIError: onAPIError))
         _peopleHome = State(initialValue: BrainPeopleHomeViewModel(client: client, cache: cache))
     }
 
@@ -216,8 +217,11 @@ struct BrainModuleListView: View {
                 if phase == .active, module == .people { Task { await peopleHome.load() } }
             }
             .onChange(of: viewModel.list) { _, list in
-                guard hasChipBar, viewModel.selectedTag == nil, let list, !list.tags.isEmpty else { return }
-                chipTags = BrainListLayout.topTags(list.tags)
+                // Frozen from the unfiltered list; a list opened on a tag builds it once, with that
+                // tag in it, so "All" is there to clear it.
+                guard hasChipBar, viewModel.selectedTag == nil || chipTags.isEmpty, let list, !list.tags.isEmpty
+                else { return }
+                chipTags = BrainListLayout.topTags(list.tags, selected: viewModel.selectedTag)
             }
     }
 
