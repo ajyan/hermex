@@ -418,7 +418,7 @@ struct BrainReaderContent: View {
         } else if !page.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             Group {
                 if let digest {
-                    BrainArticleDigestView(digest: digest, focusIdea: focusIdea)
+                    BrainArticleDigestView(digest: digest, focusIdea: focusIdea, paper: page.item.module.paper)
                 } else {
                     MarkdownRenderer(content: page.content)
                 }

@@ -506,6 +506,93 @@ extension BrainViewModelTests {
         XCTAssertEqual(store.position(for: reviewServer), BrainReviewPosition(day: "2026-10-14", batch: 0, index: 10))
     }
 
+    func testTheDeckShowsEvenWhenTheModuleListFails() async {
+        let client = FakeBrainClient()
+        client.modulesResult = .failure(URLError(.timedOut))
+        client.homeResult = .success(BrainHome(bites: bites(10), batch: 0, hasMore: true))
+        let viewModel = makeReviewModel(client: client, store: makeReviewStore())
+        await viewModel.load()
+        XCTAssertEqual(viewModel.home.bites.count, 10)
+        XCTAssertFalse(viewModel.deckFailed)
+    }
+
+    func testAFailedDeckWithNothingShownIsAFailureNotAnEmptyDay() async {
+        let client = FakeBrainClient()
+        client.modulesResult = .success([BrainModule(id: .wiki, title: "Wiki", count: 2)])
+        client.homeResult = .failure(URLError(.notConnectedToInternet))
+        let viewModel = makeReviewModel(client: client, store: makeReviewStore())
+        await viewModel.load()
+        XCTAssertTrue(viewModel.deckFailed)
+
+        client.homeResult = .failure(APIError.http(statusCode: 404, body: nil))
+        await viewModel.load()
+        XCTAssertFalse(viewModel.deckFailed, "a server without the home route has nothing to review, not a failure")
+    }
+
+    func testAFailedTenMoreSaysSoAndReports() async {
+        let client = FakeBrainClient()
+        client.homeResult = .success(BrainHome(bites: bites(10), batch: 0, hasMore: true))
+        var reported = 0
+        let viewModel = BrainHomeViewModel(client: client, cache: BrainCacheHandle(server: reviewServer, context: nil),
+                                           onAPIError: { _ in reported += 1 }, reviewStore: makeReviewStore(), today: { "2026-10-14" })
+        await viewModel.load()
+        client.homeResult = .failure(URLError(.timedOut))
+        await viewModel.dealMore()
+        XCTAssertTrue(viewModel.dealMoreFailed)
+        XCTAssertEqual(reported, 1)
+        client.homeResult = .success(BrainHome(bites: bites(10), batch: 1, hasMore: false))
+        await viewModel.dealMore()
+        XCTAssertFalse(viewModel.dealMoreFailed)
+    }
+
+    func testAFreshHomeSkipsTheNetworkButPicksUpTheReviewPosition() async {
+        let store = makeReviewStore()
+        let client = FakeBrainClient()
+        client.modulesResult = .success([BrainModule(id: .wiki, title: "Wiki", count: 2)])
+        client.homeResult = .success(BrainHome(bites: bites(10), batch: 0, hasMore: true))
+        let viewModel = makeReviewModel(client: client, store: store)
+        let start = Date()
+        await viewModel.refreshIfStale(now: start)
+        XCTAssertEqual(client.requestedBatches.count, 1)
+        store.save(BrainReviewPosition(day: "2026-10-14", batch: 0, index: 6), for: reviewServer)  // swiped on Review
+        await viewModel.refreshIfStale(now: start.addingTimeInterval(60))
+        XCTAssertEqual(client.requestedBatches.count, 1, "fresh: no refetch")
+        XCTAssertEqual(viewModel.reviewIndex, 6)
+        await viewModel.refreshIfStale(now: start.addingTimeInterval(600))
+        XCTAssertEqual(client.requestedBatches.count, 2, "stale: refetch")
+    }
+
+    func testBiteTextsAreParsedWithTheDeck() async {
+        let client = FakeBrainClient()
+        client.homeResult = .success(BrainHome(bites: bites(3), batch: 0, hasMore: false))
+        let viewModel = makeReviewModel(client: client, store: makeReviewStore())
+        await viewModel.load()
+        XCTAssertEqual(Set(viewModel.biteTexts.keys), ["b0", "b1", "b2"])
+        XCTAssertEqual(viewModel.biteTexts["b1"].map { String($0.lead.characters) }, "Idea 1")
+    }
+
+    func testReviewDots() {
+        XCTAssertEqual((0..<3).map { BrainHomeLayout.reviewDot($0, at: 0) }, ["missed", "missed", "missed"])
+        XCTAssertEqual((0..<3).map { BrainHomeLayout.reviewDot($0, at: 1) }, ["done", "today", "missed"])
+        XCTAssertEqual((0..<3).map { BrainHomeLayout.reviewDot($0, at: 3) }, ["done", "done", "done"])
+    }
+
+    func testAFailedListRefreshKeepsThePagesShown() async {
+        let client = FakeBrainClient()
+        let first = BrainList(items: [BrainItem(module: .articles, id: "a1", date: "")], nextCursor: 1)
+        let second = BrainList(items: [BrainItem(module: .articles, id: "a2", date: "")], nextCursor: nil)
+        client.listResults = [.success(first), .success(second), .failure(URLError(.timedOut))]
+        let viewModel = BrainListViewModel(module: .articles, client: client,
+                                           cache: BrainCacheHandle(server: reviewServer, context: nil))
+        await viewModel.load()
+        await viewModel.loadMore()
+        let loads = viewModel.loads
+        await viewModel.load()
+        XCTAssertEqual(viewModel.list?.items.map(\.id), ["a1", "a2"])
+        XCTAssertFalse(viewModel.isShowingCachedCopy)
+        XCTAssertEqual(viewModel.loads, loads + 1, "the journal's paging restarts after any reload")
+    }
+
     func testADeckLeftOpenOvernightKeepsItsOwnDay() async {
         let store = makeReviewStore()
         let client = FakeBrainClient()

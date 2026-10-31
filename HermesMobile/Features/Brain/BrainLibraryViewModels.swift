@@ -37,7 +37,15 @@ final class BrainHomeViewModel {
     /// The daily deck. Best effort: empty on a server without the home route, and a failed
     /// refresh keeps what was shown.
     private(set) var home = BrainHome()
+    /// Each bite's words, parsed once per deck: `CardStack` rebuilds its top cards on every drag frame.
+    private(set) var biteTexts: [BrainBite.ID: BrainBiteText] = [:]
     private(set) var isShowingCachedCopy = false
+    /// The deck couldn't load and none is shown, so the review says so instead of "Nothing to review".
+    private(set) var deckFailed = false
+    /// The last "Ten more" failed; the summary card says so, and the button tries again.
+    private(set) var dealMoreFailed = false
+    /// When modules and the deck last both landed; `refreshIfStale` skips the network until it ages.
+    private var lastLoaded: Date?
 
     /// The deck's pages: the bites, then a summary once there are any.
     var reviewPages: [BrainReviewPage] {
@@ -89,10 +97,33 @@ final class BrainHomeViewModel {
 
     /// Shows `deck` as `batch` of `day`, landing on `index` or the nearest page that exists.
     private func show(_ deck: BrainHome, day: String, batch: Int, index: Int) {
+        if deck != home {
+            biteTexts = Dictionary(deck.bites.map { ($0.id, BrainBiteText(bite: $0)) }, uniquingKeysWith: { first, _ in first })
+        }
         home = deck
         deckDay = day
         currentBatch = batch
         reviewIndex = min(max(index, 0), max(reviewPages.count - 1, 0))
+    }
+
+    private static func attempt<T>(_ body: () async throws -> T) async -> Result<T, Error> {
+        do { return .success(try await body()) } catch { return .failure(error) }
+    }
+
+    /// What the home's appear calls: a full `load()` once the last one is a few minutes old or
+    /// the day has moved on, else just the review position, which the Review screen may have moved.
+    func refreshIfStale(now: Date = .now, maxAge: TimeInterval = 300) async {
+        if let lastLoaded, now.timeIntervalSince(lastLoaded) < maxAge, !needsNewDay {
+            syncPosition()
+            return
+        }
+        await load()
+    }
+
+    /// Picks up the position the Review screen saved for the shown deck.
+    func syncPosition() {
+        guard let day = deckDay, let saved = saved(on: day), saved.batch == currentBatch else { return }
+        reviewIndex = min(max(saved.index, 0), max(reviewPages.count - 1, 0))
     }
 
     func load() async {
@@ -104,21 +135,19 @@ final class BrainHomeViewModel {
         if home.isEmpty, let cached = cache.load(BrainHome.self, kind: "home", id: "\(day)-\(batch)") {
             show(cached, day: day, batch: batch, index: saved(on: day)?.index ?? 0)
         }
-        async let fetchedHome: BrainHome? = try? client.home(batch: batch)
+        let client = self.client
+        async let fetchedHome = Self.attempt { try await client.home(batch: batch) }
+        var modulesLanded = false
         do {
             let fetched = try await client.modules()
             guard !Task.isCancelled, token == generation else { return }
             modules = fetched
             state = .loaded(fetched)
             isShowingCachedCopy = false
+            modulesLanded = true
             cache.store(fetched, kind: "modules", id: "")
-            if let loadedHome = await fetchedHome, !Task.isCancelled, token == generation {
-                // Read the position now, not before the fetch, so a swipe made while it ran wins.
-                show(loadedHome, day: day, batch: batch, index: saved(on: day)?.index ?? 0)
-                cache.store(loadedHome, kind: "home", id: "\(day)-\(batch)")
-            }
         } catch is CancellationError {
-            // The screen went away; nothing to update.
+            return  // The screen went away; nothing to update.
         } catch {
             guard !Task.isCancelled, token == generation else { return }
             if brainIsNotFound(error) {
@@ -132,19 +161,41 @@ final class BrainHomeViewModel {
             }
             onAPIError(error)
         }
+        // The deck stands on its own: it shows even when the module list failed.
+        let homeResult = await fetchedHome
+        guard !Task.isCancelled, token == generation else { return }
+        switch homeResult {
+        case .success(let loadedHome):
+            // Read the position now, not before the fetch, so a swipe made while it ran wins.
+            show(loadedHome, day: day, batch: batch, index: saved(on: day)?.index ?? 0)
+            cache.store(loadedHome, kind: "home", id: "\(day)-\(batch)")
+            deckFailed = false
+            if modulesLanded { lastLoaded = .now }
+        case .failure(let error):
+            // A server without the home route has no deck to miss; a failure with a deck shown keeps it.
+            deckFailed = !brainIsNotFound(error) && !(error is CancellationError) && home.isEmpty
+        }
     }
 
     /// "Deal me more": the next batch of ten, from the first page. A failed fetch keeps the
-    /// current batch and position.
+    /// current batch and position, and says so on the summary card.
     func dealMore() async {
         generation += 1
         let token = generation
         let batch = currentBatch + 1
         let day = deckDay ?? today()
-        guard let more = try? await client.home(batch: batch), !Task.isCancelled, token == generation else { return }
-        show(more, day: day, batch: batch, index: 0)
-        persistPosition()
-        cache.store(more, kind: "home", id: "\(day)-\(batch)")
+        dealMoreFailed = false
+        do {
+            let more = try await client.home(batch: batch)
+            guard !Task.isCancelled, token == generation else { return }
+            show(more, day: day, batch: batch, index: 0)
+            persistPosition()
+            cache.store(more, kind: "home", id: "\(day)-\(batch)")
+        } catch {
+            guard !Task.isCancelled, token == generation, !(error is CancellationError) else { return }
+            dealMoreFailed = true
+            onAPIError(error)
+        }
     }
 }
 
@@ -161,6 +212,8 @@ final class BrainListViewModel {
     private(set) var isLoading = false
     /// True when the last `loadMore` failed; cleared by the next attempt, `load()` or a tag change.
     private(set) var loadMoreFailed = false
+    /// Counts finished first-page loads, so background paging that a reload cut short can restart.
+    private(set) var loads = 0
 
     /// Setting a different tag drops the paging state and reloads.
     var selectedTag: String? {
@@ -219,7 +272,10 @@ final class BrainListViewModel {
         } catch {
             guard !Task.isCancelled, token == generation else { return }
             isLoading = false
-            if brainIsNotFound(error) {
+            if list != nil, !isShowingCachedCopy, !brainIsNotFound(error) {
+                // A failed refresh keeps the pages already shown rather than dropping to the cache.
+                loads += 1
+            } else if brainIsNotFound(error) {
                 state = .unavailable
             } else if let cached = cache.load(BrainList.self, kind: cacheKind, id: tag ?? "") {
                 apply(cached, cached: true)
@@ -256,6 +312,7 @@ final class BrainListViewModel {
         list = value
         state = .loaded(value)
         isShowingCachedCopy = cached
+        loads += 1
     }
 
     private static func merge(_ first: BrainList, _ next: BrainList) -> BrainList {

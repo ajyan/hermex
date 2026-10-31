@@ -31,6 +31,13 @@ enum BrainJournalCalendarLayout {
         String(format: "%04d-%02d-%02d", year, month, day)
     }
 
+    /// Today's key on the reader's own calendar. The grid runs in UTC, but "today" is the
+    /// reader's day: at 6pm in California it is already tomorrow in UTC.
+    static func todayKey(_ today: Date, local: Calendar = .current) -> String {
+        let parts = local.dateComponents([.year, .month, .day], from: today)
+        return key(year: parts.year ?? 1970, month: parts.month ?? 1, day: parts.day ?? 1)
+    }
+
     /// Journal items by day; the first item for a day wins.
     static func entries(_ items: [BrainItem]) -> [String: BrainItem] {
         var out: [String: BrainItem] = [:]
@@ -43,10 +50,12 @@ enum BrainJournalCalendarLayout {
     /// Every month from the latest of this month and the newest entry, back to the month of
     /// the oldest entry, newest first. Empty months in between stay, so the calendar reads
     /// continuously.
-    static func months(for keys: some Collection<String>, today: Date = .now, calendar: Calendar = calendar()) -> [Month] {
+    static func months(for keys: some Collection<String>, today: Date = .now, calendar: Calendar = calendar(),
+                       local: Calendar = .current) -> [Month] {
         let dates = keys.compactMap { date(fromKey: $0) }
         guard let oldest = dates.min(), let newest = dates.max() else { return [] }
-        let top = month(of: max(newest, today), calendar: calendar)
+        let localToday = date(fromKey: todayKey(today, local: local)) ?? today
+        let top = month(of: max(newest, localToday), calendar: calendar)
         let bottom = month(of: oldest, calendar: calendar)
         var out: [Month] = []
         var cursor = top
@@ -125,21 +134,24 @@ enum BrainJournalCalendarLayout {
 struct BrainJournalCalendarView: View {
     let isLoadingOlder: Bool
     let loadOlderFailed: Bool
+    /// Offline with the saved first page: older days can't load until the next refresh.
+    let isShowingCachedCopy: Bool
     let onRetry: () -> Void
     /// Built once per list, never in `body`.
     private let entries: [String: BrainItem]
     private let months: [BrainJournalCalendarLayout.Month]
     private let todayKey: String
 
-    init(list: BrainList, isLoadingOlder: Bool, loadOlderFailed: Bool, onRetry: @escaping () -> Void, today: Date = .now) {
+    init(list: BrainList, isLoadingOlder: Bool, loadOlderFailed: Bool, isShowingCachedCopy: Bool = false,
+         onRetry: @escaping () -> Void, today: Date = .now) {
         self.isLoadingOlder = isLoadingOlder
         self.loadOlderFailed = loadOlderFailed
+        self.isShowingCachedCopy = isShowingCachedCopy
         self.onRetry = onRetry
         let entries = BrainJournalCalendarLayout.entries(list.items)
         self.entries = entries
         self.months = BrainJournalCalendarLayout.months(for: entries.keys, today: today)
-        let parts = BrainJournalCalendarLayout.calendar().dateComponents([.year, .month, .day], from: today)
-        self.todayKey = BrainJournalCalendarLayout.key(year: parts.year ?? 0, month: parts.month ?? 0, day: parts.day ?? 0)
+        self.todayKey = BrainJournalCalendarLayout.todayKey(today)
     }
 
     var body: some View {
@@ -165,6 +177,10 @@ struct BrainJournalCalendarView: View {
                     .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
             }
             .buttonStyle(.plain)
+        } else if isShowingCachedCopy {
+            Text(verbatim: "Offline, showing saved copy")
+                .brainText(.meta)
+                .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
         } else if isLoadingOlder {
             ProgressView()
                 .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)

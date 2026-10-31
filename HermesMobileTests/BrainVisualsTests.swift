@@ -489,11 +489,21 @@ final class BrainJournalCalendarTests: XCTestCase {
     }
 
     func testMonthsRunFromThisMonthBackToTheOldestEntryWithGaps() throws {
-        let months = Layout.months(for: ["2026-08-03", "2026-10-06"], today: try utc("2026-12-01"))
+        let months = Layout.months(for: ["2026-08-03", "2026-10-06"], today: try utc("2026-12-15"))
         XCTAssertEqual(months.map(\.id), ["2026-12", "2026-11", "2026-10", "2026-09", "2026-08"])
         let acrossYear = Layout.months(for: ["2025-12-31", "2026-01-02"], today: try utc("2026-01-15"))
         XCTAssertEqual(acrossYear.map(\.id), ["2026-01", "2025-12"])
         XCTAssertEqual(Layout.months(for: [String](), today: .now), [])
+    }
+
+    func testTodayIsTheReadersOwnDayNotUTCs() throws {
+        var pacific = Calendar(identifier: .gregorian)
+        pacific.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        // 7pm on Oct 31 in California is already Nov 1 in UTC.
+        let evening = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-11-01T02:00:00Z"))
+        XCTAssertEqual(Layout.todayKey(evening, local: pacific), "2026-10-31")
+        XCTAssertEqual(Layout.months(for: ["2026-10-06"], today: evening, local: pacific).map(\.id), ["2026-10"],
+                       "no empty November on top")
     }
 
     func testCellsStartOnTheLocalesFirstWeekday() {

@@ -108,6 +108,23 @@ enum BrainBiteCopy {
 }
 
 
+/// One bite's words, parsed from Markdown once per deck rather than per drag frame.
+struct BrainBiteText {
+    let lead: AttributedString
+    let detail: AttributedString?
+    let accessibilityLabel: String
+
+    init(bite: BrainBite) {
+        lead = BrainArticleDigestView.inlineMarkdown(bite.text)
+        let detailText = bite.detail?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        detail = detailText.isEmpty ? nil : BrainArticleDigestView.inlineMarkdown(detailText)
+        accessibilityLabel = [BrainBiteCopy.kicker(bite), String(lead.characters), BrainBiteCopy.attribution(bite), bite.detail]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: ". ")
+    }
+}
+
 // MARK: - Review screen
 
 /// Today's review as its own screen, opened from the Brain home's Today list: the deck of
@@ -163,10 +180,20 @@ struct BrainReviewView: View {
                     Button { Task { await viewModel.load() } } label: { Text(verbatim: "Try again") }
                 }
             case .unavailable, .loaded:
-                ContentUnavailableView {
-                    Label { Text(verbatim: "Nothing to review today") } icon: { Image(systemName: "rectangle.stack") }
-                } description: {
-                    Text(verbatim: "Bites come from articles and highlights you've saved.")
+                if viewModel.deckFailed {
+                    ContentUnavailableView {
+                        Label { Text(verbatim: "Couldn't load the review") } icon: { Image(systemName: "wifi.exclamationmark") }
+                    } description: {
+                        Text(verbatim: "Check your connection and try again.")
+                    } actions: {
+                        Button { Task { await viewModel.load() } } label: { Text(verbatim: "Try again") }
+                    }
+                } else {
+                    ContentUnavailableView {
+                        Label { Text(verbatim: "Nothing to review today") } icon: { Image(systemName: "rectangle.stack") }
+                    } description: {
+                        Text(verbatim: "Bites come from articles and highlights you've saved.")
+                    }
                 }
             }
         }
@@ -181,9 +208,10 @@ struct BrainReviewView: View {
         ) { page, contentOpacity in
             switch page {
             case .bite(let bite):
-                BrainBiteCard(bite: bite, open: { push(Self.route(bite)) }, contentOpacity: contentOpacity)
+                BrainBiteCard(bite: bite, text: viewModel.biteTexts[bite.id] ?? BrainBiteText(bite: bite),
+                              open: { push(Self.route(bite)) }, contentOpacity: contentOpacity)
             case .summary:
-                BrainReviewSummaryCard(bites: bites, hasMore: viewModel.home.hasMore,
+                BrainReviewSummaryCard(bites: bites, hasMore: viewModel.home.hasMore, failed: viewModel.dealMoreFailed,
                                        onMore: { await viewModel.dealMore() }, contentOpacity: contentOpacity)
             }
         } edge: { page in
@@ -282,6 +310,8 @@ struct BrainDeckCard<Content: View>: View {
 /// card full screen with the bite's page as its foot button; swiping pages the deck.
 struct BrainBiteCard: View {
     let bite: BrainBite
+    /// The bite's words, parsed once per deck (`BrainHomeViewModel.biteTexts`).
+    let text: BrainBiteText
     let open: () -> Void
     /// Cards under the top one show only their paper; their words fade in as they rise.
     var contentOpacity: Double = 1
@@ -299,12 +329,12 @@ struct BrainBiteCard: View {
             .font(AppFont.footnote(weight: .semibold))
         if bite.quotesSavedWords {
             Image(systemName: "quote.opening")
-                .font(.system(size: 40, weight: .semibold))
+                .font(AppFont.display(style: .largeTitle, weight: .semibold))
                 .opacity(0.22)
                 .padding(.top, 18)
                 .accessibilityHidden(true)
         }
-        Text(BrainArticleDigestView.inlineMarkdown(bite.text))
+        Text(text.lead)
             .font(Self.leadFont(for: bite))
             .lineSpacing(3)
             .fixedSize(horizontal: false, vertical: true)
@@ -314,8 +344,8 @@ struct BrainBiteCard: View {
                 .font(AppFont.subheadline(weight: .medium))
                 .padding(.top, 12)
         }
-        if let detail = bite.detail?.trimmingCharacters(in: .whitespacesAndNewlines), !detail.isEmpty {
-            Text(BrainArticleDigestView.inlineMarkdown(detail))
+        if let detail = text.detail {
+            Text(detail)
                 .font(AppFont.body())
                 .lineSpacing(4)
                 .foregroundStyle(Color.hxTextPrimary)
@@ -324,13 +354,7 @@ struct BrainBiteCard: View {
         }
     }
 
-    private var accessibilityLabel: String {
-        let text = String(BrainArticleDigestView.inlineMarkdown(bite.text).characters)
-        return [BrainBiteCopy.kicker(bite), text, BrainBiteCopy.attribution(bite), bite.detail]
-            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .joined(separator: ". ")
-    }
+    private var accessibilityLabel: String { text.accessibilityLabel }
 
     /// The Daily Deck's lead sizes (`DeckCardText.leadStyle`); the serif for saved words, the
     /// rounded display voice otherwise.
@@ -347,6 +371,8 @@ struct BrainBiteCard: View {
 struct BrainReviewSummaryCard: View {
     let bites: [BrainBite]
     let hasMore: Bool
+    /// The last "Ten more" failed.
+    var failed = false
     let onMore: () async -> Void
     var contentOpacity: Double = 1
 
@@ -397,6 +423,13 @@ struct BrainReviewSummaryCard: View {
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize)
             if hasMore {
+                if failed, !isDealing {
+                    Text(verbatim: "Couldn't get ten more. Try again.")
+                        .font(AppFont.subheadline())
+                        .foregroundStyle(Color.hxTextSecondary)
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 8)
+                }
                 Button {
                     guard !isDealing else { return }
                     isDealing = true

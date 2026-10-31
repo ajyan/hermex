@@ -227,13 +227,16 @@ struct BrainModuleListView: View {
             BrainListStateView(viewModel: viewModel) { list in
                 BrainJournalCalendarView(
                     list: list,
-                    isLoadingOlder: list.nextCursor != nil && !viewModel.loadMoreFailed,
+                    isLoadingOlder: list.nextCursor != nil && !viewModel.loadMoreFailed && !viewModel.isShowingCachedCopy,
                     loadOlderFailed: viewModel.loadMoreFailed,
+                    isShowingCachedCopy: viewModel.isShowingCachedCopy,
                     onRetry: { loadMore() }
                 )
                 .refreshable { await viewModel.load() }
-                // Older pages load one after another so earlier months fill in.
-                .task(id: list.nextCursor) {
+                // Older pages load one after another so earlier months fill in. Keyed by the load
+                // too: a refresh drops the page in flight and lands on the same cursor, so paging
+                // starts again from there.
+                .task(id: "\(list.nextCursor ?? -1)-\(viewModel.loads)") {
                     if list.nextCursor != nil { await viewModel.loadMore() }
                 }
             }

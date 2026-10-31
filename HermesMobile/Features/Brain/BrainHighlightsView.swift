@@ -123,6 +123,10 @@ struct BrainHighlightsView: View {
                     Button(action: loadMore) { Text(verbatim: "Try again") }
                         .buttonStyle(.borderless)
                 }
+            } else if viewModel.isShowingCachedCopy, viewModel.list?.nextCursor != nil {
+                // The saved copy is only the first page; this segment may start on a later one.
+                Text(verbatim: "Offline. More are on the server.")
+                    .brainText(.rowSubtitle)
             } else {
                 Text(verbatim: segment == .books ? "No book highlights yet" : "No videos yet")
                     .brainText(.rowSubtitle)
