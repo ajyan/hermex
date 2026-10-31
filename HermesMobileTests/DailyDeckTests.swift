@@ -1007,7 +1007,7 @@ final class DailyDeckTests: XCTestCase {
         let crm = try palette("crm")
         XCTAssertEqual(crm, DeckPalette.people)
         XCTAssertNotEqual(crm.name, DeckPalette.followUps.name, "a person's card is not the follow-ups page")
-        XCTAssertEqual(crm.colors, DeckPalette.followUps.colors, "same plain paper")
+        XCTAssertEqual(crm.colors, BrainModuleID.people.paper, "a person wears the People pages' paper")
         let email = try palette("email")
         XCTAssertEqual(email, DeckPalette.plain)
         XCTAssertEqual(email.colors, try palette("nonsense").colors, "email reads like the inbox item card: the plain paper")

@@ -80,7 +80,7 @@ final class MonthlyReviewModelTests: XCTestCase {
         XCTAssertEqual(DeckPalette.of(cards[0]).colors, .dusk)
         XCTAssertEqual(DeckPalette.of(cards[3]).colors, .past)
         XCTAssertEqual(DeckPalette.of(cards[4]).colors, .notes)
-        XCTAssertEqual(DeckPalette.of(cards[5]).colors, .body)
+        XCTAssertEqual(DeckPalette.of(cards[5]).colors, .training, "an older deck naming the teal body paper reads as Body's cyan")
         XCTAssertEqual(DeckPalette.of(cards[6]).colors, .dusk)
         XCTAssertTrue(cards.allSatisfy { $0.chapterLabel == nil })
     }

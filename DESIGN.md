@@ -5,7 +5,7 @@ Hermex's look: **calm chat, colorful objects, one voice.** The reading surface s
 ## Principles
 
 1. **Neutral ground, colored objects.** Canvases, bubbles, and body text use the `hx*` neutrals. Color appears only on an object you could tap, link, or act on.
-2. **A color means a kind.** Color is assigned by object type, never by sequence, position, or status. If two things share a color, they are the same kind of thing.
+2. **A color means a kind.** Color is assigned by object type, never by sequence, position, or status. There are more kinds than hues, so some kinds share a paper (see Shared papers below), but one kind never wears two.
 3. **One material: glow.** Every colored thing is its hue on a wash of itself, deep in light mode and bright in dark mode, at two strengths: a faint `wash` for small objects (chips, request cards, drawer and log icons) and an opaque medium `card` fill for whole cards (Brief cards, the Goal hero). There are no fixed light papers anymore.
 4. **Glow text is full strength.** Text in a hue is never faded; hierarchy comes from size and weight. Fading is for decorative marks only (corner icons, dividers). Faded glow fails contrast.
 5. **Nous blue means interactive.** `Color.accentColor` (`#0053FD` / `#4A84FE`) is the tint for controls, the send button, links, and "Atlas is working". It is never an object color. On a Daily Brief card's paper the card's ink is the tint (`.tint(palette.ink)`), so its controls, the dictation mic included, wear the card's color.
@@ -46,16 +46,16 @@ Each paper is one hue rendered as a glow that adapts to the appearance:
 | `wiki` | `#D3F2E2` / `#0E4A33` | `#137049` / `#5FD3A0` | From your wiki |
 | `reading` | `#FFE4D1` / `#5A2A0C` | `#9A4410` / `#F5A37A` | From your reading |
 | `notes` | `#E6DCFF` / `#33197A` | `#5B3FC4` / `#B39DFF` | From your notes, Sleep |
-| `video` | `#D2F0F4` / `#0B4650` | `#0E6D7A` / `#5CCFE0` | Video, (Body) |
+| `video` | `#D2F0F4` / `#0B4650` | `#0E6D7A` / `#5CCFE0` | Video, (Body and the Body value) |
 | `past` | `#FFEFC2` / `#4E3A00` | `#7A5C00` / `#E8C55A` | A year ago, Your journal, Looking back |
-| `advisor` | `#E4EEF6` / `#14324A` | `#2E5878` / `#9DBEDD` | Check-in |
+| `advisor` | `#E4EEF6` / `#14324A` | `#2E5878` / `#9DBEDD` | Check-in, Letter to her, From your people |
 | `plain` | `#F4F0E8` / `#2A2A28` | `#5E5646` / `#D6CDBB` | Library, follow-ups |
 | `mandarin` | `#FFDDD6` / `#5E1A0E` | `#B03A22` / `#FF9C85` | Mandarin practice |
 | `orchid` | `#F3DDFB` / `#45105A` | `#8A2BB0` / `#DDA2F2` | (Interview prep, everywhere: not a Brief card) |
 | `ledger` | `#EEF3D6` / `#2F3A0A` | `#4F6300` / `#C2DA6E` | (Money, not a Brief card) |
 | `dusk` | `#F3E4EE` / `#4A1F3D` | `#8C3D74` / `#E7A3CF` | The weekly review's cards, Looking ahead |
 | `kitchen` | `#E3EEDB` / `#22381A` | `#46682F` / `#B2D49A` | Last night's dinner, This week's dinners |
-| `body` | `#D2F2EC` / `#0B4A40` | `#0B6E62` / `#4FD6BE` | (unused since Body moved to `video`: its teal read as `wiki`'s mint) |
+| `meadow` | `#DDF3DC` / `#173F1C` | `#2A7034` / `#7FD686` | (Goals' drawer row, not a Brief card) |
 
 ### The object key
 
@@ -68,6 +68,7 @@ Named in `Config/HermexStyle.swift`; `HermexPaper.forTool(_:)` maps tool kinds.
 | Interview prep: its drawer and Brain home rows, and every Prep card and screen (readiness card, path, runs, stories, mocks, gaps, the tutor) | `.prep` | `orchid` |
 | Brain review bite: idea or takeaway, quote, book highlight | `BrainBite.paper` | `reading`, `quote`, `book` |
 | Inside the Brain, a page of each kind: wiki, person, journal day, article, highlight, letter to his daughter | `BrainModuleID.paper` | `wiki`, `advisor`, `past`, `reading`, `book`, `advisor` (each source's Brief card paper; letters wear the Dad card's) |
+| The Daily Brief's "From your people" card (a week source from the CRM) | `DeckPalette.people` | `advisor` (`BrainModuleID.people.paper`: a person wears one paper in the Brief and the Brain) |
 | The People list's "Due for a catch-up" rows: the time since last seen | `HermexPaper.opener` | `opener` (the trailing "4 mo" in the glow; other rows' times stay `meta`) |
 | On a person page: Catch up, the rhythm strip, a timeline row's tile and its open card, and a journal day in it | `BrainModuleID.people.paper`; a journal day on its own `BrainModuleID.journal.paper` | `advisor` (Catch up and an opened note as glow cards, seen months as `advisor` glow dots, unseen ones `hxSeparator`); `past` for a journal day; the name in a journal snippet is marked in `advisor` |
 | File read, written, listed, or searched (grep, find); file attachments | `.file` | `notes` |
@@ -84,12 +85,24 @@ Named in `Config/HermexStyle.swift`; `HermexPaper.forTool(_:)` maps tool kinds.
 | A season front's divider in the morning deck (Landing the AI role, Becoming a dad, Body, People, and Also), and the week's divider wearing its front's symbol | `DeckPalette.front(_:)`, `DeckPalette.section(front:)` | `opener`, neutral like the This week divider; each front keeps its own symbol. Its week shows as `DeckDots`: one fixed column per day or pip so every row lines up; numbers are dots, never bars. Yesterday with no check-in yet is a ring with a plus (tap it), never missed |
 | A week: weekly review cards (the cover's moment rows, each weekday and line with an `HXChip` naming its value; last week's intention; one value card per value, its fact, question, line and 1–10 score; the intention card's four fields and coach changes; the note to the future), week page, year tiles | `DeckPalette.week` | `dusk` |
 | A week: the weekly review v4, in the monthly's format (`WeeklyWrappedCards.swift` plus the monthly cards). Steer-first: the cover's days (one row each, a value chip in that value's paper, a star to mark what mattered; a letter sealed a year ago opens on the cover), Did it hold (Held / Partly / Didn't, then what got in the way), the week in numbers (habit dots M–S, counts, then sleep), five value cards with the 1–10 under the title, proud and challenged with the answer under the title, next week's intention as Atlas proposes it (Use this, or tap a line), a letter to next year that seals with the week, and a close ring of 52 weeks. Each number, quote and coach appears once | `DeckPalette.month(_:)` | as the month: `dusk` frame, `notes` for held and numbers, `past` for questions, each value its paper |
-| A month: the monthly review (`MonthlyReview*.swift`, `DeckPalette.month`). The cover, weeks arc, dots, and close (the year as a ring of twelve months) wear `dusk`; every dot calendar on the dots card uses the card's one paper. Each other card wears the paper of what it's about: reflection questions (what made you proud, what challenged you, what you learned) and the insight on his own words `past`, sleep `notes` (the Sleep card's), letters `advisor` (the Dad card's), and each value its own paper. Numbers count up and dots fill once the card is on top; themes are wash tiles; his words are serif; second-brain quotes are serif italic on a wash with the book and author | `DeckPalette.month(_:)` | `dusk`; values: present `past`, people `quote`, dad `advisor`, potential `notes`, body `body` |
+| A month: the monthly review (`MonthlyReview*.swift`, `DeckPalette.month`). The cover, weeks arc, dots, and close (the year as a ring of twelve months) wear `dusk`; every dot calendar on the dots card uses the card's one paper. Each other card wears the paper of what it's about: reflection questions (what made you proud, what challenged you, what you learned) and the insight on his own words `past`, sleep `notes` (the Sleep card's), letters `advisor` (the Dad card's), and each value its own paper. Numbers count up and dots fill once the card is on top; themes are wash tiles; his words are serif; second-brain quotes are serif italic on a wash with the book and author | `DeckPalette.month(_:)` | `dusk`; values: present `past`, people `quote`, dad `advisor`, potential `notes`, body `video` (Body's) |
 | Money: net worth, accounts, the market card | `.money` | `ledger` |
 | Meals: the Daily Brief's "Last night's dinner?" and Sunday "This week's dinners" cards | `.meal` (`DeckPalette.dinner`, `DeckPalette.meals`) | `kitchen` |
-| Workouts, lifts, coach notes and proposals | `.training` | `video` |
+| Workouts, lifts, coach notes and proposals; the Body value on the reviews | `.training` | `video` |
 | Feedback inbox | `.feedback` | `notes` |
-| Drawer sections: Daily Brief, Brain, People, Interview prep, Goals, Body, Money, Feedback | `opener`, `.knowledge`, `BrainModuleID.people.paper`, `.prep` (`orchid`, also on its Brain home row), `book`, `.training`, `.money`, `.feedback`: each a different hue | |
+| Drawer sections: Daily Brief, Brain, People, Interview prep, Goals, Body, Money, Feedback | `opener`, `.knowledge`, `BrainModuleID.people.paper`, `.prep` (`orchid`, also on its Brain home row), `.goals` (`meadow`; each goal keeps its own `GoalPaper`), `.training`, `.money`, `.feedback`: each a different hue | |
+
+### Shared papers
+
+These papers carry more than one kind. Each group is related (a person, saved thinking, the past, Atlas's own machinery), so a shared hue still reads as kin. A new kind takes a free hue when one is left, else joins its closest kin here.
+
+- `advisor`: the advisor's Check-in, Letter to her and letters in the Brain, a person (People pages, Catch up, From your people), memory and skill tool steps, Energy and mood.
+- `notes`: From your notes, Sleep, Lessons, file tool steps, the Feedback inbox, and the Daily Ask (its goal's paper).
+- `video`: Video, web tool steps, Body.
+- `past`: A year ago, Your journal, Looking back, Theme, the reviews' reflection questions.
+- `plain`: From your library, Follow-ups, Atlas asks, What changed, Recap, shell and other tool steps.
+- `opener`: requests waiting on you, the Brief opener and its dividers, People rows due for a catch-up.
+- `dusk`: the weekly and monthly review frames, Looking ahead.
 
 Add a new kind of object here and in the code together. A failed tool step keeps its color and adds an `hxDanger` mark; the color never turns red.
 

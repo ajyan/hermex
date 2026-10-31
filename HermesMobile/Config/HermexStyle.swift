@@ -89,9 +89,12 @@ extension HermexPaper {
     static let feedback = HermexPaper.notes
     /// Meals: the Daily Brief's dinner and week-of-dinners cards.
     static let meal = HermexPaper.kitchen
-    /// Body: workouts, lifts, Baki's notes and proposals. Cyan, since `body`'s teal read as Brain's
-    /// mint beside it in the drawer.
+    /// Body: workouts, lifts, Baki's notes and proposals, and the Body value on the reviews. Cyan,
+    /// since a teal read as Brain's mint beside it in the drawer.
     static let training = HermexPaper.video
+    /// Goals: the drawer row. Each goal wears its own `GoalPaper`; the module's row has a hue no
+    /// other kind uses.
+    static let goals = HermexPaper.meadow
     /// Interview prep, everywhere: its drawer row, its Brain home row, and every Prep card and screen.
     /// Orchid, its own kind: never the Brain's mint or the Mandarin card's coral.
     static let prep = HermexPaper.orchid

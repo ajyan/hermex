@@ -223,7 +223,7 @@ struct DeckMonth: Decodable, Equatable {
 }
 
 extension HermexPaper {
-    /// The paper a deck names ("wiki", "body"); nil for a name outside the papers.
+    /// The paper a deck names ("wiki", "video"); nil for a name outside the papers.
     static func named(_ name: String?) -> HermexPaper? {
         switch name {
         case "opener": .opener
@@ -240,7 +240,8 @@ extension HermexPaper {
         case "ledger": .ledger
         case "dusk": .dusk
         case "kitchen": .kitchen
-        case "body": .body
+        // Decks before 2026-10-31 named the Body value's old teal; Body is cyan now.
+        case "body": .training
         default: nil
         }
     }
