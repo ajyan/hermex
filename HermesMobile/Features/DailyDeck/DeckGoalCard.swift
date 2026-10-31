@@ -107,7 +107,8 @@ private struct GoalCheckInSection: View {
                 ForEach(Array(yesterday.enumerated()), id: \.element.id) { index, row in
                     if index > 0 { Rectangle().fill(palette.ink.opacity(0.12)).frame(height: 0.5) }
                     GoalCommitmentRow(row: row, day: .yesterday, date: home.yesterday, tint: tint,
-                                      isPending: model.isPending(goal.slug, .commitment(row.id))) { status in
+                                      isPending: model.isPending(goal.slug, .commitment(row.id)),
+                                      atRisk: goal.flags.missTwice.contains(row.id)) { status in
                         Task { await model.checkIn(slug: goal.slug, commitment: row.id, status: status) }
                     }
                 }
@@ -119,6 +120,7 @@ private struct GoalCheckInSection: View {
                     GoalItemRow(
                         row: row, tint: tint,
                         isPending: model.isPending(goal.slug, .commitment(row.id)),
+                        atRisk: goal.flags.missTwice.contains(row.id),
                         onAdd: { note in await model.addItem(slug: goal.slug, commitment: row.id, note: note) },
                         onRemoveLast: { Task { await model.removeLastItem(slug: goal.slug, commitment: row.id) } }
                     )
@@ -158,12 +160,9 @@ private struct GoalCheckInSection: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 14)
             }
-            ForEach(goal.week.commitments.filter { goal.flags.missTwice.contains($0.id) }) { row in
-                Text(verbatim: GoalDetailCopy.missTwice(row))
-                    .font(AppFont.footnote())
-                    .foregroundStyle(Color.hxWarning)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 10)
+            ForEach(GoalDetailCopy.missTwiceRows(goal)) { row in
+                GoalNote(systemImage: "exclamationmark.circle", tint: tint.fill, text: GoalDetailCopy.missTwice(row))
+                    .padding(.top, 12)
             }
             ForEach(goal.flags.escalations, id: \.check) { escalation in
                 GoalNote(systemImage: "exclamationmark.triangle", tint: .hxWarning, text: escalation.say)

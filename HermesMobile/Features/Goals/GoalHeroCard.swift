@@ -40,16 +40,126 @@ struct GoalHeroCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if !goal.week.days.isEmpty {
-                GoalWeekStrip(days: goal.week.days, ink: palette.ink, today: today ?? selection?.today,
+                GoalWeekStrip(days: goal.week.days, ink: palette.ink, onInk: palette.onInk, today: today ?? selection?.today,
                               selection: selection, onSelect: onSelect)
                     .padding(.top, BrainStyle.xs)
             }
         } footer: {
-            Text(verbatim: GoalHeroCopy.weekSummary(goal.week.commitments))
-                .font(BrainStyle.meta)
-                .monospacedDigit()
+            if !goal.week.commitments.isEmpty {
+                VStack(alignment: .leading, spacing: BrainStyle.s) {
+                    ForEach(goal.week.commitments) { row in
+                        GoalCommitmentWeek(row: row, atRisk: goal.flags.missTwice.contains(row.id), paper: palette.colors)
+                    }
+                }
+            }
         }
         .foregroundStyle(palette.ink)
+    }
+}
+
+/// A commitment's week on the hero, laid out like a row of the Brief's week grid (`DeckWeekGrid`):
+/// its name with a small count in the flexible column, then its pips in the seven fixed day columns,
+/// and a "Don't miss twice" chip under it when the server flags it.
+struct GoalCommitmentWeek: View {
+    let row: GoalCommitmentProgress
+    let atRisk: Bool
+    let paper: HermexPaper
+
+    var body: some View {
+        let pips = GoalPips(row, name: GoalsCopy.shortName(row.action))
+        VStack(alignment: .leading, spacing: BrainStyle.xs) {
+            HStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(verbatim: GoalsCopy.shortName(row.action))
+                        .font(AppFont.subheadline(weight: .semibold))
+                        .foregroundStyle(Color.hxTextPrimary)
+                        .lineLimit(2)
+                    Text(verbatim: pips.count)
+                        .font(AppFont.caption())
+                        .foregroundStyle(paper.glow)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.trailing, 6)
+                GoalPipRow(pips: pips, ink: paper.glow)
+            }
+            .frame(minHeight: 24)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(verbatim: pips.spoken))
+            if atRisk {
+                GoalAtRiskChip(row: row, paper: paper)
+            }
+        }
+    }
+}
+
+/// The Brief's never-miss-twice cue on a commitment: a chip in the goal's paper, never amber.
+struct GoalAtRiskChip: View {
+    let row: GoalCommitmentProgress
+    let paper: HermexPaper
+
+    var body: some View {
+        HXChip(paper: paper, symbol: "exclamationmark.circle", label: GoalPips.atRiskLabel(row))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(verbatim: GoalPips.atRiskSpoken(row)))
+    }
+}
+
+/// A commitment's week as the Brief's pips (`DeckDot`): one per day of its target, filled once
+/// done (the 2-minute version too), then its skip budget, half-filled for a skip taken and
+/// dashed for one still left. An item commitment has a pip per item of its target.
+struct GoalPips: Equatable {
+    /// `DeckDot` states, left to right.
+    let states: [String]
+    /// The small count beside the pips: "3 of 6".
+    let count: String
+    /// "Stretch: 3 of 6 days, 1 skip left".
+    let spoken: String
+
+    init(_ row: GoalCommitmentProgress, name: String) {
+        if row.isItem {
+            let done = row.done
+            states = (0..<max(row.target, done)).map { $0 < done ? "done" : "missed" }
+            count = row.target > 0 ? "\(done) of \(row.target)" : "\(done)"
+            spoken = row.target > 0 ? "\(name): \(done) of \(row.target) this week" : "\(name): \(done) this week"
+        } else {
+            let shown = row.done + row.min
+            let used = min(row.skipped, row.skips)
+            let left = max(0, row.skips - row.skipped)
+            states = (0..<max(row.target, shown)).map { $0 < shown ? "done" : "missed" }
+                + Array(repeating: "skip", count: used) + Array(repeating: "ahead", count: left)
+            count = "\(shown) of \(row.target)"
+            let skips = row.skips == 0 ? "" : left == 1 ? ", 1 skip left" : ", \(left) skips left"
+            spoken = "\(name): \(shown) of \(row.target) day\(row.target == 1 ? "" : "s")\(skips)"
+        }
+    }
+
+    /// The chip's words: a day commitment missed yesterday, or an item one short two weeks running.
+    static func atRiskLabel(_ row: GoalCommitmentProgress) -> String {
+        row.isItem ? "Short 2 weeks running" : "Don't miss twice"
+    }
+
+    static func atRiskSpoken(_ row: GoalCommitmentProgress) -> String {
+        let name = GoalsCopy.shortName(row.action)
+        return row.isItem ? "\(name) was short two weeks running" : "\(name) missed yesterday. Don't miss twice"
+    }
+}
+
+/// The pips in the seven fixed day columns of the Brief's week grid, sharing them when there are more.
+struct GoalPipRow: View {
+    let pips: GoalPips
+    let ink: Color
+
+    var body: some View {
+        let column = DeckWeekGridLayout.pipColumn(pips: pips.states.count, addsOne: false)
+        HStack(spacing: 0) {
+            ForEach(Array(pips.states.enumerated()), id: \.offset) { _, state in
+                DeckDot(state: state, ink: ink, column: column)
+            }
+        }
+        .frame(width: DeckWeekGridLayout.trailingWidth, alignment: .leading)
+        .accessibilityHidden(true)
     }
 }
 
@@ -58,6 +168,7 @@ struct GoalHeroCard: View {
 private struct GoalWeekStrip: View {
     let days: [GoalHeatDay]
     let ink: Color
+    let onInk: Color
     let today: String?
     let selection: (today: String, yesterday: String, selected: GoalDay)?
     let onSelect: (GoalDay) -> Void
@@ -76,31 +187,37 @@ private struct GoalWeekStrip: View {
         let choice = selection.flatMap { GoalCalendar.selectableDay(day.date, today: $0.today, yesterday: $0.yesterday) }
         let isSelected = choice != nil && choice == selection?.selected
         let isFuture = today.map { day.date > $0 } ?? false
+        let shape = RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous)
         let content = VStack(spacing: 3) {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
+            shape
                 .fill(isFuture ? Color.clear : GoalPaper.fill(day.status, ink: ink))
                 .overlay {
                     if isFuture {
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .strokeBorder(ink.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                        shape.strokeBorder(ink.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                    } else if let glyph = GoalHeroCopy.glyph(day.status) {
+                        // The status as a mark too, so skip, miss and an empty day never differ by color alone.
+                        Image(systemName: glyph)
+                            .font(AppFont.caption2(weight: .bold))
+                            .foregroundStyle(day.status.isShown ? onInk : Color.hxTextPrimary)
                     }
                 }
                 .overlay {
                     if isSelected {
-                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                             .strokeBorder(ink, lineWidth: 2)
                             .padding(-3)
                     }
                 }
                 .frame(height: cellHeight)
             Text(verbatim: GoalHeroCopy.weekdayLetter(day.date))
-                .font(.caption2.weight(isSelected ? .semibold : .regular))
-
+                .font(AppFont.caption2(weight: isSelected ? .semibold : .regular))
         }
         .frame(maxWidth: .infinity)
 
         if let choice {
-            Button { onSelect(choice) } label: { content.contentShape(Rectangle()) }
+            Button { onSelect(choice) } label: {
+                content.frame(minHeight: BrainStyle.minTapTarget).contentShape(Rectangle())
+            }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text(verbatim: GoalHeroCopy.dayLabel(day, choice: choice)))
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -114,33 +231,34 @@ private struct GoalWeekStrip: View {
 }
 
 enum GoalHeroCopy {
-    static func countdown(_ goal: GoalSummary) -> String {
-        guard let days = goal.daysLeft, let deadline = goal.deadline, let date = GoalCalendar.date(deadline) else {
-            return goal.status.capitalized
-        }
+    private static let deadlineFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.timeZone = TimeZone(identifier: "UTC")
         f.dateFormat = "EEE MMM d"
+        return f
+    }()
+
+    static func countdown(_ goal: GoalSummary) -> String {
+        guard let days = goal.daysLeft, let deadline = goal.deadline, let date = GoalCalendar.date(deadline) else {
+            return goal.status.capitalized
+        }
         let left = days == 1 ? "1 day" : "\(days) days"
-        return "\(left) · \(f.string(from: date))"
+        return "\(left) · \(deadlineFormatter.string(from: date))"
     }
 
     static func sentenceCase(_ s: String) -> String { s.prefix(1).uppercased() + s.dropFirst() }
 
-    /// "Stretch 3/6 · Run 0/1 · 1 skip left": the week's counts in one line.
-    static func weekSummary(_ commitments: [GoalCommitmentProgress]) -> String {
-        var parts = commitments.map { "\(GoalsCopy.shortName($0.action)) \($0.done + $0.min)/\($0.target)" }
-        let skipsLeft = commitments.reduce(0) { $0 + max(0, $1.skips - $1.skipped) }
-        if skipsLeft > 0 { parts.append(skipsLeft == 1 ? "1 skip left" : "\(skipsLeft) skips left") }
-        return parts.joined(separator: " · ")
+    static func weekdayLetter(_ iso: String) -> String {
+        GoalCalendar.weekdayIndex(iso).map { DeckDots.weekdays[$0] } ?? ""
     }
 
-    static func weekdayLetter(_ iso: String) -> String {
-        guard let date = GoalCalendar.date(iso) else { return "" }
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: "UTC")!
-        return ["S", "M", "T", "W", "T", "F", "S"][cal.component(.weekday, from: date) - 1]
+    /// A checked-in day's mark in the strip and calendar (`GoalDetailCopy.symbol`); nil for an empty day.
+    static func glyph(_ status: GoalStatus) -> String? {
+        switch status {
+        case .done, .min, .skip, .miss: GoalDetailCopy.symbol(status)
+        case .none, .clear, .unknown: nil
+        }
     }
 
     static func dayLabel(_ day: GoalHeatDay, choice: GoalDay?) -> String {

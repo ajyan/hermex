@@ -197,7 +197,20 @@ final class GoalsViewModelsTests: XCTestCase {
         XCTAssertNil(stretch(vm)?.today)
         XCTAssertEqual(stretch(vm)?.done, 0)
         XCTAssertEqual(vm.error, "Couldn't save. Try again.")
+        XCTAssertEqual(vm.errorRow, .commitment("stretch-pm"), "the error shows at the row that failed")
         XCTAssertTrue(vm.pending.isEmpty)
+    }
+
+    func testFailedCheckSaysSoAtItsSectionAndAReloadErrorIsScreenWide() async throws {
+        let client = FakeGoalsClient()
+        client.checkInResults = [.failure(URLError(.notConnectedToInternet))]
+        let vm = try await loadedViewModel(client)
+        await vm.checkIn(check: "foot", value: "worse")
+        XCTAssertEqual(vm.errorRow, .check("foot"))
+        client.detailResults = [.failure(URLError(.timedOut))]
+        await vm.load()
+        XCTAssertEqual(vm.error, GoalDetailViewModel.refreshFailed)
+        XCTAssertNil(vm.errorRow, "a failed refresh isn't any one row's")
     }
 
     func testConflictReloads() async throws {
@@ -431,11 +444,43 @@ final class GoalsViewModelsTests: XCTestCase {
     func testFailedHomeReloadKeepsTheLoadedHome() async throws {
         let client = FakeGoalsClient()
         let home = try PrepDecoding.decode(GoalsHome.self, from: Data(GoalsModelsTests.homeSample.utf8))
-        client.homeResults = [.success(home), .failure(URLError(.timedOut))]
+        client.homeResults = [.success(home), .failure(URLError(.timedOut)), .success(home)]
         let vm = GoalsHomeViewModel(client: client)
         await vm.load()
+        XCTAssertFalse(vm.refreshFailed)
         await vm.load()
         XCTAssertEqual(vm.state, .loaded(home))
+        XCTAssertTrue(vm.refreshFailed, "the kept goals say the refresh failed")
+        await vm.load()
+        XCTAssertFalse(vm.refreshFailed)
+    }
+
+    /// The calendar draws from the view model's prepared model, which a tap in flight reaches too.
+    func testCalendarShowsATapInFlightAndDropsItOnFailure() async throws {
+        let client = FakeGoalsClient()
+        var json = try JSONSerialization.jsonObject(with: Data(GoalsModelsTests.detailJSON().utf8)) as! [String: Any]
+        json["today"] = "2026-10-13"
+        json["yesterday"] = "2026-10-12"
+        json["heatmap"] = [["date": "2026-10-12", "status": "none"], ["date": "2026-10-13", "status": "none"]]
+        var week = json["week"] as! [String: Any]
+        week["days"] = (12...18).map { ["date": "2026-10-\($0)", "status": "none"] }
+        json["week"] = week
+        client.detailResults = [.success(try PrepDecoding.decode(GoalDetail.self, from: JSONSerialization.data(withJSONObject: json)))]
+        let vm = GoalDetailViewModel(slug: "nyc-marathon-2026", client: client)
+        await vm.load()
+        let todayCell = { vm.calendar.slots.first { $0.id == "2026-10-13" }?.day?.status }
+        XCTAssertEqual(todayCell(), GoalStatus.none)
+        let gate = (started: AsyncStream<Void>.makeStream(), release: AsyncStream<Void>.makeStream())
+        client.gate = (gate.started.continuation, gate.release.stream)
+        client.checkInResults = [.failure(URLError(.notConnectedToInternet))]
+        let tap = Task { await vm.checkIn(commitment: "stretch-pm", status: .done) }
+        var started = gate.started.stream.makeAsyncIterator()
+        _ = await started.next()
+        XCTAssertEqual(todayCell(), .done, "the calendar shows the tap at once")
+        XCTAssertEqual(vm.calendar.shown, 1)
+        gate.release.continuation.yield()
+        await tap.value
+        XCTAssertEqual(todayCell(), GoalStatus.none, "and drops it with the tap")
     }
 
     func testConflictWithFailedReloadUndoesTheTap() async throws {
@@ -594,11 +639,15 @@ final class GoalsViewModelsTests: XCTestCase {
 }
 
 final class GoalsCopyTests: XCTestCase {
-    func testShortNameAndWeekLine() throws {
+    func testShortName() {
         XCTAssertEqual(GoalsCopy.shortName("Nightly stretch (knee hugs, figure-4 twists, open books)"), "Stretch")
         XCTAssertEqual(GoalsCopy.shortName("Saturday taper run (~12 mi easy)"), "Run")
-        let home = try PrepDecoding.decode(GoalsHome.self, from: Data(GoalsModelsTests.homeSample.utf8))
-        XCTAssertEqual(GoalsCopy.weekLine(home.goals[0].week.commitments), "Stretch 0/6 · Run 0/1")
+    }
+
+    func testStreakLineSaysWhenAtRisk() {
+        XCTAssertEqual(GoalsCopy.streakLine(GoalStreak(days: 12)), "12-day show-up streak")
+        XCTAssertEqual(GoalsCopy.streakLine(GoalStreak(days: 1, atRisk: true)),
+                       "1-day show-up streak · show up today to keep it")
     }
 
     func testItemRowCopy() throws {
@@ -607,9 +656,8 @@ final class GoalsCopyTests: XCTestCase {
             {"date":"2026-10-12","note":"A"},{"date":"2026-10-12"},{"date":"2026-10-13","note":"B"},
             {"date":"2026-10-13","note":"C"},{"date":"2026-10-14","note":"D"}]}
             """).utf8))
-        XCTAssertEqual(GoalItemCopy.countLine(row), "4 of 5 this week")
         XCTAssertEqual(GoalItemCopy.noteLine(row), "D · C · B", "the three latest notes, newest first")
-        XCTAssertEqual(GoalItemCopy.spoken(row), "Outreach, 4 of 5 this week")
+        XCTAssertEqual(GoalItemCopy.spoken(row), "Outreach: 4 of 5 this week")
         XCTAssertNil(GoalItemCopy.noteLine(try PrepDecoding.decode(GoalCommitmentProgress.self, from: Data(#"{"id":"x","unit":"item"}"#.utf8))))
     }
 
@@ -634,11 +682,55 @@ final class GoalsCopyTests: XCTestCase {
         XCTAssertEqual(GoalsCopy.shortTitle("Finish the NYC Marathon, uninjured"), "Finish the NYC Marathon, uninjured")
     }
 
-    func testCheckTitleAndWeekSummary() throws {
+    func testCheckTitleAndCountdown() throws {
         XCTAssertEqual(GoalDetailCopy.checkTitle("Foot today: better, same, or worse?"), "Foot today")
         let home = try PrepDecoding.decode(GoalsHome.self, from: Data(GoalsModelsTests.homeSample.utf8))
-        XCTAssertEqual(GoalHeroCopy.weekSummary(home.goals[0].week.commitments), "Stretch 0/6 · Run 0/1 · 1 skip left")
         XCTAssertEqual(GoalHeroCopy.countdown(home.goals[0]), "22 days · Sun Nov 1")
+    }
+
+    /// Skips are budgeted per commitment, so each row says its own, never a sum across rows.
+    func testPipsShowEachCommitmentsOwnSkipsLeft() throws {
+        let home = try PrepDecoding.decode(GoalsHome.self, from: Data(GoalsModelsTests.homeSample.utf8))
+        let rows = home.goals[0].week.commitments
+        let stretch = GoalPips(rows[0], name: GoalsCopy.shortName(rows[0].action))
+        XCTAssertEqual(stretch.spoken, "Stretch: 0 of 6 days, 1 skip left")
+        XCTAssertEqual(stretch.states, Array(repeating: "missed", count: 6) + ["ahead"], "six to do, then the skip left dashed")
+        XCTAssertEqual(stretch.count, "0 of 6")
+        let run = GoalPips(rows[1], name: GoalsCopy.shortName(rows[1].action))
+        XCTAssertEqual(run.spoken, "Run: 0 of 1 day", "a row with no skip budget says nothing of skips")
+        XCTAssertEqual(run.states, ["missed"])
+    }
+
+    func testPipsFillDoneAndMinThenSpentAndLeftSkips() throws {
+        let row = try PrepDecoding.decode(GoalCommitmentProgress.self, from: Data(
+            #"{"id":"s","action":"Nightly stretch (knees)","target":6,"done":2,"min":1,"skips":2,"skipped":1}"#.utf8))
+        let pips = GoalPips(row, name: "Stretch")
+        XCTAssertEqual(pips.states, ["done", "done", "done", "missed", "missed", "missed", "skip", "ahead"])
+        XCTAssertEqual(pips.spoken, "Stretch: 3 of 6 days, 1 skip left")
+        var spent = row
+        spent.skipped = 2
+        XCTAssertEqual(GoalPips(spent, name: "Stretch").spoken, "Stretch: 3 of 6 days, 0 skips left")
+    }
+
+    func testItemPipsCountPastTheTarget() throws {
+        let row = try PrepDecoding.decode(GoalCommitmentProgress.self, from: Data(
+            #"{"id":"o","action":"Outreach","target":3,"done":4,"unit":"item"}"#.utf8))
+        let pips = GoalPips(row, name: "Outreach")
+        XCTAssertEqual(pips.states, ["done", "done", "done", "done"])
+        XCTAssertEqual(pips.spoken, "Outreach: 4 of 3 this week")
+    }
+
+    func testMissTwiceSaysYesterdayAndShowsEveryFlaggedRow() throws {
+        var goal = try PrepDecoding.decode(GoalsHome.self, from: Data(GoalsModelsTests.homeSample.utf8)).goals[0]
+        goal.flags.missTwice = goal.week.commitments.map(\.id)
+        let rows = GoalDetailCopy.missTwiceRows(goal)
+        XCTAssertEqual(rows.map(\.id), goal.week.commitments.map(\.id), "every flagged commitment, not only the first")
+        XCTAssertEqual(GoalDetailCopy.missTwice(rows[0]), "Missed stretch yesterday. Even the 2-min version counts.")
+        let item = try PrepDecoding.decode(GoalCommitmentProgress.self, from: Data(
+            #"{"id":"o","action":"Outreach","target":5,"unit":"item"}"#.utf8))
+        XCTAssertEqual(GoalDetailCopy.missTwice(item), "Short on outreach two weeks running. One today counts.")
+        XCTAssertEqual(GoalPips.atRiskLabel(rows[0]), "Don't miss twice")
+        XCTAssertEqual(GoalPips.atRiskLabel(item), "Short 2 weeks running")
     }
 
     func testSourceErrorsLine() {
@@ -657,6 +749,5 @@ final class GoalsCopyTests: XCTestCase {
         XCTAssertFalse(GoalDetailCopy.skipDisabled(row, selected: .skip))
         row.skipped = 0
         XCTAssertFalse(GoalDetailCopy.skipDisabled(row, selected: nil))
-        XCTAssertEqual(GoalDetailCopy.countLine(row), "0/0 · 1 skip left")
     }
 }

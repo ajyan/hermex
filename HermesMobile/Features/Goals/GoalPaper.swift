@@ -55,12 +55,13 @@ struct GoalCalendarDay: Equatable, Hashable {
 
 /// Day maths for the week strip and the consistency calendar, on the server's ISO days.
 enum GoalCalendar {
-    private static var calendar: Calendar {
+    /// Built once: the week strip and calendar ask it for every day they draw.
+    private static let calendar: Calendar = {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "UTC")!
         cal.firstWeekday = 2
         return cal
-    }
+    }()
 
     private static let formatter: DateFormatter = {
         let f = DateFormatter()
@@ -80,6 +81,11 @@ enum GoalCalendar {
         return calendar.dateComponents([.day], from: a, to: b).day
     }
     static func iso(_ date: Date) -> String { formatter.string(from: date) }
+
+    /// Monday 0 through Sunday 6 for an ISO day; nil when it doesn't read as one.
+    static func weekdayIndex(_ iso: String) -> Int? {
+        date(iso).map { (calendar.component(.weekday, from: $0) + 5) % 7 }
+    }
 
     private static func monday(of date: Date) -> Date {
         let weekday = calendar.component(.weekday, from: date)  // Sunday = 1
@@ -128,6 +134,20 @@ enum GoalCalendar {
         return rows
     }
 
+    /// The heatmap with this week's days on top, so a check-in still in flight (which patches
+    /// only the week) shows in the calendar too. Days after `today` stay out.
+    static func merged(heatmap: [GoalHeatDay], week: [GoalHeatDay], today: String) -> [GoalHeatDay] {
+        let overlay = Dictionary(week.filter { $0.date <= today }.map { ($0.date, $0.status) },
+                                 uniquingKeysWith: { _, last in last })
+        var seen = Set<String>()
+        var out = heatmap.map { day -> GoalHeatDay in
+            seen.insert(day.date)
+            return overlay[day.date].map { GoalHeatDay(date: day.date, status: $0) } ?? day
+        }
+        out += week.filter { $0.date <= today && !seen.contains($0.date) && overlay[$0.date] != nil }
+        return out.sorted { $0.date < $1.date }
+    }
+
     /// Days shown up (done or 2-min) out of the days so far; today counts only once it's shown.
     static func shownUp(heatmap: [GoalHeatDay], today: String) -> (shown: Int, total: Int) {
         let counted = heatmap.filter { $0.date != today || $0.status.isShown }
@@ -147,5 +167,40 @@ struct GoalTint {
         fill = palette.ink
         on = palette.onInk
         paper = palette.colors
+    }
+}
+
+/// The consistency calendar as drawn: its cells in order with stable ids, and the shown-up
+/// count. Built when a goal's days change, never in a view's body.
+struct GoalCalendarModel: Equatable {
+    struct Slot: Identifiable, Equatable {
+        let id: String
+        let day: GoalCalendarDay?
+    }
+
+    let slots: [Slot]
+    let shown: Int
+    let total: Int
+    /// "12 of 20 days shown up, 9 days to go", for VoiceOver.
+    let summary: String
+
+    static let empty = GoalCalendarModel(slots: [], shown: 0, total: 0, summary: "")
+
+    init(slots: [Slot], shown: Int, total: Int, summary: String) {
+        self.slots = slots
+        self.shown = shown
+        self.total = total
+        self.summary = summary
+    }
+
+    init(heatmap: [GoalHeatDay], today: String, deadline: String?) {
+        let weeks = GoalCalendar.weeks(heatmap: heatmap, today: today, deadline: deadline)
+        slots = weeks.enumerated().flatMap { row, week in
+            week.enumerated().map { column, day in Slot(id: day?.date ?? "blank-\(row)-\(column)", day: day) }
+        }
+        let count = GoalCalendar.shownUp(heatmap: heatmap, today: today)
+        shown = count.shown
+        total = count.total
+        summary = GoalDetailCopy.calendarSummary(weeks)
     }
 }

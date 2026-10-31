@@ -20,6 +20,8 @@ private func goalsKeepsContent<Value>(_ state: BrainLoadState<Value>, after erro
 @Observable
 final class GoalsHomeViewModel {
     private(set) var state: BrainLoadState<GoalsHome> = .loading
+    /// The last reload failed while goals were on screen; they stay, with this said above them.
+    private(set) var refreshFailed = false
     @ObservationIgnored private let client: GoalsDataClient
     @ObservationIgnored private let onAPIError: (Error) -> Void
     @ObservationIgnored private var generation = 0
@@ -43,10 +45,15 @@ final class GoalsHomeViewModel {
             let home = try await client.home()
             guard token == generation, !Task.isCancelled else { return }
             state = .loaded(home)
+            refreshFailed = false
         } catch {
             guard token == generation, !goalsIsCancellation(error) else { return }
             onAPIError(error)
-            if goalsKeepsContent(state, after: error) { return }
+            if goalsKeepsContent(state, after: error) {
+                refreshFailed = true
+                return
+            }
+            refreshFailed = false
             state = goalsFailureState(error)
         }
     }
@@ -67,6 +74,10 @@ final class GoalDetailViewModel {
     /// Rows with a check-in in flight; further taps on them are ignored.
     private(set) var pending: Set<GoalRowKey> = []
     private(set) var error: String?
+    /// The row whose check-in failed, so its section says so; nil for a screen-wide error.
+    private(set) var errorRow: GoalRowKey?
+    /// The consistency calendar for what's on screen, rebuilt only when its days change.
+    private(set) var calendar = GoalCalendarModel.empty
     static let refreshFailed = "Couldn't refresh. Pull to try again."
     static let dayChanged = "The day changed. Check in again."
     static let saveFailed = "Couldn't save. Try again."
@@ -94,6 +105,14 @@ final class GoalDetailViewModel {
     /// Since the last settle: a check-in saved, or one met a day that had moved on.
     @ObservationIgnored private var savedSinceSettle = false
     @ObservationIgnored private var dayChangedSinceSettle = false
+    @ObservationIgnored private var calendarInput: CalendarInput?
+
+    private struct CalendarInput: Equatable {
+        let heatmap: [GoalHeatDay]
+        let week: [GoalHeatDay]
+        let today: String
+        let deadline: String?
+    }
 
     /// `onChange` runs once a check-in, finish or reopen has landed on the server (the widget
     /// refreshes from it).
@@ -114,12 +133,12 @@ final class GoalDetailViewModel {
             let detail = try await client.detail(slug: slug)
             guard token == generation, !Task.isCancelled else { return }
             show(detail)
-            if error == Self.refreshFailed { error = nil }
+            if error == Self.refreshFailed { setError(nil) }
         } catch {
             guard token == generation, !goalsIsCancellation(error) else { return }
             onAPIError(error)
             if goalsKeepsContent(state, after: error) {
-                self.error = Self.refreshFailed
+                setError(Self.refreshFailed)
                 return
             }
             edits = nil
@@ -133,7 +152,7 @@ final class GoalDetailViewModel {
     func finish() async {
         guard case .loaded(let detail) = state, !isFinishing, finished == nil else { return }
         isFinishing = true
-        error = nil
+        setError(nil)
         defer { isFinishing = false }
         do {
             finished = try await client.finish(GoalFinishRequest(slug: slug, asOf: detail.today))
@@ -147,11 +166,11 @@ final class GoalDetailViewModel {
             }
             if case .http(409, _)? = error as? APIError {
                 await load()
-                self.error = "The day changed. Try again."
+                setError("The day changed. Try again.")
                 return
             }
             onAPIError(error)
-            self.error = "Couldn't finish this goal. Try again."
+            setError("Couldn't finish this goal. Try again.")
         }
     }
 
@@ -160,7 +179,7 @@ final class GoalDetailViewModel {
     func reopened(_ detail: GoalDetail) {
         finished = nil
         finishDeferred = true
-        error = nil
+        setError(nil)
         show(detail)
     }
 
@@ -207,7 +226,7 @@ final class GoalDetailViewModel {
         let request = makeRequest(date, base.today)
         pendingEdits.add(key) { edit(&$0.summary, date, $0.today, $0.yesterday) }
         edits = pendingEdits
-        error = nil
+        setError(nil)
         publish()
         inFlight += 1
         var saved = false
@@ -226,7 +245,7 @@ final class GoalDetailViewModel {
                 dayChangedSinceSettle = true
             } else {
                 onAPIError(error)
-                self.error = Self.saveFailed
+                setError(Self.saveFailed, row: key)
             }
         }
         publish()
@@ -243,7 +262,7 @@ final class GoalDetailViewModel {
         guard saved || dayChanged, !Task.isCancelled else { return }
         if saved { onChange() }
         await load()
-        if dayChanged { error = Self.dayChanged }
+        if dayChanged { setError(Self.dayChanged) }
     }
 
     /// Takes a detail from the server, keeping any taps still in flight on top of it.
@@ -254,9 +273,23 @@ final class GoalDetailViewModel {
 
     private func publish() {
         guard let edits else { return }
-        state = .loaded(edits.shown)
+        let shown = edits.shown
+        state = .loaded(shown)
         let keys = edits.keys
         if pending != keys { pending = keys }
+        let input = CalendarInput(heatmap: shown.heatmap, week: shown.summary.week.days, today: shown.today,
+                                  deadline: shown.summary.deadline)
+        if input != calendarInput {
+            calendarInput = input
+            calendar = GoalCalendarModel(
+                heatmap: GoalCalendar.merged(heatmap: input.heatmap, week: input.week, today: input.today),
+                today: input.today, deadline: input.deadline)
+        }
+    }
+
+    private func setError(_ message: String?, row: GoalRowKey? = nil) {
+        error = message
+        errorRow = message == nil ? nil : row
     }
 }
 

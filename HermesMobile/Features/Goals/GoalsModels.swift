@@ -388,6 +388,11 @@ struct GoalHeatDay: Decodable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey { case date, status }
 
+    init(date: String, status: GoalStatus) {
+        self.date = date
+        self.status = status
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         date = c.string(.date)

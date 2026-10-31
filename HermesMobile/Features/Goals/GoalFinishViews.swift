@@ -296,21 +296,30 @@ enum GoalFinishCopy {
         return m >= 60 ? "\(m / 60) h \(m % 60) m" : "\(m) min"
     }
 
-    static func shortDate(_ iso: String) -> String { format(iso, "MMM d") }
-    static func longDate(_ iso: String) -> String { format(iso, "EEEE, MMM d") }
+    static func shortDate(_ iso: String) -> String { format(iso, shortFormatter) }
+    static func longDate(_ iso: String) -> String { format(iso, longFormatter) }
 
     /// "2026-04" → "Apr".
-    static func month(_ yyyyMM: String) -> String { format("\(yyyyMM)-01", "MMM") }
+    static func month(_ yyyyMM: String) -> String { format("\(yyyyMM)-01", monthFormatter) }
 
     /// "Oct 10 – Nov 1".
     static func range(_ r: GoalRecord) -> String { "\(shortDate(r.started)) – \(shortDate(r.finished))" }
 
-    private static func format(_ iso: String, _ pattern: String) -> String {
-        guard let date = GoalCalendar.date(iso) else { return iso }
+    // Built once each: the record and the Finished shelf format a date per row.
+    private static let shortFormatter = formatter("MMM d")
+    private static let longFormatter = formatter("EEEE, MMM d")
+    private static let monthFormatter = formatter("MMM")
+
+    private static func formatter(_ pattern: String) -> DateFormatter {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.timeZone = TimeZone(identifier: "UTC")
         f.dateFormat = pattern
-        return f.string(from: date)
+        return f
+    }
+
+    private static func format(_ iso: String, _ formatter: DateFormatter) -> String {
+        guard let date = GoalCalendar.date(iso) else { return iso }
+        return formatter.string(from: date)
     }
 }

@@ -71,16 +71,26 @@ struct GoalRecordContent: View {
         }
     }
 
-    /// Reopen, after a confirmation that names what it undoes.
+    /// Reopen, a quiet destructive row at the foot (after a confirmation that names what it undoes).
     private func reopenSection(_ r: GoalRecord) -> some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
-            Button(role: .destructive) { confirmingReopen = true } label: {
-                if viewModel.isReopening { ProgressView() } else { Text(verbatim: "Reopen goal") }
+            SectionCard {
+                Button(role: .destructive) { confirmingReopen = true } label: {
+                    HStack(spacing: BrainStyle.m) {
+                        Label { Text(verbatim: "Reopen goal") } icon: { Image(systemName: "arrow.uturn.backward") }
+                            .font(BrainStyle.rowTitle)
+                            .foregroundStyle(Color.hxDanger)
+                        Spacer(minLength: 0)
+                        if viewModel.isReopening { ProgressView().controlSize(.small) }
+                    }
+                    .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(viewModel.isReopening)
             }
-            .buttonStyle(ChatDecisionButtonStyle(emphasis: .destructive))
-            .disabled(viewModel.isReopening)
             if let error = viewModel.reopenError {
-                Text(verbatim: error).font(BrainStyle.meta).foregroundStyle(Color.hxWarning)
+                Text(verbatim: error).font(BrainStyle.meta).foregroundStyle(Color.hxDanger)
             }
         }
         .confirmationDialog(Text(verbatim: "Reopen \(GoalsCopy.shortTitle(r.title))?"), isPresented: $confirmingReopen,
@@ -117,7 +127,7 @@ struct GoalRecordContent: View {
             SectionCard {
                 VStack(alignment: .leading, spacing: BrainStyle.m) {
                     GoalCalendarGrid(
-                        weeks: GoalCalendar.weeks(heatmap: r.heatmap, today: r.finished, deadline: r.finished),
+                        calendar: GoalCalendarModel(heatmap: r.heatmap, today: r.finished, deadline: r.finished),
                         tint: tint
                     )
                     Text(verbatim: GoalRecordCopy.daysLine(r)).brainText(.meta)
