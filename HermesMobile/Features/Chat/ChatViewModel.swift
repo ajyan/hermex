@@ -7274,16 +7274,27 @@ extension ChatViewModel: VoiceCallChatDriving {
             VoiceCallDiagnostics.write("send: stopping the earlier run first")
             _ = await cancelActiveStream()
         }
-        let sent = await performChatSend(
-            sessionID: sessionID,
-            localMessageID: "local-\(UUID().uuidString)",
-            displayContent: message,
-            messageForAPI: message,
-            messageAttachments: [],
-            apiPayloads: nil,
-            attachmentsToRestoreOnFailure: [],
-            modelContext: nil
-        )
+        func send() async -> Bool {
+            await performChatSend(
+                sessionID: sessionID,
+                localMessageID: "local-\(UUID().uuidString)",
+                displayContent: message,
+                messageForAPI: message,
+                messageAttachments: [],
+                apiPayloads: nil,
+                attachmentsToRestoreOnFailure: [],
+                modelContext: nil
+            )
+        }
+        var sent = await send()
+        // The server can still be running a turn this phone never saw start (a call that
+        // hung up mid-reply). It keeps that run, refuses this turn without an error, and
+        // the stream reattaches to the old run. A spoken turn replaces it instead.
+        if !sent, sendErrorMessage == nil, activeStreamID != nil {
+            VoiceCallDiagnostics.write("send: the server kept an earlier run; stopping it and sending again")
+            _ = await cancelActiveStream()
+            sent = await send()
+        }
         if !sent {
             VoiceCallDiagnostics.write(
                 "send failed: \(sendErrorMessage ?? "no message") workspace=\(currentWorkspace ?? "nil") "
