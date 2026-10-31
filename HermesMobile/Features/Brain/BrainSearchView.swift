@@ -138,19 +138,16 @@ struct BrainSearchResults: View {
 }
 
 /// One reference row (search hits, the reader's Linked from and Further reading): a
-/// monogram for people, a small cover for everything else, the title, and a subtitle
+/// monogram for people, the kind's icon tile for everything else, the title, and a subtitle
 /// (the matching snippet unless the caller passes another).
 struct BrainSearchResultRow: View {
     let ref: BrainRef
     private let subtitle: String?
-    /// Built once per row, never in `body`.
-    private let cover: BrainCoverSpec?
     @ScaledMetric(relativeTo: .body) private var side = BrainStyle.searchThumbnailSize
 
     init(ref: BrainRef, subtitle: String? = nil) {
         self.ref = ref
         self.subtitle = subtitle ?? ref.snippet
-        self.cover = ref.module == .people ? nil : BrainCoverSpec.make(ref: ref)
     }
 
     var body: some View {
@@ -163,13 +160,10 @@ struct BrainSearchResultRow: View {
 
     @ViewBuilder
     private var leading: some View {
-        if let cover {
-            BrainCoverView(spec: cover)
-                .frame(width: side, height: side)
-                .clipShape(RoundedRectangle(cornerRadius: BrainStyle.thumbnailCorner, style: .continuous))
-                .drawingGroup()
-        } else {
+        if ref.module == .people {
             BrainMonogram(name: ref.title, size: side)
+        } else {
+            BrainModuleIcon(systemName: ref.module.symbolName, paper: ref.module.paper)
         }
     }
 }

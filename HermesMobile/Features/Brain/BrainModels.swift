@@ -108,14 +108,16 @@ struct BrainItem: Codable, Identifiable, Hashable, Sendable {
     let badge: String
     /// People only: the front matter's `relationship_type` (lowercased), for the list's filter.
     let relationshipType: String?
+    /// Wiki only: which date `date` is, "updated" or "added"; empty when the server doesn't say.
+    let dateLabel: String
 
     private enum CodingKeys: String, CodingKey {
-        case module, id, title, subtitle, date, tags, preview, kind, badge, relationshipType
+        case module, id, title, subtitle, date, tags, preview, kind, badge, relationshipType, dateLabel
     }
 
     init(module: BrainModuleID, id: String, title: String = "", subtitle: String = "", date: String = "",
          tags: [String] = [], preview: String = "", kind: String = "", badge: String = "",
-         relationshipType: String? = nil) {
+         relationshipType: String? = nil, dateLabel: String = "") {
         self.module = module
         self.id = id
         self.title = title
@@ -126,6 +128,7 @@ struct BrainItem: Codable, Identifiable, Hashable, Sendable {
         self.kind = kind
         self.badge = badge
         self.relationshipType = relationshipType
+        self.dateLabel = dateLabel
     }
 
     init(from decoder: Decoder) throws {
@@ -140,6 +143,7 @@ struct BrainItem: Codable, Identifiable, Hashable, Sendable {
         kind = c.string(.kind)
         badge = c.string(.badge)
         relationshipType = c.optional(String.self, .relationshipType)
+        dateLabel = c.string(.dateLabel)
     }
 }
 
