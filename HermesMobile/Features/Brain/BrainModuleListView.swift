@@ -671,14 +671,21 @@ struct BrainTagChipBar: View {
     @Binding var selected: String?
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: BrainStyle.s) {
-                chip(title: "All", tag: nil)
-                ForEach(tags, id: \.self) { tag in
-                    chip(title: tag, tag: tag)
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: BrainStyle.s) {
+                    chip(title: "All", tag: nil)
+                    ForEach(tags, id: \.self) { tag in
+                        chip(title: tag, tag: tag)
+                            .id(tag)
+                    }
                 }
+                .padding(.horizontal, BrainStyle.l)
             }
-            .padding(.horizontal, BrainStyle.l)
+            // A list opened on a tag (a page's #tag) may have it past the edge: bring it in view.
+            .onAppear {
+                if let selected { proxy.scrollTo(selected, anchor: .center) }
+            }
         }
     }
 
