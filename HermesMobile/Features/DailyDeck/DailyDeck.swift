@@ -69,6 +69,9 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         case cover, lastIntention, value, intention, keepsakes
         /// The Sunday review's training card: Baki's read of the week's lifting and his proposals.
         case training
+        /// The monthly review's own cards (`MonthlyReview*.swift`): the cover, the weeks arc, the month
+        /// in dots, an insight, the month's sleep, and a reflection question with what led to it.
+        case monthCover, monthWeeks, monthDots, monthInsight, monthSleep, monthQuestion
         case unknown(String)
 
         init(_ raw: String) {
@@ -93,6 +96,12 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case "value": self = .value
             case "intention": self = .intention
             case "training": self = .training
+            case "month_cover": self = .monthCover
+            case "month_weeks": self = .monthWeeks
+            case "month_dots": self = .monthDots
+            case "month_insight": self = .monthInsight
+            case "month_sleep": self = .monthSleep
+            case "month_question": self = .monthQuestion
             default: self = .unknown(raw)
             }
         }
@@ -210,6 +219,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     let frontReason: String?
     /// The Sunday meals card's week of candidates, accepted live through /api/meals/accept.
     let meals: DeckMealsPlan?
+    /// A monthly review card's month: the cover's totals, the weeks, the dots, an insight's stat (`DeckMonth`).
+    let month: DeckMonth?
 
     /// The vault file the card came from (`ref.link`, "wiki/nyc-marathon"); nil for pooled
     /// material with no page of its own (books, quotes, videos).
@@ -348,6 +359,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         case .prompt, .reflect, .item, .unknown: true
         case .headline, .decision, .sleep, .goal, .changes, .ask, .dinner, .meals, .section, .close, .front: false
         case .cover, .lastIntention, .value, .intention, .keepsakes, .training: false
+        case .monthCover, .monthWeeks, .monthDots, .monthInsight, .monthSleep, .monthQuestion: false
         }
     }
 
@@ -359,7 +371,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         case piece, learned, variant, date, options, returns, meals, front, fronts, frontReason, weekRows, yesterdayOne
         case todayAction = "today"
         case moments, spares, ended, text, ifThen, name, fact, changes, intention
-        case act, todayOne, gist, quotes, parts, weekQuestion, thread, dateLabel
+        case act, todayOne, gist, quotes, parts, weekQuestion, thread, dateLabel, month
         case valueID = "value"
         case itemKind = "kind"
     }
@@ -451,6 +463,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         options = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .options)) ?? []).compactMap(\.value)
         returns = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .returns)) ?? []).compactMap(\.value)
         meals = (try? c.decodeIfPresent(DeckMealsPlan.self, forKey: .meals)).flatMap { $0.slots.isEmpty ? nil : $0 }
+        month = try? c.decodeIfPresent(DeckMonth.self, forKey: .month)
         front = (try? c.decodeIfPresent(String.self, forKey: .front)).flatMap { $0.isEmpty ? nil : $0 }
         fronts = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .fronts)) ?? []).compactMap(\.value)
         frontReason = (try? c.decodeIfPresent(String.self, forKey: .frontReason)).flatMap { $0.isEmpty ? nil : $0 }
@@ -1387,9 +1400,15 @@ struct DeckCardText: Equatable {
             // The question leads; the numbers show after the rating so they don't decide it.
             lead = card.question
             leadIsQuestion = true
-        case .cover, .keepsakes:
+        case .cover, .keepsakes, .monthCover, .monthWeeks, .monthDots:
             // Each is drawn by its own view; the cover leads with its title.
             lead = card.title
+        case .monthInsight, .monthSleep:
+            lead = card.title
+            detail = card.body
+        case .monthQuestion:
+            lead = card.question
+            leadIsQuestion = true
         case .lastIntention:
             lead = card.text
             detail = card.fact?.line

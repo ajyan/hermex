@@ -109,6 +109,8 @@ extension DeckCard {
     /// The card's chapter as it shows in place of the reason line: "1 · Remember". Nil on the
     /// cover, the close, and any card off the weekly deck.
     var chapterLabel: String? {
+        // A monthly card shows no chapter line: the header's "3 of 14" already says where he is.
+        if month != nil { return nil }
         guard let chapter, !chapter.isEmpty else { return nil }
         let name = chapter.prefix(1).uppercased() + chapter.dropFirst()
         guard let index = Self.weeklyChapters.firstIndex(of: chapter) else { return name }

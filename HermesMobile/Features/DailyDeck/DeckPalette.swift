@@ -111,7 +111,26 @@ struct DeckPalette: Equatable {
         return of(page)
     }
 
+    /// A monthly review card (any card carrying a `month`): the paper of the kind it's about (an
+    /// insight's, a value's) or the review's dusk, with a mark for what the card is.
+    static func month(_ card: DeckCard) -> DeckPalette {
+        let (symbol, name): (String, String) = switch card.type {
+        case .monthCover: ("moon.stars", "Your month")
+        case .monthWeeks: ("calendar", "Your weeks")
+        case .monthDots: ("circle.grid.3x3", "Month in dots")
+        case .monthInsight: (card.month?.symbol ?? "sparkles", "Insight")
+        case .monthSleep: ("moon.zzz", "Sleep this month")
+        case .monthQuestion: ("pencil.line", "Reflect")
+        case .value: ("heart.circle", "Value")
+        case .prompt: ("pencil.line", "Reflect")
+        case .close: ("checkmark.seal", "Close")
+        default: ("sunset", "Your month")
+        }
+        return DeckPalette(HermexPaper.named(card.color) ?? .dusk, symbol: symbol, name: name, shortName: "Month")
+    }
+
     static func of(_ card: DeckCard) -> DeckPalette {
+        if card.month != nil { return month(card) }
         switch card.type {
         case .headline: return .opener
         case .section: return .section(front: card.frontName)
@@ -133,6 +152,7 @@ struct DeckPalette: Equatable {
         case .changes: return .changes
         case .cover, .lastIntention, .value, .intention, .keepsakes: return .week
         case .training: return .training
+        case .monthCover, .monthWeeks, .monthDots, .monthInsight, .monthSleep, .monthQuestion: return month(card)
         case .item, .unknown:
             switch card.itemKind {
             case "theme": return .theme
