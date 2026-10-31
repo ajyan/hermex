@@ -56,7 +56,7 @@ struct DeckFrontRowView: View {
     let palette: DeckPalette
     let deckDate: String
 
-    @Environment(GoalCheckInCardViewModel.self) private var model: GoalCheckInCardViewModel?
+    @Environment(GoalsHomeViewModel.self) private var model: GoalsHomeViewModel?
 
     var body: some View {
         let checkIn = DeckRowCheckIn(row: row, ink: palette.ink, deckDate: deckDate, model: model)
@@ -124,18 +124,18 @@ struct DeckRowCheckIn {
 
     let row: DeckFrontRow
     let ink: Color
-    let model: GoalCheckInCardViewModel?
+    let model: GoalsHomeViewModel?
     /// The goal commitment as the server has it now, on today's deck; nil otherwise.
     let live: Live?
 
-    init(row: DeckFrontRow, ink: Color, deckDate: String, model: GoalCheckInCardViewModel?) {
+    init(row: DeckFrontRow, ink: Color, deckDate: String, model: GoalsHomeViewModel?) {
         self.row = row
         self.ink = ink
         self.model = model
         live = Self.live(row: row, deckDate: deckDate, model: model)
     }
 
-    private static func live(row: DeckFrontRow, deckDate: String, model: GoalCheckInCardViewModel?) -> Live? {
+    private static func live(row: DeckFrontRow, deckDate: String, model: GoalsHomeViewModel?) -> Live? {
         guard let model, model.isLive(for: deckDate), case .loaded(let home) = model.state,
               let slug = row.goal, let id = row.commitment,
               let goal = home.goals.first(where: { $0.slug == slug }),
@@ -177,20 +177,9 @@ struct DeckRowCheckIn {
     func dot(_ day: DeckDay) -> some View {
         let shown = state(day)
         if let live, day.date == live.home.yesterday {
-            let key = GoalCheckInCardViewModel.key(live.slug, .commitment(live.row.id))
-            let explicit = live.row.yesterday
-            Menu {
-                ForEach(GoalDetailCopy.statusOptions, id: \.value) { option in
-                    Button(option.label) { checkIn(live, GoalStatus(rawValue: option.value) ?? .done) }
-                }
-                if explicit != nil { Button("Clear", role: .destructive) { checkIn(live, .clear) } }
-            } label: {
-                DeckDot(state: shown, ink: ink)
-                    .contentShape(Rectangle())
-            } primaryAction: {
-                checkIn(live, explicit == nil ? .done : .clear)
-            }
-            .disabled(model?.pending.contains(key) == true)
+            let key = GoalsHomeViewModel.key(live.slug, .commitment(live.row.id))
+            GoalCheckInDot(state: shown, ink: ink, explicit: live.row.yesterday,
+                           isPending: model?.pending.contains(key) == true) { checkIn(live, $0) }
         } else {
             DeckDot(state: shown, ink: ink)
         }
@@ -198,7 +187,7 @@ struct DeckRowCheckIn {
 
     private func checkIn(_ live: Live, _ status: GoalStatus) {
         guard let model else { return }
-        Task { await model.checkIn(slug: live.slug, commitment: live.row.id, status: status) }
+        Task { await model.checkIn(slug: live.slug, commitment: live.row.id, status: status, day: .yesterday) }
     }
 
     /// The row's VoiceOver action for yesterday's check-in.
@@ -231,20 +220,12 @@ struct DeckRowCheckIn {
     @ViewBuilder
     func addButton(column: CGFloat = DeckDots.column) -> some View {
         if let live {
-            let key = GoalCheckInCardViewModel.key(live.slug, .commitment(live.row.id))
-            Button {
+            let key = GoalsHomeViewModel.key(live.slug, .commitment(live.row.id))
+            GoalAddOneButton(ink: ink, column: column, isPending: model?.pending.contains(key) == true,
+                             label: "Add one \(row.label.lowercased())") {
                 guard let model else { return }
                 Task { await model.addItem(slug: live.slug, commitment: live.row.id, note: nil) }
-            } label: {
-                Image(systemName: "plus")
-                    .font(AppFont.caption(weight: .semibold))
-                    .foregroundStyle(ink)
-                    .frame(width: column, height: DeckDots.dot)
-                    .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .disabled(model?.pending.contains(key) == true)
-            .accessibilityLabel(Text(verbatim: "Add one \(row.label.lowercased())"))
         }
     }
 }

@@ -119,7 +119,7 @@ private struct DeckWeekGridRow: View {
     let palette: DeckPalette
     let deckDate: String
 
-    @Environment(GoalCheckInCardViewModel.self) private var model: GoalCheckInCardViewModel?
+    @Environment(GoalsHomeViewModel.self) private var model: GoalsHomeViewModel?
 
     var body: some View {
         let checkIn = DeckRowCheckIn(row: row, ink: palette.ink, deckDate: deckDate, model: model)

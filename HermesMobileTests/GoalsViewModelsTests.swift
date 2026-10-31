@@ -586,6 +586,32 @@ final class GoalsViewModelsTests: XCTestCase {
         XCTAssertTrue(saved)
     }
 
+    func testUndoAndAddNoteUseTheDayTheItemWasCounted() async throws {
+        let client = FakeGoalsClient()
+        let item: [String: Any] = ["unit": "item", "target": 5, "done": 0, "items": []]
+        client.detailResults = [.success(try detail(commitment: 0, item))]
+        client.checkInResults = [.success(try result(done: 1, today: "done"))]
+        var changes = 0
+        let vm = GoalDetailViewModel(slug: "nyc-marathon-2026", client: client, onChange: { changes += 1 })
+        await vm.load()
+        vm.day = .yesterday
+        await vm.addItem(commitment: "stretch-pm", note: nil)
+        vm.day = .today
+        XCTAssertEqual(vm.recentItems.date(for: .commitment("stretch-pm")), "2026-10-12")
+        await vm.undoItem(commitment: "stretch-pm")
+        let noted = await vm.noteItem(commitment: "stretch-pm", date: "2026-10-12", note: "Acme")
+        XCTAssertEqual(noted, .saved)
+        XCTAssertEqual(client.checkIns, [
+            .item(slug: "nyc-marathon-2026", date: "2026-10-12", asOf: "2026-10-13", id: "stretch-pm", n: 1, note: nil),
+            .item(slug: "nyc-marathon-2026", date: "2026-10-12", asOf: "2026-10-13", id: "stretch-pm", n: -1, note: nil),
+            .item(slug: "nyc-marathon-2026", date: "2026-10-12", asOf: "2026-10-13", id: "stretch-pm", n: -1, note: nil),
+            .item(slug: "nyc-marathon-2026", date: "2026-10-12", asOf: "2026-10-13", id: "stretch-pm", n: 1, note: "Acme"),
+        ])
+        XCTAssertEqual(client.log.filter { $0.hasPrefix("detail") }.count, 4,
+                       "one load, then one reload per +1 and Undo, and one for both halves of Add note")
+        XCTAssertEqual(changes, 3)
+    }
+
     func testSavedTapsRefreshTheWidgetOnceTheLastLands() async throws {
         let client = FakeGoalsClient()
         let (started, startedCont) = AsyncStream<String>.makeStream()

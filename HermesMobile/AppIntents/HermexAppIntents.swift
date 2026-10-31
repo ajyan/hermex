@@ -152,5 +152,14 @@ struct HermexShortcuts: AppShortcutsProvider {
             shortTitle: "New Chat in Profile",
             systemImageName: "person.crop.circle.badge.plus"
         )
+        AppShortcut(
+            intent: CheckInGoalIntent(),
+            phrases: [
+                "Check in a \(.applicationName) goal",
+                "Check in \(\.$commitment) in \(.applicationName)"
+            ],
+            shortTitle: "Check In a Goal",
+            systemImageName: "checkmark.circle"
+        )
     }
 }

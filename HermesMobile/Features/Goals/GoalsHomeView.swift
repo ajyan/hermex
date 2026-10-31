@@ -1,18 +1,24 @@
 import SwiftUI
 
 /// Goals' landing screen: the show-up streak, active personal goals with this week's
-/// progress, and the goals Atlas works on. Pushed from the drawer as `.goals`.
-/// New goal opens a chat drafted to start Atlas's goal interview (`onNewGoal`).
+/// progress, and the goals Atlas works on. Pushed from the drawer as `.goals`. Each goal's
+/// card opens it (`onOpen`), and its dots check in today (and yesterday while it waits) with
+/// a tap. New goal opens a chat drafted to start Atlas's goal interview (`onNewGoal`).
 struct GoalsHomeView: View {
     @State private var viewModel: GoalsHomeViewModel
     private let server: URL
     private let onNewGoal: () -> Void
+    private let onOpen: (ShellPushDestination) -> Void
+    @Environment(\.colorScheme) private var colorScheme
 
-    init(server: URL, onAPIError: @escaping (Error) -> Void, onNewGoal: @escaping () -> Void) {
+    init(server: URL, onAPIError: @escaping (Error) -> Void, onNewGoal: @escaping () -> Void,
+         onOpen: @escaping (ShellPushDestination) -> Void) {
         self.server = server
         self.onNewGoal = onNewGoal
+        self.onOpen = onOpen
         _viewModel = State(initialValue: GoalsHomeViewModel(
-            client: APIClientGoalsAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
+            client: APIClientGoalsAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError,
+            onChange: { GoalsWidgetSync.update(server: server, home: $0) }))
     }
 
     var body: some View {
@@ -60,6 +66,11 @@ struct GoalsHomeView: View {
                             .font(BrainStyle.meta)
                             .foregroundStyle(Color.hxDanger)
                     }
+                    if let error = viewModel.error {
+                        Text(verbatim: error)
+                            .font(BrainStyle.meta)
+                            .foregroundStyle(Color.hxDanger)
+                    }
                     if home.goals.isEmpty && home.errors.isEmpty {
                         emptyState
                     } else {
@@ -102,25 +113,7 @@ struct GoalsHomeView: View {
     private func activeSection(_ home: GoalsHome) -> some View {
         VStack(alignment: .leading, spacing: BrainStyle.m) {
             ForEach(home.goals) { goal in
-                NavigationLink(value: ShellPushDestination.goal(goal.slug)) {
-                    VStack(alignment: .leading, spacing: BrainStyle.s) {
-                        GoalHeroCard(goal: goal, isCompact: true, today: home.today)
-                            .zoomSource(for: .goal(goal.slug), cornerRadius: HXRadius.xl)
-                        if goal.finishDue {
-                            Text(verbatim: "Did you finish? Open to close it")
-                                .font(BrainStyle.meta)
-                                .foregroundStyle(GoalPaper.palette(for: goal).ink)
-                                .padding(.horizontal, BrainStyle.xs)
-                        } else if !goal.flags.escalations.isEmpty {
-                            Text(verbatim: "Needs attention: open to check in")
-                                .font(BrainStyle.meta)
-                                .foregroundStyle(GoalPaper.palette(for: goal).ink)
-                                .padding(.horizontal, BrainStyle.xs)
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityHint(Text(verbatim: "Opens the goal"))
+                goalRow(goal, home: home)
             }
             if !home.errors.isEmpty {
                 SectionCard {
@@ -131,6 +124,55 @@ struct GoalsHomeView: View {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /// A goal's card, which opens the goal, then Add note · Undo after a + on it, outside the card so
+    /// those taps never open it.
+    private func goalRow(_ goal: GoalSummary, home: GoalsHome) -> some View {
+        let checkIn = GoalHeroCheckIn(slug: goal.slug, home: home, model: viewModel)
+        let palette = GoalPaper.palette(for: goal)
+        let open = { onOpen(.goal(goal.slug)) }
+        return VStack(alignment: .leading, spacing: BrainStyle.s) {
+            // Not a NavigationLink: its label would swallow the dots' taps and hide them from
+            // VoiceOver. The card opens on a tap anywhere else; VoiceOver reads it as one button
+            // whose actions are the check-ins.
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                GoalHeroCard(goal: goal, isCompact: true, today: home.today, checkIn: checkIn)
+                    .zoomSource(for: .goal(goal.slug), cornerRadius: HXRadius.xl)
+                if goal.finishDue {
+                    Text(verbatim: "Did you finish? Open to close it")
+                        .font(BrainStyle.meta)
+                        .foregroundStyle(palette.ink)
+                        .padding(.horizontal, BrainStyle.xs)
+                } else if !goal.flags.escalations.isEmpty {
+                    Text(verbatim: "Needs attention: open to check in")
+                        .font(BrainStyle.meta)
+                        .foregroundStyle(palette.ink)
+                        .padding(.horizontal, BrainStyle.xs)
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture(perform: open)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint(Text(verbatim: "Opens the goal"))
+            .accessibilityAction(.default, open)
+            .accessibilityActions {
+                ForEach(checkIn.actions(for: goal)) { action in
+                    Button(action.label, action: action.run)
+                }
+            }
+            ForEach(goal.week.commitments.filter(\.isItem)) { row in
+                GoalItemFollowUp(
+                    label: "\(GoalsCopy.shortName(row.action)) counted",
+                    tint: GoalTint(palette, scheme: colorScheme),
+                    isPending: viewModel.isPending(goal.slug, .commitment(row.id)),
+                    recentDate: viewModel.recentItemDate(slug: goal.slug, commitment: row.id),
+                    actions: viewModel.itemActions(slug: goal.slug, commitment: row.id)
+                )
+                .padding(.horizontal, BrainStyle.xs)
             }
         }
     }

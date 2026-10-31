@@ -73,6 +73,7 @@ enum GoalsWidgetSync {
             guard activeServerID() == server.absoluteString else { return }
             save(home, server: server, store: store)
             lastRefresh = (server, Date())
+            refreshAppShortcutsOnce()
         } catch {
             // Only an answer counts toward the throttle, so a refresh made before sign-in
             // settles is retried on the next trigger.
@@ -81,6 +82,16 @@ enum GoalsWidgetSync {
                 lastRefresh = (server, Date())
             }
         }
+    }
+
+    private static var didRefreshAppShortcuts = false
+
+    /// Once a launch, after goals load: lets Siri index "Check in <commitment> in Hermex" with
+    /// the server's commitments (`GoalCommitmentQuery.suggestedEntities`).
+    private static func refreshAppShortcutsOnce() {
+        guard !didRefreshAppShortcuts else { return }
+        didRefreshAppShortcuts = true
+        HermexShortcuts.updateAppShortcutParameters()
     }
 
     /// `refresh(server:force: true)` without waiting: after a check-in, finish or reopen in the app.
@@ -164,7 +175,8 @@ enum GoalsWidgetSync {
 
     /// A Goals client for `server` that reads its custom headers from the Keychain, so
     /// it works in a background launch before any screen has hydrated the shared store.
-    nonisolated private static func client(for server: URL) -> GoalsDataClient {
+    /// Also used by the Check In a Goal intent.
+    nonisolated static func client(for server: URL) -> GoalsDataClient {
         let headers = ProfileEntityProvider.customHeaders(for: server)
         return APIClientGoalsAdapter(apiClient: APIClient(baseURL: server, customHeaderProvider: { headers }))
     }
