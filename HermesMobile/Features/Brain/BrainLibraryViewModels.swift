@@ -381,6 +381,14 @@ final class BrainPageViewModel {
         BrainPageViewModel(module: module, id: id, hub: hub, client: client, cache: cache, onAPIError: onAPIError)
     }
 
+    /// The pager's next or previous page, loaded; nil when it couldn't load (offline with no
+    /// saved copy, or gone), so the reader keeps the page it is on instead of an error screen.
+    func loadedSibling(module: BrainModuleID, id: String, hub: String) async -> BrainPageViewModel? {
+        let next = sibling(module: module, id: id, hub: hub)
+        await next.load()
+        return next.page == nil ? nil : next
+    }
+
     /// Bumped by every `load()`, so an older failure never overwrites a newer success.
     private var generation = 0
 

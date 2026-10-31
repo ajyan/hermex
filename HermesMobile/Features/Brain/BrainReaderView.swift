@@ -91,6 +91,8 @@ struct BrainReaderView: View {
     /// The page the pager is loading; it replaces `viewModel` once it lands.
     @State private var stepTask: Task<Void, Never>?
     @State private var stepEdge: Edge = .trailing
+    /// Bumped when the pager's next page couldn't load; plays an error haptic.
+    @State private var failedSteps = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Good/not-good on the page; shown only where the server has labels.
     @State private var labels: LabelsViewModel
@@ -144,6 +146,7 @@ struct BrainReaderView: View {
                 guard labelsAvailable, !labels.isLoaded(feature: key.feature, item: key.item) else { return }
                 try? await labels.load(feature: key.feature, item: key.item)
             }
+            .sensoryFeedback(.error, trigger: failedSteps)
             .onDisappear { stepTask?.cancel() }
     }
 
@@ -156,11 +159,12 @@ struct BrainReaderView: View {
         guard let hub = viewModel.page?.hub,
               let target = direction < 0 ? hub.prev : hub.next
         else { return }
-        let next = viewModel.sibling(module: target.module, id: target.id, hub: hub.ref.id)
+        let current = viewModel
         stepTask?.cancel()
         stepTask = Task {
-            await next.load()
+            let next = await current.loadedSibling(module: target.module, id: target.id, hub: hub.ref.id)
             guard !Task.isCancelled else { return }
+            guard let next else { failedSteps += 1; return }
             stepEdge = direction < 0 ? .leading : .trailing
             withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) { viewModel = next }
         }

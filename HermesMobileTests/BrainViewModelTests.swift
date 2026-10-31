@@ -83,6 +83,29 @@ final class BrainViewModelTests: XCTestCase {
         XCTAssertEqual(try BrainCache.load(BrainPage.self, server: cache.server, kind: "page", id: "p1", in: try XCTUnwrap(cache.context)), samplePage)
     }
 
+    func testLoadedSiblingIsNilWhenTheNextPageFails() async throws {
+        let client = FakeBrainClient()
+        client.pageResult = .success(samplePage)
+        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: try makeCache(), onAPIError: { _ in })
+        await viewModel.load()
+        client.pageResult = .failure(URLError(.notConnectedToInternet))
+        let next = await viewModel.loadedSibling(module: .wiki, id: "p2", hub: "hub")
+        XCTAssertNil(next)
+        XCTAssertEqual(viewModel.page, samplePage)
+    }
+
+    func testLoadedSiblingFallsBackToItsSavedCopy() async throws {
+        let cache = try makeCache()
+        let saved = BrainPage(item: BrainItem(module: .wiki, id: "p2", title: "Page Two"), content: "Saved")
+        try BrainCache.store(saved, server: cache.server, kind: "page", id: "p2", in: try XCTUnwrap(cache.context))
+        let client = FakeBrainClient()
+        client.pageResult = .failure(URLError(.notConnectedToInternet))
+        let viewModel = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: cache, onAPIError: { _ in })
+        let next = await viewModel.loadedSibling(module: .wiki, id: "p2", hub: "hub")
+        XCTAssertEqual(next?.page, saved)
+        XCTAssertEqual(next?.hub, "hub")
+    }
+
     func testPage404SetsMissing() async {
         let client = FakeBrainClient()
         client.pageResult = .failure(APIError.http(statusCode: 404, body: nil))
