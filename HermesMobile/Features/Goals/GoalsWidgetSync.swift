@@ -95,8 +95,7 @@ enum GoalsWidgetSync {
     /// A Goals client for `server` that reads its custom headers from the Keychain, so
     /// it works in a background launch before any screen has hydrated the shared store.
     nonisolated private static func client(for server: URL) -> GoalsDataClient {
-        let stored = try? KeychainStore().load(.customHeaders, scope: server.absoluteString)
-        let headers = [CustomHeader].decodeFromStorage(stored)
+        let headers = ProfileEntityProvider.customHeaders(for: server)
         return APIClientGoalsAdapter(apiClient: APIClient(baseURL: server, customHeaderProvider: { headers }))
     }
 }

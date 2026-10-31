@@ -168,8 +168,7 @@ enum GoalsCopy {
 
     /// "today", "tomorrow", "in 6 days", "yesterday", "3 days ago", from ISO days.
     static func relativeDay(_ day: String, today: String) -> String {
-        guard let a = isoDay(day), let b = isoDay(today) else { return day }
-        let n = Calendar(identifier: .gregorian).dateComponents([.day], from: b, to: a).day ?? 0
+        guard let n = GoalCalendar.days(from: today, to: day) else { return day }
         switch n {
         case 0: return "today"
         case 1: return "tomorrow"
@@ -177,14 +176,5 @@ enum GoalsCopy {
         case let n where n > 1: return "in \(n) days"
         default: return "\(-n) days ago"
         }
-    }
-
-    static func isoDay(_ s: String) -> Date? {
-        let f = DateFormatter()
-        f.calendar = Calendar(identifier: .gregorian)
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = TimeZone(identifier: "UTC")
-        f.dateFormat = "yyyy-MM-dd"
-        return f.date(from: String(s.prefix(10)))
     }
 }

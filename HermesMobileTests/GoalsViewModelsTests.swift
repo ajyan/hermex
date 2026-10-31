@@ -458,6 +458,16 @@ final class GoalsCopyTests: XCTestCase {
         XCTAssertEqual(GoalsCopy.relativeDay("2026-10-08", today: "2026-10-10"), "2 days ago")
     }
 
+    /// US daylight saving ends on Nov 1 2026: a local calendar counts the 25-hour day short.
+    func testRelativeDayAcrossDaylightSavingEnd() {
+        let saved = NSTimeZone.default
+        NSTimeZone.default = TimeZone(identifier: "America/New_York")!
+        defer { NSTimeZone.default = saved }
+        XCTAssertEqual(GoalsCopy.relativeDay("2026-11-02", today: "2026-10-31"), "in 2 days")
+        XCTAssertEqual(GoalsCopy.relativeDay("2026-11-01", today: "2026-10-31"), "tomorrow")
+        XCTAssertEqual(GoalsCopy.relativeDay("2026-10-31", today: "2026-11-02"), "2 days ago")
+    }
+
     func testShortTitleDropsParenthetical() {
         XCTAssertEqual(GoalsCopy.shortTitle("Nightly stretch (knee hugs, figure-4 twists, open books)"), "Nightly stretch")
         XCTAssertEqual(GoalsCopy.shortTitle("Finish the NYC Marathon, uninjured"), "Finish the NYC Marathon, uninjured")

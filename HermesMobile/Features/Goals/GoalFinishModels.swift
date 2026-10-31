@@ -5,13 +5,6 @@ import Foundation
 // `POST /api/goals/reflection`, and the `finished` list on `GET /api/goals`. The record is
 // computed once when the goal closes. Every field decodes tolerantly; decode with `PrepDecoding`.
 
-private struct FinishLossy<Value: Decodable>: Decodable {
-    let value: Value?
-    init(from decoder: Decoder) throws {
-        value = try? Value(from: decoder)
-    }
-}
-
 private extension KeyedDecodingContainer {
     func string(_ key: Key) -> String {
         (try? decodeIfPresent(String.self, forKey: key)) ?? ""
@@ -30,7 +23,7 @@ private extension KeyedDecodingContainer {
     }
 
     func lossy<Value: Decodable>(_ type: Value.Type, _ key: Key) -> [Value] {
-        ((try? decodeIfPresent([FinishLossy<Value>].self, forKey: key)) ?? []).compactMap(\.value)
+        ((try? decodeIfPresent([PrepLossy<Value>].self, forKey: key)) ?? []).compactMap(\.value)
     }
 }
 

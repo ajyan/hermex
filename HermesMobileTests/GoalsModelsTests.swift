@@ -128,6 +128,15 @@ final class GoalsModelsTests: XCTestCase {
         XCTAssertEqual(b["n"] as? Int, -1)
     }
 
+    func testCheckHistoryDropsOnlyTheBadParts() throws {
+        var goal = try JSONSerialization.jsonObject(with: Data(Self.detailJSON().utf8)) as! [String: Any]
+        goal["check_history"] = ["foot": [["date": "2026-10-10", "value": "same"], 7], "knee": "broken"]
+        let detail = try PrepDecoding.decode(GoalDetail.self, from: JSONSerialization.data(withJSONObject: goal))
+        XCTAssertEqual(detail.checkHistory["foot"]?.map(\.value), ["same"])
+        XCTAssertNil(detail.checkHistory["knee"])
+        XCTAssertEqual(detail.summary.slug, "nyc-marathon-2026")
+    }
+
     func testMissingFieldsDefault() throws {
         let home = try PrepDecoding.decode(GoalsHome.self, from: Data(#"{"goals":[{"slug":"a"}, 5]}"#.utf8))
         XCTAssertEqual(home.goals.map(\.slug), ["a"])

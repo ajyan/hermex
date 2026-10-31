@@ -109,8 +109,9 @@ enum ProfileEntityProvider {
 
     /// Loads the server's stored custom headers (scoped key first, then the pre-#16 global
     /// blob) without mutating the Keychain — mirrors `AuthManager.hydrateCustomHeaders`, but
-    /// read-only since this runs in the App Intents process.
-    private static func customHeaders(for server: URL) -> [CustomHeader] {
+    /// read-only since this runs in the App Intents process. Also used by the Goals widget's
+    /// background check-ins.
+    static func customHeaders(for server: URL) -> [CustomHeader] {
         let keychain = KeychainStore()
         let stored: String?
         if let scoped = try? keychain.load(.customHeaders, scope: server.absoluteString) {

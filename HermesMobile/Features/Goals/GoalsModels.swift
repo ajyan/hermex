@@ -5,14 +5,6 @@ import Foundation
 // `POST /api/goals/checkin`. Every field decodes tolerantly, and keys are literal snake_case,
 // so decode with `PrepDecoding`.
 
-/// Decodes an element or yields nil, so one bad element never fails its array.
-private struct GoalsLossy<Value: Decodable>: Decodable {
-    let value: Value?
-    init(from decoder: Decoder) throws {
-        value = try? Value(from: decoder)
-    }
-}
-
 private extension KeyedDecodingContainer {
     func string(_ key: Key) -> String {
         (try? decodeIfPresent(String.self, forKey: key)) ?? ""
@@ -31,7 +23,7 @@ private extension KeyedDecodingContainer {
     }
 
     func lossy<Value: Decodable>(_ type: Value.Type, _ key: Key) -> [Value] {
-        ((try? decodeIfPresent([GoalsLossy<Value>].self, forKey: key)) ?? []).compactMap(\.value)
+        ((try? decodeIfPresent([PrepLossy<Value>].self, forKey: key)) ?? []).compactMap(\.value)
     }
 }
 
@@ -464,7 +456,9 @@ struct GoalDetail: Decodable, Hashable, Sendable {
         milestones = c.lossy(GoalMilestone.self, .milestones)
         consistency = c.optional(GoalConsistency.self, .consistency) ?? GoalConsistency()
         heatmap = c.lossy(GoalHeatDay.self, .heatmap)
-        checkHistory = c.optional([String: [GoalCheckValue]].self, .checkHistory) ?? [:]
+        // One bad day (or one bad check's list) drops alone, never the whole history.
+        checkHistory = (c.optional([String: PrepLossy<[PrepLossy<GoalCheckValue>]>].self, .checkHistory) ?? [:])
+            .compactMapValues { $0.value?.compactMap(\.value) }
         today = c.string(.today)
         yesterday = c.string(.yesterday)
         streak = c.optional(GoalStreak.self, .streak) ?? GoalStreak()

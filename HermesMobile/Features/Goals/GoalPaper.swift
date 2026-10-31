@@ -72,6 +72,13 @@ enum GoalCalendar {
     }()
 
     static func date(_ iso: String) -> Date? { formatter.date(from: String(iso.prefix(10))) }
+
+    /// Whole days from one ISO day to another, counted in UTC like the days themselves, so a
+    /// daylight-saving change between them never shortens the count.
+    static func days(from start: String, to end: String) -> Int? {
+        guard let a = date(start), let b = date(end) else { return nil }
+        return calendar.dateComponents([.day], from: a, to: b).day
+    }
     static func iso(_ date: Date) -> String { formatter.string(from: date) }
 
     private static func monday(of date: Date) -> Date {
