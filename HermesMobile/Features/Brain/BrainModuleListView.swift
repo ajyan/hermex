@@ -461,7 +461,8 @@ struct BrainModuleListView: View {
     /// Pinned above the Wiki list: narrows it to pages whose title or gist match. Return
     /// opens the top match.
     private var wikiSearchField: some View {
-        listSearchField(prompt: "Search the wiki", text: $wikiQuery) {
+        // A selected tag narrows the search too, so the prompt names it.
+        listSearchField(prompt: viewModel.selectedTag.map { "Search #\($0)" } ?? "Search the wiki", text: $wikiQuery) {
             let query = wikiQuery.trimmingCharacters(in: .whitespaces)
             guard let list = viewModel.list, !query.isEmpty else { return }
             if let top = BrainListLayout.wikiMatches(list.items, query: query).first {

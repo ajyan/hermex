@@ -220,6 +220,21 @@ final class BrainVisualsTests: XCTestCase {
         XCTAssertEqual(BrainReaderLayout.metaLine(for: undated, hubPageCount: 5, today: today, calendar: utc), "Hub · 5 pages")
     }
 
+    func testAHubInsideAHubCountsItsOwnPagesInWords() throws {
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = try XCTUnwrap(TimeZone(identifier: "UTC"))
+        let today = try XCTUnwrap(utc.date(from: DateComponents(year: 2026, month: 10, day: 31, hour: 12)))
+        let item = BrainItem(module: .wiki, id: "h", date: "2026-10-24", kind: "concept", dateLabel: "updated")
+        XCTAssertEqual(BrainReaderLayout.metaLine(for: item, hubPageCount: 7, nested: true, today: today, calendar: utc),
+                       "7 pages under this one · updated 7d ago", "never \"Hub · 7\" beside the pager's \"1 of 7\"")
+    }
+
+    func testPagerPlaceLineSaysWhenAStepFailed() {
+        let hub = BrainHubContext(ref: BrainRef(module: .wiki, id: "h"), index: 0, count: 7)
+        XCTAssertEqual(BrainConnectionsLayout.placeLine(hub, failed: false), "1 of 7")
+        XCTAssertEqual(BrainConnectionsLayout.placeLine(hub, failed: true), "Couldn't open it · try again")
+    }
+
     func testWikiMatchesTitleOrGistWordPrefixesWithoutRepeats() {
         let items = [
             BrainItem(module: .wiki, id: "a", title: "Atomic Habits", preview: "Results lag inputs."),
