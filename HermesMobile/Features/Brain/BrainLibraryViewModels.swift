@@ -239,9 +239,11 @@ final class BrainListViewModel {
     /// Bumped by every `load()`, so a superseded load or page never writes back.
     private var generation = 0
 
-    init(module: BrainModuleID, client: any BrainDataClient, cache: BrainCacheHandle,
+    /// `tag` opens the list already filtered to it.
+    init(module: BrainModuleID, tag: String? = nil, client: any BrainDataClient, cache: BrainCacheHandle,
          onAPIError: @escaping (Error) -> Void = { _ in }) {
         self.module = module
+        self.selectedTag = tag
         self.client = client
         self.cache = cache
         self.onAPIError = onAPIError

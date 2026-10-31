@@ -762,6 +762,8 @@ extension BrainModuleID {
 enum BrainRoute: Hashable, Sendable {
     /// One module's browsable list.
     case module(BrainModuleID)
+    /// A module's list opened on one tag (a page's tag tapped in the reader).
+    case moduleTagged(BrainModuleID, tag: String)
     /// One page, by module and item id.
     case page(BrainModuleID, String)
     /// One page opened from its hub's list, so its trail and pager stay in that hub.

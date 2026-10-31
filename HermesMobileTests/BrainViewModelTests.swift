@@ -215,6 +215,14 @@ final class BrainViewModelTests: XCTestCase {
         XCTAssertEqual(client.listCalls.map(\.cursor), [nil, nil])
     }
 
+    func testAListOpenedOnATagLoadsFilteredWithoutAnUnfilteredLoadFirst() async throws {
+        let client = FakeBrainClient()
+        let viewModel = BrainListViewModel(module: .wiki, tag: "habits", client: client, cache: try makeCache())
+        XCTAssertEqual(viewModel.selectedTag, "habits")
+        await viewModel.load()
+        XCTAssertEqual(client.listCalls.map(\.tag), ["habits"])
+    }
+
     func testLoadMoreAppendsUsingCursorAndStopsWhenNil() async {
         let client = FakeBrainClient()
         client.listResults = [
