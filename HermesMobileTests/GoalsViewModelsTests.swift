@@ -712,6 +712,41 @@ final class GoalsCopyTests: XCTestCase {
         XCTAssertEqual(GoalPips(spent, name: "Stretch").spoken, "Stretch: 3 of 6 days, 0 skips left")
     }
 
+    /// A day row from a server that sends `week_days` is the Brief's week as days, Mon–Sun, with
+    /// today and yesterday following the row's own check-ins so a tap shows before the reply.
+    func testDayRowIsTheWeekAsDaysWithLiveTodayAndYesterday() throws {
+        let json = #"""
+        {"id":"s","action":"Nightly stretch","target":6,"done":3,"min":0,"skips":1,"skipped":0,"week_days":[
+          {"date":"2026-10-26","state":"done"},{"date":"2026-10-27","state":"done"},{"date":"2026-10-28","state":"done"},
+          {"date":"2026-10-29","state":"missed"},{"date":"2026-10-30","state":"ask"},{"date":"2026-10-31","state":"today"},
+          {"date":"2026-11-01","state":"ahead"}]}
+        """#
+        var row = try PrepDecoding.decode(GoalCommitmentProgress.self, from: Data(json.utf8))
+        XCTAssertEqual(row.weekDays.count, 7)
+        let pips = GoalPips(row, name: "Stretch", today: "2026-10-31")
+        XCTAssertEqual(pips.states, ["done", "done", "done", "missed", "ask", "today", "ahead"])
+        XCTAssertEqual(pips.count, "3 of 6 · 1 skip")
+        XCTAssertEqual(pips.spoken, "Stretch: 3 of 6 days, 1 skip left")
+        row.yesterday = .skip
+        row.today = .done
+        XCTAssertEqual(GoalPips(row, name: "Stretch", today: "2026-10-31").states,
+                       ["done", "done", "done", "missed", "skip", "done", "ahead"], "an optimistic tap shows at once")
+        row.today = nil
+        XCTAssertEqual(GoalPips(row, name: "Stretch", today: "2026-10-31").states[5], "today", "a cleared tap too")
+        XCTAssertEqual(GoalPips(row, name: "Stretch").states[5], "today", "without today it draws the server's week")
+    }
+
+    func testWidgetDaysFollowTheRowsCheckMark() {
+        var item = AtlasWidgetGoals.Item(slug: "g", commitment: "s", action: "Stretch", weekCount: 3, target: 6,
+                                         isDone: false, days: ["done", "missed", "today", "ahead", "ahead", "ahead", "ahead"],
+                                         todayIndex: 2)
+        XCTAssertEqual(item.liveDays?[2], "today")
+        item.isDone = true
+        XCTAssertEqual(item.liveDays?[2], "done", "a widget tap fills today's dot before the server answers")
+        item.days = nil
+        XCTAssertNil(item.liveDays, "an older snapshot falls back to count pips")
+    }
+
     func testItemPipsCountPastTheTarget() throws {
         let row = try PrepDecoding.decode(GoalCommitmentProgress.self, from: Data(
             #"{"id":"o","action":"Outreach","target":3,"done":4,"unit":"item"}"#.utf8))

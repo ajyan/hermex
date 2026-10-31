@@ -37,7 +37,7 @@ struct DeckFrontRow: Decodable, Equatable, Identifiable {
 
 /// One day of a front row: `done`, `today` (not yet), `ask` (yesterday, not checked in yet), `ahead`, `missed`,
 /// `skip`, or `off` (not due).
-struct DeckDay: Decodable, Equatable {
+struct DeckDay: Decodable, Hashable, Sendable {
     let date: String
     let state: String
 }

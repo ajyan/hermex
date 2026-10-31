@@ -46,6 +46,10 @@ struct AtlasWidgetGoals: AtlasWidgetSnapshot {
         /// The row's source (such as Prep) counts today as done, so clearing a check-in would
         /// leave it done. Nil in snapshots saved before this was recorded.
         var sourceCounted: Bool?
+        /// The row's Mon–Sun as `DeckDot` states, and today's place in it; nil for a row without
+        /// days (and in older snapshots), which shows count pips instead.
+        var days: [String]?
+        var todayIndex: Int?
 
         var id: String { Self.id(slug: slug, commitment: commitment) }
 
@@ -181,5 +185,18 @@ struct GoalWidgetCheckInIntent: LiveActivityIntent {
             if let snapshot = store.load() { store.save(snapshot.failed()) }
         }
         return .result()
+    }
+}
+
+extension AtlasWidgetGoals.Item {
+    /// The row's days with today following its check mark, which a widget tap flips at once.
+    var liveDays: [String]? {
+        guard var days, let todayIndex, days.indices.contains(todayIndex) else { return days }
+        if isDone {
+            days[todayIndex] = "done"
+        } else if days[todayIndex] != "off" {
+            days[todayIndex] = "today"
+        }
+        return days
     }
 }

@@ -120,6 +120,9 @@ struct GoalCommitmentProgress: Decodable, Hashable, Sendable, Identifiable {
     var sourceDays: [String]
     /// The counted items of an item row, oldest first.
     var items: [GoalItem]
+    /// A day row's Mon–Sun as the Brief draws it (`DeckDot` states); empty for an item row, or
+    /// from a server that doesn't send it.
+    var weekDays: [DeckDay]
 
     var isItem: Bool { unit == "item" }
 
@@ -127,6 +130,7 @@ struct GoalCommitmentProgress: Decodable, Hashable, Sendable, Identifiable {
         case id, action, target, skips, cue, minimum, days, done, min, skipped, missed, hit, remaining, today, yesterday
         case unit, source, items
         case dueToday = "due_today", dueYesterday = "due_yesterday", sourceDays = "source_days"
+        case weekDays = "week_days"
     }
 
     /// The status that counts for `date`: the explicit one the row shows for today or yesterday,
@@ -161,6 +165,7 @@ struct GoalCommitmentProgress: Decodable, Hashable, Sendable, Identifiable {
         source = c.optional(String.self, .source)
         sourceDays = c.optional([String].self, .sourceDays) ?? []
         items = c.lossy(GoalItem.self, .items)
+        weekDays = c.lossy(DeckDay.self, .weekDays)
     }
 }
 

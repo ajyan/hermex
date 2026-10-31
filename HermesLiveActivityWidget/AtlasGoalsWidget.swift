@@ -126,7 +126,7 @@ private struct AtlasGoalRow: View {
                 .foregroundStyle(Color.hxTextPrimary)
                 .lineLimit(1)
             Spacer(minLength: 4)
-            AtlasGoalPips(done: item.weekCount, target: item.target)
+            AtlasGoalPips(done: item.weekCount, target: item.target, days: item.liveDays)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(AtlasGoalPips.spoken(done: item.weekCount, target: item.target))
         }
@@ -153,16 +153,18 @@ private struct AtlasGoalRow: View {
 struct AtlasGoalPips: View {
     let done: Int
     let target: Int
+    /// The week as days (`DeckDot` states) when the row has them; else a pip per day of its target.
+    var days: [String]? = nil
 
     /// At most this wide, so the commitment's name keeps its room.
     static let maxWidth: CGFloat = 140
 
     var body: some View {
-        let count = max(target, done)
-        let column = Self.column(count: count)
+        let states = days ?? (0..<max(target, done)).map { $0 < done ? "done" : "missed" }
+        let column = Self.column(count: states.count)
         HStack(spacing: 0) {
-            ForEach(0..<count, id: \.self) { index in
-                DeckDot(state: index < done ? "done" : "missed", ink: Color.hxSuccess, column: column)
+            ForEach(Array(states.enumerated()), id: \.offset) { _, state in
+                DeckDot(state: state, ink: Color.hxSuccess, column: column)
             }
         }
     }
