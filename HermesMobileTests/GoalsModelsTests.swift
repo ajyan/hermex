@@ -166,4 +166,16 @@ final class GoalsAPIClientTests: APIClientTestCase {
             clientID: "tap-1")
         XCTAssertEqual(result.streak.days, 2)
     }
+
+    func testReopenPostsTheSlugAndDecodesTheOpenGoal() async throws {
+        let client = makeClient { request in
+            XCTAssertEqual(request.url?.path, "/api/goals/reopen")
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(try apiTestJSONBody(from: request) as? [String: String], ["slug": "nyc-marathon-2026"])
+            return apiTestJSONResponse(GoalsModelsTests.detailJSON(), for: request)
+        }
+        let detail = try await APIClientGoalsAdapter(apiClient: client).reopen(slug: "nyc-marathon-2026")
+        XCTAssertEqual(detail.summary.slug, "nyc-marathon-2026")
+        XCTAssertEqual(detail.today, "2026-10-13")
+    }
 }

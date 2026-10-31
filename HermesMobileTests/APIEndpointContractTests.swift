@@ -352,6 +352,7 @@ final class ContractReadinessTests: XCTestCase {
             .init(name: "goal check-in", method: "POST", endpoint: .goalCheckIn, path: "/api/goals/checkin"),
             .init(name: "goal week", method: "POST", endpoint: .goalWeek, path: "/api/goals/week"),
             .init(name: "goal finish", method: "POST", endpoint: .goalFinish, path: "/api/goals/finish"),
+            .init(name: "goal reopen", method: "POST", endpoint: .goalReopen, path: "/api/goals/reopen"),
             .init(
                 name: "goal record",
                 method: "GET",

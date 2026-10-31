@@ -208,6 +208,8 @@ enum Endpoint {
     case goalCheckIn
     case goalWeek
     case goalFinish
+    /// Reopens a finished goal; answers like `goalDetail`.
+    case goalReopen
     case goalRecord(slug: String)
     case goalReflection
     /// Today's job-search Ask (`api/vault_jobs.py`): GET today's three roles and lock state, POST an action.
@@ -583,6 +585,8 @@ enum Endpoint {
             return "/api/goals/week"
         case .goalFinish:
             return "/api/goals/finish"
+        case .goalReopen:
+            return "/api/goals/reopen"
         case .goalRecord:
             return "/api/goals/record"
         case .goalReflection:

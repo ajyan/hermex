@@ -656,7 +656,10 @@ struct ChatShellView: View {
             GoalDetailView(slug: slug, server: server, onAPIError: authManager.handleAPIError)
                 .id(slug)
         case .finishedGoal(let slug):
-            GoalRecordView(slug: slug, server: server, onAPIError: authManager.handleAPIError)
+            GoalRecordView(slug: slug, server: server, onAPIError: authManager.handleAPIError) { _ in
+                // The record gives way to the open goal, so Back still leads where it began.
+                navigation.replaceTop(with: .goal(slug))
+            }
                 .id(slug)
         case .finishedGoals:
             GoalsFinishedListView(server: server, onAPIError: authManager.handleAPIError)

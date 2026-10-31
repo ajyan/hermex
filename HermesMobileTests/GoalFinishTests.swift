@@ -192,6 +192,82 @@ final class GoalFinishTests: XCTestCase {
         XCTAssertEqual(vm.error, "The day changed. Try again.")
     }
 
+    func testFinishThatLandedAnywayShowsTheRecord() async throws {
+        for failure: Error in [APIError.http(statusCode: 409, body: nil), URLError(.networkConnectionLost)] {
+            let client = FinishClient()
+            client.details = [.success(try detail(finishDue: true))]
+            client.finishes = [.failure(failure)]
+            client.records = [.success(try Self.record())]
+            var changes = 0
+            let vm = GoalDetailViewModel(slug: "nyc-marathon-2026", client: client, onChange: { changes += 1 })
+            await vm.load()
+            await vm.finish()
+            XCTAssertEqual(vm.finished?.shown, 20, "\(failure)")
+            XCTAssertNil(vm.error)
+            XCTAssertEqual(client.detailCalls, 1, "no reload once the record shows it closed")
+            XCTAssertEqual(changes, 1)
+        }
+    }
+
+    func testFinishRefreshesOnce() async throws {
+        let client = FinishClient()
+        client.details = [.success(try detail(finishDue: true))]
+        client.finishes = [.success(try Self.record())]
+        var changes = 0
+        let vm = GoalDetailViewModel(slug: "nyc-marathon-2026", client: client, onChange: { changes += 1 })
+        await vm.load()
+        await vm.finish()
+        XCTAssertEqual(changes, 1)
+    }
+
+    func testReopenReturnsTheOpenGoal() async throws {
+        let client = FinishClient()
+        client.reopens = [.success(try detail(finishDue: true))]
+        var changes = 0
+        let vm = GoalRecordViewModel(slug: "nyc-marathon-2026", record: try Self.record(), client: client,
+                                     onChange: { changes += 1 })
+        let reopened = await vm.reopen()
+        XCTAssertEqual(reopened?.summary.slug, "nyc-marathon-2026")
+        XCTAssertEqual(client.reopenRequests, ["nyc-marathon-2026"])
+        XCTAssertEqual(changes, 1)
+        XCTAssertNil(vm.reopenError)
+        XCTAssertFalse(vm.isReopening)
+    }
+
+    func testReopenFailuresSayWhy() async throws {
+        let cases: [(Error, String)] = [
+            (APIError.http(statusCode: 409, body: nil), "An open goal already has this name."),
+            (APIError.http(statusCode: 404, body: nil), "This goal can't be reopened."),
+            (URLError(.timedOut), "Couldn't reopen this goal. Try again."),
+        ]
+        for (failure, message) in cases {
+            let client = FinishClient()
+            client.reopens = [.failure(failure)]
+            var changes = 0
+            let vm = GoalRecordViewModel(slug: "nyc-marathon-2026", record: try Self.record(), client: client,
+                                         onChange: { changes += 1 })
+            let reopened = await vm.reopen()
+            XCTAssertNil(reopened)
+            XCTAssertEqual(vm.reopenError, message)
+            XCTAssertEqual(changes, 0)
+        }
+    }
+
+    func testReopenedGoalLeavesTheRecordWithoutAskingAgain() async throws {
+        let client = FinishClient()
+        client.details = [.success(try detail(finishDue: true))]
+        client.finishes = [.success(try Self.record())]
+        let vm = GoalDetailViewModel(slug: "nyc-marathon-2026", client: client)
+        await vm.load()
+        await vm.finish()
+        XCTAssertNotNil(vm.finished)
+        vm.reopened(try detail(finishDue: true))
+        XCTAssertNil(vm.finished)
+        XCTAssertFalse(vm.asksToFinish, "the prompt waits until the goal is opened again")
+        guard case .loaded(let d) = vm.state else { return XCTFail("not loaded") }
+        XCTAssertEqual(d.summary.slug, "nyc-marathon-2026")
+    }
+
     func testReflectionSavesAndFailureKeepsTheOld() async throws {
         let client = FinishClient()
         let vm = GoalRecordViewModel(slug: "nyc-marathon-2026", record: try Self.record(), client: client)
@@ -224,7 +300,9 @@ private final class FinishClient: GoalsDataClient, @unchecked Sendable {
     var finishes: [Result<GoalRecord, Error>] = []
     var records: [Result<GoalRecord, Error>] = []
     var reflections: [Result<GoalRecord, Error>] = []
+    var reopens: [Result<GoalDetail, Error>] = []
     private(set) var detailCalls = 0
+    private(set) var reopenRequests: [String] = []
     private(set) var finishRequests: [GoalFinishRequest] = []
     private(set) var reflectionRequests: [GoalReflectionRequest] = []
 
@@ -245,6 +323,10 @@ private final class FinishClient: GoalsDataClient, @unchecked Sendable {
         return try next(&finishes)
     }
     func record(slug: String) async throws -> GoalRecord { try next(&records) }
+    func reopen(slug: String) async throws -> GoalDetail {
+        reopenRequests.append(slug)
+        return try next(&reopens)
+    }
     func saveReflection(_ r: GoalReflectionRequest) async throws -> GoalRecord {
         reflectionRequests.append(r)
         return try next(&reflections)

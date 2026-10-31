@@ -354,6 +354,11 @@ struct GoalFinishRequest: Encodable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey { case slug, asOf = "as_of" }
 }
 
+/// `POST /api/goals/reopen`: puts a finished goal back among the open ones.
+struct GoalReopenRequest: Encodable, Equatable, Sendable {
+    let slug: String
+}
+
 /// `POST /api/goals/reflection`: his words on a finished goal; empty clears them.
 struct GoalReflectionRequest: Encodable, Equatable, Sendable {
     let slug: String

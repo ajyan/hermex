@@ -1,13 +1,17 @@
 import SwiftUI
 
-/// "Did you finish?" on a goal whose last milestone is due: I finished closes the goal (the
-/// server ticks what's left and saves the record); Not yet hides it until the screen reopens.
+/// "Did you finish?" on a goal whose last milestone is due: I finished asks once more, then
+/// closes the goal (the server ticks what's left and saves the record); Not yet hides it until
+/// the screen reopens.
 struct GoalFinishPrompt: View {
+    let goalTitle: String
     let milestone: String
     let paper: HermexPaper
     let isFinishing: Bool
     let onFinish: () -> Void
     let onNotYet: () -> Void
+
+    @State private var confirming = false
 
     var body: some View {
         HXCard(.glow(paper), title: "Did you finish?", spacing: BrainStyle.s) {
@@ -27,7 +31,7 @@ struct GoalFinishPrompt: View {
             HStack(spacing: BrainStyle.s) {
                 Button(action: onNotYet) { Text(verbatim: "Not yet") }
                     .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
-                Button(action: onFinish) {
+                Button { confirming = true } label: {
                     if isFinishing { ProgressView() } else { Text(verbatim: "I finished") }
                 }
                 .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
@@ -37,6 +41,13 @@ struct GoalFinishPrompt: View {
             .padding(.top, BrainStyle.xs)
         }
         .environment(\.hxPaper, paper)
+        .confirmationDialog(Text(verbatim: "Finish \(GoalsCopy.shortTitle(goalTitle))?"), isPresented: $confirming,
+                            titleVisibility: .visible) {
+            Button(action: onFinish) { Text(verbatim: "Finish goal") }
+            Button(role: .cancel) {} label: { Text(verbatim: "Cancel") }
+        } message: {
+            Text(verbatim: "Closes the goal and saves its record. You can reopen it from the record.")
+        }
     }
 }
 

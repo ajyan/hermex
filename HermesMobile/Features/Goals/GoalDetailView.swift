@@ -23,7 +23,10 @@ struct GoalDetailView: View {
     var body: some View {
         Group {
             if let record {
-                GoalRecordContent(viewModel: record)
+                GoalRecordContent(viewModel: record) { detail in
+                    self.record = nil
+                    viewModel.reopened(detail)
+                }
             } else {
                 content
             }
@@ -68,6 +71,7 @@ struct GoalDetailView: View {
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
                     if viewModel.asksToFinish {
                         GoalFinishPrompt(
+                            goalTitle: detail.summary.title,
                             milestone: detail.milestones.last?.title ?? "",
                             paper: tint.paper,
                             isFinishing: viewModel.isFinishing,

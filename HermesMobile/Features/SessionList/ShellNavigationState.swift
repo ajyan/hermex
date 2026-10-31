@@ -99,6 +99,12 @@ struct ShellNavigationState: Equatable {
         isDrawerOpen = false
     }
 
+    /// Swaps the top pushed screen for `destination` (or pushes it onto an empty path).
+    mutating func replaceTop(with destination: ShellPushDestination) {
+        if !path.isEmpty { path.removeLast() }
+        path.append(destination)
+    }
+
     /// Replaces whatever is pushed with `destination` alone.
     mutating func showOnly(_ destination: ShellPushDestination) {
         path = [destination]

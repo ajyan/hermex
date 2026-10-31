@@ -43,6 +43,7 @@ private final class FakeGoalsClient: GoalsDataClient, @unchecked Sendable {
     func confirmWeek(_ r: GoalWeekRequest) async throws -> GoalCheckInResult { throw URLError(.unsupportedURL) }
     func finish(_ r: GoalFinishRequest) async throws -> GoalRecord { throw URLError(.unsupportedURL) }
     func record(slug: String) async throws -> GoalRecord { throw URLError(.unsupportedURL) }
+    func reopen(slug: String) async throws -> GoalDetail { throw URLError(.unsupportedURL) }
     func saveReflection(_ r: GoalReflectionRequest) async throws -> GoalRecord { throw URLError(.unsupportedURL) }
 
     /// Per-item gates key commitments by id and daily checks by "check:<id>".

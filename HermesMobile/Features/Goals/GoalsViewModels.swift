@@ -86,6 +86,7 @@ final class GoalDetailViewModel {
     let slug: String
     @ObservationIgnored private let client: GoalsDataClient
     @ObservationIgnored private let onAPIError: (Error) -> Void
+    @ObservationIgnored private let onChange: () -> Void
     @ObservationIgnored private var generation = 0
     /// The server's detail with the taps in flight on top; `state` shows `edits.shown`.
     @ObservationIgnored private var edits: GoalPendingEdits<GoalDetail, GoalRowKey>?
@@ -94,10 +95,14 @@ final class GoalDetailViewModel {
     @ObservationIgnored private var savedSinceSettle = false
     @ObservationIgnored private var dayChangedSinceSettle = false
 
-    init(slug: String, client: GoalsDataClient, onAPIError: @escaping (Error) -> Void = { _ in }) {
+    /// `onChange` runs once a check-in, finish or reopen has landed on the server (the widget
+    /// refreshes from it).
+    init(slug: String, client: GoalsDataClient, onAPIError: @escaping (Error) -> Void = { _ in },
+         onChange: @escaping () -> Void = {}) {
         self.slug = slug
         self.client = client
         self.onAPIError = onAPIError
+        self.onChange = onChange
     }
 
     func isPending(_ key: GoalRowKey) -> Bool { pending.contains(key) }
@@ -123,6 +128,8 @@ final class GoalDetailViewModel {
     }
 
     /// Closes the goal as achieved. Nothing changes on screen until the server says it's done.
+    /// When the answer is an error, the goal may have closed anyway (a lost response, or a
+    /// finish from elsewhere), so its record decides before the error shows.
     func finish() async {
         guard case .loaded(let detail) = state, !isFinishing, finished == nil else { return }
         isFinishing = true
@@ -130,8 +137,14 @@ final class GoalDetailViewModel {
         defer { isFinishing = false }
         do {
             finished = try await client.finish(GoalFinishRequest(slug: slug, asOf: detail.today))
+            onChange()
         } catch {
             guard !goalsIsCancellation(error) else { return }
+            if let record = try? await client.record(slug: slug) {
+                finished = record
+                onChange()
+                return
+            }
             if case .http(409, _)? = error as? APIError {
                 await load()
                 self.error = "The day changed. Try again."
@@ -140,6 +153,15 @@ final class GoalDetailViewModel {
             onAPIError(error)
             self.error = "Couldn't finish this goal. Try again."
         }
+    }
+
+    /// The goal open again after its record's Reopen: the screen leaves the record for it.
+    /// The finish prompt stays hidden until the screen is opened again.
+    func reopened(_ detail: GoalDetail) {
+        finished = nil
+        finishDeferred = true
+        error = nil
+        show(detail)
     }
 
     func checkIn(commitment id: String, status: GoalStatus) async {
@@ -219,6 +241,7 @@ final class GoalDetailViewModel {
         savedSinceSettle = false
         dayChangedSinceSettle = false
         guard saved || dayChanged, !Task.isCancelled else { return }
+        if saved { onChange() }
         await load()
         if dayChanged { error = Self.dayChanged }
     }
@@ -244,17 +267,24 @@ final class GoalRecordViewModel {
     private(set) var state: BrainLoadState<GoalRecord>
     private(set) var isSaving = false
     private(set) var error: String?
+    /// Reopen is in flight.
+    private(set) var isReopening = false
+    /// Why the last Reopen didn't happen.
+    private(set) var reopenError: String?
 
     let slug: String
     @ObservationIgnored private let client: GoalsDataClient
     @ObservationIgnored private let onAPIError: (Error) -> Void
+    @ObservationIgnored private let onChange: () -> Void
 
-    /// `record` is the one the finish just returned, so the screen needs no load.
+    /// `record` is the one the finish just returned, so the screen needs no load. `onChange`
+    /// runs once a reopen has landed on the server (the widget refreshes from it).
     init(slug: String, record: GoalRecord? = nil, client: GoalsDataClient,
-         onAPIError: @escaping (Error) -> Void = { _ in }) {
+         onAPIError: @escaping (Error) -> Void = { _ in }, onChange: @escaping () -> Void = {}) {
         self.slug = slug
         self.client = client
         self.onAPIError = onAPIError
+        self.onChange = onChange
         state = record.map { .loaded($0) } ?? .loading
     }
 
@@ -273,6 +303,31 @@ final class GoalRecordViewModel {
             onAPIError(error)
             if goalsKeepsContent(state, after: error) { return }
             state = goalsFailureState(error)
+        }
+    }
+
+    /// Reopens the finished goal: its open detail once the server has it, else nil with
+    /// `reopenError` saying why.
+    func reopen() async -> GoalDetail? {
+        guard case .loaded = state, !isReopening else { return nil }
+        isReopening = true
+        reopenError = nil
+        defer { isReopening = false }
+        do {
+            let detail = try await client.reopen(slug: slug)
+            onChange()
+            return detail
+        } catch {
+            guard !goalsIsCancellation(error) else { return nil }
+            onAPIError(error)
+            if case .http(409, _)? = error as? APIError {
+                reopenError = "An open goal already has this name."
+            } else if (error as? APIError)?.isNotFound == true {
+                reopenError = "This goal can't be reopened."
+            } else {
+                reopenError = "Couldn't reopen this goal. Try again."
+            }
+            return nil
         }
     }
 
