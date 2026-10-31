@@ -12,12 +12,17 @@ struct GoalDetailView: View {
     @Environment(\.colorScheme) private var colorScheme
     private let client: GoalsDataClient
     private let onAPIError: (Error) -> Void
+    /// After a check-in, finish or reopen lands: the widget refreshes for this server.
+    private let onChange: @MainActor () -> Void
 
     init(slug: String, server: URL, onAPIError: @escaping (Error) -> Void) {
         let client = APIClientGoalsAdapter(apiClient: APIClient(baseURL: server))
+        let onChange: @MainActor () -> Void = { GoalsWidgetSync.refreshAfterChange(server: server) }
         self.client = client
         self.onAPIError = onAPIError
-        _viewModel = State(initialValue: GoalDetailViewModel(slug: slug, client: client, onAPIError: onAPIError))
+        self.onChange = onChange
+        _viewModel = State(initialValue: GoalDetailViewModel(
+            slug: slug, client: client, onAPIError: onAPIError, onChange: onChange))
     }
 
     var body: some View {
@@ -40,7 +45,8 @@ struct GoalDetailView: View {
         }
         .onChange(of: viewModel.finished) { _, finished in
             guard let finished, record == nil else { return }
-            record = GoalRecordViewModel(slug: viewModel.slug, record: finished, client: client, onAPIError: onAPIError)
+            record = GoalRecordViewModel(slug: viewModel.slug, record: finished, client: client,
+                                         onAPIError: onAPIError, onChange: onChange)
             celebrating = true
         }
         .sheet(isPresented: $celebrating) {

@@ -272,6 +272,38 @@ final class GoalCheckInCardViewModelTests: XCTestCase {
         XCTAssertEqual(vm.error, "The day changed. Check in again.")
     }
 
+    func testSavedCheckInHandsTheServersHomeOn() async throws {
+        let client = FakeCardGoalsClient()
+        client.homeResults = [.success(try home(homeJSON()))]
+        client.checkInResults = [.success(try result(done: 3, yesterday: "done"))]
+        var handed: [GoalsHome] = []
+        let vm = GoalCheckInCardViewModel(client: client, onChange: { handed.append($0) })
+        await vm.load()
+        await vm.checkIn(slug: slug, commitment: "stretch-pm", status: .done)
+        XCTAssertEqual(handed.count, 1)
+        XCTAssertEqual(handed.first?.goals.first?.week.commitments.first?.done, 3)
+        XCTAssertEqual(handed.first?.streak.days, 5)
+
+        client.checkInResults = [.failure(URLError(.timedOut))]
+        await vm.checkIn(slug: slug, check: "foot", value: "same")
+        XCTAssertEqual(handed.count, 1, "a failed check-in hands nothing on")
+    }
+
+    func testACommitmentAndACheckSharingAnIdStayApart() async throws {
+        let client = FakeCardGoalsClient()
+        let (started, startedCont) = AsyncStream<Void>.makeStream()
+        let (release, releaseCont) = AsyncStream<Void>.makeStream()
+        client.gate = (startedCont, release)
+        client.checkInResults = [.success(try result(done: 1, yesterday: "done"))]
+        let vm = try await loaded(client, homeJSON(commitments: [0: ["id": "foot"]]))
+        let row = Task { await vm.checkIn(slug: slug, commitment: "foot", status: .done) }
+        for await _ in started { break }
+        XCTAssertTrue(vm.isPending(slug, .commitment("foot")))
+        XCTAssertFalse(vm.isPending(slug, .check("foot")), "the check with the same id stays free")
+        releaseCont.yield()
+        await row.value
+    }
+
     func testLiveOnlyForTheServersToday() async throws {
         let vm = try await loaded(FakeCardGoalsClient())
         XCTAssertTrue(vm.isLive(for: "2026-10-14"))

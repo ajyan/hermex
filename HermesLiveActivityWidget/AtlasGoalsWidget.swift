@@ -4,7 +4,7 @@ import WidgetKit
 
 /// Home Screen "Goals" widget: today's commitments from the snapshot the app publishes
 /// (`AtlasWidgetGoals`), each with a check button that records it on the server through
-/// `GoalWidgetCheckInIntent`.
+/// `GoalWidgetCheckInIntent` (or, on a done row, clears it). Tapping elsewhere opens Goals.
 struct AtlasGoalsWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: AtlasWidgetGoals.widgetKind, provider: AtlasGoalsProvider()) { entry in
@@ -23,20 +23,9 @@ struct AtlasGoalsEntry: TimelineEntry {
     let date: Date
     let goals: AtlasWidgetGoals?
 
-    /// The snapshot was made on an earlier day than the phone's, so its check-ins
-    /// would land on the wrong day.
-    var isStale: Bool {
-        guard let goals else { return false }
-        return goals.today < Self.dayFormatter.string(from: date)
-    }
-
-    private static let dayFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
+    /// The phone's day has turned since the app saved the snapshot (`AtlasWidgetGoals.isStale`),
+    /// so its check-ins may land on a day the server has left.
+    var isStale: Bool { goals?.isStale(at: date) ?? false }
 }
 
 struct AtlasGoalsProvider: TimelineProvider {
@@ -79,7 +68,7 @@ private struct AtlasGoalsWidgetView: View {
             }
             Spacer(minLength: 0)
         }
-        .widgetURL(URL(string: "\(HermesDeepLink.scheme)://"))
+        .widgetURL(HermesDeepLink.goalsURL)
     }
 
     private var header: some View {
@@ -117,19 +106,16 @@ private struct AtlasGoalRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            if item.isDone {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 22))
-                    .foregroundStyle(.green)
+            if item.isDone && !item.isUndoable {
+                // Only the row's source (such as Prep) counts today; clearing would change nothing.
+                mark
                     .accessibilityLabel("Done")
             } else {
-                Button(intent: GoalWidgetCheckInIntent(slug: item.slug, commitment: item.commitment)) {
-                    Image(systemName: "circle")
-                        .font(.system(size: 22))
-                        .foregroundStyle(.secondary)
+                Button(intent: GoalWidgetCheckInIntent(slug: item.slug, commitment: item.commitment, done: !item.isDone)) {
+                    mark
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Mark \(item.action) done")
+                .accessibilityLabel(item.isDone ? "Undo \(item.action)" : "Mark \(item.action) done")
             }
             Text(item.action)
                 .font(.subheadline)
@@ -141,5 +127,18 @@ private struct AtlasGoalRow: View {
                 .accessibilityLabel("\(item.weekCount) of \(item.target) this week")
         }
         .frame(minHeight: 28)
+    }
+
+    @ViewBuilder
+    private var mark: some View {
+        if item.isDone {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 22))
+                .foregroundStyle(.green)
+        } else {
+            Image(systemName: "circle")
+                .font(.system(size: 22))
+                .foregroundStyle(.secondary)
+        }
     }
 }

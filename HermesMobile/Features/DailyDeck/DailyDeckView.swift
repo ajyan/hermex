@@ -35,7 +35,9 @@ struct DailyDeckView: View {
         _labels = State(initialValue: labels)
         _labelQueue = State(initialValue: LabelQueueViewModel(
             server: server, deckClient: APIClientDailyDeckAdapter(apiClient: APIClient(baseURL: server)), labels: labels))
-        _goals = State(initialValue: GoalCheckInCardViewModel(client: APIClientGoalsAdapter(apiClient: APIClient(baseURL: server))))
+        _goals = State(initialValue: GoalCheckInCardViewModel(
+            client: APIClientGoalsAdapter(apiClient: APIClient(baseURL: server)),
+            onChange: { GoalsWidgetSync.update(server: server, home: $0) }))
         _dailyAsk = State(initialValue: DailyAskModel(client: APIClientDailyAskAdapter(apiClient: APIClient(baseURL: server))))
         _meals = State(initialValue: MealsPlanModel(client: APIClientMealsAdapter(apiClient: APIClient(baseURL: server))))
         self.openSession = openSession

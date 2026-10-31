@@ -86,7 +86,7 @@ final class GoalDetailViewModel {
     let slug: String
     @ObservationIgnored private let client: GoalsDataClient
     @ObservationIgnored private let onAPIError: (Error) -> Void
-    @ObservationIgnored private let onChange: () -> Void
+    @ObservationIgnored private let onChange: @MainActor () -> Void
     @ObservationIgnored private var generation = 0
     /// The server's detail with the taps in flight on top; `state` shows `edits.shown`.
     @ObservationIgnored private var edits: GoalPendingEdits<GoalDetail, GoalRowKey>?
@@ -98,7 +98,7 @@ final class GoalDetailViewModel {
     /// `onChange` runs once a check-in, finish or reopen has landed on the server (the widget
     /// refreshes from it).
     init(slug: String, client: GoalsDataClient, onAPIError: @escaping (Error) -> Void = { _ in },
-         onChange: @escaping () -> Void = {}) {
+         onChange: @escaping @MainActor () -> Void = {}) {
         self.slug = slug
         self.client = client
         self.onAPIError = onAPIError
@@ -275,12 +275,12 @@ final class GoalRecordViewModel {
     let slug: String
     @ObservationIgnored private let client: GoalsDataClient
     @ObservationIgnored private let onAPIError: (Error) -> Void
-    @ObservationIgnored private let onChange: () -> Void
+    @ObservationIgnored private let onChange: @MainActor () -> Void
 
     /// `record` is the one the finish just returned, so the screen needs no load. `onChange`
     /// runs once a reopen has landed on the server (the widget refreshes from it).
     init(slug: String, record: GoalRecord? = nil, client: GoalsDataClient,
-         onAPIError: @escaping (Error) -> Void = { _ in }, onChange: @escaping () -> Void = {}) {
+         onAPIError: @escaping (Error) -> Void = { _ in }, onChange: @escaping @MainActor () -> Void = {}) {
         self.slug = slug
         self.client = client
         self.onAPIError = onAPIError

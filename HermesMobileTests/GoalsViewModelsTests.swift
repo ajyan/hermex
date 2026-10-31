@@ -541,6 +541,33 @@ final class GoalsViewModelsTests: XCTestCase {
         XCTAssertTrue(saved)
     }
 
+    func testSavedTapsRefreshTheWidgetOnceTheLastLands() async throws {
+        let client = FakeGoalsClient()
+        let (started, startedCont) = AsyncStream<String>.makeStream()
+        let (releaseA, releaseACont) = AsyncStream<Void>.makeStream()
+        let (releaseB, releaseBCont) = AsyncStream<Void>.makeStream()
+        client.started = startedCont
+        client.perItem = [
+            "stretch-pm": (releaseA, .success(try result(done: 1, today: "done"))),
+            "long-run": (releaseB, .failure(URLError(.timedOut))),
+        ]
+        client.detailResults = [.success(try detail())]
+        var changes = 0
+        let vm = GoalDetailViewModel(slug: "nyc-marathon-2026", client: client, onChange: { changes += 1 })
+        await vm.load()
+        var calls = started.makeAsyncIterator()
+        let a = Task { await vm.checkIn(commitment: "stretch-pm", status: .done) }
+        _ = await calls.next()
+        let b = Task { await vm.checkIn(commitment: "long-run", status: .done) }
+        _ = await calls.next()
+        releaseACont.yield()
+        await a.value
+        XCTAssertEqual(changes, 0, "waits for the last tap in flight")
+        releaseBCont.yield()
+        await b.value
+        XCTAssertEqual(changes, 1)
+    }
+
     func testEachTapSendsItsOwnClientID() async throws {
         let client = FakeGoalsClient()
         client.checkInResults = [.success(try result(done: 1, today: "done"))]

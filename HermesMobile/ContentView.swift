@@ -14,7 +14,8 @@ struct ContentView: View {
     /// live roster (#554).
     @State private var pendingBotDestination: BotDestination?
     @State private var pendingNewChatRequest: NewChatRequest?
-    @State private var pendingDailyBrief = false
+    /// A screen a deep link asked for (the Daily Brief, Goals), shown over the open chat.
+    @State private var pendingScreen: ShellPushDestination?
     /// Shown when a new chat, session link or share arrives while a Hermes server is
     /// active and no webui server is configured to take it (#899).
     @State private var isShowingNoWebuiServer = false
@@ -39,7 +40,7 @@ struct ContentView: View {
                 // Warm launch: the intent set the deep link after the view appeared.
                 drainPendingIntentDeepLink()
             }
-            .task(id: authManager.state) { refreshGoalsWidget() }
+            .task(id: authManager.state) { await refreshGoalsWidget() }
             .onChange(of: authManager.state) {
                 // A held conversation link resolves again once sign-in or a server switch
                 // changes what it can reach.
@@ -69,7 +70,7 @@ struct ContentView: View {
                 Task { await reconcileOrphanedLiveActivities(notifiesOnCompletion: false) }
                 // Keeps a week of Daily Brief reminders queued ahead.
                 Task { await DailyBriefReminder.refresh() }
-                refreshGoalsWidget()
+                Task { await refreshGoalsWidget() }
             }
             .alert("Add a WebUI server to start a chat.", isPresented: $isShowingNoWebuiServer) {
                 if let share = unroutableShare {
@@ -82,9 +83,14 @@ struct ContentView: View {
     }
 
     /// Keeps the Goals widget on the active webui server's today (throttled in `GoalsWidgetSync`).
-    private func refreshGoalsWidget() {
-        guard case let .loggedIn(server) = authManager.state, authManager.kind(of: server) == .webui else { return }
-        Task { await GoalsWidgetSync.refresh(server: server) }
+    /// While nothing here can load Goals (a Hermes server, or none signed in), another server's
+    /// goals never stay on the widget.
+    private func refreshGoalsWidget() async {
+        guard case let .loggedIn(server) = authManager.state, authManager.kind(of: server) == .webui else {
+            GoalsWidgetSync.clear(except: authManager.state.server)
+            return
+        }
+        await GoalsWidgetSync.refresh(server: server)
     }
 
     private func reconcileOrphanedLiveActivities(notifiesOnCompletion: Bool) async {
@@ -120,7 +126,7 @@ struct ContentView: View {
                 openNextSharedImport: openNextSharedImport,
                 pendingDeepLinkedSessionID: $pendingDeepLinkedSessionID,
                 requestedNewChat: $pendingNewChatRequest,
-                requestedDailyBrief: $pendingDailyBrief,
+                requestedScreen: $pendingScreen,
                 pendingBotDestination: $pendingBotDestination,
                 pendingWebuiPush: $pendingWebuiPush
             )
@@ -150,7 +156,9 @@ struct ContentView: View {
             if reachWebuiServer() { pendingNewChatRequest = NewChatRequest(autoStartsVoiceInput: true) }
         case .dailyBrief(let date, let kind):
             if let date, let kind { DailyBriefLaunch.request(date: date, kind: kind) }
-            if reachWebuiServer() { pendingDailyBrief = true }
+            if reachWebuiServer() { pendingScreen = .dailyDeck }
+        case .goals:
+            if reachWebuiServer() { pendingScreen = .goals }
         case .newCall:
             if reachWebuiServer() { pendingNewChatRequest = NewChatRequest(startsCall: true) }
         // The profile variant pins the new session to the chosen profile (#339).

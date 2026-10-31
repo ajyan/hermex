@@ -24,10 +24,14 @@ final class GoalCheckInCardViewModel {
     @ObservationIgnored private var generation = 0
     /// The server's home with the taps in flight on top; `state` shows `edits.shown`.
     @ObservationIgnored private var edits: GoalPendingEdits<GoalsHome, Key>?
+    @ObservationIgnored private let onChange: @MainActor (GoalsHome) -> Void
 
-    init(client: GoalsDataClient, onAPIError: @escaping (Error) -> Void = { _ in }) {
+    /// `onChange` gets the server's home after each check-in lands (the widget saves it).
+    init(client: GoalsDataClient, onAPIError: @escaping (Error) -> Void = { _ in },
+         onChange: @escaping @MainActor (GoalsHome) -> Void = { _ in }) {
         self.client = client
         self.onAPIError = onAPIError
+        self.onChange = onChange
     }
 
     func load() async {
@@ -152,6 +156,7 @@ final class GoalCheckInCardViewModel {
             edits?.remove(key)
             take(result)
             publish()
+            if let home = edits?.base { onChange(home) }
             return true
         } catch {
             edits?.remove(key)

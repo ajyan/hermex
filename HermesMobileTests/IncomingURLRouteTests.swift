@@ -22,6 +22,7 @@ final class IncomingURLRouteTests: XCTestCase {
             (HermesDeepLink.newChatVoiceURL, .newChatVoice),
             (HermesDeepLink.dailyBriefURL, .dailyBrief(date: nil, kind: nil)),
             (HermesDeepLink.dailyBriefURL(date: "2026-10-11", kind: "weekly"), .dailyBrief(date: "2026-10-11", kind: "weekly")),
+            (HermesDeepLink.goalsURL, .goals),
             (HermesDeepLink.newCallURL, .newCall),
             (HermesDeepLink.newChatInProfileURL(profileName: "Research Bot"), .newChatInProfile(profileName: "Research Bot")),
             (HermesDeepLink.newChatURL, .newChat),

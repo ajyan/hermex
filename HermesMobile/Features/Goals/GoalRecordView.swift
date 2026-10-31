@@ -9,7 +9,8 @@ struct GoalRecordView: View {
     init(slug: String, server: URL, onAPIError: @escaping (Error) -> Void,
          onReopened: @escaping (GoalDetail) -> Void) {
         _viewModel = State(initialValue: GoalRecordViewModel(
-            slug: slug, client: APIClientGoalsAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
+            slug: slug, client: APIClientGoalsAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError,
+            onChange: { GoalsWidgetSync.refreshAfterChange(server: server) }))
         self.onReopened = onReopened
     }
 
