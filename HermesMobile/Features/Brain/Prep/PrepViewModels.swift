@@ -292,6 +292,21 @@ final class PrepRunViewModel {
     private(set) var tutorBusy = false
     private(set) var tutorError: String?
     var tutorDraft = ""
+
+    /// Words written but not sent: an answer on the rep on screen, or a reply to the tutor. Quitting
+    /// asks first while there are any; everything already submitted is saved on the server.
+    var hasUnsentText: Bool {
+        let typed = { (text: String) in !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        switch phase {
+        case .rep:
+            switch storyStage {
+            case .told, .probed: return false
+            case .telling, .probing: return typed(recallDraft)
+            }
+        case .result: return inDialogue && typed(tutorDraft)
+        default: return false
+        }
+    }
     /// When the telling began (the first mic tap or first non-empty edit); nil until then.
     private(set) var storyStartedAt: Date?
     /// Story titles by id, loaded only to name the story told on a wrong-story result.

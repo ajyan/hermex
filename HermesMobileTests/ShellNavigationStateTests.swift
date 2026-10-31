@@ -37,6 +37,25 @@ final class ShellNavigationStateTests: XCTestCase {
         XCTAssertFalse(state.isDrawerOpen)
     }
 
+    func testAChatOpenedFromARunOffersTheRunBack() {
+        var state = ShellNavigationState()
+        let run: [ShellPushDestination] = [.brain, .brainRoute(.prep(.home)), .brainRoute(.prep(.run))]
+        state.path = run
+        state.select(PendingNewChatRoute(initialDraft: "Go deeper"), returningTo: state.path)
+        XCTAssertTrue(state.path.isEmpty, "the chat is on screen")
+        XCTAssertEqual(state.returnPath, run)
+        state.returnToSavedScreens()
+        XCTAssertEqual(state.path, run, "Back to Prep puts the run on top of the chat again")
+        XCTAssertTrue(state.returnPath.isEmpty)
+    }
+
+    func testAnotherChatForgetsTheRun() {
+        var state = ShellNavigationState()
+        state.select(PendingNewChatRoute(), returningTo: [.brainRoute(.prep(.run))])
+        state.select(PendingNewChatRoute())
+        XCTAssertTrue(state.returnPath.isEmpty)
+    }
+
     func testBrainHomePopsBackToTheHomeInThePath() {
         var state = ShellNavigationState()
         state.path = [.brain, .brainRoute(.module(.wiki)), .brainRoute(.page(.wiki, "wiki/a.md"))]
@@ -189,6 +208,10 @@ final class ShellNavigationStateTests: XCTestCase {
         XCTAssertTrue(ShellPushDestination.goal("marathon").zoomsFromSource)
         XCTAssertTrue(ShellPushDestination.brainRoute(.page(.wiki, "prompt-caching")).zoomsFromSource)
         XCTAssertTrue(ShellPushDestination.brainRoute(.prep(.home)).zoomsFromSource)
+        for run in [PrepRoute.run, .testout("u1"), .bonus, .story("s9")] {
+            XCTAssertFalse(ShellPushDestination.brainRoute(.prep(run)).zoomsFromSource,
+                           "\(run) has an unsent answer, so it never zooms (a zoom screen can be pulled down to dismiss)")
+        }
         for drawerScreen: ShellPushDestination in [.projects, .tasks, .kanban, .dailyDeck, .brain, .goals, .money, .feedback, .settings(nil)] {
             XCTAssertFalse(drawerScreen.zoomsFromSource, "\(drawerScreen) slides in from the drawer")
         }

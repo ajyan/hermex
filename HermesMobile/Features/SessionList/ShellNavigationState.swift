@@ -94,6 +94,24 @@ struct ShellNavigationState: Equatable {
         setRoot(.newChat(route))
     }
 
+    /// The screens a chat was opened over ("Go deeper in Atlas" from a Prep run), offered back
+    /// from that chat; any other root change forgets them.
+    private(set) var returnPath: [ShellPushDestination] = []
+
+    /// A new chat that remembers the screens it was opened over, so the user can go back to them.
+    mutating func select(_ route: PendingNewChatRoute, returningTo screens: [ShellPushDestination]) {
+        setRoot(.newChat(route))
+        returnPath = screens
+    }
+
+    /// Back over the chat to the screens it was opened from; Back from them returns to the chat.
+    mutating func returnToSavedScreens() {
+        guard !returnPath.isEmpty else { return }
+        path = returnPath
+        returnPath = []
+        isDrawerOpen = false
+    }
+
     mutating func push(_ destination: ShellPushDestination) {
         path.append(destination)
         isDrawerOpen = false
@@ -157,6 +175,7 @@ struct ShellNavigationState: Equatable {
 
     private mutating func setRoot(_ newRoot: ShellRoot) {
         rootRevision += 1
+        returnPath = []
         newChatSessionID = nil
         newChatHasStarted = false
         root = newRoot
@@ -280,7 +299,12 @@ extension ShellPushDestination {
     /// (an inline link) falls back to the system's zoom from the middle of the screen.
     var zoomsFromSource: Bool {
         switch self {
-        case .goal, .finishedGoal, .brainRoute: true
+        case .goal, .finishedGoal: true
+        // A run's answer is unsent until Submit, and a zoom screen can be pulled down to dismiss,
+        // so run screens slide in as usual.
+        case .brainRoute(.prep(.run)), .brainRoute(.prep(.testout(_))), .brainRoute(.prep(.bonus)),
+             .brainRoute(.prep(.story(_))): false
+        case .brainRoute: true
         case .projects, .project, .tasks, .kanban, .dailyDeck, .brain, .goals, .finishedGoals, .money, .feedback,
              .body, .bodyLift, .bodyPlan, .bodyWorkout, .settings: false
         }
