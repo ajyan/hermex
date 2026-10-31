@@ -392,7 +392,14 @@ final class PrepRunViewModel {
     }
 
     var canSubmitRecall: Bool {
-        !recallDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSubmitting
+        !recallDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && answerFloor.isMet && !isSubmitting
+    }
+
+    /// The word floor for the answer being written: the rep's own, or its probe floor while probing.
+    var answerFloor: PrepWordFloor {
+        guard case let .rep(rep, _) = phase else { return PrepWordFloor(recallDraft, floor: 0) }
+        if case .probing = storyStage { return PrepWordFloor(recallDraft, floor: rep.probeMinWords) }
+        return PrepWordFloor(recallDraft, floor: rep.minWords)
     }
 
     /// Sends the dictated or typed recall.
@@ -601,7 +608,7 @@ final class PrepRunViewModel {
     }
 
     var canSubmitStoryAnswer: Bool {
-        !recallDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSubmitting
+        !recallDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && answerFloor.isMet && !isSubmitting
     }
 
     /// The probe the result on screen leads to and its number; nil once the rep is done (two probes

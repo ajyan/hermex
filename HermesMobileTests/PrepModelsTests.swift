@@ -48,6 +48,24 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertEqual(run.reps[3].item.options.map(\.id), ["1", "2", "3", "4"])
     }
 
+    func testRepDecodesItsWordFloors() throws {
+        let json = #"""
+        {"date": "2026-11-01", "index": 0, "reps": [
+          {"index": 0, "block": "story", "drill": "story", "min_words": 150, "probe_min_words": 50, "item": {"id": "s1"}},
+          {"index": 1, "block": "review", "drill": "recall", "item": {"id": "u1.l1"}}
+        ]}
+        """#
+        let run = try decode(PrepRun.self, json)
+        XCTAssertEqual(run.reps.map(\.minWords), [150, 0], "an older server sends no floor")
+        XCTAssertEqual(run.reps.map(\.probeMinWords), [50, 0])
+    }
+
+    func testWordFloorCountsWordsAndTitlesSubmit() {
+        XCTAssertEqual(PrepWordFloor("  one two\nthree  ", floor: 5).submitTitle, "3 of 5 words")
+        XCTAssertTrue(PrepWordFloor("one two", floor: 2).isMet)
+        XCTAssertEqual(PrepWordFloor("", floor: 0).submitTitle, "Submit")
+    }
+
     func testUnknownDrillKeptAsUnknown() throws {
         let json = #"""
         {"date": "d", "index": 0, "reps": [
