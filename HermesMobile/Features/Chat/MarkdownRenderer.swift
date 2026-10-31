@@ -206,24 +206,14 @@ private struct ChatMarkdownView: View {
         performanceSignposter.endInterval("Markdown Parse", signpost, "chars=\(content.count, privacy: .public)")
 
         return Markdown(parsedContent)
-            .environment(\.containsInlineMath, content.contains(InlineMathSource.marker))
+            .environment(\.containsInlineMath, content.contains(InlineMathSource.marker)
+                || MarkdownContentRenderingPolicy.hasTooManyInlineElements(content))
             .markdownTheme(MarkdownUI.Theme.chat(colorScheme: colorScheme, isStreaming: isStreaming))
             .markdownTextStyle {
                 ForegroundColor(.primary)
                 BackgroundColor(nil)
             }
-            .markdownTextStyle(\.code) {
-                FontFamilyVariant(.monospaced)
-                FontSize(.em(0.88))
-                BackgroundColor(SwiftUI.Color(.tertiarySystemGroupedBackground))
-            }
             .markdownCodeSyntaxHighlighter(.plainText)
-            .markdownBlockStyle(\.paragraph) { configuration in
-                configuration.label
-                    .fixedSize(horizontal: false, vertical: true)
-                    .relativeLineSpacing(.em(0.18))
-                    .markdownMargin(top: 0, bottom: 8)
-            }
     }
 }
 
@@ -748,6 +738,10 @@ enum MarkdownContentFallbackReason: String, Equatable {
 enum MarkdownContentRenderingPolicy {
     static let maxMarkdownCharacterCount = 80_000
     static let maxMarkdownLineCount = 2_000
+    /// MarkdownUI joins a paragraph's inline elements with `Text` `+`, which
+    /// SwiftUI resolves recursively; about 600 overflow an iPhone's 1 MB main
+    /// thread stack (#1333). Paragraphs over this limit render as one `Text`.
+    static let maxInlineElementsPerParagraph = 300
 
     static func fallbackReason(for content: String) -> MarkdownContentFallbackReason? {
         if content.count > maxMarkdownCharacterCount {
@@ -760,6 +754,29 @@ enum MarkdownContentRenderingPolicy {
 
         return nil
     }
+
+    /// Overestimates inline elements: each delimiter counts once; each line, and
+    /// each `:`, `@` or `www.` of a bare URL or email that GFM autolinks, counts twice.
+    static func hasTooManyInlineElements(_ markdown: String) -> Bool {
+        var count = 0
+        var trailingWs = 0
+        for byte in markdown.utf8 {
+            if byte == UInt8(ascii: "\n") || byte == UInt8(ascii: "\r") {
+                count += 2
+            } else if byte == UInt8(ascii: ":") || byte == UInt8(ascii: "@") {
+                count += 2
+            } else if byte == UInt8(ascii: "."), trailingWs >= 3 {
+                count += 2
+            } else if inlineDelimiters.contains(byte) {
+                count += 1
+            }
+            trailingWs = byte == UInt8(ascii: "w") ? trailingWs + 1 : 0
+            if count > maxInlineElementsPerParagraph { return true }
+        }
+        return false
+    }
+
+    private static let inlineDelimiters = Set("`*_~[]<>!$\\".utf8)
 }
 
 enum MarkdownHighlightEngine: Equatable {

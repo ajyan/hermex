@@ -139,7 +139,7 @@ struct DeckCardView: View {
         }
         .foregroundStyle(palette.ink)
         .tint(palette.ink)
-        .sheet(isPresented: $isWriting, onDismiss: sendMandarinAnswer) {
+        .sheet(isPresented: $isWriting) {
             ReflectionSheet(card: card, palette: palette, viewModel: viewModel)
         }
         .sheet(isPresented: $showsSleepHistory) {
@@ -182,9 +182,8 @@ struct DeckCardView: View {
         }
         if card.isMandarin {
             DeckMandarinCard(card: card, palette: palette, asked: viewModel.question(for: card),
-                             practice: viewModel.mandarinPractice(for: card)) {
-                reflection(DeckCopy.invitation(for: card))
-            }
+                             practice: viewModel.mandarinPractice(for: card),
+                             answered: viewModel.answer(for: card)?.text, onAnswer: answerMandarin)
         }
         if !card.isMandarin, let lead = text.lead {
             Text(inlineMarkdown(lead))
@@ -397,10 +396,10 @@ struct DeckCardView: View {
         }
     }
 
-    /// The Mandarin card's answer goes for feedback as soon as its sheet closes; an unchanged answer
-    /// that already has feedback isn't sent again.
-    private func sendMandarinAnswer() {
-        guard card.isMandarin, let text = viewModel.answer(for: card)?.text else { return }
+    /// The Mandarin card's answer, said on the card: kept with the deck's answers and sent for feedback
+    /// (an unchanged answer that already has feedback isn't sent again).
+    private func answerMandarin(_ text: String) {
+        viewModel.setText(text, for: card)
         let practice = viewModel.mandarinPractice(for: card)
         let asked = viewModel.question(for: card)
         Task { await practice.submit(text, question: asked == card.question ? nil : asked) }
@@ -1215,9 +1214,7 @@ private struct ReflectionSheet: View {
     @Environment(\.dismiss) private var dismiss
     @FocusState private var isFocused: Bool
     @State private var text = ""
-    /// The Mandarin card's mic: on-device zh-CN dictation into the answer.
-    @State private var voiceInput = ComposerVoiceInputController(fixedLocale: MandarinDictation.locale)
-    /// Every other card's mic, which Done waits on.
+    /// The mic, which Done waits on so the tidied words are what's saved.
     @State private var dictation = DictationModel()
     @State private var isClosing = false
 
@@ -1228,9 +1225,6 @@ private struct ReflectionSheet: View {
                     .font(AppFont.display(style: .title3, weight: .semibold))
                     .foregroundStyle(palette.ink)
                     .fixedSize(horizontal: false, vertical: true)
-                if card.isMandarin, !card.phrases.isEmpty {
-                    MandarinCueList(phrases: card.phrases, used: [], palette: palette, speaker: nil)
-                }
                 TextEditor(text: $text)
                     .font(AppFont.body())
                     .foregroundStyle(Color.hxTextPrimary)
@@ -1238,7 +1232,7 @@ private struct ReflectionSheet: View {
                     .focused($isFocused)
                     .overlay(alignment: .topLeading) {
                         if text.isEmpty {
-                            Text(verbatim: card.isMandarin ? "Answer out loud in Mandarin, or type" : "Write as much or as little as you like")
+                            Text(verbatim: "Write as much or as little as you like")
                                 .font(AppFont.body())
                                 .foregroundStyle(Color.hxTextSecondary)
                                 .padding(.top, 8)
@@ -1250,34 +1244,10 @@ private struct ReflectionSheet: View {
             .padding(20)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .background(palette.paper.ignoresSafeArea())
-            .safeAreaInset(edge: .bottom) {
-                if card.isMandarin, let message = MandarinDictation.isAvailable
-                    ? voiceInput.errorMessage
-                    : "To answer by voice, add Chinese (Simplified) dictation in Settings › General › Keyboard." {
-                    Text(verbatim: message)
-                        .font(AppFont.footnote())
-                        .foregroundStyle(Color.hxTextSecondary)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
             .toolbar {
-                if card.isMandarin && MandarinDictation.isAvailable {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button {
-                            _ = voiceInput.scheduleToggle(currentDraft: text) { text = $0 }
-                        } label: {
-                            Image(systemName: voiceInput.state == .idle ? "mic" : "stop.circle.fill")
-                        }
-                        .accessibilityLabel(Text(verbatim: voiceInput.state == .idle ? "Speak in Mandarin" : "Stop dictation"))
-                    }
-                } else if !card.isMandarin {
-                    ToolbarItem(placement: .topBarLeading) { DictationMicButton(text: $text, model: dictation) }
-                }
+                ToolbarItem(placement: .topBarLeading) { DictationMicButton(text: $text, model: dictation) }
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
-                        voiceInput.stopKeepingTranscript()
                         isClosing = true
                         Task {
                             await dictation.finish()
@@ -1296,7 +1266,6 @@ private struct ReflectionSheet: View {
             isFocused = true
         }
         .onChange(of: text) { _, new in viewModel.setText(new, for: card) }
-        .onDisappear { voiceInput.stopKeepingTranscript() }
         .presentationDragIndicator(.visible)
     }
 }
