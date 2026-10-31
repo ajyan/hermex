@@ -221,10 +221,11 @@ struct PrepKeyPointRow: View {
                     Button { overrideMissed(id) } label: {
                         Text(verbatim: overridingPoint == id ? "Saving…" : "I had that ›")
                             .font(BrainStyle.meta).foregroundStyle(Color.accentColor)
+                            .frame(minHeight: BrainStyle.minTapTarget, alignment: .leading)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .disabled(overridingPoint != nil)
-                    .frame(minHeight: 32)
                     .accessibilityLabel(Text(verbatim: "I had that: \(text)"))
                 }
             }

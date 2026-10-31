@@ -1,9 +1,10 @@
 import SwiftUI
 
-// Prep home's course: today's ring card and the path of units and lesson nodes. Passed units
-// collapse to a row with their stars, the current unit opens to its nodes and boss, the next unit
-// waits locked with Test out, and the rest are counted in one line. The path wears the `.knowledge`
-// paper; the next step is Nous blue (it starts the run); rewards are gold marks only.
+// Prep home's course: the readiness card and the path of units and lesson nodes. Passed units
+// collapse to a row with their stars, the unit being taught opens to its nodes and boss, other open
+// units fold to one row until tapped, the next unit waits locked with Test out, and the rest are
+// counted in one line. The path wears the `.knowledge` paper; only real controls are Nous blue (Start
+// and Start call on the readiness card); rewards are gold marks only.
 
 /// Today's done/total as a ring, the number inside.
 struct PrepDayRing: View {
@@ -40,33 +41,98 @@ struct PrepDayRing: View {
     }
 }
 
-/// The top of Prep home with a course: today's ring, how much of the course is interview-ready, the
-/// streak, and the run's Start or Resume. A glow card: the course is the object on this screen.
-struct PrepTodayRingCard: View {
-    let course: PrepCourse
-    let streak: PrepStreak
+/// The top of Prep home: where interview practice stands (stories ready, graded mocks, open gaps,
+/// the speaking streak) and the one thing to do next. A due voice mock leads with Start call and
+/// today's run follows as a row under it; otherwise today's run is the card's action.
+struct PrepReadinessCard: View {
+    struct DueMock {
+        let kind: PrepMockKind
+        let ladder: PrepLadder
+        let isStarting: Bool
+        let errorMessage: String?
+        let start: () -> Void
+    }
+
+    let facts: String
+    let streakDays: Int
+    let today: PrepDayCount?
+    let runAction: PrepCopy.RunAction
+    var mock: DueMock?
+
+    var body: some View {
+        let paper = HermexPaper.knowledge
+        HXCard(.wash(paper), title: mock == nil ? PrepCopy.runCardTitle(runAction) : "Call the interviewer",
+               titleStyle: .title3, spacing: BrainStyle.m, kicker: { EmptyView() }, content: {
+            if let mock, let line = PrepCopy.mockLine(mock.kind, level: mock.ladder.current) {
+                Text(verbatim: line)
+                    .font(BrainStyle.meta)
+                    .foregroundStyle(paper.glow)
+            }
+            Text(verbatim: facts)
+                .font(BrainStyle.rowSubtitle)
+                .foregroundStyle(Color.hxTextPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+            Label {
+                Text(verbatim: PrepCopy.speakingStreak(days: streakDays))
+            } icon: {
+                Image(systemName: "flame").foregroundStyle(HermexPaper.opener.glow)
+            }
+            .font(BrainStyle.meta)
+            .foregroundStyle(Color.hxTextSecondary)
+            if let message = mock?.errorMessage {
+                Text(verbatim: message)
+                    .font(BrainStyle.meta)
+                    .foregroundStyle(Color.hxDanger)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }, footer: {
+            VStack(spacing: BrainStyle.m) {
+                if let mock {
+                    PrepStartCallButton(isStarting: mock.isStarting, action: mock.start)
+                    PrepRunRow(today: today, action: runAction)
+                } else {
+                    if let today { PrepRunProgress(today: today) }
+                    PrepRunButton(action: runAction, fullWidth: true)
+                }
+            }
+        })
+    }
+}
+
+/// Today's run as one quiet row under a due mock: its ring, how far it got, and Start or Resume.
+private struct PrepRunRow: View {
+    let today: PrepDayCount?
     let action: PrepCopy.RunAction
 
     var body: some View {
-        HXCard(.wash(.knowledge), spacing: BrainStyle.m) {
-            HStack(spacing: BrainStyle.m) {
-                PrepDayRing(done: course.today.done, total: course.today.total, side: 60)
-                VStack(alignment: .leading, spacing: BrainStyle.xs) {
-                    Text(verbatim: PrepCopy.readyLine(ready: course.readyCount, total: course.lessonTotal))
-                        .font(AppFont.display(style: .headline))
-                        .foregroundStyle(HermexPaper.knowledge.glow)
-                    Label {
-                        Text(verbatim: PrepCopy.todayLine(days: streak.days, xp: course.xp))
-                    } icon: {
-                        Image(systemName: "flame").foregroundStyle(HermexPaper.opener.glow)
-                    }
-                    .font(BrainStyle.meta)
-                    .foregroundStyle(Color.hxTextPrimary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                PrepRunButton(action: action)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: BrainStyle.m) { progress; PrepRunButton(action: action, prominent: false) }
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                progress
+                PrepRunButton(action: action, fullWidth: true, prominent: false)
             }
         }
+    }
+
+    @ViewBuilder private var progress: some View {
+        if let today { PrepRunProgress(today: today).frame(maxWidth: .infinity, alignment: .leading) }
+        else { Spacer(minLength: 0) }
+    }
+}
+
+/// Today's ring beside "Today's run · 3 of 11".
+private struct PrepRunProgress: View {
+    let today: PrepDayCount
+
+    var body: some View {
+        HStack(spacing: BrainStyle.s) {
+            PrepDayRing(done: today.done, total: today.total, side: 32)
+            Text(verbatim: PrepCopy.runProgressLine(done: today.done, total: today.total))
+                .font(BrainStyle.rowSubtitle)
+                .foregroundStyle(Color.hxTextPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -75,6 +141,14 @@ struct PrepTodayRingCard: View {
 /// one quiet "N more units" line.
 struct PrepUnitPath: View {
     let course: PrepCourse
+    /// Open units the user unfolded; the unit being taught is always open.
+    @State private var unfolded: Set<String> = []
+
+    /// The unit being taught: the one holding the next lesson, else the last open unit.
+    private var teaching: String? {
+        course.units.first { $0.lessons.contains { $0.state == .next } }?.id
+            ?? course.units.last { $0.state == .current }?.id
+    }
 
     var body: some View {
         let lastCurrent = course.units.lastIndex { $0.state == .current }
@@ -88,8 +162,10 @@ struct PrepUnitPath: View {
             ForEach(Array(course.units.enumerated()), id: \.element.id) { index, unit in
                 if unit.state == .passed {
                     PrepPassedUnitRow(index: index, unit: unit)
-                } else if unit.state == .current {
+                } else if unit.state == .current, unit.id == teaching || unfolded.contains(unit.id) {
                     PrepCurrentUnit(index: index, unit: unit)
+                } else if unit.state == .current {
+                    PrepFoldedUnitRow(index: index, unit: unit) { unfolded.insert(unit.id) }
                 } else if index == nextLocked {
                     PrepLockedUnitRow(index: index, unit: unit)
                 }
@@ -127,6 +203,38 @@ private struct PrepPassedUnitRow: View {
         }
         .frame(minHeight: BrainStyle.minTapTarget)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// An open unit that isn't being taught (its boss is still to beat): one row with what's waiting in it,
+/// opening to its path on a tap.
+private struct PrepFoldedUnitRow: View {
+    let index: Int
+    let unit: PrepUnit
+    let unfold: () -> Void
+
+    var body: some View {
+        Button(action: unfold) {
+            HStack(spacing: BrainStyle.m) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: PrepCopy.unitHeader(index: index, title: unit.title))
+                        .font(AppFont.display(style: .subheadline))
+                        .foregroundStyle(Color.hxTextPrimary)
+                    Text(verbatim: PrepCopy.foldedUnitLine(unit))
+                        .font(BrainStyle.meta)
+                        .foregroundStyle(Color.hxTextSecondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.down")
+                    .font(BrainStyle.meta.weight(.semibold))
+                    .foregroundStyle(Color.hxTextSecondary)
+                    .accessibilityHidden(true)
+            }
+            .frame(minHeight: BrainStyle.minTapTarget)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(Text(verbatim: "Shows the unit's lessons"))
     }
 }
 
@@ -231,8 +339,9 @@ private struct PrepPathRow<Content: View>: View {
     }
 }
 
-/// A node's disc. Ready is filled glow with ✓; learned is a glow ring; shaky is an amber ring with ◌;
-/// next is larger with a Nous-blue ring; locked is neutral; the boss is a gold crown.
+/// A node's disc. Ready is filled glow with ✓; learned is a glow ring; a lesson back in reviews is a
+/// neutral ring with ◌ (it rejoins reviews, it didn't fail); next is larger with a heavy glow ring (it's
+/// in today's run, not a control); locked is neutral; the boss is a gold crown.
 private struct PrepNodeDisc: View {
     enum Kind { case ready, learned, shaky, next, locked, boss }
     let kind: Kind
@@ -252,12 +361,12 @@ private struct PrepNodeDisc: View {
                 symbol("book", weight: .semibold, color: paper.glow)
             case .shaky:
                 Circle().fill(Color.hxSurface)
-                Circle().strokeBorder(Color.hxWarning, lineWidth: 2.5)
-                symbol("circle.dashed", weight: .semibold, color: .hxWarning)
+                Circle().strokeBorder(Color.hxSeparator, lineWidth: 1.5)
+                symbol("circle.dashed", weight: .semibold, color: .hxTextSecondary)
             case .next:
-                Circle().fill(Color.hxCanvas)
-                Circle().strokeBorder(Color.accentColor, lineWidth: 4)
-                symbol("play.fill", weight: .bold, color: .accentColor)
+                Circle().fill(paper.wash)
+                Circle().strokeBorder(paper.glow, lineWidth: 4)
+                symbol("arrow.forward", weight: .bold, color: paper.glow)
             case .locked:
                 Circle().fill(Color.hxSurface)
                 Circle().strokeBorder(Color.hxSeparator, lineWidth: 0.5)
@@ -274,12 +383,13 @@ private struct PrepNodeDisc: View {
 
     private func symbol(_ name: String, weight: Font.Weight, color: Color) -> some View {
         Image(systemName: name)
-            .font(.system(size: side * 0.4, weight: weight))
+            .font(.system(size: side * 0.4, weight: weight)) // design-drift: allow (symbol in a scaled fixed-size disc)
             .foregroundStyle(color)
     }
 }
 
-/// One lesson on the path. Learned, ready and shaky lessons open the reader; the next one starts today's run.
+/// One lesson on the path. Learned, ready and reviewing lessons open the reader; the next one is marked as
+/// coming up in today's run (Start on the readiness card begins it), so it opens nothing.
 private struct PrepLessonNodeLink: View {
     let lesson: PrepLessonNode
 
@@ -291,10 +401,9 @@ private struct PrepLessonNodeLink: View {
                 .accessibilityLabel(Text(verbatim: "\(lesson.title), \(PrepCopy.lessonStateWord(lesson.state))"))
                 .accessibilityHint(Text(verbatim: "Opens the lesson"))
         case .next:
-            NavigationLink(value: ShellPushDestination.brainRoute(.prep(.run))) { row }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text(verbatim: "\(lesson.title), next"))
-                .accessibilityHint(Text(verbatim: "Starts today's run"))
+            row
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text(verbatim: "\(lesson.title), up next in today's run"))
         case .locked, .unknown:
             row
                 .accessibilityElement(children: .ignore)
@@ -321,7 +430,9 @@ private struct PrepLessonNodeLink: View {
                     .foregroundStyle(kind == .locked ? Color.hxTextSecondary : Color.hxTextPrimary)
                     .lineLimit(2)
                 if kind == .shaky {
-                    Text(verbatim: "Back in reviews").font(BrainStyle.meta).foregroundStyle(Color.hxWarning)
+                    Text(verbatim: "In reviews").font(BrainStyle.meta).foregroundStyle(Color.hxTextSecondary)
+                } else if kind == .next {
+                    Text(verbatim: "Up next in today's run").font(BrainStyle.meta).foregroundStyle(HermexPaper.knowledge.glow)
                 } else if lesson.reteach {
                     Text(verbatim: "Another way to see it is waiting").font(BrainStyle.meta)
                         .foregroundStyle(HermexPaper.knowledge.glow)
@@ -346,15 +457,9 @@ private struct PrepBossNodeRow: View {
         }
         .frame(minHeight: BrainStyle.minTapTarget, alignment: .leading)
         .contentShape(Rectangle())
-        if unit.boss == .ready {
-            NavigationLink(value: ShellPushDestination.brainRoute(.prep(.run))) { row }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text(verbatim: label))
-                .accessibilityHint(Text(verbatim: "Starts today's run"))
-        } else {
-            row
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(Text(verbatim: label))
-        }
+        // The boss comes up inside a run (the server schedules it), so the row says where, and opens nothing.
+        row
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(verbatim: label))
     }
 }

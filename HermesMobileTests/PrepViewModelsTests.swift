@@ -648,9 +648,9 @@ final class PrepViewModelsTests: XCTestCase {
 
     func testPathCopy() {
         XCTAssertEqual(PrepCopy.unitHeader(index: 1, title: "Prompt engineering"), "Unit 2 · Prompt engineering")
-        XCTAssertEqual(PrepCopy.todayLine(days: 6, xp: 340), "6-day streak · 340 XP")
-        XCTAssertEqual(PrepCopy.todayLine(days: 0, xp: 0), "0 XP")
-        XCTAssertEqual(PrepCopy.bossNode(.ready), "Boss quiz · ready")
+        XCTAssertEqual(PrepCopy.speakingStreak(days: 6), "6-day speaking streak")
+        XCTAssertEqual(PrepCopy.speakingStreak(days: 0), "No speaking streak yet: tell a story to start one")
+        XCTAssertEqual(PrepCopy.bossNode(.ready), "Boss quiz · comes up in a run")
         XCTAssertEqual(PrepCopy.bossNode(.resting), "Boss quiz · back in a few days")
         XCTAssertEqual(PrepCopy.bossNode(.locked), "Boss quiz")
     }
@@ -897,6 +897,21 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertTrue(vm.hasUnsentText, "quitting now would drop it")
         await vm.submitRecall()
         XCTAssertFalse(vm.hasUnsentText, "once graded, the answer is saved")
+    }
+
+    func testReadinessFactsSayWherePracticeStands() {
+        XCTAssertEqual(PrepCopy.readinessFacts(storiesReady: 0, storiesTotal: 8, gradedMocks: 0, openGaps: 10),
+                       "0 of 8 stories ready · No graded mock yet · 10 gaps to close")
+        XCTAssertEqual(PrepCopy.readinessFacts(storiesReady: 2, storiesTotal: 8, gradedMocks: 1, openGaps: 1),
+                       "2 of 8 stories ready · 1 graded mock · 1 gap to close")
+        XCTAssertEqual(PrepCopy.readinessFacts(storiesReady: nil, storiesTotal: nil, gradedMocks: nil, openGaps: nil),
+                       "Practice out loud: a story, then the follow-ups.", "still loading: no zeros that aren't true")
+    }
+
+    func testAStorySignalThatRepeatsItsQuestionIsDropped() {
+        XCTAssertNil(PrepCopy.promptSignal("Handled ambiguity", question: "Tell me about a time you handled ambiguity."))
+        XCTAssertEqual(PrepCopy.promptSignal("Ownership", question: "Tell me about a time you went beyond what was asked."),
+                       "Ownership")
     }
 
     func testRecallSubmitNeedsText() async {
@@ -1458,9 +1473,9 @@ final class PrepViewModelsTests: XCTestCase {
     // MARK: - PrepCopy
 
     func testZeroStreakCopy() {
-        XCTAssertEqual(PrepCopy.streakTitle(days: 0), "No streak yet")
-        XCTAssertEqual(PrepCopy.streakTitle(days: 3), "3-day streak")
-        XCTAssertEqual(PrepCopy.streakSubtitle(days: 0, freezes: 2), "Finish a run to start one")
+        XCTAssertEqual(PrepCopy.streakTitle(days: 0), "No speaking streak yet")
+        XCTAssertEqual(PrepCopy.streakTitle(days: 3), "3-day speaking streak")
+        XCTAssertEqual(PrepCopy.streakSubtitle(days: 0, freezes: 2), "Tell a story out loud to start one")
         XCTAssertNil(PrepCopy.streakSubtitle(days: 3, freezes: 0))
         XCTAssertEqual(PrepCopy.streakSubtitle(days: 3, freezes: 1), "1 freeze saved")
     }

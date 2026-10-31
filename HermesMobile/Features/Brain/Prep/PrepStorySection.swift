@@ -13,6 +13,8 @@ struct PrepStorySection: View {
     var onAct: (PrepStoryCandidate, PrepStoryCandidateAction) -> Void = { _, _ in }
 
     @State private var showsDismissed = false
+    @State private var showsAll = false
+    private static let shown = 3
 
     var body: some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
@@ -27,8 +29,12 @@ struct PrepStorySection: View {
             if !list.stories.isEmpty {
                 SectionCard {
                     VStack(spacing: 0) {
-                        rows(list.activeStories)
-                        if !list.benchStories.isEmpty {
+                        rows(Array(list.activeStories.prefix(showsAll ? list.activeStories.count : Self.shown)))
+                        if list.activeStories.count > Self.shown || !list.benchStories.isEmpty {
+                            PrepRowDivider()
+                            PrepShowAllButton(showsAll: $showsAll, count: list.activeStories.count + list.benchStories.count)
+                        }
+                        if showsAll && !list.benchStories.isEmpty {
                             if !list.activeStories.isEmpty { PrepRowDivider() }
                             HStack {
                                 Text(verbatim: "Bench")
@@ -233,7 +239,7 @@ private struct PrepStoryRow: View {
         VStack(alignment: .leading, spacing: BrainStyle.xs) {
             BrainRow(
                 title: story.title,
-                subtitle: story.last.map { "Last told \($0)" },
+                subtitle: story.last.map { "Last told \(BrainStyle.displayDate($0))" },
                 badge: story.ready ? "Ready" : nil)
             // One line when it fits; stacked at accessibility text sizes.
             ViewThatFits(in: .horizontal) {
@@ -352,7 +358,7 @@ struct PrepStoryPageView: View {
                 HStack(spacing: BrainStyle.m) { marks(page) }
                 VStack(alignment: .leading, spacing: BrainStyle.xs) { marks(page) }
             }
-            Text(verbatim: page.last.map { "Last told \($0)" } ?? "Not told yet")
+            Text(verbatim: page.last.map { "Last told \(BrainStyle.displayDate($0))" } ?? "Not told yet")
                 .font(BrainStyle.meta)
                 .foregroundStyle(Color.hxTextSecondary)
         }
@@ -426,7 +432,9 @@ struct PrepStoryPageView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(page.prompts.enumerated()), id: \.offset) { offset, prompt in
                         if offset > 0 { PrepRowDivider() }
-                        BrainRow(title: prompt.text, subtitle: prompt.signal, titleLineLimit: nil)
+                        // The signal only when it says something the question doesn't already.
+                        BrainRow(title: prompt.text, subtitle: PrepCopy.promptSignal(prompt.signal, question: prompt.text),
+                                 titleLineLimit: nil)
                             .padding(.vertical, BrainStyle.xs)
                     }
                 }

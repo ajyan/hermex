@@ -272,6 +272,8 @@ enum PrepMockCopy {
     static let ungraded = "Couldn't grade, saved for tonight"
     static let tooShort = "Too short to grade"
     static let notSent = "This call wasn't sent for grading."
+    /// A started call with no grade request on hand: nothing the app can send, so say what to do instead.
+    static let notSentNoRequest = "This call never reached the grader, so there's nothing to grade. Start a new call from the brief."
     static let notFound = "Couldn't find this mock"
     static let noInterviewer = "Interviewer isn't set up on this server."
 
@@ -312,17 +314,12 @@ enum PrepMockCopy {
         minutes > 0 ? "About \(minutes) minutes" : nil
     }
 
-    /// The median time to the interviewer's first word.
-    static func firstWord(_ ms: Int) -> String {
-        "First word in \(String(format: "%.1f", Double(ms) / 1000)) s (median)"
-    }
-
     static func scored(_ kind: PrepMockKind) -> String {
         switch kind {
         case .behavioral:
-            "Scored on each story's beats and how you hold up under the follow-ups. 4.0 passes."
+            "Scored out of 5 on each story's beats and how you hold up under the follow-ups. 4 passes."
         case .design:
-            "Scored on each frame point in order, plus structure, depth and communication. 4.0 passes."
+            "Scored out of 5 on each frame point in order, plus structure, depth and communication. 4 passes."
         }
     }
 

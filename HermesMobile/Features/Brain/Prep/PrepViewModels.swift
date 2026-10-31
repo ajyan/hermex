@@ -1024,13 +1024,51 @@ enum PrepCopy {
     static func unitHeader(index: Int, title: String) -> String { "Unit \(index + 1) · \(title)" }
 
     /// The ring card's line: the streak once there is one, then XP.
-    static func todayLine(days: Int, xp: Int) -> String {
-        days > 0 ? "\(streak(days: days)) · \(xp) XP" : "\(xp) XP"
+    /// The readiness card's one line of where practice stands: "0 of 8 stories ready · No graded mock yet · 10 open gaps".
+    static func readinessFacts(storiesReady: Int?, storiesTotal: Int?, gradedMocks: Int?, openGaps: Int?) -> String {
+        var parts: [String] = []
+        if let storiesReady, let storiesTotal, storiesTotal > 0 { parts.append("\(storiesReady) of \(storiesTotal) stories ready") }
+        if let gradedMocks {
+            parts.append(gradedMocks == 0 ? "No graded mock yet" : gradedMocks == 1 ? "1 graded mock" : "\(gradedMocks) graded mocks")
+        }
+        if let openGaps { parts.append(openGaps == 1 ? "1 gap to close" : "\(openGaps) gaps to close") }
+        return parts.isEmpty ? "Practice out loud: a story, then the follow-ups." : parts.joined(separator: " · ")
+    }
+
+    /// The streak counts days with an answer said out loud (a story, a probe or a voice mock).
+    static func speakingStreak(days: Int) -> String {
+        days == 0 ? "No speaking streak yet: tell a story to start one" : "\(days)-day speaking streak"
+    }
+
+    /// The readiness card's title when today's run is its action.
+    static func runCardTitle(_ action: RunAction) -> String {
+        action == .done ? "Today's run is done" : "Today's run"
+    }
+
+    static func runProgressLine(done: Int, total: Int) -> String { "Today's run · \(done) of \(total)" }
+
+    /// A due mock's level line: "Behavioral · B1 One story · About 6 minutes".
+    static func mockLine(_ kind: PrepMockKind, level: PrepMockLevel?) -> String? {
+        guard let level else { return nil }
+        return [kind.title, "\(level.level) \(level.title)", PrepMockCopy.minutes(level.minutes)]
+            .compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// An open unit folded to one row: what waits in it. "4 in reviews · boss back in a few days".
+    static func foldedUnitLine(_ unit: PrepUnit) -> String {
+        let reviewing = unit.lessons.filter { $0.state == .shaky }.count
+        var parts = reviewing > 0 ? ["\(reviewing) in reviews"] : [readyLine(ready: unit.readyCount, total: unit.lessonsTotal)]
+        switch unit.boss {
+        case .ready: parts.append("boss comes up in a run")
+        case .resting: parts.append("boss back in a few days")
+        case .locked, .passed, .unknown: break
+        }
+        return parts.joined(separator: " · ")
     }
 
     static func bossNode(_ state: PrepBossState) -> String {
         switch state {
-        case .ready: "Boss quiz · ready"
+        case .ready: "Boss quiz · comes up in a run"
         case .resting: "Boss quiz · back in a few days"
         case .locked, .passed, .unknown: "Boss quiz"
         }
@@ -1040,11 +1078,19 @@ enum PrepCopy {
     static func lessonStateWord(_ state: PrepLessonState) -> String {
         switch state {
         case .ready: "interview-ready"
-        case .shaky: "back in reviews"
+        case .shaky: "in reviews"
         case .learned: "learned"
         case .next: "next"
         case .locked, .unknown: "locked"
         }
+    }
+
+    /// A story question's signal, unless it only restates the question ("Handled ambiguity" under
+    /// "Tell me about a time you handled ambiguity.").
+    static func promptSignal(_ signal: String?, question: String) -> String? {
+        guard let signal, !signal.isEmpty else { return nil }
+        let words = { (s: String) in s.lowercased().split { !$0.isLetter }.map(String.init) }
+        return Set(words(signal)).isSubset(of: Set(words(question))) ? nil : signal
     }
 
     static func readyLine(ready: Int, total: Int) -> String { "\(ready) of \(total) ready" }
@@ -1230,12 +1276,12 @@ enum PrepCopy {
 
     /// The streak row's title; a zero streak reads as not started.
     static func streakTitle(days: Int) -> String {
-        days == 0 ? "No streak yet" : streak(days: days)
+        days == 0 ? "No speaking streak yet" : "\(days)-day speaking streak"
     }
 
     /// The streak row's subtitle: the nudge at zero, the freezes only when there are some.
     static func streakSubtitle(days: Int, freezes: Int) -> String? {
-        if days == 0 { return "Finish a run to start one" }
+        if days == 0 { return "Tell a story out loud to start one" }
         return freezes == 0 ? nil : Self.freezes(freezes)
     }
 
@@ -1243,6 +1289,15 @@ enum PrepCopy {
     static func runAction(reps: Int, remaining: Int) -> RunAction {
         if remaining <= 0 { return .done }
         return remaining < reps ? .resume : .start
+    }
+
+    /// The full-width form: "Start today's run", "Resume today's run".
+    static func runActionLongTitle(_ action: RunAction) -> String {
+        switch action {
+        case .start: "Start today's run"
+        case .resume: "Resume today's run"
+        case .done: "Done for today"
+        }
     }
 
     static func runActionTitle(_ action: RunAction) -> String {

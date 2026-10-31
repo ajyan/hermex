@@ -302,6 +302,7 @@ struct PrepJudgmentLessonCards: View {
     @Binding var checkAnswer: String
     @Binding var checkDone: Bool
     @FocusState.Binding var checkFocused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         if let repeatText = lesson.repeatText {
@@ -366,7 +367,7 @@ struct PrepJudgmentLessonCards: View {
                 if checkDone {
                     PrepPrimaryButton(title: "Done") {
                         checkAnswer = ""
-                        withAnimation { checkDone = false }
+                        withAnimation(reduceMotion ? nil : .default) { checkDone = false }
                     }
                 } else {
                     TextField(text: $checkAnswer, axis: .vertical) { Text(verbatim: "Answer with what you just learned") }
@@ -406,7 +407,7 @@ struct PrepJudgmentLessonCards: View {
 
     private func done() {
         checkFocused = false
-        withAnimation { checkDone = true }
+        withAnimation(reduceMotion ? nil : .default) { checkDone = true }
     }
 
     /// The lesson's text with inline bold and code intact; a parse failure shows the plain text.
@@ -426,16 +427,16 @@ struct PrepGapCallout: View {
         Label {
             Text(verbatim: text)
                 .font(BrainStyle.rowTitle)
-                .foregroundStyle(isKnownGap ? HermexPaper.request.glow : Color.hxTextSecondary)
+                .foregroundStyle(isKnownGap ? HermexPaper.knowledge.glow : Color.hxTextSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         } icon: {
             Image(systemName: isKnownGap ? "arrow.triangle.branch" : "tray.and.arrow.down")
-                .foregroundStyle(isKnownGap ? HermexPaper.request.glow : Color.hxTextSecondary)
+                .foregroundStyle(isKnownGap ? HermexPaper.knowledge.glow : Color.hxTextSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, BrainStyle.cardHorizontalPadding)
         .padding(.vertical, BrainStyle.cardVerticalPadding)
-        .glowSurface(HermexPaper.request, cornerRadius: HXRadius.md)
+        .glowSurface(HermexPaper.knowledge, cornerRadius: HXRadius.md)
         .accessibilityElement(children: .combine)
     }
 }
@@ -528,9 +529,9 @@ struct PrepPrimaryButton: View {
                 }
             }
             .font(AppFont.body(weight: .semibold))
-            .foregroundStyle(isActive ? paper.onGlow : paper.glow.opacity(0.6))
+            // Disabled: full-strength secondary text on a faint wash (glow text is never faded).
+            .foregroundStyle(isActive ? paper.onGlow : Color.hxTextSecondary)
             .frame(maxWidth: .infinity, minHeight: 50)
-            // Disabled: a faint wash with readable ink, so the label never disappears.
             .background(isActive ? paper.glow : paper.glow.opacity(0.15), in: Capsule())
             .contentShape(Capsule())
         }
