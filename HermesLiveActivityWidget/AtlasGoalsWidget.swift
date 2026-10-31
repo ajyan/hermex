@@ -10,7 +10,7 @@ struct AtlasGoalsWidget: Widget {
         StaticConfiguration(kind: AtlasWidgetGoals.widgetKind, provider: AtlasGoalsProvider()) { entry in
             AtlasGoalsWidgetView(entry: entry)
                 .containerBackground(for: .widget) {
-                    Color(uiColor: .secondarySystemGroupedBackground)
+                    Color.hxSurface
                 }
         }
         .configurationDisplayName("Goals")
@@ -74,20 +74,21 @@ private struct AtlasGoalsWidgetView: View {
     private var header: some View {
         HStack(spacing: 6) {
             Image(systemName: "target")
-                .font(.system(size: 13, weight: .semibold))
+                .font(AppFont.footnote(weight: .semibold))
                 .widgetAccentable()
             Text("Goals")
-                .font(.subheadline.weight(.semibold))
+                .font(AppFont.subheadline(weight: .semibold))
+                .foregroundStyle(Color.hxTextPrimary)
             Spacer()
             if let goals = entry.goals {
                 if goals.syncFailed {
                     Label("Couldn't sync", systemImage: "exclamationmark.triangle")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
+                        .font(AppFont.caption())
+                        .foregroundStyle(Color.hxDanger)
                 } else if goals.streakDays > 0, !entry.isStale {
                     Text("\(goals.streakDays)-day streak")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(AppFont.caption())
+                        .foregroundStyle(Color.hxTextSecondary)
                 }
             }
         }
@@ -95,8 +96,8 @@ private struct AtlasGoalsWidgetView: View {
 
     private func message(_ text: LocalizedStringKey) -> some View {
         Text(text)
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
+            .font(AppFont.subheadline())
+            .foregroundStyle(Color.hxTextSecondary)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
@@ -112,33 +113,67 @@ private struct AtlasGoalRow: View {
                     .accessibilityLabel("Done")
             } else {
                 Button(intent: GoalWidgetCheckInIntent(slug: item.slug, commitment: item.commitment, done: !item.isDone)) {
+                    // The whole row's height takes the tap, though the widget keeps rows compact.
                     mark
+                        .frame(maxHeight: .infinity)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(item.isDone ? "Undo \(item.action)" : "Mark \(item.action) done")
             }
             Text(item.action)
-                .font(.subheadline)
+                .font(AppFont.subheadline())
+                .foregroundStyle(Color.hxTextPrimary)
                 .lineLimit(1)
             Spacer(minLength: 4)
-            Text(verbatim: "\(item.weekCount)/\(item.target)")
-                .font(.footnote.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .accessibilityLabel("\(item.weekCount) of \(item.target) this week")
+            AtlasGoalPips(done: item.weekCount, target: item.target)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(AtlasGoalPips.spoken(done: item.weekCount, target: item.target))
         }
         .frame(minHeight: 28)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     @ViewBuilder
     private var mark: some View {
         if item.isDone {
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 22))
-                .foregroundStyle(.green)
+                .font(AppFont.title3())
+                .foregroundStyle(Color.hxSuccess)
         } else {
             Image(systemName: "circle")
-                .font(.system(size: 22))
-                .foregroundStyle(.secondary)
+                .font(AppFont.title3())
+                .foregroundStyle(Color.hxTextSecondary)
         }
+    }
+}
+
+/// The week's count as the Brief's pips (`DeckDot`, shared with the app): one per check-in of
+/// the target, filled once done. Columns narrow so a long target still fits the row.
+struct AtlasGoalPips: View {
+    let done: Int
+    let target: Int
+
+    /// At most this wide, so the commitment's name keeps its room.
+    static let maxWidth: CGFloat = 140
+
+    var body: some View {
+        let count = max(target, done)
+        let column = Self.column(count: count)
+        HStack(spacing: 0) {
+            ForEach(0..<count, id: \.self) { index in
+                DeckDot(state: index < done ? "done" : "missed", ink: Color.hxSuccess, column: column)
+            }
+        }
+    }
+
+    /// A day column's width, as the Brief's grid shares its seven when there are more pips.
+    static func column(count: Int) -> CGFloat {
+        guard count > 0 else { return DeckDots.dot }
+        return max(DeckDots.dot, min(20, maxWidth / CGFloat(count)))
+    }
+
+    static func spoken(done: Int, target: Int) -> String {
+        target > 0 ? "\(done) of \(target) this week" : "\(done) this week"
     }
 }
