@@ -12,6 +12,8 @@ struct PrepRunView: View {
     /// The unsent answer on an approach or spot-the-bug rep.
     @State private var draft = Draft(rep: -1)
     @Environment(\.dismiss) private var dismiss
+    /// A mic still working on the answer (`PrepMicBusyKey`); Submit and Send wait for it.
+    @State private var micBusy = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Starts a new Atlas chat with these words in the composer ("Go deeper in Atlas").
     private let ask: (String) -> Void
@@ -43,6 +45,7 @@ struct PrepRunView: View {
 
     var body: some View {
         content
+            .onPreferenceChange(PrepMicBusyKey.self) { micBusy = $0 }
             .environment(\.prepDiagramLoader, viewModel.diagramLoader)
             .hxNavigationTitle(title)
             .navigationBarBackButtonHidden(true)
@@ -203,7 +206,7 @@ struct PrepRunView: View {
                 PrepTutorReplyBar(
                     draft: Binding(get: { viewModel.tutorDraft }, set: { viewModel.tutorDraft = $0 }),
                     canReply: result.dialogue?.awaitingReply == true && viewModel.pendingReply == nil,
-                    canSend: viewModel.canSendTutorReply, isBusy: viewModel.tutorBusy,
+                    canSend: viewModel.canSendTutorReply && !micBusy, isBusy: viewModel.tutorBusy,
                     send: { Task { await viewModel.sendTutorReply() } },
                     showMe: { Task { await viewModel.showMe() } })
             }
@@ -369,7 +372,7 @@ struct PrepRunView: View {
         case .lesson where Self.usesRecall(rep), .recall where Self.usesRecall(rep):
             PrepPrimaryButton(
                 title: "Submit",
-                enabled: viewModel.canSubmitRecall,
+                enabled: viewModel.canSubmitRecall && !micBusy,
                 isGrading: viewModel.isSubmitting
             ) { Task { await viewModel.submitRecall() } }
         case .lesson, .warmup, .recall:
@@ -528,10 +531,10 @@ struct PrepRunView: View {
     private var storyAction: some View {
         switch viewModel.storyStage {
         case .telling:
-            PrepPrimaryButton(title: "Submit", enabled: viewModel.canSubmitStoryAnswer,
+            PrepPrimaryButton(title: "Submit", enabled: viewModel.canSubmitStoryAnswer && !micBusy,
                               isGrading: viewModel.isSubmitting) { Task { await viewModel.submitStory() } }
         case .probing:
-            PrepPrimaryButton(title: "Submit", enabled: viewModel.canSubmitStoryAnswer,
+            PrepPrimaryButton(title: "Submit", enabled: viewModel.canSubmitStoryAnswer && !micBusy,
                               isGrading: viewModel.isSubmitting) { Task { await viewModel.submitProbe() } }
         case .told, .probed:
             if let next = viewModel.nextProbe {

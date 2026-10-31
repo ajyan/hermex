@@ -5,10 +5,11 @@ private func prepIsNotFound(_ error: Error) -> Bool {
     (error as? APIError)?.isNotFound ?? false
 }
 
-/// 409 (another day's plan) and 400 (the rep no longer exists): both mean reload today.
+/// 409 (another day's plan) and 400 (the rep no longer exists): both mean reload today. A 400 for the
+/// answer itself ("bad answer") is not a conflict: reloading would drop the draft without saying why.
 private func prepIsConflict(_ error: Error) -> Bool {
-    if case let .http(statusCode, _)? = error as? APIError { return statusCode == 409 || statusCode == 400 }
-    return false
+    guard let api = error as? APIError, case let .http(statusCode, _) = api else { return false }
+    return statusCode == 409 || (statusCode == 400 && api.serverMessage != "bad answer")
 }
 
 private func prepIsCancellation(_ error: Error) -> Bool {
@@ -68,6 +69,8 @@ final class PrepHomeViewModel {
         } catch {
             guard token == generation, !prepIsCancellation(error) else { return }
             onAPIError(error)
+            // A failed quiet refresh keeps what is on screen; only a first load shows the failure.
+            if case .loaded = state { return }
             state = prepFailureState(error)
             return
         }
@@ -419,7 +422,8 @@ final class PrepRunViewModel {
         defer { if token == generation { overridingPoint = nil } }
         do {
             let updated = try await client.override(attempt: attempt, point: point)
-            guard token == generation, case .result = phase else { return }
+            // Next may have moved on while this was in flight: merge only into the same rep's result.
+            guard token == generation, case let .result(current, _, _) = phase, current.index == rep.index else { return }
             let merged = PrepAttemptResult(merging: result, override: updated)
             phase = .result(rep, merged, index: index)
             lastXP = Self.xp(for: rep, result: merged)
@@ -513,8 +517,15 @@ final class PrepRunViewModel {
                     tutorStreaming = nil
                 case .done(let done):
                     apply(done)
-                case let .failed(_, message):
-                    tutorError = message.isEmpty ? "The tutor couldn't reply. Try again." : message
+                case let .failed(status, message):
+                    if status == 409 {
+                        // The reply is already recorded (or the dialogue moved on): Try again asks for
+                        // the tutor's turn rather than resending it.
+                        pendingReply = nil
+                        tutorError = "The tutor couldn't reply. Try again."
+                    } else {
+                        tutorError = message.isEmpty ? "The tutor couldn't reply. Try again." : message
+                    }
                 }
             }
         } catch {
@@ -897,7 +908,9 @@ final class PrepRunViewModel {
             } else {
                 isSubmitting = false
                 onAPIError(error)
-                submitError = "Couldn't save. Try again."
+                submitError = (error as? APIError)?.serverMessage == "bad answer"
+                    ? "That answer couldn't be saved. Shorten it and try again."
+                    : "Couldn't save. Try again."
             }
             return nil
         }
