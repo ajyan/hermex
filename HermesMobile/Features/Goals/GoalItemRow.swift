@@ -143,8 +143,8 @@ struct GoalItemFollowUp: View {
                 offer.transition(.opacity)
             }
         }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: recentDate != nil)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: isNoting)
+        .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: recentDate != nil)
+        .animation(HXMotion.disclosure(reduceMotion: reduceMotion), value: isNoting)
     }
 
     private var offer: some View {
