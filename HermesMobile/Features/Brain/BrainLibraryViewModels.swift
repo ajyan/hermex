@@ -67,11 +67,14 @@ final class BrainHomeViewModel {
     private let today: () -> String
     /// The batch `home` holds, which is what the saved position refers to.
     private var currentBatch = 0
-    /// The day the shown batch was loaded for. A deck left open overnight keeps saving under it.
+    /// The day the shown batch was dealt for: the server's day when it says, else the phone's. A deck
+    /// left open overnight keeps saving under it.
     private(set) var deckDay: String?
+    /// The phone's day of the last load, which is what "a new day" is measured against.
+    private var loadedOn: String?
 
     /// True once a deck is on screen and the day has moved on: the screen should `load()` again.
-    var needsNewDay: Bool { deckDay.map { $0 != today() } ?? false }
+    var needsNewDay: Bool { loadedOn.map { $0 != today() } ?? false }
 
     init(client: any BrainDataClient, cache: BrainCacheHandle, onAPIError: @escaping (Error) -> Void = { _ in },
          reviewStore: BrainReviewStore = BrainReviewStore(), today: @escaping () -> String = BrainReviewStore.today) {
@@ -131,9 +134,13 @@ final class BrainHomeViewModel {
         let token = generation
         if modules.isEmpty { state = .loading }
         let day = today()
-        let batch = saved(on: day)?.batch ?? 0
+        // The batch to ask for: today's saved one, or, when the last deck came from a server whose
+        // day differs from the phone's, the one saved under that day.
+        let servedElsewhere = deckDay != nil && deckDay != loadedOn ? deckDay.flatMap { saved(on: $0) } : nil
+        let batch = (saved(on: day) ?? servedElsewhere)?.batch ?? 0
         if home.isEmpty, let cached = cache.load(BrainHome.self, kind: "home", id: "\(day)-\(batch)") {
-            show(cached, day: day, batch: batch, index: saved(on: day)?.index ?? 0)
+            show(cached, day: cached.day ?? day, batch: batch, index: saved(on: cached.day ?? day)?.index ?? 0)
+            loadedOn = day
         }
         let client = self.client
         async let fetchedHome = Self.attempt { try await client.home(batch: batch) }
@@ -166,8 +173,12 @@ final class BrainHomeViewModel {
         guard !Task.isCancelled, token == generation else { return }
         switch homeResult {
         case .success(let loadedHome):
-            // Read the position now, not before the fetch, so a swipe made while it ran wins.
-            show(loadedHome, day: day, batch: batch, index: saved(on: day)?.index ?? 0)
+            // Read the position now, not before the fetch, so a swipe made while it ran wins. It is
+            // saved under the server's day, so a phone in another time zone keeps its place.
+            let served = loadedHome.day ?? day
+            let position = saved(on: served).flatMap { $0.batch == batch ? $0.index : nil } ?? 0
+            show(loadedHome, day: served, batch: batch, index: position)
+            loadedOn = day
             cache.store(loadedHome, kind: "home", id: "\(day)-\(batch)")
             deckFailed = false
             if modulesLanded { lastLoaded = .now }
@@ -468,6 +479,10 @@ final class BrainPageViewModel {
         return result
     }
 
+    /// The page's saved copy is per hub: one opened while paging a hub carries that hub's trail and
+    /// pager, which must not show when the same page is opened from search.
+    private var cacheID: String { hub.map { "\(id)#hub=\($0)" } ?? id }
+
     func load() async {
         generation += 1
         let token = generation
@@ -479,14 +494,16 @@ final class BrainPageViewModel {
             state = .loaded(fetched)
             isShowingCachedCopy = false
             isMissing = false
-            cache.store(fetched, kind: "page", id: id)
+            cache.store(fetched, kind: "page", id: cacheID)
         } catch is CancellationError {
             // The screen went away; nothing to update.
         } catch {
             guard !Task.isCancelled, token == generation else { return }
             let notFound = brainIsNotFound(error)
             isMissing = notFound
-            if let cached = cache.load(BrainPage.self, kind: "page", id: id) {
+            // In a hub, its own copy first, then the page's plain copy; outside one, never a hub's.
+            if let cached = cache.load(BrainPage.self, kind: "page", id: cacheID)
+                ?? (hub == nil ? nil : cache.load(BrainPage.self, kind: "page", id: id)) {
                 page = cached
                 state = .loaded(cached)
                 isShowingCachedCopy = true

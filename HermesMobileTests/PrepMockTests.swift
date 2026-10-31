@@ -50,6 +50,7 @@ private final class FakeMockClient: PrepDataClient, @unchecked Sendable {
     func stories() async throws -> PrepStoryList { throw URLError(.badServerResponse) }
     func storyCandidate(id: String, action: String) async throws { throw URLError(.badServerResponse) }
     func override(attempt: String, point: String) async throws -> PrepAttemptResult { throw URLError(.badServerResponse) }
+    func undoOverride(attempt: String) async throws -> PrepAttemptResult { throw URLError(.badServerResponse) }
 }
 
 /// `GET /api/tutor/mocks` after a graded D1, as the server's routes return it (Task 13), plus a level

@@ -99,7 +99,10 @@ enum BrainJournalCalendarLayout {
     /// "12 days", how many days of the month have an entry; nil for none.
     static func entryCount(in month: Month, entries: [String: BrainItem]) -> String? {
         let prefix = month.id + "-"
-        let count = entries.keys.filter { $0.hasPrefix(prefix) }.count
+        return entryCount(entries.keys.filter { $0.hasPrefix(prefix) }.count)
+    }
+
+    static func entryCount(_ count: Int) -> String? {
         guard count > 0 else { return nil }
         return count == 1 ? "1 day" : "\(count) days"
     }
@@ -113,10 +116,13 @@ enum BrainJournalCalendarLayout {
         return date.formatted(style)
     }
 
+    /// Built once: `date(fromKey:)` runs for every item on every page.
+    private static let utc = calendar()
+
     static func date(fromKey key: String) -> Date? {
         let parts = key.split(separator: "-").compactMap { Int($0) }
         guard key.count == 10, parts.count == 3 else { return nil }
-        let calendar = calendar()
+        let calendar = utc
         let components = DateComponents(year: parts[0], month: parts[1], day: parts[2])
         guard components.isValidDate(in: calendar) else { return nil }
         return calendar.date(from: components)
@@ -140,6 +146,8 @@ struct BrainJournalCalendarView: View {
     /// Built once per list, never in `body`.
     private let entries: [String: BrainItem]
     private let months: [BrainJournalCalendarLayout.Month]
+    /// Entries per month ("2026-10"), counted once rather than per month per render.
+    private let monthCounts: [String: Int]
     private let todayKey: String
 
     init(list: BrainList, isLoadingOlder: Bool, loadOlderFailed: Bool, isShowingCachedCopy: Bool = false,
@@ -151,6 +159,7 @@ struct BrainJournalCalendarView: View {
         let entries = BrainJournalCalendarLayout.entries(list.items)
         self.entries = entries
         self.months = BrainJournalCalendarLayout.months(for: entries.keys, today: today)
+        self.monthCounts = Dictionary(grouping: entries.keys, by: { String($0.prefix(7)) }).mapValues(\.count)
         self.todayKey = BrainJournalCalendarLayout.todayKey(today)
     }
 
@@ -158,7 +167,8 @@ struct BrainJournalCalendarView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: BrainStyle.xl) {
                 ForEach(months) { month in
-                    BrainJournalMonthView(month: month, entries: entries, todayKey: todayKey)
+                    BrainJournalMonthView(month: month, entries: entries, todayKey: todayKey,
+                                          entryCount: BrainJournalCalendarLayout.entryCount(monthCounts[month.id] ?? 0))
                 }
                 footer
             }
@@ -194,12 +204,14 @@ struct BrainJournalMonthView: View {
     let month: BrainJournalCalendarLayout.Month
     let entries: [String: BrainItem]
     let todayKey: String
+    /// "12 days", counted by the calendar.
+    let entryCount: String?
     private static let columns = Array(repeating: GridItem(.flexible(), spacing: BrainStyle.xs), count: 7)
 
     var body: some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
             HXSectionHeader(title: BrainJournalCalendarLayout.title(of: month),
-                            trailing: BrainJournalCalendarLayout.entryCount(in: month, entries: entries))
+                            trailing: entryCount)
             LazyVGrid(columns: Self.columns, spacing: BrainStyle.xs) {
                 ForEach(Array(BrainJournalCalendarLayout.weekdaySymbols().enumerated()), id: \.offset) { _, symbol in
                     Text(verbatim: symbol)

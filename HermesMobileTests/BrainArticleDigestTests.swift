@@ -26,6 +26,16 @@ final class BrainArticleDigestTests: XCTestCase {
     Start with the gateway when the interviewer says microservices.
     """
 
+    func testRepeatedListNumbersCountByPosition() {
+        typealias Idea = BrainArticleDigest.Idea
+        let repeated = [Idea(number: 1, headline: "A", detail: ""), Idea(number: 1, headline: "B", detail: ""),
+                        Idea(number: 1, headline: "C", detail: "")]
+        XCTAssertEqual(BrainArticleDigest.numbered(repeated).map(\.number), [1, 2, 3])
+        let written = [Idea(number: 1, headline: "A", detail: ""), Idea(number: 2, headline: "B", detail: ""),
+                       Idea(number: 4, headline: "C", detail: "")]
+        XCTAssertEqual(BrainArticleDigest.numbered(written).map(\.number), [1, 2, 4], "written numbers stay, so a bite can name one")
+    }
+
     func testFocusIdeaStartsExpanded() throws {
         let digest = try XCTUnwrap(BrainArticleDigest.parse(article))
         XCTAssertEqual(BrainArticleDigestView.initiallyExpanded(2, in: digest), [2])

@@ -25,6 +25,8 @@ protocol PrepDataClient: Sendable {
     func storyCandidate(id: String, action: String) async throws
     /// "I had that": count one missed key point of a graded recall or boss answer as hit.
     func override(attempt: String, point: String) async throws -> PrepAttemptResult
+    /// Takes the answer's "I had that" back: the grade as it was, and the override free again.
+    func undoOverride(attempt: String) async throws -> PrepAttemptResult
     /// Both voice mock ladders and the newest mocks.
     func mocks() async throws -> PrepMocks
     /// Starts a mock at `level` (an unlocked one, to replay it), else the kind's current level: its
@@ -126,6 +128,12 @@ struct APIClientPrepAdapter: PrepDataClient {
         return try decode(data)
     }
 
+    func undoOverride(attempt: String) async throws -> PrepAttemptResult {
+        let data = try await apiClient.sendData(endpoint: .tutorOverride, method: "POST",
+                                                body: PrepOverrideRequest(attempt: attempt, point: nil, undo: true))
+        return try decode(data)
+    }
+
     func mocks() async throws -> PrepMocks {
         try await get(.tutorMocks)
     }
@@ -187,5 +195,6 @@ struct APIClientPrepAdapter: PrepDataClient {
 
 struct PrepOverrideRequest: Encodable, Hashable, Sendable {
     let attempt: String
-    let point: String
+    let point: String?
+    var undo: Bool?
 }
