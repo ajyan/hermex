@@ -313,7 +313,7 @@ struct PrepGapView: View {
     private func header(_ gap: PrepGapDetail) -> some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
             HStack(spacing: BrainStyle.s) {
-                HXChip(paper: .knowledge, label: statusWord(gap)) { EmptyView() }
+                HXChip(paper: .prep, label: statusWord(gap)) { EmptyView() }
                 if let stage = PrepCopy.stageChip(gap.stage) {
                     HXChip(paper: .plain, label: stage) { EmptyView() }
                 }

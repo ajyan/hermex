@@ -1,7 +1,7 @@
 import SwiftUI
 
 // The story rep's cards: the telling (the prompt, an m:ss clock, the transcript and a tap-to-talk
-// mic), its graded result, and up to two follow-up probes. Like every run card they are `.knowledge`
+// mic), its graded result, and up to two follow-up probes. Like every run card they are `.prep`
 // glow cards; the mic is a control, so it alone wears Nous blue. Only the sample telling is serif.
 
 /// Tap to talk: on-device dictation into the answer, punctuated as it is heard and tidied on Stop,
@@ -140,7 +140,7 @@ struct PrepStoryTellCard: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(verbatim: signal.isEmpty ? "Tell a story" : signal)
                     .font(BrainStyle.meta)
-                    .foregroundStyle(HermexPaper.knowledge.glow)
+                    .foregroundStyle(HermexPaper.prep.glow)
                 Spacer(minLength: BrainStyle.s)
                 if startedAt != nil && !isSubmitting {
                     TimelineView(.periodic(from: .now, by: 1)) { _ in
@@ -153,7 +153,7 @@ struct PrepStoryTellCard: View {
             }
             Text(verbatim: title.isEmpty ? prompt : title)
                 .font(AppFont.display(style: .title3))
-                .foregroundStyle(title.isEmpty ? Color.hxTextPrimary : HermexPaper.knowledge.glow)
+                .foregroundStyle(title.isEmpty ? Color.hxTextPrimary : HermexPaper.prep.glow)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
             if !title.isEmpty {
@@ -166,7 +166,7 @@ struct PrepStoryTellCard: View {
                 VStack(alignment: .leading, spacing: BrainStyle.xs) {
                     Text(verbatim: cues.map(\.label).joined(separator: " · "))
                         .font(BrainStyle.meta.weight(.semibold))
-                        .foregroundStyle(HermexPaper.knowledge.glow)
+                        .foregroundStyle(HermexPaper.prep.glow)
                         .fixedSize(horizontal: false, vertical: true)
                     Button(action: peek) {
                         Text(verbatim: "Peek at the cues")
@@ -188,7 +188,7 @@ struct PrepStoryTellCard: View {
                         layout {
                             Text(verbatim: cue.label)
                                 .font(AppFont.body(weight: .semibold))
-                                .foregroundStyle(HermexPaper.knowledge.glow)
+                                .foregroundStyle(HermexPaper.prep.glow)
                                 .frame(width: dynamicTypeSize.isAccessibilitySize ? nil : labelWidth, alignment: .leading)
                             Text(verbatim: cue.cue)
                                 .font(BrainStyle.rowTitle)
@@ -234,7 +234,7 @@ struct PrepProbeCard: View {
         PrepRunCard {
             Text(verbatim: PrepCopy.probeLabel(number))
                 .font(BrainStyle.meta)
-                .foregroundStyle(HermexPaper.knowledge.glow)
+                .foregroundStyle(HermexPaper.prep.glow)
             if !prompt.isEmpty {
                 Text(verbatim: prompt)
                     .font(BrainStyle.meta)
@@ -276,7 +276,7 @@ struct PrepStoryResultView: View {
         PrepRunCard {
             Text(verbatim: PrepCopy.storyHeadline(result))
                 .font(AppFont.display(style: result.isUngraded ? .headline : .title3))
-                .foregroundStyle(result.isUngraded ? Color.hxTextPrimary : HermexPaper.knowledge.glow)
+                .foregroundStyle(result.isUngraded ? Color.hxTextPrimary : HermexPaper.prep.glow)
                 .accessibilityAddTraits(.isHeader)
             if !result.isUngraded {
                 if let over = PrepCopy.storyClockState(result.elapsedMS ?? 0).text {
@@ -322,7 +322,7 @@ struct PrepProbeResultView: View {
     var body: some View {
         Text(verbatim: PrepCopy.probeLabel(number))
             .font(BrainStyle.meta)
-            .foregroundStyle(HermexPaper.knowledge.glow)
+            .foregroundStyle(HermexPaper.prep.glow)
         if result.isUngraded {
             PrepRunCard {
                 Text(verbatim: PrepCopy.storyUngraded)

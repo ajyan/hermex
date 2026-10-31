@@ -2,7 +2,7 @@ import SwiftUI
 
 // The learn-first course's screens inside a run: a lesson (its example-first cards, or the idea, and one
 // check), its graded check, a boss result without critique, and the end-of-day summary.
-// Prep wears the `.knowledge` paper; reward marks (flame, crown, stars) use the opener glow as a
+// Prep wears the `.prep` paper; reward marks (flame, crown, stars) use the opener glow as a
 // symbol color only (DESIGN.md, "Reward gold").
 
 /// The reward mark color: the opener glow, for symbols only.
@@ -15,7 +15,7 @@ private struct PrepLessonLabel: View {
     var body: some View {
         Text(verbatim: title)
             .font(AppFont.display(style: .subheadline, weight: .semibold))
-            .foregroundStyle(HermexPaper.knowledge.glow)
+            .foregroundStyle(HermexPaper.prep.glow)
             .accessibilityAddTraits(.isHeader)
     }
 }
@@ -32,7 +32,7 @@ struct PrepLessonBody: View {
                 .foregroundStyle(Color.hxTextPrimary)
                 .accessibilityAddTraits(.isHeader)
             if lesson.isReteach {
-                HXChip(paper: .knowledge, symbol: "arrow.triangle.2.circlepath", label: "Another way to see it") {
+                HXChip(paper: .prep, symbol: "arrow.triangle.2.circlepath", label: "Another way to see it") {
                     EmptyView()
                 }
             }
@@ -84,7 +84,7 @@ struct PrepXPTick: View {
     var body: some View {
         Text(verbatim: PrepCopy.xpLabel(xp))
             .font(AppFont.body(weight: .semibold))
-            .foregroundStyle(HermexPaper.knowledge.glow)
+            .foregroundStyle(HermexPaper.prep.glow)
             .monospacedDigit()
             .opacity(shown ? 1 : 0)
             .frame(maxWidth: .infinity, alignment: .trailing)
@@ -182,13 +182,13 @@ struct PrepBossResultView: View {
                     .accessibilityLabel(Text(verbatim: "Boss quiz"))
                 Text(verbatim: PrepCopy.sittingHeadline(sitting))
                     .font(AppFont.display(style: .title3))
-                    .foregroundStyle(HermexPaper.knowledge.glow)
+                    .foregroundStyle(HermexPaper.prep.glow)
                 if let score = sitting.score {
                     HStack(spacing: BrainStyle.s) {
                         PrepStars(stars: sitting.stars)
                         Text(verbatim: PrepCopy.percent(score))
                             .font(AppFont.body(weight: .semibold))
-                            .foregroundStyle(HermexPaper.knowledge.glow)
+                            .foregroundStyle(HermexPaper.prep.glow)
                             .monospacedDigit()
                     }
                 }
@@ -200,7 +200,7 @@ struct PrepBossResultView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(BrainStyle.l)
-            .glowSurface(.knowledge, cornerRadius: HXRadius.xl)
+            .glowSurface(.prep, cornerRadius: HXRadius.xl)
         } else if result.isUngraded {
             PrepNoteCard {
                 Text(verbatim: "Saved — Atlas will grade this tonight.")
@@ -242,7 +242,7 @@ struct PrepBossResultView: View {
                 FlowRow(spacing: BrainStyle.s) {
                     ForEach(result.revisit) { lesson in
                         NavigationLink(value: ShellPushDestination.brainRoute(.prep(.lesson(lesson.lessonID)))) {
-                            HXChip(paper: .knowledge, symbol: "book", label: lesson.title) { EmptyView() }
+                            HXChip(paper: .prep, symbol: "book", label: lesson.title) { EmptyView() }
                                 .frame(minHeight: BrainStyle.minTapTarget)
                         }
                         .buttonStyle(.plain)
@@ -304,7 +304,7 @@ struct PrepDayCompleteView: View {
                                     Label {
                                         Text(verbatim: title).font(BrainStyle.rowTitle).foregroundStyle(Color.hxTextPrimary)
                                     } icon: {
-                                        Image(systemName: "book").foregroundStyle(HermexPaper.knowledge.glow)
+                                        Image(systemName: "book").foregroundStyle(HermexPaper.prep.glow)
                                     }
                                     .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
                                 }
@@ -354,10 +354,10 @@ struct PrepDayCompleteView: View {
         PrepRunCard {
             VStack(spacing: BrainStyle.s) {
                 ZStack {
-                    Circle().stroke(HermexPaper.knowledge.wash, lineWidth: ring * 0.09)
+                    Circle().stroke(HermexPaper.prep.wash, lineWidth: ring * 0.09)
                     Circle()
                         .trim(from: 0, to: closed ? 1 : 0)
-                        .stroke(HermexPaper.knowledge.glow, style: StrokeStyle(lineWidth: ring * 0.09, lineCap: .round))
+                        .stroke(HermexPaper.prep.glow, style: StrokeStyle(lineWidth: ring * 0.09, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                     VStack(spacing: 0) {
                         Text(verbatim: "\(summary.readyCount)")
@@ -365,7 +365,7 @@ struct PrepDayCompleteView: View {
                             .foregroundStyle(Color.hxTextPrimary)
                         Text(verbatim: "ready")
                             .font(BrainStyle.meta)
-                            .foregroundStyle(HermexPaper.knowledge.glow)
+                            .foregroundStyle(HermexPaper.prep.glow)
                     }
                 }
                 .frame(width: ring, height: ring)
@@ -374,7 +374,7 @@ struct PrepDayCompleteView: View {
                 Text(verbatim: summary.readyGained.isEmpty ? "Day complete"
                      : "+\(summary.readyGained.count) interview-ready")
                     .font(AppFont.display(style: .title2))
-                    .foregroundStyle(HermexPaper.knowledge.glow)
+                    .foregroundStyle(HermexPaper.prep.glow)
                 if !summary.readyGained.isEmpty {
                     Text(verbatim: summary.readyGained.joined(separator: " · "))
                         .font(BrainStyle.rowSubtitle)

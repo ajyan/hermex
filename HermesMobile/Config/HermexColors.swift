@@ -164,5 +164,9 @@ struct HermexPaper: Equatable {
     /// `wiki`'s mint.
     static let body = HermexPaper(paper: 0xD2F2EC, ink: 0x0B4A40, glowLight: 0x0B6E62, glowDark: 0x4FD6BE, hue: 0x2FB59E)
 
-    static let all: [HermexPaper] = [.opener, .quote, .book, .wiki, .reading, .notes, .video, .past, .advisor, .plain, .mandarin, .ledger, .dusk, .kitchen, .body]
+    /// Interview prep: its drawer and Brain home rows and every Prep card. An orchid purple, in the gap
+    /// between `notes`' violet and `dusk`'s plum, so practice never reads as the Brain's `wiki` mint.
+    static let orchid = HermexPaper(paper: 0xF3DDFB, ink: 0x45105A, glowLight: 0x8A2BB0, glowDark: 0xDDA2F2, hue: 0xB65BD9)
+
+    static let all: [HermexPaper] = [.opener, .quote, .book, .wiki, .reading, .notes, .video, .past, .advisor, .plain, .mandarin, .ledger, .dusk, .kitchen, .body, .orchid]
 }

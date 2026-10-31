@@ -1,7 +1,7 @@
 import SwiftUI
 
 // The tutor dialogue after a question rep (spec 2026-10-19 Track A, slice 2): the question on a run card, then
-// chat bubbles, the user's on `hxSurface` at the trailing edge and the tutor's on the knowledge wash at the
+// chat bubbles, the user's on `hxSurface` at the trailing edge and the tutor's on the Prep wash at the
 // leading edge. "Show me" (a link, so Nous blue) ends it at any point; the reply bar's mic is the only other
 // control. While the tutor thinks, its bubble shows the grading sparkle, still under Reduce Motion.
 
@@ -24,7 +24,7 @@ struct PrepTutorDialogueView: View {
         PrepRunCard {
             Text(verbatim: kicker)
                 .font(BrainStyle.meta)
-                .foregroundStyle(HermexPaper.knowledge.glow)
+                .foregroundStyle(HermexPaper.prep.glow)
             Text(verbatim: prompt)
                 .font(AppFont.display(style: .headline))
                 .foregroundStyle(Color.hxTextPrimary)
@@ -35,7 +35,7 @@ struct PrepTutorDialogueView: View {
             if let followup {
                 Text(verbatim: followup)
                     .font(BrainStyle.meta)
-                    .foregroundStyle(HermexPaper.knowledge.glow)
+                    .foregroundStyle(HermexPaper.prep.glow)
             }
             if !firstAnswer.isEmpty {
                 PrepBubble(text: firstAnswer, isTutor: false)
@@ -69,7 +69,7 @@ struct PrepTutorDialogueView: View {
     }
 }
 
-/// One message: the tutor's on the knowledge wash, leading; the user's on `hxSurface`, trailing.
+/// One message: the tutor's on the Prep wash, leading; the user's on `hxSurface`, trailing.
 private struct PrepBubble: View {
     let text: String
     let isTutor: Bool
@@ -78,7 +78,7 @@ private struct PrepBubble: View {
         HStack {
             if !isTutor { Spacer(minLength: BrainStyle.xl) }
             if isTutor {
-                label.glowSurface(.knowledge, cornerRadius: HXRadius.lg)
+                label.glowSurface(.prep, cornerRadius: HXRadius.lg)
             } else {
                 label
                     .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
@@ -113,10 +113,10 @@ private struct PrepThinkingBubble: View {
                 Image(systemName: "sparkles").symbolEffect(.breathe, isActive: !reduceMotion)
             }
             .font(AppFont.body(weight: .semibold))
-            .foregroundStyle(HermexPaper.knowledge.glow)
+            .foregroundStyle(HermexPaper.prep.glow)
             .padding(.horizontal, BrainStyle.m)
             .padding(.vertical, BrainStyle.s)
-            .glowSurface(.knowledge, cornerRadius: HXRadius.lg)
+            .glowSurface(.prep, cornerRadius: HXRadius.lg)
             Spacer(minLength: BrainStyle.xl)
         }
         .accessibilityElement(children: .ignore)

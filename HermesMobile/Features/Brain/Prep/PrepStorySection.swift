@@ -132,7 +132,7 @@ struct PrepStoryCandidateCard: View {
     }
 
     var body: some View {
-        let paper = HermexPaper.knowledge
+        let paper = HermexPaper.prep
         HXCard(.wash(paper), title: candidate.title, spacing: BrainStyle.s, kicker: {
             HXChip(paper: paper, label: "That's a story") { EmptyView() }
         }, content: {
@@ -273,7 +273,7 @@ private struct PrepStoryMark: View {
                 .foregroundStyle(Color.hxTextSecondary)
             Text(verbatim: PrepCopy.storyMarkSymbol(value))
                 .font(BrainStyle.meta.weight(.semibold))
-                .foregroundStyle(value == true ? HermexPaper.knowledge.glow : Color.hxTextSecondary)
+                .foregroundStyle(value == true ? HermexPaper.prep.glow : Color.hxTextSecondary)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: PrepCopy.storyMarkLabel(kind, value)))
@@ -352,7 +352,7 @@ struct PrepStoryPageView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
             if let signal = page.primarySignal {
-                HXChip(paper: .knowledge, symbol: "person.wave.2", label: page.status == "bench" ? "\(signal) · Bench" : signal)
+                HXChip(paper: .prep, symbol: "person.wave.2", label: page.status == "bench" ? "\(signal) · Bench" : signal)
             }
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: BrainStyle.m) { marks(page) }
@@ -416,7 +416,7 @@ struct PrepStoryPageView: View {
         BrainRow(leading: {
             Image(systemName: symbol)
                 .font(AppFont.body())
-                .foregroundStyle(HermexPaper.knowledge.glow)
+                .foregroundStyle(HermexPaper.prep.glow)
                 .frame(width: 28)
                 .accessibilityHidden(true)
         }, title: title, subtitle: subtitle)
@@ -450,7 +450,7 @@ struct PrepStoryPageView: View {
                     HStack(alignment: .firstTextBaseline, spacing: BrainStyle.m) {
                         Text(verbatim: cue.label)
                             .font(AppFont.body(weight: .semibold))
-                            .foregroundStyle(HermexPaper.knowledge.glow)
+                            .foregroundStyle(HermexPaper.prep.glow)
                             .frame(minWidth: 72, alignment: .leading)
                         Text(verbatim: cue.cue)
                             .font(AppFont.body())
@@ -505,7 +505,7 @@ struct PrepStoryPageView: View {
                                     Text(verbatim: point)
                                         .fixedSize(horizontal: false, vertical: true)
                                 } icon: {
-                                    Image(systemName: "checkmark").foregroundStyle(HermexPaper.knowledge.glow)
+                                    Image(systemName: "checkmark").foregroundStyle(HermexPaper.prep.glow)
                                 }
                                 .font(BrainStyle.rowTitle)
                                 .foregroundStyle(Color.hxTextPrimary)

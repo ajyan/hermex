@@ -92,9 +92,9 @@ extension HermexPaper {
     /// Body: workouts, lifts, Baki's notes and proposals. Cyan, since `body`'s teal read as Brain's
     /// mint beside it in the drawer.
     static let training = HermexPaper.video
-    /// Interview prep's way in: its drawer row and Brain home row. Coral, so it never reads as
-    /// Brain's mint; Prep's own screens stay `knowledge`.
-    static let prep = HermexPaper.mandarin
+    /// Interview prep, everywhere: its drawer row, its Brain home row, and every Prep card and screen.
+    /// Orchid, its own kind: never the Brain's mint or the Mandarin card's coral.
+    static let prep = HermexPaper.orchid
 
     static func forTool(_ kind: ToolCallSummaryFormatter.Kind) -> HermexPaper {
         switch kind {
