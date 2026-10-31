@@ -66,6 +66,15 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertEqual(PrepWordFloor("", floor: 0).submitTitle, "Submit")
     }
 
+    func testIHadThatIsOfferedOncePerAnswer() throws {
+        let fresh = try decode(PrepAttemptResult.self, #"{"verdict": "partial", "attempt": "a-1", "overridden": []}"#)
+        let used = try decode(PrepAttemptResult.self, #"{"verdict": "partial", "attempt": "a-1", "overridden": ["p.x"]}"#)
+        XCTAssertTrue(PrepKeyPointRow.offersOverride(hit: false, canOverride: true, result: fresh))
+        XCTAssertFalse(PrepKeyPointRow.offersOverride(hit: false, canOverride: true, result: used),
+                       "one I had that per answer")
+        XCTAssertFalse(PrepKeyPointRow.offersOverride(hit: true, canOverride: true, result: fresh))
+    }
+
     func testUnknownDrillKeptAsUnknown() throws {
         let json = #"""
         {"date": "d", "index": 0, "reps": [

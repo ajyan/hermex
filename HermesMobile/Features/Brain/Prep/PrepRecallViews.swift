@@ -174,7 +174,8 @@ struct PrepRecallResultView: View {
     }
 }
 
-/// One key point of a graded answer: ✓ when hit, ◌ with "I had that" when missed.
+/// One key point of a graded answer: ✓ when hit, ◌ with "I had that" when missed, until the answer has
+/// used its one "I had that" (the server allows one per answer).
 struct PrepKeyPointRow: View {
     let result: PrepAttemptResult
     let id: String
@@ -189,6 +190,11 @@ struct PrepKeyPointRow: View {
         guard showsWhy, !hit else { return nil }
         let line = result.judgment?.pointsMissed.first { $0.pointID == id }?.why ?? ""
         return line.isEmpty ? nil : line
+    }
+
+    /// "I had that" shows on a miss the caller allows, while the answer hasn't used its one.
+    static func offersOverride(hit: Bool, canOverride: Bool, result: PrepAttemptResult) -> Bool {
+        !hit && canOverride && result.overridden.isEmpty
     }
 
     var body: some View {
@@ -211,7 +217,7 @@ struct PrepKeyPointRow: View {
                 if result.overridden.contains(id) {
                     Text(verbatim: "You had this").font(BrainStyle.meta).foregroundStyle(Color.hxTextSecondary)
                 }
-                if !hit && canOverride {
+                if Self.offersOverride(hit: hit, canOverride: canOverride, result: result) {
                     Button { overrideMissed(id) } label: {
                         Text(verbatim: overridingPoint == id ? "Saving…" : "I had that ›")
                             .font(BrainStyle.meta).foregroundStyle(Color.accentColor)
