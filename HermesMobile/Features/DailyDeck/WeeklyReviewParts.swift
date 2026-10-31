@@ -2,13 +2,14 @@ import SwiftUI
 
 // Pieces the weekly review's cards share (`WeeklyReviewCards*.swift`).
 
-/// The line at a card's foot: its weekly chapter ("1 · Remember"), else why the brief picked it.
+/// The line at a card's foot: its weekly chapter ("1 · Remember"), else why the brief picked it. The
+/// Mandarin card has none: its steps already say what's left.
 struct DeckFootnote: View {
     let card: DeckCard
     let palette: DeckPalette
 
     var body: some View {
-        if let line = card.chapterLabel ?? card.reason {
+        if let line = card.chapterLabel ?? (card.isMandarin ? nil : card.reason) {
             Text(verbatim: line)
                 .font(AppFont.footnote())
                 .foregroundStyle(palette.ink)
@@ -263,6 +264,9 @@ struct WeekEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
     @FocusState private var isFocused: Bool
     @State private var text = ""
+    /// The mic, which Done waits on so the tidied words are what's saved.
+    @State private var dictation = DictationModel()
+    @State private var isClosing = false
 
     var body: some View {
         NavigationStack {
@@ -300,14 +304,22 @@ struct WeekEditorSheet: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .background(palette.paper.ignoresSafeArea())
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { DictationMicButton(text: $text) }
+                ToolbarItem(placement: .topBarLeading) { DictationMicButton(text: $text, model: dictation) }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button { dismiss() } label: { Text(verbatim: "Done") }
+                    Button {
+                        isClosing = true
+                        Task {
+                            await dictation.finish()
+                            dismiss()
+                        }
+                    } label: { Text(verbatim: "Done") }
+                    .disabled(isClosing)
                 }
             }
             .toolbarBackground(palette.paper, for: .navigationBar)
         }
         .tint(palette.ink)
+        .interactiveDismissDisabled(dictation.isBusy)
         .onAppear {
             text = initial
             isFocused = true

@@ -6,8 +6,6 @@ protocol MandarinPracticeClient: Sendable {
     func answer(_ request: MandarinAnswerRequest) async throws -> MandarinAnswerResponse
     func recall(_ request: MandarinRecallRequest) async throws -> MandarinRecallResponse
     func versions(_ request: MandarinVersionsRequest) async throws -> MandarinVersionsResponse
-    func callPrep(_ request: MandarinCallPrepRequest) async throws -> MandarinCallResponse
-    func callAfter(_ request: MandarinCallAfterRequest) async throws -> MandarinCallResponse
 }
 
 struct APIClientMandarinAdapter: MandarinPracticeClient {
@@ -24,14 +22,6 @@ struct APIClientMandarinAdapter: MandarinPracticeClient {
     func versions(_ request: MandarinVersionsRequest) async throws -> MandarinVersionsResponse {
         try await apiClient.checkMandarinVersions(request)
     }
-
-    func callPrep(_ request: MandarinCallPrepRequest) async throws -> MandarinCallResponse {
-        try await apiClient.mandarinCallPrep(request)
-    }
-
-    func callAfter(_ request: MandarinCallAfterRequest) async throws -> MandarinCallResponse {
-        try await apiClient.mandarinCallAfter(request)
-    }
 }
 
 /// What he has done on a day's Mandarin card: fixes stepped through, phrases recalled (Got it is
@@ -44,9 +34,6 @@ struct MandarinPracticeRecord: Codable, Equatable {
     var madeYours: Set<String> = []
     var answeredText: String?
     var result: MandarinAnswerResponse?
-    /// The family call: three things to say per relative ("mom", "dad"), and what came back after it.
-    var callPrep: [String: [MandarinCallItem]] = [:]
-    var callPhrases: [MandarinCallItem] = []
 
     init() {}
 
@@ -58,8 +45,6 @@ struct MandarinPracticeRecord: Codable, Equatable {
         madeYours = (try? c.decodeIfPresent(Set<String>.self, forKey: .madeYours)) ?? []
         answeredText = try? c.decodeIfPresent(String.self, forKey: .answeredText)
         result = try? c.decodeIfPresent(MandarinAnswerResponse.self, forKey: .result)
-        callPrep = (try? c.decodeIfPresent([String: [MandarinCallItem]].self, forKey: .callPrep)) ?? [:]
-        callPhrases = (try? c.decodeIfPresent([MandarinCallItem].self, forKey: .callPhrases)) ?? []
     }
 }
 
@@ -108,9 +93,6 @@ final class MandarinPractice {
     /// The cue whose versions are being checked, and the last check's error.
     private(set) var checkingCue: String?
     private(set) var versionsError: String?
-    /// The family call's request in flight ("mom", "dad", or "after"), and its last error.
-    private(set) var callLoading: String?
-    private(set) var callError: String?
     /// The latest progress the server reported: after an answer or a recall, else the deck's.
     private(set) var progress: DeckMandarinProgress?
 
@@ -198,8 +180,9 @@ final class MandarinPractice {
         if isDone(.recall) { step = firstOpenStep }
     }
 
-    /// Checks his versions of a cue's example, added to the ones already checked so "one more" builds
-    /// toward two. An empty check (the model couldn't) is an error to retry, never kept. Returns whether
+    /// Checks his sentences with a phrase (a cue's versions of its example, or a recall phrase used in a
+    /// sentence), added to the ones already checked so "one more"
+    /// builds toward two. An empty check (the model couldn't) is an error to retry, never kept. Returns whether
     /// they were checked, so the caller keeps his words when not.
     @discardableResult
     func checkVersions(of cue: DeckPhrase, _ text: String) async -> Bool {
@@ -251,50 +234,6 @@ final class MandarinPractice {
             answering = .idle
         } catch {
             answering = .failed("Couldn't reach the server. Try again.")
-        }
-    }
-
-    /// Three things from his week to tell `who` ("mom" or "dad"); asked once per day per relative.
-    func prepareCall(_ who: String) async {
-        guard let client, callLoading == nil, record.callPrep[who] == nil else { return }
-        callLoading = who
-        callError = nil
-        defer { callLoading = nil }
-        do {
-            let items = try await client.callPrep(MandarinCallPrepRequest(date: date, who: who)).items
-            guard !items.isEmpty else {
-                callError = "Nothing came back. Try again."
-                return
-            }
-            record.callPrep[who] = items
-            save()
-        } catch {
-            callError = "Couldn't reach the server. Try again."
-        }
-    }
-
-    /// What he couldn't say on the call, back in Mandarin and added to tomorrow's recall. Returns
-    /// whether it was saved, so the sheet keeps his words when it wasn't.
-    @discardableResult
-    func saveAfterCall(_ text: String) async -> Bool {
-        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let client, !text.isEmpty, callLoading == nil else { return false }
-        callLoading = "after"
-        callError = nil
-        defer { callLoading = nil }
-        do {
-            let response = try await client.callAfter(MandarinCallAfterRequest(date: date, text: text))
-            guard !response.items.isEmpty else {
-                callError = "Nothing came back. Try again."
-                return false
-            }
-            record.callPhrases += response.items
-            progress = response.progress ?? progress
-            save()
-            return true
-        } catch {
-            callError = "Couldn't reach the server. Try again."
-            return false
         }
     }
 

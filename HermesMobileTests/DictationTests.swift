@@ -125,6 +125,38 @@ final class DictationModelTests: XCTestCase {
         }
     }
 
+    func testAKeyboardEditIsNeverOverwrittenByTheRecognizer() {
+        let box = Box()
+        let dictation = model(nil)
+        dictation.begin(binding(box))
+        dictation.heard("um so i think")
+        XCTAssertEqual(box.text, "um so i think")
+
+        box.text = "So I think"
+        dictation.textChanged(box.text)
+        dictation.heard("um so i think we should")
+        XCTAssertEqual(box.text, "So I think we should", "only the new words go on the end")
+
+        dictation.heard("um so I think we should ship")
+        XCTAssertEqual(box.text, "So I think we should", "a revised draft that no longer extends the last one is dropped")
+    }
+
+    func testFinishTidiesWhatWasDictatedOnce() async {
+        let box = Box()
+        var polishes = 0
+        let dictation = model(FakePolisher(result: .success("I think we should ship it."),
+                                           duringPolish: { polishes += 1 }))
+        dictation.begin(binding(box))
+        dictation.heard("um so i think we should ship it")
+
+        dictation.voiceStateChanged()
+        await dictation.finish()
+
+        XCTAssertEqual(box.text, "I think we should ship it.")
+        XCTAssertEqual(polishes, 1, "the recognizer going idle and Done both ask, and the tidy runs once")
+        XCTAssertFalse(dictation.isBusy)
+    }
+
     func testCancelDropsThePendingTidy() async {
         let box = Box()
         let dictation = model(FakePolisher(result: .success("We should ship it on Friday.")))
