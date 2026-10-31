@@ -2498,15 +2498,15 @@ final class DeckReviewTests: XCTestCase {
         XCTAssertEqual(reviews[2].label, "September review")
     }
 
-    func testReviewNotificationsComeOnSundaysAndTheFirstAndOpenTheirDeck() throws {
+    func testReviewNotificationsComeOnSundaysAndTheMonthsLastDayAndOpenTheirDeck() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "America/New_York")!
         let friday = calendar.date(from: DateComponents(year: 2026, month: 10, day: 30, hour: 7))!
         let reviews = DailyBriefReminder.plan(now: friday, filedOn: nil, calendar: calendar).compactMap(\.review)
         XCTAssertEqual(reviews, [
-            .init(date: "2026-11-01", kind: "weekly"),
-            .init(date: "2026-10-31", kind: "monthly")
-        ], "Sunday Nov 1 is both a Sunday and the 1st")
+            .init(date: "2026-10-31", kind: "monthly"),
+            .init(date: "2026-11-01", kind: "weekly")
+        ], "Saturday Oct 31 ends the month, then Sunday Nov 1 ends the week")
         let url = try XCTUnwrap(DailyBriefReminder.url(for: ["dailyBrief": true, "date": "2026-11-01", "kind": "weekly"]))
         XCTAssertTrue(HermesDeepLink.isDailyBriefURL(url))
         XCTAssertEqual(HermesDeepLink.dailyBriefDeck(from: url)?.date, "2026-11-01")
