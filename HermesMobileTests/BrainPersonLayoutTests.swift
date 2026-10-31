@@ -77,6 +77,16 @@ final class BrainPersonLayoutTests: XCTestCase {
         XCTAssertEqual(layout.timeline[0].kicker, "Note · Oct 20 · today")
     }
 
+    func testSourceLinesAndInvisibleMarksStayOffThePage() {
+        let person = BrainPerson(encounters: [
+            BrainEncounter(id: "e", date: "2026-10-12", bullets: ["\u{FFFC} Coming on November 12"],
+                           body: "- \u{FFFC} Coming on November 12\n\n_Source: followups touch_\n\nThey stayed late."),
+        ])
+        let entry = layout(person).timeline[0]
+        XCTAssertEqual(entry.headline, "Coming on November 12")
+        XCTAssertEqual(entry.extra, "They stayed late.", "where the note came from is the pipeline's")
+    }
+
     func testALoggedTextReadsAsTheMessage() {
         let person = BrainPerson(encounters: [
             BrainEncounter(id: "t", date: "2026-10-12", bullets: ["Texted: \"Drinks Friday?\""]),
@@ -146,7 +156,7 @@ final class BrainPersonLayoutTests: XCTestCase {
         let entry = layout(BrainPerson(encounters: [encounter])).timeline[0]
         XCTAssertEqual(entry.headline, "Walk")
         XCTAssertEqual(entry.bullets, ["a", "b", "c\n  continued", "d"])
-        XCTAssertEqual(entry.extra, "#### Later\nprose line\n_Source: invented note_")
+        XCTAssertEqual(entry.extra, "#### Later\nprose line", "the `_Source:` line stays off the page")
     }
 
     func testExtraSkipsTheHeadlineAndProseShownAsItems() {
@@ -165,7 +175,7 @@ final class BrainPersonLayoutTests: XCTestCase {
         XCTAssertEqual(timeline[1].extra, "Afterthought")
         XCTAssertEqual(timeline[2].headline, "a")
         XCTAssertEqual(timeline[2].bullets, ["b"])
-        XCTAssertEqual(timeline[2].extra, "_Source: x_")
+        XCTAssertEqual(timeline[2].extra, "")
     }
 
     func testNestedContinuationStaysInsideItsBullet() {
