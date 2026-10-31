@@ -12,6 +12,8 @@ struct PrepRunView: View {
     /// The unsent answer on an approach or spot-the-bug rep.
     @State private var draft = Draft(rep: -1)
     @Environment(\.dismiss) private var dismiss
+    /// "Save and quit" with an unsent answer asks before dropping it.
+    @State private var confirmingQuit = false
     /// A mic still working on the answer (`PrepMicBusyKey`); Submit and Send wait for it.
     @State private var micBusy = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -29,6 +31,8 @@ struct PrepRunView: View {
         var text = ""
         var line: Int?
         var fix: String?
+        /// A choice rep's picked option, sent by the pinned Submit.
+        var choice: String?
     }
 
     init(server: URL, run: PrepRunKind = .daily, unit: String? = nil, onAPIError: @escaping (Error) -> Void,
@@ -52,8 +56,7 @@ struct PrepRunView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
-                        viewModel.leave()
-                        dismiss()
+                        if hasUnsentAnswer { confirmingQuit = true } else { quit() }
                     } label: {
                         Image(systemName: "xmark")
                     }
@@ -68,6 +71,13 @@ struct PrepRunView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) { FeedbackMoreMenu() }
+            }
+            .confirmationDialog(Text(verbatim: "Discard your answer?"), isPresented: $confirmingQuit,
+                                titleVisibility: .visible) {
+                Button(role: .destructive, action: quit) { Text(verbatim: "Discard and quit") }
+                Button(role: .cancel) {} label: { Text(verbatim: "Keep writing") }
+            } message: {
+                Text(verbatim: "Your answered reps are saved. The one you're writing hasn't been sent.")
             }
             .feedbackContext(feedbackContext)
             .background(Color.hxCanvas.ignoresSafeArea())
@@ -349,12 +359,12 @@ struct PrepRunView: View {
         switch rep.drill {
         case .judgment, .boss, .story: true
         case .lesson where Self.usesRecall(rep), .recall where Self.usesRecall(rep): true
-        case .lesson, .warmup, .recall: Self.isCloze(rep)
+        case .lesson, .warmup, .recall: true  // cloze text, or the picked option
         case .approach, .complexity, .spotBug, .trace, .primer, .fact, .unknown, .probe: true  // Skip
         }
     }
 
-    /// The pinned action for a rep awaiting its answer; choice reps answer by tapping an option.
+    /// The pinned action for a rep awaiting its answer; a choice rep's tap only picks, Submit sends it.
     @ViewBuilder
     private func repAction(_ rep: PrepRep) -> some View {
         switch rep.drill {
@@ -377,11 +387,20 @@ struct PrepRunView: View {
                 isGrading: viewModel.isSubmitting
             ) { Task { await viewModel.submitRecall() } }
         case .lesson, .warmup, .recall:
-            let text = draft(for: rep).text
-            PrepPrimaryButton(
-                title: "Submit",
-                enabled: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !viewModel.isSubmitting
-            ) { Task { await viewModel.submitCloze(text) } }
+            if Self.isCloze(rep) {
+                let text = draft(for: rep).text
+                PrepPrimaryButton(
+                    title: "Submit",
+                    enabled: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !viewModel.isSubmitting
+                ) { Task { await viewModel.submitCloze(text) } }
+            } else {
+                let picked = draft(for: rep).choice
+                PrepPrimaryButton(title: "Submit", enabled: picked != nil && !viewModel.isSubmitting,
+                                  isGrading: viewModel.isSubmitting) {
+                    guard let picked else { return }
+                    choose(PrepOption(id: picked, title: picked), in: rep)
+                }
+            }
         case .story:
             storyAction
         // The retired DSA drills (an old plan entry) and drills this build doesn't know; a probe only
@@ -437,8 +456,9 @@ struct PrepRunView: View {
                             options: lesson.check.options.map { PrepOption(id: $0, title: $0) },
                             grading: nil,
                             isSubmitting: viewModel.isSubmitting,
-                            submitError: viewModel.submitError
-                        ) { option in choose(option, in: rep) }
+                            submitError: viewModel.submitError,
+                            selectedID: draft(for: rep).choice
+                        ) { option in updateDraft(rep) { $0.choice = option.id } }
                     }
                 }
             }
@@ -460,8 +480,9 @@ struct PrepRunView: View {
                         options: lesson.check.options.map { PrepOption(id: $0, title: $0) },
                         grading: nil,
                         isSubmitting: viewModel.isSubmitting,
-                        submitError: viewModel.submitError
-                    ) { option in choose(option, in: rep) }
+                        submitError: viewModel.submitError,
+                        selectedID: draft(for: rep).choice
+                    ) { option in updateDraft(rep) { $0.choice = option.id } }
                 }
                 if review && !viewModel.revealedLesson {
                     Button {
@@ -549,6 +570,20 @@ struct PrepRunView: View {
     private func choose(_ option: PrepOption, in rep: PrepRep) {
         chosen = ChosenOption(rep: rep.index, id: option.id)
         Task { await viewModel.choose(.choice(option.id)) }
+    }
+
+    private func quit() {
+        viewModel.leave()
+        dismiss()
+    }
+
+    /// Typed, dictated or still-transcribing words the server hasn't seen.
+    private var hasUnsentAnswer: Bool {
+        if viewModel.hasUnsentText || micBusy { return true }
+        guard case let .rep(rep, _) = viewModel.phase else { return false }
+        let local = draft(for: rep)
+        return !local.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || local.line != nil
+            || local.choice != nil
     }
 
     private func draft(for rep: PrepRep) -> Draft {

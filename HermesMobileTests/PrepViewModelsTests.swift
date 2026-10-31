@@ -883,6 +883,22 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(vm.recallDraft, "", "each recall starts empty")
     }
 
+    func testATypedRecallCountsAsUnsentUntilItIsGraded() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([recallLessonRep(0, drill: "recall", block: "review")]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.success(recallResult("pass", next: 1, missed: []))]
+        let vm = makeVM(client)
+        await vm.load()
+        XCTAssertFalse(vm.hasUnsentText)
+        vm.recallDraft = "  "
+        XCTAssertFalse(vm.hasUnsentText, "whitespace isn't an answer")
+        vm.recallDraft = "Tokens are word pieces"
+        XCTAssertTrue(vm.hasUnsentText, "quitting now would drop it")
+        await vm.submitRecall()
+        XCTAssertFalse(vm.hasUnsentText, "once graded, the answer is saved")
+    }
+
     func testRecallSubmitNeedsText() async {
         let client = FakePrepClient()
         client.todayResults = [.success(courseRun([recallLessonRep(0, drill: "recall", block: "review")]))]

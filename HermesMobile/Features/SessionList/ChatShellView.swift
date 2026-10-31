@@ -600,6 +600,15 @@ struct ChatShellView: View {
             .accessibilityLabel(navigation.isDrawerOpen ? "Close chats" : "Open chats")
         }
 
+        if !navigation.returnPath.isEmpty && navigation.path.isEmpty {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { navigation.returnToSavedScreens() } label: {
+                    Label { Text(verbatim: "Back to Prep") } icon: { Image(systemName: "arrow.uturn.backward") }
+                        .labelStyle(.titleAndIcon)
+                }
+            }
+        }
+
         ToolbarItem(placement: .topBarTrailing) {
             // On a chat that's already new and empty, a new chat goes nowhere: offer the call instead.
             if navigation.isOnEmptyNewChat {
@@ -700,9 +709,11 @@ struct ChatShellView: View {
         }
     }
 
-    /// Starts a new chat with these words in the composer, as the Brain home's Ask Atlas does.
+    /// Starts a new chat with these words in the composer, as the Brain home's Ask Atlas does, and
+    /// keeps the Prep screens it came from one tap away ("Back to Prep").
     private func askAtlas(_ words: String) {
-        selectDestination(PendingNewChatRoute(initialDraft: words))
+        viewModel.invalidateSessionOpening()
+        navigation.select(PendingNewChatRoute(initialDraft: words), returningTo: navigation.path)
     }
 
     @ViewBuilder

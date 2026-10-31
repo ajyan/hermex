@@ -60,6 +60,8 @@ struct PrepChoiceView: View {
     let grading: Grading?
     var isSubmitting = false
     var submitError: String?
+    /// The option picked and not yet submitted: a tap selects, the run's pinned Submit sends it.
+    var selectedID: String?
     let onChoose: (PrepOption) -> Void
 
     var body: some View {
@@ -100,14 +102,21 @@ struct PrepChoiceView: View {
                 ? (PrepCopy.isSameChoice(option.id, grading.chosenID) ? "Your answer, correct" : "Correct answer")
                 : (isWrongPick ? "Your answer, wrong" : "")))
         } else {
+            let isSelected = PrepCopy.isSameChoice(option.id, selectedID)
             Button { onChoose(option) } label: {
-                optionTitle(option)
-                    .frame(minHeight: BrainStyle.minTapTarget)
-                    .contentShape(Rectangle())
+                HStack(spacing: BrainStyle.m) {
+                    optionTitle(option)
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(isSelected ? Color.accentColor : Color.hxTextSecondary)
+                        .accessibilityHidden(true)
+                }
+                .frame(minHeight: BrainStyle.minTapTarget)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(isSubmitting)
             .accessibilityLabel(Text(verbatim: option.title))
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
         }
     }
 
