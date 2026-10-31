@@ -160,13 +160,13 @@ struct HermexPaper: Equatable {
     /// Meals: the week's dinners and last night's. A sage green, kept clear of `wiki`'s mint and
     /// `ledger`'s olive.
     static let kitchen = HermexPaper(paper: 0xE3EEDB, ink: 0x22381A, glowLight: 0x46682F, glowDark: 0xB2D49A, hue: 0x7FA866)
-    /// Body: workouts, lifts, Baki's notes and proposals. A teal, kept clear of `video`'s cyan and
-    /// `wiki`'s mint.
-    static let body = HermexPaper(paper: 0xD2F2EC, ink: 0x0B4A40, glowLight: 0x0B6E62, glowDark: 0x4FD6BE, hue: 0x2FB59E)
+    /// Goals: the drawer row. A leaf green, in the wide gap between `kitchen`'s sage and `wiki`'s
+    /// mint, so the row reads as neither the Brain above it nor Body's cyan below.
+    static let meadow = HermexPaper(paper: 0xDDF3DC, ink: 0x173F1C, glowLight: 0x2A7034, glowDark: 0x7FD686, hue: 0x4FBA5A)
 
     /// Interview prep: its drawer and Brain home rows and every Prep card. An orchid purple, in the gap
     /// between `notes`' violet and `dusk`'s plum, so practice never reads as the Brain's `wiki` mint.
     static let orchid = HermexPaper(paper: 0xF3DDFB, ink: 0x45105A, glowLight: 0x8A2BB0, glowDark: 0xDDA2F2, hue: 0xB65BD9)
 
-    static let all: [HermexPaper] = [.opener, .quote, .book, .wiki, .reading, .notes, .video, .past, .advisor, .plain, .mandarin, .ledger, .dusk, .kitchen, .body, .orchid]
+    static let all: [HermexPaper] = [.opener, .quote, .book, .wiki, .reading, .notes, .video, .past, .advisor, .plain, .mandarin, .ledger, .dusk, .kitchen, .meadow, .orchid]
 }
