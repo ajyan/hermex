@@ -281,7 +281,7 @@ struct BrainHomeView: View {
                     if !modules.isEmpty { BrainHomeDivider() }
                     link(.prep(.home)) {
                         BrainRow(
-                            leading: { BrainModuleIcon(systemName: dailyAsk?.isLocked == true ? "lock.fill" : "target", paper: .knowledge) },
+                            leading: { BrainModuleIcon(systemName: dailyAsk?.isLocked == true ? "lock.fill" : "target", paper: .prep) },
                             title: "Interview prep",
                             subtitle: dailyAsk?.isLocked == true ? "After today's Ask" : "Today's run, mocks and stories",
                             subtitleLineLimit: 1

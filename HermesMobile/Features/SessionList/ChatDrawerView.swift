@@ -144,7 +144,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
             drawerRow("People", systemImage: BrainModuleID.people.symbolName, paper: BrainModuleID.people.paper) {
                 onOpen(.brainRoute(.module(.people)))
             }
-            drawerRow("Interview prep", systemImage: "target", paper: .knowledge) {
+            drawerRow("Interview prep", systemImage: "target", paper: .prep) {
                 onOpen(.brainRoute(.prep(.home)))
             }
         }

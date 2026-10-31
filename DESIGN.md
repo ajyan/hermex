@@ -46,15 +46,15 @@ Each paper is one hue rendered as a glow that adapts to the appearance:
 | `wiki` | `#D3F2E2` / `#0E4A33` | `#137049` / `#5FD3A0` | From your wiki |
 | `reading` | `#FFE4D1` / `#5A2A0C` | `#9A4410` / `#F5A37A` | From your reading |
 | `notes` | `#E6DCFF` / `#33197A` | `#5B3FC4` / `#B39DFF` | From your notes, Sleep |
-| `video` | `#D2F0F4` / `#0B4650` | `#0E6D7A` / `#5CCFE0` | Video |
+| `video` | `#D2F0F4` / `#0B4650` | `#0E6D7A` / `#5CCFE0` | Video, (Body) |
 | `past` | `#FFEFC2` / `#4E3A00` | `#7A5C00` / `#E8C55A` | A year ago, Your journal, Looking back |
 | `advisor` | `#E4EEF6` / `#14324A` | `#2E5878` / `#9DBEDD` | Check-in |
 | `plain` | `#F4F0E8` / `#2A2A28` | `#5E5646` / `#D6CDBB` | Library, follow-ups |
-| `mandarin` | `#FFDDD6` / `#5E1A0E` | `#B03A22` / `#FF9C85` | Mandarin practice |
+| `mandarin` | `#FFDDD6` / `#5E1A0E` | `#B03A22` / `#FF9C85` | Mandarin practice, (Interview prep's drawer and Brain home rows) |
 | `ledger` | `#EEF3D6` / `#2F3A0A` | `#4F6300` / `#C2DA6E` | (Money, not a Brief card) |
 | `dusk` | `#F3E4EE` / `#4A1F3D` | `#8C3D74` / `#E7A3CF` | The weekly review's cards, Looking ahead |
 | `kitchen` | `#E3EEDB` / `#22381A` | `#46682F` / `#B2D49A` | Last night's dinner, This week's dinners |
-| `body` | `#D2F2EC` / `#0B4A40` | `#0B6E62` / `#4FD6BE` | (Body, not a Brief card) |
+| `body` | `#D2F2EC` / `#0B4A40` | `#0B6E62` / `#4FD6BE` | (unused since Body moved to `video`: its teal read as `wiki`'s mint) |
 
 ### The object key
 
@@ -85,9 +85,9 @@ Named in `Config/HermexStyle.swift`; `HermexPaper.forTool(_:)` maps tool kinds.
 | A month: the monthly review (`MonthlyReview*.swift`, `DeckPalette.month`). The cover, weeks arc, dots, and close (the year as a ring of twelve months) wear `dusk`; every dot calendar on the dots card uses the card's one paper. Each other card wears the paper of what it's about: reflection questions (what made you proud, what challenged you, what you learned) and the insight on his own words `past`, sleep `notes` (the Sleep card's), letters `advisor` (the Dad card's), and each value its own paper. Numbers count up and dots fill once the card is on top; themes are wash tiles; his words are serif; second-brain quotes are serif italic on a wash with the book and author | `DeckPalette.month(_:)` | `dusk`; values: present `past`, people `quote`, dad `advisor`, potential `notes`, body `body` |
 | Money: net worth, accounts, the market card | `.money` | `ledger` |
 | Meals: the Daily Brief's "Last night's dinner?" and Sunday "This week's dinners" cards | `.meal` (`DeckPalette.dinner`, `DeckPalette.meals`) | `kitchen` |
-| Workouts, lifts, coach notes and proposals | `.training` | `body` |
+| Workouts, lifts, coach notes and proposals | `.training` | `video` |
 | Feedback inbox | `.feedback` | `notes` |
-| Drawer sections: Daily Brief, Brain, People, Interview prep, Goals, Body, Money, Feedback | `opener`, `.knowledge`, `BrainModuleID.people.paper`, `.knowledge`, `book`, `.training`, `.money`, `.feedback` | |
+| Drawer sections: Daily Brief, Brain, People, Interview prep, Goals, Body, Money, Feedback | `opener`, `.knowledge`, `BrainModuleID.people.paper`, `.prep` (`mandarin`, also on its Brain home row), `book`, `.training`, `.money`, `.feedback`: each a different hue | |
 
 Add a new kind of object here and in the code together. A failed tool step keeps its color and adds an `hxDanger` mark; the color never turns red.
 
