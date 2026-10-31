@@ -100,10 +100,17 @@ struct DeckCardView: View {
                     if card.chapter != nil { DeckFootnote(card: card, palette: palette) }
                 case .cover: WeekCoverCard(card: card, palette: palette, viewModel: viewModel)
                 case .lastIntention: WeekLastIntentionCard(card: card, palette: palette, viewModel: viewModel)
+                case .value where card.month != nil: MonthValueCard(card: card, palette: palette, viewModel: viewModel)
                 case .value: WeekValueCard(card: card, palette: palette, viewModel: viewModel)
                 case .intention: WeekIntentionCard(card: card, palette: palette, viewModel: viewModel)
                 case .keepsakes: WeekKeepsakesCard(card: card, palette: palette, viewModel: viewModel)
                 case .training: WeekTrainingCard(card: card, palette: palette, model: viewModel.training)
+                case .monthCover: MonthCoverCard(card: card, palette: palette, viewModel: viewModel)
+                case .monthWeeks: MonthWeeksCard(card: card, palette: palette, viewModel: viewModel)
+                case .monthDots: MonthDotsCard(card: card, palette: palette, viewModel: viewModel)
+                case .monthInsight: MonthInsightCard(card: card, palette: palette, viewModel: viewModel)
+                case .monthSleep: MonthSleepCard(card: card, palette: palette, viewModel: viewModel)
+                case .monthQuestion: MonthQuestionCard(card: card, palette: palette, viewModel: viewModel)
                 default: if isJobCard { jobReading } else { reading }
                 }
                 // Reaching the end of the card counts toward the style learner's usage (`DeckSignals`). A short card's
@@ -913,23 +920,33 @@ struct DeckCardView: View {
         let count = viewModel.answeredCount
         let filed = viewModel.isFiled && !viewModel.hasChanges
         let seal = viewModel.isSealedWeekly
-        Text(verbatim: DeckCopy.closeHeading(seal: seal, filed: filed, count: count))
-            .font(AppFont.display(style: .largeTitle, weight: .semibold))
-        if seal {
-            Text(verbatim: DeckCopy.answered(count))
-                .font(AppFont.subheadline(weight: .semibold))
-                .foregroundStyle(palette.ink)
-                .padding(.top, 4)
+        if let month = card.month {
+            // The month's close: the year with this month lit, then filing, without the daily close's lines.
+            MonthCloseHero(month: month, title: viewModel.cards.first?.title, palette: palette,
+                           answered: count, filed: filed, isOnTop: viewModel.currentCardID == card.id)
+            if case .failed(let message) = viewModel.filing {
+                Text(verbatim: message).font(AppFont.footnote()).foregroundStyle(Color.hxDanger).padding(.top, 12)
+            }
+            fileButton(seal: false)
+        } else {
+            Text(verbatim: DeckCopy.closeHeading(seal: seal, filed: filed, count: count))
+                .font(AppFont.display(style: .largeTitle, weight: .semibold))
+            if seal {
+                Text(verbatim: DeckCopy.answered(count))
+                    .font(AppFont.subheadline(weight: .semibold))
+                    .foregroundStyle(palette.ink)
+                    .padding(.top, 4)
+            }
+            closeStatus(seal: seal)
+            if !card.options.isEmpty, !seal {
+                DeckTodaysOne(card: card, palette: palette, viewModel: viewModel).padding(.top, 24)
+            }
+            if let variantCard = viewModel.variantCard, !seal {
+                DeckVariantPick(card: variantCard, viewModel: viewModel, palette: palette)
+                    .padding(.top, 24)
+            }
+            fileButton(seal: seal)
         }
-        closeStatus(seal: seal)
-        if !card.options.isEmpty, !seal {
-            DeckTodaysOne(card: card, palette: palette, viewModel: viewModel).padding(.top, 24)
-        }
-        if let variantCard = viewModel.variantCard, !seal {
-            DeckVariantPick(card: variantCard, viewModel: viewModel, palette: palette)
-                .padding(.top, 24)
-        }
-        fileButton(seal: seal)
     }
 
     /// What filing does (or did), and anything that failed.

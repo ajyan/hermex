@@ -19,7 +19,7 @@ enum DailyBriefReminder {
 
     static let readyPrefix = "dailyBrief.ready."
     static let reminderPrefix = "dailyBrief.reminder."
-    /// Sundays and the 1st: "Your weekly (monthly) review is ready", opening that review.
+    /// Sundays and the month's last day: "Your weekly (monthly) review is ready", opening that review.
     static let reviewPrefix = "dailyBrief.review."
     static let readyTime = (hour: 7, minute: 30)
     static let reminderTime = (hour: 8, minute: 0)
@@ -74,15 +74,15 @@ enum DailyBriefReminder {
         return planned
     }
 
-    /// The reviews that open on `day`: the week's on Sunday (dated that Sunday), the month
-    /// before's on the 1st (dated its last day). Matches tools/review_deck.py.
+    /// The reviews that open on `day`: the week's on Sunday and the month's on its last day, each
+    /// dated that day. Matches tools/review_deck.py.
     static func reviews(on day: Date, calendar: Calendar = .current) -> [DeckRef] {
         var out: [DeckRef] = []
         if calendar.component(.weekday, from: day) == 1 {
             out.append(DeckRef(date: DailyDeckPaths.day(day, calendar: calendar), kind: "weekly"))
         }
-        if calendar.component(.day, from: day) == 1, let last = calendar.date(byAdding: .day, value: -1, to: day) {
-            out.append(DeckRef(date: DailyDeckPaths.day(last, calendar: calendar), kind: "monthly"))
+        if let next = calendar.date(byAdding: .day, value: 1, to: day), calendar.component(.day, from: next) == 1 {
+            out.append(DeckRef(date: DailyDeckPaths.day(day, calendar: calendar), kind: "monthly"))
         }
         return out
     }
