@@ -16,7 +16,7 @@ enum MonthValues {
         case "people": .quote
         case "dad": .advisor
         case "potential": .notes
-        case "body": .body
+        case "body": .training
         default: .dusk
         }
     }

@@ -80,8 +80,9 @@ struct DeckPalette: Equatable {
     /// Atlas's questions from last night's review: Atlas's own system cards (like What changed) wear the plain paper.
     static let dream = DeckPalette(.plain, symbol: "moon.stars", name: "Atlas asks", shortName: "Atlas")
     static let plain = DeckPalette(.plain, symbol: "tray", name: "From your library", shortName: "Library")
-    /// A reflect card about a person (a week source from the CRM), on the plain paper.
-    static let people = DeckPalette(.plain, symbol: "person.2", name: "From your people", shortName: "People")
+    /// A reflect card about a person (a week source from the CRM), in the person paper the Brain's
+    /// People pages wear.
+    static let people = DeckPalette(BrainModuleID.people.paper, symbol: "person.2", name: "From your people", shortName: "People")
     static let followUps = DeckPalette(.plain, symbol: "checklist", name: "Follow-ups", shortName: "Follow-ups")
     // A weekly review's Wrapped cards. Themes quote your own past words; mood reads like a
     // check-in; lessons come from your notes; the goals card wears its goal's paper.
