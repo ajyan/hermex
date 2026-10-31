@@ -428,6 +428,17 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertTrue(client.log.contains("course"))
     }
 
+    func testAFailedHomeRefreshKeepsTheLoadedHome() async {
+        let client = FakePrepClient()
+        client.homeResults = [.success(decode(PrepHome.self, #"{"streak": {"days": 3, "freezes": 0}}"#)),
+                              .failure(http(500))]
+        let vm = PrepHomeViewModel(client: client)
+        await vm.load()
+        await vm.load()
+        guard case let .loaded(home) = vm.state else { return XCTFail("state \(vm.state)") }
+        XCTAssertEqual(home.streak.days, 3)
+    }
+
     func testHomeWithoutCourseSkipsCourseCall() async {
         let client = FakePrepClient()
         client.homeResults = [.success(decode(PrepHome.self, #"{"streak": {"days": 1, "freezes": 0}}"#))]
@@ -770,6 +781,32 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertTrue(vm.inDialogue)
         XCTAssertNil(vm.tutorStreaming)
         XCTAssertEqual(vm.tutorError, "The tutor couldn't reply. Try again.", "never a blank tutor screen")
+    }
+
+    func testTryAgainAfterA409AsksForTheTurnInsteadOfResending() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([questionRep(0)]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.success(dialogueResult("miss", attempt: "a1", hit: [], missed: ["r1", "r2"], followups: 0, open: true))]
+        let asked = [("tutor", "Where is the loss?")]
+        client.dialogueScripts = [
+            [.turn("Where is the loss?"),
+             .done(dialogueResult("miss", attempt: "a2", hit: [], missed: ["r1", "r2"], followups: 0, open: true, turns: asked))],
+            [.failed(status: 409, message: "the tutor hasn't asked anything yet")],
+            [],
+        ]
+        let vm = makeVM(client)
+        await vm.load()
+        vm.beginRecall()
+        vm.recallDraft = "Not sure"
+        await vm.submitRecall()
+        vm.tutorDraft = "Ranking"
+        await vm.sendTutorReply()
+        XCTAssertNil(vm.pendingReply, "the server already has the reply")
+        XCTAssertEqual(vm.tutorError, "The tutor couldn't reply. Try again.")
+        await vm.retryTutor()
+        XCTAssertEqual(client.dialogueCalls.count, 3)
+        XCTAssertNil(client.dialogueCalls.last?.1, "Try again asks for the turn, never resends the reply")
     }
 
     func testAReplyThatHitsEverythingEndsTheDialogue() async {
@@ -1176,6 +1213,20 @@ final class PrepViewModelsTests: XCTestCase {
         await vm.choose(.choice("a"))
         XCTAssertNil(vm.submitError)
         XCTAssertEqual(currentRep(vm)?.index, 2)
+    }
+
+    func testABadAnswerKeepsTheDraftInsteadOfReloading() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([recallLessonRep(0, drill: "recall", block: "review")]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.failure(APIError.http(statusCode: 400, body: #"{"error": "bad answer"}"#))]
+        let vm = makeVM(client)
+        await vm.load()
+        vm.recallDraft = "my answer"
+        await vm.submitRecall()
+        XCTAssertEqual(vm.recallDraft, "my answer")
+        XCTAssertEqual(vm.submitError, "That answer couldn't be saved. Shorten it and try again.")
+        XCTAssertEqual(client.log.filter { $0 == "today" }.count, 1, "no reload")
     }
 
     func testStaleSubmitErrorDoesNotLandOnReloadedRun() async {

@@ -80,8 +80,10 @@ struct APIClientPrepAdapter: PrepDataClient {
         try await get(.tutorMap(track: track))
     }
 
+    /// Grading runs inside the request (up to two model calls on the local model), so it gets three
+    /// minutes rather than the default minute; a retry before it lands would grade the answer twice.
     func attempt(_ r: PrepAttemptRequest) async throws -> PrepAttemptResult {
-        let data = try await apiClient.sendData(endpoint: .tutorAttempt, method: "POST", body: r)
+        let data = try await apiClient.sendData(endpoint: .tutorAttempt, method: "POST", body: r, timeout: 180)
         return try decode(data)
     }
 
