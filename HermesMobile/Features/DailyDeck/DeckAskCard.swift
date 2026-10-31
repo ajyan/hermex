@@ -45,6 +45,11 @@ struct DailyAskBody: View {
         DailyAskForm(model: model, ask: ask).id(ask.today)
     }
 
+    /// An application or outreach opens Prep for the day, so the open Ask card's foot offers Open Prep.
+    static func opensPrep(_ outcome: DailyAskOutcome) -> Bool {
+        outcome.event == "applied" || outcome.event == "sent"
+    }
+
     static func doneLine(_ outcome: DailyAskOutcome) -> String {
         switch outcome.event {
         case "applied": return "Applied to \(outcome.company ?? "the role") — Prep is open"

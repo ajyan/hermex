@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// A run, one rep per screen: today's (`.brainRoute(.prep(.run))`), a test out (`.prep(.testout(unit))`)
-/// or a mock (`.prep(.mock)`). Owns no
+/// A run, one rep per screen: today's (`.brainRoute(.prep(.run))`), a test out (`.prep(.testout(unit))`),
+/// one more round (`.prep(.bonus)`) or one story (`.prep(.story(id))`). Owns no
 /// `NavigationStack`. Closing pops: the server records every answer, so closing is
 /// save and quit. The drills themselves live in `PrepDrillViews.swift`.
 struct PrepRunView: View {
@@ -12,7 +12,6 @@ struct PrepRunView: View {
     /// The unsent answer on an approach or spot-the-bug rep.
     @State private var draft = Draft(rep: -1)
     @Environment(\.dismiss) private var dismiss
-    @State private var screenHeight: CGFloat = 800
     /// A mic still working on the answer (`PrepMicBusyKey`); Submit and Send wait for it.
     @State private var micBusy = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -72,13 +71,6 @@ struct PrepRunView: View {
             }
             .feedbackContext(feedbackContext)
             .background(Color.hxCanvas.ignoresSafeArea())
-            .background {
-                GeometryReader { proxy in
-                    Color.clear
-                        .onAppear { screenHeight = proxy.size.height }
-                        .onChange(of: proxy.size.height) { _, height in screenHeight = height }
-                }
-            }
             .task {
                 guard !didLoad else { return }
                 didLoad = true
@@ -131,27 +123,23 @@ struct PrepRunView: View {
         return .prepRun(rep: currentRep, answer: currentRep.flatMap(answer(for:)), result: result)
     }
 
-    /// The answer on screen for a rep: the option tapped, the approach draft, or the bug pick.
+    /// The answer on screen for a rep: the option tapped, the typed answer, or the recall draft.
     private func answer(for rep: PrepRep) -> PrepAnswer? {
         switch rep.drill {
-        case .complexity, .trace:
-            return chosen?.rep == rep.index ? chosen.map { .choice($0.id) } : nil
-        case .approach, .judgment, .boss:
+        case .judgment, .boss:
             return .choice(draft(for: rep).text)
         case .lesson where Self.usesRecall(rep), .recall where Self.usesRecall(rep):
             return .choice(viewModel.recallDraft)
-        case .fact, .lesson, .warmup, .recall:
+        case .lesson, .warmup, .recall:
             if Self.isCloze(rep) { return .choice(draft(for: rep).text) }
             return chosen?.rep == rep.index ? chosen.map { .choice($0.id) } : nil
-        case .spotBug:
-            let draft = draft(for: rep)
-            return draft.line.map { .bugFix(line: $0, fix: draft.fix ?? "") }
         case .story:
             switch viewModel.storyStage {
             case .telling, .probing: return .choice(viewModel.recallDraft)
             case .told, .probed: return nil
             }
-        case .primer, .unknown, .probe:  // a probe only comes inside a story rep
+        // Skipped: the retired DSA drills and unknown ones. A probe only comes inside a story rep.
+        case .approach, .complexity, .spotBug, .trace, .primer, .fact, .unknown, .probe:
             return nil
         }
     }
@@ -175,9 +163,9 @@ struct PrepRunView: View {
         }
     }
 
-    /// A fact or lesson check answered by typing rather than tapping an option.
+    /// A lesson check answered by typing rather than tapping an option.
     fileprivate static func isCloze(_ rep: PrepRep) -> Bool {
-        [.lesson, .warmup, .recall].contains(rep.drill) ? rep.item.lesson?.check.isCloze == true : rep.item.format == "cloze"
+        rep.item.lesson?.check.isCloze == true
     }
 
     /// The rep's position among today's reps (not its stable index, which can skip).
@@ -292,13 +280,7 @@ struct PrepRunView: View {
             .id(rep.index)
         case .result(let rep, let result, _):
             scaffold(rep, hasAction: true) {
-                PrepResultView(
-                    rep: rep,
-                    result: result,
-                    chosenID: chosen?.rep == rep.index ? chosen?.id : nil,
-                    chosenLine: draft(for: rep).line,
-                    typedAnswer: draft(for: rep).text
-                )
+                PrepResultView(rep: rep, result: result)
                 if rep.item.isCoachWritten {
                     PrepFlagCardButton(
                         isFlagged: viewModel.isFlagged(rep.item.id),
@@ -312,7 +294,7 @@ struct PrepRunView: View {
         case .finished(let summary) where summary.isCourse:
             PrepDayCompleteView(summary: summary, offersBonus: viewModel.runKind != .bonus) { dismiss() }
         case .finished(let summary):
-            PrepRunCompleteView(streak: summary.streak, moved: summary.moved) { dismiss() }
+            PrepRunCompleteView(streak: summary.streak) { dismiss() }
         }
     }
 
@@ -322,9 +304,7 @@ struct PrepRunView: View {
         _ rep: PrepRep, hasAction: Bool, followsLatest: Bool = false,
         @ViewBuilder content: () -> Content, @ViewBuilder bottom: () -> Bottom
     ) -> some View {
-        // The expanded card is capped at 45% of the screen; its detail scrolls inside.
-        let availableHeight = screenHeight
-        return ScrollView {
+        ScrollView {
             VStack(alignment: .leading, spacing: BrainStyle.xl) {
                 content()
             }
@@ -341,7 +321,7 @@ struct PrepRunView: View {
                     PrepSegmentBar(position: progress.position, count: progress.count)
                 }
                 if ![.lesson, .recall, .warmup, .story].contains(rep.drill) {  // these cards carry their own content
-                    PrepProblemCard(rep: rep, maxHeight: availableHeight * 0.45)
+                    PrepProblemCard(rep: rep)
                 }
             }
             .padding(.horizontal, BrainStyle.l)
@@ -367,10 +347,10 @@ struct PrepRunView: View {
 
     private func hasAction(_ rep: PrepRep) -> Bool {
         switch rep.drill {
-        case .primer, .approach, .spotBug, .unknown, .judgment, .boss, .story, .probe: true
+        case .judgment, .boss, .story: true
         case .lesson where Self.usesRecall(rep), .recall where Self.usesRecall(rep): true
-        case .fact, .lesson, .warmup, .recall: Self.isCloze(rep)
-        case .complexity, .trace: false
+        case .lesson, .warmup, .recall: Self.isCloze(rep)
+        case .approach, .complexity, .spotBug, .trace, .primer, .fact, .unknown, .probe: true  // Skip
         }
     }
 
@@ -378,26 +358,6 @@ struct PrepRunView: View {
     @ViewBuilder
     private func repAction(_ rep: PrepRep) -> some View {
         switch rep.drill {
-        case .primer:
-            PrepPrimaryButton(title: "Got it", enabled: !viewModel.isSubmitting) {
-                Task { await viewModel.acknowledgePrimer() }
-            }
-        case .approach:
-            let text = draft(for: rep).text.trimmingCharacters(in: .whitespacesAndNewlines)
-            PrepPrimaryButton(
-                title: "Submit",
-                enabled: !text.isEmpty && !viewModel.isSubmitting,
-                isGrading: viewModel.isSubmitting
-            ) { Task { await viewModel.submitApproach(text) } }
-        case .spotBug:
-            let answer = draft(for: rep)
-            PrepPrimaryButton(
-                title: "Submit",
-                enabled: PrepCopy.canSubmitBugFix(line: answer.line, fix: answer.fix) && !viewModel.isSubmitting
-            ) {
-                guard let line = answer.line, let fix = answer.fix else { return }
-                Task { await viewModel.submitBugFix(line: line, fix: fix) }
-            }
         case .judgment, .boss:
             let text = draft(for: rep).text
             let floor = PrepWordFloor(text, floor: rep.minWords)
@@ -416,7 +376,7 @@ struct PrepRunView: View {
                 enabled: viewModel.canSubmitRecall && !micBusy,
                 isGrading: viewModel.isSubmitting
             ) { Task { await viewModel.submitRecall() } }
-        case .fact, .lesson, .warmup, .recall:
+        case .lesson, .warmup, .recall:
             let text = draft(for: rep).text
             PrepPrimaryButton(
                 title: "Submit",
@@ -424,69 +384,16 @@ struct PrepRunView: View {
             ) { Task { await viewModel.submitCloze(text) } }
         case .story:
             storyAction
-        case .unknown, .probe:  // a probe only comes inside a story rep
+        // The retired DSA drills (an old plan entry) and drills this build doesn't know; a probe only
+        // comes inside a story rep.
+        case .approach, .complexity, .spotBug, .trace, .primer, .fact, .unknown, .probe:
             PrepPrimaryButton(title: "Skip") { Task { await viewModel.skip() } }
-        case .complexity, .trace:
-            EmptyView()
         }
     }
 
     @ViewBuilder
     private func repContent(_ rep: PrepRep) -> some View {
         switch rep.drill {
-        case .complexity:
-            PrepChoiceView(
-                title: "Time complexity?",
-                options: rep.item.options,
-                grading: nil,
-                isSubmitting: viewModel.isSubmitting,
-                submitError: viewModel.submitError
-            ) { option in choose(option, in: rep) }
-        case .trace:
-            PrepTraceView(
-                item: rep.item,
-                isSubmitting: viewModel.isSubmitting,
-                submitError: viewModel.submitError
-            ) { option in choose(option, in: rep) }
-        case .approach:
-            PrepApproachView(
-                text: Binding(
-                    get: { draft(for: rep).text },
-                    set: { text in updateDraft(rep) { $0.text = PrepCopy.cappedApproach(text) } }),
-                hints: rep.item.hints,
-                hintsShown: viewModel.hintsShown,
-                isSubmitting: viewModel.isSubmitting,
-                showHint: { viewModel.showHint() },
-                shownAt: viewModel.shownAt
-            )
-        case .spotBug:
-            let answer = draft(for: rep)
-            PrepSpotBugView(
-                code: rep.item.code,
-                fixes: rep.item.fixes,
-                selectedLine: answer.line,
-                selectedFix: answer.fix,
-                isSubmitting: viewModel.isSubmitting,
-                selectLine: { line in updateDraft(rep) { $0.line = line } },
-                selectFix: { fix in updateDraft(rep) { $0.fix = fix } }
-            )
-        case .primer:
-            PrepPrimerView(item: rep.item)
-        case .fact:
-            if rep.item.format == "cloze" {
-                PrepClozeView(
-                    text: Binding(get: { draft(for: rep).text }, set: { text in updateDraft(rep) { $0.text = text } }),
-                    isSubmitting: viewModel.isSubmitting
-                ) { Task { await viewModel.submitCloze(draft(for: rep).text) } }
-            } else {
-                PrepChoiceView(
-                    title: "Your answer",
-                    options: rep.item.options,
-                    grading: nil,
-                    isSubmitting: viewModel.isSubmitting,
-                    submitError: viewModel.submitError
-                ) { option in choose(option, in: rep) }
-            }
         case .lesson where Self.usesRecall(rep), .recall where Self.usesRecall(rep):
             if let lesson = rep.item.lesson, let recall = lesson.recall {
                 if let label = rep.label {
@@ -569,21 +476,15 @@ struct PrepRunView: View {
                 }
             }
         case .judgment, .boss:
-            PrepApproachView(
+            PrepAnswerEditor(
                 text: Binding(
                     get: { draft(for: rep).text },
                     set: { text in updateDraft(rep) { $0.text = PrepCopy.cappedApproach(text) } }),
-                hints: [],
-                hintsShown: 0,
-                isSubmitting: viewModel.isSubmitting,
-                showHint: {},
-                shownAt: viewModel.shownAt,
-                prompt: "Your answer",
-                showsClock: false
+                isSubmitting: viewModel.isSubmitting
             )
         case .story:
             storyContent(rep)
-        case .unknown, .probe:  // a probe only comes inside a story rep
+        case .approach, .complexity, .spotBug, .trace, .primer, .fact, .unknown, .probe:
             PrepNoteCard {
                 Text(verbatim: "Update Atlas to do this rep")
                     .font(BrainStyle.rowTitle)
@@ -686,10 +587,9 @@ private struct PrepSegmentBar: View {
     }
 }
 
-/// The end of the run: the streak, the skills whose mastery moved, and Done.
+/// The end of a run outside the course: the streak and Done.
 struct PrepRunCompleteView: View {
     let streak: PrepStreak
-    let moved: [PrepSkill]
     let done: () -> Void
 
     var body: some View {
@@ -699,23 +599,6 @@ struct PrepRunCompleteView: View {
                     BrainRow(
                         title: PrepCopy.streakTitle(days: streak.days),
                         subtitle: PrepCopy.streakSubtitle(days: streak.days, freezes: streak.freezes))
-                }
-                if !moved.isEmpty {
-                    VStack(alignment: .leading, spacing: BrainStyle.s) {
-                        BrainSectionHeader(title: "Moved today")
-                        SectionCard {
-                            VStack(spacing: 0) {
-                                ForEach(Array(moved.enumerated()), id: \.element.id) { offset, skill in
-                                    if offset > 0 { PrepRowDivider() }
-                                    BrainRow(
-                                        leading: { PrepCoverThumbnail(id: PrepCopy.coverID(skill.id)) },
-                                        title: skill.title,
-                                        subtitle: PrepCopy.movedSubtitle(mastery: skill.mastery)
-                                    )
-                                }
-                            }
-                        }
-                    }
                 }
                 PrepPrimaryButton(title: "Done", action: done)
             }

@@ -276,6 +276,15 @@ final class DailyAskModelTests: XCTestCase {
                        "Skipped: sick")
     }
 
+    func testAppliedOrSentOffersOpenPrep() {
+        func outcome(_ event: String) -> DailyAskOutcome {
+            DailyAskOutcome(event: event, role: "r", company: "C", title: "T", reason: nil, name: nil)
+        }
+        XCTAssertTrue(DailyAskBody.opensPrep(outcome("applied")))
+        XCTAssertTrue(DailyAskBody.opensPrep(outcome("sent")))
+        XCTAssertFalse(DailyAskBody.opensPrep(outcome("skip")))
+    }
+
     func testNeverMissTwiceLine() throws {
         XCTAssertEqual(DailyAskBody.neverMissTwiceLine(try Self.ask()), "Yesterday's Ask was missed — never miss twice.")
         XCTAssertEqual(DailyAskBody.neverMissTwiceLine(try Self.ask { $0["previous"] = "skipped" }),

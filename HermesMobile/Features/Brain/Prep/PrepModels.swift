@@ -109,66 +109,20 @@ struct PrepRunSummary: Decodable, Hashable, Sendable {
     }
 }
 
-struct PrepTrackSummary: Decodable, Identifiable, Hashable, Sendable {
-    let id: String
-    let title: String
-    let mastered: Int
-    let total: Int
-    let progress: Double
-    let subtitle: String
-
-    private enum CodingKeys: String, CodingKey { case id, title, mastered, total, progress, subtitle }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = c.string(.id)
-        title = c.string(.title)
-        mastered = c.int(.mastered)
-        total = c.int(.total)
-        progress = c.double(.progress)
-        subtitle = c.string(.subtitle)
-    }
-}
-
-struct PrepNeedsWork: Decodable, Identifiable, Hashable, Sendable {
-    let skill: String
-    let title: String
-    let detail: String
-
-    var id: String { skill }
-
-    private enum CodingKeys: String, CodingKey { case skill, title, detail }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        skill = c.string(.skill)
-        title = c.string(.title)
-        detail = c.string(.detail)
-    }
-}
-
-/// `GET /api/tutor/home`. `readiness` is null until the server has enough history.
+/// `GET /api/tutor/home`. The server also sends `readiness`, `tracks` and `needs_work` from the
+/// retired DSA tracks; the app reads none of them.
 struct PrepHome: Decodable, Hashable, Sendable {
     let streak: PrepStreak
-    let readiness: Double?
     let run: PrepRunSummary
-    let tracks: [PrepTrackSummary]
-    let needsWork: [PrepNeedsWork]
     /// The learn-first course path; nil on servers without a course.
     let course: PrepCourse?
 
-    private enum CodingKeys: String, CodingKey {
-        case streak, readiness, run, tracks, course
-        case needsWork = "needs_work"
-    }
+    private enum CodingKeys: String, CodingKey { case streak, run, course }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         streak = c.object(PrepStreak.self, .streak, default: PrepStreak())
-        readiness = c.optional(Double.self, .readiness)
         run = c.object(PrepRunSummary.self, .run, default: PrepRunSummary())
-        tracks = c.lossy(PrepTrackSummary.self, .tracks)
-        needsWork = c.lossy(PrepNeedsWork.self, .needsWork)
         course = c.optional(PrepCourse.self, .course)
     }
 }
@@ -1103,97 +1057,4 @@ struct PrepGapDetail: Decodable, Hashable, Sendable {
         evidence = c.lossy(PrepGapEvidence.self, .evidence)
         cards = c.lossy(PrepGapCard.self, .cards)
     }
-}
-
-// MARK: - Map
-
-enum PrepSkillState: String, Decodable, Hashable, Sendable {
-    case new
-    case inProgress = "in_progress"
-    case weak
-    case locked
-    case mastered
-    case unknown
-
-    init(from decoder: Decoder) throws {
-        let raw = try? decoder.singleValueContainer().decode(String.self)
-        self = raw.flatMap(PrepSkillState.init(rawValue:)) ?? .unknown
-    }
-}
-
-struct PrepSkill: Decodable, Identifiable, Hashable, Sendable {
-    let id: String
-    let title: String
-    let state: PrepSkillState
-    let mastery: Double
-    let detail: String
-
-    private enum CodingKeys: String, CodingKey { case id, title, state, mastery, detail }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = c.string(.id)
-        title = c.string(.title)
-        state = c.optional(PrepSkillState.self, .state) ?? .unknown
-        mastery = c.double(.mastery)
-        detail = c.string(.detail)
-    }
-}
-
-struct PrepLevel: Decodable, Hashable, Sendable {
-    let title: String
-    let locked: Bool
-    let skills: [PrepSkill]
-
-    private enum CodingKeys: String, CodingKey { case title, locked, skills }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        title = c.string(.title)
-        locked = c.bool(.locked)
-        skills = c.lossy(PrepSkill.self, .skills)
-    }
-}
-
-struct PrepMapSummary: Decodable, Hashable, Sendable {
-    let mastered: Int
-    let total: Int
-    let problems: Int
-    let due: Int
-
-    private enum CodingKeys: String, CodingKey { case mastered, total, problems, due }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        mastered = c.int(.mastered)
-        total = c.int(.total)
-        problems = c.int(.problems)
-        due = c.int(.due)
-    }
-}
-
-/// `GET /api/tutor/map?track=`.
-struct PrepTrackMap: Decodable, Hashable, Sendable {
-    let track: String
-    let title: String
-    let summary: PrepMapSummary
-    let levels: [PrepLevel]
-
-    private enum CodingKeys: String, CodingKey { case track, title, summary, levels }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        track = c.string(.track)
-        title = c.string(.title)
-        summary = c.object(PrepMapSummary.self, .summary, default: PrepMapSummary.empty)
-        levels = c.lossy(PrepLevel.self, .levels)
-    }
-}
-
-private extension PrepMapSummary {
-    static let empty: PrepMapSummary = {
-        // `{}` always decodes: every field defaults.
-        // swiftlint:disable:next force_try
-        try! PrepDecoding.decode(PrepMapSummary.self, from: Data("{}".utf8))
-    }()
 }

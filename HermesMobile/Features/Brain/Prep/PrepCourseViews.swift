@@ -1,9 +1,9 @@
 import SwiftUI
 
 // Prep home's course: today's ring card and the path of units and lesson nodes. Passed units
-// collapse to a row with their stars, the current unit opens to its nodes and boss, later units
-// wait locked with Test out. The path wears the `.knowledge` paper; the next step is Nous blue
-// (it starts the run); rewards are gold marks only.
+// collapse to a row with their stars, the current unit opens to its nodes and boss, the next unit
+// waits locked with Test out, and the rest are counted in one line. The path wears the `.knowledge`
+// paper; the next step is Nous blue (it starts the run); rewards are gold marks only.
 
 /// Today's done/total as a ring, the number inside.
 struct PrepDayRing: View {
@@ -71,21 +71,19 @@ struct PrepTodayRingCard: View {
 }
 
 /// The course: passed units as rows with stars, each current unit (the one being taught, and any whose
-/// boss is still to beat) as a banner over a winding path, the next unit with Test out, and the rest as a
-/// quiet "Coming up" list.
-struct PrepUnitPath<Between: View>: View {
+/// boss is still to beat) as a banner over a winding path, the next unit with Test out, and the rest as
+/// one quiet "N more units" line.
+struct PrepUnitPath: View {
     let course: PrepCourse
-    /// The text critique run's row, for servers without the voice mock ladders (whose brief
-    /// screens carry it otherwise).
-    var showsTextMockRow = true
-    /// Shown under the units (the story bank and the mock ladders).
-    @ViewBuilder let between: Between
 
     var body: some View {
         let lastCurrent = course.units.lastIndex { $0.state == .current }
         let nextLocked = course.units.indices.first { i in
             course.units[i].state != .passed && course.units[i].state != .current && lastCurrent.map { i > $0 } ?? true
         }
+        let later = course.units.indices.filter { i in
+            course.units[i].state != .passed && course.units[i].state != .current && i != nextLocked
+        }.count
         VStack(alignment: .leading, spacing: BrainStyle.l) {
             ForEach(Array(course.units.enumerated()), id: \.element.id) { index, unit in
                 if unit.state == .passed {
@@ -93,30 +91,20 @@ struct PrepUnitPath<Between: View>: View {
                 } else if unit.state == .current {
                     PrepCurrentUnit(index: index, unit: unit)
                 } else if index == nextLocked {
-                    PrepLockedUnitRow(index: index, unit: unit, prominent: true)
+                    PrepLockedUnitRow(index: index, unit: unit)
                 }
             }
-            let later = course.units.indices.filter { i in
-                course.units[i].state != .passed && course.units[i].state != .current && i != nextLocked
-            }
-            if !later.isEmpty {
-                VStack(alignment: .leading, spacing: BrainStyle.xs) {
-                    BrainSectionHeader(title: "Coming up")
-                    ForEach(later, id: \.self) { i in
-                        PrepLockedUnitRow(index: i, unit: course.units[i], prominent: false)
-                    }
-                }
-            }
-            between
-            if showsTextMockRow, course.units.contains(where: { $0.mock }) {
-                NavigationLink(value: ShellPushDestination.brainRoute(.prep(.mock))) {
-                    BrainRow(title: "Mock interview", subtitle: "Full critique on what you've passed")
-                        .padding(.horizontal, BrainStyle.cardHorizontalPadding)
-                        .hxCard()
-                }
-                .buttonStyle(.plain)
+            if later > 0 {
+                Text(verbatim: Self.moreUnitsLine(later))
+                    .font(BrainStyle.meta)
+                    .foregroundStyle(Color.hxTextSecondary)
             }
         }
+    }
+
+    /// The units past the next one, counted: "1 more unit", "4 more units".
+    static func moreUnitsLine(_ count: Int) -> String {
+        count == 1 ? "1 more unit" : "\(count) more units"
     }
 }
 
@@ -142,11 +130,10 @@ private struct PrepPassedUnitRow: View {
     }
 }
 
-/// A unit not yet reached. The next one offers Test out as a chip; later ones as a quiet link.
+/// The next unit not yet reached, with Test out as a chip.
 private struct PrepLockedUnitRow: View {
     let index: Int
     let unit: PrepUnit
-    let prominent: Bool
 
     var body: some View {
         HStack(spacing: BrainStyle.m) {
@@ -159,15 +146,8 @@ private struct PrepLockedUnitRow: View {
             .foregroundStyle(Color.hxTextSecondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             NavigationLink(value: ShellPushDestination.brainRoute(.prep(.testout(unit.id)))) {
-                if prominent {
-                    HXChip(paper: .knowledge, label: "Test out") { EmptyView() }
-                        .frame(minHeight: BrainStyle.minTapTarget)
-                } else {
-                    Text(verbatim: "Test out")
-                        .font(BrainStyle.meta)
-                        .foregroundStyle(Color.hxTextSecondary)
-                        .frame(minHeight: BrainStyle.minTapTarget)
-                }
+                HXChip(paper: .knowledge, label: "Test out") { EmptyView() }
+                    .frame(minHeight: BrainStyle.minTapTarget)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Text(verbatim: "Test out of \(unit.title)"))
