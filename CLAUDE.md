@@ -14,6 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Fork-only features** live in `HermesMobile/Features/`: `DailyDeck` (the daily brief, read from workspace files), `Goals`, `Body` (workout tracker, Sleep link, Baki the coach), `Brain` (including `Brain/Prep/` for Interview Prep), `VoiceCall`, and `Activity`.
 - **Design language.** [DESIGN.md](DESIGN.md) defines the "calm chat, colorful objects" direction: neutral `hx*` surfaces, a fixed paper color per object kind, and accent blue only for controls. Read it before UI work.
 - **Bots.** [docs/agents/bots.md](docs/agents/bots.md) covers the direct-Hermes Bot connection.
+- **Disk.** A simulator made for one piece of work is named `iPhone 17 (<slug>)`, a lowercase slug, so the vault watcher can delete it once it has sat shut down for 7 days; delete it yourself when the work lands. Phone installs reuse `build/device-dd`, and compile checks reuse one `-derivedDataPath`, never a new dated folder per run.
 
 ## Build quick reference
 
