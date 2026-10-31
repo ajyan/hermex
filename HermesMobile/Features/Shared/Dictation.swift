@@ -7,7 +7,9 @@ import SwiftUI
 // the dictated part is tidied (grammar, fillers, paragraphs) by the server's local model, or the
 // on-device model when the server is slow or away, with "Original" one tap away. Tidying starts
 // while the speaker talks, a passage at a time, so Stop waits only on the last few words. Text
-// typed before the dictation is never rewritten.
+// typed before the dictation is never rewritten. The keyboard goes away while the mic listens, and
+// typing into the box stops it: the recognizer never writes over a keyboard edit, and the tidy waits
+// for the box's Done (`finish()`) rather than rewriting under the cursor.
 
 /// Rewrites one dictated passage. Tests inject their own; the live one is Apple's on-device model.
 protocol DictationPolishing {
@@ -37,6 +39,16 @@ final class DictationModel {
     @ObservationIgnored private var tidiedEarly: [String] = []
     /// Tidies the early passages one after another, so they finish in the order they were spoken.
     @ObservationIgnored private var earlyChain: Task<Void, Never>?
+    /// The field as dictation last wrote it, and the recognizer's draft it wrote: a field that differs
+    /// was edited on the keyboard.
+    @ObservationIgnored private var lastWritten = ""
+    @ObservationIgnored private var lastHeard = ""
+    /// Set when typing stopped the mic: the tidy waits for `finish()`.
+    @ObservationIgnored private var heldForEdit = false
+    /// Set once the field was edited on the keyboard: from then on the recognizer only adds words at the end.
+    @ObservationIgnored private var appendsOnly = false
+    /// `finish()` calls waiting for a server transcription to land.
+    @ObservationIgnored private var idleWaiters: [CheckedContinuation<Void, Never>] = []
 
     /// Words a finished stretch of speech needs before it is tidied early: enough context for a good rewrite.
     static let earlyPassageWords = 25
@@ -47,27 +59,72 @@ final class DictationModel {
     ) {
         self.voiceInput = voiceInput ?? ComposerVoiceInputController(punctuates: true)
         self.polisher = polisher
+        // Driven by the recognizer rather than the view, so a box that closes mid-dictation still tidies.
+        self.voiceInput.onStateChange = { [weak self] in self?.voiceStateChanged() }
     }
 
     var canUndoTidy: Bool { lastTidy != nil }
+
+    /// Listening, or tidying what was heard: a box closing now would lose words or their tidy.
+    var isBusy: Bool { voiceInput.state != .idle || isTidying }
 
     /// Starts or stops dictation into `text`.
     func toggle(_ text: Binding<String>) {
         if voiceInput.state == .idle {
             begin(text)
         }
-        voiceInput.scheduleToggle(currentDraft: text.wrappedValue) { text.wrappedValue = $0 }
+        voiceInput.scheduleToggle(currentDraft: text.wrappedValue) { [weak self] in self?.heard($0) }
     }
 
-    /// Call when the recognizer's state changes: a return to idle tidies what was dictated.
+    /// A draft from the recognizer: written whole while the field is as dictation left it. After a
+    /// keyboard edit only its new words go on the end (a server transcript landing after the edit).
+    func heard(_ draft: String) {
+        guard let text else { return }
+        let current = text.wrappedValue
+        var next = draft
+        if current != lastWritten { appendsOnly = true }
+        if appendsOnly {
+            guard draft.hasPrefix(lastHeard) else { return }
+            let added = draft.dropFirst(lastHeard.count).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !added.isEmpty else { return }
+            next = current.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? added : current + " " + added
+        }
+        lastHeard = draft
+        lastWritten = next
+        text.wrappedValue = next
+    }
+
+    /// Called on every recognizer state change: a return to idle tidies what was dictated.
     func voiceStateChanged() {
-        guard voiceInput.state == .idle, base != nil else { return }
-        tidyTask = Task { await tidy() }
+        guard voiceInput.state == .idle else { return }
+        if !heldForEdit { startTidy() }
+        let waiters = idleWaiters
+        idleWaiters = []
+        waiters.forEach { $0.resume() }
     }
 
-    /// Call on every change to the field: an edit after a tidy keeps the edit and drops "Original".
+    /// Call on every change to the field: typing while the mic listens stops it and keeps every word;
+    /// an edit after a tidy keeps the edit and drops "Original".
     func textChanged(_ newText: String) {
+        if newText != lastWritten, voiceInput.state == .listening || voiceInput.state == .serverListening {
+            heldForEdit = true
+            voiceInput.stopKeepingTranscript()
+        }
         if let lastTidy, newText != lastTidy.tidied { self.lastTidy = nil }
+    }
+
+    /// Stops listening and waits for the words to land and be tidied: a box's Done calls this before it
+    /// closes, so what it saves is the tidied text.
+    func finish() async {
+        switch voiceInput.state {
+        case .listening, .serverListening, .requestingPermission: voiceInput.stopKeepingTranscript()
+        case .idle, .transcribing: break
+        }
+        if voiceInput.state != .idle {
+            await withCheckedContinuation { idleWaiters.append($0) }
+        }
+        startTidy()
+        await tidyTask?.value
     }
 
     /// Puts back the words as they were heard.
@@ -80,6 +137,7 @@ final class DictationModel {
     /// Stops listening and drops any pending tidy: the answer is being sent or the box is going away.
     func cancel() {
         base = nil
+        heldForEdit = false
         tidyTask?.cancel()
         tidyTask = nil
         dropEarly()
@@ -87,15 +145,21 @@ final class DictationModel {
         voiceInput.stopBeforeSubmittingDraft()
     }
 
+    /// Begins dictating into `text`, putting the keyboard away: you're talking, not typing.
     func begin(_ text: Binding<String>) {
         tidyTask?.cancel()
         dropEarly()
         isTidying = false
         lastTidy = nil
+        heldForEdit = false
+        appendsOnly = false
         self.text = text
         base = text.wrappedValue
+        lastWritten = text.wrappedValue
+        lastHeard = text.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines)
         activePolisher = polisher(server)
         voiceInput.onCommittedTranscript = { [weak self] in self?.committedChanged($0) }
+        HXKeyboard.dismiss()
     }
 
     /// Call with every finished-segment transcript while listening: once enough new words have
@@ -115,9 +179,21 @@ final class DictationModel {
         }
     }
 
+    /// Tidies what was dictated since `begin`, if it hasn't been handed to the tidy already.
     func tidy() async {
-        guard let base, let text else { return }
+        startTidy()
+        await tidyTask?.value
+    }
+
+    /// Hands what was dictated to the tidy, once: the recognizer going idle and `finish()` can both ask.
+    private func startTidy() {
+        guard let base else { return }
         self.base = nil
+        tidyTask = Task { await tidy(from: base) }
+    }
+
+    private func tidy(from base: String) async {
+        guard let text else { return }
         let heard = text.wrappedValue
         guard let polisher = activePolisher, let split = DictationSplice.split(base: base, draft: heard) else {
             dropEarly()

@@ -149,23 +149,36 @@ struct DeckIdeaBody: View {
                 .padding(.top, 20)
             }
             if !card.parts.isEmpty {
-                Text(verbatim: "The parts")
-                    .font(AppFont.footnote(weight: .semibold))
-                    .foregroundStyle(palette.ink.opacity(0.75))
-                    .accessibilityAddTraits(.isHeader)
-                    .padding(.top, 22)
-                    .padding(.bottom, 8)
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(card.parts, id: \.self) { part in
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text(verbatim: "•").accessibilityHidden(true)
-                            (Text(verbatim: "\(part.label): ").font(AppFont.subheadline(weight: .semibold))
-                                + Text(verbatim: part.text).font(AppFont.subheadline()))
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .foregroundStyle(Color.hxTextPrimary)
-                        .accessibilityElement(children: .combine)
+                DeckPartsList(parts: card.parts.map { ($0.label, $0.text) }, palette: palette).padding(.top, 22)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// "The parts": a bullet per part, its label bold before its text. An idea card's parts, and a Piece
+/// card's steps.
+struct DeckPartsList: View {
+    let parts: [(label: String?, text: String)]
+    let palette: DeckPalette
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(verbatim: "The parts")
+                .font(AppFont.footnote(weight: .semibold))
+                .foregroundStyle(palette.ink.opacity(0.75))
+                .accessibilityAddTraits(.isHeader)
+                .padding(.bottom, 8)
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(verbatim: "•").accessibilityHidden(true)
+                        (Text(verbatim: part.label.map { "\($0): " } ?? "").font(AppFont.subheadline(weight: .semibold))
+                            + Text(verbatim: part.text).font(AppFont.subheadline()))
+                            .fixedSize(horizontal: false, vertical: true)
                     }
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .accessibilityElement(children: .combine)
                 }
             }
         }

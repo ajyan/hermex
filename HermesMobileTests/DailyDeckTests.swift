@@ -2973,14 +2973,6 @@ final class MandarinPracticeTests: XCTestCase {
         XCTAssertEqual(after.items.map(\.hanzi), ["对"])
         XCTAssertEqual(after.progress?.phrases, 3)
     }
-
-    func testProgressLine() {
-        XCTAssertEqual(MandarinProgressLine.text(DeckMandarinProgress(phrases: 36, usedWeek: 6, englishNow: 1.2, englishBefore: 3)),
-                       "36 phrases · 6 used this week · English per answer 3 → 1.2")
-        XCTAssertEqual(MandarinProgressLine.text(DeckMandarinProgress(phrases: 1, usedWeek: nil, englishNow: nil, englishBefore: nil)),
-                       "1 phrase")
-        XCTAssertNil(MandarinProgressLine.text(DeckMandarinProgress(phrases: nil, usedWeek: nil, englishNow: nil, englishBefore: nil)))
-    }
 }
 
 // MARK: - Meals

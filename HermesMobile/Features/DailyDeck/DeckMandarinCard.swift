@@ -279,12 +279,6 @@ struct DeckMandarinCard<Answer: View>: View {
         }
         answer()
         takeaways
-        if let progress = practice.progress, let line = MandarinProgressLine.text(progress) {
-            Text(verbatim: line)
-                .font(AppFont.footnote())
-                .foregroundStyle(Color.hxTextSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
         Button { speaker.stop(); isCalling = true } label: {
             Label { Text(verbatim: "Calling Mom or Dad?") } icon: { Image(systemName: "phone") }
                 .font(AppFont.subheadline(weight: .semibold))
@@ -309,7 +303,7 @@ struct DeckMandarinCard<Answer: View>: View {
         case .idle:
             if let result = practice.result {
                 if let feedback = result.feedback {
-                    feedbackBlocks(feedback, used: result.used)
+                    feedbackBlocks(feedback)
                 } else {
                     retryLine("Feedback comes with tomorrow's card.")
                 }
@@ -318,14 +312,12 @@ struct DeckMandarinCard<Answer: View>: View {
     }
 
     @ViewBuilder
-    private func feedbackBlocks(_ feedback: DeckMandarinFeedback, used: [String]) -> some View {
+    private func feedbackBlocks(_ feedback: DeckMandarinFeedback) -> some View {
         Text(verbatim: "Takeaways")
             .font(AppFont.footnote(weight: .semibold))
             .foregroundStyle(palette.ink)
             .padding(.top, 4)
-        let cues = card.phrases.count
-        takeaway("Natural", feedback.natural, pinyin: feedback.naturalPinyin,
-                 note: cues == 0 ? nil : "Used \(used.count) of \(cues) phrases" + (used.isEmpty ? "" : ": " + used.joined(separator: " ")))
+        takeaway("Natural", feedback.natural, pinyin: feedback.naturalPinyin, note: nil)
         ForEach(feedback.gaps, id: \.self) { gap in
             takeaway("New word", gap.hanzi, pinyin: gap.pinyin,
                      note: [gap.en, gap.build].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · "))
@@ -550,23 +542,6 @@ struct MandarinCueList: View {
                 .accessibilityAddTraits(.isButton)
             }
         }
-    }
-}
-
-/// The progress line: "36 phrases · 6 used this week · English per answer 2.8 → 1.2".
-enum MandarinProgressLine {
-    static func text(_ progress: DeckMandarinProgress) -> String? {
-        var parts: [String] = []
-        if let phrases = progress.phrases { parts.append(phrases == 1 ? "1 phrase" : "\(phrases) phrases") }
-        if let used = progress.usedWeek { parts.append("\(used) used this week") }
-        if let now = progress.englishNow {
-            parts.append("English per answer " + (progress.englishBefore.map { "\(number($0)) → " } ?? "") + number(now))
-        }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
-    }
-
-    private static func number(_ value: Double) -> String {
-        value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
     }
 }
 

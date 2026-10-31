@@ -23,6 +23,7 @@ final class ComposerVoiceInputController {
             } else {
                 recordingLease.release()
             }
+            if state != oldValue { onStateChange?() }
         }
     }
     private(set) var errorMessage: String?
@@ -64,6 +65,8 @@ final class ComposerVoiceInputController {
     /// The words of every finished utterance segment so far (never the earlier draft), each time a
     /// segment ends during on-device dictation. Dictation tidy starts on them while the speaker talks.
     @ObservationIgnored var onCommittedTranscript: ((String) -> Void)?
+    /// Called after every change of `state`, for an owner that must act on it with no view on screen.
+    @ObservationIgnored var onStateChange: (() -> Void)?
     @ObservationIgnored private var reportedCommitted = ""
     @ObservationIgnored var providerPreference = ComposerSTTProviderPreference.defaultValue
 

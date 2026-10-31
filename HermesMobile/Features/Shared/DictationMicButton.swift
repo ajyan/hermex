@@ -1,16 +1,19 @@
 import SwiftUI
 
 /// A text box's mic: tap to talk into `text`, tap again to stop, and the dictated words are tidied.
-/// After a tidy, "Original" beside the mic puts back the words as heard. It is a control, so it
-/// wears Nous blue; place it in the box's trailing corner.
+/// After a tidy, "Original" beside the mic puts back the words as heard. It wears the tint: Nous blue,
+/// or a card's ink on a Daily Brief card. Place it in the box's trailing corner.
 struct DictationMicButton: View {
     @Binding var text: String
     var isSubmitting = false
-    @State private var dictation = DictationModel()
+    /// A box whose Done waits for the tidy (`DictationModel.finish()`) passes its own; else the mic keeps one.
+    var model: DictationModel?
+    @State private var ownModel = DictationModel()
     @State private var shownError: String?
     @Environment(\.dictationServer) private var server
 
     var body: some View {
+        let dictation = model ?? ownModel
         let voiceInput = dictation.voiceInput
         HStack(spacing: 4) {
             if dictation.canUndoTidy {
@@ -28,7 +31,7 @@ struct DictationMicButton: View {
                             .font(AppFont.body(weight: .semibold))
                     }
                 }
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(.tint)
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
             }
@@ -61,7 +64,7 @@ struct DictationOriginalButton: View {
                 Image(systemName: "arrow.uturn.backward")
             }
             .font(AppFont.caption(weight: .semibold))
-            .foregroundStyle(Color.accentColor)
+            .foregroundStyle(.tint)
             .padding(.horizontal, 10)
             .frame(minHeight: 30)
             .background(Color.hxSurface, in: Capsule())
@@ -95,8 +98,8 @@ extension View {
         }
     }
 
-    /// Wires a mic's dictation to its box: tidy on stop, drop "Original" on an edit, stop on send,
-    /// background, or the box going away.
+    /// Wires a mic's dictation to its box: stop on a keyboard edit, drop "Original" on an edit, stop on
+    /// send, background, or the box going away. The model tidies on stop by itself.
     func dictationLifecycle(_ dictation: DictationModel, text: String, isSubmitting: Bool) -> some View {
         modifier(DictationLifecycle(dictation: dictation, text: text, isSubmitting: isSubmitting))
     }
@@ -110,7 +113,6 @@ private struct DictationLifecycle: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onChange(of: dictation.voiceInput.state) { _, _ in dictation.voiceStateChanged() }
             .onChange(of: text) { _, newText in dictation.textChanged(newText) }
             .onChange(of: isSubmitting) { _, submitting in
                 if submitting { dictation.cancel() }

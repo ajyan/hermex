@@ -995,8 +995,8 @@ struct DeckCardView: View {
 
 /// A recap's entries: each label set small and bold above its text, shown once for a run of
 /// entries that share it (the items under "Career Priorities"), with hairlines between groups.
-/// A Piece card's argument: "The argument · N steps", each a numbered claim with where it sits in the piece,
-/// then "In its own words", a few of its quotes in the saved-words serif with where each comes from.
+/// A Piece card's argument: its steps as "The parts" (the map behind "Open the map" has every step and
+/// where it sits), then "In its own words", a few of its quotes in the saved-words serif.
 private struct PieceArgument: View {
     let piece: DeckPiece
     let palette: DeckPalette
@@ -1004,64 +1004,18 @@ private struct PieceArgument: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if !piece.steps.isEmpty {  // the variant's gist face shows the quotes alone
-                Text(verbatim: "The argument · \(piece.steps.count) \(piece.steps.count == 1 ? "step" : "steps")")
-                    .font(AppFont.subheadline(weight: .semibold))
-                    .foregroundStyle(palette.ink)
-                    .accessibilityAddTraits(.isHeader)
-                    .padding(.bottom, 10)
-            }
-            ForEach(Array(piece.steps.enumerated()), id: \.offset) { index, step in
-                if index > 0 {
-                    Rectangle().fill(palette.ink.opacity(0.12)).frame(height: 0.5).padding(.vertical, 12)
-                }
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text(verbatim: "\(index + 1)")
-                        .font(AppFont.display(style: .subheadline, weight: .semibold))
-                        .foregroundStyle(palette.ink)
-                        .frame(minWidth: 16, alignment: .leading)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(verbatim: step.claim)
-                            .font(AppFont.body())
-                            .foregroundStyle(Color.hxTextPrimary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        if let span = step.span {
-                            Text(verbatim: span)
-                                .font(AppFont.footnote(weight: .medium))
-                                .foregroundStyle(palette.ink)
-                        }
-                    }
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(Text(verbatim: "Step \(index + 1): \(step.claim)\(step.span.map { ". \($0)" } ?? "")"))
+                DeckPartsList(parts: piece.steps.map { ($0.name, $0.claim) }, palette: palette)
             }
             if !piece.quotes.isEmpty {
                 Text(verbatim: "In its own words")
-                    .font(AppFont.subheadline(weight: .semibold))
-                    .foregroundStyle(palette.ink)
+                    .font(AppFont.footnote(weight: .semibold))
+                    .foregroundStyle(palette.ink.opacity(0.75))
                     .accessibilityAddTraits(.isHeader)
-                    .padding(.top, 26)
-                    .padding(.bottom, 10)
+                    .padding(.top, piece.steps.isEmpty ? 0 : 22)
+                    .padding(.bottom, 8)
                 VStack(alignment: .leading, spacing: 14) {
                     ForEach(piece.quotes, id: \.self) { quote in
-                        HStack(alignment: .firstTextBaseline, spacing: 10) {
-                            Image(systemName: "quote.opening")
-                                .font(AppFont.footnote(weight: .semibold))
-                                .foregroundStyle(palette.ink)
-                                .accessibilityHidden(true)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(verbatim: quote.text)
-                                    .font(AppFont.serif(style: .body))
-                                    .lineSpacing(3)
-                                    .foregroundStyle(Color.hxTextPrimary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                if let at = quote.at {
-                                    Text(verbatim: at)
-                                        .font(AppFont.footnote(weight: .medium))
-                                        .foregroundStyle(palette.ink)
-                                }
-                            }
-                        }
-                        .accessibilityElement(children: .combine)
+                        DeckQuoteRow(text: quote.text, at: quote.at, palette: palette)
                     }
                 }
             }
@@ -1251,7 +1205,8 @@ private struct GoalMeters: View {
 }
 
 /// Writing a reflection: the card's question pinned on its own paper, the whole sheet for words.
-/// Text saves as you type, so closing the sheet any way keeps it.
+/// Text saves as you type, so closing the sheet any way keeps it. Done waits for dictation to land
+/// and be tidied; a swipe can't close the sheet mid-dictation.
 private struct ReflectionSheet: View {
     let card: DeckCard
     let palette: DeckPalette
@@ -1262,6 +1217,9 @@ private struct ReflectionSheet: View {
     @State private var text = ""
     /// The Mandarin card's mic: on-device zh-CN dictation into the answer.
     @State private var voiceInput = ComposerVoiceInputController(fixedLocale: MandarinDictation.locale)
+    /// Every other card's mic, which Done waits on.
+    @State private var dictation = DictationModel()
+    @State private var isClosing = false
 
     var body: some View {
         NavigationStack {
@@ -1315,18 +1273,24 @@ private struct ReflectionSheet: View {
                         .accessibilityLabel(Text(verbatim: voiceInput.state == .idle ? "Speak in Mandarin" : "Stop dictation"))
                     }
                 } else if !card.isMandarin {
-                    ToolbarItem(placement: .topBarLeading) { DictationMicButton(text: $text) }
+                    ToolbarItem(placement: .topBarLeading) { DictationMicButton(text: $text, model: dictation) }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
                         voiceInput.stopKeepingTranscript()
-                        dismiss()
+                        isClosing = true
+                        Task {
+                            await dictation.finish()
+                            dismiss()
+                        }
                     } label: { Text(verbatim: "Done") }
+                    .disabled(isClosing)
                 }
             }
             .toolbarBackground(palette.paper, for: .navigationBar)
         }
         .tint(palette.ink)
+        .interactiveDismissDisabled(dictation.isBusy)
         .onAppear {
             text = viewModel.answer(for: card)?.text ?? ""
             isFocused = true
