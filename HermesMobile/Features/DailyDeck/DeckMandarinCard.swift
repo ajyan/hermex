@@ -298,8 +298,15 @@ struct DeckMandarinCard: View {
                 return told
             }
             if case let .failed(message) = practice.answering { retryLine(message) }
-            actions(primary: ("Back to the feedback", "text.bubble", { change { retelling = false } }),
-                    busy: practice.answering == .waiting)
+            Button { change { retelling = false } } label: {
+                Text(verbatim: "Back to the feedback")
+                    .font(AppFont.footnote(weight: .semibold))
+                    .foregroundStyle(palette.ink)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(practice.answering == .waiting)
         } else if let again = practice.againText {
             telling("First time", answered ?? "")
             telling("Second time", again)
