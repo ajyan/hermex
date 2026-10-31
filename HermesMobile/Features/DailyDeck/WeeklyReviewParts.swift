@@ -263,6 +263,9 @@ struct WeekEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
     @FocusState private var isFocused: Bool
     @State private var text = ""
+    /// The mic, which Done waits on so the tidied words are what's saved.
+    @State private var dictation = DictationModel()
+    @State private var isClosing = false
 
     var body: some View {
         NavigationStack {
@@ -300,14 +303,22 @@ struct WeekEditorSheet: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .background(palette.paper.ignoresSafeArea())
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { DictationMicButton(text: $text) }
+                ToolbarItem(placement: .topBarLeading) { DictationMicButton(text: $text, model: dictation) }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button { dismiss() } label: { Text(verbatim: "Done") }
+                    Button {
+                        isClosing = true
+                        Task {
+                            await dictation.finish()
+                            dismiss()
+                        }
+                    } label: { Text(verbatim: "Done") }
+                    .disabled(isClosing)
                 }
             }
             .toolbarBackground(palette.paper, for: .navigationBar)
         }
         .tint(palette.ink)
+        .interactiveDismissDisabled(dictation.isBusy)
         .onAppear {
             text = initial
             isFocused = true
