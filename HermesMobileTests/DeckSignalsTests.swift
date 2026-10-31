@@ -104,6 +104,22 @@ final class DeckSignalsTests: XCTestCase {
         XCTAssertEqual(DeckLearned(id: "a", text: "Short.", state: "unlearned").line, "Unlearned: Short.")
     }
 
+    func testWeekRowReadsAsItsTextAndStillOffersUndo() {
+        let week = DeckLearned(id: "week.2026-10-26", text: "Undo this week's learning", state: "learned")
+        XCTAssertEqual(week.line, "Undo this week's learning")
+        XCTAssertTrue(week.offersUndo)
+        let rule = DeckLearned(id: "wiki.length.shorter", text: "Short.", state: "learned")
+        XCTAssertEqual(rule.line, "Learned: Short.")
+        XCTAssertTrue(rule.offersUndo)
+    }
+
+    func testRetiredQuestionApproachIsInformationalWithoutUndo() {
+        let retired = DeckLearned(id: "question.own-example", text: "Own-example questions: retired", state: "unlearned")
+        XCTAssertEqual(retired.line, "Unlearned: Own-example questions: retired")
+        XCTAssertFalse(retired.offersUndo)
+        XCTAssertTrue(DeckLearned(id: "question.own-example", text: "Own-example questions", state: "learned").offersUndo)
+    }
+
     func testFiledSignalsReadBack() {
         let filed = """
         {"version": 1, "answers": [], "style": [{"card": "book", "chips": ["too-long"]}, {"bad": 1}],

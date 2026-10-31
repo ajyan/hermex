@@ -32,6 +32,12 @@ struct RateControl: View {
                 button(.bad)
             }
             if labels.verdict(for: key) == .bad, !LabelReason.options(for: key).isEmpty {
+                if labels.asksWhy(for: key) {
+                    Text(verbatim: "Why?")
+                        .font(AppFont.caption(weight: .semibold))
+                        .foregroundStyle(ink)
+                        .padding(.top, 2)
+                }
                 LabelReasonChips(key: key, title: title, labels: labels, paper: paper)
             }
             if let error = labels.error(for: key) {

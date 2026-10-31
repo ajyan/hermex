@@ -19,8 +19,9 @@ struct DeckVariantPick: View {
                     .font(AppFont.footnote())
                     .foregroundStyle(Color.hxTextSecondary)
                 let previews = variant.previews
-                faceButton("a", previews.a)
-                faceButton("b", previews.b)
+                let wholeQuestions = variant.a.question != nil && variant.b.question != nil
+                faceButton("a", previews.a, wholeQuestions)
+                faceButton("b", previews.b, wholeQuestions)
                 if viewModel.signals.pick?.card == card.id, !viewModel.isFiled || viewModel.hasChanges {
                     Text(verbatim: "Tap your pick again to clear it.")
                         .font(AppFont.footnote())
@@ -30,7 +31,8 @@ struct DeckVariantPick: View {
         }
     }
 
-    private func faceButton(_ id: String, _ preview: String) -> some View {
+    /// `whole`: two questions, shown in full at any length; a card face stops at 6 lines.
+    private func faceButton(_ id: String, _ preview: String, _ whole: Bool) -> some View {
         let isPicked = viewModel.signals.pick == DeckPick(card: card.id, chose: id)
         return Button {
             viewModel.choose(id, on: card)
@@ -38,7 +40,7 @@ struct DeckVariantPick: View {
             Text(verbatim: preview)
                 .font(AppFont.body())
                 .foregroundStyle(Color.hxTextPrimary)
-                .lineLimit(6)
+                .lineLimit(whole ? nil : 6)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(12)

@@ -146,7 +146,13 @@ struct DeckLearned: Decodable, Equatable, Identifiable {
     let state: String
 
     var isLearned: Bool { state == "learned" }
-    var line: String { "\(isLearned ? "Learned" : "Unlearned"): \(text)" }
+    /// A `week.` row is the week's own sentence ("Undo this week's learning"); the rest read "Learned: …".
+    var line: String {
+        id.hasPrefix("week.") ? text : "\(isLearned ? "Learned" : "Unlearned"): \(text)"
+    }
+    /// Whether the row offers Undo: learned rows only. An unlearned row, such as a `question.` approach the picks
+    /// retired, only informs: it is already dropped, so there is nothing to take back.
+    var offersUndo: Bool { isLearned }
 }
 
 /// The day's variant card: the same card written two ways along one style `dimension`. The card's own fields hold
@@ -162,6 +168,8 @@ struct DeckVariant: Decodable, Equatable {
     /// share), so a 6-line preview never shows two identical starts. A face with nothing after the shared lines
     /// reads "… and nothing more".
     var previews: (a: String, b: String) {
+        // Two questions are each shown whole: they're one line, so trimming would leave "…".
+        if a.question != nil, b.question != nil { return (a.preview, b.preview) }
         let lines = (a.preview.components(separatedBy: "\n"), b.preview.components(separatedBy: "\n"))
         let shared = zip(lines.0, lines.1).prefix { $0 == $1 }.count
         guard shared > 0 else { return (a.preview, b.preview) }
@@ -180,9 +188,12 @@ struct DeckFace: Equatable {
     let context: String?
     let entries: [DeckEntry]?
     let piece: DeckPiece?
+    /// A question variant's face: the whole question, in place of the card's body.
+    var question: String? = nil
 
     /// The face as plain text for the close card's side-by-side.
     var preview: String {
+        if let question { return question }
         if let context { return context }
         if let entries { return entries.map { ($0.label.map { "\($0): " } ?? "") + $0.text }.joined(separator: "\n") }
         if let piece {
@@ -194,7 +205,7 @@ struct DeckFace: Equatable {
 }
 
 extension DeckFace: Decodable {
-    private enum CodingKeys: String, CodingKey { case dir, context, entries, piece }
+    private enum CodingKeys: String, CodingKey { case dir, context, entries, piece, question }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -202,5 +213,6 @@ extension DeckFace: Decodable {
         context = try? c.decodeIfPresent(String.self, forKey: .context)
         entries = (try? c.decodeIfPresent([Lossy<DeckEntry>].self, forKey: .entries))?.compactMap(\.value)
         piece = try? c.decodeIfPresent(DeckPiece.self, forKey: .piece)
+        question = try? c.decodeIfPresent(String.self, forKey: .question)
     }
 }
