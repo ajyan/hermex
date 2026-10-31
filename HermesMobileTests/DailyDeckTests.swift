@@ -2922,6 +2922,59 @@ final class MandarinPracticeTests: XCTestCase {
         XCTAssertEqual(client.answers.count, 3, "an answer without feedback can be sent again")
     }
 
+    private func reply(_ natural: String, used: [String] = []) throws -> MandarinAnswerResponse {
+        let json: [String: Any] = ["feedback": ["natural": natural], "used": used]
+        return try JSONDecoder().decode(MandarinAnswerResponse.self, from: JSONSerialization.data(withJSONObject: json))
+    }
+
+    func testTellingItAgainKeepsBothTellingsAndResumes() async throws {
+        let client = FakeMandarinClient()
+        let first = try reply("我最近还不错。", used: ["还不错"])
+        let second = try reply("我最近还不错，在等消息。", used: ["在等消息"])
+        client.answerResult = .success(first)
+        let practice = practice(try card(), client: client)
+        let early = await practice.tellAgain("还不错")
+        XCTAssertFalse(early, "there's nothing to tell again before the first telling has feedback")
+        XCTAssertTrue(client.answers.isEmpty)
+        await practice.submit("还不错", question: nil)
+        client.answerResult = .success(second)
+        let told = await practice.tellAgain("  我最近还不错，在等消息。  ")
+        XCTAssertTrue(told)
+        XCTAssertEqual(client.answers.map(\.again), [nil, true])
+        XCTAssertEqual(practice.result, first, "the first telling keeps its feedback")
+        XCTAssertEqual(practice.againText, "我最近还不错，在等消息。")
+        XCTAssertEqual(practice.againResult, second)
+        XCTAssertEqual(practice.usedCues, ["还不错", "在等消息"], "a cue said in either telling counts")
+        let resumed = self.practice(try card(), client: client)
+        XCTAssertEqual(resumed.againText, "我最近还不错，在等消息。")
+        XCTAssertEqual(resumed.againResult, second)
+    }
+
+    func testTellingItAgainThatFailsCanBeTriedAgainAsTheSecondTelling() async throws {
+        let client = FakeMandarinClient()
+        client.answerResult = .success(try reply("好。"))
+        let practice = practice(try card(), client: client)
+        await practice.submit("好", question: nil)
+        client.answerResult = .failure(URLError(.timedOut))
+        let told = await practice.tellAgain("很好")
+        XCTAssertFalse(told, "the mic keeps his words")
+        XCTAssertEqual(practice.answering, .failed("Couldn't reach the server. Try again."))
+        XCTAssertNil(practice.againText)
+        client.answerResult = .success(try reply("很好。"))
+        await practice.retry()
+        XCTAssertEqual(client.answers.map(\.again), [nil, true, true])
+        XCTAssertEqual(practice.againText, "很好")
+        XCTAssertEqual(practice.result?.feedback?.natural, "好。")
+    }
+
+    func testAnswerRequestSendsAgainOnlyForTheSecondTelling() throws {
+        let first = String(decoding: try JSONEncoder().encode(MandarinAnswerRequest(date: "2026-10-25", text: "好", question: nil)), as: UTF8.self)
+        XCTAssertFalse(first.contains("again"))
+        let again = try JSONSerialization.jsonObject(with: JSONEncoder().encode(
+            MandarinAnswerRequest(date: "2026-10-25", text: "好", question: nil, again: true))) as? [String: Any]
+        XCTAssertEqual(again?["again"] as? Bool, true)
+    }
+
     func testThePracticeResumesForTheSameServerAndDayOnly() async throws {
         let card = try card()
         let first = practice(card, client: FakeMandarinClient())

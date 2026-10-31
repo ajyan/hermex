@@ -184,7 +184,6 @@ enum Endpoint {
     case tutorStory(id: String)
     case tutorDiagram(topic: String)
     case tutorMap(track: String)
-    case tutorItem(id: String)
     case tutorAttempt
     case tutorGaps
     case tutorGap(id: String)
@@ -548,8 +547,6 @@ enum Endpoint {
             return "/api/tutor/diagram"
         case .tutorMap:
             return "/api/tutor/map"
-        case .tutorItem:
-            return "/api/tutor/item"
         case .tutorAttempt:
             return "/api/tutor/attempt"
         case .tutorGaps:
@@ -840,7 +837,7 @@ enum Endpoint {
             return batch > 0 ? [URLQueryItem(name: "batch", value: String(batch))] : []
         case let .tutorMap(track):
             return [URLQueryItem(name: "track", value: track)]
-        case let .tutorItem(id), let .tutorGap(id), let .tutorLesson(id), let .tutorStory(id):
+        case let .tutorGap(id), let .tutorLesson(id), let .tutorStory(id):
             return [URLQueryItem(name: "id", value: id)]
         case let .tutorDiagram(topic):
             return [URLQueryItem(name: "topic", value: topic)]

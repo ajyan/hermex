@@ -5,7 +5,7 @@ import SwiftUI
 /// The Mandarin practice card in steps, moved through by its segment bar: Fix yesterday's slips, Recall
 /// the phrasebook's due phrases, make each cue Yours (say its example, then two versions about his
 /// week, checked), Talk (the question, a transition, a feeling and an everyday cue, and the answer),
-/// then the takeaways that come back seconds after answering. Everything he says, he says on the card.
+/// then the takeaways that come back seconds after answering, and telling it again without them. Everything he says, he says on the card.
 struct DeckMandarinCard: View {
     let card: DeckCard
     let palette: DeckPalette
@@ -21,6 +21,8 @@ struct DeckMandarinCard: View {
     @State private var revealed: Set<String> = []
     /// What he said for each fix before seeing it, to set beside the natural way.
     @State private var attempts: [String: String] = [:]
+    /// Talk: telling it again, with the feedback out of sight.
+    @State private var retelling = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -34,6 +36,7 @@ struct DeckMandarinCard: View {
             }
         }
         .onDisappear { speaker.stop() }
+        .onChange(of: practice.againText) { _, _ in retelling = false }  // a retried second telling landed
     }
 
     // MARK: Step bar
@@ -285,26 +288,42 @@ struct DeckMandarinCard: View {
                      note: [pattern.name, pattern.en].compactMap { $0 }.joined(separator: "\n"), play: false)
         }
         if !card.phrases.isEmpty {
-            MandarinCueChips(phrases: card.phrases, used: Set(practice.result?.used ?? []), palette: palette,
-                             speaker: speaker)
+            MandarinCueChips(phrases: card.phrases, used: Set(practice.usedCues), palette: palette, speaker: speaker)
         }
-        if let answered, !answered.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(verbatim: "You said")
-                    .font(AppFont.caption(weight: .semibold))
-                    .foregroundStyle(palette.ink)
-                Text(verbatim: answered)
-                    .font(AppFont.body())
-                    .fixedSize(horizontal: false, vertical: true)
+        if retelling {
+            MandarinMic(prompt: "Tell it again, a little longer", palette: palette,
+                        isBusy: practice.answering == .waiting, onListen: { speaker.stop() }) { text in
+                let told = await practice.tellAgain(text)
+                if told { change { retelling = false } }
+                return told
             }
-            .accessibilityElement(children: .combine)
+            if case let .failed(message) = practice.answering { retryLine(message) }
+            Button { change { retelling = false } } label: {
+                Text(verbatim: "Back to the feedback")
+                    .font(AppFont.footnote(weight: .semibold))
+                    .foregroundStyle(palette.ink)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(practice.answering == .waiting)
+        } else if let again = practice.againText {
+            telling("First time", answered ?? "")
+            telling("Second time", again)
+            takeaways(for: practice.againResult)
+            tellAgainButton
+        } else {
+            telling("You said", answered ?? "")
+            if practice.result?.feedback == nil {
+                MandarinMic(prompt: talkPrompt, palette: palette, isBusy: practice.answering == .waiting,
+                            editing: answered, onListen: { speaker.stop() }) { text in
+                    onAnswer(text)
+                    return true
+                }
+            }
+            takeaways(for: practice.result)
+            if practice.result?.feedback != nil, practice.answering == .idle { tellAgainButton }
         }
-        MandarinMic(prompt: talkPrompt, palette: palette, isBusy: practice.answering == .waiting,
-                    editing: answered, onListen: { speaker.stop() }) { text in
-            onAnswer(text)
-            return true
-        }
-        takeaways
     }
 
     private var talkPrompt: String {
@@ -312,15 +331,39 @@ struct DeckMandarinCard: View {
         return card.mandarinTellsAStory ? "What happened → how you felt → what's next" : "Answer out loud"
     }
 
+    /// One telling of his answer: what he said, under its tag. Nothing when he hasn't said anything.
     @ViewBuilder
-    private var takeaways: some View {
+    private func telling(_ tag: String, _ text: String) -> some View {
+        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(verbatim: tag)
+                    .font(AppFont.caption(weight: .semibold))
+                    .foregroundStyle(palette.ink)
+                Text(verbatim: text)
+                    .font(AppFont.body())
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    /// After the feedback: tell the same story again with it out of sight.
+    private var tellAgainButton: some View {
+        actions(primary: ("Tell it again", "arrow.counterclockwise", {
+            speaker.stop()
+            change { retelling = true }
+        }))
+    }
+
+    @ViewBuilder
+    private func takeaways(for result: MandarinAnswerResponse?) -> some View {
         switch practice.answering {
         case .waiting:
             EmptyView()
         case let .failed(message):
             retryLine(message)
         case .idle:
-            if let result = practice.result {
+            if let result {
                 if let feedback = result.feedback {
                     feedbackBlocks(feedback)
                 } else {

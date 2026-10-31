@@ -1473,6 +1473,43 @@ final class ChatViewModelSendTests: XCTestCase {
         XCTAssertNil(viewModel.sendErrorRuntimeStale)
     }
 
+    /// A call hung up mid-reply leaves its run going on the server, which keeps it and
+    /// refuses the next spoken turn. The turn replaces that run instead of failing.
+    @MainActor
+    func testVoiceTurnReplacesARunTheServerKeptAndSendsAgain() async throws {
+        var starts = 0
+        var cancels = 0
+        let viewModel = try makeViewModel { request in
+            switch request.url?.path {
+            case "/api/chat/start":
+                starts += 1
+                if starts == 1 {
+                    return apiTestJSONResponse(
+                        #"{"error": "A response is already running", "active_stream_id": "stream-old"}"#,
+                        for: request, status: 409)
+                }
+                return apiTestJSONResponse(#"{"session_id":"session-abc","stream_id":"stream-new"}"#, for: request)
+            case "/api/session":
+                return apiTestJSONResponse("""
+                {"session": {"session_id": "session-abc", "title": "Call", "active_stream_id": "stream-old",
+                  "messages": [{"role": "user", "content": "[voice] earlier", "timestamp": 1770000100, "message_id": "u1"}]}}
+                """, for: request)
+            case "/api/chat/cancel":
+                cancels += 1
+                return apiTestJSONResponse(#"{"ok":true}"#, for: request)
+            default:
+                return apiTestJSONResponse(#"{}"#, for: request)
+            }
+        }
+
+        let sent = await viewModel.sendVoiceMessage("[voice] who is my dad")
+
+        XCTAssertTrue(sent)
+        XCTAssertEqual(starts, 2)
+        XCTAssertEqual(cancels, 1)
+        XCTAssertEqual(viewModel.activeStreamID, "stream-new")
+    }
+
     /// Slash commands that send (`/queue` with nothing running, skill shortcuts)
     /// hand the failed send's text back, and ChatView sets it again.
     @MainActor

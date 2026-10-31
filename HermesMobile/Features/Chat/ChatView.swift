@@ -904,6 +904,8 @@ struct ChatView: View {
                 viewModel.setShowsLiveActivityResponseExcerpts(showsLiveActivityResponseExcerpts)
             }
             .onDisappear {
+                // A call screen closing on its own mid-call starts here when the chat goes too.
+                if isVoiceCallPresented { VoiceCallDiagnostics.write("chat closed under a live call") }
                 isOnScreen = false
                 composerFocusRevision += 1
                 completionScrollPolicy.readerDidInteract()
