@@ -220,6 +220,32 @@ final class BrainVisualsTests: XCTestCase {
         XCTAssertEqual(BrainReaderLayout.metaLine(for: undated, hubPageCount: 5, today: today, calendar: utc), "Hub · 5 pages")
     }
 
+    func testWikiMatchesTitleOrGistWordPrefixesWithoutRepeats() {
+        let items = [
+            BrainItem(module: .wiki, id: "a", title: "Atomic Habits", preview: "Results lag inputs."),
+            BrainItem(module: .wiki, id: "b", title: "Café culture", preview: "Small rituals."),
+            BrainItem(module: .wiki, id: "a", title: "Atomic Habits", preview: "Results lag inputs."),
+            BrainItem(module: .wiki, id: "c", title: "Kafka", preview: "A distributed log."),
+        ]
+        XCTAssertEqual(BrainListLayout.wikiMatches(items, query: "hab").map(\.id), ["a"], "a recent page listed twice matches once")
+        XCTAssertEqual(BrainListLayout.wikiMatches(items, query: "cafe rit").map(\.id), ["b"], "accents and the gist count")
+        XCTAssertEqual(BrainListLayout.wikiMatches(items, query: "log").map(\.id), ["c"])
+        XCTAssertEqual(BrainListLayout.wikiMatches(items, query: "  ").map(\.id), [])
+        XCTAssertEqual(BrainListLayout.wikiMatches(items, query: "abits").map(\.id), [], "words match from their start")
+        let ranked = [BrainItem(module: .wiki, id: "gist", title: "Talks", preview: "Consistency matters."),
+                      BrainItem(module: .wiki, id: "title", title: "Consistent reads")]
+        XCTAssertEqual(BrainListLayout.wikiMatches(ranked, query: "consist").map(\.id), ["title", "gist"],
+                       "a title match leads")
+    }
+
+    func testSectionCountsTheWholeGroupNotJustTheLoadedRows() {
+        let list = BrainList(items: [BrainItem(module: .wiki, id: "s1"), BrainItem(module: .wiki, id: "s2")],
+                             groups: [BrainGroup(title: "Sources", ids: ["s1", "s2"], total: 99),
+                                      BrainGroup(title: "Other", ids: ["s1"])])
+        let sections = BrainListLayout.sections(list)
+        XCTAssertEqual(sections.map(\.count), [99, 1], "an older server's group counts what loaded")
+    }
+
     func testListAgeUsesThePeopleListSteps() throws {
         var utc = Calendar(identifier: .gregorian)
         utc.timeZone = try XCTUnwrap(TimeZone(identifier: "UTC"))

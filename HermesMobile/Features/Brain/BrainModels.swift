@@ -518,18 +518,22 @@ struct BrainTagCount: Codable, Hashable, Sendable {
 struct BrainGroup: Codable, Hashable, Sendable {
     let title: String
     let ids: [String]
+    /// The group's size across the whole list, not just this page; nil from an older server.
+    let total: Int?
 
-    private enum CodingKeys: String, CodingKey { case title, ids }
+    private enum CodingKeys: String, CodingKey { case title, ids, total }
 
-    init(title: String, ids: [String] = []) {
+    init(title: String, ids: [String] = [], total: Int? = nil) {
         self.title = title
         self.ids = ids
+        self.total = total
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         title = c.string(.title)
         ids = c.strings(.ids)
+        total = c.optional(Int.self, .total)
     }
 }
 
