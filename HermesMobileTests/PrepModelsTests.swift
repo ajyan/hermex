@@ -21,12 +21,7 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertEqual(home.run.reps, 2)
         XCTAssertEqual(home.run.remaining, 2)
         XCTAssertEqual(home.run.focus, ["Arrays & Hashing"])
-        XCTAssertEqual(home.tracks.first?.id, "dsa")
-        XCTAssertEqual(home.tracks.first?.total, 18)
-        XCTAssertEqual(home.tracks.first?.subtitle, "0 of 18 mastered")
-        XCTAssertEqual(home.needsWork.first?.skill, "dsa.arrays_hashing")
-        XCTAssertEqual(home.needsWork.first?.detail, "Mixed up with Two Pointers")
-        XCTAssertNil(home.readiness)
+        XCTAssertNil(home.course, "the retired readiness, tracks and needs_work fields are read past")
     }
 
     func testDecodesApproachSpotBugTraceReps() throws {
@@ -173,38 +168,17 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertEqual(result.nextIndex, 3)
     }
 
-    func testMapDecodesLevelsAndSkillStates() throws {
-        let map = try decode(PrepTrackMap.self, #"""
-        {"track": "dsa", "title": "DSA patterns", "summary": {"mastered": 0, "total": 18, "problems": 150, "due": 0},
-         "levels": [
-          {"title": "Start here", "locked": false, "skills": [{"id": "dsa.arrays_hashing", "title": "Arrays & Hashing", "state": "in_progress", "mastery": 0.4, "detail": "9 problems"}]},
-          {"title": "Level 2", "locked": true, "skills": [{"id": "dsa.stack", "title": "Stack", "state": "locked", "mastery": 0.0, "detail": "x"},
-                                                           {"id": "dsa.q", "title": "Q", "state": "brand_new", "mastery": 0.0}]}]}
-        """#)
-        XCTAssertEqual(map.summary.problems, 150)
-        XCTAssertEqual(map.levels.count, 2)
-        XCTAssertTrue(map.levels[1].locked)
-        XCTAssertEqual(map.levels[0].skills[0].state, .inProgress)
-        XCTAssertEqual(map.levels[0].skills[0].mastery, 0.4, accuracy: 0.001)
-        XCTAssertEqual(map.levels[1].skills.map(\.state), [.locked, .unknown])
-    }
-
     func testMissingFieldsDefault() throws {
         let home = try decode(PrepHome.self, "{}")
         XCTAssertEqual(home.streak.days, 0)
         XCTAssertEqual(home.run.reps, 0)
-        XCTAssertTrue(home.tracks.isEmpty)
-        XCTAssertTrue(home.needsWork.isEmpty)
+        XCTAssertNil(home.course)
 
         let run = try decode(PrepRun.self, #"{"reps": [{"index": 0, "drill": "primer", "item": {}}]}"#)
         XCTAssertEqual(run.date, "")
         XCTAssertEqual(run.reps.first?.item.id, "")
         XCTAssertEqual(run.reps.first?.item.hints, [])
         XCTAssertTrue(run.reps.first?.item.links.isEmpty ?? false)
-
-        let map = try decode(PrepTrackMap.self, #"{"levels": [{"skills": [{"id": "s"}]}]}"#)
-        XCTAssertEqual(map.levels.first?.skills.first?.state, .unknown)
-        XCTAssertEqual(map.levels.first?.locked, false)
     }
 
     // MARK: - Anthropic track

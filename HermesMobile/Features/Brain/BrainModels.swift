@@ -747,18 +747,15 @@ enum BrainRoute: Hashable, Sendable {
     case prep(PrepRoute)
 }
 
-/// A screen in the Prep module: its home, one track's skill map, today's run, or one gap.
+/// A screen in the Prep module: its home, today's run, or one gap.
 enum PrepRoute: Hashable, Sendable {
     case home
-    case track(String)
     case run
     case gap(String)
     /// One course lesson to re-read.
     case lesson(String)
     /// A unit's boss, taken early.
     case testout(String)
-    /// The optional critique run over passed units.
-    case mock
     /// "One more round": up to five more recalls after the day's run.
     case bonus
     /// One behavioral story, drilled on its own.

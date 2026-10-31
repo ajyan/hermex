@@ -765,11 +765,6 @@ struct ChatShellView: View {
                 PrepHomeView(server: server, onAPIError: authManager.handleAPIError)
                     .adaptiveSecondaryNavigationTitle()
             }
-        case .prep(.track(let track)):
-            PrepGate {
-                PrepTrackView(track: track, server: server, onAPIError: authManager.handleAPIError)
-                    .adaptiveSecondaryNavigationTitle()
-            }
         case .prep(.run):
             PrepGate {
                 PrepRunView(server: server, onAPIError: authManager.handleAPIError, ask: askAtlas)
@@ -787,10 +782,6 @@ struct ChatShellView: View {
         case .prep(.testout(let unit)):
             PrepGate {
                 PrepRunView(server: server, run: .testout, unit: unit, onAPIError: authManager.handleAPIError, ask: askAtlas)
-            }
-        case .prep(.mock):
-            PrepGate {
-                PrepRunView(server: server, run: .mock, onAPIError: authManager.handleAPIError, ask: askAtlas)
             }
         case .prep(.bonus):
             PrepGate {

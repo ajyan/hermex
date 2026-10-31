@@ -12,11 +12,6 @@ import SwiftUI
 struct PrepMockSection: View {
     let mocks: PrepMocks
 
-    /// Whether the section shows: once the ladders load with at least one kind.
-    static func isShown(_ mocks: PrepMocks?) -> Bool {
-        PrepMockKind.allCases.contains { mocks?.ladder($0) != nil }
-    }
-
     private var rows: [(kind: PrepMockKind, ladder: PrepLadder)] {
         PrepMockKind.allCases.compactMap { kind in mocks.ladder(kind).map { (kind, $0) } }
     }
@@ -64,8 +59,8 @@ private struct PrepMockIcon: View {
 // MARK: - Brief
 
 /// One ladder: the level a call takes (the current one, or any unlocked level picked to replay it),
-/// how long it runs and what is scored, Start call, the recent mocks of this kind, and the older text
-/// critique run. Pushed as `.prep(.mockLadder(kind))`.
+/// how long it runs and what is scored, Start call, and the recent mocks of this kind. Pushed as
+/// `.prep(.mockLadder(kind))`.
 struct PrepMockBriefView: View {
     let kind: PrepMockKind
     @State private var viewModel: PrepMockViewModel
@@ -101,15 +96,6 @@ struct PrepMockBriefView: View {
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
                     briefCard(mocks.ladder(kind))
                     recent(mocks.recent(for: kind), ladder: mocks.ladder(kind))
-                    VStack(alignment: .leading, spacing: BrainStyle.s) {
-                        BrainSectionHeader(title: "In text")
-                        SectionCard {
-                            NavigationLink(value: ShellPushDestination.brainRoute(.prep(.mock))) {
-                                BrainRow(title: "Mock interview", subtitle: "Full critique on what you've passed")
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
                 }
                 .padding(BrainStyle.l)
                 .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)

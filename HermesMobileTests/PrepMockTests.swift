@@ -41,7 +41,6 @@ private final class FakeMockClient: PrepDataClient, @unchecked Sendable {
 
     func home() async throws -> PrepHome { throw URLError(.badServerResponse) }
     func today(run: PrepRunKind, unit: String?) async throws -> PrepRun { throw URLError(.badServerResponse) }
-    func map(track: String) async throws -> PrepTrackMap { throw URLError(.badServerResponse) }
     func attempt(_ r: PrepAttemptRequest) async throws -> PrepAttemptResult { throw URLError(.badServerResponse) }
     func gaps() async throws -> [PrepGapSummary] { throw URLError(.badServerResponse) }
     func gap(id: String) async throws -> PrepGapDetail { throw URLError(.badServerResponse) }
@@ -459,12 +458,6 @@ final class PrepMockTests: APIClientTestCase {
 
         XCTAssertEqual(client.log, ["grade:m1", "mocks"])
         XCTAssertEqual(PrepMockCopy.display(viewModel.result(mockID: "m1")), .grading)
-    }
-
-    func testSectionShowsOnlyWithLadders() throws {
-        XCTAssertFalse(PrepMockSection.isShown(nil))
-        XCTAssertFalse(PrepMockSection.isShown(try decodeMocks(#"{"ladders": {}, "recent": []}"#)))
-        XCTAssertTrue(PrepMockSection.isShown(try decodeMocks(mocksJSON)))
     }
 
     // MARK: The interviewer profile

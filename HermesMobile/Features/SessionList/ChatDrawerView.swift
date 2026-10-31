@@ -144,6 +144,9 @@ struct ChatDrawerView<ServerMenu: View>: View {
             drawerRow("People", systemImage: BrainModuleID.people.symbolName, paper: BrainModuleID.people.paper) {
                 onOpen(.brainRoute(.module(.people)))
             }
+            drawerRow("Interview prep", systemImage: "target", paper: .knowledge) {
+                onOpen(.brainRoute(.prep(.home)))
+            }
         }
         drawerRow("Goals", systemImage: "flag.checkered", paper: .book) { onOpen(.goals) }
         drawerRow("Body", systemImage: "figure.strengthtraining.traditional", paper: .training) { onOpen(.body) }
@@ -170,8 +173,8 @@ struct ChatDrawerView<ServerMenu: View>: View {
         .padding(.bottom, 16)
     }
 
-    /// A section row. A section with its own paper (Brief, Brain, People, Goals, Money, Feedback) shows its icon in that
-    /// paper's glow; the rest stay neutral so the colored ones stand out.
+    /// A section row. A section with its own paper (Brief, Brain, People, Interview prep, Goals, Money,
+    /// Feedback) shows its icon in that paper's glow; the rest stay neutral so the colored ones stand out.
     private func drawerRow(
         _ title: String,
         systemImage: String,
