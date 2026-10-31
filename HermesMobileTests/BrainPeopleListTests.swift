@@ -94,17 +94,29 @@ final class BrainPeopleListTests: XCTestCase {
         XCTAssertEqual(row.accessibilityLabel, "Ann, Dinner, seen 4 months ago, due for a catch-up")
     }
 
-    func testDueRowLeadsWithTheirUsualGap() {
+    func testDueRowLeadsWithTheirRhythmOrLapsed() {
         let home = BrainPeopleHome(
+            // 122 days against a 3-week rhythm: lapsed, not "Every 3 wk".
             due: [BrainPersonRow(id: "a", title: "Ann", subtitle: "Friend", lastSeen: "2026-06-14", headline: "Dinner",
                                  cadenceDays: 21),
                   BrainPersonRow(id: "b", title: "Bo", subtitle: "", lastSeen: "2026-06-14", cadenceDays: 90)],
             recent: [BrainPersonRow(id: "c", title: "Cy", lastSeen: "2026-10-08", headline: "Lunch", cadenceDays: 21)])
         let sections = BrainPeopleLayout.sections(home, today: today, calendar: calendar)
-        XCTAssertEqual(sections[0].rows.map(\.subtitle), ["Every 3 wk · Dinner", "Every 3 mo"])
+        XCTAssertEqual(sections[0].rows.map(\.subtitle), ["Lapsed · Dinner", "Every 3 mo"])
         XCTAssertEqual(sections[0].rows[0].accessibilityLabel,
-                       "Ann, Dinner, seen 4 months ago, due for a catch-up, usually every 3 weeks")
+                       "Ann, Dinner, seen 4 months ago, due for a catch-up, lapsed, usually every 3 weeks")
         XCTAssertEqual(sections[1].rows[0].subtitle, "Lunch", "only due rows explain themselves")
+    }
+
+    func testDueRowSaysWhyNowWithTheCatchUpHook() {
+        let home = BrainPeopleHome(
+            due: [BrainPersonRow(id: "a", title: "Ann", lastSeen: "2026-08-14", headline: "\u{FFFC} Old dinner",
+                                 cadenceDays: 30, hook: "Her startup launch")],
+            recent: [BrainPersonRow(id: "c", title: "Cy", lastSeen: "2026-10-08", headline: "\u{FFFC} Lunch",
+                                    hook: "Not shown here")])
+        let sections = BrainPeopleLayout.sections(home, today: today, calendar: calendar)
+        XCTAssertEqual(sections[0].rows[0].subtitle, "Every 4 wk · Her startup launch")
+        XCTAssertEqual(sections[1].rows[0].subtitle, "Lunch", "the placeholder mark is gone, and only due rows hook")
     }
 
     func testCadenceBuckets() {
@@ -123,7 +135,7 @@ final class BrainPeopleListTests: XCTestCase {
         XCTAssertEqual(row.trailing, "6d")
         XCTAssertFalse(row.isDue)
         XCTAssertEqual(row.subtitle, "Colleague")
-        XCTAssertEqual(row.accessibilityLabel, "Bo, seen 6 days ago")
+        XCTAssertEqual(row.accessibilityLabel, "Bo, Colleague, seen 6 days ago", "it reads what the row shows")
     }
 
     func testBirthdayRowsCountDown() {

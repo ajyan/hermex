@@ -705,13 +705,15 @@ struct BrainPersonRow: Codable, Hashable, Sendable {
     let headline: String?
     let cadenceDays: Int?
     let nextBirthday: String?
+    /// Why now: the first open thread of their current Catch up digest; nil without one.
+    let hook: String?
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, subtitle, lastSeen, headline, cadenceDays, nextBirthday
+        case id, title, subtitle, lastSeen, headline, cadenceDays, nextBirthday, hook
     }
 
     init(id: String, title: String, subtitle: String = "", lastSeen: String? = nil, headline: String? = nil,
-         cadenceDays: Int? = nil, nextBirthday: String? = nil) {
+         cadenceDays: Int? = nil, nextBirthday: String? = nil, hook: String? = nil) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
@@ -719,6 +721,7 @@ struct BrainPersonRow: Codable, Hashable, Sendable {
         self.headline = headline
         self.cadenceDays = cadenceDays
         self.nextBirthday = nextBirthday
+        self.hook = hook
     }
 
     init(from decoder: Decoder) throws {
@@ -730,6 +733,7 @@ struct BrainPersonRow: Codable, Hashable, Sendable {
         headline = c.optional(String.self, .headline)
         cadenceDays = c.optional(Int.self, .cadenceDays)
         nextBirthday = c.optional(String.self, .nextBirthday)
+        hook = c.optional(String.self, .hook)
     }
 }
 
