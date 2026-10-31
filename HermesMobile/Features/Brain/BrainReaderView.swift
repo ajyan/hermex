@@ -30,11 +30,10 @@ enum BrainReaderLayout {
         return [kind, when].filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
-    /// The one reason every further-reading row shares ("Shares #mindfulness"), said once in
-    /// the header; nil when the reasons differ or are missing.
-    static func sharedReason(_ refs: [BrainRef]) -> String? {
-        guard let first = refs.first?.reason, !first.isEmpty, refs.allSatisfy({ $0.reason == first }) else { return nil }
-        return first.prefix(1).uppercased() + first.dropFirst()
+    /// Further reading split as the server sends it: the page's sources (reason "source"),
+    /// then pages that share its tags (the reason names them, "#rome · #person").
+    static func furtherGroups(_ refs: [BrainRef]) -> (sources: [BrainRef], tagged: [BrainRef]) {
+        (refs.filter { $0.reason == "source" }, refs.filter { $0.reason != "source" })
     }
 
     /// The reader's tags as one meta line, "#habits · #self".
@@ -229,7 +228,6 @@ struct BrainReaderView: View {
                 isShowingCachedCopy: viewModel.isShowingCachedCopy,
                 isMissing: viewModel.isMissing,
                 push: push,
-                onStep: BrainConnectionsLayout.showsPager(page.hub) ? step : nil,
                 rating: labelsAvailable && labels.isLoaded(feature: ratingKey.feature, item: ratingKey.item)
                     ? BrainPageRating(labels: labels, key: ratingKey) : nil,
                 focusIdea: viewModel.module == opened.module && viewModel.id == opened.id ? focusIdea : nil
@@ -250,8 +248,6 @@ struct BrainReaderContent: View {
     let isShowingCachedCopy: Bool
     let isMissing: Bool
     let push: (BrainRoute) -> Void
-    /// Pages through the hub (-1 previous, +1 next) on a sideways swipe; nil without a pager.
-    var onStep: ((Int) -> Void)?
     /// The page's Rate control; nil where the server has no labels.
     var rating: BrainPageRating?
     /// The key idea a bite opened this page at; nil on any other page.
@@ -278,13 +274,12 @@ struct BrainReaderContent: View {
     @State private var showsDiagram = false
 
     init(page: BrainPage, person: BrainPersonPage?, isShowingCachedCopy: Bool, isMissing: Bool = false,
-         push: @escaping (BrainRoute) -> Void, onStep: ((Int) -> Void)? = nil, rating: BrainPageRating? = nil,
+         push: @escaping (BrainRoute) -> Void, rating: BrainPageRating? = nil,
          focusIdea: Int? = nil) {
         self.page = page
         self.isShowingCachedCopy = isShowingCachedCopy
         self.isMissing = isMissing
         self.push = push
-        self.onStep = onStep
         self.rating = rating
         self.focusIdea = focusIdea
         self.hubPages = BrainConnectionsLayout.hubPages(page)
@@ -347,18 +342,17 @@ struct BrainReaderContent: View {
                     }
                 }
                 if let person {
-                    // Outside the body's hub swipe, so paging the timeline never pages the hub.
                     personSections(person)
                         .environment(\.openURL, brainLinks)
                 }
                 if !linkCards.isEmpty {
                     BrainLinkCardsRow(refs: linkCards)
                 }
+                // No sideways swipe here: code blocks and tables scroll sideways, and the pager
+                // and its list already move through the hub.
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
                     bodyAndMentions
                 }
-                .contentShape(Rectangle())
-                .simultaneousGesture(swipe, including: onStep == nil ? .subviews : .all)
                 // A hub's pages come after its own words: the first screen is the page.
                 if !hubPages.isEmpty {
                     hubPagesSection
@@ -384,18 +378,6 @@ struct BrainReaderContent: View {
                 DiagramSheet(title: diagram.title ?? page.item.title) { diagram.html }
             }
         }
-    }
-
-    /// A sideways swipe over the body pages through the hub. Kept off the card row, which
-    /// scrolls sideways itself.
-    private var swipe: some Gesture {
-        DragGesture(minimumDistance: 24, coordinateSpace: .global)
-            .onEnded { value in
-                if let onStep, let direction = BrainConnectionsLayout.swipeStep(value.translation,
-                                                                                  startX: value.startLocation.x) {
-                    onStep(direction)
-                }
-            }
     }
 
     /// A structured person page's Catch up, Timeline and About, in that order.
@@ -516,14 +498,23 @@ struct BrainReaderContent: View {
         )
     }
 
+    /// Further reading as two sections: Sources, each with its gist, then Also tagged, each
+    /// with the tags it shares, so every row says why it's here.
     @ViewBuilder
     private var furtherReading: some View {
-        if !page.further.isEmpty {
+        let groups = BrainReaderLayout.furtherGroups(page.further)
+        if !groups.sources.isEmpty {
             BrainReaderRefSection(
-                title: "Further reading",
-                count: page.further.count,
-                rows: page.further.map { BrainReaderRefSection.Row(ref: $0, subtitle: $0.snippet.isEmpty ? $0.reason : $0.snippet) },
-                trailing: BrainReaderLayout.sharedReason(page.further)
+                title: "Sources",
+                count: groups.sources.count,
+                rows: groups.sources.map { BrainReaderRefSection.Row(ref: $0, subtitle: $0.snippet) }
+            )
+        }
+        if !groups.tagged.isEmpty {
+            BrainReaderRefSection(
+                title: "Also tagged",
+                count: groups.tagged.count,
+                rows: groups.tagged.map { BrainReaderRefSection.Row(ref: $0, subtitle: $0.reason) }
             )
         }
     }
