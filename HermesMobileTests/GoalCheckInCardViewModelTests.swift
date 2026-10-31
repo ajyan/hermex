@@ -122,6 +122,15 @@ final class GoalCheckInCardViewModelTests: XCTestCase {
         XCTAssertEqual(GoalsHomeViewModel.todayCues(goal).map(\.id), ["stretch-pm", "long-run"])
     }
 
+    func testTodayRowsAreDayRowsDueOrCheckedToday() throws {
+        // Wednesday: the stretch and the run are due; Prep isn't, and Outreach counts by +1.
+        var goal = try home(homeJSON()).goals[0]
+        XCTAssertEqual(GoalsHomeViewModel.todayRows(goal).map(\.id), ["stretch-pm", "long-run"])
+        goal = try home(homeJSON(commitments: [1: ["due_today": false], 3: ["today": "done"]])).goals[0]
+        XCTAssertEqual(GoalsHomeViewModel.todayRows(goal).map(\.id), ["stretch-pm", "prep"],
+                       "a row checked in today stays so it can be cleared")
+    }
+
     private func outreach(_ vm: GoalsHomeViewModel) -> GoalCommitmentProgress? {
         guard case .loaded(let h) = vm.state else { return nil }
         return h.goals.first?.week.commitments.first { $0.id == "outreach" }

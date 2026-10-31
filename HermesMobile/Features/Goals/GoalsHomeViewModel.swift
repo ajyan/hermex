@@ -87,6 +87,11 @@ final class GoalsHomeViewModel {
         goal.week.commitments.filter { !$0.isItem && ($0.dueYesterday || $0.yesterday != nil) }
     }
 
+    /// Today's commitments: the ones due today, plus any already checked in for today.
+    static func todayRows(_ goal: GoalSummary) -> [GoalCommitmentProgress] {
+        goal.week.commitments.filter { !$0.isItem && ($0.dueToday || $0.today != nil) }
+    }
+
     /// The commitments counted by +1 (applications, outreach), shown under "This week".
     static func itemRows(_ goal: GoalSummary) -> [GoalCommitmentProgress] {
         goal.week.commitments.filter(\.isItem)

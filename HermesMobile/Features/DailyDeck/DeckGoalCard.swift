@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// The goal card's body: per goal, yesterday's commitments to check in (tap for Done, hold for
-/// the 2-minute version, Skip or Missed), today's daily checks and cues, the next milestone and any
-/// nudge. It reads live from the Goals API (`GoalsHomeViewModel`), so it stays true after a
+/// The goal card's body: per goal, yesterday's and today's commitments to check in (tap for Done,
+/// hold for the 2-minute version, Skip or Missed), today's daily checks and cues, the next milestone
+/// and any nudge. It reads live from the Goals API (`GoalsHomeViewModel`), so it stays true after a
 /// tap or a later reopen; the brief's `fallback` text stands in until then, or when the server
 /// can't serve goals.
 struct DeckGoalCard: View {
@@ -91,7 +91,9 @@ private struct GoalCheckInSection: View {
     var body: some View {
         let yesterday = GoalsHomeViewModel.yesterdayRows(goal)
         let items = GoalsHomeViewModel.itemRows(goal)
-        let cues = GoalsHomeViewModel.todayCues(goal)
+        let today = GoalsHomeViewModel.todayRows(goal)
+        // A row listed under Today already shows its cue.
+        let cues = GoalsHomeViewModel.todayCues(goal).filter { cue in !today.contains { $0.id == cue.id } }
         VStack(alignment: .leading, spacing: 0) {
             Text(verbatim: goal.title)
                 .font(AppFont.display(style: .title2, weight: .semibold))
@@ -126,8 +128,16 @@ private struct GoalCheckInSection: View {
                     )
                 }
             }
-            if !goal.dailyChecks.isEmpty || !cues.isEmpty {
+            if !today.isEmpty || !goal.dailyChecks.isEmpty || !cues.isEmpty {
                 header("Today")
+                ForEach(Array(today.enumerated()), id: \.element.id) { index, row in
+                    if index > 0 { Rectangle().fill(palette.ink.opacity(0.12)).frame(height: 0.5) }
+                    GoalCommitmentRow(row: row, day: .today, date: home.today, tint: tint,
+                                      isPending: model.isPending(goal.slug, .commitment(row.id))) { status in
+                        Task { await model.checkIn(slug: goal.slug, commitment: row.id, status: status, day: .today) }
+                    }
+                }
+                if !today.isEmpty, !goal.dailyChecks.isEmpty { Color.clear.frame(height: 8) }
                 ForEach(goal.dailyChecks) { check in
                     Text(verbatim: check.question)
                         .font(AppFont.body())
