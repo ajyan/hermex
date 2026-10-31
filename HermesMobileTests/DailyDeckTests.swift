@@ -2865,6 +2865,20 @@ final class MandarinPracticeTests: XCTestCase {
         XCTAssertEqual(practice.record.recalled, ["宝宝一月份出生。": true, "紧张": false])
     }
 
+    func testARecallPhraseSentenceIsCheckedWithoutRecallingIt() async throws {
+        let client = FakeMandarinClient()
+        client.versionsResult = .success(MandarinVersionsResponse(versions: [.init(said: "我有点紧张。")]))
+        let practice = practice(try card(), client: client)
+        practice.nextFix()
+        let phrase = try XCTUnwrap(practice.currentRecall)
+        let checked = await practice.checkVersions(of: phrase, "我有点紧张。")
+        XCTAssertTrue(checked)
+        XCTAssertEqual(client.checks.map(\.hanzi), [phrase.hanzi])
+        XCTAssertEqual(practice.record.versions[phrase.hanzi]?.versions.map(\.said), ["我有点紧张。"])
+        XCTAssertEqual(practice.currentRecall, phrase, "the sentence is practice; Got it or Again moves on")
+        XCTAssertTrue(client.recalls.isEmpty)
+    }
+
     func testAFailedRecallStaysOnThePhrase() async throws {
         let client = FakeMandarinClient()
         client.recallFails = true
