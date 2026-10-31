@@ -30,7 +30,7 @@ private final class FakeCardGoalsClient: GoalsDataClient, @unchecked Sendable {
     func saveReflection(_ r: GoalReflectionRequest) async throws -> GoalRecord { throw URLError(.unsupportedURL) }
     func confirmWeek(_ r: GoalWeekRequest) async throws -> GoalCheckInResult { throw URLError(.unsupportedURL) }
 
-    func checkIn(_ r: GoalCheckInRequest) async throws -> GoalCheckInResult {
+    func checkIn(_ r: GoalCheckInRequest, clientID: String) async throws -> GoalCheckInResult {
         lock.withLock { _checkIns.append(r) }
         if let gate {
             gate.started.yield()
@@ -145,7 +145,7 @@ final class GoalCheckInCardViewModelTests: XCTestCase {
         for await _ in started { break }
         XCTAssertEqual(outreach(vm)?.done, 3)
         XCTAssertEqual(outreach(vm)?.items.last?.note, "Anthropic")
-        XCTAssertTrue(vm.pending.contains("\(slug)/outreach"))
+        XCTAssertTrue(vm.isPending(slug, .commitment("outreach")))
         releaseCont.yield()
         await tap.value
         XCTAssertEqual(client.checkIns, [
@@ -195,7 +195,7 @@ final class GoalCheckInCardViewModelTests: XCTestCase {
         for await _ in started { break }
         XCTAssertEqual(stretch(vm)?.yesterday, .done)
         XCTAssertEqual(stretch(vm)?.done, 1)
-        XCTAssertTrue(vm.pending.contains("\(slug)/stretch-pm"))
+        XCTAssertTrue(vm.isPending(slug, .commitment("stretch-pm")))
         releaseCont.yield()
         await tap.value
         XCTAssertEqual(client.checkIns, [

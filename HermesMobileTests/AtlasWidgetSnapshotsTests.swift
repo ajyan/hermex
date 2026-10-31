@@ -66,7 +66,7 @@ private final class WidgetGoalsClient: GoalsDataClient, @unchecked Sendable {
     func saveReflection(_ r: GoalReflectionRequest) async throws -> GoalRecord { throw URLError(.unsupportedURL) }
     func confirmWeek(_ r: GoalWeekRequest) async throws -> GoalCheckInResult { throw URLError(.unsupportedURL) }
     /// Throws `checkInError` when set; otherwise accepts with a minimal result.
-    func checkIn(_ r: GoalCheckInRequest) async throws -> GoalCheckInResult {
+    func checkIn(_ r: GoalCheckInRequest, clientID: String) async throws -> GoalCheckInResult {
         checkIns.append(r)
         if let checkInError { throw checkInError }
         let body = #"{"goal": {"slug": "nyc-marathon-2026"}, "streak": {"days": 1}, "today": "2026-10-10", "yesterday": "2026-10-09"}"#

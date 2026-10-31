@@ -238,7 +238,7 @@ private final class FinishClient: GoalsDataClient, @unchecked Sendable {
         detailCalls += 1
         return try next(&details)
     }
-    func checkIn(_ r: GoalCheckInRequest) async throws -> GoalCheckInResult { throw URLError(.unsupportedURL) }
+    func checkIn(_ r: GoalCheckInRequest, clientID: String) async throws -> GoalCheckInResult { throw URLError(.unsupportedURL) }
     func confirmWeek(_ r: GoalWeekRequest) async throws -> GoalCheckInResult { throw URLError(.unsupportedURL) }
     func finish(_ r: GoalFinishRequest) async throws -> GoalRecord {
         finishRequests.append(r)

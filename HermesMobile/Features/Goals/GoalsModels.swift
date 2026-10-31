@@ -506,6 +506,21 @@ enum GoalCheckInRequest: Encodable, Equatable, Sendable {
     }
 }
 
+/// The body of `POST /api/goals/checkin`: the request plus `client_id`, fresh for each tap (and
+/// reused only by a retry of that tap), so the server ignores a repeat of the same tap.
+struct GoalCheckInPost: Encodable, Sendable {
+    let request: GoalCheckInRequest
+    let clientID: String
+
+    private enum CodingKeys: String, CodingKey { case clientID = "client_id" }
+
+    func encode(to encoder: Encoder) throws {
+        try request.encode(to: encoder)
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(clientID, forKey: .clientID)
+    }
+}
+
 /// `POST /api/goals/week`: the commitments for the week starting `start` (a Monday). `asOf` is
 /// the server's today, as for a check-in; the server answers 409 once that week can't be planned.
 struct GoalWeekRequest: Encodable, Equatable, Sendable {

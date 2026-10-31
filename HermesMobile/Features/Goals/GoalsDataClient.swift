@@ -8,7 +8,8 @@ import Foundation
 protocol GoalsDataClient: Sendable {
     func home() async throws -> GoalsHome
     func detail(slug: String) async throws -> GoalDetail
-    func checkIn(_ r: GoalCheckInRequest) async throws -> GoalCheckInResult
+    /// Posts one tap; `clientID` is fresh per tap, so the server ignores a repeat of it.
+    func checkIn(_ r: GoalCheckInRequest, clientID: String) async throws -> GoalCheckInResult
     /// Confirms a goal's commitments for the week starting `r.start`; answers like a check-in.
     func confirmWeek(_ r: GoalWeekRequest) async throws -> GoalCheckInResult
     /// Closes the goal as achieved and returns its record.
@@ -31,8 +32,9 @@ struct APIClientGoalsAdapter: GoalsDataClient {
         try decode(try await apiClient.sendData(endpoint: .goalDetail(slug: slug), method: "GET"))
     }
 
-    func checkIn(_ r: GoalCheckInRequest) async throws -> GoalCheckInResult {
-        try decode(try await apiClient.sendData(endpoint: .goalCheckIn, method: "POST", body: r))
+    func checkIn(_ r: GoalCheckInRequest, clientID: String) async throws -> GoalCheckInResult {
+        let body = GoalCheckInPost(request: r, clientID: clientID)
+        return try decode(try await apiClient.sendData(endpoint: .goalCheckIn, method: "POST", body: body))
     }
 
     func confirmWeek(_ r: GoalWeekRequest) async throws -> GoalCheckInResult {

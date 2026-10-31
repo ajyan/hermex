@@ -18,12 +18,13 @@ enum GoalItemCopy {
 }
 
 /// An item commitment: its week count and latest notes, with a +1 chip that opens an inline
-/// note field (Return or Add counts it) and, on long press, "Remove last".
+/// note field (Return or Add counts it) and, on long press, "Remove last". `onAdd` answers
+/// whether the server took the item; when it didn't, the field reopens with the typed note.
 struct GoalItemRow: View {
     let row: GoalCommitmentProgress
     let tint: GoalTint
     let isPending: Bool
-    let onAdd: (String?) -> Void
+    let onAdd: (String?) async -> Bool
     let onRemoveLast: () -> Void
 
     @State private var isAdding = false
@@ -88,12 +89,18 @@ struct GoalItemRow: View {
         }
     }
 
-    /// Counts the item with the typed note, or none when the field is blank.
+    /// Counts the item with the typed note, or none when the field is blank. The count shows at
+    /// once; if the save fails, the note comes back in a reopened field (unless he's typing anew).
     private func add() {
-        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        onAdd(trimmed.isEmpty ? nil : trimmed)
+        let typed = note
+        let trimmed = typed.trimmingCharacters(in: .whitespacesAndNewlines)
         note = ""
         isAdding = false
         noteFocused = false
+        Task {
+            guard await !onAdd(trimmed.isEmpty ? nil : trimmed) else { return }
+            if note.isEmpty { note = typed }
+            isAdding = true
+        }
     }
 }

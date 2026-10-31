@@ -64,10 +64,12 @@ enum GoalDay: Hashable, Sendable {
 final class GoalDetailViewModel {
     private(set) var state: BrainLoadState<GoalDetail> = .loading
     var day: GoalDay = .today
-    /// Commitment and check ids with a check-in in flight; further taps on them are ignored.
-    private(set) var pending: Set<String> = []
+    /// Rows with a check-in in flight; further taps on them are ignored.
+    private(set) var pending: Set<GoalRowKey> = []
     private(set) var error: String?
     static let refreshFailed = "Couldn't refresh. Pull to try again."
+    static let dayChanged = "The day changed. Check in again."
+    static let saveFailed = "Couldn't save. Try again."
     /// "I finished" is in flight.
     private(set) var isFinishing = false
     /// "Not yet" hides the finish prompt until the screen is opened again.
@@ -85,6 +87,12 @@ final class GoalDetailViewModel {
     @ObservationIgnored private let client: GoalsDataClient
     @ObservationIgnored private let onAPIError: (Error) -> Void
     @ObservationIgnored private var generation = 0
+    /// The server's detail with the taps in flight on top; `state` shows `edits.shown`.
+    @ObservationIgnored private var edits: GoalPendingEdits<GoalDetail, GoalRowKey>?
+    @ObservationIgnored private var inFlight = 0
+    /// Since the last settle: a check-in saved, or one met a day that had moved on.
+    @ObservationIgnored private var savedSinceSettle = false
+    @ObservationIgnored private var dayChangedSinceSettle = false
 
     init(slug: String, client: GoalsDataClient, onAPIError: @escaping (Error) -> Void = { _ in }) {
         self.slug = slug
@@ -92,13 +100,15 @@ final class GoalDetailViewModel {
         self.onAPIError = onAPIError
     }
 
+    func isPending(_ key: GoalRowKey) -> Bool { pending.contains(key) }
+
     func load() async {
         generation += 1
         let token = generation
         do {
             let detail = try await client.detail(slug: slug)
             guard token == generation, !Task.isCancelled else { return }
-            state = .loaded(detail)
+            show(detail)
             if error == Self.refreshFailed { error = nil }
         } catch {
             guard token == generation, !goalsIsCancellation(error) else { return }
@@ -107,6 +117,7 @@ final class GoalDetailViewModel {
                 self.error = Self.refreshFailed
                 return
             }
+            edits = nil
             state = goalsFailureState(error)
         }
     }
@@ -132,71 +143,97 @@ final class GoalDetailViewModel {
     }
 
     func checkIn(commitment id: String, status: GoalStatus) async {
-        await send(id: id) { detail, date, asOf in
-            GoalCheckInEdit.apply(status, to: id, on: date, today: detail.today, yesterday: detail.yesterday,
-                                  in: &detail.summary)
-            return .commitment(slug: self.slug, date: date, asOf: asOf, id: id, status: status)
+        await send(.commitment(id), request: { .commitment(slug: self.slug, date: $0, asOf: $1, id: id, status: status) }) {
+            GoalCheckInEdit.apply(status, to: id, on: $1, today: $2, yesterday: $3, in: &$0)
         }
     }
 
-    /// Counts one more item (with its optional note) on the selected day.
-    func addItem(commitment id: String, note: String?) async {
-        await send(id: id) { detail, date, asOf in
-            GoalCheckInEdit.addItem(1, note: note, to: id, on: date, in: &detail.summary)
-            return .item(slug: self.slug, date: date, asOf: asOf, id: id, n: 1, note: note)
+    /// Counts one more item (with its optional note) on the selected day; true once the server has it.
+    @discardableResult
+    func addItem(commitment id: String, note: String?) async -> Bool {
+        await send(.commitment(id), request: { .item(slug: self.slug, date: $0, asOf: $1, id: id, n: 1, note: note) }) { goal, date, _, _ in
+            GoalCheckInEdit.addItem(1, note: note, to: id, on: date, in: &goal)
         }
     }
 
     /// Takes the latest counted item back off.
     func removeLastItem(commitment id: String) async {
-        await send(id: id) { detail, date, asOf in
-            GoalCheckInEdit.addItem(-1, note: nil, to: id, on: date, in: &detail.summary)
-            return .item(slug: self.slug, date: date, asOf: asOf, id: id, n: -1, note: nil)
+        await send(.commitment(id), request: { .item(slug: self.slug, date: $0, asOf: $1, id: id, n: -1, note: nil) }) { goal, date, _, _ in
+            GoalCheckInEdit.addItem(-1, note: nil, to: id, on: date, in: &goal)
         }
     }
 
     func checkIn(check id: String, value: String) async {
-        await send(id: id) { detail, date, asOf in
-            GoalCheckInEdit.setCheck(value, id: id, on: date, today: detail.today, yesterday: detail.yesterday,
-                                     in: &detail.summary)
-            return .check(slug: self.slug, date: date, asOf: asOf, id: id, value: value)
+        await send(.check(id), request: { .check(slug: self.slug, date: $0, asOf: $1, id: id, value: value) }) {
+            GoalCheckInEdit.setCheck(value, id: id, on: $1, today: $2, yesterday: $3, in: &$0)
         }
     }
 
-    /// Applies the optimistic edit, posts, then takes the server's summary or restores this
-    /// item's pre-tap values (never another check-in's, which may have landed meanwhile).
-    private func send(id: String, edit: (inout GoalDetail, String, String) -> GoalCheckInRequest) async {
-        guard case .loaded(let snapshot) = state, !pending.contains(id) else { return }
+    /// Shows the tap at once, posts it, then takes the server's summary, or drops the tap (its
+    /// rollback; other taps in flight stay). The row is free again as soon as the post answers;
+    /// the full detail (heatmap, consistency, history) reloads once, after the last tap in flight.
+    @discardableResult
+    private func send(
+        _ key: GoalRowKey,
+        request makeRequest: (_ date: String, _ asOf: String) -> GoalCheckInRequest,
+        edit: @escaping (_ goal: inout GoalSummary, _ date: String, _ today: String, _ yesterday: String) -> Void
+    ) async -> Bool {
+        guard case .loaded = state, var pendingEdits = edits, !pendingEdits.contains(key) else { return false }
         // The server's dates, never the phone's: the server decides what "today" is.
-        let date = day == .today ? snapshot.today : snapshot.yesterday
-        var optimistic = snapshot
-        let request = edit(&optimistic, date, snapshot.today)
-        state = .loaded(optimistic)
-        pending.insert(id)
+        let base = pendingEdits.base
+        let date = day == .today ? base.today : base.yesterday
+        let request = makeRequest(date, base.today)
+        pendingEdits.add(key) { edit(&$0.summary, date, $0.today, $0.yesterday) }
+        edits = pendingEdits
         error = nil
-        defer { pending.remove(id) }
+        publish()
+        inFlight += 1
+        var saved = false
         do {
-            let result = try await client.checkIn(request)
-            guard case .loaded(var current) = state else { return }
-            current.summary = result.goal
-            current.streak = result.streak
-            state = .loaded(current)
-            // The heatmap, consistency and check history come only with the full detail.
-            await load()
+            let result = try await client.checkIn(request, clientID: UUID().uuidString)
+            edits?.remove(key)
+            edits?.base.summary = result.goal
+            edits?.base.streak = result.streak
+            savedSinceSettle = true
+            saved = true
         } catch {
-            guard !goalsIsCancellation(error) else { return }
-            if case .http(409, _)? = error as? APIError {
-                await load()
-                self.error = "The day changed. Check in again."
-                return
+            edits?.remove(key)
+            if goalsIsCancellation(error) {
+                // The screen is gone; nothing to tell.
+            } else if case .http(409, _)? = error as? APIError {
+                dayChangedSinceSettle = true
+            } else {
+                onAPIError(error)
+                self.error = Self.saveFailed
             }
-            onAPIError(error)
-            if case .loaded(var current) = state {
-                GoalCheckInEdit.restore(id, from: snapshot.summary, in: &current.summary)
-                state = .loaded(current)
-            }
-            self.error = "Couldn't save. Try again."
         }
+        publish()
+        inFlight -= 1
+        if inFlight == 0 { await settle() }
+        return saved
+    }
+
+    /// After the last check-in in flight: one full reload when any saved or the day moved on.
+    private func settle() async {
+        let saved = savedSinceSettle, dayChanged = dayChangedSinceSettle
+        savedSinceSettle = false
+        dayChangedSinceSettle = false
+        guard saved || dayChanged, !Task.isCancelled else { return }
+        await load()
+        if dayChanged { error = Self.dayChanged }
+    }
+
+    /// Takes a detail from the server, keeping any taps still in flight on top of it.
+    private func show(_ detail: GoalDetail) {
+        if edits == nil { edits = GoalPendingEdits(detail) } else { edits?.base = detail }
+        publish()
+    }
+
+    private func publish() {
+        guard let edits else { return }
+        state = .loaded(edits.shown)
+        let keys = edits.keys
+        if pending != keys { pending = keys }
     }
 }
 

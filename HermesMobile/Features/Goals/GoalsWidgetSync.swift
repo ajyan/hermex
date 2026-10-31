@@ -79,7 +79,7 @@ enum GoalsWidgetSync {
         do {
             _ = try await client.checkIn(.commitment(
                 slug: slug, date: snapshot.today, asOf: snapshot.today, id: commitment, status: .done
-            ))
+            ), clientID: UUID().uuidString)
             store.save(AtlasWidgetGoals(server: snapshot.server, home: try await client.home()))
         } catch {
             // A 409 means the server's day moved on: show the new day, still flagged.

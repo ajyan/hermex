@@ -220,7 +220,7 @@ struct DeckRowCheckIn {
     func dot(_ day: DeckDay) -> some View {
         let shown = state(day)
         if let live, day.date == live.home.yesterday {
-            let key = GoalCheckInCardViewModel.key(live.slug, live.row.id)
+            let key = GoalCheckInCardViewModel.key(live.slug, .commitment(live.row.id))
             let explicit = live.row.yesterday
             Menu {
                 ForEach(GoalDetailCopy.statusOptions, id: \.value) { option in
@@ -274,7 +274,7 @@ struct DeckRowCheckIn {
     @ViewBuilder
     func addButton(column: CGFloat = DeckDots.column) -> some View {
         if let live {
-            let key = GoalCheckInCardViewModel.key(live.slug, live.row.id)
+            let key = GoalCheckInCardViewModel.key(live.slug, .commitment(live.row.id))
             Button {
                 guard let model else { return }
                 Task { await model.addItem(slug: live.slug, commitment: live.row.id, note: nil) }

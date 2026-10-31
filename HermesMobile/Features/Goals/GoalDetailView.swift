@@ -117,8 +117,8 @@ struct GoalDetailView: View {
                             GoalItemRow(
                                 row: row,
                                 tint: tint,
-                                isPending: viewModel.pending.contains(row.id),
-                                onAdd: { note in Task { await viewModel.addItem(commitment: row.id, note: note) } },
+                                isPending: viewModel.isPending(.commitment(row.id)),
+                                onAdd: { note in await viewModel.addItem(commitment: row.id, note: note) },
                                 onRemoveLast: { Task { await viewModel.removeLastItem(commitment: row.id) } }
                             )
                         } else {
@@ -127,7 +127,7 @@ struct GoalDetailView: View {
                                 day: viewModel.day,
                                 date: viewModel.day == .today ? d.today : d.yesterday,
                                 tint: tint,
-                                isPending: viewModel.pending.contains(row.id)
+                                isPending: viewModel.isPending(.commitment(row.id))
                             ) { status in
                                 Task { await viewModel.checkIn(commitment: row.id, status: status) }
                             }
@@ -159,7 +159,7 @@ struct GoalDetailView: View {
                     options: check.options.map { ($0, $0.capitalized) },
                     selected: viewModel.day == .today ? check.today : check.yesterday,
                     tint: tint,
-                    isDisabled: viewModel.pending.contains(check.id),
+                    isDisabled: viewModel.isPending(.check(check.id)),
                     accessibilityPrefix: check.question
                 ) { value in
                     Task { await viewModel.checkIn(check: check.id, value: value) }

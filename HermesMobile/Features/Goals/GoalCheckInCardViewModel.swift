@@ -8,14 +8,22 @@ import Observation
 @Observable
 final class GoalCheckInCardViewModel {
     private(set) var state: BrainLoadState<GoalsHome> = .loading
-    /// "<slug>/<id>" for each commitment or check with a check-in in flight; more taps on it are ignored.
-    private(set) var pending: Set<String> = []
+    /// Each goal row with a check-in in flight; more taps on it are ignored.
+    private(set) var pending: Set<Key> = []
     private(set) var error: String?
+
+    /// One row of one goal on the card.
+    struct Key: Hashable {
+        let slug: String
+        let row: GoalRowKey
+    }
 
     /// Shared with the deck's Week ahead cards, which confirm through the same server.
     @ObservationIgnored let client: GoalsDataClient
     @ObservationIgnored private let onAPIError: (Error) -> Void
     @ObservationIgnored private var generation = 0
+    /// The server's home with the taps in flight on top; `state` shows `edits.shown`.
+    @ObservationIgnored private var edits: GoalPendingEdits<GoalsHome, Key>?
 
     init(client: GoalsDataClient, onAPIError: @escaping (Error) -> Void = { _ in }) {
         self.client = client
@@ -28,12 +36,14 @@ final class GoalCheckInCardViewModel {
         do {
             let home = try await client.home()
             guard token == generation, !Task.isCancelled else { return }
-            state = .loaded(home)
+            if edits == nil { edits = GoalPendingEdits(home) } else { edits?.base = home }
+            publish()
         } catch {
             guard token == generation, !Self.isCancellation(error) else { return }
             onAPIError(error)
             let notFound = (error as? APIError)?.isNotFound ?? false
             if case .loaded = state, !notFound { return }  // a failed reload keeps the card's goals
+            edits = nil
             state = notFound ? .unavailable : .failed(error.localizedDescription)
         }
     }
@@ -68,88 +78,107 @@ final class GoalCheckInCardViewModel {
         goal.week.commitments.filter { $0.dueToday && !$0.cue.isEmpty }
     }
 
-    static func key(_ slug: String, _ id: String) -> String { "\(slug)/\(id)" }
+    static func key(_ slug: String, _ row: GoalRowKey) -> Key { Key(slug: slug, row: row) }
+
+    func isPending(_ slug: String, _ row: GoalRowKey) -> Bool { pending.contains(Self.key(slug, row)) }
 
     func checkIn(slug: String, commitment id: String, status: GoalStatus) async {
-        await send(slug: slug, id: id) { goal, home in
+        await send(slug: slug, row: .commitment(id), request: {
+            .commitment(slug: slug, date: $0.yesterday, asOf: $0.today, id: id, status: status)
+        }) { goal, home in
             GoalCheckInEdit.apply(status, to: id, on: home.yesterday, today: home.today, yesterday: home.yesterday,
                                   in: &goal)
-            return .commitment(slug: slug, date: home.yesterday, asOf: home.today, id: id, status: status)
         }
     }
 
-    /// Counts one more item (with its optional note) for the server's today.
-    func addItem(slug: String, commitment id: String, note: String?) async {
-        await send(slug: slug, id: id) { goal, home in
+    /// Counts one more item (with its optional note) for the server's today; true once the server has it.
+    @discardableResult
+    func addItem(slug: String, commitment id: String, note: String?) async -> Bool {
+        await send(slug: slug, row: .commitment(id), request: {
+            .item(slug: slug, date: $0.today, asOf: $0.today, id: id, n: 1, note: note)
+        }) { goal, home in
             GoalCheckInEdit.addItem(1, note: note, to: id, on: home.today, in: &goal)
-            return .item(slug: slug, date: home.today, asOf: home.today, id: id, n: 1, note: note)
         }
     }
 
     /// Takes the latest counted item back off.
     func removeLastItem(slug: String, commitment id: String) async {
-        await send(slug: slug, id: id) { goal, home in
+        await send(slug: slug, row: .commitment(id), request: {
+            .item(slug: slug, date: $0.today, asOf: $0.today, id: id, n: -1, note: nil)
+        }) { goal, home in
             GoalCheckInEdit.addItem(-1, note: nil, to: id, on: home.today, in: &goal)
-            return .item(slug: slug, date: home.today, asOf: home.today, id: id, n: -1, note: nil)
         }
     }
 
     func checkIn(slug: String, check id: String, value: String) async {
-        await send(slug: slug, id: id) { goal, home in
+        await send(slug: slug, row: .check(id), request: {
+            .check(slug: slug, date: $0.today, asOf: $0.today, id: id, value: value)
+        }) { goal, home in
             GoalCheckInEdit.setCheck(value, id: id, on: home.today, today: home.today, yesterday: home.yesterday,
                                      in: &goal)
-            return .check(slug: slug, date: home.today, asOf: home.today, id: id, value: value)
         }
     }
 
     /// Takes a goal's summary from another write (a confirmed week), so the deck's cards agree.
     func apply(_ result: GoalCheckInResult) {
-        guard case .loaded(var current) = state,
-              let i = current.goals.firstIndex(where: { $0.slug == result.goal.slug }) else { return }
-        current.goals[i] = result.goal
-        current.streak = result.streak
-        state = .loaded(current)
+        take(result)
+        publish()
     }
 
-    /// Applies the optimistic edit, posts, then takes the server's summary of that goal or restores
-    /// this item's pre-tap values.
-    private func send(slug: String, id: String,
-                      edit: (inout GoalSummary, GoalsHome) -> GoalCheckInRequest) async {
-        let key = Self.key(slug, id)
-        guard case .loaded(var home) = state, !pending.contains(key),
-              let index = home.goals.firstIndex(where: { $0.slug == slug }) else { return }
-        let snapshot = home.goals[index]
-        let request = edit(&home.goals[index], home)
-        state = .loaded(home)
-        pending.insert(key)
+    /// Shows the tap at once, posts it, then takes the server's summary of that goal, or drops the
+    /// tap (its rollback; other taps in flight stay). A 409 means the server's day moved on, so the
+    /// card reloads.
+    @discardableResult
+    private func send(
+        slug: String,
+        row: GoalRowKey,
+        request makeRequest: (GoalsHome) -> GoalCheckInRequest,
+        edit: @escaping (_ goal: inout GoalSummary, _ home: GoalsHome) -> Void
+    ) async -> Bool {
+        let key = Self.key(slug, row)
+        guard case .loaded = state, var pendingEdits = edits, !pendingEdits.contains(key),
+              pendingEdits.base.goals.contains(where: { $0.slug == slug }) else { return false }
+        let request = makeRequest(pendingEdits.base)
+        pendingEdits.add(key) { home in
+            guard let i = home.goals.firstIndex(where: { $0.slug == slug }) else { return }
+            let dates = home
+            edit(&home.goals[i], dates)
+        }
+        edits = pendingEdits
         error = nil
-        defer { pending.remove(key) }
+        publish()
         do {
-            let result = try await client.checkIn(request)
-            guard case .loaded(var current) = state,
-                  let i = current.goals.firstIndex(where: { $0.slug == slug }) else { return }
-            current.goals[i] = result.goal
-            current.streak = result.streak
-            state = .loaded(current)
+            let result = try await client.checkIn(request, clientID: UUID().uuidString)
+            edits?.remove(key)
+            take(result)
+            publish()
+            return true
         } catch {
-            guard !Self.isCancellation(error) else { return }
+            edits?.remove(key)
+            publish()  // nothing was saved; a failed reload must not keep the tap
+            guard !Self.isCancellation(error) else { return false }
             if case .http(409, _)? = error as? APIError {
-                undo(id, slug: slug, from: snapshot)  // nothing was saved; a failed reload must not keep the tap
                 await load()
                 self.error = "The day changed. Check in again."
-                return
+                return false
             }
             onAPIError(error)
-            undo(id, slug: slug, from: snapshot)
             self.error = "Couldn't save. Try again."
+            return false
         }
     }
 
-    /// Puts one item of one goal back as it was before the tap.
-    private func undo(_ id: String, slug: String, from snapshot: GoalSummary) {
-        guard case .loaded(var current) = state, let i = current.goals.firstIndex(where: { $0.slug == slug }) else { return }
-        GoalCheckInEdit.restore(id, from: snapshot, in: &current.goals[i])
-        state = .loaded(current)
+    private func take(_ result: GoalCheckInResult) {
+        guard let i = edits?.base.goals.firstIndex(where: { $0.slug == result.goal.slug }) else { return }
+        edits?.base.goals[i] = result.goal
+        edits?.base.streak = result.streak
+    }
+
+    private func publish() {
+        guard let edits else { return }
+        state = .loaded(edits.shown)
+        let keys = edits.keys
+        if pending != keys { pending = keys }
     }
 
     private static func isCancellation(_ error: Error) -> Bool {

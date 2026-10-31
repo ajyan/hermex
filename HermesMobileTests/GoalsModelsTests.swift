@@ -146,3 +146,24 @@ final class GoalsModelsTests: XCTestCase {
         XCTAssertEqual(home.goals[0].flags, GoalFlags())
     }
 }
+
+/// The Goals adapter against a scripted server: what it posts and what it decodes.
+final class GoalsAPIClientTests: APIClientTestCase {
+    func testCheckInPostsClientIDBesideTheServersKeys() async throws {
+        let client = makeClient { request in
+            XCTAssertEqual(request.url?.path, "/api/goals/checkin")
+            let body = try apiTestJSONBody(from: request)
+            XCTAssertEqual(body["client_id"] as? String, "tap-1")
+            XCTAssertEqual(body["as_of"] as? String, "2026-10-11")
+            XCTAssertEqual(body["commitment"] as? String, "stretch-pm")
+            XCTAssertEqual(body["status"] as? String, "done")
+            return apiTestJSONResponse(
+                #"{"goal": {"slug": "m"}, "streak": {"days": 2}, "today": "2026-10-11", "yesterday": "2026-10-10"}"#,
+                for: request)
+        }
+        let result = try await APIClientGoalsAdapter(apiClient: client).checkIn(
+            .commitment(slug: "m", date: "2026-10-10", asOf: "2026-10-11", id: "stretch-pm", status: .done),
+            clientID: "tap-1")
+        XCTAssertEqual(result.streak.days, 2)
+    }
+}
