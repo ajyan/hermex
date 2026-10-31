@@ -293,7 +293,9 @@ final class TranscriptMediaVisibilityTests: XCTestCase {
         await fulfillment(of: [finished], timeout: 5)
         XCTAssertEqual(log.cancelled["/u/near.png", default: 0], 0, "Scrolling away must not cancel an admitted load")
 
-        // Removing the row cancels its held load, and mounting it again retries.
+        // Remounting the row after its load failed retries. Attachment images
+        // load through `TranscriptImageCache`, which shares one load per key
+        // across rows, so removing the row leaves that load running.
         scroll.setContentOffset(CGPoint(x: 0, y: -scroll.adjustedContentInset.top), animated: false)
         await renderVisibleRows(window)
         let restarted = log.expect("/u/near.png")
@@ -302,11 +304,12 @@ final class TranscriptMediaVisibilityTests: XCTestCase {
         transcript.showsTop = true
         await renderVisibleRows(window)
         await fulfillment(of: [restarted], timeout: 5)
-        let cancelled = log.expectFinish("/u/near.png")
+        let released = log.expectFinish("/u/near.png")
         transcript.showsTop = false
         await renderVisibleRows(window)
-        await fulfillment(of: [cancelled], timeout: 5)
-        XCTAssertEqual(log.cancelled["/u/near.png"], 1)
+        log.releaseHeldLoads()
+        await fulfillment(of: [released], timeout: 5)
+        XCTAssertEqual(log.cancelled["/u/near.png", default: 0], 0, "Removing the row must not cancel the shared image load")
 
         let retried = log.expect("/u/near.png")
         let retryFinished = log.expectFinish("/u/near.png")
@@ -315,7 +318,6 @@ final class TranscriptMediaVisibilityTests: XCTestCase {
         await fulfillment(of: [retried], timeout: 5)
         log.releaseHeldLoads()
         await fulfillment(of: [retryFinished], timeout: 5)
-        XCTAssertEqual(log.cancelled["/u/near.png"], 1, "The remounted row's load must run to completion")
     }
 
     /// A user message with an image attachment, then a settled
