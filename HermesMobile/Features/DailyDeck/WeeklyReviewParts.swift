@@ -2,13 +2,14 @@ import SwiftUI
 
 // Pieces the weekly review's cards share (`WeeklyReviewCards*.swift`).
 
-/// The line at a card's foot: its weekly chapter ("1 · Remember"), else why the brief picked it.
+/// The line at a card's foot: its weekly chapter ("1 · Remember"), else why the brief picked it. The
+/// Mandarin card has none: its steps already say what's left.
 struct DeckFootnote: View {
     let card: DeckCard
     let palette: DeckPalette
 
     var body: some View {
-        if let line = card.chapterLabel ?? card.reason {
+        if let line = card.chapterLabel ?? (card.isMandarin ? nil : card.reason) {
             Text(verbatim: line)
                 .font(AppFont.footnote())
                 .foregroundStyle(palette.ink)
