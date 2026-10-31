@@ -379,7 +379,7 @@ struct PrepRunView: View {
             ) { Task { await viewModel.submitJudgment(text) } }
         case .lesson where Self.usesRecall(rep) && viewModel.lessonStage == .reading:
             PrepPrimaryButton(title: rep.item.lesson?.recall?.isQuestion == true ? "Try a question" : "I'm ready") {
-                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { viewModel.beginRecall() }
+                withAnimation(HXMotion.swap(reduceMotion: reduceMotion)) { viewModel.beginRecall() }
             }
         case .lesson where Self.usesRecall(rep), .recall where Self.usesRecall(rep):
             PrepPrimaryButton(

@@ -79,7 +79,7 @@ import SwiftUI
                             let fold = folds.rowState(for: message.id, expandedTurnKeys: expandedTurnKeys)
                             // Only folded rows animate in and out, so settling stays instant.
                             let transition = fold == nil ? AnyTransition.identity
-                                : ChatMotion.disclosureTransition(reduceMotion: reduceMotion)
+                                : HXMotion.disclosureTransition(reduceMotion: reduceMotion)
                             if let host = fold?.fold {
                                 TranscriptTurnFoldRowView(fold: host, isExpanded: fold?.isExpanded == true) {
                                     toggleTurnFold(host.turnKey)
@@ -195,14 +195,14 @@ import SwiftUI
                         ChatScrollToBottomButton(bottomPadding: 12) {
                             ChatHaptics.scrolledToLatest(isEnabled: isHapticsEnabled)
                             handleFollowEvent(.reset)
-                            withAnimation(isStreaming ? nil : ChatMotion.scrollToLatest(reduceMotion: reduceMotion)) {
+                            withAnimation(isStreaming ? nil : HXMotion.scroll(reduceMotion: reduceMotion)) {
                                 followLatest(proxy)
                             }
                         }
-                        .transition(ChatMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
+                        .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
                     }
                 }
-                .animation(ChatMotion.quickState(reduceMotion: reduceMotion), value: showsScrollToBottomButton)
+                .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: showsScrollToBottomButton)
                 .overlay {
                     if model.messages.isEmpty && model.liveMessages.isEmpty && model.pendingRequest == nil {
                         // Recovery with nothing on screen yet is the first load: the
@@ -375,7 +375,7 @@ import SwiftUI
     private func toggleTurnFold(_ turnKey: String) {
         ChatHaptics.disclosureToggled(isEnabled: isHapticsEnabled)
         handleFollowEvent(.userScrollBegin)
-        withAnimation(ChatMotion.disclosure(reduceMotion: reduceMotion)) {
+        withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) {
             if !expandedTurnKeys.insert(turnKey).inserted { expandedTurnKeys.remove(turnKey) }
         }
     }

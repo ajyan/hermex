@@ -81,7 +81,7 @@ struct GoalCelebrationView: View {
         .onAppear {
             draft = viewModel.reflection
             guard !sealShown else { return }
-            if reduceMotion { sealShown = true } else { withAnimation(.spring(duration: 0.5)) { sealShown = true } }
+            withAnimation(HXMotion.pop(reduceMotion: reduceMotion)) { sealShown = true }
         }
     }
 

@@ -24,7 +24,7 @@ struct MoneyView: View {
             .toolbar {
                 if viewModel.state == .ready {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button { withAnimation(reduceMotion ? nil : .snappy) { viewModel.toggleReveal() } } label: {
+                        Button { withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) { viewModel.toggleReveal() } } label: {
                             Image(systemName: viewModel.isHidden ? "eye" : "eye.slash")
                         }
                         .accessibilityLabel(Text(verbatim: viewModel.isHidden ? "Show Amounts" : "Hide Amounts"))

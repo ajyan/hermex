@@ -124,7 +124,7 @@ struct SendChoiceCard<Choice: SendChoice>: View {
         transitionTask = Task { @MainActor in
             await Task.yield()
             guard !Task.isCancelled else { return }
-            withAnimation(.snappy(duration: 0.2)) { isVisible = true }
+            withAnimation(HXMotion.panel(reduceMotion: reduceMotion)) { isVisible = true }
             transitionTask = nil
         }
     }
@@ -138,7 +138,7 @@ struct SendChoiceCard<Choice: SendChoice>: View {
         isDismissing = true
         transitionTask?.cancel()
         guard !reduceMotion else { completion(); return }
-        withAnimation(.easeInOut(duration: 0.16)) { isVisible = false }
+        withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) { isVisible = false }
         transitionTask = Task { @MainActor in
             do { try await Task.sleep(for: .milliseconds(160)) } catch { return }
             guard !Task.isCancelled else { return }

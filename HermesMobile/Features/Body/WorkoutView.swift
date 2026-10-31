@@ -124,7 +124,7 @@ struct WorkoutView: View {
         guard let exercises = viewModel.session?.exercises, exercises.indices.contains(viewModel.current) else { return }
         let id = exercises[viewModel.current].id
         if animated {
-            withAnimation(.snappy) { proxy.scrollTo(id, anchor: .top) }
+            withAnimation(HXMotion.scroll(reduceMotion: reduceMotion)) { proxy.scrollTo(id, anchor: .top) }
         } else {
             proxy.scrollTo(id, anchor: .top)
         }

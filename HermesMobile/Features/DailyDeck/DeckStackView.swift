@@ -102,10 +102,10 @@ struct DeckStackView: View {
         guard let (card, feedback) = pendingFeedback else { return }
         pendingFeedback = nil
         guard !reduceMotion else {
-            withAnimation(.easeInOut(duration: 0.2)) { viewModel.dismiss(card, feedback: feedback) }
+            withAnimation(HXMotion.crossfade) { viewModel.dismiss(card, feedback: feedback) }
             return
         }
-        withAnimation(.easeIn(duration: 0.28)) {
+        withAnimation(HXMotion.card(reduceMotion: reduceMotion)) {
             droppingID = card.id
         } completion: {
             withoutAnimation {
@@ -125,7 +125,7 @@ struct DeckStackView: View {
                      ? "Less like this: \(title)" : "Skipped: \(title)")
                     .lineLimit(1)
                 Spacer(minLength: 8)
-                Button { withAnimation(reduceMotion ? nil : .spring(duration: 0.4, bounce: 0.15)) { viewModel.undoDismissal() } } label: {
+                Button { withAnimation(HXMotion.card(reduceMotion: reduceMotion)) { viewModel.undoDismissal() } } label: {
                     Text(verbatim: "Undo").font(AppFont.subheadline(weight: .semibold))
                 }
             }
@@ -135,10 +135,10 @@ struct DeckStackView: View {
             .adaptiveGlass(.regular, fallbackMaterial: .regularMaterial, in: Capsule())
             .padding(.horizontal, 16)
             .padding(.bottom, 8)
-            .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
             .task(id: dismissal.card.id) {
                 try? await Task.sleep(for: .seconds(4))
-                withAnimation { viewModel.clearDismissal() }
+                withAnimation(HXMotion.panel(reduceMotion: reduceMotion)) { viewModel.clearDismissal() }
             }
         }
     }

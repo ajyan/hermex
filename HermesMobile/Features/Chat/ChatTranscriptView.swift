@@ -212,10 +212,10 @@ struct ChatTranscriptView: View {
                                 releasingHold { onScrollToBottom(proxy) }
                             }
                         )
-                        .transition(ChatMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
+                        .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
                     }
                 }
-                .animation(ChatMotion.quickState(reduceMotion: reduceMotion), value: showsScrollToBottomButton)
+                .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: showsScrollToBottomButton)
                 .background(Color.hxCanvas)
                 .background {
                     StreamingFollowTrigger(trigger: streamingScrollTrigger) {
@@ -414,7 +414,7 @@ struct ChatTranscriptView: View {
                 target: state == .idle ? nil : state,
                 // Offline needs no confirming: nothing resumes until the network does.
                 immediately: state == .waitingForNetwork,
-                animation: ChatMotion.quickState(reduceMotion: reduceMotion)
+                animation: HXMotion.quickState(reduceMotion: reduceMotion)
             )
         }
         .id(transcriptContentID)
@@ -442,7 +442,7 @@ struct ChatTranscriptView: View {
             return .identity
         }
 
-        return ChatMotion.freshRowTransition(isUserRow: message.role == "user", reduceMotion: reduceMotion)
+        return HXMotion.freshRowTransition(isUserRow: message.role == "user", reduceMotion: reduceMotion)
     }
 
     private func compressionReferenceCardView(_ card: CompressionReferenceCard) -> some View {
@@ -524,7 +524,7 @@ struct ChatTranscriptView: View {
             StreamRecoveryStatusView(state: state)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityHidden(hidesRunStatusAccessibility)
-                .transition(ChatMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
+                .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
         }
     }
 
@@ -729,7 +729,7 @@ struct ChatTranscriptMessageBlock: View, Equatable {
     /// Only folded rows animate in and out; ordinary rows keep no transition
     /// so streaming appends stay instant.
     private var foldTransition: AnyTransition {
-        foldState == nil ? .identity : ChatMotion.disclosureTransition(reduceMotion: reduceMotion)
+        foldState == nil ? .identity : HXMotion.disclosureTransition(reduceMotion: reduceMotion)
     }
 
     private var showsActivity: Bool {

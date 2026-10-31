@@ -86,7 +86,7 @@ struct WeekCoverCard: View {
                             palette: palette, initial: title) { viewModel.setText($0, for: card) }
         }
         .weekAddAlert("Add a moment", prompt: "What happened?", isPresented: $isAddingMoment) { line in
-            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { viewModel.addOwnMoment(line, for: card) }
+            withAnimation(HXMotion.swap(reduceMotion: reduceMotion)) { viewModel.addOwnMoment(line, for: card) }
         }
     }
 
@@ -223,14 +223,14 @@ struct WeekCoverCard: View {
     }
 
     private func change(_ body: () -> Void) {
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2), body)
+        withAnimation(HXMotion.quickState(reduceMotion: reduceMotion), body)
     }
 
     /// A sealed envelope until tapped; then the note, in his own words.
     private func noteFromPast(_ note: DeckPastNote) -> some View {
         let week = note.weekEnding.flatMap(Self.weekNumber(ofDay:)).map { "Week \($0)" } ?? "a year ago"
         return Button {
-            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) { noteIsOpen.toggle() }
+            withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) { noteIsOpen.toggle() }
         } label: {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {

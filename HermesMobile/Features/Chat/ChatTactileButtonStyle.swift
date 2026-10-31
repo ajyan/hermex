@@ -114,7 +114,7 @@ struct ChatTactileButtonStyle: ButtonStyle {
     }
 
     private var animation: Animation? {
-        ChatMotion.press(duration: variant.duration, reduceMotion: reduceMotion)
+        HXMotion.press(duration: variant.duration, reduceMotion: reduceMotion)
     }
 }
 
@@ -395,7 +395,7 @@ struct ChatDecisionButtonStyle: ButtonStyle {
     }
 
     private var animation: Animation? {
-        ChatMotion.press(duration: 0.18, reduceMotion: reduceMotion)
+        HXMotion.press(duration: 0.18, reduceMotion: reduceMotion)
     }
 }
 

@@ -528,7 +528,7 @@ struct DeckMandarinCard: View {
     }
 
     private func change(_ update: () -> Void) {
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2), update)
+        withAnimation(HXMotion.quickState(reduceMotion: reduceMotion), update)
     }
 }
 
@@ -659,7 +659,7 @@ struct MandarinCueChips: View {
                     let isUsed = used.contains(phrase.hanzi)
                     let isOpen = peeking == phrase.hanzi
                     Button {
-                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { peeking = isOpen ? nil : phrase.hanzi }
+                        withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) { peeking = isOpen ? nil : phrase.hanzi }
                     } label: {
                         HStack(spacing: 4) {
                             if isUsed { Image(systemName: "checkmark").font(AppFont.caption2(weight: .bold)) }

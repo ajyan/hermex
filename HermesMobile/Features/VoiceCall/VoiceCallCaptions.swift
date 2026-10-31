@@ -66,8 +66,8 @@ struct VoiceCallCaptions: View {
         // A soft dark halo around the letters keeps them legible over the glow.
         .shadow(color: .black.opacity(0.55), radius: 10)
         .shadow(color: .black.opacity(0.5), radius: 2)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: content?.speaker)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: content?.isActive)
+        .animation(HXMotion.swap(reduceMotion: reduceMotion), value: content?.speaker)
+        .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: content?.isActive)
     }
 
     private func caption(_ content: Content) -> some View {

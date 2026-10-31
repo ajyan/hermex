@@ -19,7 +19,7 @@ struct MarkerMessageCardView: View {
         VStack(alignment: .leading, spacing: isExpanded ? 8 : 0) {
             Button {
                 chatDisclosureToggled()
-                withAnimation(ChatMotion.disclosure(reduceMotion: reduceMotion)) {
+                withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) {
                     isExpanded.toggle()
                 }
             } label: {
@@ -35,7 +35,7 @@ struct MarkerMessageCardView: View {
                     .foregroundStyle(.primary)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .transition(ChatMotion.disclosureTransition(reduceMotion: reduceMotion))
+                    .transition(HXMotion.disclosureTransition(reduceMotion: reduceMotion))
             }
         }
         .padding(.horizontal, 10)

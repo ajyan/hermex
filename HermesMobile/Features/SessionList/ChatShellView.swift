@@ -857,7 +857,7 @@ struct ChatShellView: View {
             hasOpenedDrawer = true
             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         }
-        withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.3)) {
+        withAnimation(HXMotion.panel(reduceMotion: reduceMotion)) {
             navigation.isDrawerOpen = isOpen
         }
     }
@@ -1263,7 +1263,7 @@ struct ChatShellView: View {
             !(session.pinned ?? false),
             for: session,
             modelContext: modelContext,
-            animation: SessionListMotion.sessionMutationAnimation(reduceMotion: reduceMotion)
+            animation: HXMotion.swap(reduceMotion: reduceMotion)
         )
         handleLastError()
 
@@ -1281,7 +1281,7 @@ struct ChatShellView: View {
         let didArchive = await viewModel.archive(
             session,
             modelContext: modelContext,
-            animation: SessionListMotion.sessionMutationAnimation(reduceMotion: reduceMotion)
+            animation: HXMotion.swap(reduceMotion: reduceMotion)
         )
         handleLastError()
 
@@ -1323,7 +1323,7 @@ struct ChatShellView: View {
         let didUnarchive = await viewModel.unarchive(
             session,
             modelContext: modelContext,
-            animation: SessionListMotion.sessionMutationAnimation(reduceMotion: reduceMotion)
+            animation: HXMotion.swap(reduceMotion: reduceMotion)
         )
         handleLastError()
 
@@ -1337,7 +1337,7 @@ struct ChatShellView: View {
         let didDelete = await viewModel.delete(
             session,
             modelContext: modelContext,
-            animation: SessionListMotion.sessionMutationAnimation(reduceMotion: reduceMotion)
+            animation: HXMotion.swap(reduceMotion: reduceMotion)
         )
         handleLastError()
 

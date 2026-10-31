@@ -80,7 +80,7 @@ struct DailyDeckView: View {
                                     }
                                 }
                                 if viewModel.skippedCount > 0 {
-                                    Button { withAnimation { viewModel.restoreSkipped() } } label: {
+                                    Button { withAnimation(HXMotion.swap(reduceMotion: reduceMotion)) { viewModel.restoreSkipped() } } label: {
                                         Label { Text(verbatim: "Restore Skipped Cards (\(viewModel.skippedCount))") } icon: {
                                             Image(systemName: "arrow.uturn.backward")
                                         }
@@ -233,8 +233,8 @@ struct DailyDeckView: View {
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
-        .animation(reduceMotion ? nil : .smooth(duration: 0.3), value: viewModel.index)
-        .animation(reduceMotion ? nil : .smooth(duration: 0.3), value: count)
+        .animation(HXMotion.swap(reduceMotion: reduceMotion), value: viewModel.index)
+        .animation(HXMotion.swap(reduceMotion: reduceMotion), value: count)
         .accessibilityElement(children: .combine)
         // Swipe up or down on the counter to move through the deck.
         .accessibilityAdjustableAction { direction in
@@ -248,11 +248,7 @@ struct DailyDeckView: View {
 
     private func step(_ delta: Int) {
         let target = min(max(viewModel.index + delta, 0), max(viewModel.visiblePages.count - 1, 0))
-        if reduceMotion {
-            viewModel.index = target
-        } else {
-            withAnimation(.easeInOut(duration: 0.25)) { viewModel.index = target }
-        }
+        withAnimation(HXMotion.card(reduceMotion: reduceMotion)) { viewModel.index = target }
     }
 
     private func file() {
@@ -335,16 +331,12 @@ private struct SealedWeekCover: View {
         .opacity(isShown ? 1 : 0)
         .presentationBackground(.clear)
         .onAppear {
-            if reduceMotion { isShown = true } else { withAnimation(.easeInOut(duration: 0.35)) { isShown = true } }
+            withAnimation(HXMotion.panel(reduceMotion: reduceMotion)) { isShown = true }
         }
     }
 
     private func fade(reopen: String?) {
-        if reduceMotion {
-            close(reopen)
-        } else {
-            withAnimation(.easeInOut(duration: 0.25)) { isShown = false } completion: { close(reopen) }
-        }
+        withAnimation(HXMotion.panel(reduceMotion: reduceMotion)) { isShown = false } completion: { close(reopen) }
     }
 }
 

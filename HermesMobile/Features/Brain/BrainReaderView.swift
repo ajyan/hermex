@@ -291,7 +291,7 @@ struct BrainReaderView: View {
                 return
             }
             stepEdge = edge
-            withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) { viewModel = next }
+            withAnimation(HXMotion.swap(reduceMotion: reduceMotion)) { viewModel = next }
         }
     }
 

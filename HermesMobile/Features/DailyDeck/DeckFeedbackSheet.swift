@@ -36,7 +36,7 @@ struct DeckFeedbackSheet: View {
                     if !card.altQuestions.isEmpty {
                         row("Regenerate Question", systemImage: "arrow.triangle.2.circlepath") {
                             dismiss()
-                            withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .smooth(duration: 0.35)) {
+                            withAnimation(HXMotion.swap(reduceMotion: reduceMotion)) {
                                 viewModel.regenerateQuestion(for: card)
                             }
                         }

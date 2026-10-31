@@ -52,7 +52,7 @@ struct WeekHeldCard: View {
             HStack(spacing: 8) {
                 ForEach(Self.answers, id: \.0) { id, label in
                     ChoiceButton(title: label, isSelected: held == id) {
-                        withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.8)) {
+                        withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) {
                             viewModel.setStatus("held", held == id ? nil : id, for: card)
                         }
                     }
@@ -160,7 +160,7 @@ struct WeekPlanCard: View {
             }
             .padding(.top, 10)
             Button {
-                withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.75)) {
+                withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) {
                     viewModel.setStatus("plan", accepted ? nil : "accepted", for: card)
                 }
             } label: {
@@ -252,7 +252,7 @@ struct WeekLetterCard: View {
         .sheet(isPresented: $isWriting) {
             WeekEditorSheet(title: "Dear me, a year from now", placeholder: starredMoments.first.map { "Start with \($0.day): \($0.line)" } ?? "It opens on this week next year", serif: true,
                             palette: palette, initial: letter ?? "") { text in
-                withAnimation(reduceMotion ? nil : .spring(response: 0.5, dampingFraction: 0.65)) {
+                withAnimation(HXMotion.pop(reduceMotion: reduceMotion)) {
                     viewModel.setText(text, for: card)
                 }
             }

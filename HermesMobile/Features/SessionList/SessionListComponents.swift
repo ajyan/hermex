@@ -47,36 +47,6 @@ enum SessionRowActionPolicy {
 
 }
 
-enum SessionListMotion {
-    static func disclosureAnimation(reduceMotion: Bool) -> Animation? {
-        reduceMotion ? nil : .smooth(duration: 0.28, extraBounce: 0)
-    }
-
-    static func searchChromeAnimation(reduceMotion: Bool) -> Animation? {
-        reduceMotion ? nil : .smooth(duration: 0.24, extraBounce: 0)
-    }
-
-    static func searchFocusAnimation(reduceMotion: Bool) -> Animation? {
-        reduceMotion ? nil : .easeInOut(duration: 0.18)
-    }
-
-    static func pressAnimation(reduceMotion: Bool) -> Animation? {
-        reduceMotion ? .easeOut(duration: 0.12) : .smooth(duration: 0.18, extraBounce: 0)
-    }
-
-    static func sessionMutationAnimation(reduceMotion: Bool) -> Animation? {
-        reduceMotion ? nil : .snappy(duration: 0.24, extraBounce: 0)
-    }
-
-    static func sessionRowTransition(reduceMotion: Bool) -> AnyTransition {
-        reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top))
-    }
-
-    static func disclosureContentTransition(reduceMotion: Bool) -> AnyTransition {
-        reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top))
-    }
-}
-
 /// Which of the session list's optional navigation rows are shown, so a user can
 /// hide the parts of the app they never use (issue #189).
 struct SidebarSectionVisibility: Equatable {
@@ -282,7 +252,7 @@ struct SessionInteractiveRow: View {
                 : Color.clear,
             in: RoundedRectangle(cornerRadius: 12, style: .continuous)
         )
-        .transition(SessionListMotion.sessionRowTransition(reduceMotion: reduceMotion))
+        .transition(HXMotion.disclosureTransition(reduceMotion: reduceMotion))
         .swipeActions(edge: .leading, allowsFullSwipe: false) {
             sessionLeadingSwipeActions(for: session)
         }

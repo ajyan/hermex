@@ -740,8 +740,8 @@ final class ClarificationRequestPresentationTests: XCTestCase {
     }
 
     func testToggleCurveIsOneEaseOutClockAndSnapsUnderReduceMotion() {
-        XCTAssertEqual(ChatMotion.clarificationToggle(reduceMotion: false), .easeOut(duration: 0.22))
-        XCTAssertNil(ChatMotion.clarificationToggle(reduceMotion: true))
+        XCTAssertEqual(HXMotion.clarificationToggle(reduceMotion: false), .easeOut(duration: 0.22))
+        XCTAssertNil(HXMotion.clarificationToggle(reduceMotion: true))
     }
 
     func testHeightPolicyFitsContentWithoutGrowingTheCard() {
@@ -798,23 +798,33 @@ final class ClarificationRequestPresentationTests: XCTestCase {
     }
 }
 
-final class ChatMotionTests: XCTestCase {
+final class HXMotionTests: XCTestCase {
     func testEveryCurveSnapsUnderReduceMotion() {
-        XCTAssertNil(ChatMotion.press(duration: 0.2, reduceMotion: true))
-        XCTAssertNil(ChatMotion.quickState(reduceMotion: true))
-        XCTAssertNil(ChatMotion.disclosure(reduceMotion: true))
-        XCTAssertNil(ChatMotion.composerChrome(reduceMotion: true))
-        XCTAssertNil(ChatMotion.scrollToLatest(reduceMotion: true))
-        XCTAssertNil(ChatMotion.clarificationToggle(reduceMotion: true))
+        XCTAssertNil(HXMotion.press(duration: 0.2, reduceMotion: true))
+        XCTAssertNil(HXMotion.quickState(reduceMotion: true))
+        XCTAssertNil(HXMotion.disclosure(reduceMotion: true))
+        XCTAssertNil(HXMotion.chrome(reduceMotion: true))
+        XCTAssertNil(HXMotion.scroll(reduceMotion: true))
+        XCTAssertNil(HXMotion.clarificationToggle(reduceMotion: true))
+        XCTAssertNil(HXMotion.swap(reduceMotion: true))
+        XCTAssertNil(HXMotion.reveal(reduceMotion: true, delay: 0.3))
+        XCTAssertNil(HXMotion.pop(reduceMotion: true, delay: 0.3))
+        XCTAssertNil(HXMotion.draw(reduceMotion: true))
+        XCTAssertNil(HXMotion.card(reduceMotion: true))
+    }
+
+    func testPanelsCrossfadeUnderReduceMotion() {
+        XCTAssertEqual(HXMotion.panel(reduceMotion: true), HXMotion.crossfade)
+        XCTAssertNotEqual(HXMotion.panel(reduceMotion: false), HXMotion.crossfade)
     }
 
     func testCurvesKeepTheirUnreducedTiming() {
-        XCTAssertEqual(ChatMotion.press(duration: 0.2, reduceMotion: false), .smooth(duration: 0.2, extraBounce: 0))
-        XCTAssertEqual(ChatMotion.quickState(reduceMotion: false), .easeInOut(duration: 0.16))
-        XCTAssertEqual(ChatMotion.disclosure(reduceMotion: false), .smooth(duration: 0.18, extraBounce: 0))
-        XCTAssertEqual(ChatMotion.composerChrome(reduceMotion: false), .smooth(duration: 0.22, extraBounce: 0))
-        XCTAssertEqual(ChatMotion.scrollToLatest(reduceMotion: false), .easeOut(duration: 0.20))
-        XCTAssertEqual(ChatMotion.clarificationToggle(reduceMotion: false), .easeOut(duration: 0.22))
+        XCTAssertEqual(HXMotion.press(duration: 0.2, reduceMotion: false), .smooth(duration: 0.2, extraBounce: 0))
+        XCTAssertEqual(HXMotion.quickState(reduceMotion: false), .easeInOut(duration: 0.16))
+        XCTAssertEqual(HXMotion.disclosure(reduceMotion: false), .smooth(duration: 0.18, extraBounce: 0))
+        XCTAssertEqual(HXMotion.chrome(reduceMotion: false), .smooth(duration: 0.22, extraBounce: 0))
+        XCTAssertEqual(HXMotion.scroll(reduceMotion: false), .easeOut(duration: 0.20))
+        XCTAssertEqual(HXMotion.clarificationToggle(reduceMotion: false), .easeOut(duration: 0.22))
     }
 }
 

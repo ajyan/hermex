@@ -74,7 +74,7 @@ struct ClarificationRequestInset: View {
             onDismissKeyboard()
         }
         ChatHaptics.disclosureToggled(isEnabled: isHapticsEnabled)
-        withAnimation(ChatMotion.clarificationToggle(reduceMotion: reduceMotion)) {
+        withAnimation(HXMotion.clarificationToggle(reduceMotion: reduceMotion)) {
             isExpanded = expanded
         }
     }

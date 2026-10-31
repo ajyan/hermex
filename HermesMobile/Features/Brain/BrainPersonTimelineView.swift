@@ -219,11 +219,7 @@ private struct BrainAboutSection: View {
     }
 
     private func toggle() {
-        if reduceMotion {
-            expanded.toggle()
-        } else {
-            withAnimation(.snappy(duration: 0.2)) { expanded.toggle() }
-        }
+        withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) { expanded.toggle() }
     }
 }
 

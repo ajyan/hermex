@@ -158,7 +158,7 @@ private struct DailyAskForm: View {
         let isOpen = expandedID == role.id
         VStack(alignment: .leading, spacing: 10) {
             Button {
-                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { expandedID = isOpen ? nil : role.id }
+                withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) { expandedID = isOpen ? nil : role.id }
             } label: {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 2) {

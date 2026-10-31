@@ -116,13 +116,13 @@ struct PrepRecallResultView: View {
             }
             while shown < rows.count {
                 try? await Task.sleep(for: .milliseconds(120))
-                withAnimation(.easeOut(duration: 0.2)) { shown += 1 }
+                withAnimation(HXMotion.reveal(reduceMotion: reduceMotion)) { shown += 1 }
             }
         }
         if isQuestion && !result.strongAnswer.isEmpty {
             VStack(alignment: .leading, spacing: BrainStyle.s) {
                 Button {
-                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { showsWorked.toggle() }
+                    withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) { showsWorked.toggle() }
                 } label: {
                     HStack {
                         Text(verbatim: "Worked answer for this question")

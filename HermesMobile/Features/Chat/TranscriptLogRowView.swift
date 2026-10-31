@@ -56,7 +56,7 @@ struct TranscriptLogRowBodyWindow<Content: View>: View {
                         // zero, so rows below only move down toward their final
                         // positions. Later content changes keep their existing
                         // non-animated sizing behavior.
-                        withAnimation(ChatMotion.disclosure(reduceMotion: reduceMotion)) {
+                        withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) {
                             contentHeight = height
                         }
                     } else {
@@ -126,7 +126,7 @@ struct TranscriptLogRowView<Icon: View, Accessory: View, Status: View, ExpandedB
                         .transition(
                             .asymmetric(
                                 insertion: .opacity,
-                                removal: ChatMotion.disclosureTransition(reduceMotion: reduceMotion)
+                                removal: HXMotion.disclosureTransition(reduceMotion: reduceMotion)
                             )
                         )
                 }
@@ -227,7 +227,7 @@ struct TranscriptLogRowView<Icon: View, Accessory: View, Status: View, ExpandedB
 
     private func toggle() {
         chatDisclosureToggled()
-        withAnimation(ChatMotion.disclosure(reduceMotion: reduceMotion)) {
+        withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) {
             toggleExpansion()
         }
     }
@@ -240,7 +240,7 @@ struct TranscriptLogRowView<Icon: View, Accessory: View, Status: View, ExpandedB
         UIPasteboard.general.string = copyText()
         ChatHaptics.copied(isEnabled: isHapticsEnabled)
 
-        withAnimation(ChatMotion.quickState(reduceMotion: reduceMotion)) {
+        withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) {
             showsCopied = true
         }
 
@@ -248,7 +248,7 @@ struct TranscriptLogRowView<Icon: View, Accessory: View, Status: View, ExpandedB
         copiedResetTask = Task { @MainActor in
             try? await Task.sleep(for: .seconds(1.2))
             guard !Task.isCancelled else { return }
-            withAnimation(ChatMotion.quickState(reduceMotion: reduceMotion)) {
+            withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) {
                 showsCopied = false
             }
         }

@@ -72,7 +72,7 @@ struct OnboardingView: View {
                     .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: isEditingConnectionField)
+        .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: isEditingConnectionField)
         .preferredColorScheme(.dark)
         .onChange(of: currentPage) { oldPage, newPage in
             handlePageChange(from: oldPage, to: newPage)
@@ -219,13 +219,13 @@ struct OnboardingView: View {
 
     private func advanceToNextPage() {
         guard currentPage < OnboardingFlowPolicy.connectPageIndex else { return }
-        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.3)) {
+        withAnimation(HXMotion.swap(reduceMotion: reduceMotion)) {
             currentPage += 1
         }
     }
 
     private func jumpToConnectPage() {
-        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.3)) {
+        withAnimation(HXMotion.swap(reduceMotion: reduceMotion)) {
             currentPage = OnboardingFlowPolicy.connectPageIndex
         }
     }

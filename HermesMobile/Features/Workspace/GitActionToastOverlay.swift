@@ -22,7 +22,7 @@ final class GitActionToastState {
     private var dismissTask: Task<Void, Never>?
 
     static func toastAnimation(reduceMotion: Bool) -> Animation? {
-        reduceMotion ? nil : .easeInOut(duration: 0.18)
+        HXMotion.panel(reduceMotion: reduceMotion)
     }
 
     static func toastTransition(reduceMotion: Bool) -> AnyTransition {

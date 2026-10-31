@@ -280,7 +280,7 @@ struct DeckTodaysOne: View {
                 let front = DeckPalette.front(option.front)
                 let isPicked = picked == option.id
                 Button {
-                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { viewModel.pick(option.id, for: card) }
+                    withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) { viewModel.pick(option.id, for: card) }
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: isPicked ? "checkmark.circle.fill" : front.symbol)
@@ -327,7 +327,7 @@ struct DeckYesterdayLine: View {
             HStack(spacing: 8) {
                 ForEach(card.options) { option in
                     ChoiceButton(title: option.label, isSelected: picked == option.id) {
-                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { viewModel.pick(option.id, for: card) }
+                        withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) { viewModel.pick(option.id, for: card) }
                     }
                 }
             }

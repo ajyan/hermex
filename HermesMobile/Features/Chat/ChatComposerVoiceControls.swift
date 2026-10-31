@@ -72,7 +72,7 @@ struct ComposerVoiceControlButton: View {
             .frame(width: 44, height: 44)
             .foregroundStyle(isListening || isRecordingVoiceNote ? Color.hxDanger : color)
             .scaleEffect(reduceMotion ? 1 : (isRecordingVoiceNote ? 1.3 : 1))
-            .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.7), value: isRecordingVoiceNote)
+            .animation(HXMotion.pop(reduceMotion: reduceMotion), value: isRecordingVoiceNote)
             .contentShape(Circle())
             .opacity(isDisabled && !isRecordingVoiceNote ? 0.4 : 1)
             .accessibilityLabel(accessibilityLabel)
