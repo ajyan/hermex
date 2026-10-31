@@ -2592,6 +2592,13 @@ final class DeckCardSourceTests: XCTestCase {
         XCTAssertEqual(DeckCard.openTitle(for: try XCTUnwrap(wiki.sourceRoute)), "Open the page")
     }
 
+    func testAPersonFollowUpOpensTheirPage() throws {
+        let followUp = try card(#"{"id": "followup-6", "type": "decision", "title": "Pat Doe", "ref": {"followup": 6, "key": "person:Pat Doe", "person": "Pat Doe", "link": "crm/contacts/Pat Doe.md"}}"#)
+        XCTAssertTrue(followUp.isFollowUp)
+        XCTAssertEqual(followUp.sourceRoute, .page(.people, "crm/contacts/Pat Doe.md"))
+        XCTAssertEqual(DeckCard.openTitle(for: try XCTUnwrap(followUp.sourceRoute)), "Open their page")
+    }
+
     func testEachVaultFolderOpensItsModule() {
         XCTAssertEqual(DeckCard.brainRoute(forLink: "journal/2025/10-October/2025-10-10"),
                        .page(.journal, "journal/2025/10-October/2025-10-10.md"))

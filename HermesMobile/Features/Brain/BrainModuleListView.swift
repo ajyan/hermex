@@ -146,6 +146,7 @@ struct BrainModuleListView: View {
     /// People only: Everyone narrowed to one `relationship_type`.
     @State private var relationship: String?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.scenePhase) private var scenePhase
 
     init(
         module: BrainModuleID,
@@ -178,6 +179,10 @@ struct BrainModuleListView: View {
                 guard !didLoad || viewModel.state == .loading else { return }
                 didLoad = true
                 await reload()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                // Back from the background (often the next day): "6d" and "Birthdays soon" move on.
+                if phase == .active, module == .people { Task { await peopleHome.load() } }
             }
             .onChange(of: viewModel.list) { _, list in
                 guard hasChipBar, viewModel.selectedTag == nil, let list, !list.tags.isEmpty else { return }
