@@ -290,13 +290,6 @@ final class ContractReadinessTests: XCTestCase {
             .init(name: "upload", method: "POST", endpoint: .upload, path: "/api/upload"),
             .init(name: "tutor home", method: "GET", endpoint: .tutorHome, path: "/api/tutor/home"),
             .init(name: "tutor today", method: "GET", endpoint: .tutorToday, path: "/api/tutor/today"),
-            .init(
-                name: "tutor map",
-                method: "GET",
-                endpoint: .tutorMap(track: "dsa"),
-                path: "/api/tutor/map",
-                query: ["track": "dsa"]
-            ),
             .init(name: "tutor attempt", method: "POST", endpoint: .tutorAttempt, path: "/api/tutor/attempt"),
             .init(
                 name: "tutor test out",

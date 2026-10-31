@@ -74,7 +74,6 @@
 		B1A1C0DE0000000000000E21 /* PrepHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E22 /* PrepHomeView.swift */; };
 		3C0B73F47257718F46862DFB /* PrepGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 004ECAAB770CF240AFC8EE3C /* PrepGate.swift */; };
 		C0F5E9630000000000000000 /* PrepCourseViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F5E9620000000000000000 /* PrepCourseViews.swift */; };
-		B1A1C0DE0000000000000E23 /* PrepTrackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E24 /* PrepTrackView.swift */; };
 		B1A1C0DE0000000000000E25 /* PrepRunView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE0000000000000E26 /* PrepRunView.swift */; };
 		C0F5EE310000000000000000 /* PrepLessonViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F5EE300000000000000000 /* PrepLessonViews.swift */; };
 		C0F5EA050000000000000000 /* PrepRecallViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F5EA040000000000000000 /* PrepRecallViews.swift */; };
@@ -957,7 +956,6 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		B1A1C0DE0000000000000E22 /* PrepHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepHomeView.swift; sourceTree = "<group>"; };
 		004ECAAB770CF240AFC8EE3C /* PrepGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepGate.swift; sourceTree = "<group>"; };
 		C0F5E9620000000000000000 /* PrepCourseViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepCourseViews.swift; sourceTree = "<group>"; };
-		B1A1C0DE0000000000000E24 /* PrepTrackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepTrackView.swift; sourceTree = "<group>"; };
 		B1A1C0DE0000000000000E26 /* PrepRunView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepRunView.swift; sourceTree = "<group>"; };
 		C0F5EE300000000000000000 /* PrepLessonViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepLessonViews.swift; sourceTree = "<group>"; };
 		C0F5EA040000000000000000 /* PrepRecallViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrepRecallViews.swift; sourceTree = "<group>"; };
@@ -1841,7 +1839,6 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				B1A1C0DE0000000000000E22 /* PrepHomeView.swift */,
 				004ECAAB770CF240AFC8EE3C /* PrepGate.swift */,
 				C0F5E9620000000000000000 /* PrepCourseViews.swift */,
-				B1A1C0DE0000000000000E24 /* PrepTrackView.swift */,
 				B1A1C0DE0000000000000E26 /* PrepRunView.swift */,
 				C0F5EE300000000000000000 /* PrepLessonViews.swift */,
 				C0F5EA040000000000000000 /* PrepRecallViews.swift */,
@@ -3279,7 +3276,6 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				B1A1C0DE0000000000000E21 /* PrepHomeView.swift in Sources */,
 				3C0B73F47257718F46862DFB /* PrepGate.swift in Sources */,
 				C0F5E9630000000000000000 /* PrepCourseViews.swift in Sources */,
-				B1A1C0DE0000000000000E23 /* PrepTrackView.swift in Sources */,
 				B1A1C0DE0000000000000E25 /* PrepRunView.swift in Sources */,
 				C0F5EE310000000000000000 /* PrepLessonViews.swift in Sources */,
 				C0F5EA050000000000000000 /* PrepRecallViews.swift in Sources */,

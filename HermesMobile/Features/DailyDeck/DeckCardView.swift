@@ -18,6 +18,7 @@ struct DeckPageView: View {
     var isOpen = false
 
     @Environment(\.openBrainRoute) private var openBrainRoute
+    @Environment(DailyAskModel.self) private var askModel: DailyAskModel?
 
     var body: some View {
         let palette = DeckPalette.of(page, inV2Weekly: viewModel.isSealedWeekly)
@@ -45,10 +46,16 @@ struct DeckPageView: View {
         }
     }
 
-    /// "Open the page" on an open card whose source is a Brain page.
+    /// "Open the page" on an open card whose source is a Brain page; "Open Prep" on today's Ask once it
+    /// is acted on.
     private var sourceAction: HXCardAction? {
-        guard case .card(let card) = page, let route = card.sourceRoute, openBrainRoute.isAvailable else { return nil }
+        guard case .card(let card) = page, openBrainRoute.isAvailable else { return nil }
         let (open, deck) = (openBrainRoute, viewModel)
+        if card.type == .ask, let askModel, askModel.isLive(for: viewModel.date),
+           case .loaded(let ask) = askModel.state, let outcome = ask.outcome, DailyAskBody.opensPrep(outcome) {
+            return HXCardAction(title: "Open Prep") { open(.prep(.home)) }
+        }
+        guard let route = card.sourceRoute else { return nil }
         return HXCardAction(title: DeckCard.openTitle(for: route)) {
             deck.opened("source", on: card.id)
             open(route)
