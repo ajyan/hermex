@@ -948,6 +948,24 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertTrue(vm.canSubmitRecall)
     }
 
+    func testRecallSubmitWaitsForTheWordFloor() async {
+        let client = FakePrepClient()
+        let rep = recallLessonRep(0, drill: "recall", block: "review").replacingOccurrences(
+            of: #""block": "review","#, with: #""block": "review", "min_words": 5,"#)
+        client.todayResults = [.success(courseRun([rep]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        let vm = makeVM(client)
+        await vm.load()
+        vm.recallDraft = "Tokens are word pieces"
+        XCTAssertFalse(vm.canSubmitRecall)
+        XCTAssertEqual(vm.answerFloor.submitTitle, "4 of 5 words")
+        await vm.submitRecall()
+        XCTAssertTrue(client.attempts.isEmpty)
+        vm.recallDraft = "Tokens are word pieces, roughly"
+        XCTAssertTrue(vm.canSubmitRecall)
+        XCTAssertEqual(vm.answerFloor.submitTitle, "Submit")
+    }
+
     func testDontKnowPostsWithoutText() async {
         let client = FakePrepClient()
         client.todayResults = [.success(courseRun([recallLessonRep(0, drill: "recall", block: "review")]))]
