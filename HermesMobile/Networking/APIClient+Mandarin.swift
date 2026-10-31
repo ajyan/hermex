@@ -7,6 +7,8 @@ struct MandarinAnswerRequest: Encodable, Sendable {
     let text: String
     /// "Ask my own question" replaces the card's; nil keeps it.
     let question: String?
+    /// True for his second telling after reading the feedback, kept beside the first; nil (left out) for the first.
+    var again: Bool? = nil
 }
 
 /// The feedback (nil when the model couldn't answer in time: the next morning's deck retries it),

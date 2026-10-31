@@ -25,7 +25,8 @@ struct APIClientMandarinAdapter: MandarinPracticeClient {
 }
 
 /// What he has done on a day's Mandarin card: fixes stepped through, phrases recalled (Got it is
-/// true), cues made his own (and their checked versions), and the answer the feedback is for. Kept per server and day, so the card resumes.
+/// true), cues made his own (and their checked versions), the answer the feedback is for, and his second
+/// telling with its own. Kept per server and day, so the card resumes.
 struct MandarinPracticeRecord: Codable, Equatable {
     var fixesSeen = 0
     var recalled: [String: Bool] = [:]
@@ -34,6 +35,8 @@ struct MandarinPracticeRecord: Codable, Equatable {
     var madeYours: Set<String> = []
     var answeredText: String?
     var result: MandarinAnswerResponse?
+    var againText: String?
+    var againResult: MandarinAnswerResponse?
 
     init() {}
 
@@ -45,6 +48,8 @@ struct MandarinPracticeRecord: Codable, Equatable {
         madeYours = (try? c.decodeIfPresent(Set<String>.self, forKey: .madeYours)) ?? []
         answeredText = try? c.decodeIfPresent(String.self, forKey: .answeredText)
         result = try? c.decodeIfPresent(MandarinAnswerResponse.self, forKey: .result)
+        againText = try? c.decodeIfPresent(String.self, forKey: .againText)
+        againResult = try? c.decodeIfPresent(MandarinAnswerResponse.self, forKey: .againResult)
     }
 }
 
@@ -70,7 +75,7 @@ struct MandarinPracticeStore {
 
 /// One day's Mandarin card: fix yesterday's slips, recall due phrases (Got it / Again), make each cue
 /// yours (say its example, then two versions about his week, checked), talk (answer the question,
-/// cues on hand), and the takeaways that come back seconds after answering.
+/// cues on hand), the takeaways that come back seconds after answering, and telling it again without them.
 /// Recalls and answers count only once the server has them; a failure leaves the step where it was.
 @MainActor
 @Observable
@@ -99,7 +104,7 @@ final class MandarinPractice {
     @ObservationIgnored private let server: URL
     @ObservationIgnored private let client: (any MandarinPracticeClient)?
     @ObservationIgnored private let store: MandarinPracticeStore
-    @ObservationIgnored private var lastAttempt: (text: String, question: String?)?
+    @ObservationIgnored private var lastAttempt: (text: String, question: String?, again: Bool)?
 
     init(card: DeckCard, date: String, server: URL, client: (any MandarinPracticeClient)?,
          store: MandarinPracticeStore = MandarinPracticeStore()) {
@@ -138,6 +143,14 @@ final class MandarinPractice {
     var currentRecall: DeckPhrase? { card.recall.first { record.recalled[$0.hanzi] == nil } }
 
     var result: MandarinAnswerResponse? { record.result }
+    var againText: String? { record.againText }
+    var againResult: MandarinAnswerResponse? { record.againResult }
+
+    /// The card's cues he said in either telling.
+    var usedCues: [String] {
+        let again = record.againResult?.used ?? []
+        return (record.result?.used ?? []) + again.filter { !(record.result?.used ?? []).contains($0) }
+    }
 
     /// The cues with an example sentence to make his own.
     var yoursCues: [DeckPhrase] { card.phrases.filter { $0.example != nil } }
@@ -223,12 +236,14 @@ final class MandarinPractice {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let client, !text.isEmpty, answering != .waiting else { return }
         guard text != record.answeredText || record.result?.feedback == nil else { return }
-        lastAttempt = (text, question)
+        lastAttempt = (text, question, false)
         answering = .waiting
         do {
             let response = try await client.answer(MandarinAnswerRequest(date: date, text: text, question: question))
             record.answeredText = text
             record.result = response
+            record.againText = nil
+            record.againResult = nil
             progress = response.progress ?? progress
             save()
             answering = .idle
@@ -237,8 +252,34 @@ final class MandarinPractice {
         }
     }
 
-    /// Try again: the last answer sent, or the one that came back without feedback.
+    /// His second telling, after reading the first one's feedback, sent with its own feedback coming
+    /// back beside the first. Returns whether the server has it, so the mic keeps his words when not.
+    @discardableResult
+    func tellAgain(_ text: String) async -> Bool {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let client, !text.isEmpty, answering != .waiting, record.result?.feedback != nil else { return false }
+        lastAttempt = (text, nil, true)
+        answering = .waiting
+        do {
+            let response = try await client.answer(MandarinAnswerRequest(date: date, text: text, question: nil, again: true))
+            record.againText = text
+            record.againResult = response
+            progress = response.progress ?? progress
+            save()
+            answering = .idle
+            return true
+        } catch {
+            answering = .failed("Couldn't reach the server. Try again.")
+            return false
+        }
+    }
+
+    /// Try again: the last telling sent, or the one that came back without feedback.
     func retry() async {
+        if let lastAttempt, lastAttempt.again {
+            await tellAgain(lastAttempt.text)
+            return
+        }
         guard let text = lastAttempt?.text ?? record.answeredText else { return }
         await submit(text, question: lastAttempt?.question)
     }
