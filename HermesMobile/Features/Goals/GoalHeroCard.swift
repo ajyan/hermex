@@ -48,7 +48,8 @@ struct GoalHeroCard: View {
             if !goal.week.commitments.isEmpty {
                 VStack(alignment: .leading, spacing: BrainStyle.s) {
                     ForEach(goal.week.commitments) { row in
-                        GoalCommitmentWeek(row: row, atRisk: goal.flags.missTwice.contains(row.id), paper: palette.colors)
+                        GoalCommitmentWeek(row: row, atRisk: goal.flags.missTwice.contains(row.id), paper: palette.colors,
+                                           today: today ?? selection?.today)
                     }
                 }
             }
@@ -64,9 +65,11 @@ struct GoalCommitmentWeek: View {
     let row: GoalCommitmentProgress
     let atRisk: Bool
     let paper: HermexPaper
+    /// The server's today, so today's and yesterday's dots follow a tap at once.
+    var today: String?
 
     var body: some View {
-        let pips = GoalPips(row, name: GoalsCopy.shortName(row.action))
+        let pips = GoalPips(row, name: GoalsCopy.shortName(row.action), today: today)
         VStack(alignment: .leading, spacing: BrainStyle.xs) {
             HStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 1) {
@@ -106,18 +109,21 @@ struct GoalAtRiskChip: View {
     }
 }
 
-/// A commitment's week as the Brief's pips (`DeckDot`): one per day of its target, filled once
-/// done (the 2-minute version too), then its skip budget, half-filled for a skip taken and
-/// dashed for one still left. An item commitment has a pip per item of its target.
+/// A commitment's week as the Brief's dots (`DeckDot`). A day commitment is the week as days,
+/// Mon–Sun as the server sends it, with today and yesterday following the row's check-ins so a
+/// tap shows at once; from a server without those days, a pip per day of its target, then its
+/// skip budget, half-filled for a skip taken and dashed for one still left. An item commitment
+/// has a pip per item of its target.
 struct GoalPips: Equatable {
     /// `DeckDot` states, left to right.
     let states: [String]
-    /// The small count beside the pips: "3 of 6".
+    /// The small count beside the dots: "3 of 6", and the skips left: "3 of 6 · 1 skip".
     let count: String
     /// "Stretch: 3 of 6 days, 1 skip left".
     let spoken: String
 
-    init(_ row: GoalCommitmentProgress, name: String) {
+    /// `today` is the server's today, for the live today and yesterday dots.
+    init(_ row: GoalCommitmentProgress, name: String, today: String? = nil) {
         if row.isItem {
             let done = row.done
             states = (0..<max(row.target, done)).map { $0 < done ? "done" : "missed" }
@@ -127,11 +133,31 @@ struct GoalPips: Equatable {
             let shown = row.done + row.min
             let used = min(row.skipped, row.skips)
             let left = max(0, row.skips - row.skipped)
-            states = (0..<max(row.target, shown)).map { $0 < shown ? "done" : "missed" }
-                + Array(repeating: "skip", count: used) + Array(repeating: "ahead", count: left)
-            count = "\(shown) of \(row.target)"
+            if row.weekDays.count == 7 {
+                states = Self.weekStates(row, today: today)
+                count = "\(shown) of \(row.target)" + (left == 0 ? "" : left == 1 ? " · 1 skip" : " · \(left) skips")
+            } else {
+                states = (0..<max(row.target, shown)).map { $0 < shown ? "done" : "missed" }
+                    + Array(repeating: "skip", count: used) + Array(repeating: "ahead", count: left)
+                count = "\(shown) of \(row.target)"
+            }
             let skips = row.skips == 0 ? "" : left == 1 ? ", 1 skip left" : ", \(left) skips left"
             spoken = "\(name): \(shown) of \(row.target) day\(row.target == 1 ? "" : "s")\(skips)"
+        }
+    }
+
+    /// The server's Mon–Sun, with today and yesterday read from the row's own check-ins (which an
+    /// optimistic tap updates) the way the Brief's live rows read them.
+    static func weekStates(_ row: GoalCommitmentProgress, today: String?) -> [String] {
+        guard let today, let index = row.weekDays.firstIndex(where: { $0.date == today }) else {
+            return row.weekDays.map(\.state)
+        }
+        let yesterday = index > 0 ? row.weekDays[index - 1].date : ""
+        return row.weekDays.map { day in
+            guard day.date == today || day.date == yesterday else { return day.state }
+            let status = row.effectiveStatus(day.date, today: today, yesterday: yesterday)
+            if status == nil, day.state == "off" { return "off" }
+            return DeckRowCheckIn.liveState(status, isToday: day.date == today, deckState: day.state)
         }
     }
 

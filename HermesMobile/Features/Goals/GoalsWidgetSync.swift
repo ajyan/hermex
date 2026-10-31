@@ -21,7 +21,9 @@ extension AtlasWidgetGoals {
                             weekCount: c.done + c.min,
                             target: c.target,
                             isDone: c.effectiveStatus(home.today, today: home.today, yesterday: home.yesterday)?.isShown == true,
-                            sourceCounted: c.sourceDays.contains(home.today)
+                            sourceCounted: c.sourceDays.contains(home.today),
+                            days: c.weekDays.count == 7 ? GoalPips.weekStates(c, today: home.today) : nil,
+                            todayIndex: c.weekDays.firstIndex { $0.date == home.today }
                         )
                     }
             }
