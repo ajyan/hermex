@@ -19,15 +19,15 @@ enum BrainReaderLayout {
     /// The line under a page's title. A page whose date the server labels (a wiki page) says
     /// how long ago: "Concept · updated 3 wk ago", "Source · added today"; any other page
     /// keeps `metaLine(kind:date:)`.
-    static func metaLine(for item: BrainItem, today: Date = Date(), calendar: Calendar = .current,
-                         locale: Locale = .current) -> String {
+    /// A hub says so instead of its kind: "Hub · 8 pages · updated 3 wk ago".
+    static func metaLine(for item: BrainItem, hubPageCount: Int = 0, today: Date = Date(),
+                         calendar: Calendar = .current, locale: Locale = .current) -> String {
+        let kind = hubPageCount > 0 ? "Hub · \(hubPageCount) pages" : metaLine(kind: item.kind, date: "", locale: locale)
         guard !item.dateLabel.isEmpty, let age = BrainListLayout.age(item.date, today: today, calendar: calendar) else {
-            return metaLine(kind: item.kind, date: item.date, locale: locale)
+            return hubPageCount > 0 ? kind : metaLine(kind: item.kind, date: item.date, locale: locale)
         }
         let when = age == "today" ? "\(item.dateLabel) today" : "\(item.dateLabel) \(age) ago"
-        return [metaLine(kind: item.kind, date: "", locale: locale), when]
-            .filter { !$0.isEmpty }
-            .joined(separator: " · ")
+        return [kind, when].filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
     /// Reader tag chips without the ingest-channel tags every article or video carries.
@@ -93,6 +93,8 @@ struct BrainReaderView: View {
     @State private var stepEdge: Edge = .trailing
     /// Bumped when the pager's next page couldn't load; plays an error haptic.
     @State private var failedSteps = 0
+    /// The hub's page list, opened from the pager.
+    @State private var showsHubPages = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Good/not-good on the page; shown only where the server has labels.
     @State private var labels: LabelsViewModel
@@ -103,13 +105,14 @@ struct BrainReaderView: View {
     private let opened: (module: BrainModuleID, id: String)
     private let focusIdea: Int?
 
-    init(module: BrainModuleID, id: String, server: URL, modelContext: ModelContext,
+    /// `hub` keeps the page in the hub it was opened from (its trail and pager).
+    init(module: BrainModuleID, id: String, hub: String? = nil, server: URL, modelContext: ModelContext,
          onAPIError: @escaping (Error) -> Void, push: @escaping (BrainRoute) -> Void,
          focusIdea: Int? = nil) {
         let client = APIClientBrainAdapter(apiClient: APIClient(baseURL: server))
         let cache = BrainCacheHandle(server: server, context: modelContext)
         _viewModel = State(initialValue: BrainPageViewModel(
-            module: module, id: id, client: client, cache: cache, onAPIError: onAPIError))
+            module: module, id: id, hub: hub, client: client, cache: cache, onAPIError: onAPIError))
         _labels = State(initialValue: LabelsViewModel(client: APIClientLabelsAdapter(apiClient: APIClient(baseURL: server))))
         self.push = push
         self.opened = (module, id)
@@ -129,9 +132,14 @@ struct BrainReaderView: View {
             .background(Color.hxCanvas.ignoresSafeArea())
             .safeAreaInset(edge: .bottom) {
                 if let hub = viewModel.page?.hub, BrainConnectionsLayout.showsPager(hub) {
-                    BrainHubPager(hub: hub, onStep: step)
+                    BrainHubPager(hub: hub, onStep: step, onShowPages: { showsHubPages = true })
                         .padding(.horizontal, BrainStyle.l)
                         .padding(.bottom, BrainStyle.s)
+                }
+            }
+            .sheet(isPresented: $showsHubPages) {
+                if let hub = viewModel.page?.hub {
+                    BrainHubPagesSheet(hub: hub, currentID: viewModel.id, onPick: jump)
                 }
             }
             .task(id: viewModel.id) {
@@ -159,13 +167,24 @@ struct BrainReaderView: View {
         guard let hub = viewModel.page?.hub,
               let target = direction < 0 ? hub.prev : hub.next
         else { return }
+        move(to: target, in: hub, from: direction < 0 ? .leading : .trailing)
+    }
+
+    /// Moves to a page picked from the hub's list, sliding in from the side it sits on.
+    private func jump(to target: BrainRef) {
+        guard let hub = viewModel.page?.hub else { return }
+        let before = (hub.pages.firstIndex { $0.id == target.id } ?? 0) < (hub.index ?? 0)
+        move(to: target, in: hub, from: before ? .leading : .trailing)
+    }
+
+    private func move(to target: BrainRef, in hub: BrainHubContext, from edge: Edge) {
         let current = viewModel
         stepTask?.cancel()
         stepTask = Task {
             let next = await current.loadedSibling(module: target.module, id: target.id, hub: hub.ref.id)
             guard !Task.isCancelled else { return }
             guard let next else { failedSteps += 1; return }
-            stepEdge = direction < 0 ? .leading : .trailing
+            stepEdge = edge
             withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) { viewModel = next }
         }
     }
@@ -228,6 +247,8 @@ struct BrainReaderContent: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Built once per page: the line under the title.
     private let meta: String
+    /// Built once per page: a hub's own pages (In this hub).
+    private let hubPages: [BrainRef]
     /// Articles and video notes in the summary outline read as a digest.
     private let digest: BrainArticleDigest?
     /// Built once per page: the linked-page cards.
@@ -240,6 +261,7 @@ struct BrainReaderContent: View {
     private let unlinkedRefs: [BrainRef]
     private let unlinkedTotal: Int
     @State private var showsAllBacklinks = false
+    @State private var showsAllHubPages = false
     /// The page's diagram sheet, while open.
     @State private var showsDiagram = false
 
@@ -253,7 +275,8 @@ struct BrainReaderContent: View {
         self.onStep = onStep
         self.rating = rating
         self.focusIdea = focusIdea
-        self.meta = BrainReaderLayout.metaLine(for: page.item)
+        self.hubPages = BrainConnectionsLayout.hubPages(page)
+        self.meta = BrainReaderLayout.metaLine(for: page.item, hubPageCount: hubPages.count)
         self.digest = BrainReaderLayout.digest(for: page)
         self.linkCards = BrainConnectionsLayout.linkCards(page)
         self.person = person
@@ -310,6 +333,9 @@ struct BrainReaderContent: View {
                             .accessibilityHint(Text(verbatim: diagram.isMap ? "Opens the piece's parts and argument, step by step"
                                                     : "Opens an interactive diagram"))
                     }
+                }
+                if !hubPages.isEmpty {
+                    hubPagesSection
                 }
                 if let person {
                     // Outside the body's hub swipe, so paging the timeline never pages the hub.
@@ -463,6 +489,20 @@ struct BrainReaderContent: View {
         }
     }
 
+    /// A hub's own pages, in pager order: the first few, then "Show all N". Each opens in this
+    /// hub, so its trail and pager stay here.
+    private var hubPagesSection: some View {
+        let shown = showsAllHubPages ? hubPages : Array(hubPages.prefix(BrainConnectionsLayout.hubPreviewCount))
+        return BrainReaderRefSection(
+            title: "In this hub",
+            count: hubPages.count,
+            rows: shown.map { BrainReaderRefSection.Row(ref: $0, subtitle: $0.snippet) },
+            showAllTitle: hubPages.count > shown.count ? BrainReaderLayout.showAllTitle(hubPages.count) : nil,
+            onShowAll: { showsAllHubPages = true },
+            route: { .pageInHub($0.module, $0.id, hub: page.item.id) }
+        )
+    }
+
     @ViewBuilder
     private var furtherReading: some View {
         if !page.further.isEmpty {
@@ -521,6 +561,8 @@ struct BrainReaderRefSection: View {
     let rows: [Row]
     var showAllTitle: String?
     var onShowAll: () -> Void = {}
+    /// Where a row goes; a plain page unless the section says otherwise.
+    var route: (BrainRef) -> BrainRoute = { .page($0.module, $0.id) }
     /// The separator starts where the row's text does (thumbnail plus spacing).
     @ScaledMetric(relativeTo: .body) private var separatorInset = BrainStyle.searchThumbnailSize + BrainStyle.m
 
@@ -531,7 +573,7 @@ struct BrainReaderRefSection: View {
                 // A section's rows never reorder ("Show all" only appends), so position is a stable id.
                 ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
                     if index > 0 { separator }
-                    NavigationLink(value: ShellPushDestination.brainRoute(.page(row.ref.module, row.ref.id))) {
+                    NavigationLink(value: ShellPushDestination.brainRoute(route(row.ref))) {
                         HStack(spacing: BrainStyle.s) {
                             BrainSearchResultRow(ref: row.ref, subtitle: row.subtitle)
                             Image(systemName: "chevron.right")

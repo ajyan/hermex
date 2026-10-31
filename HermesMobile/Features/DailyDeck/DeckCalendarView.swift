@@ -69,6 +69,9 @@ struct DeckCalendarView: View {
     @State private var journalDays: Set<String> = []
     @State private var isLoading = false
     @State private var path = NavigationPath()
+    /// The month's weekly reviews, folded under the month's own review until opened.
+    @State private var weeksOpen = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(viewModel: DailyDeckViewModel, weeks: WeeksModel?, openDeck: @escaping (String, String) -> Void) {
         self.viewModel = viewModel
@@ -194,33 +197,82 @@ struct DeckCalendarView: View {
         .accessibilityLabel(Text(verbatim: accessibilityLabel(key, hasEntry: hasEntry, hasDeck: hasDeck)))
     }
 
-    /// This month's reviews: each week that ends in it, and the month itself.
+    /// This month's reviews as one group: the month's own review on top, then its weekly reviews folded
+    /// under a "Weekly reviews · 4" row that opens and closes them.
     @ViewBuilder
     private var reviewList: some View {
         let prefix = String(format: "%04d-%02d", year, month)
         let here = viewModel.reviews.filter { $0.date.hasPrefix(prefix) }
+        let monthly = here.first { $0.kind == "monthly" }
+        let weekly = here.filter { $0.kind == "weekly" }
         if !here.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Text(verbatim: "Reviews").font(AppFont.headline())
-                ForEach(here) { review in
-                    let route = DeckCalendarRoute.for(review: review, records: weeks?.recordDates ?? [])
-                    let sealed = route == .weekPage(review.date)
-                    // A weekly whose answers were saved but never sealed still waits.
-                    let filed = review.isFiled && !(review.kind == "weekly" && weeks?.unfiledDecks.contains(review.date) == true)
-                    Button { go(route) } label: {
-                        row(symbol: review.kind == "weekly" ? "calendar.badge.clock" : "calendar", title: review.label,
-                            status: sealed ? ("Sealed", "checkmark.seal") : filed ? ("Filed", "checkmark") : nil)
+                VStack(spacing: 0) {
+                    if let monthly {
+                        reviewButton(monthly)
                     }
-                    .buttonStyle(.plain)
+                    if !weekly.isEmpty, monthly == nil {
+                        // No month's review yet (the month is still going): the weeks are the list.
+                        ForEach(Array(weekly.enumerated()), id: \.element.id) { index, review in
+                            if index > 0 { Divider().padding(.leading, 14) }
+                            reviewButton(review)
+                        }
+                    } else if !weekly.isEmpty {
+                        Divider().padding(.leading, 14)
+                        Button {
+                            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { weeksOpen.toggle() }
+                        } label: {
+                            HStack {
+                                Image(systemName: "calendar.badge.clock").foregroundStyle(Color.accentColor)
+                                Text(verbatim: "Weekly reviews").foregroundStyle(.primary)
+                                Text(verbatim: "\(weekly.count)").foregroundStyle(.secondary).monospacedDigit()
+                                Spacer()
+                                Image(systemName: "chevron.down")
+                                    .font(AppFont.footnote(weight: .semibold))
+                                    .foregroundStyle(.tertiary)
+                                    .rotationEffect(.degrees(weeksOpen ? 0 : -90))
+                            }
+                            .font(AppFont.body())
+                            .padding(.horizontal, 14)
+                            .frame(minHeight: 48)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(Text(verbatim: "Weekly reviews, \(weekly.count)"))
+                        .accessibilityValue(Text(verbatim: weeksOpen ? "Expanded" : "Collapsed"))
+                        .accessibilityHint(Text(verbatim: weeksOpen ? "Hides the weekly reviews" : "Shows the weekly reviews"))
+                        if weeksOpen {
+                            ForEach(weekly) { review in
+                                Divider().padding(.leading, 40)
+                                reviewButton(review).padding(.leading, 26)
+                            }
+                        }
+                    }
                 }
+                .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 8)
         }
     }
 
+    /// One review's row: it opens the review, or a sealed week's page.
+    private func reviewButton(_ review: DeckReview) -> some View {
+        let route = DeckCalendarRoute.for(review: review, records: weeks?.recordDates ?? [])
+        let sealed = route == .weekPage(review.date)
+        // A weekly whose answers were saved but never sealed still waits.
+        let filed = review.isFiled && !(review.kind == "weekly" && weeks?.unfiledDecks.contains(review.date) == true)
+        return Button { go(route) } label: {
+            row(symbol: review.kind == "weekly" ? "calendar.badge.clock" : "calendar", title: review.label,
+                status: sealed ? ("Sealed", "checkmark.seal") : filed ? ("Filed", "checkmark") : nil, framed: false)
+        }
+        .buttonStyle(.plain)
+    }
+
     /// A tappable row: a review, or the way into the year of weeks.
-    private func row(symbol: String, title: String, status: (label: String, symbol: String)? = nil) -> some View {
+    private func row(symbol: String, title: String, status: (label: String, symbol: String)? = nil,
+                     framed: Bool = true) -> some View {
         HStack {
             Image(systemName: symbol)
                 .foregroundStyle(Color.accentColor)
@@ -236,7 +288,8 @@ struct DeckCalendarView: View {
         .font(AppFont.body())
         .padding(.horizontal, 14)
         .frame(minHeight: 48)
-        .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .contentShape(Rectangle())
+        .background(framed ? Color.hxSurface : Color.clear, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
     }
 
     /// A sealed week pushes its page; anything else closes the calendar and opens the deck.

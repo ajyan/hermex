@@ -201,15 +201,20 @@ struct BrainHubContext: Codable, Hashable, Sendable {
     let count: Int
     let prev: BrainRef?
     let next: BrainRef?
+    /// Every page in the hub, in pager order (each with its gist as the snippet); empty from
+    /// an older server.
+    let pages: [BrainRef]
 
-    private enum CodingKeys: String, CodingKey { case ref, index, count, prev, next }
+    private enum CodingKeys: String, CodingKey { case ref, index, count, prev, next, pages }
 
-    init(ref: BrainRef, index: Int? = nil, count: Int = 0, prev: BrainRef? = nil, next: BrainRef? = nil) {
+    init(ref: BrainRef, index: Int? = nil, count: Int = 0, prev: BrainRef? = nil, next: BrainRef? = nil,
+         pages: [BrainRef] = []) {
         self.ref = ref
         self.index = index
         self.count = count
         self.prev = prev
         self.next = next
+        self.pages = pages
     }
 
     init(from decoder: Decoder) throws {
@@ -219,6 +224,7 @@ struct BrainHubContext: Codable, Hashable, Sendable {
         count = c.int(.count)
         prev = c.optional(BrainRef.self, .prev)
         next = c.optional(BrainRef.self, .next)
+        pages = c.lossy(BrainRef.self, .pages)
     }
 }
 
@@ -403,6 +409,8 @@ struct BrainPage: Codable, Hashable, Sendable {
     let unlinkedCount: Int
     /// The page's place in its parent hub, for the trail and the pager.
     let hub: BrainHubContext?
+    /// When this page is a hub: its pages, in pager order. Empty otherwise.
+    let hubPages: [BrainRef]
     /// People pages only: the structured encounters/profile view; nil for other pages or older servers.
     let person: BrainPerson?
     /// The page's interactive diagram from the vault (`diagrams/index.json`); nil for most pages and older servers.
@@ -410,14 +418,14 @@ struct BrainPage: Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case item, content, links, backlinks, further, prev, next, highlights, facts, unlinked, hub, unlinkedCount, person
-        case diagram
+        case diagram, hubPages
     }
 
     init(item: BrainItem, content: String = "", links: [BrainRef] = [], backlinks: [BrainRef] = [],
          further: [BrainRef] = [], prev: BrainRef? = nil, next: BrainRef? = nil,
          highlights: [BrainHighlight] = [], facts: [BrainFact] = [], unlinked: [BrainRef] = [],
          unlinkedCount: Int? = nil, hub: BrainHubContext? = nil, person: BrainPerson? = nil,
-         diagram: BrainDiagram? = nil) {
+         diagram: BrainDiagram? = nil, hubPages: [BrainRef] = []) {
         self.item = item
         self.content = content
         self.links = links
@@ -432,6 +440,7 @@ struct BrainPage: Codable, Hashable, Sendable {
         self.hub = hub
         self.person = person
         self.diagram = diagram
+        self.hubPages = hubPages
     }
 
     init(from decoder: Decoder) throws {
@@ -451,6 +460,7 @@ struct BrainPage: Codable, Hashable, Sendable {
         hub = c.optional(BrainHubContext.self, .hub)
         person = c.optional(BrainPerson.self, .person)
         diagram = c.optional(BrainDiagram.self, .diagram)
+        hubPages = c.lossy(BrainRef.self, .hubPages)
     }
 }
 
@@ -745,6 +755,8 @@ enum BrainRoute: Hashable, Sendable {
     case module(BrainModuleID)
     /// One page, by module and item id.
     case page(BrainModuleID, String)
+    /// One page opened from its hub's list, so its trail and pager stay in that hub.
+    case pageInHub(BrainModuleID, String, hub: String)
     /// One page opened from a review bite; `idea` is the key idea the bite came from,
     /// which the article digest opens expanded and scrolled into view.
     case bite(BrainModuleID, String, idea: Int?)
