@@ -432,6 +432,25 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertTrue(controller.isFinished)
     }
 
+    func testALookupSaysLetMeCheckAtOnceAndStillWorkingLater() async {
+        await controller.start()
+        await say("what did I write about the taper")
+        clock += 2
+        update(tool: "terminal")
+        XCTAssertEqual(speaker.spoken, [VoiceCallPhrases.checking])
+        update(tool: nil)
+        update(tool: "read_file")
+        XCTAssertEqual(speaker.spoken, [VoiceCallPhrases.checking])  // once per turn
+
+        // No "One moment" at the usual delay; "Still working on it" comes on the usual interval.
+        clock += VoiceCallTiming.holdOnDelay
+        controller.tick()
+        XCTAssertEqual(speaker.spoken, [VoiceCallPhrases.checking])
+        clock += VoiceCallTiming.stillWorkingInterval
+        controller.tick()
+        XCTAssertEqual(speaker.spoken, [VoiceCallPhrases.checking, VoiceCallPhrases.stillWorking])
+    }
+
     func testReplyCutMidSentenceAtRunEndIsCompletedWhenTheFullTextLands() async {
         await startSpeaking()
         let cut = "An octopus has three hearts, and its blood is blue because it uses copper to carry oxygen instead of"
