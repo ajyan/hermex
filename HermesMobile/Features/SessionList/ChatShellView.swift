@@ -536,7 +536,10 @@ struct ChatShellView: View {
         .environment(\.coveredChatStream, coveredChat)
         .onChange(of: navigation.path) { coveredChat.isCovered = !navigation.path.isEmpty }
         // A new root rebuilds the stack, so a chat kept live under a pushed screen is gone.
-        .onChange(of: navigation.rootRevision) { coveredChat.suspendHeld() }
+        .onChange(of: navigation.rootRevision) {
+            coveredChat.suspendHeld()
+            VoiceCallDiagnostics.write("chat root replaced (revision \(navigation.rootRevision))")
+        }
         // Pushed screens (the Daily Brief's open cards) open Brain pages too.
         .environment(\.openBrainRoute, brainRouteOpener)
         .environment(\.openDraftChat, draftChatOpener)

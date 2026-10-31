@@ -413,63 +413,23 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(chat.sent, [tag + "Explain how Tailscale works in detail."])
     }
 
-    func testSilentListeningSaysIDidntCatchThatOnceThenRearms() async {
+    func testSilenceAndNoiseNeverPromptAndAForgottenCallHangsUp() async {
         await controller.start()
-        clock += VoiceCallTiming.noSpeechTimeout - 1
+        // Noise the level meter calls speech, with no words, is never answered.
+        voice(true, for: 0.6)
+        voice(false, for: 0.9)
+        clock += 60
         controller.tick()
         XCTAssertTrue(speaker.spoken.isEmpty)
-        clock += 1
-        controller.tick()
-        XCTAssertEqual(speaker.spoken, [VoiceCallPhrases.didntCatch])
-        controller.tick()
-        XCTAssertEqual(speaker.spoken.count, 1)
-        speaker.drain()
         XCTAssertEqual(controller.state, .listening)
-        clock += VoiceCallTiming.noSpeechTimeout
-        controller.tick()
-        XCTAssertEqual(speaker.spoken.count, 2)
-    }
 
-    /// Lets one no-speech timeout pass and plays out whatever the call said.
-    private func sitSilentThroughNoSpeechTimeout() {
-        clock += VoiceCallTiming.noSpeechTimeout
-        controller.tick()
-        speaker.drain()
-    }
-
-    func testForgottenCallHangsUpAfterUnansweredNoSpeechPrompts() async {
-        await controller.start()
-        for _ in 0..<VoiceCallTiming.noSpeechPromptsBeforeHangUp {
-            sitSilentThroughNoSpeechTimeout()
-        }
-        XCTAssertEqual(controller.state, .listening)
-        XCTAssertEqual(bridge.endCount, 0)
-
-        clock += VoiceCallTiming.noSpeechTimeout
+        clock += VoiceCallTiming.silentHangUp
         controller.tick()
         XCTAssertEqual(controller.state, .ended(VoiceCallPhrases.hangingUpNoSpeech))
-        XCTAssertEqual(speaker.spoken.last, VoiceCallPhrases.hangingUpNoSpeech + ".")
-        XCTAssertEqual(listener.stopCount, 1)
+        XCTAssertEqual(speaker.spoken, [VoiceCallPhrases.hangingUpNoSpeech + "."])
         speaker.drain()
         XCTAssertEqual(bridge.endCount, 1)
         XCTAssertTrue(controller.isFinished)
-    }
-
-    func testSpeakingResetsTheNoSpeechHangUpCount() async {
-        await controller.start()
-        for _ in 0..<VoiceCallTiming.noSpeechPromptsBeforeHangUp {
-            sitSilentThroughNoSpeechTimeout()
-        }
-        // A mumble too short to send still counts as someone being there.
-        voice(true, for: 0.6)
-        listener.onPartial?("um")
-        listener.onFinal?("")
-        voice(false, for: 0.9)
-        XCTAssertTrue(chat.sent.isEmpty)
-        // The user spoke, so the next silence prompts again instead of hanging up.
-        sitSilentThroughNoSpeechTimeout()
-        XCTAssertEqual(speaker.spoken.last, VoiceCallPhrases.didntCatch)
-        XCTAssertEqual(bridge.endCount, 0)
     }
 
     func testReplyCutMidSentenceAtRunEndIsCompletedWhenTheFullTextLands() async {
@@ -547,12 +507,107 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertNil(controller.lastSentTurn)
     }
 
-    func testNoSecondSendWhileThinking() async {
+    func testWordsAddedBeforeTheReplyReopenTheTurn() async {
+        await controller.start()
+        await say("tell me an interesting fact")
+        XCTAssertEqual(controller.state, .thinking)
+
+        voice(true, for: 0.4)
+        listener.onPartial?("about the Welsh flag")
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.cancelCount, 1)
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertEqual(controller.partialTranscript, "tell me an interesting fact about the Welsh flag")
+
+        listener.onFinal?("about the Welsh flag.")
+        voice(false, for: 0.9)
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.sent, [
+            tag + "tell me an interesting fact",
+            tag + "tell me an interesting fact about the Welsh flag.",
+        ])
+        XCTAssertEqual(chat.cancelCount, 1)
+    }
+
+    func testSpeechStartingLongAfterTheSendIsTheRoomNotMoreOfTheTurn() async {
+        await controller.start()
+        await say("find me an article")
+        clock += VoiceCallTiming.continuationWindow + 1
+        voice(true, for: 0.4)
+        listener.onPartial?("put your finger on the screen")
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.cancelCount, 0)
+        XCTAssertEqual(controller.state, .thinking)
+    }
+
+    func testOneStrayWordWhileThinkingKeepsTheTurn() async {
         await controller.start()
         await say("hello")
-        await say("are you there")
+        listener.onPartial?("so")
+        await controller.lastChatTask?.value
         XCTAssertEqual(chat.sent, [tag + "hello"])
+        XCTAssertEqual(chat.cancelCount, 0)
         XCTAssertEqual(controller.state, .thinking)
+    }
+
+    func testTheRecognizerFinishingTheSentTurnDoesNotReopenIt() async {
+        await controller.start()
+        voice(true, for: 0.6)
+        listener.onPartial?("Hi can you rec")
+        controller.performTapAction()
+        await controller.lastChatTask?.value
+        listener.onFinal?("Hi, can you recall my journal?")
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.cancelCount, 0)
+        XCTAssertEqual(controller.state, .thinking)
+    }
+
+    func testWaitWhileThinkingTakesTheTurnBackUntilThereIsMore() async {
+        await controller.start()
+        await say("what should I cook")
+        listener.onPartial?("wait")
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.cancelCount, 1)
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertEqual(controller.partialTranscript, "what should I cook")
+        voice(true, for: 0.3)
+        listener.onFinal?("Wait.")
+        XCTAssertEqual(controller.partialTranscript, "what should I cook")
+
+        // Nothing more yet: the turn waits instead of going straight back.
+        clock += VoiceCallTiming.finalTranscriptSettle + 1
+        controller.tick()
+        XCTAssertEqual(chat.sent.count, 1)
+
+        voice(true, for: 0.4)
+        listener.onFinal?("for dinner tonight")
+        voice(false, for: 0.9)
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.sent.last, tag + "what should I cook for dinner tonight")
+    }
+
+    func testWaitWithNothingAddedSendsTheTurnAgainLater() async {
+        await controller.start()
+        await say("what should I cook")
+        listener.onPartial?("hold on")
+        clock += VoiceCallTiming.waitForMore
+        controller.tick()
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.sent, [tag + "what should I cook", tag + "what should I cook"])
+    }
+
+    func testStopWhileThinkingDropsTheTurn() async {
+        await controller.start()
+        await say("delete everything")
+        listener.onFinal?("Stop.")
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.cancelCount, 1)
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertEqual(controller.partialTranscript, "")
+        XCTAssertNil(controller.lastSentTurn)
+        clock += 5
+        controller.tick()
+        XCTAssertEqual(chat.sent, [tag + "delete everything"])
     }
 
     func testBargeInStopsSpeakerAndCancelsOnce() async {
@@ -606,8 +661,8 @@ final class VoiceCallControllerTests: XCTestCase {
         // The abandoned reply isn't spoken, and the next turn sends normally.
         update(text: "First sentence. Second sentence. Third.")
         XCTAssertEqual(speaker.spoken, ["First sentence."])
-        await say("never mind")
-        XCTAssertEqual(chat.sent, [tag + "hello", tag + "never mind"])
+        await say("go on then")
+        XCTAssertEqual(chat.sent, [tag + "hello", tag + "go on then"])
     }
 
     func testTapInterruptAfterTheRunFinishedDoesNotCancel() async {
@@ -629,13 +684,57 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(chat.cancelCount, 0)
     }
 
-    func testStopWordAloneInterrupts() async {
+    func testStopSilencesAtlasAndIsNeverSent() async {
         await startSpeaking()
         voice(true, for: 0.3)
         listener.onPartial?("stop")
         await controller.lastChatTask?.value
         XCTAssertEqual(speaker.stopCount, 1)
+        XCTAssertEqual(chat.cancelCount, 1)
         XCTAssertEqual(controller.state, .listening)
+        XCTAssertEqual(controller.partialTranscript, "")
+
+        // The recognizer's final for the same word is dropped too.
+        listener.onFinal?("Stop.")
+        voice(false, for: 0.9)
+        clock += 2
+        controller.tick()
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.sent, [tag + "hello"])
+    }
+
+    func testStopOrWaitAloneWhileListeningIsNotSent() async {
+        await controller.start()
+        await say("Okay, wait.")
+        await say("Never mind.")
+        XCTAssertTrue(chat.sent.isEmpty)
+        XCTAssertEqual(controller.state, .listening)
+        await say("wait for the rain to stop")
+        XCTAssertEqual(chat.sent, [tag + "wait for the rain to stop"])
+    }
+
+    func testOneNewWordInterruptsButABackchannelDoesNot() async {
+        await startSpeaking()
+        voice(true, for: 0.3)
+        listener.onPartial?("yeah")
+        XCTAssertEqual(controller.state, .speaking)
+        XCTAssertEqual(speaker.stopCount, 0)
+
+        listener.onPartial?("Actually")
+        await controller.lastChatTask?.value
+        XCTAssertEqual(speaker.stopCount, 1)
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertEqual(controller.partialTranscript, "Actually")
+    }
+
+    func testCommandsAreWholeUtterancesOnly() {
+        XCTAssertEqual(VoiceCallController.command(in: "Stop."), .stop)
+        XCTAssertEqual(VoiceCallController.command(in: "okay, never mind"), .stop)
+        XCTAssertEqual(VoiceCallController.command(in: "Hold on."), .wait)
+        XCTAssertEqual(VoiceCallController.command(in: "Wait, Atlas."), .wait)
+        XCTAssertNil(VoiceCallController.command(in: "stop the timer"))
+        XCTAssertNil(VoiceCallController.command(in: "wait what"))
+        XCTAssertNil(VoiceCallController.command(in: ""))
     }
 
     func testTurnWaitsForFinalTranscriptBeforeSending() async {
