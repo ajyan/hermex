@@ -22,6 +22,7 @@ enum VoiceCallPhrases {
     static let denied = "Denied."
     static let hangingUpNoSpeech = "I haven't heard anything, so I'm hanging up"
     static let holdOn = "One moment."
+    static let checking = "Let me check."
     static let stillWorking = "Still working on it."
 
     /// The tag before each spoken turn, carrying the phone's local time (`[voice 2:41 PM] `)
@@ -798,7 +799,10 @@ final class VoiceCallController {
     ) {
         guard !isEnded, state != .idle, state != .connecting else { return }
         if self.currentTool != currentTool {
-            if let currentTool { log("tool: \(currentTool) \(since(sentAt))") }
+            if let currentTool {
+                log("tool: \(currentTool) \(since(sentAt))")
+                sayCheckingIfFirstWait()
+            }
             self.currentTool = currentTool
         }
         if isStreaming != lastIsStreaming {
@@ -851,6 +855,17 @@ final class VoiceCallController {
         // With no text yet, the reply may still land (the transcript refresh
         // after the run); `tick` gives up after a grace period.
         if runFinished, replyStarted, !speaker.isSpeaking { finishReply() }
+    }
+
+    /// A lookup means a long wait: say so the moment it starts, as the first hold-on line, instead of
+    /// after `holdOnDelay` of silence.
+    private func sayCheckingIfFirstWait() {
+        guard state == .thinking, replyActive, !replyStarted, !isHeld, holdOnLinesSaid == 0,
+              pendingApproval == nil, let thinkingSince else { return }
+        setCue(false)
+        say(VoiceCallPhrases.checking)
+        holdOnLinesSaid = 1
+        nextHoldOnAt = now() - thinkingSince + VoiceCallTiming.stillWorkingInterval
     }
 
     /// "after 1.23s" since `start`, for the log.
