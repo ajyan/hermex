@@ -123,8 +123,8 @@ private struct GoalCheckInSection: View {
                         row: row, tint: tint,
                         isPending: model.isPending(goal.slug, .commitment(row.id)),
                         atRisk: goal.flags.missTwice.contains(row.id),
-                        onAdd: { note in await model.addItem(slug: goal.slug, commitment: row.id, note: note) },
-                        onRemoveLast: { Task { await model.removeLastItem(slug: goal.slug, commitment: row.id) } }
+                        recentDate: model.recentItemDate(slug: goal.slug, commitment: row.id),
+                        actions: model.itemActions(slug: goal.slug, commitment: row.id)
                     )
                 }
             }

@@ -28,6 +28,8 @@ final class GoalsHomeViewModel {
     /// The server's home with the taps in flight on top; `state` shows `edits.shown`.
     @ObservationIgnored private var edits: GoalPendingEdits<GoalsHome, Key>?
     @ObservationIgnored private let onChange: @MainActor (GoalsHome) -> Void
+    /// The +1 just counted, while its row offers Add note and Undo.
+    let recentItems: GoalRecentItemWindow<Key>
 
     /// New goal shows only once the server has served goals: a goal written on a server
     /// without the goals API would never appear.
@@ -38,10 +40,12 @@ final class GoalsHomeViewModel {
 
     /// `onChange` gets the server's home after each check-in lands (the widget saves it).
     init(client: GoalsDataClient, onAPIError: @escaping (Error) -> Void = { _ in },
-         onChange: @escaping @MainActor (GoalsHome) -> Void = { _ in }) {
+         onChange: @escaping @MainActor (GoalsHome) -> Void = { _ in },
+         recentItems: GoalRecentItemWindow<Key> = GoalRecentItemWindow()) {
         self.client = client
         self.onAPIError = onAPIError
         self.onChange = onChange
+        self.recentItems = recentItems
     }
 
     func load() async {
@@ -117,21 +121,46 @@ final class GoalsHomeViewModel {
     }
 
     /// Counts one more item (with its optional note) for the server's today; true once the server has it.
+    /// A +1 without a note then offers Add note and Undo for a few seconds (`recentItems`).
     @discardableResult
     func addItem(slug: String, commitment id: String, note: String?) async -> Bool {
-        await send(slug: slug, row: .commitment(id), request: {
-            .item(slug: slug, date: $0.today, asOf: $0.today, id: id, n: 1, note: note)
-        }) { goal, home in
-            GoalCheckInEdit.addItem(1, note: note, to: id, on: home.today, in: &goal)
-        }
+        let date = edits?.base.today
+        let saved = await sendItem(slug: slug, commitment: id, date: nil, n: 1, note: note)
+        if saved, note == nil, let date { recentItems.open(Self.key(slug, .commitment(id)), date: date) }
+        return saved
     }
 
     /// Takes the latest counted item back off.
     func removeLastItem(slug: String, commitment id: String) async {
+        await sendItem(slug: slug, commitment: id, date: nil, n: -1, note: nil)
+    }
+
+    /// Takes back the +1 just counted, on the day it was counted; nothing once its offer has passed.
+    func undoItem(slug: String, commitment id: String) async {
+        guard let date = recentItems.take(Self.key(slug, .commitment(id))) else { return }
+        await sendItem(slug: slug, commitment: id, date: date, n: -1, note: nil)
+    }
+
+    /// Puts `note` on the item just counted on `date`: the server can't edit a note, so it takes the
+    /// item back and counts it again with the note, showing the noted item throughout.
+    func noteItem(slug: String, commitment id: String, date: String, note: String) async -> GoalItemNoteOutcome {
+        let removed = await send(slug: slug, row: .commitment(id), request: {
+            .item(slug: slug, date: date, asOf: $0.today, id: id, n: -1, note: nil)
+        }) { goal, _ in
+            GoalCheckInEdit.addItem(-1, note: nil, to: id, on: date, in: &goal)
+            GoalCheckInEdit.addItem(1, note: note, to: id, on: date, in: &goal)
+        }
+        guard removed else { return .unchanged }
+        return await sendItem(slug: slug, commitment: id, date: date, n: 1, note: note) ? .saved : .removed
+    }
+
+    /// One +1 or -1 on an item commitment, for `date` or else the server's today.
+    @discardableResult
+    private func sendItem(slug: String, commitment id: String, date: String?, n: Int, note: String?) async -> Bool {
         await send(slug: slug, row: .commitment(id), request: {
-            .item(slug: slug, date: $0.today, asOf: $0.today, id: id, n: -1, note: nil)
+            .item(slug: slug, date: date ?? $0.today, asOf: $0.today, id: id, n: n, note: note)
         }) { goal, home in
-            GoalCheckInEdit.addItem(-1, note: nil, to: id, on: home.today, in: &goal)
+            GoalCheckInEdit.addItem(n, note: note, to: id, on: date ?? home.today, in: &goal)
         }
     }
 

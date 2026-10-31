@@ -9,6 +9,7 @@ struct GoalsHomeView: View {
     private let server: URL
     private let onNewGoal: () -> Void
     private let onOpen: (ShellPushDestination) -> Void
+    @Environment(\.colorScheme) private var colorScheme
 
     init(server: URL, onAPIError: @escaping (Error) -> Void, onNewGoal: @escaping () -> Void,
          onOpen: @escaping (ShellPushDestination) -> Void) {
@@ -112,37 +113,7 @@ struct GoalsHomeView: View {
     private func activeSection(_ home: GoalsHome) -> some View {
         VStack(alignment: .leading, spacing: BrainStyle.m) {
             ForEach(home.goals) { goal in
-                // Not a NavigationLink: its label would swallow the dots' taps and hide them from
-                // VoiceOver. The card opens on a tap anywhere else; VoiceOver reads it as one button
-                // whose actions are the check-ins.
-                let checkIn = GoalHeroCheckIn(slug: goal.slug, home: home, model: viewModel)
-                let open = { onOpen(.goal(goal.slug)) }
-                VStack(alignment: .leading, spacing: BrainStyle.s) {
-                    GoalHeroCard(goal: goal, isCompact: true, today: home.today, checkIn: checkIn)
-                        .zoomSource(for: .goal(goal.slug), cornerRadius: HXRadius.xl)
-                    if goal.finishDue {
-                        Text(verbatim: "Did you finish? Open to close it")
-                            .font(BrainStyle.meta)
-                            .foregroundStyle(GoalPaper.palette(for: goal).ink)
-                            .padding(.horizontal, BrainStyle.xs)
-                    } else if !goal.flags.escalations.isEmpty {
-                        Text(verbatim: "Needs attention: open to check in")
-                            .font(BrainStyle.meta)
-                            .foregroundStyle(GoalPaper.palette(for: goal).ink)
-                            .padding(.horizontal, BrainStyle.xs)
-                    }
-                }
-                .contentShape(Rectangle())
-                .onTapGesture(perform: open)
-                .accessibilityElement(children: .combine)
-                .accessibilityAddTraits(.isButton)
-                .accessibilityHint(Text(verbatim: "Opens the goal"))
-                .accessibilityAction(.default, open)
-                .accessibilityActions {
-                    ForEach(checkIn.actions(for: goal)) { action in
-                        Button(action.label, action: action.run)
-                    }
-                }
+                goalRow(goal, home: home)
             }
             if !home.errors.isEmpty {
                 SectionCard {
@@ -153,6 +124,55 @@ struct GoalsHomeView: View {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /// A goal's card, which opens the goal, then Add note · Undo after a + on it, outside the card so
+    /// those taps never open it.
+    private func goalRow(_ goal: GoalSummary, home: GoalsHome) -> some View {
+        let checkIn = GoalHeroCheckIn(slug: goal.slug, home: home, model: viewModel)
+        let palette = GoalPaper.palette(for: goal)
+        let open = { onOpen(.goal(goal.slug)) }
+        return VStack(alignment: .leading, spacing: BrainStyle.s) {
+            // Not a NavigationLink: its label would swallow the dots' taps and hide them from
+            // VoiceOver. The card opens on a tap anywhere else; VoiceOver reads it as one button
+            // whose actions are the check-ins.
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                GoalHeroCard(goal: goal, isCompact: true, today: home.today, checkIn: checkIn)
+                    .zoomSource(for: .goal(goal.slug), cornerRadius: HXRadius.xl)
+                if goal.finishDue {
+                    Text(verbatim: "Did you finish? Open to close it")
+                        .font(BrainStyle.meta)
+                        .foregroundStyle(palette.ink)
+                        .padding(.horizontal, BrainStyle.xs)
+                } else if !goal.flags.escalations.isEmpty {
+                    Text(verbatim: "Needs attention: open to check in")
+                        .font(BrainStyle.meta)
+                        .foregroundStyle(palette.ink)
+                        .padding(.horizontal, BrainStyle.xs)
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture(perform: open)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint(Text(verbatim: "Opens the goal"))
+            .accessibilityAction(.default, open)
+            .accessibilityActions {
+                ForEach(checkIn.actions(for: goal)) { action in
+                    Button(action.label, action: action.run)
+                }
+            }
+            ForEach(goal.week.commitments.filter(\.isItem)) { row in
+                GoalItemFollowUp(
+                    label: "\(GoalsCopy.shortName(row.action)) counted",
+                    tint: GoalTint(palette, scheme: colorScheme),
+                    isPending: viewModel.isPending(goal.slug, .commitment(row.id)),
+                    recentDate: viewModel.recentItemDate(slug: goal.slug, commitment: row.id),
+                    actions: viewModel.itemActions(slug: goal.slug, commitment: row.id)
+                )
+                .padding(.horizontal, BrainStyle.xs)
             }
         }
     }

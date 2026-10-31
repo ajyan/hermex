@@ -70,9 +70,10 @@ private func home(_ json: [String: Any]) throws -> GoalsHome {
     try PrepDecoding.decode(GoalsHome.self, from: JSONSerialization.data(withJSONObject: json))
 }
 
-/// A check-in answer whose outreach row reports `done` items.
-private func itemResult(done: Int) throws -> GoalCheckInResult {
-    let json = try homeJSON(commitments: [2: ["done": done]])
+/// A check-in answer whose outreach row reports `done` items (and that many, when `listed`).
+private func itemResult(done: Int, listed: Bool = false) throws -> GoalCheckInResult {
+    let items = (0..<done).map { _ in ["date": "2026-10-14"] }
+    let json = try homeJSON(commitments: [2: listed ? ["done": done, "items": items] : ["done": done]])
     let body: [String: Any] = ["goal": (json["goals"] as! [[String: Any]])[0], "streak": ["days": 5, "at_risk": false],
                                "today": "2026-10-14", "yesterday": "2026-10-13"]
     return try PrepDecoding.decode(GoalCheckInResult.self, from: JSONSerialization.data(withJSONObject: body))
@@ -438,3 +439,110 @@ final class GoalsHomeCheckInTests: XCTestCase {
                        ["Stretch done today", "Clear Stretch yesterday", "Run done today", "Add one outreach"])
     }
 }
+
+/// The instant +1 on an item row: it counts at once, then offers Add note and Undo for a few seconds.
+@MainActor
+final class GoalQuickItemTests: XCTestCase {
+    private let slug = "nyc-marathon-2026"
+    private var clock = Date(timeIntervalSince1970: 0)
+
+    private func loaded(_ client: FakeCardGoalsClient) async throws -> GoalsHomeViewModel {
+        client.homeResults = [.success(try home(homeJSON()))]
+        let vm = GoalsHomeViewModel(client: client, recentItems: GoalRecentItemWindow(duration: 5, now: { self.clock }))
+        await vm.load()
+        return vm
+    }
+
+    private func outreach(_ vm: GoalsHomeViewModel) -> GoalCommitmentProgress? {
+        guard case .loaded(let h) = vm.state else { return nil }
+        return h.goals.first?.week.commitments.first { $0.id == "outreach" }
+    }
+
+    func testPlusOneThenUndoSendsMinusOneForTheSameDay() async throws {
+        let client = FakeCardGoalsClient()
+        client.checkInResults = [.success(try itemResult(done: 3)), .success(try itemResult(done: 2))]
+        let vm = try await loaded(client)
+        await vm.addItem(slug: slug, commitment: "outreach", note: nil)
+        XCTAssertEqual(vm.recentItemDate(slug: slug, commitment: "outreach"), "2026-10-14")
+        await vm.undoItem(slug: slug, commitment: "outreach")
+        XCTAssertEqual(client.checkIns, [
+            .item(slug: slug, date: "2026-10-14", asOf: "2026-10-14", id: "outreach", n: 1, note: nil),
+            .item(slug: slug, date: "2026-10-14", asOf: "2026-10-14", id: "outreach", n: -1, note: nil),
+        ])
+        XCTAssertEqual(outreach(vm)?.done, 2)
+        XCTAssertNil(vm.recentItemDate(slug: slug, commitment: "outreach"), "Undo ends the offer")
+    }
+
+    func testFailedPlusOneRollsBackAndOffersNoUndo() async throws {
+        let client = FakeCardGoalsClient()
+        client.checkInResults = [.failure(URLError(.timedOut))]
+        let vm = try await loaded(client)
+        await vm.addItem(slug: slug, commitment: "outreach", note: nil)
+        XCTAssertEqual(outreach(vm)?.done, 2)
+        XCTAssertEqual(outreach(vm)?.items.count, 2)
+        XCTAssertNil(vm.recentItemDate(slug: slug, commitment: "outreach"))
+        XCTAssertEqual(vm.error, "Couldn't save. Try again.")
+    }
+
+    func testUndoAfterTheWindowIsNotOfferedAndSendsNothing() async throws {
+        let client = FakeCardGoalsClient()
+        client.checkInResults = [.success(try itemResult(done: 3))]
+        let vm = try await loaded(client)
+        await vm.addItem(slug: slug, commitment: "outreach", note: nil)
+        clock = clock.addingTimeInterval(6)
+        XCTAssertNil(vm.recentItemDate(slug: slug, commitment: "outreach"))
+        await vm.undoItem(slug: slug, commitment: "outreach")
+        XCTAssertEqual(client.checkIns.count, 1, "only the +1 went out")
+        XCTAssertEqual(outreach(vm)?.done, 3)
+    }
+
+    func testAPlusOneWithANoteOffersNoUndo() async throws {
+        let client = FakeCardGoalsClient()
+        client.checkInResults = [.success(try itemResult(done: 3))]
+        let vm = try await loaded(client)
+        await vm.addItem(slug: slug, commitment: "outreach", note: "Anthropic")
+        XCTAssertNil(vm.recentItemDate(slug: slug, commitment: "outreach"))
+    }
+
+    func testAddNoteTakesTheItemBackAndCountsItWithTheNote() async throws {
+        let client = FakeCardGoalsClient()
+        let (started, startedCont) = AsyncStream<Void>.makeStream()
+        let (release, releaseCont) = AsyncStream<Void>.makeStream()
+        client.checkInResults = [.success(try itemResult(done: 3, listed: true)),
+                                 .success(try itemResult(done: 2, listed: true)),
+                                 .success(try itemResult(done: 3, listed: true))]
+        let vm = try await loaded(client)
+        await vm.addItem(slug: slug, commitment: "outreach", note: nil)
+        client.gate = (startedCont, release)
+        let date = try XCTUnwrap(vm.recentItems.take(GoalsHomeViewModel.key(slug, .commitment("outreach"))))
+        let save = Task { await vm.noteItem(slug: slug, commitment: "outreach", date: date, note: "Acme") }
+        for await _ in started { break }
+        XCTAssertEqual(outreach(vm)?.done, 3, "the count holds while the item is swapped")
+        XCTAssertEqual(outreach(vm)?.items.last?.note, "Acme")
+        releaseCont.yield()
+        releaseCont.yield()
+        let outcome = await save.value
+        XCTAssertEqual(outcome, .saved)
+        XCTAssertEqual(Array(client.checkIns.suffix(2)), [
+            .item(slug: slug, date: "2026-10-14", asOf: "2026-10-14", id: "outreach", n: -1, note: nil),
+            .item(slug: slug, date: "2026-10-14", asOf: "2026-10-14", id: "outreach", n: 1, note: "Acme"),
+        ])
+    }
+
+    func testAddNoteSaysWhichHalfFailed() async throws {
+        let client = FakeCardGoalsClient()
+        client.checkInResults = [.failure(URLError(.timedOut))]
+        let vm = try await loaded(client)
+        let unchanged = await vm.noteItem(slug: slug, commitment: "outreach", date: "2026-10-14", note: "Acme")
+        XCTAssertEqual(unchanged, .unchanged)
+        XCTAssertEqual(client.checkIns.count, 1, "no +1 after a failed -1")
+        XCTAssertEqual(outreach(vm)?.done, 2)
+        XCTAssertNil(outreach(vm)?.items.last?.note)
+
+        client.checkInResults = [.success(try itemResult(done: 1)), .failure(URLError(.timedOut))]
+        let removed = await vm.noteItem(slug: slug, commitment: "outreach", date: "2026-10-14", note: "Acme")
+        XCTAssertEqual(removed, .removed)
+        XCTAssertEqual(outreach(vm)?.done, 1, "the server took the item back")
+    }
+}
+

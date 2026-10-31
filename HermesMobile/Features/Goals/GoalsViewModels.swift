@@ -62,6 +62,8 @@ final class GoalDetailViewModel {
     @ObservationIgnored private var savedSinceSettle = false
     @ObservationIgnored private var dayChangedSinceSettle = false
     @ObservationIgnored private var calendarInput: CalendarInput?
+    /// The +1 just counted, while its row offers Add note and Undo.
+    let recentItems: GoalRecentItemWindow<GoalRowKey>
 
     private struct CalendarInput: Equatable {
         let heatmap: [GoalHeatDay]
@@ -73,11 +75,13 @@ final class GoalDetailViewModel {
     /// `onChange` runs once a check-in, finish or reopen has landed on the server (the widget
     /// refreshes from it).
     init(slug: String, client: GoalsDataClient, onAPIError: @escaping (Error) -> Void = { _ in },
-         onChange: @escaping @MainActor () -> Void = {}) {
+         onChange: @escaping @MainActor () -> Void = {},
+         recentItems: GoalRecentItemWindow<GoalRowKey> = GoalRecentItemWindow()) {
         self.slug = slug
         self.client = client
         self.onAPIError = onAPIError
         self.onChange = onChange
+        self.recentItems = recentItems
     }
 
     func isPending(_ key: GoalRowKey) -> Bool { pending.contains(key) }
@@ -146,17 +150,56 @@ final class GoalDetailViewModel {
     }
 
     /// Counts one more item (with its optional note) on the selected day; true once the server has it.
+    /// A +1 without a note then offers Add note and Undo for a few seconds (`recentItems`).
     @discardableResult
     func addItem(commitment id: String, note: String?) async -> Bool {
-        await send(.commitment(id), request: { .item(slug: self.slug, date: $0, asOf: $1, id: id, n: 1, note: note) }) { goal, date, _, _ in
-            GoalCheckInEdit.addItem(1, note: note, to: id, on: date, in: &goal)
-        }
+        guard let date = selectedDate else { return false }
+        let saved = await sendItem(id, date: date, n: 1, note: note)
+        if saved, note == nil { recentItems.open(.commitment(id), date: date) }
+        return saved
     }
 
     /// Takes the latest counted item back off.
     func removeLastItem(commitment id: String) async {
-        await send(.commitment(id), request: { .item(slug: self.slug, date: $0, asOf: $1, id: id, n: -1, note: nil) }) { goal, date, _, _ in
+        guard let date = selectedDate else { return }
+        await sendItem(id, date: date, n: -1, note: nil)
+    }
+
+    /// Takes back the +1 just counted, on the day it was counted; nothing once its offer has passed.
+    func undoItem(commitment id: String) async {
+        guard let date = recentItems.take(.commitment(id)) else { return }
+        await sendItem(id, date: date, n: -1, note: nil)
+    }
+
+    /// Puts `note` on the item just counted on `date`: the server can't edit a note, so it takes the
+    /// item back and counts it again with the note, showing the noted item throughout. The detail
+    /// reloads once, after both.
+    func noteItem(commitment id: String, date: String, note: String) async -> GoalItemNoteOutcome {
+        inFlight += 1  // holds the reload until the +1 has answered too
+        let removed = await send(.commitment(id), on: date, request: {
+            .item(slug: self.slug, date: $0, asOf: $1, id: id, n: -1, note: nil)
+        }) { goal, date, _, _ in
             GoalCheckInEdit.addItem(-1, note: nil, to: id, on: date, in: &goal)
+            GoalCheckInEdit.addItem(1, note: note, to: id, on: date, in: &goal)
+        }
+        let outcome: GoalItemNoteOutcome = removed ? (await sendItem(id, date: date, n: 1, note: note) ? .saved : .removed) : .unchanged
+        inFlight -= 1
+        if inFlight == 0 { await settle() }
+        return outcome
+    }
+
+    /// The server's date for the selected day.
+    private var selectedDate: String? {
+        guard let base = edits?.base else { return nil }
+        return day == .today ? base.today : base.yesterday
+    }
+
+    @discardableResult
+    private func sendItem(_ id: String, date: String, n: Int, note: String?) async -> Bool {
+        await send(.commitment(id), on: date, request: {
+            .item(slug: self.slug, date: $0, asOf: $1, id: id, n: n, note: note)
+        }) { goal, date, _, _ in
+            GoalCheckInEdit.addItem(n, note: note, to: id, on: date, in: &goal)
         }
     }
 
@@ -172,13 +215,14 @@ final class GoalDetailViewModel {
     @discardableResult
     private func send(
         _ key: GoalRowKey,
+        on chosenDate: String? = nil,
         request makeRequest: (_ date: String, _ asOf: String) -> GoalCheckInRequest,
         edit: @escaping (_ goal: inout GoalSummary, _ date: String, _ today: String, _ yesterday: String) -> Void
     ) async -> Bool {
         guard case .loaded = state, var pendingEdits = edits, !pendingEdits.contains(key) else { return false }
         // The server's dates, never the phone's: the server decides what "today" is.
         let base = pendingEdits.base
-        let date = day == .today ? base.today : base.yesterday
+        let date = chosenDate ?? (day == .today ? base.today : base.yesterday)
         let request = makeRequest(date, base.today)
         pendingEdits.add(key) { edit(&$0.summary, date, $0.today, $0.yesterday) }
         edits = pendingEdits
