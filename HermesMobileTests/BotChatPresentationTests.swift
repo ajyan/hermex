@@ -1378,7 +1378,7 @@ import XCTest
     }
 
     /// The activity rows are the Sessions log rows, whose only motion is
-    /// `ChatMotion.disclosure`, which is nil under Reduce Motion (covered in
+    /// `HXMotion.disclosure`, which is nil under Reduce Motion (covered in
     /// `TranscriptDisplayModelTests`); the Bot views add no animation of their own.
     func testActivityRowsRenderAndFollowTheCardsSetting() async throws {
         let defaults = UserDefaults.standard

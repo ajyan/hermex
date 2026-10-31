@@ -62,7 +62,7 @@ struct MonthCountUp: View {
         Text(shown, format: .number)
             .monospacedDigit()
             .contentTransition(.numericText(value: Double(shown)))
-            .animation(reduceMotion ? nil : .smooth(duration: 1.1).delay(delay), value: revealed)
+            .animation(HXMotion.draw(reduceMotion: reduceMotion, delay: delay), value: revealed)
             .accessibilityLabel(Text(value, format: .number))
     }
 }
@@ -136,7 +136,7 @@ struct MonthCoverCard: View {
                     momentRow(moment)
                         .opacity(revealed ? 1 : 0.35)
                         .offset(y: revealed ? 0 : 14)
-                        .animation(reduceMotion ? nil : .easeOut(duration: 0.45).delay(0.7 + Double(index) * 0.32),
+                        .animation(HXMotion.reveal(reduceMotion: reduceMotion, delay: 0.5 + Double(index) * HXMotion.rowStagger),
                                    value: revealed)
                 }
             }
@@ -148,7 +148,7 @@ struct MonthCoverCard: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 18)
                     .opacity(revealed ? 1 : 0.35)
-                    .animation(reduceMotion ? nil : .easeOut(duration: 0.5).delay(0.8 + Double(card.moments.count) * 0.32),
+                    .animation(HXMotion.reveal(reduceMotion: reduceMotion, delay: 0.5 + Double(card.moments.count) * HXMotion.rowStagger),
                                value: revealed)
             }
         }
@@ -218,8 +218,7 @@ struct MonthWeeksCard: View {
                     row(week, isLast: index == weeks.count - 1, index: index)
                         .opacity(revealed ? 1 : 0.35)
                         .offset(x: revealed ? 0 : -40)
-                        .animation(reduceMotion ? nil : .spring(response: 0.55, dampingFraction: 0.72)
-                            .delay(0.1 + Double(index) * 0.14), value: revealed)
+                        .animation(HXMotion.reveal(reduceMotion: reduceMotion, delay: 0.1 + Double(index) * HXMotion.rowStagger), value: revealed)
                 }
             }
             .padding(.top, 16)
@@ -251,7 +250,7 @@ struct MonthWeeksCard: View {
                         .frame(maxHeight: .infinity)
                         .padding(.vertical, 4)
                         .scaleEffect(y: revealed ? 1 : 0, anchor: .top)
-                        .animation(reduceMotion ? nil : .easeOut(duration: 0.35).delay(0.3 + Double(index) * 0.14),
+                        .animation(HXMotion.reveal(reduceMotion: reduceMotion, delay: 0.3 + Double(index) * HXMotion.rowStagger),
                                    value: revealed)
                         .accessibilityHidden(true)
                 }
@@ -428,7 +427,7 @@ private struct MonthDot: View {
             .overlay(Circle().strokeBorder(paper.glow.opacity(on ? 0 : 0.3), lineWidth: 1))
             .frame(width: size, height: size)
             .scaleEffect(on ? 1 : 0.72)
-            .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.6).delay(delay), value: revealed)
+            .animation(HXMotion.pop(reduceMotion: reduceMotion, delay: delay), value: revealed)
     }
 }
 
@@ -526,7 +525,7 @@ struct MonthDayStrip: View {
                                                        lineWidth: marked.contains(day) ? 1.5 : 1))
                         .frame(width: 7, height: 7)
                         .frame(maxWidth: .infinity)
-                        .animation(reduceMotion ? nil : .easeOut(duration: 0.2).delay(0.3 + Double(day) * 0.025),
+                        .animation(HXMotion.pop(reduceMotion: reduceMotion, delay: 0.3 + Double(day) * HXMotion.dotStagger),
                                    value: revealed)
                 }
             }
@@ -601,7 +600,7 @@ struct MonthDayRows: View {
                 row(day, starred: stars.contains(day.day), stars: stars)
                     .opacity(revealed ? 1 : 0.35)
                     .offset(y: revealed ? 0 : 12)
-                    .animation(reduceMotion ? nil : .easeOut(duration: 0.3).delay(0.15 + Double(index) * 0.06), value: revealed)
+                    .animation(HXMotion.reveal(reduceMotion: reduceMotion, delay: 0.15 + Double(index) * HXMotion.rowStagger), value: revealed)
             }
         }
     }
@@ -609,7 +608,7 @@ struct MonthDayRows: View {
     private func row(_ day: DeckMonth.DayLine, starred: Bool, stars: [String]) -> some View {
         Button {
             let next = starred ? stars.filter { $0 != day.day } : stars + [day.day]
-            withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.6)) {
+            withAnimation(HXMotion.pop(reduceMotion: reduceMotion)) {
                 viewModel.setList("stars", next, for: card)
             }
         } label: {
@@ -704,7 +703,7 @@ struct MonthLetterFromPast: View {
 
     var body: some View {
         Button {
-            withAnimation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.8)) { isOpen.toggle() }
+            withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) { isOpen.toggle() }
         } label: {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {

@@ -838,7 +838,7 @@ struct ChatView: View {
                         // banner above stays in the app's default direction.
                         .environment(\.layoutDirection, chatLayoutDirection)
                 }
-                .animation(ChatMotion.quickState(reduceMotion: reduceMotion), value: viewModel.showsListenPlaybackBar)
+                .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: viewModel.showsListenPlaybackBar)
 
                 BottomComposerMaterialFade(composerHeight: composerHeight)
 
@@ -1248,7 +1248,7 @@ struct ChatView: View {
                     viewModel.setListenPlaybackSpeed(speed)
                 }
             )
-            .transition(ChatMotion.disclosureTransition(reduceMotion: reduceMotion))
+            .transition(HXMotion.disclosureTransition(reduceMotion: reduceMotion))
         }
     }
 
@@ -1550,11 +1550,11 @@ struct ChatView: View {
                 .id(clarificationPrompt.id)
                 .padding(.horizontal, 16)
                 .padding(.bottom, composerHeight + 8)
-                .transition(ChatMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
+                .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
             }
         }
         .zIndex(9)
-        .animation(ChatMotion.quickState(reduceMotion: reduceMotion), value: viewModel.clarificationPrompt?.id)
+        .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: viewModel.clarificationPrompt?.id)
     }
 
     @ViewBuilder
@@ -1568,7 +1568,7 @@ struct ChatView: View {
                         } action: { height in
                             pinnedNoticeStackHeight = height
                         }
-                        .transition(ChatMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
+                        .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
                 }
 
                 if let activeRunStatusPresentation {
@@ -1578,12 +1578,12 @@ struct ChatView: View {
                         } action: { height in
                             activeRunStatusHeight = height
                         }
-                        .transition(ChatMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
+                        .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
                 }
 
                 if showsApprovalBypassStatus {
                     ApprovalBypassStatusPill()
-                        .transition(ChatMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
+                        .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
                 }
             }
             .padding(.horizontal)
@@ -1591,10 +1591,10 @@ struct ChatView: View {
             .padding(.bottom, composerHeight + 8 + clarificationFootprintHeight)
             .allowsHitTesting(false)
             .zIndex(8)
-            .animation(ChatMotion.quickState(reduceMotion: reduceMotion), value: composerAccessoryVisibleItemCount)
-            .animation(ChatMotion.quickState(reduceMotion: reduceMotion), value: activeRunStatusPresentation)
-            .animation(ChatMotion.quickState(reduceMotion: reduceMotion), value: composerLocalNotices)
-            .animation(ChatMotion.quickState(reduceMotion: reduceMotion), value: showsApprovalBypassStatus)
+            .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: composerAccessoryVisibleItemCount)
+            .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: activeRunStatusPresentation)
+            .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: composerLocalNotices)
+            .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: showsApprovalBypassStatus)
         }
     }
 
@@ -1973,7 +1973,7 @@ struct ChatView: View {
 
     private func toggleTurnFold(_ turnKey: String) {
         handleDisclosureToggle()
-        withAnimation(ChatMotion.disclosure(reduceMotion: reduceMotion)) {
+        withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) {
             if !expandedTurnKeys.insert(turnKey).inserted {
                 expandedTurnKeys.remove(turnKey)
             }
@@ -3311,7 +3311,7 @@ struct ChatView: View {
             // Following a live stream snaps too: updates land every ~48 ms, so
             // an animated follow is cut off by the next one and never settles.
             if animated, !isCacheFirstSnapWindow, viewModel.activeStreamID == nil {
-                withAnimation(ChatMotion.scrollToLatest(reduceMotion: reduceMotion)) {
+                withAnimation(HXMotion.scroll(reduceMotion: reduceMotion)) {
                     proxy.scrollTo(targetID, anchor: anchor)
                 }
             } else {

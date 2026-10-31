@@ -110,7 +110,7 @@ struct ToolActivityGroupView: View {
                     ForEach(entries) { entry in
                         ToolCallLogRowView(entry: entry)
                     }
-                    .transition(ChatMotion.disclosureTransition(reduceMotion: reduceMotion))
+                    .transition(HXMotion.disclosureTransition(reduceMotion: reduceMotion))
                 } else if isLive {
                     chipRow(entries)
                 } else {
@@ -131,12 +131,12 @@ struct ToolActivityGroupView: View {
         ) else {
             return .identity
         }
-        return ChatMotion.freshRowTransition(isUserRow: false, reduceMotion: reduceMotion)
+        return HXMotion.freshRowTransition(isUserRow: false, reduceMotion: reduceMotion)
     }
 
     private func toggleExpansion() {
         chatDisclosureToggled()
-        withAnimation(ChatMotion.disclosure(reduceMotion: reduceMotion)) {
+        withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) {
             userToggledExpansion = !isExpanded
         }
     }

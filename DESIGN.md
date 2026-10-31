@@ -108,7 +108,7 @@ Add a new kind of object here and in the code together. A failed tool step keeps
 
 ## Components
 
-- **Card** (`HXCard`, `.hxCardSurface(_:)`, `HXCardRole` in `Config/HermexStyle.swift`): the one card. Its role decides the fill, edge, corners, and shadow: **glow** (one kind of thing: the paper's `card` fill and `edge`, `xl`, the `paper` shadow; Brief cards, review bites, timeline cards, Catch up, the Goal hero), **summary** (a neutral card that sits among glow cards: `hxSurface`, `hxSeparator` edge, `xl`, the `paper` shadow; the Brief opener, the review summary), **neutral** (`hxSurface`, `hxSeparator` edge, `lg`, flat; the same as `.hxCard()`), and **wash** (the paper's wash over `hxSurface` through `glowSurface`, `xl`, the `paper` shadow; Prep's run and home cards, whose controls take the paper's tint). `HXCard` stacks an optional kicker, a headline in `AppFont.display` semibold (in the glow on a colored card, `hxTextPrimary` on a neutral one, marked as a header), the body, and an optional footer, padded 16 pt; text keeps the colors its caller gives it. Cards whose words scroll inside them (Daily Deck cards, `BrainDeckCard`) use `.hxCardSurface(role, clipsContent: true)`, and a stack's bare papers fill `role.shape` with `role.fill`. Build new cards from these, never from a hand-rolled fill, stroke, and shadow. `scripts/check-design-drift` warns about fixed font sizes, numeric corner radii, raw materials, and raw colors outside `Config/` (a documented exception ends its line with `// design-drift: allow`).
+- **Card** (`HXCard`, `.hxCardSurface(_:)`, `HXCardRole` in `Config/HermexStyle.swift`): the one card. Its role decides the fill, edge, corners, and shadow: **glow** (one kind of thing: the paper's `card` fill and `edge`, `xl`, the `paper` shadow; Brief cards, review bites, timeline cards, Catch up, the Goal hero), **summary** (a neutral card that sits among glow cards: `hxSurface`, `hxSeparator` edge, `xl`, the `paper` shadow; the Brief opener, the review summary), **neutral** (`hxSurface`, `hxSeparator` edge, `lg`, flat; the same as `.hxCard()`), and **wash** (the paper's wash over `hxSurface` through `glowSurface`, `xl`, the `paper` shadow; Prep's run and home cards, whose controls take the paper's tint). `HXCard` stacks an optional kicker, a headline in `AppFont.display` semibold (in the glow on a colored card, `hxTextPrimary` on a neutral one, marked as a header), the body, and an optional footer, padded 16 pt; text keeps the colors its caller gives it. Cards whose words scroll inside them (Daily Deck cards, `BrainDeckCard`) use `.hxCardSurface(role, clipsContent: true)`, and a stack's bare papers fill `role.shape` with `role.fill`. Build new cards from these, never from a hand-rolled fill, stroke, and shadow. `scripts/check-design-drift` warns about fixed font sizes, numeric corner radii, raw materials, raw colors, and raw animation curves outside `Config/` (a documented exception ends its line with `// design-drift: allow`).
 - **`HXChip`** (`Config/HermexStyle.swift`): the one chip. A capsule with the wash, edge, and glow, an optional symbol, a label (caption medium, one line, middle-truncated), and an optional trailing mark. Tool calls, run counts, Brain citations, and `+N` all use it. Lay chips out with `FlowRow`, which wraps and offers an over-wide chip the row's width so large text truncates instead of overflowing.
 - **Live run.** While Atlas works, each call is a `ToolCallChip`: its target (cut at 24 characters), an ellipsis while running, a red `xmark` after failing. The newest four show; older calls sit behind `+N`.
 - **Finished run.** One chip per kind of tool with its count, in the order each kind first ran ("3 commands", "2 searches"), plus a red `xmark` on a kind with failures. Tapping the row opens the full log; "Expand Tools by Default" starts it open. The row is at least 44 pt tall.
@@ -175,7 +175,33 @@ No `.system(size:)` on text. The one exception: an SF Symbol inside a fixed-size
 
 ## Motion
 
-A live chip fades in as its call arrives (off for replays and under Reduce Motion), and opening the log uses the chat disclosure motion. A card or chip that opens a screen is its zoom source (`.zoomSource(for:cornerRadius:)`): the screen grows out of it and shrinks back into it on the way back, with the system's crossfade under Reduce Motion. Goal cards, Brain home rows, link cards, module grid cards, and chat citation chips zoom; screens the drawer opens slide in as usual. Nothing loops or repaints continuously, with one exception: while Atlas grades a Prep answer, the submit button's sparkle breathes (a symbol effect, still under Reduce Motion) beside a once-a-second counter, because that wait runs long enough to look stuck. The Prep tutor's "Thinking" bubble uses the same sparkle until its first words stream in.
+All motion comes from `HXMotion` (`Config/HermexMotion.swift`). Choose a curve by what is moving, never by screen, so a section opening in the Brief moves like one in chat. No view builds its own `.spring`, `.easeOut`, or bare `withAnimation {}`.
+
+| Curve | Timing | Use |
+|---|---|---|
+| `press` | smooth, caller's duration | A control pressed down and released |
+| `quickState` | easeInOut 0.16 s | A small state flip: a pick, a rating, a toggle, a hint or control chrome showing or hiding |
+| `disclosure` | smooth 0.18 s | Expanding or collapsing in place: show more, a peek, a section or a worked answer opening |
+| `chrome` | smooth 0.22 s | The composer's and session search's chrome growing and shrinking |
+| `scroll` | easeOut 0.2 s | Scrolling to a row in code: the latest message, last night, the current exercise |
+| `swap` | smooth 0.25 s | Content replaced in place: the next page, a new question, a refreshed chart, list rows added or removed |
+| `panel` | smooth 0.3 s | A surface arriving or leaving: the drawer, a toast, an opened card, a picker over the composer |
+| `card` | spring 0.4 s, bounce 0.15 | A deck card moving: swiped, flown off, pulled back, settled, fanned, dropped |
+| `reveal` | easeOut 0.35 s | A row or tile arriving as its card comes on top; lists stagger by `rowStagger` (0.08 s) |
+| `pop` | spring 0.4 s, bounce 0.3 | A mark landing: a dot filling (staggered by `dotStagger`, 0.025 s), a star, a seal, a bot's reaction |
+| `draw` | easeInOut 1.2 s | A number counting up or a ring drawing itself, once |
+
+`clarificationToggle` (easeOut 0.22 s, the keyboard's clock) and the transcript's row transitions stay chat-only.
+
+**Reduce Motion.** Every curve takes `reduceMotion` and returns `nil`, so the change snaps, never a shorter ease. The one exception is `panel`, which returns `HXMotion.crossfade` (easeInOut 0.2 s), because a surface appearing must still read as a change. The deck uses the same crossfade to turn a page instead of flying a card, and its fan opens and closes without moving. Movement transitions (`bottomOverlayTransition`, `disclosureTransition`) become a plain fade.
+
+A live chip fades in as its call arrives (off for replays and under Reduce Motion), and opening the log uses `disclosure`. A card or chip that opens a screen is its zoom source (`.zoomSource(for:cornerRadius:)`): the screen grows out of it and shrinks back into it on the way back, with the system's crossfade under Reduce Motion. Goal cards, Brain home rows, link cards, module grid cards, and chat citation chips zoom; screens the drawer opens slide in as usual.
+
+**Nothing loops or repaints continuously**, with three exceptions, each still under Reduce Motion:
+
+- **Prep's sparkle.** While Atlas grades a Prep answer, the submit button's sparkle breathes (a symbol effect) beside a once-a-second counter, because that wait runs long enough to look stuck. The Prep tutor's "Thinking" bubble uses the same sparkle until its first words stream in.
+- **The voice call orb** (`VoiceCallOrb`) redraws at 30 fps for the whole call, because it follows the live audio levels of whoever is speaking. Reduce Motion pauses the timeline and draws the orb still.
+- **The bot face** (`BotFaceMotion`) plays short scripted bits (a glance, a blink, a hop; 0.5–1.6 s each) at 60 fps, idle ones every 4–9 s while the face is on screen, so a bot reads as present. Between bits nothing redraws. Reduce Motion skips the bits and holds the face still.
 
 ## Decisions and exceptions
 

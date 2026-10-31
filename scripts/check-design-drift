@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Reports Swift code that bypasses the design system (DESIGN.md): fixed font sizes, one-off
-# corner radii, raw materials, and raw colors outside Config/. A warning, never a gate, like
+# corner radii, raw materials, raw colors, and raw animation curves outside Config/. A warning, never a gate, like
 # check-swift-file-sizes. A line that is a documented exception (DESIGN.md § Decisions and
 # exceptions, or an SF Symbol in a fixed-size control) can end with `// design-drift: allow`.
 set -euo pipefail
@@ -47,6 +47,11 @@ report "raw material" \
 report "raw color outside Config/" \
   "use the hx* neutrals or a HermexPaper; new tokens go in Config/" \
   'Color\(red:|Color\(hex|UIColor\(red:|"#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?"|0x[0-9A-Fa-f]{6}\b' \
+  '^HermesMobile/Config/'
+
+report "raw animation curve" \
+  "use an HXMotion curve (DESIGN.md § Motion), which also honors Reduce Motion" \
+  '(\.(spring|snappy|smooth|bouncy|easeIn|easeOut|easeInOut|linear)\(|withAnimation *\{|withAnimation\(\.(spring|snappy|smooth|bouncy|easeIn|easeOut|easeInOut|linear|default)\b)' \
   '^HermesMobile/Config/'
 
 if (( warning_count == 0 )); then

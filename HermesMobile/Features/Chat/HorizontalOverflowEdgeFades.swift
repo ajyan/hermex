@@ -73,7 +73,7 @@ private struct HorizontalOverflowFadesModifier: ViewModifier {
                 fades = newFades
             }
         )
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: fades)
+        .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: fades)
     }
 
     @ViewBuilder

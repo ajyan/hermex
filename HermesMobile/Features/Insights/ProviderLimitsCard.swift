@@ -26,7 +26,7 @@ struct ProviderLimitsSection: View {
                 ProviderLimitsPlaceholderCard()
             }
         }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: cards)
+        .animation(HXMotion.swap(reduceMotion: reduceMotion), value: cards)
     }
 }
 

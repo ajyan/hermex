@@ -235,6 +235,7 @@ struct OnboardingStepHeader: View {
 }
 
 struct OnboardingAgentPromptCard: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let prompt: String
     @Binding var hasCopied: Bool
     @State private var didCopyRecently = false
@@ -255,7 +256,7 @@ struct OnboardingAgentPromptCard: View {
                 UIPasteboard.general.string = prompt
                 hasCopied = true
                 ChatHaptics.copied(isEnabled: isHapticsEnabled)
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) {
                     didCopyRecently = true
                 }
             } label: {
@@ -292,7 +293,7 @@ struct OnboardingPageIndicator: View {
                     .frame(width: index == currentPage ? 24 : 8, height: 8)
             }
         }
-        .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.8), value: currentPage)
+        .animation(HXMotion.swap(reduceMotion: reduceMotion), value: currentPage)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(String(localized: "Page \(currentPage + 1) of \(pageCount)"))
     }

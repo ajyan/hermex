@@ -158,7 +158,7 @@ struct ImageLightboxView<Actions: View>: View {
         }
         .opacity(isChromeVisible ? 1 : 0)
         .allowsHitTesting(isChromeVisible)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: isChromeVisible)
+        .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: isChromeVisible)
     }
 
     private var topBar: some View {

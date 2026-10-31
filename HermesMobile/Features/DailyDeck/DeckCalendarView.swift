@@ -221,7 +221,7 @@ struct DeckCalendarView: View {
                     } else if !weekly.isEmpty {
                         Divider().padding(.leading, 14)
                         Button {
-                            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { weeksOpen.toggle() }
+                            withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) { weeksOpen.toggle() }
                         } label: {
                             HStack {
                                 Image(systemName: "calendar.badge.clock").foregroundStyle(Color.accentColor)

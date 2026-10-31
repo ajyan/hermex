@@ -52,7 +52,7 @@ final class ActionToastState {
     }
 
     static func animation(reduceMotion: Bool) -> Animation {
-        reduceMotion ? .easeInOut(duration: 0.2) : .snappy(duration: 0.25)
+        HXMotion.panel(reduceMotion: reduceMotion)
     }
 
     func show(_ newToast: ActionToast) {

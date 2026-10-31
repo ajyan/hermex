@@ -16,7 +16,7 @@ struct DrawerContainer<Main: View, Drawer: View>: View {
 
     /// Animated reset, so a release glides from the finger to the settled state
     /// instead of snapping back to it first.
-    @GestureState(resetTransaction: Transaction(animation: .spring(duration: 0.3)))
+    @GestureState(resetTransaction: Transaction(animation: HXMotion.panel(reduceMotion: false)))
     private var drag: CGFloat = 0
     /// Whether the current pan started on sideways-scrolling content, probed once per pan.
     @State private var startProbe = SidewaysScrollProbe()

@@ -66,7 +66,7 @@ struct PrepLessonCardsView: View {
                 .scrollTargetLayout()
             }
             .frame(height: heights[page ?? .theCase], alignment: .top)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: page)
+            .animation(HXMotion.swap(reduceMotion: reduceMotion), value: page)
             .scrollTargetBehavior(.viewAligned)  // .paging pages by the view width and drifts by the spacing
             .scrollPosition(id: $page)
             .scrollIndicators(.hidden)
@@ -152,7 +152,7 @@ struct PrepLessonCardsView: View {
             VStack(alignment: .leading, spacing: BrainStyle.l) {
                 ForEach(Array(cards.idea.enumerated()), id: \.offset) { index, bullet in
                     Button {
-                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { recalled.formSymmetricDifference([index]) }
+                        withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) { recalled.formSymmetricDifference([index]) }
                     } label: {
                         PrepIdeaPoint(number: index + 1, lead: bullet.lead) {
                             if recalled.contains(index) {

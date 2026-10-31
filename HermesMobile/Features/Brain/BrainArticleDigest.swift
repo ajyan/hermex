@@ -227,7 +227,7 @@ struct BrainArticleDigestView: View {
                     .brainText(.rowTitle)
                     .lineLimit(4)
                 Button {
-                    withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) { showsFullGist = true }
+                    withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) { showsFullGist = true }
                 } label: {
                     Text(verbatim: "Read more")
                         .font(BrainStyle.sectionCaption)
@@ -353,13 +353,13 @@ struct BrainArticleDigestView: View {
     }
 
     private func toggle(_ number: Int) {
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
+        withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) {
             if expanded.contains(number) { expanded.remove(number) } else { expanded.insert(number) }
         }
     }
 
     private func toggleAll() {
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
+        withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) {
             expanded = allExpanded ? [] : Set(digest.ideas.filter { !$0.detail.isEmpty }.map(\.number))
         }
     }

@@ -510,11 +510,11 @@ final class GitWorkspaceViewModelTests: APIClientTestCase {
     }
 
     @MainActor
-    func testToastAnimationSnapsUnderReduceMotion() {
-        XCTAssertNil(GitActionToastState.toastAnimation(reduceMotion: true))
+    func testToastAnimationIsAPanelThatCrossfadesUnderReduceMotion() {
+        XCTAssertEqual(GitActionToastState.toastAnimation(reduceMotion: true), HXMotion.crossfade)
         XCTAssertEqual(
             GitActionToastState.toastAnimation(reduceMotion: false),
-            .easeInOut(duration: 0.18)
+            HXMotion.panel(reduceMotion: false)
         )
     }
 

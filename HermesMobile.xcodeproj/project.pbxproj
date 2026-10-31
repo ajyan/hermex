@@ -351,7 +351,7 @@
 		C0DE12000000000000000007 /* TranscriptLinkPreviewCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE12000000000000000008 /* TranscriptLinkPreviewCache.swift */; };
 		C0DE12000000000000000005 /* TranscriptLinkPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE12000000000000000006 /* TranscriptLinkPreviewView.swift */; };
 		C0DE20000000000000000001 /* ChatTactileButtonStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE20000000000000000002 /* ChatTactileButtonStyle.swift */; };
-		C0DE21000000000000000001 /* ChatMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE21000000000000000002 /* ChatMotion.swift */; };
+		C0DE21000000000000000001 /* HermexMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE21000000000000000002 /* HermexMotion.swift */; };
 		C0DE25000000000000000001 /* ChatScrollPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE25000000000000000002 /* ChatScrollPolicy.swift */; };
 		C8660A000000000000000001 /* InAppBrowserPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8660A000000000000000002 /* InAppBrowserPolicy.swift */; };
 		C8660A000000000000000005 /* SafariView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8660A000000000000000006 /* SafariView.swift */; };
@@ -1214,7 +1214,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		C0DE12000000000000000008 /* TranscriptLinkPreviewCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptLinkPreviewCache.swift; sourceTree = "<group>"; };
 		C0DE12000000000000000006 /* TranscriptLinkPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptLinkPreviewView.swift; sourceTree = "<group>"; };
 		C0DE20000000000000000002 /* ChatTactileButtonStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatTactileButtonStyle.swift; sourceTree = "<group>"; };
-		C0DE21000000000000000002 /* ChatMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMotion.swift; sourceTree = "<group>"; };
+		C0DE21000000000000000002 /* HermexMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermexMotion.swift; sourceTree = "<group>"; };
 		C0DE25000000000000000002 /* ChatScrollPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatScrollPolicy.swift; sourceTree = "<group>"; };
 		C8660A000000000000000002 /* InAppBrowserPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InAppBrowserPolicy.swift; sourceTree = "<group>"; };
 		C8660A000000000000000006 /* SafariView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariView.swift; sourceTree = "<group>"; };
@@ -2501,7 +2501,6 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C08730000000000000000F04 /* HorizontalOverflowEdgeFades.swift */,
 				C042A000000000000000004 /* ChatComposerSelectorSheets.swift */,
 				C0DE20000000000000000002 /* ChatTactileButtonStyle.swift */,
-				C0DE21000000000000000002 /* ChatMotion.swift */,
 				C0DE25000000000000000002 /* ChatScrollPolicy.swift */,
 				C8660A000000000000000002 /* InAppBrowserPolicy.swift */,
 				C8660A000000000000000006 /* SafariView.swift */,
@@ -2679,6 +2678,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				1A2B3C4D5E6F700000000101 /* AppTheme.swift */,
 				49A8CFA21E6B5DAE7B38D48C /* HermexColors.swift */,
 				D35A00000000000000000002 /* HermexStyle.swift */,
+				C0DE21000000000000000002 /* HermexMotion.swift */,
 				863000000000000000000002 /* NotificationOffer.swift */,
 				C012400000000000000001 /* AppIconChoice.swift */,
 			);
@@ -3605,7 +3605,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C0DE12000000000000000007 /* TranscriptLinkPreviewCache.swift in Sources */,
 				C0DE12000000000000000005 /* TranscriptLinkPreviewView.swift in Sources */,
 				C0DE20000000000000000001 /* ChatTactileButtonStyle.swift in Sources */,
-				C0DE21000000000000000001 /* ChatMotion.swift in Sources */,
+				C0DE21000000000000000001 /* HermexMotion.swift in Sources */,
 				C0DE25000000000000000001 /* ChatScrollPolicy.swift in Sources */,
 				C8660A000000000000000001 /* InAppBrowserPolicy.swift in Sources */,
 				C8660A000000000000000005 /* SafariView.swift in Sources */,

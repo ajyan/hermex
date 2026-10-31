@@ -43,7 +43,7 @@ struct MonthSnippets: View {
                 .accessibilityElement(children: .combine)
                 .opacity(revealed ? 1 : 0.35)
                 .offset(y: revealed ? 0 : 10)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.3).delay(min(delay, 0.25) + Double(index) * 0.06), value: revealed)
+                .animation(HXMotion.reveal(reduceMotion: reduceMotion, delay: min(delay, 0.25) + Double(index) * HXMotion.rowStagger), value: revealed)
             }
         }
     }
@@ -112,10 +112,10 @@ struct MonthHighlights: View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 10, alignment: .topLeading),
                             GridItem(.flexible(), spacing: 10, alignment: .topLeading)], alignment: .leading, spacing: 10) {
             ForEach(Array(tiles.enumerated()), id: \.offset) { index, tile in
-                tileView(tile, delay: 0.1 + Double(index) * 0.12)
+                tileView(tile, delay: 0.1 + Double(index) * HXMotion.rowStagger)
                     .scaleEffect(revealed ? 1 : 0.9)
                     .opacity(revealed ? 1 : 0.35)
-                    .animation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.7).delay(0.1 + Double(index) * 0.12),
+                    .animation(HXMotion.pop(reduceMotion: reduceMotion, delay: 0.1 + Double(index) * HXMotion.rowStagger),
                                value: revealed)
             }
         }
@@ -227,7 +227,7 @@ struct MonthThemes: View {
                 .accessibilityElement(children: .combine)
                 .opacity(revealed ? 1 : 0.35)
                 .offset(y: revealed ? 0 : 10)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.3).delay(min(delay, 0.2) + Double(index) * 0.06), value: revealed)
+                .animation(HXMotion.reveal(reduceMotion: reduceMotion, delay: min(delay, 0.2) + Double(index) * HXMotion.rowStagger), value: revealed)
             }
         }
     }
@@ -541,7 +541,7 @@ private struct TierDot: View {
                                            lineWidth: shown == "rough" ? 1.5 : 1))
             .frame(width: size, height: size)
             .scaleEffect(tier == nil ? 0.5 : shown == nil ? 0.72 : 1)
-            .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.6).delay(delay), value: revealed)
+            .animation(HXMotion.pop(reduceMotion: reduceMotion, delay: delay), value: revealed)
     }
 }
 
@@ -704,7 +704,7 @@ struct MonthCloseHero: View {
         .frame(maxWidth: .infinity)
         .onAppear {
             guard !drawn else { return }
-            withAnimation(reduceMotion ? nil : .easeInOut(duration: 1.4).delay(0.25)) { drawn = true }
+            withAnimation(HXMotion.draw(reduceMotion: reduceMotion, delay: 0.25)) { drawn = true }
         }
     }
 }

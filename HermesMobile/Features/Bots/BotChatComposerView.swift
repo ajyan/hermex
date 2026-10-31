@@ -76,15 +76,15 @@ struct BotChatComposerView: View {
                                     onShowRequest: onShowRequest,
                                     onCancelUpload: { model.cancelAttachmentUpload() },
                                     onDismissError: { if let text = pill.errorText { dismissedErrors.insert(text) } })
-                    .transition(ChatMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
+                    .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
             } else if showsQuickReplies {
                 BotQuickReplyRow(replies: quickReplies) { model.applyQuickReply($0) }
                     .transition(.opacity)
             }
             composerContainer
         }
-        .animation(ChatMotion.quickState(reduceMotion: reduceMotion), value: pill)
-        .animation(ChatMotion.quickState(reduceMotion: reduceMotion), value: showsQuickReplies)
+        .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: pill)
+        .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: showsQuickReplies)
         .onChange(of: storedQuickReplies, initial: true) { _, raw in
             quickReplies = BotQuickReplyStore.decode(raw)
         }
@@ -163,13 +163,13 @@ struct BotChatComposerView: View {
                             .padding(.top, -10).padding(.bottom, -12)
                             .ignoresSafeArea(edges: .bottom)
                     )
-                    .transition(ChatMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
+                    .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
                 }
             }
             // Focus flips arrive from UIKit outside any withAnimation, so the
             // pill-to-card morph and the row's insertion animate from here,
             // exactly as the Sessions composer does.
-            .animation(ChatMotion.composerChrome(reduceMotion: reduceMotion), value: isExpanded)
+            .animation(HXMotion.chrome(reduceMotion: reduceMotion), value: isExpanded)
         }
         .modifier(BotAttachmentPickerPresentation(model: model, picker: $picker))
         .confirmationDialog("Change chat model?", isPresented: Binding(

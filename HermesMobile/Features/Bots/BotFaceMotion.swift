@@ -170,7 +170,7 @@ enum BotFaceBit: CaseIterable, Equatable, Sendable {
         guard progress > 0, progress < 1 else { return .rest }
         let p = progress
         // Out for the first third, hold, back over the last third.
-        let hold = p < 0.3 ? Self.easeOut(p / 0.3) : p > 0.7 ? 1 - Self.easeOut((p - 0.7) / 0.3) : 1
+        let hold = p < 0.3 ? Self.easeOut(p / 0.3) : p > 0.7 ? 1 - Self.easeOut((p - 0.7) / 0.3) : 1 // design-drift: allow (keyframe math, not a SwiftUI curve)
         switch self {
         case .glanceLeft: return BotFacePose(gazeX: -0.07 * hold)
         case .glanceRight: return BotFacePose(gazeX: 0.07 * hold)
@@ -306,12 +306,12 @@ struct BotInteractiveFaceView: View {
                         gaze = CGSize(width: dx * clamp * Self.reach * 2, height: dy * clamp * Self.reach * 2)
                     }
                     .onEnded { value in
-                        withAnimation(reduceMotion ? nil : .spring(duration: 0.35)) { gaze = .zero }
+                        withAnimation(HXMotion.pop(reduceMotion: reduceMotion)) { gaze = .zero }
                         let moved = hypot(value.translation.width, value.translation.height)
                         if moved < 10 { react() }
                     }
             )
-            .animation(reduceMotion ? nil : .spring(duration: 0.3, bounce: 0.4), value: reaction > 0)
+            .animation(HXMotion.pop(reduceMotion: reduceMotion), value: reaction > 0)
             .accessibilityHidden(true)
             .onChange(of: cue?.id) { if let cue { play(cue.bit) } }
             // Reduce Motion is part of the identity so flipping it restarts, or stops, the idle loop.

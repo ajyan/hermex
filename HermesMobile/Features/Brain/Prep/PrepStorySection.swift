@@ -476,7 +476,7 @@ struct PrepStoryPageView: View {
                         .foregroundStyle(Color.hxTextSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                     Button {
-                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { showsTelling = true }
+                        withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) { showsTelling = true }
                     } label: {
                         Text(verbatim: "Show the full telling")
                             .font(BrainStyle.rowTitle)
@@ -513,7 +513,7 @@ struct PrepStoryPageView: View {
                             .transition(.opacity)
                         } else if !probe.points.isEmpty {
                             Button {
-                                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { _ = openProbes.insert(index) }
+                                withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) { _ = openProbes.insert(index) }
                             } label: {
                                 Text(verbatim: "What a strong answer covers")
                                     .font(BrainStyle.rowTitle)

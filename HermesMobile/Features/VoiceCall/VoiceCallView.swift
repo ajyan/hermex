@@ -300,7 +300,7 @@ struct VoiceCallView: View {
                     .transition(.opacity)
             }
         }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: controller?.currentTool)
+        .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: controller?.currentTool)
         .accessibilityElement(children: .combine)
     }
 
@@ -333,7 +333,7 @@ struct VoiceCallView: View {
                 .font(.footnote.weight(.medium))
                 .foregroundStyle(.secondary)
                 .opacity(tapHint == nil ? 0 : 1)
-                .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: tapHint)
+                .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: tapHint)
                 .accessibilityHidden(true)
         }
     }

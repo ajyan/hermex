@@ -500,7 +500,7 @@ struct MessageComposerView: View {
                             onSelect: applyFileCompletion
                         )
                         .padding(.horizontal)
-                        .transition(ChatMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
+                        .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
                     } else if let slashQuery {
                         SlashCommandAutocompleteView(
                             query: slashQuery,
@@ -533,11 +533,11 @@ struct MessageComposerView: View {
                             }
                         )
                         .padding(.horizontal)
-                        .transition(ChatMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
+                        .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
                     }
                 }
-                .animation(ChatMotion.quickState(reduceMotion: reduceMotion), value: showsSlashAutocomplete)
-                .animation(ChatMotion.quickState(reduceMotion: reduceMotion), value: showsFileAutocomplete)
+                .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: showsSlashAutocomplete)
+                .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: showsFileAutocomplete)
 
                 composerSurface
                     .padding(.horizontal)
@@ -559,12 +559,12 @@ struct MessageComposerView: View {
                                 .padding(.bottom, -12)
                                 .ignoresSafeArea(edges: .bottom)
                         )
-                        .transition(ChatMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
+                        .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
                 }
             }
             // Focus flips arrive from UIKit outside any withAnimation, so the
             // morph and the row's insertion take their animation from here.
-            .animation(ChatMotion.composerChrome(reduceMotion: reduceMotion), value: isExpanded)
+            .animation(HXMotion.chrome(reduceMotion: reduceMotion), value: isExpanded)
         }
         .background(
             GeometryReader { proxy in

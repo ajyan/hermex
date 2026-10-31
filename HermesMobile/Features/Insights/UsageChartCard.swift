@@ -116,7 +116,7 @@ struct UsageChartCard: View {
             .chartYAxis(.hidden)
             .chartLegend(.hidden)
             .frame(height: Self.chartHeight)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: buckets)
+            .animation(HXMotion.swap(reduceMotion: reduceMotion), value: buckets)
             .chartOverlay { proxy in
                 GeometryReader { geometry in
                     Rectangle()

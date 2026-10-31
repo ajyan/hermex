@@ -385,7 +385,7 @@ struct HermexAttachmentCameraPanel: View {
 
             controls
         }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: controller.captureDevice != nil)
+        .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: controller.captureDevice != nil)
         .onAppear {
             if scenePhase == .active { controller.start() }
         }

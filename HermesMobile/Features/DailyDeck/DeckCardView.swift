@@ -508,7 +508,7 @@ struct DeckCardView: View {
         FlowRow(spacing: 8) {
             ForEach(Array(card.scale.enumerated()), id: \.offset) { index, label in
                 ChoiceButton(title: label, isSelected: rating == index + 1) {
-                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { viewModel.rate(index + 1, for: card) }
+                    withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) { viewModel.rate(index + 1, for: card) }
                 }
             }
         }
@@ -534,7 +534,7 @@ struct DeckCardView: View {
                     .transition(.opacity)
             } else {
                 Button {
-                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { showsNumbers = true }
+                    withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) { showsNumbers = true }
                 } label: {
                     Label { Text(verbatim: "Show last night") } icon: { Image(systemName: "chart.bar") }
                         .font(AppFont.subheadline(weight: .semibold))
@@ -561,7 +561,7 @@ struct DeckCardView: View {
         FlowRow(spacing: 8) {
             ForEach(card.options) { option in
                 ChoiceButton(title: option.label, isSelected: answer?.action == option.id) {
-                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { viewModel.pick(option.id, for: card) }
+                    withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) { viewModel.pick(option.id, for: card) }
                 }
             }
         }
@@ -823,7 +823,7 @@ struct DeckCardView: View {
             }
             if more {
                 Button(showsFullIntention ? "Less" : "More") {
-                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { showsFullIntention.toggle() }
+                    withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) { showsFullIntention.toggle() }
                 }
                 .font(AppFont.subheadline(weight: .semibold))
                 .buttonStyle(.borderless)
@@ -860,7 +860,7 @@ struct DeckCardView: View {
     private var newQuestion: some View {
         Button {
             hasAskedNewQuestion = true
-            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) { viewModel.regenerateQuestion(for: card) }
+            withAnimation(HXMotion.swap(reduceMotion: reduceMotion)) { viewModel.regenerateQuestion(for: card) }
             AccessibilityNotification.Announcement("New question: \(shownQuestion)").post()
         } label: {
             Label { Text(verbatim: "New question") } icon: { Image(systemName: "arrow.triangle.2.circlepath") }

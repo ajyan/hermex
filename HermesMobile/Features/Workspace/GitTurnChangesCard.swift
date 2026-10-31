@@ -7,6 +7,7 @@ import SwiftUI
 /// diff surface and each file row opens that surface at the file. The host owns the
 /// actual sheet presentation.
 struct GitTurnChangesCard: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(AppHaptics.isEnabledKey) private var isHapticsEnabled = true
     @State private var isExpanded = true
 
@@ -73,7 +74,7 @@ struct GitTurnChangesCard: View {
                     : String(localized: "Expand file changes"),
                 rotation: isExpanded ? 0 : -90
             ) {
-                withAnimation(.easeInOut(duration: 0.18)) { isExpanded.toggle() }
+                withAnimation(HXMotion.disclosure(reduceMotion: reduceMotion)) { isExpanded.toggle() }
             }
         }
         .padding(.leading, 12)

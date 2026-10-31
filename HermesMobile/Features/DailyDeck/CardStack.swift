@@ -168,7 +168,7 @@ struct CardStack<Page: Identifiable, Card: View, Edge: View>: View {
                 if let fanPick {
                     let pick = CardFan.index(atX: value.location.x, count: pages.count, width: width)
                     if pick != fanPick {
-                        withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) { self.fanPick = pick }
+                        withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) { self.fanPick = pick }
                     }
                     return
                 }
@@ -179,7 +179,7 @@ struct CardStack<Page: Identifiable, Card: View, Edge: View>: View {
                     hold = Task { @MainActor in
                         try? await Task.sleep(for: .milliseconds(400))
                         guard !Task.isCancelled, !holdMoved else { return }
-                        withAnimation(reduceMotion ? nil : .spring(duration: 0.4, bounce: 0.2)) {
+                        withAnimation(HXMotion.card(reduceMotion: reduceMotion)) {
                             dragX = 0
                             fanPick = index
                         }
@@ -191,7 +191,7 @@ struct CardStack<Page: Identifiable, Card: View, Edge: View>: View {
                 hold = nil
                 holdMoved = false
                 guard let pick = fanPick else { return }
-                withAnimation(reduceMotion ? nil : .spring(duration: 0.4, bounce: 0.15)) {
+                withAnimation(HXMotion.card(reduceMotion: reduceMotion)) {
                     index = pick
                     fanPick = nil
                 }
@@ -207,10 +207,10 @@ struct CardStack<Page: Identifiable, Card: View, Edge: View>: View {
     private func advance(width: CGFloat) {
         guard index < pages.count - 1 else { return settle() }
         guard !reduceMotion else {
-            withAnimation(.easeInOut(duration: 0.2)) { index += 1 }
+            withAnimation(HXMotion.crossfade) { index += 1 }
             return
         }
-        withAnimation(.spring(duration: 0.35, bounce: 0)) {
+        withAnimation(HXMotion.card(reduceMotion: reduceMotion)) {
             dragX = -Self.fly * width
         } completion: {
             withoutAnimation {
@@ -224,7 +224,7 @@ struct CardStack<Page: Identifiable, Card: View, Edge: View>: View {
     private func retreat(width: CGFloat) {
         guard index > 0 else { return settle() }
         guard !reduceMotion else {
-            withAnimation(.easeInOut(duration: 0.2)) { index -= 1 }
+            withAnimation(HXMotion.crossfade) { index -= 1 }
             return
         }
         let incoming = min(0, -Self.fly * width + max(dragX, 0) * Self.fly)
@@ -232,11 +232,11 @@ struct CardStack<Page: Identifiable, Card: View, Edge: View>: View {
             index -= 1
             dragX = incoming
         }
-        withAnimation(.spring(duration: 0.4, bounce: 0.15)) { dragX = 0 }
+        withAnimation(HXMotion.card(reduceMotion: reduceMotion)) { dragX = 0 }
     }
 
     private func settle() {
-        withAnimation(reduceMotion ? nil : .spring(duration: 0.4, bounce: 0.3)) { dragX = 0 }
+        withAnimation(HXMotion.card(reduceMotion: reduceMotion)) { dragX = 0 }
     }
 }
 

@@ -82,6 +82,7 @@ final class SleepViewModel {
 /// Sleep over time, from the sleep card: a night up top (last night by default) with its
 /// hypnogram and its numbers against usual, trend charts by span, and a table of nights. Tapping a bar or a row puts that night up top.
 struct SleepView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State var viewModel: SleepViewModel
     @Environment(\.dismiss) private var dismiss
 
@@ -128,11 +129,11 @@ struct SleepView: View {
             }
             SleepTrendSection(viewModel: viewModel) { date in
                 viewModel.select(date)
-                withAnimation { proxy.scrollTo("night", anchor: .top) }
+                withAnimation(HXMotion.scroll(reduceMotion: reduceMotion)) { proxy.scrollTo("night", anchor: .top) }
             }
             SleepNightsTable(viewModel: viewModel) { date in
                 viewModel.select(date)
-                withAnimation { proxy.scrollTo("night", anchor: .top) }
+                withAnimation(HXMotion.scroll(reduceMotion: reduceMotion)) { proxy.scrollTo("night", anchor: .top) }
             }
         }
     }

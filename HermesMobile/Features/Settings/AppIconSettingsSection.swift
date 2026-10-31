@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 struct AppIconSettingsSection: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedAppIcon = AppIconChoice.system
     @State private var updatingAppIcon: AppIconChoice?
@@ -78,7 +79,7 @@ struct AppIconSettingsSection: View {
 
         UIApplication.shared.setAlternateIconName(appIcon.alternateIconName) { error in
             Task { @MainActor in
-                withAnimation {
+                withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) {
                     updatingAppIcon = nil
 
                     if let error {

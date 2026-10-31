@@ -658,7 +658,7 @@ struct HermexAttachmentPickerView: View {
                         model.selectionCount == 0 ? Color.black.opacity(0.54) : Color.accentColor,
                         in: Capsule()
                     )
-                    .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: confirmLabel)
+                    .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: confirmLabel)
                 }
                 .buttonStyle(.plain)
                 .disabled(model.selectionCount == 0 || model.isPreparing || model.libraryStatus == .loading)
@@ -891,7 +891,7 @@ struct HermexAttachmentPickerView: View {
         transitionTask = Task { @MainActor in
             await Task.yield()
             guard !Task.isCancelled else { return }
-            withAnimation(.snappy(duration: 0.2)) {
+            withAnimation(HXMotion.panel(reduceMotion: reduceMotion)) {
                 isVisible = true
             }
             transitionTask = nil
@@ -907,7 +907,7 @@ struct HermexAttachmentPickerView: View {
             onDismiss()
             return
         }
-        withAnimation(.easeInOut(duration: 0.16)) {
+        withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) {
             isVisible = false
         }
         transitionTask = Task { @MainActor in
@@ -928,7 +928,7 @@ struct HermexAttachmentPickerView: View {
     }
 
     private func animate(_ changes: () -> Void) {
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.28), changes)
+        withAnimation(HXMotion.swap(reduceMotion: reduceMotion), changes)
     }
 
     private func openSettings() {

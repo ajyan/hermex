@@ -89,11 +89,7 @@ struct PrepXPTick: View {
             .opacity(shown ? 1 : 0)
             .frame(maxWidth: .infinity, alignment: .trailing)
             .onAppear {
-                if reduceMotion {
-                    shown = true
-                } else {
-                    withAnimation(.easeOut(duration: 0.25)) { shown = true }
-                }
+                withAnimation(HXMotion.reveal(reduceMotion: reduceMotion)) { shown = true }
             }
             .accessibilityLabel(Text(verbatim: PrepCopy.xpSpoken(xp)))
     }
@@ -341,11 +337,7 @@ struct PrepDayCompleteView: View {
         }
         .sensoryFeedback(.success, trigger: closed)
         .onAppear {
-            if reduceMotion {
-                closed = true
-            } else {
-                withAnimation(.easeOut(duration: 0.7)) { closed = true }
-            }
+            withAnimation(HXMotion.draw(reduceMotion: reduceMotion)) { closed = true }
         }
     }
 

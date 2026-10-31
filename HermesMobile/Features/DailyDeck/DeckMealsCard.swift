@@ -346,7 +346,7 @@ struct DeckMealsCard: View {
         guard let plan = card.meals else { return }
         var next = selection ?? MealsSelection(plan: plan)
         edit(&next)
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { selection = next }
+        withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) { selection = next }
     }
 
     // MARK: Accepted
@@ -378,7 +378,7 @@ struct DeckMealsCard: View {
             .padding(.top, 4)
         }
         Button {
-            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { model.reopen(week.week) }
+            withAnimation(HXMotion.swap(reduceMotion: reduceMotion)) { model.reopen(week.week) }
         } label: {
             Label { Text(verbatim: "Change the plan") } icon: { Image(systemName: "arrow.uturn.backward") }
                 .font(AppFont.subheadline(weight: .semibold))
