@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Prep's landing screen: today's ring card, then interview practice (the voice mock ladders and the
-/// story bank), then the course's unit path and the gaps. Pushed as `.brainRoute(.prep(.home))`;
+/// Prep's landing screen: the readiness card (where practice stands and the one thing to do next), then
+/// interview practice (the voice mock ladders and the story bank), then the course's unit path and the gaps. Pushed as `.brainRoute(.prep(.home))`;
 /// owns no `NavigationStack`.
 struct PrepHomeView: View {
     @State private var viewModel: PrepHomeViewModel
@@ -46,11 +46,7 @@ struct PrepHomeView: View {
         case .loaded(let home):
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
-                    weeklyMockCard
-                    if let course = viewModel.course {
-                        PrepTodayRingCard(course: course, streak: home.streak,
-                                          action: PrepCopy.runAction(reps: home.run.reps, remaining: home.run.remaining))
-                    }
+                    readinessCard(home)
                     // Interview practice first: the mock ladders, then the story bank.
                     mockSection
                     storiesSection
@@ -70,16 +66,24 @@ struct PrepHomeView: View {
 
     // MARK: Mocks
 
-    /// The weekly mock, ahead of everything, while no mock was graded in the last 7 days.
-    @ViewBuilder
-    private var weeklyMockCard: some View {
-        if openMockCall.isAvailable, let mocks = mockViewModel.mocks, let kind = mocks.weeklyDue(),
-           let ladder = mocks.ladder(kind) {
-            PrepWeeklyMockCard(kind: kind, ladder: ladder, isStarting: mockViewModel.isStarting,
-                               errorMessage: mockViewModel.errorMessage) {
-                Task { await mockViewModel.startCall(kind: kind, open: openMockCall) }
-            }
-        }
+    /// Where practice stands, and one action: a due voice mock (none graded in 7 days) first, else today's run.
+    private func readinessCard(_ home: PrepHome) -> some View {
+        let mocks = mockViewModel.mocks
+        let due: PrepReadinessCard.DueMock? = openMockCall.isAvailable
+            ? mocks.flatMap { m in m.weeklyDue().flatMap { kind in m.ladder(kind).map { ladder in
+                PrepReadinessCard.DueMock(kind: kind, ladder: ladder, isStarting: mockViewModel.isStarting,
+                                          errorMessage: mockViewModel.errorMessage) {
+                    Task { await mockViewModel.startCall(kind: kind, open: openMockCall) }
+                }
+            } } }
+            : nil
+        let facts = PrepCopy.readinessFacts(
+            storiesReady: viewModel.stories?.readyCount, storiesTotal: viewModel.stories?.activeTotal,
+            gradedMocks: mocks.map { $0.recent.filter { $0.status == "graded" }.count },
+            openGaps: viewModel.gaps.map { $0.filter { $0.status == .open || $0.status == .improving }.count })
+        return PrepReadinessCard(facts: facts, streakDays: home.streak.days, today: viewModel.course?.today,
+                                 runAction: PrepCopy.runAction(reps: home.run.reps, remaining: home.run.remaining),
+                                 mock: due)
     }
 
     @ViewBuilder
@@ -107,9 +111,13 @@ struct PrepHomeView: View {
 /// Done is shown disabled once nothing is left today.
 struct PrepRunButton: View {
     let action: PrepCopy.RunAction
+    /// The readiness card's primary: full width, like Start call. Otherwise a compact capsule.
+    var fullWidth = false
+    /// Filled when it is the screen's main action; outlined when a due mock leads and the run follows.
+    var prominent = true
 
     var body: some View {
-        let title = PrepCopy.runActionTitle(action)
+        let title = fullWidth ? PrepCopy.runActionLongTitle(action) : PrepCopy.runActionTitle(action)
         if action == .done {
             label(title, enabled: false)
                 .accessibilityLabel(Text(verbatim: "Today's run is done"))
@@ -118,20 +126,22 @@ struct PrepRunButton: View {
                 label(title, enabled: true)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(Text(verbatim: "\(title) today's run"))
+            .accessibilityLabel(Text(verbatim: fullWidth ? title : "\(title) today's run"))
         }
     }
 
     private func label(_ title: String, enabled: Bool) -> some View {
-        Text(verbatim: title)
-            .font(BrainStyle.rowSubtitle.weight(.semibold))
-            .foregroundStyle(enabled ? Color.hxOnAccent : Color.hxTextSecondary)
-            .lineLimit(1)
-            .fixedSize()
+        let filled = enabled && prominent
+        return Text(verbatim: title)
+            .font((fullWidth ? AppFont.body(weight: .semibold) : BrainStyle.rowSubtitle.weight(.semibold)))
+            .foregroundStyle(filled ? Color.hxOnAccent : enabled ? Color.accentColor : Color.hxTextSecondary)
+            .lineLimit(fullWidth ? 2 : 1)
+            .fixedSize(horizontal: !fullWidth, vertical: true)
             .padding(.horizontal, BrainStyle.l)
             .padding(.vertical, BrainStyle.s)
-            .background(enabled ? Color.accentColor : Color.hxSeparator.opacity(0.6), in: Capsule())
-            .frame(minHeight: BrainStyle.minTapTarget)
+            .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: BrainStyle.minTapTarget)
+            .background(filled ? Color.accentColor : enabled ? Color.clear : Color.hxSeparator.opacity(0.6), in: Capsule())
+            .overlay { if enabled && !prominent { Capsule().strokeBorder(Color.accentColor, lineWidth: 1) } }
             .contentShape(Capsule())
     }
 }
@@ -178,11 +188,13 @@ struct PrepFailedView: View {
 
 // MARK: - Gaps
 
-/// The gap ledger on Prep home: open gaps (red dot) and improving ones (amber dot), each
-/// pushing its detail, then a "Closed this week" count. Replaces "Needs work" when the server
+/// The gap ledger on Prep home: the first three open or improving gaps (a filled amber dot, or an amber
+/// ring while improving), each pushing its detail, "See all N" for the rest, then a "Closed this week" count. Replaces "Needs work" when the server
 /// has the gaps route.
 struct PrepGapsSection: View {
     let gaps: [PrepGapSummary]
+    @State private var showsAll = false
+    private static let shown = 3
 
     private var active: [PrepGapSummary] { gaps.filter { $0.status == .open || $0.status == .improving } }
     private var closed: Int { gaps.filter { $0.status == .closed }.count }
@@ -199,17 +211,20 @@ struct PrepGapsSection: View {
                         BrainRow(title: "No open gaps",
                                  subtitle: "Atlas names a gap when the same point is missed across answers.")
                     }
-                    ForEach(Array(active.enumerated()), id: \.element.id) { offset, gap in
+                    ForEach(Array(active.prefix(showsAll ? active.count : Self.shown).enumerated()), id: \.element.id) { offset, gap in
                         if offset > 0 { PrepRowDivider() }
                         NavigationLink(value: ShellPushDestination.brainRoute(.prep(.gap(gap.id)))) {
                             BrainRow(
                                 leading: { PrepGapStatusDot(status: gap.status) },
                                 title: gap.label,
-                                subtitle: PrepCopy.stageChip(gap.stage),
                                 trailing: PrepCopy.gapRowDetail(gap)
                             )
                         }
                         .buttonStyle(.plain)
+                    }
+                    if active.count > Self.shown {
+                        PrepRowDivider()
+                        PrepShowAllButton(showsAll: $showsAll, count: active.count)
                     }
                     if closed > 0 {
                         PrepRowDivider()
@@ -221,14 +236,20 @@ struct PrepGapsSection: View {
     }
 }
 
-/// A gap's status as a small dot: open in the danger tint, improving in the warning tint.
+/// A gap's status as a small mark: open a filled amber dot (it needs care, it didn't fail), improving an
+/// amber ring, closed a gray dot. The shape tells open from improving as well as the fill.
 struct PrepGapStatusDot: View {
     let status: PrepGapStatus
 
     var body: some View {
-        Circle()
-            .fill(status == .open ? Color.hxDanger : status == .improving ? Color.hxWarning : Color.hxTextSecondary)
-            .frame(width: 8, height: 8)
+        Group {
+            switch status {
+            case .open: Circle().fill(Color.hxWarning)
+            case .improving: Circle().strokeBorder(Color.hxWarning, lineWidth: 1.5)
+            default: Circle().fill(Color.hxTextSecondary)
+            }
+        }
+        .frame(width: 9, height: 9)
             .accessibilityLabel(Text(verbatim: status == .open ? "Open" : status == .improving ? "Improving" : "Closed"))
     }
 }
@@ -287,7 +308,7 @@ struct PrepGapView: View {
     private func header(_ gap: PrepGapDetail) -> some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
             HStack(spacing: BrainStyle.s) {
-                HXChip(paper: .request, label: statusWord(gap)) { EmptyView() }
+                HXChip(paper: .knowledge, label: statusWord(gap)) { EmptyView() }
                 if let stage = PrepCopy.stageChip(gap.stage) {
                     HXChip(paper: .plain, label: stage) { EmptyView() }
                 }
@@ -349,5 +370,24 @@ struct PrepGapView: View {
                 }
             }
         }
+    }
+}
+
+/// "See all 14" / "Show fewer" under a list cut to its first few rows.
+struct PrepShowAllButton: View {
+    @Binding var showsAll: Bool
+    let count: Int
+
+    var body: some View {
+        Button {
+            showsAll.toggle()
+        } label: {
+            Text(verbatim: showsAll ? "Show fewer" : "See all \(count)")
+                .font(BrainStyle.rowSubtitle)
+                .foregroundStyle(Color.accentColor)
+                .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }

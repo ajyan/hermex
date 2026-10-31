@@ -464,7 +464,6 @@ final class PrepMockTests: APIClientTestCase {
         XCTAssertEqual(PrepMockCopy.rowTitle(.design, ladder: design), "System design · D2 Through architecture")
         XCTAssertEqual(PrepMockCopy.next(after: "D1", in: design), "Next: D2 Through architecture")
         XCTAssertNil(PrepMockCopy.next(after: "D2", in: design))
-        XCTAssertEqual(PrepMockCopy.firstWord(900), "First word in 0.9 s (median)")
     }
 
     // MARK: The brief's start

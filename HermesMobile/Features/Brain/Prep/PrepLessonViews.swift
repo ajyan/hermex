@@ -424,10 +424,8 @@ struct PrepLessonView: View {
             }
     }
 
-    private var title: String {
-        if case let .loaded(lesson) = viewModel.state { return lesson.title }
-        return "Lesson"
-    }
+    /// The lesson's own title heads the page (PrepLessonBody), so the bar just says where you are.
+    private var title: String { "Lesson" }
 
     @ViewBuilder
     private var content: some View {

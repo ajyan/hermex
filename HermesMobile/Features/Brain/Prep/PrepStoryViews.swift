@@ -124,6 +124,7 @@ struct PrepStoryTellCard: View {
     let startClock: () -> Void
     @State private var showsScript = false
     @ScaledMetric(relativeTo: .subheadline) private var labelWidth: CGFloat = 76
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         PrepRunCard {
@@ -155,11 +156,15 @@ struct PrepStoryTellCard: View {
             if !cues.isEmpty {
                 VStack(alignment: .leading, spacing: BrainStyle.s) {
                     ForEach(cues) { cue in
-                        HStack(alignment: .firstTextBaseline, spacing: BrainStyle.m) {
+                        // At accessibility sizes the label sits over its cue, so the cue keeps the full width.
+                        let layout = dynamicTypeSize.isAccessibilitySize
+                            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+                            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: BrainStyle.m))
+                        layout {
                             Text(verbatim: cue.label)
                                 .font(AppFont.body(weight: .semibold))
                                 .foregroundStyle(HermexPaper.knowledge.glow)
-                                .frame(width: labelWidth, alignment: .leading)
+                                .frame(width: dynamicTypeSize.isAccessibilitySize ? nil : labelWidth, alignment: .leading)
                             Text(verbatim: cue.cue)
                                 .font(BrainStyle.rowTitle)
                                 .foregroundStyle(Color.hxTextPrimary)
