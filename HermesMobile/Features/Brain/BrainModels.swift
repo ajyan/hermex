@@ -649,13 +649,16 @@ struct BrainHome: Codable, Hashable, Sendable {
     let bites: [BrainBite]
     let batch: Int
     let hasMore: Bool
+    /// The server's day the deck was dealt for ("2026-10-31"); nil from an older server.
+    let day: String?
 
-    private enum CodingKeys: String, CodingKey { case bites, batch, hasMore }
+    private enum CodingKeys: String, CodingKey { case bites, batch, hasMore, day }
 
-    init(bites: [BrainBite] = [], batch: Int = 0, hasMore: Bool = false) {
+    init(bites: [BrainBite] = [], batch: Int = 0, hasMore: Bool = false, day: String? = nil) {
         self.bites = bites
         self.batch = batch
         self.hasMore = hasMore
+        self.day = day
     }
 
     init(from decoder: Decoder) throws {
@@ -663,6 +666,7 @@ struct BrainHome: Codable, Hashable, Sendable {
         bites = c.lossy(BrainBite.self, .bites).filter { $0.kind != .unknown }
         batch = c.int(.batch)
         hasMore = (c.optional(Bool.self, .hasMore)) ?? false
+        day = c.optional(String.self, .day)
     }
 
     var isEmpty: Bool { bites.isEmpty }
