@@ -209,6 +209,17 @@ final class BrainVisualsTests: XCTestCase {
         XCTAssertEqual(BrainReaderLayout.metaLine(for: undated, today: today, calendar: utc, locale: us), "Concept · someday")
     }
 
+    func testAHubSaysSoInItsMetaLine() throws {
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = try XCTUnwrap(TimeZone(identifier: "UTC"))
+        let today = try XCTUnwrap(utc.date(from: DateComponents(year: 2026, month: 10, day: 31, hour: 12)))
+        let item = BrainItem(module: .wiki, id: "h", date: "2026-10-10", kind: "concept", dateLabel: "updated")
+        XCTAssertEqual(BrainReaderLayout.metaLine(for: item, hubPageCount: 8, today: today, calendar: utc),
+                       "Hub · 8 pages · updated 3 wk ago")
+        let undated = BrainItem(module: .wiki, id: "h", kind: "entity")
+        XCTAssertEqual(BrainReaderLayout.metaLine(for: undated, hubPageCount: 5, today: today, calendar: utc), "Hub · 5 pages")
+    }
+
     func testListAgeUsesThePeopleListSteps() throws {
         var utc = Calendar(identifier: .gregorian)
         utc.timeZone = try XCTUnwrap(TimeZone(identifier: "UTC"))
@@ -306,6 +317,40 @@ final class BrainConnectionsTests: XCTestCase {
         let page = BrainPage(item: BrainItem(module: .wiki, id: "self"),
                              links: [ref("a"), ref("self"), ref("b", .people), ref("a")])
         XCTAssertEqual(BrainConnectionsLayout.linkCards(page).map(\.id), ["a", "b"])
+    }
+
+    func testLinkCardsLeaveOutTheTrailHubAndAHubsOwnPages() {
+        let member = BrainPage(item: BrainItem(module: .wiki, id: "self"), links: [ref("hub"), ref("a")],
+                               hub: BrainHubContext(ref: ref("hub"), index: 0, count: 3))
+        XCTAssertEqual(BrainConnectionsLayout.linkCards(member).map(\.id), ["a"], "the trail already names the hub")
+        let hub = BrainPage(item: BrainItem(module: .wiki, id: "self"), links: [ref("a"), ref("b"), ref("c")],
+                            hubPages: [ref("a"), ref("b")])
+        XCTAssertEqual(BrainConnectionsLayout.linkCards(hub).map(\.id), ["c"], "In this hub lists a and b")
+    }
+
+    func testAHubInsideAHubListsItsPagesWithoutItsParent() {
+        let page = BrainPage(item: BrainItem(module: .wiki, id: "self"),
+                             hub: BrainHubContext(ref: ref("parent"), index: 2, count: 7),
+                             hubPages: [ref("parent"), ref("a"), ref("self"), ref("b")])
+        XCTAssertEqual(BrainConnectionsLayout.hubPages(page).map(\.id), ["a", "b"])
+    }
+
+    func testHubPagesDecodeOnThePageAndInTheHubContext() throws {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let json = #"""
+        {"item": {"module": "wiki", "id": "p1"},
+         "hub": {"ref": {"module": "wiki", "id": "h"}, "index": 0, "count": 2,
+                 "pages": [{"module": "wiki", "id": "p1", "snippet": "One."}, {"module": "nope", "id": "x"},
+                           {"module": "wiki", "id": "p2"}]},
+         "hub_pages": [{"module": "wiki", "id": "c1", "title": "C1", "snippet": "Gist."}]}
+        """#
+        let page = try decoder.decode(BrainPage.self, from: Data(json.utf8))
+        XCTAssertEqual(page.hub?.pages.map(\.id), ["p1", "p2"], "an unknown module drops one row, not the list")
+        XCTAssertEqual(page.hub?.pages.first?.snippet, "One.")
+        XCTAssertEqual(page.hubPages.map(\.snippet), ["Gist."])
+        let older = try decoder.decode(BrainPage.self, from: Data(#"{"item": {"module": "wiki", "id": "p"}}"#.utf8))
+        XCTAssertEqual(older.hubPages, [])
     }
 
     func testPagerShowsOnlyForAPageInItsHubWithANeighbour() {

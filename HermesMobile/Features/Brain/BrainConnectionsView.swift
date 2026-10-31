@@ -7,10 +7,23 @@ enum BrainConnectionsLayout {
     /// A horizontal drag this long, and mostly sideways, pages through the hub.
     static let swipeDistance: CGFloat = 80
 
-    /// The linked-page cards: the page's links without repeats or itself, in server order.
+    /// The linked-page cards: the page's links without repeats or itself, in server order,
+    /// and without what the page already shows elsewhere: its hub (the trail names it) and,
+    /// on a hub, its own pages (In this hub lists them).
     static func linkCards(_ page: BrainPage) -> [BrainRef] {
         var seen: Set<String> = [page.item.id]
+        if let hub = page.hub { seen.insert(hub.ref.id) }
+        seen.formUnion(page.hubPages.map(\.id))
         return page.links.filter { seen.insert($0.id).inserted }
+    }
+
+    /// The hub's pages shown before "Show all N" on the hub itself.
+    static let hubPreviewCount = 3
+
+    /// A hub's own pages as its page lists them: without the hub it sits in itself, which
+    /// the trail and the pager already name.
+    static func hubPages(_ page: BrainPage) -> [BrainRef] {
+        page.hubPages.filter { $0.id != page.hub?.ref.id && $0.id != page.item.id }
     }
 
     /// The pager shows only when the page sits in its hub's list and has a neighbour there.
@@ -248,27 +261,35 @@ struct BrainMentionRow: View {
 }
 
 /// A glass bar over the page's foot: previous and next in the hub, and where you are.
+/// Tapping where you are lists the hub's pages.
 struct BrainHubPager: View {
     let hub: BrainHubContext
     let onStep: (Int) -> Void
+    var onShowPages: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 0) {
             stepButton(-1, ref: hub.prev, symbol: "chevron.backward", label: "Previous")
-            VStack(spacing: 1) {
-                Text(verbatim: hub.ref.title)
-                    .font(AppFont.caption(weight: .semibold))
-                    .foregroundStyle(Color.hxTextPrimary)
-                    .lineLimit(1)
-                if let position = BrainConnectionsLayout.position(hub) {
-                    Text(verbatim: position)
-                        .font(AppFont.caption2())
-                        .foregroundStyle(Color.hxTextSecondary)
-                        .monospacedDigit()
+            Button { onShowPages?() } label: {
+                VStack(spacing: 1) {
+                    Text(verbatim: hub.ref.title)
+                        .font(AppFont.caption(weight: .semibold))
+                        .foregroundStyle(Color.hxTextPrimary)
+                        .lineLimit(1)
+                    if let position = BrainConnectionsLayout.position(hub) {
+                        Text(verbatim: position)
+                            .font(AppFont.caption2())
+                            .foregroundStyle(Color.hxTextSecondary)
+                            .monospacedDigit()
+                    }
                 }
+                .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
+                .contentShape(Rectangle())
             }
-            .frame(maxWidth: .infinity)
+            .buttonStyle(.plain)
+            .disabled(onShowPages == nil || hub.pages.isEmpty)
             .accessibilityElement(children: .combine)
+            .accessibilityHint(Text(verbatim: "Lists the pages in this hub"))
             stepButton(1, ref: hub.next, symbol: "chevron.forward", label: "Next")
         }
         .padding(.horizontal, BrainStyle.xs)
@@ -289,6 +310,57 @@ struct BrainHubPager: View {
         .foregroundStyle(ref == nil ? Color.hxTextSecondary.opacity(0.4) : Color.accentColor)
         .disabled(ref == nil)
         .accessibilityLabel(Text(verbatim: ref.map { "\(label): \($0.title)" } ?? label))
+    }
+}
+
+/// A hub's pages, in pager order, the current one checked. Picking another closes the sheet
+/// and the reader moves to it, as a pager step would.
+struct BrainHubPagesSheet: View {
+    let hub: BrainHubContext
+    let currentID: String
+    let onPick: (BrainRef) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @ScaledMetric(relativeTo: .body) private var numberWidth = BrainStyle.searchThumbnailSize
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(Array(hub.pages.enumerated()), id: \.element.id) { index, ref in
+                    let isCurrent = ref.id == currentID
+                    Button {
+                        dismiss()
+                        if !isCurrent { onPick(ref) }
+                    } label: {
+                        HStack(spacing: BrainStyle.m) {
+                            Text(verbatim: "\(index + 1)")
+                                .brainText(.meta)
+                                .monospacedDigit()
+                                .frame(width: numberWidth, alignment: .trailing)
+                            BrainRow(title: ref.title.isEmpty ? ref.id : ref.title, subtitle: ref.snippet)
+                            if isCurrent {
+                                Image(systemName: "checkmark")
+                                    .font(BrainStyle.rowSubtitle.weight(.semibold))
+                                    .foregroundStyle(Color.accentColor)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(Color.hxSurface)
+                    .accessibilityAddTraits(isCurrent ? .isSelected : [])
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .navigationTitle(Text(verbatim: hub.ref.title))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button { dismiss() } label: { Text(verbatim: "Done") }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 }
 
