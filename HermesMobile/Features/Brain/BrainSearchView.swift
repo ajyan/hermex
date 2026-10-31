@@ -146,9 +146,13 @@ struct BrainSearchResultRow: View {
     @ScaledMetric(relativeTo: .body) private var side = BrainStyle.searchThumbnailSize
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    init(ref: BrainRef, subtitle: String? = nil) {
+    /// Off when the row's section shows one kind only.
+    private let showsLeading: Bool
+
+    init(ref: BrainRef, subtitle: String? = nil, showsLeading: Bool = true) {
         self.ref = ref
         self.subtitle = subtitle ?? ref.snippet
+        self.showsLeading = showsLeading
     }
 
     var body: some View {
@@ -163,7 +167,9 @@ struct BrainSearchResultRow: View {
 
     @ViewBuilder
     private var leading: some View {
-        if ref.module == .people {
+        if !showsLeading {
+            EmptyView()
+        } else if ref.module == .people {
             BrainMonogram(name: ref.title, size: side)
         } else {
             BrainModuleIcon(systemName: ref.module.symbolName, paper: ref.module.paper)
