@@ -283,7 +283,7 @@ struct BrainHomeView: View {
                         BrainRow(
                             leading: { BrainModuleIcon(systemName: dailyAsk?.isLocked == true ? "lock.fill" : "target", paper: .knowledge) },
                             title: "Interview prep",
-                            subtitle: dailyAsk?.isLocked == true ? "After today's Ask" : "Today's run and your tracks",
+                            subtitle: dailyAsk?.isLocked == true ? "After today's Ask" : "Today's run, mocks and stories",
                             subtitleLineLimit: 1
                         )
                     }

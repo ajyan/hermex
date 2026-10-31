@@ -8,7 +8,6 @@ import Foundation
 protocol PrepDataClient: Sendable {
     func home() async throws -> PrepHome
     func today(run: PrepRunKind, unit: String?) async throws -> PrepRun
-    func map(track: String) async throws -> PrepTrackMap
     func attempt(_ r: PrepAttemptRequest) async throws -> PrepAttemptResult
     func gaps() async throws -> [PrepGapSummary]
     func gap(id: String) async throws -> PrepGapDetail
@@ -74,10 +73,6 @@ struct APIClientPrepAdapter: PrepDataClient {
 
     func today(run: PrepRunKind, unit: String?) async throws -> PrepRun {
         try await get(run == .daily ? .tutorToday : .tutorRun(run: run.rawValue, unit: unit))
-    }
-
-    func map(track: String) async throws -> PrepTrackMap {
-        try await get(.tutorMap(track: track))
     }
 
     func attempt(_ r: PrepAttemptRequest) async throws -> PrepAttemptResult {
