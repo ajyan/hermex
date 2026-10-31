@@ -123,11 +123,18 @@ struct MonthCoverCard: View {
                 }
                 .padding(.top, 22)
             }
+            if let note = card.noteFromPast {
+                MonthLetterFromPast(note: note, palette: palette).padding(.top, 20)
+            }
+            if let days = card.month?.dayLines, !days.isEmpty {
+                MonthDayRows(card: card, days: days, palette: palette, viewModel: viewModel, revealed: revealed)
+                    .padding(.top, 22)
+            }
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(card.moments.enumerated()), id: \.element.id) { index, moment in
                     if index > 0 { WeekHairline(palette: palette) }
                     momentRow(moment)
-                        .opacity(revealed ? 1 : 0)
+                        .opacity(revealed ? 1 : 0.35)
                         .offset(y: revealed ? 0 : 14)
                         .animation(reduceMotion ? nil : .easeOut(duration: 0.45).delay(0.7 + Double(index) * 0.32),
                                    value: revealed)
@@ -140,14 +147,10 @@ struct MonthCoverCard: View {
                     .foregroundStyle(Color.hxTextPrimary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 18)
-                    .opacity(revealed ? 1 : 0)
+                    .opacity(revealed ? 1 : 0.35)
                     .animation(reduceMotion ? nil : .easeOut(duration: 0.5).delay(0.8 + Double(card.moments.count) * 0.32),
                                value: revealed)
             }
-            Text(verbatim: "Swipe to begin")
-                .font(AppFont.footnote())
-                .foregroundStyle(palette.ink)
-                .padding(.top, 20)
         }
         .monthReveal(card, viewModel, $revealed)
         .sensoryFeedback(.impact(weight: .light), trigger: revealed) { _, now in now }
@@ -213,7 +216,7 @@ struct MonthWeeksCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(weeks.enumerated()), id: \.element.id) { index, week in
                     row(week, isLast: index == weeks.count - 1, index: index)
-                        .opacity(revealed ? 1 : 0)
+                        .opacity(revealed ? 1 : 0.35)
                         .offset(x: revealed ? 0 : -40)
                         .animation(reduceMotion ? nil : .spring(response: 0.55, dampingFraction: 0.72)
                             .delay(0.1 + Double(index) * 0.14), value: revealed)
@@ -302,6 +305,10 @@ struct MonthDotsCard: View {
         let month = card.month
         VStack(alignment: .leading, spacing: 0) {
             WeekCardHeading(title: card.title ?? "Your month in dots", palette: palette)
+            if let month, month.daysInMonth == 7 {
+                MonthWeekDots(rows: month.rows, labels: month.labels, revealed: revealed, paper: palette.colors)
+                    .padding(.top, 18)
+            } else {
             Grid(alignment: .topLeading, horizontalSpacing: 18, verticalSpacing: 20) {
                 let rows = month?.rows ?? []
                 ForEach(Array(stride(from: 0, to: rows.count, by: 2)), id: \.self) { start in
@@ -315,6 +322,7 @@ struct MonthDotsCard: View {
                 }
             }
             .padding(.top, 18)
+            }
             ForEach(Array((month?.pips ?? []).enumerated()), id: \.element.id) { index, row in
                 pips(row, delay: 0.9 + Double(index) * 0.2).padding(.top, index == 0 ? 22 : 12)
             }
@@ -498,7 +506,7 @@ struct MonthInsightCard: View {
 }
 
 /// The month's days in one line: a day the insight touched fills in, a marked day keeps a ring.
-private struct MonthDayStrip: View {
+struct MonthDayStrip: View {
     let days: Set<Int>
     let marked: Set<Int>
     let count: Int
@@ -565,5 +573,171 @@ struct MonthWeekScores: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: "Weekly scores: " + scores.map { $0.map(String.init) ?? "none" }.joined(separator: ", ")))
+    }
+}
+
+// MARK: The week
+
+/// A weekly cover's days, one row each: the day, its line, and its value in that value's paper. A star
+/// marks a real moment of the week (filed as `lists["stars"]`); the month's cover draws from the stars.
+struct MonthDayRows: View {
+    let card: DeckCard
+    let days: [DeckMonth.DayLine]
+    let palette: DeckPalette
+    let viewModel: DailyDeckViewModel
+    let revealed: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        let stars = viewModel.answer(for: card)?.lists?["stars"] ?? []
+        VStack(alignment: .leading, spacing: 0) {
+            Text(verbatim: "Star the moments that mattered")
+                .font(AppFont.footnote(weight: .semibold))
+                .foregroundStyle(palette.ink)
+                .padding(.bottom, 6)
+            ForEach(Array(days.enumerated()), id: \.element.id) { index, day in
+                if index > 0 { WeekHairline(palette: palette) }
+                row(day, starred: stars.contains(day.day), stars: stars)
+                    .opacity(revealed ? 1 : 0.35)
+                    .offset(y: revealed ? 0 : 12)
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.3).delay(0.15 + Double(index) * 0.06), value: revealed)
+            }
+        }
+    }
+
+    private func row(_ day: DeckMonth.DayLine, starred: Bool, stars: [String]) -> some View {
+        Button {
+            let next = starred ? stars.filter { $0 != day.day } : stars + [day.day]
+            withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.6)) {
+                viewModel.setList("stars", next, for: card)
+            }
+        } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(verbatim: day.day)
+                    .font(AppFont.footnote(weight: .semibold))
+                    .foregroundStyle(Color.hxTextSecondary)
+                    .frame(minWidth: 34, alignment: .leading)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(verbatim: day.line)
+                        .font(AppFont.subheadline())
+                        .foregroundStyle(Color.hxTextPrimary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let value = day.value, let name = WeekValues.shortName(value) {
+                        HXChip(paper: MonthValues.paper(value), label: name)
+                    }
+                }
+                Spacer(minLength: 4)
+                Image(systemName: starred ? "star.fill" : "star")
+                    .font(AppFont.body(weight: .semibold))
+                    .foregroundStyle(starred ? palette.ink : palette.ink.opacity(0.45))
+                    .scaleEffect(starred ? 1.15 : 1)
+                    .frame(minWidth: 32, minHeight: 32)
+            }
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(verbatim: "\(day.day), \(day.line)"))
+        .accessibilityValue(Text(verbatim: starred ? "Starred" : "Not starred"))
+        .accessibilityHint(Text(verbatim: starred ? "Removes the star" : "Stars this moment"))
+    }
+}
+
+/// The week in dots: one row per habit, a dot per day under the weekday letters, and its count.
+struct MonthWeekDots: View {
+    let rows: [DeckMonth.DotRow]
+    let labels: [String]
+    let revealed: Bool
+    let paper: HermexPaper
+
+    @ScaledMetric(relativeTo: .body) private var dot: CGFloat = 16
+
+    var body: some View {
+        let letters = labels.count == 7 ? labels : ["M", "T", "W", "T", "F", "S", "S"]
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 0) {
+                Color.clear.frame(width: 96, height: 1)
+                ForEach(Array(letters.enumerated()), id: \.offset) { _, letter in
+                    Text(verbatim: letter)
+                        .font(AppFont.caption2(weight: .semibold))
+                        .foregroundStyle(Color.hxTextSecondary)
+                        .frame(maxWidth: .infinity)
+                }
+                Color.clear.frame(width: 26, height: 1)
+            }
+            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                let done = Set(row.days)
+                HStack(spacing: 0) {
+                    Text(verbatim: row.label)
+                        .font(AppFont.subheadline(weight: .semibold))
+                        .foregroundStyle(Color.hxTextPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .frame(width: 96, alignment: .leading)
+                    ForEach(1...7, id: \.self) { day in
+                        MonthDot(filled: done.contains(day), revealed: revealed,
+                                 delay: Double(index) * 0.08 + Double(day) * 0.06, paper: paper, size: dot)
+                            .frame(maxWidth: .infinity)
+                    }
+                    MonthCountUp(value: done.count, revealed: revealed, delay: 0.3 + Double(index) * 0.08)
+                        .font(AppFont.subheadline(weight: .bold))
+                        .foregroundStyle(paper.glow)
+                        .frame(width: 26, alignment: .trailing)
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text(verbatim: "\(row.label), \(done.count) of 7 days"))
+            }
+        }
+    }
+}
+
+
+/// The letter he sealed this week a year ago: a sealed envelope until tapped, then his words.
+struct MonthLetterFromPast: View {
+    let note: DeckPastNote
+    let palette: DeckPalette
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isOpen = false
+
+    var body: some View {
+        Button {
+            withAnimation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.8)) { isOpen.toggle() }
+        } label: {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 12) {
+                    Image(systemName: isOpen ? "envelope.open" : "envelope.fill")
+                        .font(AppFont.title3(weight: .semibold))
+                        .foregroundStyle(palette.ink)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(verbatim: "A letter from a year ago")
+                            .font(AppFont.subheadline(weight: .semibold))
+                            .foregroundStyle(Color.hxTextPrimary)
+                        Text(verbatim: isOpen ? (note.title ?? "You wrote this a year ago") : "Sealed a year ago · tap to open")
+                            .font(AppFont.footnote())
+                            .foregroundStyle(Color.hxTextSecondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+                if isOpen {
+                    Text(verbatim: note.text)
+                        .font(AppFont.serif(style: .body))
+                        .foregroundStyle(Color.hxTextPrimary)
+                        .lineSpacing(3)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .transition(.opacity)
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .glowSurface(palette.colors, cornerRadius: HXRadius.md, opaque: true)
+            .contentShape(RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(verbatim: isOpen ? "A letter from a year ago: \(note.text)" : "A sealed letter from a year ago"))
+        .accessibilityHint(Text(verbatim: isOpen ? "Closes the letter" : "Opens the letter"))
     }
 }

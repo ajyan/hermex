@@ -111,6 +111,9 @@ struct DeckCardView: View {
                 case .monthInsight: MonthInsightCard(card: card, palette: palette, viewModel: viewModel)
                 case .monthSleep: MonthSleepCard(card: card, palette: palette, viewModel: viewModel)
                 case .monthQuestion: MonthQuestionCard(card: card, palette: palette, viewModel: viewModel)
+                case .weekHeld: WeekHeldCard(card: card, palette: palette, viewModel: viewModel)
+                case .weekPlan: WeekPlanCard(card: card, palette: palette, viewModel: viewModel)
+                case .weekLetter: WeekLetterCard(card: card, palette: palette, viewModel: viewModel)
                 default: if isJobCard { jobReading } else { reading }
                 }
                 // Reaching the end of the card counts toward the style learner's usage (`DeckSignals`). A short card's
@@ -923,11 +926,12 @@ struct DeckCardView: View {
         if let month = card.month {
             // The month's close: the year with this month lit, then filing, without the daily close's lines.
             MonthCloseHero(month: month, title: viewModel.cards.first?.title, palette: palette,
-                           answered: count, filed: filed, isOnTop: viewModel.currentCardID == card.id)
+                           answered: count, filed: filed, isOnTop: viewModel.currentCardID == card.id,
+                           stars: viewModel.cards.first.flatMap { viewModel.answer(for: $0)?.lists?["stars"]?.count } ?? 0)
             if case .failed(let message) = viewModel.filing {
                 Text(verbatim: message).font(AppFont.footnote()).foregroundStyle(Color.hxDanger).padding(.top, 12)
             }
-            fileButton(seal: false)
+            fileButton(seal: seal)
         } else {
             Text(verbatim: DeckCopy.closeHeading(seal: seal, filed: filed, count: count))
                 .font(AppFont.display(style: .largeTitle, weight: .semibold))

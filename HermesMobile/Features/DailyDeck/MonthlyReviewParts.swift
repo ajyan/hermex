@@ -41,9 +41,9 @@ struct MonthSnippets: View {
                 .padding(.top, index > 0 ? 0 : 10)
                 .padding(.bottom, 10)
                 .accessibilityElement(children: .combine)
-                .opacity(revealed ? 1 : 0)
+                .opacity(revealed ? 1 : 0.35)
                 .offset(y: revealed ? 0 : 10)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.4).delay(delay + Double(index) * 0.18), value: revealed)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.3).delay(min(delay, 0.25) + Double(index) * 0.06), value: revealed)
             }
         }
     }
@@ -114,7 +114,7 @@ struct MonthHighlights: View {
             ForEach(Array(tiles.enumerated()), id: \.offset) { index, tile in
                 tileView(tile, delay: 0.1 + Double(index) * 0.12)
                     .scaleEffect(revealed ? 1 : 0.9)
-                    .opacity(revealed ? 1 : 0)
+                    .opacity(revealed ? 1 : 0.35)
                     .animation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.7).delay(0.1 + Double(index) * 0.12),
                                value: revealed)
             }
@@ -225,9 +225,9 @@ struct MonthThemes: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
                 .accessibilityElement(children: .combine)
-                .opacity(revealed ? 1 : 0)
+                .opacity(revealed ? 1 : 0.35)
                 .offset(y: revealed ? 0 : 10)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.4).delay(delay + Double(index) * 0.15), value: revealed)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.3).delay(min(delay, 0.2) + Double(index) * 0.06), value: revealed)
             }
         }
     }
@@ -254,6 +254,25 @@ struct MonthValueCard: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.trailing, clearance)
                 .accessibilityAddTraits(.isHeader)
+            if month?.scored == true, month?.inputFirst == true { scoreRow.padding(.top, 16) }
+            if let stat = month?.stat {
+                // Becoming a dad carries the letters: how many, and the days written.
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    MonthCountUp(value: stat.value, revealed: revealed, delay: 0.1)
+                        .font(AppFont.display(style: .largeTitle, weight: .heavy))
+                        .foregroundStyle(palette.ink)
+                    Text(verbatim: stat.label)
+                        .font(AppFont.subheadline(weight: .medium))
+                        .foregroundStyle(Color.hxTextSecondary)
+                }
+                .accessibilityElement(children: .combine)
+                .padding(.top, 14)
+                if let month, !month.days.isEmpty {
+                    MonthDayStrip(days: Set(month.days), marked: [], count: month.daysInMonth ?? 31,
+                                  revealed: revealed, paper: palette.colors)
+                        .padding(.top, 10)
+                }
+            }
             if let themes = month?.themes, !themes.isEmpty {
                 MonthThemes(themes: themes, palette: palette, revealed: revealed).padding(.top, 20)
             }
@@ -271,8 +290,16 @@ struct MonthValueCard: View {
             if let library = month?.library, !library.isEmpty {
                 MonthLibrary(quotes: library, palette: palette).padding(.top, 22)
             }
+            if month?.scored == true, month?.inputFirst != true { scoreRow.padding(.top, 24) }
         }
         .monthReveal(card, viewModel, $revealed)
+    }
+
+    /// The weekly review's 1–10 for the value; the monthly's value cards are read only.
+    private var scoreRow: some View {
+        let valueID = card.valueID ?? card.id
+        return WeekScoreRow(title: "How you lived it this week", score: viewModel.answer(for: card)?.scores?[valueID],
+                            palette: palette) { viewModel.setScore(valueID, $0, for: card) }
     }
 }
 
@@ -307,8 +334,29 @@ struct MonthSleepCard: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 12)
             }
+            if let month, !month.rows.isEmpty, month.daysInMonth == 7 {
+                MonthWeekDots(rows: month.rows, labels: month.labels, revealed: revealed, paper: palette.colors)
+                    .padding(.top, 20)
+                ForEach(month.pips) { row in
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(verbatim: row.label)
+                            .font(AppFont.subheadline(weight: .semibold))
+                            .foregroundStyle(Color.hxTextPrimary)
+                        Spacer()
+                        MonthCountUp(value: row.count, revealed: revealed, delay: 0.3)
+                            .font(AppFont.subheadline(weight: .bold))
+                            .foregroundStyle(palette.ink)
+                    }
+                    .padding(.top, 12)
+                    .accessibilityElement(children: .combine)
+                }
+                Text(verbatim: "Sleep")
+                    .font(AppFont.title3(weight: .semibold))
+                    .foregroundStyle(palette.ink)
+                    .padding(.top, 26)
+            }
             if let sleep = month?.sleep {
-                score(sleep).padding(.top, 22)
+                score(sleep).padding(.top, 14)
                 nights(sleep, firstWeekday: month?.firstWeekday ?? 0, count: month?.daysInMonth ?? 31).padding(.top, 18)
                 hrv(sleep, count: month?.daysInMonth ?? 31).padding(.top, 20)
                 tiles(sleep.tiles).padding(.top, 20)
@@ -317,7 +365,7 @@ struct MonthSleepCard: View {
                 }
             }
             if let snippets = month?.snippets, !snippets.isEmpty {
-                MonthSnippets(snippets: snippets, palette: palette, revealed: revealed, delay: 1.2).padding(.top, 22)
+                MonthSnippets(snippets: snippets, palette: palette, revealed: revealed, delay: 0.2).padding(.top, 22)
             }
             if let library = month?.library, !library.isEmpty {
                 MonthLibrary(quotes: library, palette: palette).padding(.top, 22)
@@ -336,13 +384,25 @@ struct MonthSleepCard: View {
                     .font(AppFont.subheadline(weight: .medium))
                     .foregroundStyle(Color.hxTextPrimary)
                 if let delta = sleep.delta {
-                    Text(verbatim: delta == 0 ? "same as last month" : "\(delta > 0 ? "+" : "−")\(abs(delta)) on last month")
+                    Text(verbatim: delta == 0 ? "same as last \(span)" : "\(delta > 0 ? "+" : "−")\(abs(delta)) on last \(span)")
                         .font(AppFont.footnote(weight: .semibold))
                         .foregroundStyle(palette.ink)
                 }
             }
         }
         .accessibilityElement(children: .combine)
+    }
+
+    /// A week's calendar runs Monday to Sunday (the deck's `labels`); a month's Sunday to Saturday.
+    private var isWeek: Bool { card.month?.labels.count == 7 }
+    private var span: String { isWeek ? "week" : "month" }
+    private var columnLetters: [String] { isWeek ? card.month?.labels ?? [] : ["S", "M", "T", "W", "T", "F", "S"] }
+
+    /// The HRV strip's ends: "Mon" and "Sun" for a week, the month's first and last day for a month.
+    private var stripEnds: (String, String) {
+        if isWeek { return ("Mon", "Sun") }
+        let month = DailyDeckPaths.date(day: viewModel.date)?.formatted(.dateTime.month(.abbreviated)) ?? ""
+        return ("\(month) 1", "\(month) \(card.month?.daysInMonth ?? 31)")
     }
 
     /// The month as a calendar of nights: full for 80+, half for the 70s, a ring under 70.
@@ -352,7 +412,7 @@ struct MonthSleepCard: View {
         let weeks = stride(from: 0, to: cells.count, by: 7).map { Array(cells[$0..<min($0 + 7, cells.count)]) }
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 0) {
-                ForEach(Array(["S", "M", "T", "W", "T", "F", "S"].enumerated()), id: \.offset) { _, letter in
+                ForEach(Array(columnLetters.enumerated()), id: \.offset) { _, letter in
                     Text(verbatim: letter)
                         .font(AppFont.caption2(weight: .semibold))
                         .foregroundStyle(Color.hxTextSecondary)
@@ -418,9 +478,9 @@ struct MonthSleepCard: View {
                 }
             }
             HStack {
-                Text(verbatim: "Oct 1")
+                Text(verbatim: stripEnds.0)
                 Spacer()
-                Text(verbatim: "Oct \(count)")
+                Text(verbatim: stripEnds.1)
             }
             .font(AppFont.caption2(weight: .medium))
             .foregroundStyle(Color.hxTextSecondary)
@@ -512,6 +572,9 @@ struct MonthQuestionCard: View {
                     .padding(.bottom, 18)
                     .accessibilityAddTraits(.isHeader)
             }
+            if month?.inputFirst == true {
+                answerBlock(answer).padding(.bottom, 24)
+            }
             if let tiles = month?.tiles, !tiles.isEmpty {
                 MonthHighlights(tiles: tiles, palette: palette, revealed: revealed).padding(.bottom, 20)
             }
@@ -530,14 +593,19 @@ struct MonthQuestionCard: View {
             if let library = month?.library, !library.isEmpty {
                 MonthLibrary(quotes: library, palette: palette).padding(.bottom, 22)
             }
-            WeekCardHeading(title: card.question ?? "", palette: palette)
-            WeekWordsBox(text: answer, placeholder: "In your words", palette: palette) { isEditing = true }
-                .padding(.top, 14)
+            if month?.inputFirst != true { answerBlock(answer) }
         }
         .monthReveal(card, viewModel, $revealed)
         .sheet(isPresented: $isEditing) {
             WeekEditorSheet(title: card.title ?? "Reflect", subtitle: card.question, placeholder: "In your words", serif: true,
                             palette: palette, initial: answer) { viewModel.setText($0, for: card) }
+        }
+    }
+
+    private func answerBlock(_ answer: String) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            WeekCardHeading(title: card.question ?? "", palette: palette)
+            WeekWordsBox(text: answer, placeholder: "In your words", palette: palette) { isEditing = true }
         }
     }
 }
@@ -554,12 +622,22 @@ struct MonthCloseHero: View {
     let filed: Bool
     /// Whether the close is the card on top; the ring draws only once he reaches it.
     let isOnTop: Bool
+    /// Moments he starred this week (the weekly cover's `lists["stars"]`).
+    var stars = 0
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ScaledMetric(relativeTo: .body) private var ring: CGFloat = 250
     @State private var drawn = false
 
     private var current: Int? { month.months.lastIndex { $0.title != nil } }
+
+    /// "3 moments starred · 7 answers to keep", leaving out what's zero.
+    private var summary: String {
+        let answers = max(0, answered - (stars > 0 ? 1 : 0))
+        let parts = [stars > 0 ? "\(stars) \(stars == 1 ? "moment" : "moments") starred" : nil,
+                     answers > 0 ? "\(answers) \(answers == 1 ? "answer" : "answers") to keep" : nil].compactMap { $0 }
+        return parts.isEmpty ? "Nothing written yet." : parts.joined(separator: " · ")
+    }
 
     var body: some View {
         let count = max(1, month.months.count)
@@ -584,11 +662,12 @@ struct MonthCloseHero: View {
                         Circle()
                             .fill(item.title != nil ? palette.ink : palette.paper)
                             .overlay(Circle().strokeBorder(palette.ink.opacity(item.title != nil ? 0 : 0.35), lineWidth: 1))
-                            .frame(width: isCurrent ? 16 : 9, height: isCurrent ? 16 : 9)
+                            .frame(width: isCurrent ? 16 : (count > 12 ? 6 : 9), height: isCurrent ? 16 : (count > 12 ? 6 : 9))
                             .scaleEffect(isCurrent && !drawn ? 0.2 : 1)
                     }
                     .offset(x: cos(angle.radians) * r, y: sin(angle.radians) * r)
-                    Text(verbatim: String(item.month.prefix(1)))
+                    // A ring of weeks labels only the first week of each month.
+                    Text(verbatim: String(item.month.prefix(month.months.count > 12 ? 3 : 1)))
                         .font(AppFont.caption2(weight: isCurrent ? .bold : .medium))
                         .foregroundStyle(isCurrent ? palette.ink : Color.hxTextSecondary)
                         .offset(x: cos(angle.radians) * (r + 22), y: sin(angle.radians) * (r + 22))
@@ -617,15 +696,14 @@ struct MonthCloseHero: View {
             .padding(.vertical, 26)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text(verbatim: "\(month.name ?? "This month"), \(title ?? ""), in your year"))
-            Text(verbatim: filed ? "Filed. \(month.name ?? "This month") is part of your year now."
-                 : answered == 0 ? "Nothing written yet." : "\(answered) \(answered == 1 ? "answer" : "answers") to keep.")
+            Text(verbatim: filed ? "Sealed. \(month.name ?? "This month") is part of your year now." : summary)
                 .font(AppFont.subheadline(weight: .medium))
                 .foregroundStyle(Color.hxTextSecondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .task(id: isOnTop) {
-            guard isOnTop, !drawn else { return }
+        .onAppear {
+            guard !drawn else { return }
             withAnimation(reduceMotion ? nil : .easeInOut(duration: 1.4).delay(0.25)) { drawn = true }
         }
     }
