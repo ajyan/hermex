@@ -13,11 +13,6 @@ enum BrainConnectionsLayout {
         return page.links.filter { seen.insert($0.id).inserted }
     }
 
-    /// A page with links shows them as cards under the title; one without keeps its cover.
-    static func showsCover(_ page: BrainPage) -> Bool {
-        linkCards(page).isEmpty
-    }
-
     /// The pager shows only when the page sits in its hub's list and has a neighbour there.
     static func showsPager(_ hub: BrainHubContext?) -> Bool {
         guard let hub, hub.index != nil else { return false }

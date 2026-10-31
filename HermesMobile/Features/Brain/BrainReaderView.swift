@@ -5,15 +5,6 @@ import SwiftUI
 enum BrainReaderLayout {
     /// Backlinks shown before "Show all N".
     static let backlinkPreviewCount = 5
-    /// The cover's height, on a page with no links to show instead.
-    static let headerHeight: CGFloat = 180
-
-    /// Whether the decorative cover tops the page: only when there are no link cards to show
-    /// instead, and never on a person page, whose header and Catch up card should sit at the top.
-    static func showsCover(for page: BrainPage, hasLinkCards: Bool) -> Bool {
-        !hasLinkCards && page.person == nil
-    }
-
     /// "<Kind> · <date>", the kind's first letter capitalised and the date in the one
     /// Brain format; either part may be absent.
     static func metaLine(kind: String, date: String, locale: Locale = .current) -> String {
@@ -21,6 +12,20 @@ enum BrainReaderLayout {
         if kind == "day" { return "Journal" }
         let capitalised = kind.prefix(1).uppercased() + kind.dropFirst()
         return [capitalised, BrainStyle.displayDate(date, locale: locale)]
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
+    }
+
+    /// The line under a page's title. A page whose date the server labels (a wiki page) says
+    /// how long ago: "Concept · updated 3 wk ago", "Source · added today"; any other page
+    /// keeps `metaLine(kind:date:)`.
+    static func metaLine(for item: BrainItem, today: Date = Date(), calendar: Calendar = .current,
+                         locale: Locale = .current) -> String {
+        guard !item.dateLabel.isEmpty, let age = BrainListLayout.age(item.date, today: today, calendar: calendar) else {
+            return metaLine(kind: item.kind, date: item.date, locale: locale)
+        }
+        let when = age == "today" ? "\(item.dateLabel) today" : "\(item.dateLabel) \(age) ago"
+        return [metaLine(kind: item.kind, date: "", locale: locale), when]
             .filter { !$0.isEmpty }
             .joined(separator: " · ")
     }
@@ -58,11 +63,6 @@ enum BrainReaderLayout {
             return .push(.page(ref.0, ref.1))
         }
         return url.scheme?.lowercased() == "brain" ? .discard : .system
-    }
-
-    /// The page's one cover recipe.
-    static func cover(for item: BrainItem) -> BrainCoverSpec {
-        BrainCoverSpec.make(id: item.id, tag: item.tags.first)
     }
 
     static func visibleBacklinks(_ backlinks: [BrainRef], expanded: Bool) -> [BrainRef] {
@@ -225,8 +225,8 @@ struct BrainReaderContent: View {
     /// The key idea a bite opened this page at; nil on any other page.
     var focusIdea: Int?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// Built once per page, never in `body`.
-    private let cover: BrainCoverSpec
+    /// Built once per page: the line under the title.
+    private let meta: String
     /// Articles and video notes in the summary outline read as a digest.
     private let digest: BrainArticleDigest?
     /// Built once per page: the linked-page cards.
@@ -251,7 +251,7 @@ struct BrainReaderContent: View {
         self.onStep = onStep
         self.rating = rating
         self.focusIdea = focusIdea
-        self.cover = BrainReaderLayout.cover(for: page.item)
+        self.meta = BrainReaderLayout.metaLine(for: page.item)
         self.digest = BrainReaderLayout.digest(for: page)
         self.linkCards = BrainConnectionsLayout.linkCards(page)
         let personLayout = page.person.map { BrainPersonLayout(page: page, person: $0, today: Date()) }
@@ -280,12 +280,6 @@ struct BrainReaderContent: View {
         ScrollView {
             VStack(alignment: .leading, spacing: BrainStyle.xl) {
                 VStack(alignment: .leading, spacing: BrainStyle.l) {
-                    if BrainReaderLayout.showsCover(for: page, hasLinkCards: !linkCards.isEmpty) {
-                        BrainCoverView(spec: cover)
-                            .frame(height: BrainReaderLayout.headerHeight)
-                            .frame(maxWidth: .infinity)
-                            .clipShape(BrainStyle.cardShape())
-                    }
                     BrainTrail(hub: page.hub?.ref)
                     if let personLayout {
                         BrainPersonCardView(item: page.item, facts: [], subtitle: personLayout.subtitle)
@@ -413,16 +407,16 @@ struct BrainReaderContent: View {
         }
     }
 
+    /// The title, then what kind of page it is and how fresh.
     private var titleBlock: some View {
-        let meta = BrainReaderLayout.metaLine(kind: page.item.kind, date: page.item.date)
-        return VStack(alignment: .leading, spacing: BrainStyle.xs) {
+        VStack(alignment: .leading, spacing: BrainStyle.xs) {
+            Text(verbatim: page.item.title)
+                .brainText(.readerTitle)
+                .accessibilityAddTraits(.isHeader)
             if !meta.isEmpty {
                 Text(verbatim: meta)
                     .brainText(.meta)
             }
-            Text(verbatim: page.item.title)
-                .brainText(.readerTitle)
-                .accessibilityAddTraits(.isHeader)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

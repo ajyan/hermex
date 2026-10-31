@@ -51,6 +51,15 @@ final class BrainPeopleListTests: XCTestCase {
         XCTAssertNil(wiki.relationshipType)
     }
 
+    func testWikiItemDecodesItsDateLabelAndRoundTrips() throws {
+        let json = #"{"module": "wiki", "id": "w.md", "date": "2026-10-01", "date_label": "updated"}"#
+        let item = try snakeDecoder().decode(BrainItem.self, from: Data(json.utf8))
+        XCTAssertEqual(item.dateLabel, "updated")
+        XCTAssertEqual(try JSONDecoder().decode(BrainItem.self, from: JSONEncoder().encode(item)), item)
+        let older = try snakeDecoder().decode(BrainItem.self, from: Data(#"{"module": "wiki", "id": "w.md"}"#.utf8))
+        XCTAssertEqual(older.dateLabel, "", "an older server sends no label")
+    }
+
     // MARK: Sections
 
     func testElapsedBuckets() {
