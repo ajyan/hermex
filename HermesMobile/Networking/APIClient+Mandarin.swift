@@ -107,45 +107,6 @@ struct MandarinVersionsResponse: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey { case versions, used }
 }
 
-/// The family call. `who` is "mom" or "dad".
-struct MandarinCallPrepRequest: Encodable, Sendable {
-    let date: String
-    let who: String
-}
-
-struct MandarinCallAfterRequest: Encodable, Sendable {
-    let date: String
-    let text: String
-}
-
-/// One thing to say on the call: what it means in English and how he says it.
-struct MandarinCallItem: Codable, Equatable, Hashable, Sendable {
-    let en: String
-    let hanzi: String
-    let pinyin: String?
-}
-
-/// Prep's three things to say, or after-call's phrases (added to tomorrow's recall) with progress.
-struct MandarinCallResponse: Decodable, Equatable, Sendable {
-    let items: [MandarinCallItem]
-    let progress: DeckMandarinProgress?
-
-    init(items: [MandarinCallItem], progress: DeckMandarinProgress? = nil) {
-        self.items = items
-        self.progress = progress
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        let items = (try? c.decodeIfPresent([Lossy<MandarinCallItem>].self, forKey: .items))
-            ?? (try? c.decodeIfPresent([Lossy<MandarinCallItem>].self, forKey: .phrases)) ?? []
-        self.items = items.compactMap(\.value)
-        progress = try? c.decodeIfPresent(DeckMandarinProgress.self, forKey: .progress)
-    }
-
-    private enum CodingKeys: String, CodingKey { case items, phrases, progress }
-}
-
 extension APIClient {
     /// Waits up to 90 s: the server gives the local model 75 s before it answers without feedback.
     func answerMandarin(_ request: MandarinAnswerRequest) async throws -> MandarinAnswerResponse {
@@ -158,13 +119,5 @@ extension APIClient {
 
     func checkMandarinVersions(_ request: MandarinVersionsRequest) async throws -> MandarinVersionsResponse {
         try await send(endpoint: .mandarinVersions, method: "POST", body: request, timeout: 90)
-    }
-
-    func mandarinCallPrep(_ request: MandarinCallPrepRequest) async throws -> MandarinCallResponse {
-        try await send(endpoint: .mandarinCallPrep, method: "POST", body: request, timeout: 90)
-    }
-
-    func mandarinCallAfter(_ request: MandarinCallAfterRequest) async throws -> MandarinCallResponse {
-        try await send(endpoint: .mandarinCallAfter, method: "POST", body: request, timeout: 90)
     }
 }

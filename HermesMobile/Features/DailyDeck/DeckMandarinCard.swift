@@ -19,7 +19,8 @@ struct DeckMandarinCard: View {
     @State private var speaker = MandarinSpeaker()
     /// Fixes and recall phrases whose answer is showing.
     @State private var revealed: Set<String> = []
-    @State private var isCalling = false
+    /// What he said for each fix before seeing it, to set beside the natural way.
+    @State private var attempts: [String: String] = [:]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -33,7 +34,6 @@ struct DeckMandarinCard: View {
             }
         }
         .onDisappear { speaker.stop() }
-        .sheet(isPresented: $isCalling) { MandarinCallSheet(practice: practice, palette: palette) }
     }
 
     // MARK: Step bar
@@ -74,22 +74,56 @@ struct DeckMandarinCard: View {
         let yesterday = card.yesterday
         if let fix = practice.currentFix {
             let key = "fix:\(fix.said)"
-            headingRow("Say it the natural way", pips: practice.fixes.count, at: practice.fixes.firstIndex(of: fix) ?? 0)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(slip(in: yesterday?.said ?? fix.said, fix.said))
-                    .font(AppFont.body())
-                    .fixedSize(horizontal: false, vertical: true)
-                if let en = fix.en {
-                    Text(verbatim: "You meant: \(en)")
-                        .font(AppFont.footnote())
-                        .foregroundStyle(Color.hxTextSecondary)
+            let isRevealed = revealed.contains(key)
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    if fix.en != nil {
+                        Text(verbatim: "How would you say")
+                            .font(AppFont.caption(weight: .semibold))
+                            .foregroundStyle(palette.ink)
+                    }
+                    headingRow(fix.en.map { "“\($0)”" } ?? "Say it the natural way",
+                               pips: practice.fixes.count, at: practice.fixes.firstIndex(of: fix) ?? 0)
+                }
+                if !isRevealed {
+                    Button { change { _ = revealed.insert(key) } } label: {
+                        Text(verbatim: "Show me")
+                            .font(AppFont.subheadline(weight: .semibold))
+                            .foregroundStyle(palette.ink)
+                            .frame(minWidth: 44, minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-            if revealed.contains(key) {
-                takeaway("Fix", fix.natural, pinyin: fix.naturalPinyin, note: fix.why)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(verbatim: "Yesterday you said")
+                    .font(AppFont.caption(weight: .semibold))
+                    .foregroundStyle(Color.hxTextSecondary)
+                Text(slip(in: yesterday?.said ?? fix.said, fix.said))
+                    .font(AppFont.body())
+                    .foregroundStyle(Color.hxTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
+            if isRevealed {
+                if let tried = attempts[key] {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(verbatim: "You tried")
+                            .font(AppFont.caption(weight: .semibold))
+                            .foregroundStyle(palette.ink)
+                        Text(verbatim: tried).font(AppFont.body()).fixedSize(horizontal: false, vertical: true)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+                takeaway("Natural", fix.natural, pinyin: fix.naturalPinyin, note: fix.why)
                 actions(primary: ("Next", "arrow.right", { change { practice.nextFix() } }))
             } else {
-                actions(primary: ("Show me", "eye", { change { _ = revealed.insert(key) } }))
+                MandarinMic(prompt: "Say it in Mandarin", palette: palette, onListen: { speaker.stop() }) { text in
+                    attempts[key] = text
+                    change { _ = revealed.insert(key) }
+                    return true
+                }
+                .id(key)
             }
         } else if practice.fixes.isEmpty, let yesterday {
             heading("Yesterday, said naturally", detail: nil)
@@ -290,14 +324,6 @@ struct DeckMandarinCard: View {
             return true
         }
         takeaways
-        Button { speaker.stop(); isCalling = true } label: {
-            Label { Text(verbatim: "Calling Mom or Dad?") } icon: { Image(systemName: "phone") }
-                .font(AppFont.footnote(weight: .semibold))
-                .foregroundStyle(palette.ink)
-                .frame(minHeight: 44)
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint(Text(verbatim: "Three things to say before the call, and what you couldn't say after it"))
     }
 
     private var talkPrompt: String {
@@ -644,9 +670,7 @@ struct MandarinMic: View {
                 }
                 mainButton
             }
-            if let message = MandarinDictation.isAvailable
-                ? voiceInput.errorMessage
-                : "To answer by voice, add Chinese (Simplified) dictation in Settings › General › Keyboard." {
+            if let message = voiceInput.errorMessage {
                 Text(verbatim: message)
                     .font(AppFont.footnote())
                     .foregroundStyle(Color.hxTextSecondary)

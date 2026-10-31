@@ -2691,20 +2691,6 @@ private final class FakeMandarinClient: MandarinPracticeClient, @unchecked Senda
         checks.append(request)
         return try versionsResult.get()
     }
-
-    var preps: [MandarinCallPrepRequest] = []
-    var afters: [MandarinCallAfterRequest] = []
-    var callResult: Result<MandarinCallResponse, Error> = .success(MandarinCallResponse(items: []))
-
-    func callPrep(_ request: MandarinCallPrepRequest) async throws -> MandarinCallResponse {
-        preps.append(request)
-        return try callResult.get()
-    }
-
-    func callAfter(_ request: MandarinCallAfterRequest) async throws -> MandarinCallResponse {
-        afters.append(request)
-        return try callResult.get()
-    }
 }
 
 @MainActor
@@ -2941,57 +2927,6 @@ final class MandarinPracticeTests: XCTestCase {
         XCTAssertEqual(practice.steps, [.talk])
         XCTAssertEqual(practice.step, .talk)
     }
-
-    func testCallPrepIsAskedOncePerRelativeAndKept() async throws {
-        let client = FakeMandarinClient()
-        let item = MandarinCallItem(en: "I had three interviews", hanzi: "我这个星期面试了三次", pinyin: "Wǒ")
-        client.callResult = .success(MandarinCallResponse(items: [item]))
-        let practice = practice(try card(), client: client)
-        await practice.prepareCall("mom")
-        await practice.prepareCall("mom")
-        XCTAssertEqual(client.preps.map(\.who), ["mom"], "the day's prep for Mom is kept")
-        XCTAssertEqual(practice.record.callPrep["mom"], [item])
-        XCTAssertNil(practice.callLoading)
-        let again = self.practice(try card(), client: client)
-        XCTAssertEqual(again.record.callPrep["mom"], [item], "it's still there when the card comes back")
-    }
-
-    func testAnEmptyOrFailedPrepSaysSoAndKeepsNothing() async throws {
-        let client = FakeMandarinClient()
-        let practice = practice(try card(), client: client)
-        await practice.prepareCall("dad")
-        XCTAssertEqual(practice.callError, "Nothing came back. Try again.")
-        client.callResult = .failure(URLError(.timedOut))
-        await practice.prepareCall("dad")
-        XCTAssertEqual(practice.callError, "Couldn't reach the server. Try again.")
-        XCTAssertNil(practice.record.callPrep["dad"])
-    }
-
-    func testAfterTheCallPhrasesAreKeptAndAFailureKeepsHisWords() async throws {
-        let client = FakeMandarinClient()
-        let phrase = MandarinCallItem(en: "the due date moved", hanzi: "预产期改了", pinyin: nil)
-        client.callResult = .success(MandarinCallResponse(items: [phrase], progress: DeckMandarinProgress(
-            phrases: 40, usedWeek: nil, englishNow: nil, englishBefore: nil)))
-        let practice = practice(try card(), client: client)
-        let saved = await practice.saveAfterCall("  the due date moved  ")
-        XCTAssertTrue(saved)
-        XCTAssertEqual(client.afters.map(\.text), ["the due date moved"])
-        XCTAssertEqual(practice.record.callPhrases, [phrase])
-        XCTAssertEqual(practice.progress?.phrases, 40)
-        client.callResult = .failure(URLError(.timedOut))
-        let failed = await practice.saveAfterCall("I'm nervous about the race")
-        XCTAssertFalse(failed, "the sheet keeps his words to try again")
-        XCTAssertEqual(practice.record.callPhrases, [phrase])
-    }
-
-    func testCallResponseReadsItemsOrPhrases() throws {
-        let prep = try JSONDecoder().decode(MandarinCallResponse.self, from: Data(#"{"items":[{"en":"a","hanzi":"好"},{"en":"no hanzi"}]}"#.utf8))
-        XCTAssertEqual(prep.items.map(\.hanzi), ["好"])
-        let after = try JSONDecoder().decode(MandarinCallResponse.self, from: Data(#"{"phrases":[{"en":"b","hanzi":"对"}],"progress":{"phrases":3}}"#.utf8))
-        XCTAssertEqual(after.items.map(\.hanzi), ["对"])
-        XCTAssertEqual(after.progress?.phrases, 3)
-    }
-
 }
 
 // MARK: - Meals
