@@ -5,13 +5,6 @@ import Foundation
 // `POST /api/goals/reflection`, and the `finished` list on `GET /api/goals`. The record is
 // computed once when the goal closes. Every field decodes tolerantly; decode with `PrepDecoding`.
 
-private struct FinishLossy<Value: Decodable>: Decodable {
-    let value: Value?
-    init(from decoder: Decoder) throws {
-        value = try? Value(from: decoder)
-    }
-}
-
 private extension KeyedDecodingContainer {
     func string(_ key: Key) -> String {
         (try? decodeIfPresent(String.self, forKey: key)) ?? ""
@@ -30,7 +23,7 @@ private extension KeyedDecodingContainer {
     }
 
     func lossy<Value: Decodable>(_ type: Value.Type, _ key: Key) -> [Value] {
-        ((try? decodeIfPresent([FinishLossy<Value>].self, forKey: key)) ?? []).compactMap(\.value)
+        ((try? decodeIfPresent([PrepLossy<Value>].self, forKey: key)) ?? []).compactMap(\.value)
     }
 }
 
@@ -359,6 +352,11 @@ struct GoalFinishRequest: Encodable, Equatable, Sendable {
     let asOf: String
 
     private enum CodingKeys: String, CodingKey { case slug, asOf = "as_of" }
+}
+
+/// `POST /api/goals/reopen`: puts a finished goal back among the open ones.
+struct GoalReopenRequest: Encodable, Equatable, Sendable {
+    let slug: String
 }
 
 /// `POST /api/goals/reflection`: his words on a finished goal; empty clears them.

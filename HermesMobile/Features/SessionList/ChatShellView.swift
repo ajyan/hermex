@@ -64,7 +64,8 @@ struct ChatShellView: View {
     private let openNextSharedImport: () -> Void
     @Binding private var pendingDeepLinkedSessionID: String?
     @Binding private var requestedNewChat: NewChatRequest?
-    @Binding private var requestedDailyBrief: Bool
+    /// A screen a deep link asked for (the Daily Brief, Goals); cleared once shown.
+    @Binding private var requestedScreen: ShellPushDestination?
     /// The bot a deep link named. Non-nil flips this screen to the Bots inbox, which
     /// resolves it against its live roster and clears it (#554).
     @Binding private var pendingBotDestination: BotDestination?
@@ -148,7 +149,7 @@ struct ChatShellView: View {
         openNextSharedImport: @escaping () -> Void = {},
         pendingDeepLinkedSessionID: Binding<String?> = .constant(nil),
         requestedNewChat: Binding<NewChatRequest?> = .constant(nil),
-        requestedDailyBrief: Binding<Bool> = .constant(false),
+        requestedScreen: Binding<ShellPushDestination?> = .constant(nil),
         pendingBotDestination: Binding<BotDestination?> = .constant(nil),
         pendingWebuiPush: Binding<WebuiPushDestination?> = .constant(nil),
         draftStore: ChatDraftStore? = nil
@@ -162,7 +163,7 @@ struct ChatShellView: View {
         self.draftStore = draftStore ?? .shared
         _pendingDeepLinkedSessionID = pendingDeepLinkedSessionID
         _requestedNewChat = requestedNewChat
-        _requestedDailyBrief = requestedDailyBrief
+        _requestedScreen = requestedScreen
         _pendingBotDestination = pendingBotDestination
         _pendingWebuiPush = pendingWebuiPush
         _viewModel = State(initialValue: SessionListViewModel(server: server))
@@ -371,7 +372,7 @@ struct ChatShellView: View {
             .onAppear {
                 openPendingSharedImportIfNeeded()
                 openRequestedNewChatIfNeeded()
-                openRequestedDailyBriefIfNeeded()
+                openRequestedScreenIfNeeded()
                 refreshAfterReturningIfNeeded()
             }
             .onDisappear {
@@ -396,8 +397,8 @@ struct ChatShellView: View {
             .onChange(of: requestedNewChat) {
                 openRequestedNewChatIfNeeded()
             }
-            .onChange(of: requestedDailyBrief) {
-                openRequestedDailyBriefIfNeeded()
+            .onChange(of: requestedScreen) {
+                openRequestedScreenIfNeeded()
             }
             .onChange(of: navigation.root) { oldValue, newValue in
                 if case .session(let previous) = oldValue, previous.sessionId != navigation.selectedSessionID {
@@ -665,7 +666,10 @@ struct ChatShellView: View {
             GoalDetailView(slug: slug, server: server, onAPIError: authManager.handleAPIError)
                 .id(slug)
         case .finishedGoal(let slug):
-            GoalRecordView(slug: slug, server: server, onAPIError: authManager.handleAPIError)
+            GoalRecordView(slug: slug, server: server, onAPIError: authManager.handleAPIError) { _ in
+                // The record gives way to the open goal, so Back still leads where it began.
+                navigation.replaceTop(with: .goal(slug))
+            }
                 .id(slug)
         case .finishedGoals:
             GoalsFinishedListView(server: server, onAPIError: authManager.handleAPIError)
@@ -1473,11 +1477,11 @@ struct ChatShellView: View {
     /// mirroring the "+" button. Carries `autoStartsVoiceInput` so the voice variant begins
     /// dictation once the composer appears. The request is cleared so it fires once per
     /// invocation.
-    /// A Daily Brief notification tap: show the brief over whatever chat is open.
-    private func openRequestedDailyBriefIfNeeded() {
-        guard requestedDailyBrief else { return }
-        requestedDailyBrief = false
-        if navigation.path.last != .dailyDeck { navigation.showOnly(.dailyDeck) }
+    /// A Daily Brief notification or Goals widget tap: show that screen over whatever chat is open.
+    private func openRequestedScreenIfNeeded() {
+        guard let screen = requestedScreen else { return }
+        requestedScreen = nil
+        if navigation.path.last != screen { navigation.showOnly(screen) }
     }
 
     private func openRequestedNewChatIfNeeded() {

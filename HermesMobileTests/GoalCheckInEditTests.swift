@@ -39,6 +39,35 @@ final class GoalCheckInEditTests: XCTestCase {
         XCTAssertEqual(g.week.commitments[0].done, 0)
     }
 
+    /// Two day rows and an item row over a week strip with Wednesday skipped; today is Thursday.
+    private func stripGoal() throws -> GoalSummary {
+        let days = (12...18).map { #"{"date":"2026-10-\#($0)","status":"\#($0 == 14 ? "skip" : "none")"}"# }
+        let json = #"{"slug":"g","week":{"start":"2026-10-12","end":"2026-10-18","days":[\#(days.joined(separator: ","))],"commitments":[{"id":"a","target":6,"skips":1,"skipped":1,"yesterday":"skip"},{"id":"b","target":3},{"id":"o","unit":"item","target":5}]}}"#
+        return try PrepDecoding.decode(GoalSummary.self, from: Data(json.utf8))
+    }
+
+    func testCheckInPatchesTheWeekStripDay() throws {
+        var g = try stripGoal()
+        GoalCheckInEdit.apply(.min, to: "b", on: today, today: today, yesterday: yesterday, in: &g)
+        XCTAssertEqual(g.week.days.first { $0.date == today }?.status, .min)
+        GoalCheckInEdit.apply(.done, to: "a", on: today, today: today, yesterday: yesterday, in: &g)
+        XCTAssertEqual(g.week.days.first { $0.date == today }?.status, .done, "the day's best check-in across rows")
+        GoalCheckInEdit.apply(.miss, to: "b", on: yesterday, today: today, yesterday: yesterday, in: &g)
+        XCTAssertEqual(g.week.days.first { $0.date == yesterday }?.status, .skip, "a skip outranks a miss")
+        GoalCheckInEdit.apply(.clear, to: "a", on: yesterday, today: today, yesterday: yesterday, in: &g)
+        XCTAssertEqual(g.week.days.first { $0.date == yesterday }?.status, .miss)
+        XCTAssertEqual(g.week.days.filter { $0.date != today && $0.date != yesterday }.map(\.status),
+                       Array(repeating: GoalStatus.none, count: 5), "other days stay as the server sent them")
+    }
+
+    func testDroppingAFailedTapRestoresTheWeekStripDay() throws {
+        var edits = GoalPendingEdits<GoalSummary, GoalRowKey>(try stripGoal())
+        edits.add(.commitment("b")) { GoalCheckInEdit.apply(.done, to: "b", on: self.today, today: self.today, yesterday: self.yesterday, in: &$0) }
+        XCTAssertEqual(edits.shown.week.days.first { $0.date == self.today }?.status, .done)
+        edits.remove(.commitment("b"))
+        XCTAssertEqual(edits.shown.week.days.first { $0.date == self.today }?.status, GoalStatus.none)
+    }
+
     func testAddItemAndRemoveLast() throws {
         var g = try goal(#"{"id":"outreach","unit":"item","target":3,"done":0,"remaining":3}"#)
         GoalCheckInEdit.addItem(1, note: "Anthropic", to: "outreach", on: today, in: &g)

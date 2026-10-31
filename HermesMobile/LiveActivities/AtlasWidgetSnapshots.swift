@@ -43,8 +43,14 @@ struct AtlasWidgetGoals: AtlasWidgetSnapshot {
         var weekCount: Int
         let target: Int
         var isDone: Bool
+        /// The row's source (such as Prep) counts today as done, so clearing a check-in would
+        /// leave it done. Nil in snapshots saved before this was recorded.
+        var sourceCounted: Bool?
 
         var id: String { Self.id(slug: slug, commitment: commitment) }
+
+        /// A tap on a done row clears it, unless only its source would keep it done.
+        var isUndoable: Bool { isDone && sourceCounted != true }
 
         static func id(slug: String, commitment: String) -> String { "\(slug)/\(commitment)" }
     }
@@ -55,15 +61,46 @@ struct AtlasWidgetGoals: AtlasWidgetSnapshot {
     let streakDays: Int
     var items: [Item]
     var syncFailed = false
+    /// The phone's day (`yyyy-MM-dd`) when the app saved this; nil in older snapshots.
+    var savedDay: String?
 
-    /// The snapshot as it reads once `id` is checked in, before the server confirms.
-    func checkingIn(_ id: String) -> AtlasWidgetGoals {
+    /// Whether the phone's day has turned since the app saved this, so its check-ins may land on
+    /// a day the server has left. Compares the phone's days with each other, never with the
+    /// server's `today` (the server may keep another time zone); an older snapshot without
+    /// `savedDay` falls back to `today`.
+    func isStale(at date: Date) -> Bool {
+        (savedDay ?? today) < Self.phoneDay(date)
+    }
+
+    static func phoneDay(_ date: Date) -> String { phoneDayFormatter.string(from: date) }
+
+    private static let phoneDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    /// The snapshot as it reads once `id` is ticked (`done`) or unticked, before the server confirms.
+    func checking(_ id: String, done: Bool) -> AtlasWidgetGoals {
         var copy = self
         copy.syncFailed = false
-        if let i = copy.items.firstIndex(where: { $0.id == id }), !copy.items[i].isDone {
-            copy.items[i].isDone = true
-            copy.items[i].weekCount += 1
+        if let i = copy.items.firstIndex(where: { $0.id == id }), copy.items[i].isDone != done {
+            copy.items[i].isDone = done
+            copy.items[i].weekCount += done ? 1 : -1
         }
+        return copy
+    }
+
+    /// This snapshot with only row `id` put back as it was in `old`, on the same day; every
+    /// other row keeps its state.
+    func restoring(_ id: String, from old: AtlasWidgetGoals) -> AtlasWidgetGoals {
+        var copy = self
+        guard old.today == today, let item = old.items.first(where: { $0.id == id }),
+              let i = copy.items.firstIndex(where: { $0.id == id }) else { return copy }
+        copy.items[i] = item
         return copy
     }
 
@@ -94,6 +131,14 @@ struct AtlasWidgetStore<Snapshot: AtlasWidgetSnapshot> {
         WidgetCenter.shared.reloadTimelines(ofKind: Snapshot.widgetKind)
     }
 
+    /// Drops the stored snapshot unless it belongs to `server` (nil drops any), so another
+    /// server's snapshot never stays on a widget while this one is active.
+    func remove(except server: URL?) {
+        guard let defaults, let stored = load(), stored.server.absoluteString != server?.absoluteString else { return }
+        defaults.removeObject(forKey: Snapshot.storageKey)
+        WidgetCenter.shared.reloadTimelines(ofKind: Snapshot.widgetKind)
+    }
+
     /// Drops the stored snapshot when it belongs to `server` (sign-out, removal, or a
     /// server without the feature).
     func remove(for server: URL) {
@@ -106,28 +151,31 @@ struct AtlasWidgetStore<Snapshot: AtlasWidgetSnapshot> {
 typealias AtlasWidgetRecentsStore = AtlasWidgetStore<AtlasWidgetRecents>
 typealias AtlasWidgetGoalsStore = AtlasWidgetStore<AtlasWidgetGoals>
 
-/// The Goals widget's check button. A `LiveActivityIntent` so the system performs it in
-/// the app's process, which holds the server's sign-in; the app installs `handler` at
-/// launch. Compiled into the widget too, where `handler` stays nil.
+/// The Goals widget's check button: ticks a row (`done`) or, on a done row, clears it. A
+/// `LiveActivityIntent` so the system performs it in the app's process, which holds the
+/// server's sign-in; the app installs `handler` at launch. Compiled into the widget too, where
+/// `handler` stays nil.
 struct GoalWidgetCheckInIntent: LiveActivityIntent {
     static var title: LocalizedStringResource = "Check In Goal"
     static var isDiscoverable = false
 
     @Parameter(title: "Goal") var slug: String
     @Parameter(title: "Commitment") var commitment: String
+    @Parameter(title: "Done", default: true) var done: Bool
 
     init() {}
 
-    init(slug: String, commitment: String) {
+    init(slug: String, commitment: String, done: Bool) {
         self.slug = slug
         self.commitment = commitment
+        self.done = done
     }
 
-    @MainActor static var handler: ((_ slug: String, _ commitment: String) async -> Void)?
+    @MainActor static var handler: ((_ slug: String, _ commitment: String, _ done: Bool) async -> Void)?
 
     func perform() async throws -> some IntentResult {
         if let handler = await Self.handler {
-            await handler(slug, commitment)
+            await handler(slug, commitment, done)
         } else {
             let store = AtlasWidgetGoalsStore()
             if let snapshot = store.load() { store.save(snapshot.failed()) }

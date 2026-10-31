@@ -50,6 +50,7 @@
 		B1A1C0DE00000000000F0013 /* GoalsDesignTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0012 /* GoalsDesignTests.swift */; };
 		B1A1C0DE00000000000F0011 /* GoalPaper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F0010 /* GoalPaper.swift */; };
 		B1A1C0DE00000000000F000F /* GoalDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F000E /* GoalDetailView.swift */; };
+		A0DE00FF71B0EBD4FA4E8F14 /* GoalCalendarViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE00FF71B0EBD4FA4E8F15 /* GoalCalendarViews.swift */; };
 		B1A1C0DE00000000000F000D /* GoalsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F000C /* GoalsHomeView.swift */; };
 		B1A1C0DE00000000000F000B /* GoalsViewModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */; };
 		26F2837D3F563CA15D120502 /* GoalFinishTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65E7E4A0AFF2834CF2D496ED /* GoalFinishTests.swift */; };
@@ -753,6 +754,9 @@
 		1F2EF7D6C585EAF7E1C46CD2 /* DeckCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */; };
 		A0DE001C71B0EBD4FA4E885E /* DeckGoalCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE001C71B0EBD4FA4E885D /* DeckGoalCard.swift */; };
 		A0DE00FF71B0EBD4FA4E8F02 /* DeckFrontParts.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE00FF71B0EBD4FA4E8F01 /* DeckFrontParts.swift */; };
+		A0DE00FF71B0EBD4FA4E8F12 /* DeckDot.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE00FF71B0EBD4FA4E8F11 /* DeckDot.swift */; };
+		A0DE00FF71B0EBD4FA4E8F13 /* DeckDot.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DE00FF71B0EBD4FA4E8F11 /* DeckDot.swift */; };
+		C09200000000000000000003 /* AppFont.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09200000000000000000002 /* AppFont.swift */; };
 		B1D0B70B0000000000000004 /* DeckJobParts.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D0B70B0000000000000003 /* DeckJobParts.swift */; };
 		B1D0B70B0000000000000002 /* DeckWeekGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D0B70B0000000000000001 /* DeckWeekGrid.swift */; };
 		AE625BAC72CC28032AA09722 /* DeckAskCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20F34E30177D3A494A9742C3 /* DeckAskCard.swift */; };
@@ -932,6 +936,7 @@
 		B1A1C0DE00000000000F0012 /* GoalsDesignTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsDesignTests.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F0010 /* GoalPaper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalPaper.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F000E /* GoalDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalDetailView.swift; sourceTree = "<group>"; };
+		A0DE00FF71B0EBD4FA4E8F15 /* GoalCalendarViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalCalendarViews.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F000C /* GoalsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsHomeView.swift; sourceTree = "<group>"; };
 		B1A1C0DE00000000000F000A /* GoalsViewModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsViewModelsTests.swift; sourceTree = "<group>"; };
 65E7E4A0AFF2834CF2D496ED /* GoalFinishTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalFinishTests.swift; sourceTree = "<group>"; };
@@ -1631,6 +1636,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckCardView.swift; sourceTree = "<group>"; };
 		A0DE001C71B0EBD4FA4E885D /* DeckGoalCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckGoalCard.swift; sourceTree = "<group>"; };
 		A0DE00FF71B0EBD4FA4E8F01 /* DeckFrontParts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckFrontParts.swift; sourceTree = "<group>"; };
+		A0DE00FF71B0EBD4FA4E8F11 /* DeckDot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckDot.swift; sourceTree = "<group>"; };
 		B1D0B70B0000000000000003 /* DeckJobParts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckJobParts.swift; sourceTree = "<group>"; };
 		B1D0B70B0000000000000001 /* DeckWeekGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckWeekGrid.swift; sourceTree = "<group>"; };
 		20F34E30177D3A494A9742C3 /* DeckAskCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckAskCard.swift; sourceTree = "<group>"; };
@@ -1805,6 +1811,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				B1A1C0DE00000000000F0014 /* GoalHeroCard.swift */,
 				B1A1C0DE00000000000F0010 /* GoalPaper.swift */,
 				B1A1C0DE00000000000F000E /* GoalDetailView.swift */,
+				A0DE00FF71B0EBD4FA4E8F15 /* GoalCalendarViews.swift */,
 				B1A1C0DE00000000000F000C /* GoalsHomeView.swift */,
 				B1A1C0DE00000000000F0008 /* GoalsViewModels.swift */,
 				A0DE002C9AEE2AE3608A3D15 /* GoalCheckInCardViewModel.swift */,
@@ -2861,6 +2868,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				7D3FEB0E165B0B0AB0AA8B2C /* DeckCardView.swift */,
 				A0DE001C71B0EBD4FA4E885D /* DeckGoalCard.swift */,
 				A0DE00FF71B0EBD4FA4E8F01 /* DeckFrontParts.swift */,
+				A0DE00FF71B0EBD4FA4E8F11 /* DeckDot.swift */,
 				B1D0B70B0000000000000003 /* DeckJobParts.swift */,
 				B1D0B70B0000000000000001 /* DeckWeekGrid.swift */,
 				20F34E30177D3A494A9742C3 /* DeckAskCard.swift */,
@@ -3184,6 +3192,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				1F2EF7D6C585EAF7E1C46CD2 /* DeckCardView.swift in Sources */,
 				A0DE001C71B0EBD4FA4E885E /* DeckGoalCard.swift in Sources */,
 				A0DE00FF71B0EBD4FA4E8F02 /* DeckFrontParts.swift in Sources */,
+				A0DE00FF71B0EBD4FA4E8F12 /* DeckDot.swift in Sources */,
 				B1D0B70B0000000000000004 /* DeckJobParts.swift in Sources */,
 				B1D0B70B0000000000000002 /* DeckWeekGrid.swift in Sources */,
 				AE625BAC72CC28032AA09722 /* DeckAskCard.swift in Sources */,
@@ -3242,6 +3251,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				B1A1C0DE00000000000F0015 /* GoalHeroCard.swift in Sources */,
 				B1A1C0DE00000000000F0011 /* GoalPaper.swift in Sources */,
 				B1A1C0DE00000000000F000F /* GoalDetailView.swift in Sources */,
+				A0DE00FF71B0EBD4FA4E8F14 /* GoalCalendarViews.swift in Sources */,
 				B1A1C0DE00000000000F000D /* GoalsHomeView.swift in Sources */,
 				B1A1C0DE00000000000F0009 /* GoalsViewModels.swift in Sources */,
 				A0DE002C9AEE2AE3608A3D16 /* GoalCheckInCardViewModel.swift in Sources */,
@@ -4005,6 +4015,8 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				A04500000000000000000006 /* AgentRunLiveActivityWidget.swift in Sources */,
 				A04500000000000000000090 /* AtlasHomeWidget.swift in Sources */,
 				A04500000000000000000099 /* AtlasGoalsWidget.swift in Sources */,
+				A0DE00FF71B0EBD4FA4E8F13 /* DeckDot.swift in Sources */,
+				C09200000000000000000003 /* AppFont.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

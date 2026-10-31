@@ -71,6 +71,28 @@ final class GoalsDesignTests: XCTestCase {
         XCTAssertEqual(GoalCalendar.shownUp(heatmap: done, today: "2026-10-15").total, 2)
     }
 
+    func testMergedHeatmapTakesThisWeeksDaysUpToToday() throws {
+        let heat = try [day("2026-10-13", "none"), day("2026-10-14", "miss")]
+        let week = try [day("2026-10-14", "done"), day("2026-10-15", "min"), day("2026-10-16", "none")]
+        let merged = GoalCalendar.merged(heatmap: heat, week: week, today: "2026-10-15")
+        XCTAssertEqual(merged.map(\.date), ["2026-10-13", "2026-10-14", "2026-10-15"], "nothing after today")
+        XCTAssertEqual(merged.map(\.status), [GoalStatus.none, .done, .min])
+    }
+
+    func testCalendarModelHasStableIdsAndCounts() throws {
+        let heat = try [day("2026-10-14", "skip"), day("2026-10-15", "done")]
+        let model = GoalCalendarModel(heatmap: heat, today: "2026-10-15", deadline: nil)
+        XCTAssertEqual(Set(model.slots.map(\.id)).count, model.slots.count, "every cell has its own id")
+        XCTAssertEqual(model.slots.first { $0.day?.date == "2026-10-15" }?.id, "2026-10-15", "a day's id is its date")
+        XCTAssertEqual(model.shown, 1)
+        XCTAssertEqual(model.total, 2)
+        XCTAssertEqual(GoalHeroCopy.weekdayLetter("2026-10-15"), "T")
+        XCTAssertEqual(GoalHeroCopy.weekdayLetter("2026-10-18"), "S")
+        XCTAssertEqual(GoalHeroCopy.glyph(.skip), "arrow.uturn.forward")
+        XCTAssertEqual(GoalHeroCopy.glyph(.miss), "xmark")
+        XCTAssertNil(GoalHeroCopy.glyph(.none), "an empty day has no mark")
+    }
+
     func testShownUpLineOnDayOne() {
         XCTAssertEqual(GoalDetailCopy.shownUpLine((0, 0)), "Starts today")
         XCTAssertEqual(GoalDetailCopy.shownUpLine((5, 6)), "5 of 6 days")

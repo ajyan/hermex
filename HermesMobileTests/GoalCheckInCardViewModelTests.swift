@@ -27,10 +27,11 @@ private final class FakeCardGoalsClient: GoalsDataClient, @unchecked Sendable {
     func detail(slug: String) async throws -> GoalDetail { throw URLError(.unsupportedURL) }
     func finish(_ r: GoalFinishRequest) async throws -> GoalRecord { throw URLError(.unsupportedURL) }
     func record(slug: String) async throws -> GoalRecord { throw URLError(.unsupportedURL) }
+    func reopen(slug: String) async throws -> GoalDetail { throw URLError(.unsupportedURL) }
     func saveReflection(_ r: GoalReflectionRequest) async throws -> GoalRecord { throw URLError(.unsupportedURL) }
     func confirmWeek(_ r: GoalWeekRequest) async throws -> GoalCheckInResult { throw URLError(.unsupportedURL) }
 
-    func checkIn(_ r: GoalCheckInRequest) async throws -> GoalCheckInResult {
+    func checkIn(_ r: GoalCheckInRequest, clientID: String) async throws -> GoalCheckInResult {
         lock.withLock { _checkIns.append(r) }
         if let gate {
             gate.started.yield()
@@ -145,7 +146,7 @@ final class GoalCheckInCardViewModelTests: XCTestCase {
         for await _ in started { break }
         XCTAssertEqual(outreach(vm)?.done, 3)
         XCTAssertEqual(outreach(vm)?.items.last?.note, "Anthropic")
-        XCTAssertTrue(vm.pending.contains("\(slug)/outreach"))
+        XCTAssertTrue(vm.isPending(slug, .commitment("outreach")))
         releaseCont.yield()
         await tap.value
         XCTAssertEqual(client.checkIns, [
@@ -195,7 +196,7 @@ final class GoalCheckInCardViewModelTests: XCTestCase {
         for await _ in started { break }
         XCTAssertEqual(stretch(vm)?.yesterday, .done)
         XCTAssertEqual(stretch(vm)?.done, 1)
-        XCTAssertTrue(vm.pending.contains("\(slug)/stretch-pm"))
+        XCTAssertTrue(vm.isPending(slug, .commitment("stretch-pm")))
         releaseCont.yield()
         await tap.value
         XCTAssertEqual(client.checkIns, [
@@ -269,6 +270,38 @@ final class GoalCheckInCardViewModelTests: XCTestCase {
         XCTAssertNil(stretch(vm)?.yesterday, "nothing was saved, so nothing shows as saved")
         XCTAssertEqual(stretch(vm)?.done, 0)
         XCTAssertEqual(vm.error, "The day changed. Check in again.")
+    }
+
+    func testSavedCheckInHandsTheServersHomeOn() async throws {
+        let client = FakeCardGoalsClient()
+        client.homeResults = [.success(try home(homeJSON()))]
+        client.checkInResults = [.success(try result(done: 3, yesterday: "done"))]
+        var handed: [GoalsHome] = []
+        let vm = GoalCheckInCardViewModel(client: client, onChange: { handed.append($0) })
+        await vm.load()
+        await vm.checkIn(slug: slug, commitment: "stretch-pm", status: .done)
+        XCTAssertEqual(handed.count, 1)
+        XCTAssertEqual(handed.first?.goals.first?.week.commitments.first?.done, 3)
+        XCTAssertEqual(handed.first?.streak.days, 5)
+
+        client.checkInResults = [.failure(URLError(.timedOut))]
+        await vm.checkIn(slug: slug, check: "foot", value: "same")
+        XCTAssertEqual(handed.count, 1, "a failed check-in hands nothing on")
+    }
+
+    func testACommitmentAndACheckSharingAnIdStayApart() async throws {
+        let client = FakeCardGoalsClient()
+        let (started, startedCont) = AsyncStream<Void>.makeStream()
+        let (release, releaseCont) = AsyncStream<Void>.makeStream()
+        client.gate = (startedCont, release)
+        client.checkInResults = [.success(try result(done: 1, yesterday: "done"))]
+        let vm = try await loaded(client, homeJSON(commitments: [0: ["id": "foot"]]))
+        let row = Task { await vm.checkIn(slug: slug, commitment: "foot", status: .done) }
+        for await _ in started { break }
+        XCTAssertTrue(vm.isPending(slug, .commitment("foot")))
+        XCTAssertFalse(vm.isPending(slug, .check("foot")), "the check with the same id stays free")
+        releaseCont.yield()
+        await row.value
     }
 
     func testLiveOnlyForTheServersToday() async throws {

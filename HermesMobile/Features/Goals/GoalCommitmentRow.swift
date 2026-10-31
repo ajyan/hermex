@@ -10,6 +10,8 @@ struct GoalCommitmentRow: View {
     let date: String
     let tint: GoalTint
     let isPending: Bool
+    /// Missed yesterday and due today (the server's never-miss-twice flag): shows the chip.
+    var atRisk = false
     let onSelect: (GoalStatus) -> Void
 
     var body: some View {
@@ -22,6 +24,7 @@ struct GoalCommitmentRow: View {
                 Text(verbatim: GoalsCopy.shortTitle(row.action)).brainText(.rowTitle)
                 if !row.cue.isEmpty { Text(verbatim: row.cue).brainText(.rowSubtitle).lineLimit(2) }
                 if fromSource { Text(verbatim: "Prep").brainText(.meta) }
+                if atRisk { GoalAtRiskChip(row: row, paper: tint.paper) }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .opacity(isDue || shown != nil ? 1 : 0.55)

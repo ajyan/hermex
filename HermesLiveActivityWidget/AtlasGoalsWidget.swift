@@ -4,13 +4,13 @@ import WidgetKit
 
 /// Home Screen "Goals" widget: today's commitments from the snapshot the app publishes
 /// (`AtlasWidgetGoals`), each with a check button that records it on the server through
-/// `GoalWidgetCheckInIntent`.
+/// `GoalWidgetCheckInIntent` (or, on a done row, clears it). Tapping elsewhere opens Goals.
 struct AtlasGoalsWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: AtlasWidgetGoals.widgetKind, provider: AtlasGoalsProvider()) { entry in
             AtlasGoalsWidgetView(entry: entry)
                 .containerBackground(for: .widget) {
-                    Color(uiColor: .secondarySystemGroupedBackground)
+                    Color.hxSurface
                 }
         }
         .configurationDisplayName("Goals")
@@ -23,20 +23,9 @@ struct AtlasGoalsEntry: TimelineEntry {
     let date: Date
     let goals: AtlasWidgetGoals?
 
-    /// The snapshot was made on an earlier day than the phone's, so its check-ins
-    /// would land on the wrong day.
-    var isStale: Bool {
-        guard let goals else { return false }
-        return goals.today < Self.dayFormatter.string(from: date)
-    }
-
-    private static let dayFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
+    /// The phone's day has turned since the app saved the snapshot (`AtlasWidgetGoals.isStale`),
+    /// so its check-ins may land on a day the server has left.
+    var isStale: Bool { goals?.isStale(at: date) ?? false }
 }
 
 struct AtlasGoalsProvider: TimelineProvider {
@@ -79,26 +68,27 @@ private struct AtlasGoalsWidgetView: View {
             }
             Spacer(minLength: 0)
         }
-        .widgetURL(URL(string: "\(HermesDeepLink.scheme)://"))
+        .widgetURL(HermesDeepLink.goalsURL)
     }
 
     private var header: some View {
         HStack(spacing: 6) {
             Image(systemName: "target")
-                .font(.system(size: 13, weight: .semibold))
+                .font(AppFont.footnote(weight: .semibold))
                 .widgetAccentable()
             Text("Goals")
-                .font(.subheadline.weight(.semibold))
+                .font(AppFont.subheadline(weight: .semibold))
+                .foregroundStyle(Color.hxTextPrimary)
             Spacer()
             if let goals = entry.goals {
                 if goals.syncFailed {
                     Label("Couldn't sync", systemImage: "exclamationmark.triangle")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
+                        .font(AppFont.caption())
+                        .foregroundStyle(Color.hxDanger)
                 } else if goals.streakDays > 0, !entry.isStale {
                     Text("\(goals.streakDays)-day streak")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(AppFont.caption())
+                        .foregroundStyle(Color.hxTextSecondary)
                 }
             }
         }
@@ -106,8 +96,8 @@ private struct AtlasGoalsWidgetView: View {
 
     private func message(_ text: LocalizedStringKey) -> some View {
         Text(text)
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
+            .font(AppFont.subheadline())
+            .foregroundStyle(Color.hxTextSecondary)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
@@ -117,29 +107,73 @@ private struct AtlasGoalRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            if item.isDone {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 22))
-                    .foregroundStyle(.green)
+            if item.isDone && !item.isUndoable {
+                // Only the row's source (such as Prep) counts today; clearing would change nothing.
+                mark
                     .accessibilityLabel("Done")
             } else {
-                Button(intent: GoalWidgetCheckInIntent(slug: item.slug, commitment: item.commitment)) {
-                    Image(systemName: "circle")
-                        .font(.system(size: 22))
-                        .foregroundStyle(.secondary)
+                Button(intent: GoalWidgetCheckInIntent(slug: item.slug, commitment: item.commitment, done: !item.isDone)) {
+                    // The whole row's height takes the tap, though the widget keeps rows compact.
+                    mark
+                        .frame(maxHeight: .infinity)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Mark \(item.action) done")
+                .accessibilityLabel(item.isDone ? "Undo \(item.action)" : "Mark \(item.action) done")
             }
             Text(item.action)
-                .font(.subheadline)
+                .font(AppFont.subheadline())
+                .foregroundStyle(Color.hxTextPrimary)
                 .lineLimit(1)
             Spacer(minLength: 4)
-            Text(verbatim: "\(item.weekCount)/\(item.target)")
-                .font(.footnote.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .accessibilityLabel("\(item.weekCount) of \(item.target) this week")
+            AtlasGoalPips(done: item.weekCount, target: item.target)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(AtlasGoalPips.spoken(done: item.weekCount, target: item.target))
         }
         .frame(minHeight: 28)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder
+    private var mark: some View {
+        if item.isDone {
+            Image(systemName: "checkmark.circle.fill")
+                .font(AppFont.title3())
+                .foregroundStyle(Color.hxSuccess)
+        } else {
+            Image(systemName: "circle")
+                .font(AppFont.title3())
+                .foregroundStyle(Color.hxTextSecondary)
+        }
+    }
+}
+
+/// The week's count as the Brief's pips (`DeckDot`, shared with the app): one per check-in of
+/// the target, filled once done. Columns narrow so a long target still fits the row.
+struct AtlasGoalPips: View {
+    let done: Int
+    let target: Int
+
+    /// At most this wide, so the commitment's name keeps its room.
+    static let maxWidth: CGFloat = 140
+
+    var body: some View {
+        let count = max(target, done)
+        let column = Self.column(count: count)
+        HStack(spacing: 0) {
+            ForEach(0..<count, id: \.self) { index in
+                DeckDot(state: index < done ? "done" : "missed", ink: Color.hxSuccess, column: column)
+            }
+        }
+    }
+
+    /// A day column's width, as the Brief's grid shares its seven when there are more pips.
+    static func column(count: Int) -> CGFloat {
+        guard count > 0 else { return DeckDots.dot }
+        return max(DeckDots.dot, min(20, maxWidth / CGFloat(count)))
+    }
+
+    static func spoken(done: Int, target: Int) -> String {
+        target > 0 ? "\(done) of \(target) this week" : "\(done) this week"
     }
 }

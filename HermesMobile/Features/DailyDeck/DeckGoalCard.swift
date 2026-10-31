@@ -13,6 +13,7 @@ struct DeckGoalCard: View {
 
     @Environment(GoalCheckInCardViewModel.self) private var model: GoalCheckInCardViewModel?
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         let goals = model?.isLive(for: deckDate) == true ? model?.goals(for: card) ?? [] : []
@@ -34,11 +35,16 @@ struct DeckGoalCard: View {
             }
         }
         .task(id: deckDate) {
-            // Once per screen, and again when the deck turns over to a new day while open.
+            // Each time the card appears (and when the deck turns over to a new day), so a check-in
+            // made elsewhere shows. A reload keeps the card's goals on screen until it lands.
             guard let model else { return }
-            if case .loaded(let home) = model.state, home.today == deckDate { return }
             if case .unavailable = model.state { return }
             await model.load()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, let model else { return }
+            if case .unavailable = model.state { return }
+            Task { await model.load() }
         }
     }
 
@@ -101,7 +107,8 @@ private struct GoalCheckInSection: View {
                 ForEach(Array(yesterday.enumerated()), id: \.element.id) { index, row in
                     if index > 0 { Rectangle().fill(palette.ink.opacity(0.12)).frame(height: 0.5) }
                     GoalCommitmentRow(row: row, day: .yesterday, date: home.yesterday, tint: tint,
-                                      isPending: model.pending.contains(GoalCheckInCardViewModel.key(goal.slug, row.id))) { status in
+                                      isPending: model.isPending(goal.slug, .commitment(row.id)),
+                                      atRisk: goal.flags.missTwice.contains(row.id)) { status in
                         Task { await model.checkIn(slug: goal.slug, commitment: row.id, status: status) }
                     }
                 }
@@ -112,8 +119,9 @@ private struct GoalCheckInSection: View {
                     if index > 0 { Rectangle().fill(palette.ink.opacity(0.12)).frame(height: 0.5) }
                     GoalItemRow(
                         row: row, tint: tint,
-                        isPending: model.pending.contains(GoalCheckInCardViewModel.key(goal.slug, row.id)),
-                        onAdd: { note in Task { await model.addItem(slug: goal.slug, commitment: row.id, note: note) } },
+                        isPending: model.isPending(goal.slug, .commitment(row.id)),
+                        atRisk: goal.flags.missTwice.contains(row.id),
+                        onAdd: { note in await model.addItem(slug: goal.slug, commitment: row.id, note: note) },
                         onRemoveLast: { Task { await model.removeLastItem(slug: goal.slug, commitment: row.id) } }
                     )
                 }
@@ -130,7 +138,7 @@ private struct GoalCheckInSection: View {
                         options: check.options.map { ($0, $0.capitalized) },
                         selected: check.today,
                         tint: tint,
-                        isDisabled: model.pending.contains(GoalCheckInCardViewModel.key(goal.slug, check.id)),
+                        isDisabled: model.isPending(goal.slug, .check(check.id)),
                         accessibilityPrefix: check.question
                     ) { value in
                         Task { await model.checkIn(slug: goal.slug, check: check.id, value: value) }
@@ -152,12 +160,9 @@ private struct GoalCheckInSection: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 14)
             }
-            ForEach(goal.week.commitments.filter { goal.flags.missTwice.contains($0.id) }) { row in
-                Text(verbatim: GoalDetailCopy.missTwice(row))
-                    .font(AppFont.footnote())
-                    .foregroundStyle(Color.hxWarning)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 10)
+            ForEach(GoalDetailCopy.missTwiceRows(goal)) { row in
+                GoalNote(systemImage: "exclamationmark.circle", tint: tint.fill, text: GoalDetailCopy.missTwice(row))
+                    .padding(.top, 12)
             }
             ForEach(goal.flags.escalations, id: \.check) { escalation in
                 GoalNote(systemImage: "exclamationmark.triangle", tint: .hxWarning, text: escalation.say)

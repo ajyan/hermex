@@ -20,6 +20,8 @@ private func goalsKeepsContent<Value>(_ state: BrainLoadState<Value>, after erro
 @Observable
 final class GoalsHomeViewModel {
     private(set) var state: BrainLoadState<GoalsHome> = .loading
+    /// The last reload failed while goals were on screen; they stay, with this said above them.
+    private(set) var refreshFailed = false
     @ObservationIgnored private let client: GoalsDataClient
     @ObservationIgnored private let onAPIError: (Error) -> Void
     @ObservationIgnored private var generation = 0
@@ -43,10 +45,15 @@ final class GoalsHomeViewModel {
             let home = try await client.home()
             guard token == generation, !Task.isCancelled else { return }
             state = .loaded(home)
+            refreshFailed = false
         } catch {
             guard token == generation, !goalsIsCancellation(error) else { return }
             onAPIError(error)
-            if goalsKeepsContent(state, after: error) { return }
+            if goalsKeepsContent(state, after: error) {
+                refreshFailed = true
+                return
+            }
+            refreshFailed = false
             state = goalsFailureState(error)
         }
     }
@@ -64,10 +71,16 @@ enum GoalDay: Hashable, Sendable {
 final class GoalDetailViewModel {
     private(set) var state: BrainLoadState<GoalDetail> = .loading
     var day: GoalDay = .today
-    /// Commitment and check ids with a check-in in flight; further taps on them are ignored.
-    private(set) var pending: Set<String> = []
+    /// Rows with a check-in in flight; further taps on them are ignored.
+    private(set) var pending: Set<GoalRowKey> = []
     private(set) var error: String?
+    /// The row whose check-in failed, so its section says so; nil for a screen-wide error.
+    private(set) var errorRow: GoalRowKey?
+    /// The consistency calendar for what's on screen, rebuilt only when its days change.
+    private(set) var calendar = GoalCalendarModel.empty
     static let refreshFailed = "Couldn't refresh. Pull to try again."
+    static let dayChanged = "The day changed. Check in again."
+    static let saveFailed = "Couldn't save. Try again."
     /// "I finished" is in flight.
     private(set) var isFinishing = false
     /// "Not yet" hides the finish prompt until the screen is opened again.
@@ -84,13 +97,34 @@ final class GoalDetailViewModel {
     let slug: String
     @ObservationIgnored private let client: GoalsDataClient
     @ObservationIgnored private let onAPIError: (Error) -> Void
+    @ObservationIgnored private let onChange: @MainActor () -> Void
     @ObservationIgnored private var generation = 0
+    /// The server's detail with the taps in flight on top; `state` shows `edits.shown`.
+    @ObservationIgnored private var edits: GoalPendingEdits<GoalDetail, GoalRowKey>?
+    @ObservationIgnored private var inFlight = 0
+    /// Since the last settle: a check-in saved, or one met a day that had moved on.
+    @ObservationIgnored private var savedSinceSettle = false
+    @ObservationIgnored private var dayChangedSinceSettle = false
+    @ObservationIgnored private var calendarInput: CalendarInput?
 
-    init(slug: String, client: GoalsDataClient, onAPIError: @escaping (Error) -> Void = { _ in }) {
+    private struct CalendarInput: Equatable {
+        let heatmap: [GoalHeatDay]
+        let week: [GoalHeatDay]
+        let today: String
+        let deadline: String?
+    }
+
+    /// `onChange` runs once a check-in, finish or reopen has landed on the server (the widget
+    /// refreshes from it).
+    init(slug: String, client: GoalsDataClient, onAPIError: @escaping (Error) -> Void = { _ in },
+         onChange: @escaping @MainActor () -> Void = {}) {
         self.slug = slug
         self.client = client
         self.onAPIError = onAPIError
+        self.onChange = onChange
     }
+
+    func isPending(_ key: GoalRowKey) -> Bool { pending.contains(key) }
 
     func load() async {
         generation += 1
@@ -98,105 +132,164 @@ final class GoalDetailViewModel {
         do {
             let detail = try await client.detail(slug: slug)
             guard token == generation, !Task.isCancelled else { return }
-            state = .loaded(detail)
-            if error == Self.refreshFailed { error = nil }
+            show(detail)
+            if error == Self.refreshFailed { setError(nil) }
         } catch {
             guard token == generation, !goalsIsCancellation(error) else { return }
             onAPIError(error)
             if goalsKeepsContent(state, after: error) {
-                self.error = Self.refreshFailed
+                setError(Self.refreshFailed)
                 return
             }
+            edits = nil
             state = goalsFailureState(error)
         }
     }
 
     /// Closes the goal as achieved. Nothing changes on screen until the server says it's done.
+    /// When the answer is an error, the goal may have closed anyway (a lost response, or a
+    /// finish from elsewhere), so its record decides before the error shows.
     func finish() async {
         guard case .loaded(let detail) = state, !isFinishing, finished == nil else { return }
         isFinishing = true
-        error = nil
+        setError(nil)
         defer { isFinishing = false }
         do {
             finished = try await client.finish(GoalFinishRequest(slug: slug, asOf: detail.today))
+            onChange()
         } catch {
             guard !goalsIsCancellation(error) else { return }
+            if let record = try? await client.record(slug: slug) {
+                finished = record
+                onChange()
+                return
+            }
             if case .http(409, _)? = error as? APIError {
                 await load()
-                self.error = "The day changed. Try again."
+                setError("The day changed. Try again.")
                 return
             }
             onAPIError(error)
-            self.error = "Couldn't finish this goal. Try again."
+            setError("Couldn't finish this goal. Try again.")
         }
+    }
+
+    /// The goal open again after its record's Reopen: the screen leaves the record for it.
+    /// The finish prompt stays hidden until the screen is opened again.
+    func reopened(_ detail: GoalDetail) {
+        finished = nil
+        finishDeferred = true
+        setError(nil)
+        show(detail)
     }
 
     func checkIn(commitment id: String, status: GoalStatus) async {
-        await send(id: id) { detail, date, asOf in
-            GoalCheckInEdit.apply(status, to: id, on: date, today: detail.today, yesterday: detail.yesterday,
-                                  in: &detail.summary)
-            return .commitment(slug: self.slug, date: date, asOf: asOf, id: id, status: status)
+        await send(.commitment(id), request: { .commitment(slug: self.slug, date: $0, asOf: $1, id: id, status: status) }) {
+            GoalCheckInEdit.apply(status, to: id, on: $1, today: $2, yesterday: $3, in: &$0)
         }
     }
 
-    /// Counts one more item (with its optional note) on the selected day.
-    func addItem(commitment id: String, note: String?) async {
-        await send(id: id) { detail, date, asOf in
-            GoalCheckInEdit.addItem(1, note: note, to: id, on: date, in: &detail.summary)
-            return .item(slug: self.slug, date: date, asOf: asOf, id: id, n: 1, note: note)
+    /// Counts one more item (with its optional note) on the selected day; true once the server has it.
+    @discardableResult
+    func addItem(commitment id: String, note: String?) async -> Bool {
+        await send(.commitment(id), request: { .item(slug: self.slug, date: $0, asOf: $1, id: id, n: 1, note: note) }) { goal, date, _, _ in
+            GoalCheckInEdit.addItem(1, note: note, to: id, on: date, in: &goal)
         }
     }
 
     /// Takes the latest counted item back off.
     func removeLastItem(commitment id: String) async {
-        await send(id: id) { detail, date, asOf in
-            GoalCheckInEdit.addItem(-1, note: nil, to: id, on: date, in: &detail.summary)
-            return .item(slug: self.slug, date: date, asOf: asOf, id: id, n: -1, note: nil)
+        await send(.commitment(id), request: { .item(slug: self.slug, date: $0, asOf: $1, id: id, n: -1, note: nil) }) { goal, date, _, _ in
+            GoalCheckInEdit.addItem(-1, note: nil, to: id, on: date, in: &goal)
         }
     }
 
     func checkIn(check id: String, value: String) async {
-        await send(id: id) { detail, date, asOf in
-            GoalCheckInEdit.setCheck(value, id: id, on: date, today: detail.today, yesterday: detail.yesterday,
-                                     in: &detail.summary)
-            return .check(slug: self.slug, date: date, asOf: asOf, id: id, value: value)
+        await send(.check(id), request: { .check(slug: self.slug, date: $0, asOf: $1, id: id, value: value) }) {
+            GoalCheckInEdit.setCheck(value, id: id, on: $1, today: $2, yesterday: $3, in: &$0)
         }
     }
 
-    /// Applies the optimistic edit, posts, then takes the server's summary or restores this
-    /// item's pre-tap values (never another check-in's, which may have landed meanwhile).
-    private func send(id: String, edit: (inout GoalDetail, String, String) -> GoalCheckInRequest) async {
-        guard case .loaded(let snapshot) = state, !pending.contains(id) else { return }
+    /// Shows the tap at once, posts it, then takes the server's summary, or drops the tap (its
+    /// rollback; other taps in flight stay). The row is free again as soon as the post answers;
+    /// the full detail (heatmap, consistency, history) reloads once, after the last tap in flight.
+    @discardableResult
+    private func send(
+        _ key: GoalRowKey,
+        request makeRequest: (_ date: String, _ asOf: String) -> GoalCheckInRequest,
+        edit: @escaping (_ goal: inout GoalSummary, _ date: String, _ today: String, _ yesterday: String) -> Void
+    ) async -> Bool {
+        guard case .loaded = state, var pendingEdits = edits, !pendingEdits.contains(key) else { return false }
         // The server's dates, never the phone's: the server decides what "today" is.
-        let date = day == .today ? snapshot.today : snapshot.yesterday
-        var optimistic = snapshot
-        let request = edit(&optimistic, date, snapshot.today)
-        state = .loaded(optimistic)
-        pending.insert(id)
-        error = nil
-        defer { pending.remove(id) }
+        let base = pendingEdits.base
+        let date = day == .today ? base.today : base.yesterday
+        let request = makeRequest(date, base.today)
+        pendingEdits.add(key) { edit(&$0.summary, date, $0.today, $0.yesterday) }
+        edits = pendingEdits
+        setError(nil)
+        publish()
+        inFlight += 1
+        var saved = false
         do {
-            let result = try await client.checkIn(request)
-            guard case .loaded(var current) = state else { return }
-            current.summary = result.goal
-            current.streak = result.streak
-            state = .loaded(current)
-            // The heatmap, consistency and check history come only with the full detail.
-            await load()
+            let result = try await client.checkIn(request, clientID: UUID().uuidString)
+            edits?.remove(key)
+            edits?.base.summary = result.goal
+            edits?.base.streak = result.streak
+            savedSinceSettle = true
+            saved = true
         } catch {
-            guard !goalsIsCancellation(error) else { return }
-            if case .http(409, _)? = error as? APIError {
-                await load()
-                self.error = "The day changed. Check in again."
-                return
+            edits?.remove(key)
+            if goalsIsCancellation(error) {
+                // The screen is gone; nothing to tell.
+            } else if case .http(409, _)? = error as? APIError {
+                dayChangedSinceSettle = true
+            } else {
+                onAPIError(error)
+                setError(Self.saveFailed, row: key)
             }
-            onAPIError(error)
-            if case .loaded(var current) = state {
-                GoalCheckInEdit.restore(id, from: snapshot.summary, in: &current.summary)
-                state = .loaded(current)
-            }
-            self.error = "Couldn't save. Try again."
         }
+        publish()
+        inFlight -= 1
+        if inFlight == 0 { await settle() }
+        return saved
+    }
+
+    /// After the last check-in in flight: one full reload when any saved or the day moved on.
+    private func settle() async {
+        let saved = savedSinceSettle, dayChanged = dayChangedSinceSettle
+        savedSinceSettle = false
+        dayChangedSinceSettle = false
+        guard saved || dayChanged, !Task.isCancelled else { return }
+        if saved { onChange() }
+        await load()
+        if dayChanged { setError(Self.dayChanged) }
+    }
+
+    /// Takes a detail from the server, keeping any taps still in flight on top of it.
+    private func show(_ detail: GoalDetail) {
+        if edits == nil { edits = GoalPendingEdits(detail) } else { edits?.base = detail }
+        publish()
+    }
+
+    private func publish() {
+        guard let edits else { return }
+        let shown = edits.shown
+        state = .loaded(shown)
+        let keys = edits.keys
+        if pending != keys { pending = keys }
+        let input = CalendarInput(heatmap: shown.heatmap, week: shown.summary.week.days, today: shown.today,
+                                  deadline: shown.summary.deadline)
+        if input != calendarInput {
+            calendarInput = input
+            calendar = GoalCalendarModel(
+                heatmap: GoalCalendar.merged(heatmap: input.heatmap, week: input.week, today: input.today),
+                today: input.today, deadline: input.deadline)
+        }
+    }
+
+    private func setError(_ message: String?, row: GoalRowKey? = nil) {
+        error = message
+        errorRow = message == nil ? nil : row
     }
 }
 
@@ -207,17 +300,24 @@ final class GoalRecordViewModel {
     private(set) var state: BrainLoadState<GoalRecord>
     private(set) var isSaving = false
     private(set) var error: String?
+    /// Reopen is in flight.
+    private(set) var isReopening = false
+    /// Why the last Reopen didn't happen.
+    private(set) var reopenError: String?
 
     let slug: String
     @ObservationIgnored private let client: GoalsDataClient
     @ObservationIgnored private let onAPIError: (Error) -> Void
+    @ObservationIgnored private let onChange: @MainActor () -> Void
 
-    /// `record` is the one the finish just returned, so the screen needs no load.
+    /// `record` is the one the finish just returned, so the screen needs no load. `onChange`
+    /// runs once a reopen has landed on the server (the widget refreshes from it).
     init(slug: String, record: GoalRecord? = nil, client: GoalsDataClient,
-         onAPIError: @escaping (Error) -> Void = { _ in }) {
+         onAPIError: @escaping (Error) -> Void = { _ in }, onChange: @escaping @MainActor () -> Void = {}) {
         self.slug = slug
         self.client = client
         self.onAPIError = onAPIError
+        self.onChange = onChange
         state = record.map { .loaded($0) } ?? .loading
     }
 
@@ -236,6 +336,31 @@ final class GoalRecordViewModel {
             onAPIError(error)
             if goalsKeepsContent(state, after: error) { return }
             state = goalsFailureState(error)
+        }
+    }
+
+    /// Reopens the finished goal: its open detail once the server has it, else nil with
+    /// `reopenError` saying why.
+    func reopen() async -> GoalDetail? {
+        guard case .loaded = state, !isReopening else { return nil }
+        isReopening = true
+        reopenError = nil
+        defer { isReopening = false }
+        do {
+            let detail = try await client.reopen(slug: slug)
+            onChange()
+            return detail
+        } catch {
+            guard !goalsIsCancellation(error) else { return nil }
+            onAPIError(error)
+            if case .http(409, _)? = error as? APIError {
+                reopenError = "An open goal already has this name."
+            } else if (error as? APIError)?.isNotFound == true {
+                reopenError = "This goal can't be reopened."
+            } else {
+                reopenError = "Couldn't reopen this goal. Try again."
+            }
+            return nil
         }
     }
 

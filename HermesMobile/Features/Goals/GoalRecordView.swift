@@ -1,16 +1,21 @@
 import SwiftUI
 
 /// A finished goal's record, pushed as `.finishedGoal(slug)` from the Finished log.
+/// `onReopened` takes over once Reopen has put the goal back among the open ones.
 struct GoalRecordView: View {
     @State private var viewModel: GoalRecordViewModel
+    private let onReopened: (GoalDetail) -> Void
 
-    init(slug: String, server: URL, onAPIError: @escaping (Error) -> Void) {
+    init(slug: String, server: URL, onAPIError: @escaping (Error) -> Void,
+         onReopened: @escaping (GoalDetail) -> Void) {
         _viewModel = State(initialValue: GoalRecordViewModel(
-            slug: slug, client: APIClientGoalsAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
+            slug: slug, client: APIClientGoalsAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError,
+            onChange: { GoalsWidgetSync.refreshAfterChange(server: server) }))
+        self.onReopened = onReopened
     }
 
     var body: some View {
-        GoalRecordContent(viewModel: viewModel)
+        GoalRecordContent(viewModel: viewModel, onReopened: onReopened)
             .hxNavigationTitle("Finished", subtitle: viewModel.subtitle)
             .background(Color.hxCanvas.ignoresSafeArea())
             .task { await viewModel.load() }
@@ -26,10 +31,12 @@ extension GoalRecordViewModel {
 }
 
 /// The record, top to bottom: the finisher card, race day and the running year (Garmin goals),
-/// the story, every day, the totals, then his why and reflection.
+/// the story, every day, the totals, then his why and reflection, and Reopen.
 struct GoalRecordContent: View {
     @Bindable var viewModel: GoalRecordViewModel
+    let onReopened: (GoalDetail) -> Void
     @Environment(\.colorScheme) private var colorScheme
+    @State private var confirmingReopen = false
 
     var body: some View {
         switch viewModel.state {
@@ -56,10 +63,44 @@ struct GoalRecordContent: View {
                     everyDay(record, tint: GoalTint(palette, scheme: colorScheme))
                     totals(record)
                     GoalReflectionSection(viewModel: viewModel, record: record, paper: palette.colors)
+                    reopenSection(record)
                 }
                 .padding(BrainStyle.l)
                 .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
             }
+        }
+    }
+
+    /// Reopen, a quiet destructive row at the foot (after a confirmation that names what it undoes).
+    private func reopenSection(_ r: GoalRecord) -> some View {
+        VStack(alignment: .leading, spacing: BrainStyle.s) {
+            SectionCard {
+                Button(role: .destructive) { confirmingReopen = true } label: {
+                    HStack(spacing: BrainStyle.m) {
+                        Label { Text(verbatim: "Reopen goal") } icon: { Image(systemName: "arrow.uturn.backward") }
+                            .font(BrainStyle.rowTitle)
+                            .foregroundStyle(Color.hxDanger)
+                        Spacer(minLength: 0)
+                        if viewModel.isReopening { ProgressView().controlSize(.small) }
+                    }
+                    .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(viewModel.isReopening)
+            }
+            if let error = viewModel.reopenError {
+                Text(verbatim: error).font(BrainStyle.meta).foregroundStyle(Color.hxDanger)
+            }
+        }
+        .confirmationDialog(Text(verbatim: "Reopen \(GoalsCopy.shortTitle(r.title))?"), isPresented: $confirmingReopen,
+                            titleVisibility: .visible) {
+            Button(role: .destructive) {
+                Task { if let detail = await viewModel.reopen() { onReopened(detail) } }
+            } label: { Text(verbatim: "Reopen goal") }
+            Button(role: .cancel) {} label: { Text(verbatim: "Cancel") }
+        } message: {
+            Text(verbatim: "Puts the goal back among your open goals and takes it out of Finished.")
         }
     }
 
@@ -86,7 +127,7 @@ struct GoalRecordContent: View {
             SectionCard {
                 VStack(alignment: .leading, spacing: BrainStyle.m) {
                     GoalCalendarGrid(
-                        weeks: GoalCalendar.weeks(heatmap: r.heatmap, today: r.finished, deadline: r.finished),
+                        calendar: GoalCalendarModel(heatmap: r.heatmap, today: r.finished, deadline: r.finished),
                         tint: tint
                     )
                     Text(verbatim: GoalRecordCopy.daysLine(r)).brainText(.meta)

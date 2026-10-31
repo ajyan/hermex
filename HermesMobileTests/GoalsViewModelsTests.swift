@@ -6,6 +6,7 @@ private final class FakeGoalsClient: GoalsDataClient, @unchecked Sendable {
     private let lock = NSLock()
     private var _log: [String] = []
     private var _checkIns: [GoalCheckInRequest] = []
+    private var _clientIDs: [String] = []
 
     var homeResults: [Result<GoalsHome, Error>] = []
     var detailResults: [Result<GoalDetail, Error>] = []
@@ -20,6 +21,9 @@ private final class FakeGoalsClient: GoalsDataClient, @unchecked Sendable {
 
     var log: [String] { lock.withLock { _log } }
     var checkIns: [GoalCheckInRequest] { lock.withLock { _checkIns } }
+    var clientIDs: [String] { lock.withLock { _clientIDs } }
+    /// When set, `detail` signals `started` and then waits on `release` before answering.
+    var detailGate: (started: AsyncStream<Void>.Continuation, release: AsyncStream<Void>)?
 
     private func next<T>(_ name: String, _ queue: inout [Result<T, Error>]) throws -> T {
         lock.lock(); defer { lock.unlock() }
@@ -29,17 +33,29 @@ private final class FakeGoalsClient: GoalsDataClient, @unchecked Sendable {
     }
 
     func home() async throws -> GoalsHome { try next("home", &homeResults) }
-    func detail(slug: String) async throws -> GoalDetail { try next("detail:\(slug)", &detailResults) }
+    func detail(slug: String) async throws -> GoalDetail {
+        if let detailGate {
+            detailGate.started.yield()
+            for await _ in detailGate.release { break }
+        }
+        return try next("detail:\(slug)", &detailResults)
+    }
     func confirmWeek(_ r: GoalWeekRequest) async throws -> GoalCheckInResult { throw URLError(.unsupportedURL) }
     func finish(_ r: GoalFinishRequest) async throws -> GoalRecord { throw URLError(.unsupportedURL) }
     func record(slug: String) async throws -> GoalRecord { throw URLError(.unsupportedURL) }
+    func reopen(slug: String) async throws -> GoalDetail { throw URLError(.unsupportedURL) }
     func saveReflection(_ r: GoalReflectionRequest) async throws -> GoalRecord { throw URLError(.unsupportedURL) }
 
-    func checkIn(_ r: GoalCheckInRequest) async throws -> GoalCheckInResult {
-        lock.withLock { _checkIns.append(r) }
+    /// Per-item gates key commitments by id and daily checks by "check:<id>".
+    func checkIn(_ r: GoalCheckInRequest, clientID: String) async throws -> GoalCheckInResult {
+        lock.withLock {
+            _checkIns.append(r)
+            _clientIDs.append(clientID)
+        }
         let id: String
         switch r {
-        case .commitment(_, _, _, let c, _), .check(_, _, _, let c, _), .item(_, _, _, let c, _, _): id = c
+        case .commitment(_, _, _, let c, _), .item(_, _, _, let c, _, _): id = c
+        case .check(_, _, _, let c, _): id = "check:\(c)"
         }
         if let item = lock.withLock({ perItem[id] }) {
             started?.yield(id)
@@ -163,12 +179,12 @@ final class GoalsViewModelsTests: XCTestCase {
         XCTAssertEqual(stretch(vm)?.today, .done)
         XCTAssertEqual(stretch(vm)?.done, 1)
         XCTAssertEqual(stretch(vm)?.remaining, 5)
-        XCTAssertTrue(vm.pending.contains("stretch-pm"))
+        XCTAssertTrue(vm.isPending(.commitment("stretch-pm")))
         releaseCont.yield()
         await tap.value
         // The optimistic 1 gives way to the server: its reloaded detail reports 0.
         XCTAssertEqual(stretch(vm)?.done, 0)
-        XCTAssertFalse(vm.pending.contains("stretch-pm"))
+        XCTAssertFalse(vm.isPending(.commitment("stretch-pm")))
         guard case .loaded(let d) = vm.state else { return XCTFail("not loaded") }
         XCTAssertEqual(d.streak.days, 1)
     }
@@ -181,7 +197,20 @@ final class GoalsViewModelsTests: XCTestCase {
         XCTAssertNil(stretch(vm)?.today)
         XCTAssertEqual(stretch(vm)?.done, 0)
         XCTAssertEqual(vm.error, "Couldn't save. Try again.")
+        XCTAssertEqual(vm.errorRow, .commitment("stretch-pm"), "the error shows at the row that failed")
         XCTAssertTrue(vm.pending.isEmpty)
+    }
+
+    func testFailedCheckSaysSoAtItsSectionAndAReloadErrorIsScreenWide() async throws {
+        let client = FakeGoalsClient()
+        client.checkInResults = [.failure(URLError(.notConnectedToInternet))]
+        let vm = try await loadedViewModel(client)
+        await vm.checkIn(check: "foot", value: "worse")
+        XCTAssertEqual(vm.errorRow, .check("foot"))
+        client.detailResults = [.failure(URLError(.timedOut))]
+        await vm.load()
+        XCTAssertEqual(vm.error, GoalDetailViewModel.refreshFailed)
+        XCTAssertNil(vm.errorRow, "a failed refresh isn't any one row's")
     }
 
     func testConflictReloads() async throws {
@@ -415,11 +444,188 @@ final class GoalsViewModelsTests: XCTestCase {
     func testFailedHomeReloadKeepsTheLoadedHome() async throws {
         let client = FakeGoalsClient()
         let home = try PrepDecoding.decode(GoalsHome.self, from: Data(GoalsModelsTests.homeSample.utf8))
-        client.homeResults = [.success(home), .failure(URLError(.timedOut))]
+        client.homeResults = [.success(home), .failure(URLError(.timedOut)), .success(home)]
         let vm = GoalsHomeViewModel(client: client)
         await vm.load()
+        XCTAssertFalse(vm.refreshFailed)
         await vm.load()
         XCTAssertEqual(vm.state, .loaded(home))
+        XCTAssertTrue(vm.refreshFailed, "the kept goals say the refresh failed")
+        await vm.load()
+        XCTAssertFalse(vm.refreshFailed)
+    }
+
+    /// The calendar draws from the view model's prepared model, which a tap in flight reaches too.
+    func testCalendarShowsATapInFlightAndDropsItOnFailure() async throws {
+        let client = FakeGoalsClient()
+        var json = try JSONSerialization.jsonObject(with: Data(GoalsModelsTests.detailJSON().utf8)) as! [String: Any]
+        json["today"] = "2026-10-13"
+        json["yesterday"] = "2026-10-12"
+        json["heatmap"] = [["date": "2026-10-12", "status": "none"], ["date": "2026-10-13", "status": "none"]]
+        var week = json["week"] as! [String: Any]
+        week["days"] = (12...18).map { ["date": "2026-10-\($0)", "status": "none"] }
+        json["week"] = week
+        client.detailResults = [.success(try PrepDecoding.decode(GoalDetail.self, from: JSONSerialization.data(withJSONObject: json)))]
+        let vm = GoalDetailViewModel(slug: "nyc-marathon-2026", client: client)
+        await vm.load()
+        let todayCell = { vm.calendar.slots.first { $0.id == "2026-10-13" }?.day?.status }
+        XCTAssertEqual(todayCell(), GoalStatus.none)
+        let gate = (started: AsyncStream<Void>.makeStream(), release: AsyncStream<Void>.makeStream())
+        client.gate = (gate.started.continuation, gate.release.stream)
+        client.checkInResults = [.failure(URLError(.notConnectedToInternet))]
+        let tap = Task { await vm.checkIn(commitment: "stretch-pm", status: .done) }
+        var started = gate.started.stream.makeAsyncIterator()
+        _ = await started.next()
+        XCTAssertEqual(todayCell(), .done, "the calendar shows the tap at once")
+        XCTAssertEqual(vm.calendar.shown, 1)
+        gate.release.continuation.yield()
+        await tap.value
+        XCTAssertEqual(todayCell(), GoalStatus.none, "and drops it with the tap")
+    }
+
+    func testConflictWithFailedReloadUndoesTheTap() async throws {
+        let client = FakeGoalsClient()
+        client.checkInResults = [.failure(APIError.http(statusCode: 409, body: nil))]
+        let vm = try await loadedViewModel(client)
+        client.detailResults = [.failure(URLError(.notConnectedToInternet))]
+        await vm.checkIn(commitment: "stretch-pm", status: .done)
+        XCTAssertNil(stretch(vm)?.today, "nothing was saved, so nothing shows as saved")
+        XCTAssertEqual(stretch(vm)?.done, 0)
+        XCTAssertEqual(vm.error, "The day changed. Check in again.")
+    }
+
+    func testACommitmentAndACheckSharingAnIdStayApart() async throws {
+        let client = FakeGoalsClient()
+        let (started, startedCont) = AsyncStream<String>.makeStream()
+        let (releaseRow, releaseRowCont) = AsyncStream<Void>.makeStream()
+        let (releaseCheck, releaseCheckCont) = AsyncStream<Void>.makeStream()
+        client.started = startedCont
+        client.perItem = [
+            "foot": (releaseRow, .failure(URLError(.notConnectedToInternet))),
+            "check:foot": (releaseCheck, .success(try result(done: 0, today: "done"))),
+        ]
+        client.detailResults = [.success(try detail(commitment: 0, ["id": "foot"]))]
+        let vm = GoalDetailViewModel(slug: "nyc-marathon-2026", client: client)
+        await vm.load()
+        var calls = started.makeAsyncIterator()
+        let row = Task { await vm.checkIn(commitment: "foot", status: .done) }
+        _ = await calls.next()
+        let check = Task { await vm.checkIn(check: "foot", value: "worse") }
+        _ = await calls.next()
+        XCTAssertEqual(client.checkIns.count, 2, "the commitment's tap doesn't block the check")
+        releaseRowCont.yield()
+        await row.value
+        guard case .loaded(let d) = vm.state else { return XCTFail("not loaded") }
+        XCTAssertNil(d.summary.week.commitments.first { $0.id == "foot" }?.today, "the failed tap rolls back")
+        XCTAssertEqual(d.summary.dailyChecks.first?.today, "worse", "the check's tap still shows")
+        XCTAssertTrue(vm.isPending(.check("foot")))
+        XCTAssertFalse(vm.isPending(.commitment("foot")))
+        releaseCheckCont.yield()
+        await check.value
+    }
+
+    func testRowsFreeOnAnswerAndOneReloadFollowsTheLastTap() async throws {
+        let client = FakeGoalsClient()
+        let (started, startedCont) = AsyncStream<String>.makeStream()
+        let (releaseA, releaseACont) = AsyncStream<Void>.makeStream()
+        let (releaseB, releaseBCont) = AsyncStream<Void>.makeStream()
+        client.started = startedCont
+        client.perItem = [
+            "stretch-pm": (releaseA, .success(try result(done: 1, today: "done"))),
+            "long-run": (releaseB, .success(try result(done: 1, today: "done"))),
+        ]
+        let vm = try await loadedViewModel(client)
+        var calls = started.makeAsyncIterator()
+        let a = Task { await vm.checkIn(commitment: "stretch-pm", status: .done) }
+        _ = await calls.next()
+        let b = Task { await vm.checkIn(commitment: "long-run", status: .done) }
+        _ = await calls.next()
+        releaseACont.yield()
+        await a.value
+        XCTAssertFalse(vm.isPending(.commitment("stretch-pm")), "free as soon as its post answers")
+        XCTAssertTrue(vm.isPending(.commitment("long-run")))
+        let (reloadStarted, reloadStartedCont) = AsyncStream<Void>.makeStream()
+        let (reloadRelease, reloadReleaseCont) = AsyncStream<Void>.makeStream()
+        client.detailGate = (reloadStartedCont, reloadRelease)
+        releaseBCont.yield()
+        for await _ in reloadStarted { break }
+        XCTAssertTrue(vm.pending.isEmpty, "no spinner while the full detail reloads")
+        reloadReleaseCont.yield()
+        await b.value
+        XCTAssertEqual(client.log, ["detail:nyc-marathon-2026", "checkIn", "checkIn", "detail:nyc-marathon-2026"])
+    }
+
+    func testReloadDuringATapKeepsTheTap() async throws {
+        let client = FakeGoalsClient()
+        let (started, startedCont) = AsyncStream<Void>.makeStream()
+        let (release, releaseCont) = AsyncStream<Void>.makeStream()
+        client.gate = (startedCont, release)
+        client.checkInResults = [.success(try result(done: 1, today: "done"))]
+        let vm = try await loadedViewModel(client)
+        let tap = Task { await vm.checkIn(commitment: "stretch-pm", status: .done) }
+        for await _ in started { break }
+        await vm.load()  // a pull to refresh lands mid-tap with the server's pre-tap state
+        XCTAssertEqual(stretch(vm)?.today, .done)
+        XCTAssertEqual(stretch(vm)?.done, 1)
+        XCTAssertTrue(vm.isPending(.commitment("stretch-pm")))
+        releaseCont.yield()
+        await tap.value
+    }
+
+    func testAddItemSaysWhetherTheServerTookIt() async throws {
+        let client = FakeGoalsClient()
+        let item: [String: Any] = ["unit": "item", "target": 5, "done": 0, "items": []]
+        client.detailResults = [.success(try detail(commitment: 0, item))]
+        client.checkInResults = [.failure(URLError(.notConnectedToInternet))]
+        let vm = GoalDetailViewModel(slug: "nyc-marathon-2026", client: client)
+        await vm.load()
+        let failed = await vm.addItem(commitment: "stretch-pm", note: "Anthropic")
+        XCTAssertFalse(failed)
+        client.checkInResults = [.success(try result(done: 1, today: "done"))]
+        let saved = await vm.addItem(commitment: "stretch-pm", note: "Anthropic")
+        XCTAssertTrue(saved)
+    }
+
+    func testSavedTapsRefreshTheWidgetOnceTheLastLands() async throws {
+        let client = FakeGoalsClient()
+        let (started, startedCont) = AsyncStream<String>.makeStream()
+        let (releaseA, releaseACont) = AsyncStream<Void>.makeStream()
+        let (releaseB, releaseBCont) = AsyncStream<Void>.makeStream()
+        client.started = startedCont
+        client.perItem = [
+            "stretch-pm": (releaseA, .success(try result(done: 1, today: "done"))),
+            "long-run": (releaseB, .failure(URLError(.timedOut))),
+        ]
+        client.detailResults = [.success(try detail())]
+        var changes = 0
+        let vm = GoalDetailViewModel(slug: "nyc-marathon-2026", client: client, onChange: { changes += 1 })
+        await vm.load()
+        var calls = started.makeAsyncIterator()
+        let a = Task { await vm.checkIn(commitment: "stretch-pm", status: .done) }
+        _ = await calls.next()
+        let b = Task { await vm.checkIn(commitment: "long-run", status: .done) }
+        _ = await calls.next()
+        releaseACont.yield()
+        await a.value
+        XCTAssertEqual(changes, 0, "waits for the last tap in flight")
+        releaseBCont.yield()
+        await b.value
+        XCTAssertEqual(changes, 1)
+    }
+
+    func testEachTapSendsItsOwnClientID() async throws {
+        let client = FakeGoalsClient()
+        client.checkInResults = [.success(try result(done: 1, today: "done"))]
+        let vm = try await loadedViewModel(client)
+        await vm.checkIn(commitment: "stretch-pm", status: .done)
+        await vm.checkIn(commitment: "stretch-pm", status: .clear)
+        let ids = client.clientIDs
+        XCTAssertEqual(ids.count, 2)
+        XCTAssertNotEqual(ids[0], ids[1])
+        for id in ids {
+            XCTAssertTrue((1...64).contains(id.count))
+            XCTAssertNil(id.range(of: "[^A-Za-z0-9-]", options: .regularExpression), id)
+        }
     }
 
     func testCheckValuePostsCheckShape() async throws {
@@ -433,11 +639,15 @@ final class GoalsViewModelsTests: XCTestCase {
 }
 
 final class GoalsCopyTests: XCTestCase {
-    func testShortNameAndWeekLine() throws {
+    func testShortName() {
         XCTAssertEqual(GoalsCopy.shortName("Nightly stretch (knee hugs, figure-4 twists, open books)"), "Stretch")
         XCTAssertEqual(GoalsCopy.shortName("Saturday taper run (~12 mi easy)"), "Run")
-        let home = try PrepDecoding.decode(GoalsHome.self, from: Data(GoalsModelsTests.homeSample.utf8))
-        XCTAssertEqual(GoalsCopy.weekLine(home.goals[0].week.commitments), "Stretch 0/6 · Run 0/1")
+    }
+
+    func testStreakLineSaysWhenAtRisk() {
+        XCTAssertEqual(GoalsCopy.streakLine(GoalStreak(days: 12)), "12-day show-up streak")
+        XCTAssertEqual(GoalsCopy.streakLine(GoalStreak(days: 1, atRisk: true)),
+                       "1-day show-up streak · show up today to keep it")
     }
 
     func testItemRowCopy() throws {
@@ -446,9 +656,8 @@ final class GoalsCopyTests: XCTestCase {
             {"date":"2026-10-12","note":"A"},{"date":"2026-10-12"},{"date":"2026-10-13","note":"B"},
             {"date":"2026-10-13","note":"C"},{"date":"2026-10-14","note":"D"}]}
             """).utf8))
-        XCTAssertEqual(GoalItemCopy.countLine(row), "4 of 5 this week")
         XCTAssertEqual(GoalItemCopy.noteLine(row), "D · C · B", "the three latest notes, newest first")
-        XCTAssertEqual(GoalItemCopy.spoken(row), "Outreach, 4 of 5 this week")
+        XCTAssertEqual(GoalItemCopy.spoken(row), "Outreach: 4 of 5 this week")
         XCTAssertNil(GoalItemCopy.noteLine(try PrepDecoding.decode(GoalCommitmentProgress.self, from: Data(#"{"id":"x","unit":"item"}"#.utf8))))
     }
 
@@ -458,16 +667,70 @@ final class GoalsCopyTests: XCTestCase {
         XCTAssertEqual(GoalsCopy.relativeDay("2026-10-08", today: "2026-10-10"), "2 days ago")
     }
 
+    /// US daylight saving ends on Nov 1 2026: a local calendar counts the 25-hour day short.
+    func testRelativeDayAcrossDaylightSavingEnd() {
+        let saved = NSTimeZone.default
+        NSTimeZone.default = TimeZone(identifier: "America/New_York")!
+        defer { NSTimeZone.default = saved }
+        XCTAssertEqual(GoalsCopy.relativeDay("2026-11-02", today: "2026-10-31"), "in 2 days")
+        XCTAssertEqual(GoalsCopy.relativeDay("2026-11-01", today: "2026-10-31"), "tomorrow")
+        XCTAssertEqual(GoalsCopy.relativeDay("2026-10-31", today: "2026-11-02"), "2 days ago")
+    }
+
     func testShortTitleDropsParenthetical() {
         XCTAssertEqual(GoalsCopy.shortTitle("Nightly stretch (knee hugs, figure-4 twists, open books)"), "Nightly stretch")
         XCTAssertEqual(GoalsCopy.shortTitle("Finish the NYC Marathon, uninjured"), "Finish the NYC Marathon, uninjured")
     }
 
-    func testCheckTitleAndWeekSummary() throws {
+    func testCheckTitleAndCountdown() throws {
         XCTAssertEqual(GoalDetailCopy.checkTitle("Foot today: better, same, or worse?"), "Foot today")
         let home = try PrepDecoding.decode(GoalsHome.self, from: Data(GoalsModelsTests.homeSample.utf8))
-        XCTAssertEqual(GoalHeroCopy.weekSummary(home.goals[0].week.commitments), "Stretch 0/6 · Run 0/1 · 1 skip left")
         XCTAssertEqual(GoalHeroCopy.countdown(home.goals[0]), "22 days · Sun Nov 1")
+    }
+
+    /// Skips are budgeted per commitment, so each row says its own, never a sum across rows.
+    func testPipsShowEachCommitmentsOwnSkipsLeft() throws {
+        let home = try PrepDecoding.decode(GoalsHome.self, from: Data(GoalsModelsTests.homeSample.utf8))
+        let rows = home.goals[0].week.commitments
+        let stretch = GoalPips(rows[0], name: GoalsCopy.shortName(rows[0].action))
+        XCTAssertEqual(stretch.spoken, "Stretch: 0 of 6 days, 1 skip left")
+        XCTAssertEqual(stretch.states, Array(repeating: "missed", count: 6) + ["ahead"], "six to do, then the skip left dashed")
+        XCTAssertEqual(stretch.count, "0 of 6")
+        let run = GoalPips(rows[1], name: GoalsCopy.shortName(rows[1].action))
+        XCTAssertEqual(run.spoken, "Run: 0 of 1 day", "a row with no skip budget says nothing of skips")
+        XCTAssertEqual(run.states, ["missed"])
+    }
+
+    func testPipsFillDoneAndMinThenSpentAndLeftSkips() throws {
+        let row = try PrepDecoding.decode(GoalCommitmentProgress.self, from: Data(
+            #"{"id":"s","action":"Nightly stretch (knees)","target":6,"done":2,"min":1,"skips":2,"skipped":1}"#.utf8))
+        let pips = GoalPips(row, name: "Stretch")
+        XCTAssertEqual(pips.states, ["done", "done", "done", "missed", "missed", "missed", "skip", "ahead"])
+        XCTAssertEqual(pips.spoken, "Stretch: 3 of 6 days, 1 skip left")
+        var spent = row
+        spent.skipped = 2
+        XCTAssertEqual(GoalPips(spent, name: "Stretch").spoken, "Stretch: 3 of 6 days, 0 skips left")
+    }
+
+    func testItemPipsCountPastTheTarget() throws {
+        let row = try PrepDecoding.decode(GoalCommitmentProgress.self, from: Data(
+            #"{"id":"o","action":"Outreach","target":3,"done":4,"unit":"item"}"#.utf8))
+        let pips = GoalPips(row, name: "Outreach")
+        XCTAssertEqual(pips.states, ["done", "done", "done", "done"])
+        XCTAssertEqual(pips.spoken, "Outreach: 4 of 3 this week")
+    }
+
+    func testMissTwiceSaysYesterdayAndShowsEveryFlaggedRow() throws {
+        var goal = try PrepDecoding.decode(GoalsHome.self, from: Data(GoalsModelsTests.homeSample.utf8)).goals[0]
+        goal.flags.missTwice = goal.week.commitments.map(\.id)
+        let rows = GoalDetailCopy.missTwiceRows(goal)
+        XCTAssertEqual(rows.map(\.id), goal.week.commitments.map(\.id), "every flagged commitment, not only the first")
+        XCTAssertEqual(GoalDetailCopy.missTwice(rows[0]), "Missed stretch yesterday. Even the 2-min version counts.")
+        let item = try PrepDecoding.decode(GoalCommitmentProgress.self, from: Data(
+            #"{"id":"o","action":"Outreach","target":5,"unit":"item"}"#.utf8))
+        XCTAssertEqual(GoalDetailCopy.missTwice(item), "Short on outreach two weeks running. One today counts.")
+        XCTAssertEqual(GoalPips.atRiskLabel(rows[0]), "Don't miss twice")
+        XCTAssertEqual(GoalPips.atRiskLabel(item), "Short 2 weeks running")
     }
 
     func testSourceErrorsLine() {
@@ -486,6 +749,5 @@ final class GoalsCopyTests: XCTestCase {
         XCTAssertFalse(GoalDetailCopy.skipDisabled(row, selected: .skip))
         row.skipped = 0
         XCTAssertFalse(GoalDetailCopy.skipDisabled(row, selected: nil))
-        XCTAssertEqual(GoalDetailCopy.countLine(row), "0/0 · 1 skip left")
     }
 }

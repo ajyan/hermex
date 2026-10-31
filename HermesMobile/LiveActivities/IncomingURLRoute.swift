@@ -9,6 +9,8 @@ enum IncomingURLRoute: Equatable {
     case newChatVoice
     /// A daily-brief link; `date` and `kind` are set together when it names a review.
     case dailyBrief(date: String?, kind: String?)
+    /// The Goals widget's tap: open Goals on the active webui server.
+    case goals
     case newCall
     /// A malformed link with no profile carries nil and falls back to a plain new chat.
     case newChatInProfile(profileName: String?)
@@ -26,6 +28,8 @@ enum IncomingURLRoute: Equatable {
         } else if HermesDeepLink.isDailyBriefURL(url) {
             let deck = HermesDeepLink.dailyBriefDeck(from: url)
             self = .dailyBrief(date: deck?.date, kind: deck?.kind)
+        } else if HermesDeepLink.isGoalsURL(url) {
+            self = .goals
         } else if HermesDeepLink.isNewCallURL(url) {
             self = .newCall
         } else if HermesDeepLink.isNewChatInProfileURL(url) {

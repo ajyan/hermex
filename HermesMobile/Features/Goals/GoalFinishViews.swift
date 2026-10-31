@@ -1,13 +1,17 @@
 import SwiftUI
 
-/// "Did you finish?" on a goal whose last milestone is due: I finished closes the goal (the
-/// server ticks what's left and saves the record); Not yet hides it until the screen reopens.
+/// "Did you finish?" on a goal whose last milestone is due: I finished asks once more, then
+/// closes the goal (the server ticks what's left and saves the record); Not yet hides it until
+/// the screen reopens.
 struct GoalFinishPrompt: View {
+    let goalTitle: String
     let milestone: String
     let paper: HermexPaper
     let isFinishing: Bool
     let onFinish: () -> Void
     let onNotYet: () -> Void
+
+    @State private var confirming = false
 
     var body: some View {
         HXCard(.glow(paper), title: "Did you finish?", spacing: BrainStyle.s) {
@@ -27,7 +31,7 @@ struct GoalFinishPrompt: View {
             HStack(spacing: BrainStyle.s) {
                 Button(action: onNotYet) { Text(verbatim: "Not yet") }
                     .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
-                Button(action: onFinish) {
+                Button { confirming = true } label: {
                     if isFinishing { ProgressView() } else { Text(verbatim: "I finished") }
                 }
                 .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
@@ -37,6 +41,13 @@ struct GoalFinishPrompt: View {
             .padding(.top, BrainStyle.xs)
         }
         .environment(\.hxPaper, paper)
+        .confirmationDialog(Text(verbatim: "Finish \(GoalsCopy.shortTitle(goalTitle))?"), isPresented: $confirming,
+                            titleVisibility: .visible) {
+            Button(action: onFinish) { Text(verbatim: "Finish goal") }
+            Button(role: .cancel) {} label: { Text(verbatim: "Cancel") }
+        } message: {
+            Text(verbatim: "Closes the goal and saves its record. You can reopen it from the record.")
+        }
     }
 }
 
@@ -285,21 +296,30 @@ enum GoalFinishCopy {
         return m >= 60 ? "\(m / 60) h \(m % 60) m" : "\(m) min"
     }
 
-    static func shortDate(_ iso: String) -> String { format(iso, "MMM d") }
-    static func longDate(_ iso: String) -> String { format(iso, "EEEE, MMM d") }
+    static func shortDate(_ iso: String) -> String { format(iso, shortFormatter) }
+    static func longDate(_ iso: String) -> String { format(iso, longFormatter) }
 
     /// "2026-04" → "Apr".
-    static func month(_ yyyyMM: String) -> String { format("\(yyyyMM)-01", "MMM") }
+    static func month(_ yyyyMM: String) -> String { format("\(yyyyMM)-01", monthFormatter) }
 
     /// "Oct 10 – Nov 1".
     static func range(_ r: GoalRecord) -> String { "\(shortDate(r.started)) – \(shortDate(r.finished))" }
 
-    private static func format(_ iso: String, _ pattern: String) -> String {
-        guard let date = GoalCalendar.date(iso) else { return iso }
+    // Built once each: the record and the Finished shelf format a date per row.
+    private static let shortFormatter = formatter("MMM d")
+    private static let longFormatter = formatter("EEEE, MMM d")
+    private static let monthFormatter = formatter("MMM")
+
+    private static func formatter(_ pattern: String) -> DateFormatter {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.timeZone = TimeZone(identifier: "UTC")
         f.dateFormat = pattern
-        return f.string(from: date)
+        return f
+    }
+
+    private static func format(_ iso: String, _ formatter: DateFormatter) -> String {
+        guard let date = GoalCalendar.date(iso) else { return iso }
+        return formatter.string(from: date)
     }
 }

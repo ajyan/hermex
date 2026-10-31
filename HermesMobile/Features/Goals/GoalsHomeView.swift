@@ -55,8 +55,17 @@ struct GoalsHomeView: View {
         case .loaded(let home):
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.l) {
-                    if !home.goals.isEmpty || !home.errors.isEmpty { activeSection(home) }
-                    streakLine(home.streak)
+                    if viewModel.refreshFailed {
+                        Text(verbatim: GoalDetailViewModel.refreshFailed)
+                            .font(BrainStyle.meta)
+                            .foregroundStyle(Color.hxDanger)
+                    }
+                    if home.goals.isEmpty && home.errors.isEmpty {
+                        emptyState
+                    } else {
+                        streakLine(home.streak)
+                        activeSection(home)
+                    }
                     if !home.finished.isEmpty { GoalsFinishedShelf(goals: home.finished) }
                     if !home.agentGoals.isEmpty { agentSection(home.agentGoals) }
                 }
@@ -67,16 +76,26 @@ struct GoalsHomeView: View {
         }
     }
 
-    private func streakLine(_ streak: GoalStreak) -> some View {
-        HStack(spacing: BrainStyle.s) {
-            if streak.atRisk {
-                Circle().fill(Color.hxWarning).frame(width: 6, height: 6).accessibilityHidden(true)
-            }
-            Text(verbatim: streak.atRisk
-                 ? "\(GoalsCopy.streakTitle(streak.days)) · show up today to keep it"
-                 : GoalsCopy.streakTitle(streak.days))
-                .brainText(.meta)
+    /// No open goals yet: what Goals is for, and New goal.
+    private var emptyState: some View {
+        ContentUnavailableView {
+            Label { Text(verbatim: "No goals yet") } icon: { Image(systemName: "flag.checkered") }
+        } description: {
+            Text(verbatim: "Tell Atlas what you're working toward. It sets up the weekly commitments you check in here.")
+        } actions: {
+            Button(action: onNewGoal) { Text(verbatim: "New goal") }
         }
+    }
+
+    /// The show-up streak with Prep's reward flame (DESIGN.md § Reward gold), above the goals.
+    private func streakLine(_ streak: GoalStreak) -> some View {
+        Label {
+            Text(verbatim: GoalsCopy.streakLine(streak))
+        } icon: {
+            Image(systemName: "flame").foregroundStyle(HermexPaper.opener.glow)
+        }
+        .font(BrainStyle.meta)
+        .foregroundStyle(Color.hxTextPrimary)
         .padding(.horizontal, BrainStyle.xs)
     }
 
@@ -92,10 +111,10 @@ struct GoalsHomeView: View {
                                 .font(BrainStyle.meta)
                                 .foregroundStyle(GoalPaper.palette(for: goal).ink)
                                 .padding(.horizontal, BrainStyle.xs)
-                        } else if GoalsCopy.needsAttention(goal) {
+                        } else if !goal.flags.escalations.isEmpty {
                             Text(verbatim: "Needs attention: open to check in")
                                 .font(BrainStyle.meta)
-                                .foregroundStyle(Color.hxWarning)
+                                .foregroundStyle(GoalPaper.palette(for: goal).ink)
                                 .padding(.horizontal, BrainStyle.xs)
                         }
                     }
@@ -121,13 +140,11 @@ struct GoalsHomeView: View {
             BrainSectionHeader(title: "Atlas is working on")
             SectionCard {
                 VStack(spacing: 0) {
+                    // Plain rows: these goals live in chat, so nothing here opens.
                     ForEach(Array(goals.enumerated()), id: \.element.id) { offset, goal in
                         if offset > 0 { PrepRowDivider() }
-                        BrainRow(
-                            leading: { BrainModuleIcon(systemName: "sparkles") },
-                            title: goal.title,
-                            subtitle: goal.status.capitalized
-                        )
+                        BrainRow(title: goal.title, trailing: goal.status.capitalized)
+                            .accessibilityAddTraits(.isStaticText)
                     }
                 }
             }
@@ -145,8 +162,9 @@ enum GoalsCopy {
         days == 1 ? "1-day show-up streak" : "\(days)-day show-up streak"
     }
 
-    static func needsAttention(_ goal: GoalSummary) -> Bool {
-        !goal.flags.missTwice.isEmpty || !goal.flags.escalations.isEmpty
+    /// "12-day show-up streak", with "show up today to keep it" while it's at risk.
+    static func streakLine(_ streak: GoalStreak) -> String {
+        streak.atRisk ? "\(streakTitle(streak.days)) · show up today to keep it" : streakTitle(streak.days)
     }
 
     /// A commitment's short name: the last word of its action before any parenthesis
@@ -162,14 +180,9 @@ enum GoalsCopy {
         (action.split(separator: "(").first.map(String.init) ?? action).trimmingCharacters(in: .whitespaces)
     }
 
-    static func weekLine(_ commitments: [GoalCommitmentProgress]) -> String {
-        commitments.map { "\(shortName($0.action)) \($0.done + $0.min)/\($0.target)" }.joined(separator: " · ")
-    }
-
     /// "today", "tomorrow", "in 6 days", "yesterday", "3 days ago", from ISO days.
     static func relativeDay(_ day: String, today: String) -> String {
-        guard let a = isoDay(day), let b = isoDay(today) else { return day }
-        let n = Calendar(identifier: .gregorian).dateComponents([.day], from: b, to: a).day ?? 0
+        guard let n = GoalCalendar.days(from: today, to: day) else { return day }
         switch n {
         case 0: return "today"
         case 1: return "tomorrow"
@@ -177,14 +190,5 @@ enum GoalsCopy {
         case let n where n > 1: return "in \(n) days"
         default: return "\(-n) days ago"
         }
-    }
-
-    static func isoDay(_ s: String) -> Date? {
-        let f = DateFormatter()
-        f.calendar = Calendar(identifier: .gregorian)
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = TimeZone(identifier: "UTC")
-        f.dateFormat = "yyyy-MM-dd"
-        return f.date(from: String(s.prefix(10)))
     }
 }

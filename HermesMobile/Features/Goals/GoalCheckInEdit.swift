@@ -1,8 +1,8 @@
 import Foundation
 
 /// The optimistic side of a check-in: what a goal's summary looks like once the server takes a
-/// tap, and how to put one item back when it doesn't. Shared by the goal screen and the Daily
-/// Deck's goal card. `today` and `yesterday` are always the server's dates.
+/// tap. Shared by the goal screen and the Daily Deck's goal card, which replay these edits through
+/// `GoalPendingEdits`. `today` and `yesterday` are always the server's dates.
 enum GoalCheckInEdit {
     /// Moves one day's commitment status between this week's counts, as the server will.
     static func apply(_ status: GoalStatus, to id: String, on date: String, today: String, yesterday: String,
@@ -26,6 +26,24 @@ enum GoalCheckInEdit {
         let shown: GoalStatus? = status == .clear ? nil : status
         if date == today { row.today = shown } else { row.yesterday = shown }
         goal.week.commitments[i] = row
+        // The week strip's cell for the day: its best check-in across the day rows, as the server ranks it.
+        if let d = goal.week.days.firstIndex(where: { $0.date == date }) {
+            let best = goal.week.commitments.filter { !$0.isItem }
+                .compactMap { $0.effectiveStatus(date, today: today, yesterday: yesterday) }
+                .max { rank($0) < rank($1) }
+            goal.week.days[d] = GoalHeatDay(date: date, status: best ?? .none)
+        }
+    }
+
+    /// The server's order for a day's best check-in: done, then the 2-minute version, skip, miss.
+    private static func rank(_ status: GoalStatus) -> Int {
+        switch status {
+        case .done: 4
+        case .min: 3
+        case .skip: 2
+        case .miss: 1
+        case .none, .clear, .unknown: 0
+        }
     }
 
     /// Adds (`n` > 0, with its `note`) or removes the last (`n` < 0) item of an item commitment,
@@ -56,19 +74,6 @@ enum GoalCheckInEdit {
         if date == yesterday { goal.dailyChecks[i].yesterday = shown }
     }
 
-    /// Puts one commitment's or daily check's values from `snapshot` back into `goal`, leaving
-    /// every other item (whose check-ins may have landed meanwhile) alone.
-    static func restore(_ id: String, from snapshot: GoalSummary, in goal: inout GoalSummary) {
-        if let old = snapshot.week.commitments.first(where: { $0.id == id }),
-           let i = goal.week.commitments.firstIndex(where: { $0.id == id }) {
-            goal.week.commitments[i] = old
-        }
-        if let old = snapshot.dailyChecks.first(where: { $0.id == id }),
-           let i = goal.dailyChecks.firstIndex(where: { $0.id == id }) {
-            goal.dailyChecks[i] = old
-        }
-    }
-
     /// The server counts a week's skips in day order and any past the budget as misses, so
     /// adding one with the budget spent, or removing one while `skipDays` exceeds it, moves `missed`.
     private static func adjust(_ row: inout GoalCommitmentProgress, _ status: GoalStatus?, by n: Int, skipDays: Int) {
@@ -82,4 +87,29 @@ enum GoalCheckInEdit {
         default: break
         }
     }
+}
+
+/// Which of a goal's rows a check-in touches. Commitments and daily checks keep separate ids, so
+/// a commitment and a check that share one never block or roll back each other.
+enum GoalRowKey: Hashable, Sendable {
+    case commitment(String)
+    case check(String)
+}
+
+/// The server's latest value with the taps still in flight replayed on top: what a check-in
+/// screen shows. A reload or another tap's answer replaces only `base`, so it never wipes a tap
+/// that is still in flight, and dropping a tap that failed is its whole rollback.
+struct GoalPendingEdits<Value, Key: Hashable> {
+    var base: Value
+    private var edits: [(key: Key, apply: (inout Value) -> Void)] = []
+
+    init(_ base: Value) { self.base = base }
+
+    var shown: Value { edits.reduce(into: base) { value, edit in edit.apply(&value) } }
+    var keys: Set<Key> { Set(edits.map(\.key)) }
+
+    func contains(_ key: Key) -> Bool { edits.contains { $0.key == key } }
+
+    mutating func add(_ key: Key, _ apply: @escaping (inout Value) -> Void) { edits.append((key, apply)) }
+    mutating func remove(_ key: Key) { edits.removeAll { $0.key == key } }
 }
