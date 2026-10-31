@@ -10,9 +10,12 @@ struct MoneySnapshot: Decodable, Equatable {
     var accounts: [MoneyAccount] = []
     var week: MoneyWeek?
     var stale: [MoneyStale] = []
+    /// Accounts the last pull left out because their bank connection is failing; net worth
+    /// still counts them at their last balance.
+    var missing = 0
     var holdingsMissing = false
 
-    enum CodingKeys: String, CodingKey { case asOf, slot, netWorth, series, accounts, week, stale, holdingsMissing }
+    enum CodingKeys: String, CodingKey { case asOf, slot, netWorth, series, accounts, week, stale, missing, holdingsMissing }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -23,11 +26,20 @@ struct MoneySnapshot: Decodable, Equatable {
         accounts = c.lossy(MoneyAccount.self, .accounts)
         week = try? c.decodeIfPresent(MoneyWeek.self, forKey: .week)
         stale = c.lossy(MoneyStale.self, .stale)
+        missing = (try? c.decodeIfPresent(Int.self, forKey: .missing)) ?? 0
         holdingsMissing = (try? c.decodeIfPresent(Bool.self, forKey: .holdingsMissing)) ?? false
     }
 
     static func decode(_ data: Data) throws -> MoneySnapshot {
         try MoneyDates.decoder.decode(MoneySnapshot.self, from: data)
+    }
+
+    /// The day the series ends: the script's today, which ranges count back from.
+    var lastDay: Date? { series.last?.date }
+
+    /// The stale entry for an account: by id, else by name for snapshots written before ids.
+    func staleEntry(for account: MoneyAccount) -> MoneyStale? {
+        stale.first { $0.id.map { $0 == account.id } ?? ($0.name == account.name) }
     }
 }
 
@@ -172,13 +184,15 @@ struct MoneyIndex: Decodable, Equatable, Identifiable {
 }
 
 struct MoneyStale: Decodable, Equatable {
+    var id: String?
     var name = ""
     var ageDays: Double = 0
 
-    enum CodingKeys: String, CodingKey { case name, ageDays }
+    enum CodingKeys: String, CodingKey { case id, name, ageDays }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try? c.decodeIfPresent(String.self, forKey: .id)
         name = (try? c.decodeIfPresent(String.self, forKey: .name)) ?? ""
         ageDays = (try? c.decodeIfPresent(Double.self, forKey: .ageDays)) ?? 0
     }
@@ -238,6 +252,17 @@ enum MoneyRange: String, CaseIterable, Identifiable {
     case week = "1W", month = "1M", quarter = "3M", year = "1Y", all = "All"
 
     var id: String { rawValue }
+
+    /// What VoiceOver reads for the range's segment.
+    var spokenName: String {
+        switch self {
+        case .week: "1 week"
+        case .month: "1 month"
+        case .quarter: "3 months"
+        case .year: "1 year"
+        case .all: "All time"
+        }
+    }
 
     var label: String {
         switch self {
@@ -316,6 +341,16 @@ enum MoneyFormat {
         guard account.isDebt, change != 0 else { return change == 0 ? "No change this week" : weekChange(account, hidden: hidden) + " this week" }
         let size = hidden ? "" : " " + amount(abs(change), hidden: false)
         return "Owe\(size) \(change > 0 ? "less" : "more") this week"
+    }
+
+    /// "Last synced today", "yesterday", or "9 days ago", for an account whose balance is old.
+    static func lastSynced(ageDays: Double) -> String {
+        let days = Int(ageDays.rounded(.down))
+        switch days {
+        case ..<1: return "Last synced today"
+        case 1: return "Last synced yesterday"
+        default: return "Last synced \(days) days ago"
+        }
     }
 
     /// "+$1.8k" for thousands, "+$340" below.

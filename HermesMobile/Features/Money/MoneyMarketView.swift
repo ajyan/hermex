@@ -20,6 +20,7 @@ struct MoneyMarketView: View {
         }
         .background(Color.hxCanvas.ignoresSafeArea())
         .hxNavigationTitle("Market This Week", subtitle: subtitle)
+        .hidesMoneyOnResign(viewModel)
     }
 
     private var hidden: Bool { viewModel.isHidden }

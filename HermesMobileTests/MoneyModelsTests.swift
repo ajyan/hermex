@@ -33,6 +33,21 @@ final class MoneyModelsTests: XCTestCase {
         XCTAssertTrue(note.matches(snapshot.week))
     }
 
+    func testStaleEntriesMatchByIdThenNameAndSayWhenLastSynced() throws {
+        let snapshot = try MoneySnapshot.decode(Data(#"""
+        {"accounts": [{"id": "a", "name": "Checking"}, {"id": "b", "name": "Checking"}, {"id": "c", "name": "Old"}],
+         "stale": [{"id": "b", "name": "Checking", "age_days": 1}, {"name": "Old", "age_days": 9}],
+         "missing": 1}
+        """#.utf8))
+        XCTAssertEqual(snapshot.missing, 1)
+        XCTAssertNil(snapshot.staleEntry(for: snapshot.accounts[0]), "Same name, different id: not stale")
+        XCTAssertEqual(snapshot.staleEntry(for: snapshot.accounts[1])?.ageDays, 1)
+        XCTAssertEqual(snapshot.staleEntry(for: snapshot.accounts[2])?.ageDays, 9, "Older snapshots carry no ids")
+        XCTAssertEqual(MoneyFormat.lastSynced(ageDays: 0.4), "Last synced today")
+        XCTAssertEqual(MoneyFormat.lastSynced(ageDays: 1), "Last synced yesterday")
+        XCTAssertEqual(MoneyFormat.lastSynced(ageDays: 9), "Last synced 9 days ago")
+    }
+
     func testDecodesMinimalSnapshot() throws {
         let snapshot = try MoneySnapshot.decode(Data(#"{"net_worth": 1}"#.utf8))
         XCTAssertEqual(snapshot.netWorth, 1)
