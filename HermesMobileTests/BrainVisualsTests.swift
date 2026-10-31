@@ -354,6 +354,37 @@ final class BrainConnectionsTests: XCTestCase {
         XCTAssertEqual(BrainConnectionsLayout.linkCards(hub).map(\.id), ["c"], "In this hub lists a and b")
     }
 
+    func testASwipeFromTheLeadingEdgeIsLeftToBack() {
+        let right = CGSize(width: 120, height: 10)
+        XCTAssertEqual(BrainConnectionsLayout.swipeStep(right, startX: 200), -1)
+        XCTAssertNil(BrainConnectionsLayout.swipeStep(right, startX: 12), "the edge is the system's Back")
+        XCTAssertEqual(BrainConnectionsLayout.swipeStep(CGSize(width: -120, height: 10), startX: 300), 1)
+    }
+
+    func testALongMentionIsMarkedWithoutTheWash() {
+        let paper = HermexPaper.wiki
+        let short = BrainConnectionsLayout.highlighted("Read Virtues today", mention: "Virtues", paper: paper)
+        XCTAssertTrue(short.runs.contains { $0.backgroundColor != nil })
+        let title = "Dr. K's Meditation Techniques: Cognitive Fingerprint Mapping"
+        let long = BrainConnectionsLayout.highlighted("See \(title) for more", mention: title, paper: paper)
+        XCTAssertFalse(long.runs.contains { $0.backgroundColor != nil })
+        XCTAssertTrue(long.runs.contains { $0.foregroundColor != nil }, "still marked in the glow")
+    }
+
+    func testFurtherReadingSaysASharedReasonOnce() {
+        let shared = [BrainRef(module: .wiki, id: "a", reason: "shares #mindfulness"),
+                      BrainRef(module: .wiki, id: "b", reason: "shares #mindfulness")]
+        XCTAssertEqual(BrainReaderLayout.sharedReason(shared), "Shares #mindfulness")
+        let mixed = shared + [BrainRef(module: .wiki, id: "c", reason: "source")]
+        XCTAssertNil(BrainReaderLayout.sharedReason(mixed))
+        XCTAssertNil(BrainReaderLayout.sharedReason([]))
+    }
+
+    func testReaderTagsReadAsOneMetaLine() {
+        XCTAssertEqual(BrainReaderLayout.tagLine(["habits", "email", "self"]), "#habits · #self")
+        XCTAssertEqual(BrainReaderLayout.tagLine([]), "")
+    }
+
     func testAHubInsideAHubListsItsPagesWithoutItsParent() {
         let page = BrainPage(item: BrainItem(module: .wiki, id: "self"),
                              hub: BrainHubContext(ref: ref("parent"), index: 2, count: 7),
