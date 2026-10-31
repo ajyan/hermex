@@ -2,25 +2,24 @@ import AVFoundation
 import Speech
 import SwiftUI
 
-/// The Mandarin practice card in steps, chosen from its step bar: Fix yesterday's slips, Recall the
-/// phrasebook's due phrases, make each cue Yours (say its example, then two versions about his week,
-/// checked), Talk (the question, a transition, a feeling and an everyday cue, and the answer), then
-/// the takeaways that come back seconds after answering. `answer` is the deck's
-/// own answer button (or his words once written).
-struct DeckMandarinCard<Answer: View>: View {
+/// The Mandarin practice card in steps, moved through by its segment bar: Fix yesterday's slips, Recall
+/// the phrasebook's due phrases, make each cue Yours (say its example, then two versions about his
+/// week, checked), Talk (the question, a transition, a feeling and an everyday cue, and the answer),
+/// then the takeaways that come back seconds after answering. Everything he says, he says on the card.
+struct DeckMandarinCard: View {
     let card: DeckCard
     let palette: DeckPalette
     /// The question on display: the deck's, or his own from "Ask My Own Question".
     let asked: String?
     let practice: MandarinPractice
-    @ViewBuilder let answer: () -> Answer
+    /// His Talk answer so far, and where a new one goes (kept with the deck's answers and sent for feedback).
+    let answered: String?
+    let onAnswer: (String) -> Void
 
     @State private var speaker = MandarinSpeaker()
     /// Fixes and recall phrases whose answer is showing.
     @State private var revealed: Set<String> = []
     @State private var isCalling = false
-    /// The cue whose versions he is saying, in the dictation sheet.
-    @State private var makingYours: DeckPhrase?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -35,44 +34,35 @@ struct DeckMandarinCard<Answer: View>: View {
         }
         .onDisappear { speaker.stop() }
         .sheet(isPresented: $isCalling) { MandarinCallSheet(practice: practice, palette: palette) }
-        .sheet(item: $makingYours) { cue in
-            MandarinVersionsSheet(cue: cue, palette: palette) { text in
-                Task { await practice.checkVersions(of: cue, text) }
-            }
-        }
     }
 
     // MARK: Step bar
 
+    /// One thin segment per step: done ones solid, the current one darkest, the rest faint.
     private var stepBar: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             ForEach(practice.steps, id: \.self) { step in
                 let isCurrent = practice.step == step
                 let isDone = practice.isDone(step)
                 Button { change { practice.step = step } } label: {
-                    HStack(spacing: 4) {
-                        if isDone { Image(systemName: "checkmark").font(AppFont.caption2(weight: .bold)) }
-                        Text(verbatim: title(step))
-                    }
-                    .font(AppFont.caption(weight: .semibold))
-                    .foregroundStyle(isCurrent ? palette.onInk : palette.ink)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(isCurrent ? palette.ink : palette.colors.wash, in: Capsule())
+                    Capsule()
+                        .fill(palette.ink.opacity(isCurrent ? 1 : isDone ? 0.5 : 0.15))
+                        .frame(height: 4)
+                        .frame(maxWidth: .infinity, minHeight: 24)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text(verbatim: title(step) + (isDone ? ", done" : "")))
                 .accessibilityAddTraits(isCurrent ? .isSelected : [])
             }
-            Spacer(minLength: 0)
         }
     }
 
     private func title(_ step: MandarinPractice.Step) -> String {
         switch step {
         case .fix: "Fix"
-        case .recall: "Recall \(card.recall.count)"
-        case .yours: "Yours"
+        case .recall: "Recall"
+        case .yours: "Make it yours"
         case .talk: "Talk"
         }
     }
@@ -84,8 +74,7 @@ struct DeckMandarinCard<Answer: View>: View {
         let yesterday = card.yesterday
         if let fix = practice.currentFix {
             let key = "fix:\(fix.said)"
-            heading("Say it the natural way",
-                    detail: practice.fixes.count > 1 ? "\((practice.fixes.firstIndex(of: fix) ?? 0) + 1) of \(practice.fixes.count)" : nil)
+            headingRow("Say it the natural way", pips: practice.fixes.count, at: practice.fixes.firstIndex(of: fix) ?? 0)
             VStack(alignment: .leading, spacing: 4) {
                 Text(slip(in: yesterday?.said ?? fix.said, fix.said))
                     .font(AppFont.body())
@@ -109,17 +98,17 @@ struct DeckMandarinCard<Answer: View>: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             takeaway("Natural", yesterday.natural, pinyin: yesterday.naturalPinyin, note: nil)
-            if let flow = yesterday.flow { flowTakeaway(flow) }
+            if let flow = yesterday.flow { flowRow(flow) }
             if !practice.isDone(.fix) {
                 actions(primary: ("Next", "arrow.right", { change { practice.nextFix() } }))
             }
         } else {
             heading("Yesterday's fixes", detail: nil)
             ForEach(practice.fixes, id: \.self) { fix in
-                takeaway("Fix", fix.natural, pinyin: fix.naturalPinyin, note: [fix.said + " → " + fix.natural, fix.why]
+                row("Fix", fix.natural, pinyin: fix.naturalPinyin, note: [fix.said + " → " + fix.natural, fix.why]
                     .compactMap { $0 }.joined(separator: "\n"))
             }
-            if let flow = yesterday?.flow { flowTakeaway(flow) }
+            if let flow = yesterday?.flow { flowRow(flow) }
         }
     }
 
@@ -188,29 +177,29 @@ struct DeckMandarinCard<Answer: View>: View {
     private var yoursStep: some View {
         let cues = practice.yoursCues
         if let cue = practice.currentCue, let example = cue.example {
-            heading("Make it yours",
-                    detail: cues.count > 1 ? "\((cues.firstIndex(of: cue) ?? 0) + 1) of \(cues.count)" : nil)
+            let checked = practice.record.versions[cue.hanzi]
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                headingRow("Make it yours", pips: cues.count, at: cues.firstIndex(of: cue) ?? 0)
+                Button { change { practice.nextCue() } } label: {
+                    Text(verbatim: checked == nil ? "Skip" : "Next")
+                        .font(AppFont.subheadline(weight: .semibold))
+                        .foregroundStyle(palette.ink)
+                        .frame(minWidth: 44, minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .disabled(practice.checkingCue != nil)
+            }
             takeaway([cue.kindLabel, cue.hanzi].compactMap { $0 }.joined(separator: " · "), example,
                      pinyin: cue.examplePinyin, note: cue.exampleEn)
-            Text(verbatim: "Say it out loud. Then two of your own about this week, changing a word or two.")
-                .font(AppFont.footnote())
-                .foregroundStyle(Color.hxTextSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if let checked = practice.record.versions[cue.hanzi] {
-                versionsBlock(checked, cue: cue)
-                actions(primary: ("Next", "arrow.right", { change { practice.nextCue() } }),
-                        secondary: ("Say more", "mic", { speaker.stop(); makingYours = cue }))
-            } else {
-                actions(primary: ("Say yours", "mic", { speaker.stop(); makingYours = cue }),
-                        secondary: ("Skip", "forward", { change { practice.nextCue() } }),
-                        busy: practice.checkingCue == cue.hanzi)
+            if let checked { versionsBlock(checked) }
+            MandarinMic(prompt: yoursPrompt(checked, cue: cue), palette: palette,
+                        isBusy: practice.checkingCue == cue.hanzi, onListen: { speaker.stop() }) { text in
+                let ok = await practice.checkVersions(of: cue, text)
+                if ok, practice.record.versions[cue.hanzi]?.isClean == true { moveOn(from: cue) }
+                return ok
             }
-            if practice.checkingCue == cue.hanzi {
-                HStack(spacing: 10) {
-                    ProgressView()
-                    Text(verbatim: "Checking…").font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
-                }
-            } else if let error = practice.versionsError {
+            .id(cue.hanzi)
+            if let error = practice.versionsError {
                 Text(verbatim: error).font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
             }
         } else {
@@ -220,18 +209,35 @@ struct DeckMandarinCard<Answer: View>: View {
                     .font(AppFont.footnote(weight: .semibold))
                     .foregroundStyle(palette.ink)
                     .padding(.top, 4)
-                if let checked = practice.record.versions[cue.hanzi] { versionsBlock(checked, cue: cue) }
+                if let checked = practice.record.versions[cue.hanzi] { versionsBlock(checked) }
             }
         }
     }
 
-    /// His versions: a fine one as he said it, one that needs it as the natural way and why.
+    /// What the mic asks for next: the example and two of his own, one more, or one that uses the cue.
+    private func yoursPrompt(_ checked: MandarinVersionsResponse?, cue: DeckPhrase) -> String {
+        guard let checked else { return "Say it, then two of your own about this week" }
+        if !checked.used { return "Now one with \(cue.hanzi)" }
+        if checked.versions.count < 2 { return "One more of your own" }
+        return "Say another, or tap Next"
+    }
+
+    /// Two clean versions: a beat to see the checks, then the next cue (unless he has already moved).
+    private func moveOn(from cue: DeckPhrase) {
+        Task {
+            try? await Task.sleep(for: .seconds(1.2))
+            guard practice.currentCue == cue else { return }
+            change { practice.nextCue() }
+        }
+    }
+
+    /// His versions: a fine one as he said it with a check, one that needs it as the natural way and why.
     @ViewBuilder
-    private func versionsBlock(_ checked: MandarinVersionsResponse, cue: DeckPhrase) -> some View {
+    private func versionsBlock(_ checked: MandarinVersionsResponse) -> some View {
         ForEach(checked.versions, id: \.self) { version in
             if let natural = version.natural {
-                takeaway("Better", natural, pinyin: version.naturalPinyin,
-                         note: [version.said + " → " + natural, version.why].compactMap { $0 }.joined(separator: "\n"))
+                row("Better", natural, pinyin: version.naturalPinyin,
+                    note: [version.said + " → " + natural, version.why].compactMap { $0 }.joined(separator: "\n"))
             } else {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Image(systemName: "checkmark").font(AppFont.footnote(weight: .bold)).foregroundStyle(palette.ink)
@@ -240,12 +246,8 @@ struct DeckMandarinCard<Answer: View>: View {
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityValue(Text(verbatim: "Natural"))
+                .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
             }
-        }
-        if !checked.used {
-            Text(verbatim: "These didn't use \(cue.hanzi). Say one that does.")
-                .font(AppFont.footnote())
-                .foregroundStyle(Color.hxTextSecondary)
         }
     }
 
@@ -263,53 +265,57 @@ struct DeckMandarinCard<Answer: View>: View {
             let line = card.mandarinQuestion(asked: asked)
             takeaway("Question", line.hanzi, pinyin: line.pinyin, note: line.english)
         }
-        if card.mandarinTellsAStory {
-            Text(verbatim: "Tell it in three beats: what happened → how you felt → what's next")
-                .font(AppFont.footnote())
-                .foregroundStyle(Color.hxTextSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
         if let pattern = card.pattern {
             takeaway("Today's pattern", pattern.form ?? pattern.name, pinyin: nil,
                      note: [pattern.name, pattern.en].compactMap { $0 }.joined(separator: "\n"), play: false)
         }
         if !card.phrases.isEmpty {
-            MandarinCueList(phrases: card.phrases, used: Set(practice.result?.used ?? []), palette: palette,
-                            speaker: speaker)
+            MandarinCueChips(phrases: card.phrases, used: Set(practice.result?.used ?? []), palette: palette,
+                             speaker: speaker)
         }
-        answer()
+        if let answered, !answered.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(verbatim: "You said")
+                    .font(AppFont.caption(weight: .semibold))
+                    .foregroundStyle(palette.ink)
+                Text(verbatim: answered)
+                    .font(AppFont.body())
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
+        }
+        MandarinMic(prompt: talkPrompt, palette: palette, isBusy: practice.answering == .waiting,
+                    editing: answered, onListen: { speaker.stop() }) { text in
+            onAnswer(text)
+            return true
+        }
         takeaways
-        if let progress = practice.progress, let line = MandarinProgressLine.text(progress) {
-            Text(verbatim: line)
-                .font(AppFont.footnote())
-                .foregroundStyle(Color.hxTextSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
         Button { speaker.stop(); isCalling = true } label: {
             Label { Text(verbatim: "Calling Mom or Dad?") } icon: { Image(systemName: "phone") }
-                .font(AppFont.subheadline(weight: .semibold))
+                .font(AppFont.footnote(weight: .semibold))
                 .foregroundStyle(palette.ink)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .overlay(Capsule().strokeBorder(palette.ink, lineWidth: 1))
+                .frame(minHeight: 44)
         }
         .buttonStyle(.plain)
         .accessibilityHint(Text(verbatim: "Three things to say before the call, and what you couldn't say after it"))
+    }
+
+    private var talkPrompt: String {
+        if answered?.isEmpty == false { return "Say it again" }
+        return card.mandarinTellsAStory ? "What happened → how you felt → what's next" : "Answer out loud"
     }
 
     @ViewBuilder
     private var takeaways: some View {
         switch practice.answering {
         case .waiting:
-            HStack(spacing: 10) {
-                ProgressView()
-                Text(verbatim: "Getting feedback…").font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
-            }
+            EmptyView()
         case let .failed(message):
             retryLine(message)
         case .idle:
             if let result = practice.result {
                 if let feedback = result.feedback {
-                    feedbackBlocks(feedback, used: result.used)
+                    feedbackBlocks(feedback)
                 } else {
                     retryLine("Feedback comes with tomorrow's card.")
                 }
@@ -318,34 +324,28 @@ struct DeckMandarinCard<Answer: View>: View {
     }
 
     @ViewBuilder
-    private func feedbackBlocks(_ feedback: DeckMandarinFeedback, used: [String]) -> some View {
-        Text(verbatim: "Takeaways")
-            .font(AppFont.footnote(weight: .semibold))
-            .foregroundStyle(palette.ink)
-            .padding(.top, 4)
-        let cues = card.phrases.count
-        takeaway("Natural", feedback.natural, pinyin: feedback.naturalPinyin,
-                 note: cues == 0 ? nil : "Used \(used.count) of \(cues) phrases" + (used.isEmpty ? "" : ": " + used.joined(separator: " ")))
+    private func feedbackBlocks(_ feedback: DeckMandarinFeedback) -> some View {
+        takeaway("Said naturally", feedback.natural, pinyin: feedback.naturalPinyin, note: nil)
         ForEach(feedback.gaps, id: \.self) { gap in
-            takeaway("New word", gap.hanzi, pinyin: gap.pinyin,
-                     note: [gap.en, gap.build].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · "))
+            row("New word", gap.hanzi, pinyin: gap.pinyin,
+                note: [gap.en, gap.build].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · "))
         }
         ForEach(feedback.fixes, id: \.self) { fix in
-            takeaway("Fix", fix.natural, pinyin: fix.naturalPinyin,
-                     note: [fix.said + " → " + fix.natural, fix.why].compactMap { $0 }.joined(separator: "\n"))
+            row("Fix", fix.natural, pinyin: fix.naturalPinyin,
+                note: [fix.said + " → " + fix.natural, fix.why].compactMap { $0 }.joined(separator: "\n"))
         }
         if let flow = feedback.flow {
-            flowTakeaway(flow)
+            flowRow(flow)
         } else if let pattern = feedback.pattern {
-            takeaway("Pattern", pattern.pattern, pinyin: nil, note: pattern.en, play: false)
+            row("Pattern", pattern.pattern, pinyin: nil, note: pattern.en, play: false)
         }
     }
 
     /// The flow note: his two sentences joined, and the transition that joins them.
-    private func flowTakeaway(_ flow: DeckMandarinFeedback.Flow) -> some View {
+    private func flowRow(_ flow: DeckMandarinFeedback.Flow) -> some View {
         let word = flow.transition + (flow.en.map { " (\($0))" } ?? "")
-        return takeaway("Flow", flow.joined, pinyin: flow.joinedPinyin,
-                        note: [word, flow.why].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · "))
+        return row("Flow", flow.joined, pinyin: flow.joinedPinyin,
+                   note: [word, flow.why].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · "))
     }
 
     private func retryLine(_ message: String) -> some View {
@@ -375,8 +375,32 @@ struct DeckMandarinCard<Answer: View>: View {
         }
     }
 
+    /// A heading with a pip per item (the current one filled) when there is more than one.
+    private func headingRow(_ text: String, pips count: Int, at index: Int) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            heading(text, detail: nil)
+            if count > 1 {
+                HStack(spacing: 4) {
+                    ForEach(0..<count, id: \.self) { pip in
+                        Circle()
+                            .fill(palette.ink.opacity(pip <= index ? 1 : 0.2))
+                            .frame(width: 6, height: 6)
+                    }
+                }
+                .accessibilityElement()
+                .accessibilityLabel(Text(verbatim: "\(index + 1) of \(count)"))
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
     private func takeaway(_ tag: String, _ text: String, pinyin: String?, note: String?, play: Bool = true) -> some View {
         MandarinTakeaway(tag: tag, text: text, pinyin: pinyin, note: note, palette: palette, speaker: play ? speaker : nil)
+            .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+    }
+
+    private func row(_ tag: String, _ text: String, pinyin: String?, note: String?, play: Bool = true) -> some View {
+        MandarinRow(tag: tag, text: text, pinyin: pinyin, note: note, palette: palette, speaker: play ? speaker : nil)
             .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
     }
 
@@ -472,103 +496,218 @@ struct MandarinTakeaway: View {
     }
 }
 
-/// The day's phrases as English cues, each labeled by kind: tap one to peek at the Mandarin, an example
-/// from his life and a one-line note. A phrase he used in his answer gets a check. Shown on the card
-/// and above the answer while he dictates.
-struct MandarinCueList: View {
+/// A lighter takeaway for the ones under the main one: the same tag, Mandarin, pinyin and note, with
+/// ▶ beside it and no box.
+struct MandarinRow: View {
+    let tag: String
+    let text: String
+    let pinyin: String?
+    let note: String?
+    let palette: DeckPalette
+    let speaker: MandarinSpeaker?
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: tag)
+                    .font(AppFont.caption(weight: .semibold))
+                    .foregroundStyle(palette.ink)
+                Text(verbatim: text)
+                    .font(AppFont.body(weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                if let pinyin {
+                    Text(verbatim: pinyin).font(AppFont.footnote(weight: .medium)).foregroundStyle(palette.ink)
+                }
+                if let note, !note.isEmpty {
+                    Text(verbatim: note)
+                        .font(AppFont.footnote())
+                        .foregroundStyle(Color.hxTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let speaker {
+                Button { speaker.toggle(text) } label: {
+                    Image(systemName: speaker.speaking == text ? "stop.fill" : "play.fill")
+                        .font(AppFont.caption(weight: .semibold))
+                        .foregroundStyle(palette.ink)
+                        .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHidden(true)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: [tag, text, note].compactMap { $0 }.joined(separator: ". ")))
+        .accessibilityAction(named: Text(verbatim: "Play")) { speaker?.toggle(text) }
+    }
+}
+
+/// The day's cues as chips in his English, checked once used in the answer. Tapping one peeks at its
+/// Mandarin, example and note underneath; tapping it again closes it.
+struct MandarinCueChips: View {
     let phrases: [DeckPhrase]
     let used: Set<String>
     let palette: DeckPalette
-    /// Nil in the answer sheet, where playing would fight the microphone.
-    let speaker: MandarinSpeaker?
+    let speaker: MandarinSpeaker
 
-    @State private var peeking: Set<String> = []
+    @State private var peeking: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(verbatim: "Work these in · tap to peek")
+        VStack(alignment: .leading, spacing: 10) {
+            Text(verbatim: "Work these in")
                 .font(AppFont.caption(weight: .semibold))
                 .foregroundStyle(palette.ink)
-                .padding(.bottom, 2)
-            ForEach(phrases, id: \.hanzi) { phrase in
-                let isUsed = used.contains(phrase.hanzi)
-                let isPeeking = peeking.contains(phrase.hanzi) || phrase.en == nil
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Image(systemName: isUsed ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(isUsed ? palette.ink : Color.hxTextSecondary)
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        if let kind = phrase.kindLabel {
-                            Text(verbatim: kind).font(AppFont.caption(weight: .semibold)).foregroundStyle(palette.ink)
+            FlowRow(spacing: 6) {
+                ForEach(phrases, id: \.hanzi) { phrase in
+                    let isUsed = used.contains(phrase.hanzi)
+                    let isOpen = peeking == phrase.hanzi
+                    Button {
+                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { peeking = isOpen ? nil : phrase.hanzi }
+                    } label: {
+                        HStack(spacing: 4) {
+                            if isUsed { Image(systemName: "checkmark").font(AppFont.caption2(weight: .bold)) }
+                            Text(verbatim: phrase.en ?? phrase.hanzi)
                         }
-                        if let en = phrase.en { Text(verbatim: en).font(AppFont.subheadline()) }
-                        if isPeeking {
-                            Text(verbatim: phrase.hanzi).font(AppFont.body(weight: .semibold))
-                            if let pinyin = phrase.pinyin {
-                                Text(verbatim: pinyin).font(AppFont.footnote()).foregroundStyle(palette.ink)
-                            }
-                            if let example = phrase.example {
-                                Text(verbatim: example).font(AppFont.subheadline()).padding(.top, 4)
-                                if let pinyin = phrase.examplePinyin {
-                                    Text(verbatim: pinyin).font(AppFont.footnote()).foregroundStyle(palette.ink)
-                                }
-                                if let en = phrase.exampleEn {
-                                    Text(verbatim: en).font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
-                                }
-                            }
-                            if let note = phrase.note {
-                                Text(verbatim: note).font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
-                            }
-                        }
+                        .font(AppFont.subheadline(weight: .medium))
+                        .foregroundStyle(isOpen ? palette.onInk : palette.ink)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(isOpen ? palette.ink : palette.colors.wash, in: Capsule())
                     }
-                    .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
-                    if isPeeking, let speaker {
-                        Button { speaker.toggle(phrase.hanzi) } label: {
-                            Image(systemName: speaker.speaking == phrase.hanzi ? "stop.fill" : "play.fill")
-                                .font(AppFont.caption(weight: .semibold))
-                                .foregroundStyle(palette.ink)
-                                .frame(width: 32, height: 32)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityHidden(true)
-                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(verbatim: [phrase.kindLabel, phrase.en].compactMap { $0 }.joined(separator: ". ")))
+                    .accessibilityValue(Text(verbatim: isUsed ? "Used" : ""))
+                    .accessibilityHint(Text(verbatim: isOpen ? "Hides the Mandarin" : "Shows the Mandarin"))
                 }
-                .padding(.vertical, 8)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
-                        if peeking.contains(phrase.hanzi) { peeking.remove(phrase.hanzi) } else { peeking.insert(phrase.hanzi) }
-                    }
-                }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(Text(verbatim: [phrase.kindLabel, phrase.en, isPeeking ? phrase.hanzi : nil,
-                                                    isPeeking ? phrase.example : nil].compactMap { $0 }.joined(separator: ". ")))
-                .accessibilityValue(Text(verbatim: isUsed ? "Used" : ""))
-                .accessibilityHint(Text(verbatim: isPeeking ? "" : "Shows the Mandarin"))
-                .accessibilityAddTraits(.isButton)
+            }
+            if let phrase = phrases.first(where: { $0.hanzi == peeking }) {
+                MandarinRow(tag: phrase.kindLabel ?? "Phrase", text: phrase.hanzi, pinyin: phrase.pinyin,
+                            note: [phrase.example, phrase.exampleEn, phrase.note].compactMap { $0 }.joined(separator: "\n"),
+                            palette: palette, speaker: speaker)
+                    .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
             }
         }
     }
 }
 
-/// The progress line: "36 phrases · 6 used this week · English per answer 2.8 → 1.2".
-enum MandarinProgressLine {
-    static func text(_ progress: DeckMandarinProgress) -> String? {
-        var parts: [String] = []
-        if let phrases = progress.phrases { parts.append(phrases == 1 ? "1 phrase" : "\(phrases) phrases") }
-        if let used = progress.usedWeek { parts.append("\(used) used this week") }
-        if let now = progress.englishNow {
-            parts.append("English per answer " + (progress.englishBefore.map { "\(number($0)) → " } ?? "") + number(now))
+/// Speaking on the card: a big mic writes his Mandarin as he says it (zh-CN, on device), and stop hands
+/// the words to `onFinish`. The keyboard button types instead. `onFinish` returns whether the words were
+/// taken, so a failed check keeps them to send again.
+struct MandarinMic: View {
+    let prompt: String
+    let palette: DeckPalette
+    var isBusy = false
+    /// What typing starts from when nothing is said yet: his earlier answer, to edit.
+    var editing: String?
+    /// Called as listening starts, so nothing on the card plays over the mic.
+    var onListen: () -> Void = {}
+    let onFinish: (String) async -> Bool
+
+    @State private var text = ""
+    @State private var isTyping = !MandarinDictation.isAvailable
+    @State private var voiceInput = ComposerVoiceInputController(fixedLocale: MandarinDictation.locale)
+    @FocusState private var isFocused: Bool
+
+    private var isListening: Bool { voiceInput.state != .idle }
+    private var said: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if isTyping {
+                TextField(text: $text, axis: .vertical) { Text(verbatim: "Type in Mandarin") }
+                    .font(AppFont.body())
+                    .focused($isFocused)
+                    .padding(12)
+                    .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
+            } else if !text.isEmpty {
+                Text(verbatim: text)
+                    .font(AppFont.body())
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 12) {
+                Text(verbatim: status)
+                    .font(AppFont.footnote())
+                    .foregroundStyle(Color.hxTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if MandarinDictation.isAvailable, !isListening, !isBusy {
+                    Button { toggleTyping() } label: {
+                        Image(systemName: isTyping ? "mic" : "keyboard")
+                            .font(AppFont.body(weight: .medium))
+                            .foregroundStyle(palette.ink)
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(verbatim: isTyping ? "Speak instead" : "Type instead"))
+                }
+                mainButton
+            }
+            if let message = MandarinDictation.isAvailable
+                ? voiceInput.errorMessage
+                : "To answer by voice, add Chinese (Simplified) dictation in Settings › General › Keyboard." {
+                Text(verbatim: message)
+                    .font(AppFont.footnote())
+                    .foregroundStyle(Color.hxTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+        .onDisappear { voiceInput.stopKeepingTranscript() }
     }
 
-    private static func number(_ value: Double) -> String {
-        value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
+    private var status: String {
+        if isBusy { return "Checking…" }
+        if isListening { return "Listening… tap stop when you're done" }
+        return prompt
+    }
+
+    @ViewBuilder
+    private var mainButton: some View {
+        let symbol = isListening ? "stop.fill" : isTyping ? "arrow.up" : "mic.fill"
+        Button { isListening ? finish() : isTyping ? finish() : listen() } label: {
+            ZStack {
+                Circle().fill(palette.ink)
+                if isBusy {
+                    ProgressView().tint(palette.onInk)
+                } else {
+                    Image(systemName: symbol)
+                        .font(AppFont.title3(weight: .semibold))
+                        .foregroundStyle(palette.onInk)
+                }
+            }
+            .frame(width: 56, height: 56)
+        }
+        .buttonStyle(.plain)
+        .disabled(isBusy || (isTyping && said.isEmpty))
+        .opacity(isTyping && said.isEmpty && !isBusy ? 0.4 : 1)
+        .accessibilityLabel(Text(verbatim: isListening ? "Stop and check" : isTyping ? "Check" : "Speak in Mandarin"))
+    }
+
+    private func listen() {
+        onListen()
+        _ = voiceInput.scheduleToggle(currentDraft: text) { text = $0 }
+    }
+
+    private func toggleTyping() {
+        isTyping.toggle()
+        if isTyping, text.isEmpty, let editing { text = editing }
+        isFocused = isTyping
+    }
+
+    private func finish() {
+        voiceInput.stopKeepingTranscript()
+        let words = said
+        guard !words.isEmpty else { return }
+        isFocused = false
+        Task {
+            guard await onFinish(words) else { return }
+            text = ""
+            isTyping = !MandarinDictation.isAvailable
+        }
     }
 }
+
 
 /// Reads Mandarin aloud with the system's zh-CN voice, a little slower than normal for practice.
 /// Tapping the playing line again stops it; tapping another switches to it.
@@ -644,90 +783,6 @@ private final class MandarinSpeakerDelegate: NSObject, AVSpeechSynthesizerDelega
     }
 }
 
-/// Make it yours: the cue's example on top, his versions by zh-CN dictation (or typed) below. Done
-/// sends them for checking; closing with nothing said sends nothing.
-struct MandarinVersionsSheet: View {
-    let cue: DeckPhrase
-    let palette: DeckPalette
-    let onDone: (String) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @FocusState private var isFocused: Bool
-    @State private var text = ""
-    @State private var voiceInput = ComposerVoiceInputController(fixedLocale: MandarinDictation.locale)
-
-    var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(verbatim: cue.example ?? cue.hanzi)
-                        .font(AppFont.display(style: .title3, weight: .semibold))
-                        .foregroundStyle(palette.ink)
-                    if let en = cue.exampleEn {
-                        Text(verbatim: en).font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
-                    }
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                TextEditor(text: $text)
-                    .font(AppFont.body())
-                    .foregroundStyle(Color.hxTextPrimary)
-                    .scrollContentBackground(.hidden)
-                    .focused($isFocused)
-                    .overlay(alignment: .topLeading) {
-                        if text.isEmpty {
-                            Text(verbatim: "Two sentences with \(cue.hanzi) about your week")
-                                .font(AppFont.body())
-                                .foregroundStyle(Color.hxTextSecondary)
-                                .padding(.top, 8)
-                                .padding(.leading, 5)
-                                .allowsHitTesting(false)
-                        }
-                    }
-            }
-            .padding(20)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .background(palette.paper.ignoresSafeArea())
-            .safeAreaInset(edge: .bottom) {
-                if let message = MandarinDictation.isAvailable
-                    ? voiceInput.errorMessage
-                    : "To answer by voice, add Chinese (Simplified) dictation in Settings › General › Keyboard." {
-                    Text(verbatim: message)
-                        .font(AppFont.footnote())
-                        .foregroundStyle(Color.hxTextSecondary)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-            .toolbar {
-                if MandarinDictation.isAvailable {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button {
-                            _ = voiceInput.scheduleToggle(currentDraft: text) { text = $0 }
-                        } label: {
-                            Image(systemName: voiceInput.state == .idle ? "mic" : "stop.circle.fill")
-                        }
-                        .accessibilityLabel(Text(verbatim: voiceInput.state == .idle ? "Speak in Mandarin" : "Stop dictation"))
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        voiceInput.stopKeepingTranscript()
-                        dismiss()
-                    } label: { Text(verbatim: "Done") }
-                }
-            }
-            .toolbarBackground(palette.paper, for: .navigationBar)
-        }
-        .tint(palette.ink)
-        .onAppear { isFocused = true }
-        .onDisappear {
-            voiceInput.stopKeepingTranscript()
-            onDone(text)
-        }
-        .presentationDragIndicator(.visible)
-    }
-}
 
 /// The Mandarin card's dictation: on-device zh-CN only, so the answer arrives as characters.
 enum MandarinDictation {

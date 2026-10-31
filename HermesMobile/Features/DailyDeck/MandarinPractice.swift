@@ -198,8 +198,9 @@ final class MandarinPractice {
         if isDone(.recall) { step = firstOpenStep }
     }
 
-    /// Checks his versions of a cue's example. An empty check (the model couldn't) is an error to
-    /// retry, never kept. Returns whether they were checked, so the caller keeps his words when not.
+    /// Checks his versions of a cue's example, added to the ones already checked so "one more" builds
+    /// toward two. An empty check (the model couldn't) is an error to retry, never kept. Returns whether
+    /// they were checked, so the caller keeps his words when not.
     @discardableResult
     func checkVersions(of cue: DeckPhrase, _ text: String) async -> Bool {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -213,7 +214,9 @@ final class MandarinPractice {
                 versionsError = "Couldn't check them. Try again."
                 return false
             }
-            record.versions[cue.hanzi] = response
+            let earlier = record.versions[cue.hanzi]
+            record.versions[cue.hanzi] = MandarinVersionsResponse(versions: (earlier?.versions ?? []) + response.versions,
+                                                                 used: earlier?.used == true || response.used)
             save()
             return true
         } catch {
@@ -304,4 +307,9 @@ final class MandarinPractice {
     private var firstOpenStep: Step { steps.first { !isDone($0) } ?? .talk }
 
     private func save() { store.setRecord(record, for: server, date: date) }
+}
+
+extension MandarinVersionsResponse {
+    /// Two or more versions that use the cue and need no fix: the cue is his, so the card moves on.
+    var isClean: Bool { used && versions.count >= 2 && versions.allSatisfy { $0.natural == nil } }
 }
