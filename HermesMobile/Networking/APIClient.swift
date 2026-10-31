@@ -117,10 +117,11 @@ actor APIClient {
     func sendData<Body: Encodable>(
         endpoint: Endpoint,
         method: String,
-        body: Body?
+        body: Body?,
+        timeout: TimeInterval? = nil
     ) async throws -> Data {
         let encodedBody = try body.map { try encoder.encode($0) }
-        return try await sendData(endpoint: endpoint, method: method, encodedBody: encodedBody)
+        return try await sendData(endpoint: endpoint, method: method, encodedBody: encodedBody, timeout: timeout)
     }
 
     func sendData(
