@@ -375,6 +375,19 @@ final class BrainPersonLayoutTests: XCTestCase {
         XCTAssertEqual(layout.rhythmAccessibilityLabel, "Seen in 0 of the last 12 months")
     }
 
+    func testRhythmLabelsFollowTheServersEndMonth() {
+        // A saved copy counted through October, read in December: the dots still end at Oct.
+        let december = calendar.date(from: DateComponents(year: 2026, month: 12, day: 3, hour: 12))!
+        let person = BrainPerson(rhythm: Array(repeating: 0, count: 12), rhythmEnd: "2026-10")
+        let page = BrainPage(item: BrainItem(module: .people, id: "people/ada-test.md", title: "Ada Test"), person: person)
+        let layout = BrainPersonLayout(page: page, person: person, today: december, calendar: calendar)
+        XCTAssertEqual(layout.rhythm.first?.label, "Nov")
+        XCTAssertEqual(layout.rhythm.last?.label, "Oct")
+        let odd = BrainPerson(rhythm: Array(repeating: 0, count: 12), rhythmEnd: "2026-13")
+        XCTAssertEqual(BrainPersonLayout(page: page, person: odd, today: december, calendar: calendar).rhythm.last?.label,
+                       "Dec", "an unreadable end month falls back to today's")
+    }
+
     func testRhythmNeedsTwelveMonths() {
         XCTAssertTrue(layout(BrainPerson(rhythm: Array(repeating: 1, count: 11))).rhythm.isEmpty)
         XCTAssertTrue(layout(BrainPerson(rhythm: Array(repeating: 1, count: 13))).rhythm.isEmpty)

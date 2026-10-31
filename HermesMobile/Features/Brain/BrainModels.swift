@@ -347,14 +347,17 @@ struct BrainPerson: Codable, Hashable, Sendable {
     let threads: [String]
     /// Days seen per calendar month, oldest first, ending with this month (12 when present).
     let rhythm: [Int]
+    /// The month `rhythm` ends with ("2026-10"); nil from an older server.
+    let rhythmEnd: String?
 
     private enum CodingKeys: String, CodingKey {
-        case encounters, profile, questions, other, journal, lastSeen, nextBirthday, catchup, threads, rhythm
+        case encounters, profile, questions, other, journal, lastSeen, nextBirthday, catchup, threads, rhythm, rhythmEnd
     }
 
     init(encounters: [BrainEncounter] = [], profile: [BrainProfileSection] = [], questions: [String] = [],
          other: String = "", lastSeen: String? = nil, nextBirthday: String? = nil,
-         journal: [BrainJournalMention] = [], catchup: String? = nil, threads: [String] = [], rhythm: [Int] = []) {
+         journal: [BrainJournalMention] = [], catchup: String? = nil, threads: [String] = [], rhythm: [Int] = [],
+         rhythmEnd: String? = nil) {
         self.encounters = encounters
         self.profile = profile
         self.questions = questions
@@ -365,6 +368,7 @@ struct BrainPerson: Codable, Hashable, Sendable {
         self.catchup = catchup
         self.threads = threads
         self.rhythm = rhythm
+        self.rhythmEnd = rhythmEnd
     }
 
     init(from decoder: Decoder) throws {
@@ -379,6 +383,7 @@ struct BrainPerson: Codable, Hashable, Sendable {
         catchup = c.optional(String.self, .catchup)
         threads = c.lossy(String.self, .threads)
         rhythm = c.lossy(Int.self, .rhythm)
+        rhythmEnd = c.optional(String.self, .rhythmEnd)
     }
 }
 

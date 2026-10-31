@@ -299,6 +299,20 @@ struct BrainModuleListView: View {
                     .foregroundStyle(Color.hxTextSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .brainListRow()
+            } else if items.isEmpty, let relationship, list.nextCursor == nil {
+                // Every page is in and no one has this relationship (any more): say so, with the way back.
+                let label = BrainPeopleLayout.relationshipLabel(relationship, in: BrainPeopleLayout.relationships(everyone))
+                HStack {
+                    Text(verbatim: "No one marked \(label)")
+                        .font(AppFont.subheadline())
+                        .foregroundStyle(Color.hxTextSecondary)
+                    Spacer(minLength: BrainStyle.s)
+                    Button { self.relationship = nil } label: {
+                        Text(verbatim: "Show everyone").font(AppFont.subheadline(weight: .medium))
+                    }
+                    .frame(minHeight: BrainStyle.minTapTarget)
+                }
+                .brainListRow()
             }
         } header: {
             if query.isEmpty {

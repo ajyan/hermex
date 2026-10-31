@@ -2580,6 +2580,23 @@ final class CardFanTests: XCTestCase {
     }
 }
 
+final class DeckMessageSMSTests: XCTestCase {
+    func testTheBodyKeepsAmpersandsAndPlusSigns() throws {
+        let url = try XCTUnwrap(DeckMessage(to: "+15550100100", body: "Drinks & dinner? 2+2=4 #soon").smsURL)
+        XCTAssertEqual(url.absoluteString, "sms:+15550100100&body=Drinks%20%26%20dinner%3F%202%2B2%3D4%20%23soon")
+    }
+
+    func testAFormattedNumberStillMakesALink() throws {
+        XCTAssertEqual(DeckMessage(to: " +1 (555) 010-0100", body: nil).smsURL?.absoluteString, "sms:+15550100100")
+        XCTAssertEqual(DeckMessage(to: "555-010+0100", body: "").smsURL?.absoluteString, "sms:5550100100",
+                       "only a leading + is kept")
+    }
+
+    func testAnEmailRecipientIsKeptWhole() {
+        XCTAssertEqual(DeckMessage(to: "pat@example.com", body: "Hi").smsURL?.absoluteString, "sms:pat@example.com&body=Hi")
+    }
+}
+
 final class DeckCardSourceTests: XCTestCase {
     private func card(_ json: String) throws -> DeckCard {
         try JSONDecoder().decode(DeckCard.self, from: Data(json.utf8))

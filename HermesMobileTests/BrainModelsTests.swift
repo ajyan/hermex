@@ -230,6 +230,14 @@ final class BrainModelsTests: XCTestCase {
         XCTAssertEqual(person.rhythm, [0, 1, 0, 0, 2, 0, 0, 0, 1, 0, 0, 3])
     }
 
+    func testPersonRhythmEndDecodesAndSurvivesTheCache() throws {
+        let person = try appDecoder.decode(BrainPerson.self, from: Data(#"{"rhythm_end": "2026-10"}"#.utf8))
+        XCTAssertEqual(person.rhythmEnd, "2026-10")
+        let cached = try JSONDecoder().decode(BrainPerson.self, from: JSONEncoder().encode(person))
+        XCTAssertEqual(cached.rhythmEnd, "2026-10")
+        XCTAssertNil(try appDecoder.decode(BrainPerson.self, from: Data("{}".utf8)).rhythmEnd)
+    }
+
     func testPersonWithoutCatchUpKeysDefaults() throws {
         let person = try appDecoder.decode(BrainPage.self, from: pageJSON(withPerson: personJSON)).person
         XCTAssertNil(person?.catchup)

@@ -972,6 +972,22 @@ struct DeckMessage: Decodable, Equatable {
     let body: String?
 }
 
+extension DeckMessage {
+    /// `sms:` to the same recipient and words, for a device without the Messages sheet (the
+    /// simulator). A phone number keeps only its digits and a leading `+`, so "+1 (555) 010-0100"
+    /// still makes a link; the body escapes `&`, `+`, `=` and `#`, which would cut it short.
+    var smsURL: URL? {
+        var safe = CharacterSet.urlQueryAllowed
+        safe.remove(charactersIn: "&+=#?")
+        let recipient = to.contains("@")
+            ? to.trimmingCharacters(in: .whitespaces).addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? to
+            : String(to.trimmingCharacters(in: .whitespaces).enumerated()
+                .filter { $1.isNumber || ($1 == "+" && $0 == 0) }.map(\.element))
+        let words = body?.addingPercentEncoding(withAllowedCharacters: safe) ?? ""
+        return URL(string: "sms:\(recipient)" + (words.isEmpty ? "" : "&body=\(words)"))
+    }
+}
+
 /// What the user did with one card. Only non-empty answers are sent.
 struct DeckAnswer: Codable, Equatable {
     var card: String

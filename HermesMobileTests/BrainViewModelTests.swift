@@ -83,6 +83,26 @@ final class BrainViewModelTests: XCTestCase {
         XCTAssertEqual(try BrainCache.load(BrainPage.self, server: cache.server, kind: "page", id: "p1", in: try XCTUnwrap(cache.context)), samplePage)
     }
 
+    func testAPersonPageIsLaidOutOnceWhenItLoads() async throws {
+        let client = FakeBrainClient()
+        let person = BrainPerson(encounters: [BrainEncounter(id: "2026-10-01#1", date: "2026-10-01", title: "Dinner",
+                                                             bullets: ["Talked about **Lisbon**"], body: "")],
+                                 catchup: "Moving to Lisbon.")
+        client.pageResult = .success(BrainPage(item: BrainItem(module: .people, id: "crm/contacts/Dara.md", title: "Dara"),
+                                               person: person))
+        let viewModel = BrainPageViewModel(module: .people, id: "crm/contacts/Dara.md", client: client,
+                                           cache: try makeCache(), onAPIError: { _ in })
+        await viewModel.load()
+        let built = try XCTUnwrap(viewModel.person)
+        XCTAssertEqual(built.layout.timeline.map(\.id), ["2026-10-01#1"])
+        XCTAssertEqual(built.layout.catchUp?.summary, "Moving to Lisbon.")
+
+        client.pageResult = .success(samplePage)
+        let wiki = BrainPageViewModel(module: .wiki, id: "p1", client: client, cache: try makeCache(), onAPIError: { _ in })
+        await wiki.load()
+        XCTAssertNil(wiki.person)
+    }
+
     func testLoadedSiblingIsNilWhenTheNextPageFails() async throws {
         let client = FakeBrainClient()
         client.pageResult = .success(samplePage)
