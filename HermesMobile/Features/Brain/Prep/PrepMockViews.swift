@@ -40,6 +40,42 @@ struct PrepMockSection: View {
     }
 }
 
+/// Leads Prep home when no voice mock was graded this week (`PrepMocks.weeklyDue`): the ladder's
+/// current level and Start call, which opens the call straight from home.
+struct PrepWeeklyMockCard: View {
+    let kind: PrepMockKind
+    let ladder: PrepLadder
+    let isStarting: Bool
+    let errorMessage: String?
+    let start: () -> Void
+
+    var body: some View {
+        let paper = HermexPaper.knowledge
+        HXCard(.wash(paper), title: "Call the interviewer", titleStyle: .title3, spacing: BrainStyle.m, kicker: {
+            HXChip(paper: paper, symbol: "phone.fill", label: "This week's mock")
+        }, content: {
+            if let level = ladder.current {
+                Text(verbatim: [kind.title, "\(level.level) \u{00B7} \(level.title)", PrepMockCopy.minutes(level.minutes)]
+                    .compactMap { $0 }.joined(separator: " \u{00B7} "))
+                    .font(BrainStyle.meta)
+                    .foregroundStyle(paper.glow)
+            }
+            Text(verbatim: "No graded mock in \(PrepMocks.weeklyDays) days. The loop is spoken, so practice it out loud.")
+                .font(BrainStyle.rowSubtitle)
+                .foregroundStyle(Color.hxTextPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let errorMessage {
+                Text(verbatim: errorMessage)
+                    .font(BrainStyle.meta)
+                    .foregroundStyle(Color.hxDanger)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }, footer: {
+            PrepStartCallButton(isStarting: isStarting, action: start)
+        })
+    }
+}
+
 /// A phone on a small tile in the Prep paper's wash.
 private struct PrepMockIcon: View {
     @ScaledMetric(relativeTo: .body) private var side: CGFloat = 32

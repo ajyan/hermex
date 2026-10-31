@@ -7,6 +7,7 @@ struct PrepHomeView: View {
     @State private var viewModel: PrepHomeViewModel
     /// The voice mock ladders, loaded beside home; their section hides until they load.
     @State private var mockViewModel: PrepMockViewModel
+    @Environment(\.openMockCall) private var openMockCall
 
     init(server: URL, onAPIError: @escaping (Error) -> Void) {
         let client = APIClientPrepAdapter(apiClient: APIClient(baseURL: server))
@@ -45,6 +46,7 @@ struct PrepHomeView: View {
         case .loaded(let home):
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
+                    weeklyMockCard
                     if let course = viewModel.course {
                         PrepTodayRingCard(course: course, streak: home.streak,
                                           action: PrepCopy.runAction(reps: home.run.reps, remaining: home.run.remaining))
@@ -67,6 +69,18 @@ struct PrepHomeView: View {
     }
 
     // MARK: Mocks
+
+    /// The weekly mock, ahead of everything, while no mock was graded in the last 7 days.
+    @ViewBuilder
+    private var weeklyMockCard: some View {
+        if openMockCall.isAvailable, let mocks = mockViewModel.mocks, let kind = mocks.weeklyDue(),
+           let ladder = mocks.ladder(kind) {
+            PrepWeeklyMockCard(kind: kind, ladder: ladder, isStarting: mockViewModel.isStarting,
+                               errorMessage: mockViewModel.errorMessage) {
+                Task { await mockViewModel.startCall(kind: kind, open: openMockCall) }
+            }
+        }
+    }
 
     @ViewBuilder
     private var mockSection: some View {
