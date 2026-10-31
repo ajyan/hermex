@@ -24,6 +24,9 @@ struct ChatTranscriptView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var scrollPositionController = ChatScrollPositionController()
+    /// The stream recovery chip, shown 400 ms after recovery starts and held
+    /// at least 400 ms, so quick recoveries don't flash (#1373).
+    @State private var recoveryChip = DelayedStatusDriver<ActiveStreamRecoveryState>()
 
     let isLoading: Bool
     let errorMessage: String?
@@ -405,6 +408,15 @@ struct ChatTranscriptView: View {
             pinReader(proxy: proxy)
             onDisclosureToggle()
         }
+        .task(id: activeStreamRecoveryState) {
+            let state = activeStreamRecoveryState
+            await recoveryChip.run(
+                target: state == .idle ? nil : state,
+                // Offline needs no confirming: nothing resumes until the network does.
+                immediately: state == .waitingForNetwork,
+                animation: ChatMotion.quickState(reduceMotion: reduceMotion)
+            )
+        }
         .id(transcriptContentID)
         .background {
             ZStack {
@@ -504,13 +516,15 @@ struct ChatTranscriptView: View {
                     )
                 }
             }
+        }
 
-            if activeStreamRecoveryState != .idle {
-                StreamRecoveryStatusView(state: activeStreamRecoveryState)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityHidden(hidesRunStatusAccessibility)
-                    .transition(ChatMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
-            }
+        // Outside the stream check, so a chip held past the stream's end stays
+        // until its hold ends.
+        DelayedStatusView(driver: recoveryChip) { state in
+            StreamRecoveryStatusView(state: state)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityHidden(hidesRunStatusAccessibility)
+                .transition(ChatMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
         }
     }
 
@@ -592,7 +606,7 @@ struct StreamingFollowTrigger: View {
     }
 }
 
-private struct ChatTranscriptMessageBlock: View, Equatable {
+struct ChatTranscriptMessageBlock: View, Equatable {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let transcriptMessage: TranscriptMessage
@@ -670,9 +684,14 @@ private struct ChatTranscriptMessageBlock: View, Equatable {
     }
 
     var body: some View {
+        let foldedQuestions = Self.foldedQuestionLines(
+            in: toolCallGroups,
+            foldState: foldState,
+            showsThinkingAndToolCards: showsThinkingAndToolCards
+        )
         // Yield nothing when every part is folded away, so the outer stack adds
         // no spacing for an empty row.
-        if hasVisibleContent {
+        if hasVisibleContent || !foldedQuestions.isEmpty {
             VStack(alignment: .leading, spacing: transcriptSpacing) {
                 if let fold = foldState?.fold {
                     TranscriptTurnFoldRowView(
@@ -688,6 +707,13 @@ private struct ChatTranscriptMessageBlock: View, Equatable {
                         liveReasoningBlock
                         toolActivityGroups
                         liveToolActivityGroup
+                    }
+                    .transition(foldTransition)
+                } else if !foldedQuestions.isEmpty {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(foldedQuestions) { line in
+                            ClarifyAnswerLineView(line: line)
+                        }
                     }
                     .transition(foldTransition)
                 }
@@ -721,6 +747,18 @@ private struct ChatTranscriptMessageBlock: View, Equatable {
         return hasArchivedActivity || shouldRenderLiveReasoningBlock || shouldRenderLiveToolActivityGroup
     }
 
+    /// The answered questions a folded turn keeps in view while it hides a
+    /// row's tool rows. Empty when the row's activity shows, since its clarify
+    /// rows already show the answers, and when thinking and tool cards are off.
+    static func foldedQuestionLines(
+        in toolCallGroups: [ToolCallGroup],
+        foldState: TranscriptTurnFoldRowState?,
+        showsThinkingAndToolCards: Bool
+    ) -> [ClarifyResult.Line] {
+        guard showsThinkingAndToolCards, foldState?.hidesActivity == true else { return [] }
+        return ClarifyResult.lines(in: toolCallGroups)
+    }
+
     private var hasVisibleContent: Bool {
         foldState?.fold != nil || (showsActivity && rendersActivity) || showsBubble
     }
@@ -742,6 +780,7 @@ private struct ChatTranscriptMessageBlock: View, Equatable {
                         streamingAssistantMessageID: streamingAssistantMessageID
                     ),
                     liveTokensPerSecond: liveTokensPerSecond,
+                    transcriptSpacing: transcriptSpacing,
                     isRegeneratingMessage: isRegeneratingMessage,
                     isEditingMessage: isEditingMessage,
                     isForkingMessage: isForkingMessage,
@@ -831,6 +870,7 @@ private struct ChatTranscriptMessageRow: View {
     let hasActiveStream: Bool
     let isStreaming: Bool
     let liveTokensPerSecond: Double?
+    let transcriptSpacing: CGFloat
     let isRegeneratingMessage: Bool
     let isEditingMessage: Bool
     let isForkingMessage: Bool
@@ -855,7 +895,7 @@ private struct ChatTranscriptMessageRow: View {
         if let markerKind = ChatMarkerMessageClassifier.classify(message) {
             MarkerMessageCardView(kind: markerKind, content: message.content)
         } else {
-            VStack(alignment: isUserMessage ? .trailing : .leading, spacing: 4) {
+            VStack(alignment: isUserMessage ? .trailing : .leading, spacing: metaRowSpacing) {
                 bubble
 
                 if showsMetaRow {
@@ -874,6 +914,13 @@ private struct ChatTranscriptMessageRow: View {
 
     private var isUserMessage: Bool {
         message.role == "user"
+    }
+
+    /// A reply's footer leaves the same visible gap below it as the turn's fold row
+    /// leaves above it. The footer's controls draw 13 pt glyphs centred in 28 pt
+    /// frames (`ChatCopyButton`), so their tops already sit 7.5 pt inside the row.
+    private var metaRowSpacing: CGFloat {
+        isUserMessage ? 4 : transcriptSpacing - (28 - 13) / 2
     }
 
     /// Keep actions reachable for every actionable reply, including active turns.

@@ -20,6 +20,30 @@ Before debugging the app, verify the server is reachable:
 curl https://<your-server>/health
 ```
 
+## Compression continuation recovery
+
+When a WebUI chat send is rejected with HTTP 409 and `code: "session_rotated"`,
+the server supplies `continuation_session_id` for the compressed conversation's
+continuation. Hermex loads that session on the same server, verifies the Profile,
+and opens it only after restoring the rejected composer submission. The draft
+and retained attachments move together; the message is **not automatically
+resent**. If the user edits while recovery is pending, the rejected text and
+quotes are retained alongside those edits for review before explicit resend.
+The same retention applies to rejected `/queue` and `/steer` fallbacks, before
+slash-command result handling can consume the composer.
+A late rejection still rolls back its optimistic message and retains its files,
+even if the view has left. After a successful handoff the covered parent composer
+is cleared, and that sealed parent cannot start another POST on Back.
+An invalid target, failed load, stale view, or existing nonempty draft at the
+destination keeps the original draft in place rather than overwriting it.
+Other HTTP 409 responses retain their own recovery behavior.
+
+Focused coverage lives in `APIClientAuthAndErrorTests` and
+`ChatViewModelSendTests`. For a manual simulator check, open a sealed compressed
+parent, send a draft with an attachment, and verify that its continuation opens
+with the draft intact and no new agent run until Send is tapped again. Also
+check leaving the parent during recovery and a destination with an existing draft.
+
 ## Upstream Contract Pin
 
 The app is tested against the `hermes-webui` commit in the root [`UPSTREAM_TESTED_SHA`](UPSTREAM_TESTED_SHA) file — the only copy of the pin, so it cannot drift. To see its release tag: `git -C .codex-tmp/hermes-webui describe --tags --exact-match $(cat UPSTREAM_TESTED_SHA)`. The advance procedure lives in `AGENTS.md` § Working with the server.
@@ -82,6 +106,12 @@ main checkout normally uses **iPhone 17**. Resolve its UDID with
 are ambiguous, so pass the UDID. The runner never chooses another device or
 creates one, and refuses to boot a fifth simulator.
 
+The tests run inside the installed app, so a test can change its real Keychain,
+cookies and defaults. `HermesMobileTests/TestHostStateGuard.swift` snapshots
+them when the test bundle starts and restores them when it finishes. A simulator
+signed in with `scripts/sim-login` stays signed in after a run. A run killed
+before it finishes can still sign it out.
+
 ```zsh
 # Focused tests; repeat --only for multiple classes or individual test methods.
 scripts/test-sim <simulator-udid> --only HermesMobileTests/BotLiveActivityTests
@@ -104,8 +134,11 @@ that device (an app left attached by a build-and-run makes the test runner hang
 before connecting, `0 tests executed`; set `HERMEX_BUNDLE_ID` if
 `Config/Local.xcconfig` changes the bundle ID), then holds locks on the simulator
 and checkout until testing finishes. A competing runner reports the current
-owner immediately; different checkout/device pairs run independently. These
-locks coordinate this runner only: keep other build/install tools on their
+owner immediately; different checkout/device pairs run independently, except
+on a Mac with 16 GB of RAM or less, where they wait their turn on one host build
+lock (up to an hour) because two simulators building at once page memory.
+hermex-flow's `run-sim.sh` takes the same lock. Otherwise these locks
+coordinate this runner only: keep other build/install tools on their
 session's assigned device, and do not run them during its test run.
 
 Before each test attempt, a bounded `get_app_container` check skips termination
@@ -144,12 +177,34 @@ Exit codes: **0** passed; **1** build/test failure; **2** busy device, setup, or
 result-verification failure; **124** timeout; **130** interrupted. On a busy
 device or infrastructure failure, report the blocker and log path; stop rather
 than rebooting, erasing devices, clearing caches, or rerunning unchanged tests.
+Each run also saves the Mac's swap use at start in `memory.log`.
 For actual test failures, inspect the recorded failure and follow the repo's
 baseline-check procedure where applicable. On timeout or interruption, the runner
 terminates the isolated process group it spawned, including remaining descendants,
 and leaves other jobs and the simulator itself alone.
 
 Runner checks: `python3 -m unittest discover -s scripts/tests -v`.
+
+### Stuck simulators
+
+`scripts/sim-doctor [udid]` says why a simulator is stuck and prints the one
+command that clears it. Every probe has a 20-second limit, so it is safe to run
+while things hang. Exit 0 means nothing needs clearing; 1 prints a `FIX:` line.
+
+- `SERVICE`: CoreSimulator itself stopped answering. Only the owner restarts it,
+  because that stops every booted simulator.
+- `MEMORY`: the device doesn't respond while the Mac is paging. On a 16 GB Mac,
+  simulator processes then sit in uninterruptible waits, and boots and launches
+  stall. Free memory first; booting another simulator makes it worse. Heavy swap
+  alone only warns.
+- `DEVICE`: one simulator stopped answering while CoreSimulator still does. The
+  session that owns it shuts it down and boots it by UDID.
+- `ZOMBIE_APP`: Hermex is a zombie the simulator still lists as running, so
+  `launch` and `terminate` never return. A debugger that detached, or was
+  killed, while the app was stopped leaves this. Restart that simulator. To get
+  a backtrace without causing it, end lldb with `kill`:
+  `lldb -p <pid> --batch -o continue -k "thread backtrace all" -k kill`, and
+  don't `simctl terminate` the app while lldb holds it.
 
 ## PR CI
 
