@@ -5,10 +5,11 @@ private func prepIsNotFound(_ error: Error) -> Bool {
     (error as? APIError)?.isNotFound ?? false
 }
 
-/// 409 (another day's plan) and 400 (the rep no longer exists): both mean reload today.
+/// 409 (another day's plan) and 400 (the rep no longer exists): both mean reload today. A 400 for the
+/// answer itself ("bad answer") is not a conflict: reloading would drop the draft without saying why.
 private func prepIsConflict(_ error: Error) -> Bool {
-    if case let .http(statusCode, _)? = error as? APIError { return statusCode == 409 || statusCode == 400 }
-    return false
+    guard let api = error as? APIError, case let .http(statusCode, _) = api else { return false }
+    return statusCode == 409 || (statusCode == 400 && api.serverMessage != "bad answer")
 }
 
 private func prepIsCancellation(_ error: Error) -> Bool {
@@ -19,13 +20,13 @@ private func prepFailureState<Value>(_ error: Error) -> BrainLoadState<Value> {
     prepIsNotFound(error) ? .unavailable : .failed(error.localizedDescription)
 }
 
-/// The Prep landing screen: streak, today's run summary, tracks, needs-work.
+/// The Prep landing screen: streak, today's run summary, the course, stories and gaps.
 @MainActor
 @Observable
 final class PrepHomeViewModel {
     private(set) var state: BrainLoadState<PrepHome> = .loading
     /// The gap ledger; nil when the server has no gaps route (an older fork) or it failed,
-    /// in which case the home shows the older "Needs work" section instead.
+    /// in which case the Gaps section hides.
     private(set) var gaps: [PrepGapSummary]?
     /// The course path with the current unit's lessons; nil on servers without a course. When the full
     /// path fails to load, home's summary (units without lessons) stands in.
@@ -68,6 +69,8 @@ final class PrepHomeViewModel {
         } catch {
             guard token == generation, !prepIsCancellation(error) else { return }
             onAPIError(error)
+            // A failed quiet refresh keeps what is on screen; only a first load shows the failure.
+            if case .loaded = state { return }
             state = prepFailureState(error)
             return
         }
@@ -178,11 +181,10 @@ final class PrepLessonViewModel {
     }
 }
 
-/// What a finished run shows. Course runs fill the XP, lessons and next-up fields; a DSA run
-/// fills `moved`.
+/// What a finished run shows. Course runs fill the XP, lessons and next-up fields; any other run
+/// shows just the streak.
 struct PrepDaySummary: Equatable {
     var streak = PrepStreak()
-    var moved: [PrepSkill] = []
     var isCourse = false
     var xpGained = 0
     /// Titles of the lessons taught this run, in order.
@@ -230,38 +232,6 @@ enum PrepMilestone: Equatable, Sendable {
             out.append(.streak(mark))
         }
         return out
-    }
-}
-
-/// One track's skill map.
-@MainActor
-@Observable
-final class PrepTrackViewModel {
-    let track: String
-    private(set) var state: BrainLoadState<PrepTrackMap> = .loading
-    @ObservationIgnored private let client: PrepDataClient
-    @ObservationIgnored private var generation = 0
-
-    @ObservationIgnored private let onAPIError: (Error) -> Void
-
-    init(track: String, client: PrepDataClient, onAPIError: @escaping (Error) -> Void = { _ in }) {
-        self.track = track
-        self.client = client
-        self.onAPIError = onAPIError
-    }
-
-    func load() async {
-        generation += 1
-        let token = generation
-        do {
-            let map = try await client.map(track: track)
-            guard token == generation, !Task.isCancelled else { return }
-            state = .loaded(map)
-        } catch {
-            guard token == generation, !prepIsCancellation(error) else { return }
-            onAPIError(error)
-            state = prepFailureState(error)
-        }
     }
 }
 
@@ -334,7 +304,6 @@ final class PrepRunViewModel {
     /// Opens a lesson's diagram from this screen's server.
     var diagramLoader: PrepDiagramLoader { PrepDiagramLoader(client: client) }
     @ObservationIgnored private let now: () -> Date
-    @ObservationIgnored private var mapBefore: PrepTrackMap?
     @ObservationIgnored private var lastStreak: PrepStreak?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var isAdvancing = false
@@ -377,7 +346,6 @@ final class PrepRunViewModel {
         let token = generation
         phase = .loading
         submitError = nil
-        mapBefore = nil
         lastStreak = nil
         xpBefore = nil
         tally = PrepDaySummary()
@@ -396,15 +364,6 @@ final class PrepRunViewModel {
 
     func choose(_ answer: PrepAnswer) async {
         await submit(answer)
-    }
-
-    func acknowledgePrimer() async {
-        await submit(.choice("seen"))
-    }
-
-    /// An approach rep's written answer, capped to the server's limit; graded by the server before it returns.
-    func submitApproach(_ text: String) async {
-        await submit(.choice(PrepCopy.cappedApproach(text)))
     }
 
     /// A judgment card's spoken or typed answer, trimmed and capped like an approach.
@@ -433,7 +392,14 @@ final class PrepRunViewModel {
     }
 
     var canSubmitRecall: Bool {
-        !recallDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSubmitting
+        !recallDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && answerFloor.isMet && !isSubmitting
+    }
+
+    /// The word floor for the answer being written: the rep's own, or its probe floor while probing.
+    var answerFloor: PrepWordFloor {
+        guard case let .rep(rep, _) = phase else { return PrepWordFloor(recallDraft, floor: 0) }
+        if case .probing = storyStage { return PrepWordFloor(recallDraft, floor: rep.probeMinWords) }
+        return PrepWordFloor(recallDraft, floor: rep.minWords)
     }
 
     /// Sends the dictated or typed recall.
@@ -463,7 +429,8 @@ final class PrepRunViewModel {
         defer { if token == generation { overridingPoint = nil } }
         do {
             let updated = try await client.override(attempt: attempt, point: point)
-            guard token == generation, case .result = phase else { return }
+            // Next may have moved on while this was in flight: merge only into the same rep's result.
+            guard token == generation, case let .result(current, _, _) = phase, current.index == rep.index else { return }
             let merged = PrepAttemptResult(merging: result, override: updated)
             phase = .result(rep, merged, index: index)
             lastXP = Self.xp(for: rep, result: merged)
@@ -557,8 +524,15 @@ final class PrepRunViewModel {
                     tutorStreaming = nil
                 case .done(let done):
                     apply(done)
-                case let .failed(_, message):
-                    tutorError = message.isEmpty ? "The tutor couldn't reply. Try again." : message
+                case let .failed(status, message):
+                    if status == 409 {
+                        // The reply is already recorded (or the dialogue moved on): Try again asks for
+                        // the tutor's turn rather than resending it.
+                        pendingReply = nil
+                        tutorError = "The tutor couldn't reply. Try again."
+                    } else {
+                        tutorError = message.isEmpty ? "The tutor couldn't reply. Try again." : message
+                    }
                 }
             }
         } catch {
@@ -634,7 +608,7 @@ final class PrepRunViewModel {
     }
 
     var canSubmitStoryAnswer: Bool {
-        !recallDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSubmitting
+        !recallDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && answerFloor.isMet && !isSubmitting
     }
 
     /// The probe the result on screen leads to and its number; nil once the rep is done (two probes
@@ -763,11 +737,6 @@ final class PrepRunViewModel {
         }
     }
 
-    /// A spot-the-bug answer: `line` is a 0-based index into `item.code`.
-    func submitBugFix(line: Int, fix: String) async {
-        await submit(.bugFix(line: line, fix: fix))
-    }
-
     /// Moves past a rep this build can't run (an unknown drill) without posting.
     func skip() async {
         guard !isSubmitting, !isAdvancing, case let .rep(rep, _) = phase, let run else { return }
@@ -776,20 +745,9 @@ final class PrepRunViewModel {
         await advance(in: run, to: rep.index + 1, after: rep.index, token: generation)
     }
 
-    /// The track today's run drills, for the before/after skill map: `anth` once the run holds
-    /// Anthropic-track reps (ids `anth.…`), otherwise `dsa`.
-    static func track(of run: PrepRun) -> String {
-        run.reps.contains { $0.item.id.hasPrefix("anth.") } ? "anth" : "dsa"
-    }
-
     /// The user closed the run: any response still in flight is dropped.
     func leave() {
         generation += 1
-    }
-
-    func showHint() {
-        guard case let .rep(rep, _) = phase, hintsShown < rep.item.hints.count else { return }
-        hintsShown += 1
     }
 
     func `continue`() async {
@@ -824,8 +782,7 @@ final class PrepRunViewModel {
         }
     }
 
-    /// What the end of the run compares against: the XP before a course run, or the skill map before
-    /// any other run. Both are non-fatal.
+    /// What the end of a course run compares against: the XP and ready lessons before it. Non-fatal.
     private func snapshot(_ run: PrepRun, token: Int) async {
         if Self.isCourse(run, kind: runKind) {
             async let homeLoad = try? await client.home()
@@ -837,9 +794,6 @@ final class PrepRunViewModel {
                 readyBefore = ready.map(Self.readyLessons)
                 tally.welcomeBack = PrepCopy.isWelcomeBack(lastDay: home?.streak.lastDay, today: now())
             }
-        } else {
-            let map = try? await client.map(track: Self.track(of: run))
-            if token == generation { mapBefore = map }
         }
     }
 
@@ -961,7 +915,9 @@ final class PrepRunViewModel {
             } else {
                 isSubmitting = false
                 onAPIError(error)
-                submitError = "Couldn't save. Try again."
+                submitError = (error as? APIError)?.serverMessage == "bad answer"
+                    ? "That answer couldn't be saved. Shorten it and try again."
+                    : "Couldn't save. Try again."
             }
             return nil
         }
@@ -970,7 +926,6 @@ final class PrepRunViewModel {
     /// The plan belongs to another day: reload it and start at its index.
     private func restart(token: Int) async {
         guard token == generation else { return }
-        mapBefore = nil
         lastStreak = nil
         xpBefore = nil
         tally = PrepDaySummary()
@@ -1012,18 +967,8 @@ final class PrepRunViewModel {
         }
         var streak = lastStreak
         if streak == nil { streak = try? await client.home().streak }
-        var moved: [PrepSkill] = []
-        let after = mapBefore == nil ? nil : try? await client.map(track: run.map(Self.track(of:)) ?? "dsa")
         guard token == generation, !Task.isCancelled else { return }
-        if let before = mapBefore, let after {
-            let old = Dictionary(
-                before.levels.flatMap(\.skills).map { ($0.id, $0.mastery) },
-                uniquingKeysWith: { first, _ in first })
-            moved = after.levels.flatMap(\.skills).filter { skill in
-                old[skill.id].map { $0 != skill.mastery } ?? false
-            }
-        }
-        phase = .finished(PrepDaySummary(streak: streak ?? PrepStreak(), moved: moved))
+        phase = .finished(PrepDaySummary(streak: streak ?? PrepStreak()))
     }
 }
 
@@ -1279,14 +1224,6 @@ enum PrepCopy {
         return freezes == 0 ? nil : Self.freezes(freezes)
     }
 
-    /// "32 min · 14 reps · Sliding window, Stack" (the focus part only when present).
-    static func runSubtitle(minutes: Double, reps: Int, focus: [String]) -> String {
-        var parts = ["\(Int(minutes.rounded())) min", "\(reps) reps"]
-        let focus = focus.filter { !$0.isEmpty }
-        if !focus.isEmpty { parts.append(focus.joined(separator: ", ")) }
-        return parts.joined(separator: " · ")
-    }
-
     /// Start a fresh run, resume one with answered reps, or nothing left today.
     static func runAction(reps: Int, remaining: Int) -> RunAction {
         if remaining <= 0 { return .done }
@@ -1299,11 +1236,6 @@ enum PrepCopy {
         case .resume: "Resume"
         case .done: "Done"
         }
-    }
-
-    /// Readiness arrives as a 0–1 fraction or a 0–100 score; shown as a whole score.
-    static func readiness(_ value: Double) -> String {
-        "Readiness \(Int((value <= 1 ? value * 100 : value).rounded()))"
     }
 
     static func blockTitle(_ block: String) -> String {
@@ -1333,30 +1265,6 @@ enum PrepCopy {
         return title.isEmpty ? "Boss quiz" : "Boss quiz · \(title)"
     }
 
-    static func mapTitle(mastered: Int, total: Int) -> String {
-        "\(mastered) of \(total) patterns mastered"
-    }
-
-    static func mapSubtitle(problems: Int, due: Int) -> String {
-        "\(problems) problems · NeetCode order · \(due) reviews due"
-    }
-
-    static func stateWords(_ state: PrepSkillState) -> String {
-        switch state {
-        case .new: "not started"
-        case .inProgress: "in progress"
-        case .weak: "weak"
-        case .locked: "locked"
-        case .mastered: "mastered"
-        case .unknown: ""
-        }
-    }
-
-    /// The skill row's VoiceOver label: "{title}, {state words}, {detail}".
-    static func skillLabel(title: String, state: PrepSkillState, detail: String) -> String {
-        [title, stateWords(state), detail].filter { !$0.isEmpty }.joined(separator: ", ")
-    }
-
     /// The feedback split after its first sentence, so the lead can be set in bold.
     static func feedbackParts(_ feedback: String) -> (lead: String, rest: String) {
         let text = feedback.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1374,14 +1282,6 @@ enum PrepCopy {
         func norm(_ s: String) -> String { s.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
         return norm(optionID) == norm(correctID)
     }
-
-    /// A moved skill's subtitle on the run-complete screen.
-    static func movedSubtitle(mastery: Double) -> String {
-        "\(Int((mastery * 100).rounded()))% mastered"
-    }
-
-    /// The approach soft limit, in seconds; past it the server caps the rating.
-    static let approachLimit: TimeInterval = 90
 
     /// The longest approach answer the server accepts. It counts Unicode scalars (Python `len`).
     static let approachMaxLength = 4000
@@ -1470,30 +1370,4 @@ enum PrepCopy {
         text.unicodeScalars.count >= approachMaxLength
     }
 
-    /// The approach clock: time left as "m:ss", then the overrun as "+m:ss".
-    static func approachClock(elapsed: TimeInterval) -> (text: String, isOver: Bool) {
-        let seconds = Int(elapsed.rounded(.down))
-        let limit = Int(approachLimit)
-        func clock(_ total: Int) -> String { String(format: "%d:%02d", total / 60, total % 60) }
-        return seconds > limit ? ("+" + clock(seconds - limit), true) : (clock(limit - seconds), false)
-    }
-
-    /// A code line's VoiceOver label; `index` is 0-based, the label counts from 1.
-    static func codeLineLabel(index: Int, code: String) -> String {
-        "Line \(index + 1): \(code)"
-    }
-
-    /// Whether a spot-the-bug answer is complete enough to submit.
-    static func canSubmitBugFix(line: Int?, fix: String?) -> Bool {
-        line != nil && !(fix ?? "").isEmpty
-    }
-
-    /// A grader rubric key as a title: "edge_cases" → "Edge cases".
-    static func rubricTitle(_ key: String) -> String {
-        let words = key.replacingOccurrences(of: "_", with: " ")
-        return words.prefix(1).uppercased() + words.dropFirst()
-    }
-
-    /// The cover id for a Prep track or skill, seeded apart from Brain pages.
-    static func coverID(_ id: String) -> String { "prep.\(id)" }
 }

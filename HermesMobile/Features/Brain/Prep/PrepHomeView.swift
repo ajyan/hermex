@@ -1,13 +1,13 @@
 import SwiftUI
 
-/// Prep's landing screen: today's run (the course's ring card and path when the server has a
-/// course), the tracks as cover cards, and what needs work. Pushed as `.brainRoute(.prep(.home))`;
+/// Prep's landing screen: today's ring card, then interview practice (the voice mock ladders and the
+/// story bank), then the course's unit path and the gaps. Pushed as `.brainRoute(.prep(.home))`;
 /// owns no `NavigationStack`.
 struct PrepHomeView: View {
     @State private var viewModel: PrepHomeViewModel
     /// The voice mock ladders, loaded beside home; their section hides until they load.
     @State private var mockViewModel: PrepMockViewModel
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.openMockCall) private var openMockCall
 
     init(server: URL, onAPIError: @escaping (Error) -> Void) {
         let client = APIClientPrepAdapter(apiClient: APIClient(baseURL: server))
@@ -46,26 +46,19 @@ struct PrepHomeView: View {
         case .loaded(let home):
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
+                    weeklyMockCard
                     if let course = viewModel.course {
-                        // The course replaces the run row: a ring card, then the path. Skill maps and
-                        // gaps (fed by mocks) follow below.
                         PrepTodayRingCard(course: course, streak: home.streak,
                                           action: PrepCopy.runAction(reps: home.run.reps, remaining: home.run.remaining))
-                        PrepUnitPath(course: course, showsTextMockRow: showsTextMockRow) {
-                            storiesSection
-                            mockSection
-                        }
-                    } else {
-                        todaySection(home)
-                        mockSection
                     }
-                    if !home.tracks.isEmpty {
-                        tracksSection(home.tracks, title: viewModel.course == nil ? "Tracks" : "Skill maps")
+                    // Interview practice first: the mock ladders, then the story bank.
+                    mockSection
+                    storiesSection
+                    if let course = viewModel.course {
+                        PrepUnitPath(course: course)
                     }
                     if let gaps = viewModel.gaps {
                         PrepGapsSection(gaps: gaps)
-                    } else if !home.needsWork.isEmpty {
-                        needsWorkSection(home.needsWork)
                     }
                 }
                 .padding(BrainStyle.l)
@@ -77,10 +70,16 @@ struct PrepHomeView: View {
 
     // MARK: Mocks
 
-    /// The old text critique row stays on home whenever the ladders aren't there to carry it
-    /// (a server without them); hidden while they load, so it doesn't flash.
-    private var showsTextMockRow: Bool {
-        mockViewModel.state != .loading && !PrepMockSection.isShown(mockViewModel.mocks)
+    /// The weekly mock, ahead of everything, while no mock was graded in the last 7 days.
+    @ViewBuilder
+    private var weeklyMockCard: some View {
+        if openMockCall.isAvailable, let mocks = mockViewModel.mocks, let kind = mocks.weeklyDue(),
+           let ladder = mocks.ladder(kind) {
+            PrepWeeklyMockCard(kind: kind, ladder: ladder, isStarting: mockViewModel.isStarting,
+                               errorMessage: mockViewModel.errorMessage) {
+                Task { await mockViewModel.startCall(kind: kind, open: openMockCall) }
+            }
+        }
     }
 
     @ViewBuilder
@@ -100,77 +99,6 @@ struct PrepHomeView: View {
                 onAct: { candidate, action in
                     Task { await viewModel.act(on: candidate, action: action) }
                 })
-        }
-    }
-
-    // MARK: Today
-
-    private func todaySection(_ home: PrepHome) -> some View {
-        let action = PrepCopy.runAction(reps: home.run.reps, remaining: home.run.remaining)
-        return VStack(alignment: .leading, spacing: BrainStyle.s) {
-            BrainSectionHeader(title: "Today")
-            SectionCard {
-                VStack(spacing: 0) {
-                    HStack(spacing: BrainStyle.m) {
-                        BrainRow(
-                            title: "Today's run",
-                            subtitle: PrepCopy.runSubtitle(
-                                minutes: home.run.minutes, reps: home.run.reps, focus: home.run.focus)
-                        )
-                        PrepRunButton(action: action)
-                    }
-                    PrepRowDivider()
-                    BrainRow(
-                        title: PrepCopy.streakTitle(days: home.streak.days),
-                        subtitle: PrepCopy.streakSubtitle(days: home.streak.days, freezes: home.streak.freezes)
-                    )
-                    if let readiness = home.readiness {
-                        PrepRowDivider()
-                        BrainRow(title: PrepCopy.readiness(readiness))
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: Tracks
-
-    private func tracksSection(_ tracks: [PrepTrackSummary], title: String) -> some View {
-        let columns = BrainListLayout.columnCount(2, dynamicType: dynamicTypeSize)
-        return VStack(alignment: .leading, spacing: BrainStyle.s) {
-            BrainSectionHeader(title: title)
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: BrainStyle.m, alignment: .top), count: columns),
-                spacing: BrainStyle.m
-            ) {
-                ForEach(tracks) { track in
-                    NavigationLink(value: ShellPushDestination.brainRoute(.prep(.track(track.id)))) {
-                        PrepTrackCard(track: track)
-                            .zoomSource(for: .brainRoute(.prep(.track(track.id))), cornerRadius: BrainStyle.cardCorner)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-
-    // MARK: Needs work
-
-    private func needsWorkSection(_ items: [PrepNeedsWork]) -> some View {
-        VStack(alignment: .leading, spacing: BrainStyle.s) {
-            BrainSectionHeader(title: "Needs work", count: items.count)
-            SectionCard {
-                VStack(spacing: 0) {
-                    ForEach(Array(items.enumerated()), id: \.element.id) { offset, item in
-                        if offset > 0 { PrepRowDivider() }
-                        BrainRow(
-                            leading: { PrepCoverThumbnail(id: PrepCopy.coverID(item.skill)) },
-                            title: item.title,
-                            subtitle: item.detail
-                        )
-                    }
-                }
-            }
         }
     }
 }
@@ -208,97 +136,7 @@ struct PrepRunButton: View {
     }
 }
 
-/// A track as a Brain glow card (the `.knowledge` paper): cover, title, the server's
-/// subtitle, and a thin progress bar. Built from the same pieces and constants as `BrainCard`.
-private struct PrepTrackCard: View {
-    let track: PrepTrackSummary
-    /// Built once per card, never in `body`.
-    private let cover: BrainCoverSpec
-
-    init(track: PrepTrackSummary) {
-        self.track = track
-        self.cover = BrainCoverSpec.make(id: PrepCopy.coverID(track.id), tag: "career")
-    }
-
-    var body: some View {
-        let paper = HermexPaper.knowledge
-        let shape = BrainStyle.cardShape()
-        VStack(alignment: .leading, spacing: 0) {
-            // The clear base takes the card's full width at the cover ratio; the art
-            // is an overlay so it can never be narrower than the card.
-            Color.clear
-                .aspectRatio(BrainStyle.coverAspectRatio, contentMode: .fit)
-                .overlay { BrainCoverView(spec: cover).drawingGroup() }
-                .clipped()
-            VStack(alignment: .leading, spacing: BrainStyle.xs) {
-                Text(verbatim: track.title)
-                    .font(AppFont.display(style: .body))
-                    .foregroundStyle(paper.glow)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                if !track.subtitle.isEmpty {
-                    Text(verbatim: track.subtitle)
-                        .font(BrainStyle.meta)
-                        .foregroundStyle(paper.glow)
-                        .lineLimit(2)
-                }
-                PrepProgressBar(fraction: track.progress, tint: paper.glow)
-                    .padding(.top, BrainStyle.xs)
-            }
-            .padding(.horizontal, BrainStyle.cardHorizontalPadding)
-            .padding(.vertical, BrainStyle.cardVerticalPadding)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-        }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .clipShape(shape)
-        .background(paper.card, in: shape)
-        .overlay(shape.strokeBorder(paper.edge, lineWidth: 0.5))
-        .contentShape(shape)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: [track.title, track.subtitle].filter { !$0.isEmpty }.joined(separator: ", ")))
-        .accessibilityValue(Text(verbatim: "\(Int((min(max(track.progress, 0), 1) * 100).rounded())) percent"))
-    }
-}
-
-/// A 3pt bar: the filled share in `tint` on a separator track.
-struct PrepProgressBar: View {
-    let fraction: Double
-    var tint: Color = .hxTextSecondary.opacity(0.55)
-
-    var body: some View {
-        let clamped = min(max(fraction, 0), 1)
-        Capsule()
-            .fill(Color.hxSeparator)
-            .frame(height: 3)
-            .overlay(alignment: .leading) {
-                GeometryReader { proxy in
-                    Capsule()
-                        .fill(tint)
-                        .frame(width: proxy.size.width * clamped)
-                }
-            }
-            .accessibilityHidden(true)
-    }
-}
-
 // MARK: - Shared Prep pieces
-
-/// A square cover thumbnail for a row's leading slot (40pt, scaled with Dynamic Type).
-struct PrepCoverThumbnail: View {
-    private let cover: BrainCoverSpec
-    @ScaledMetric(relativeTo: .body) private var side: CGFloat = 40
-
-    init(id: String) {
-        self.cover = BrainCoverSpec.make(id: id, tag: "career")
-    }
-
-    var body: some View {
-        BrainCoverView(spec: cover)
-            .frame(width: side, height: side)
-            .clipShape(RoundedRectangle(cornerRadius: BrainStyle.thumbnailCorner, style: .continuous))
-            .drawingGroup()
-    }
-}
 
 /// The hairline between rows inside a `SectionCard`.
 struct PrepRowDivider: View {

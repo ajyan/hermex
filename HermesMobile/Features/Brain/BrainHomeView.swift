@@ -99,6 +99,7 @@ struct BrainHomeView: View {
                 // Left open overnight, the review row moves on to the new day's ten.
                 if phase == .active, viewModel.needsNewDay { Task { await viewModel.load() } }
                 if phase == .active { Task { await dailyAsk?.load() } }  // a new day's Ask, or one acted on elsewhere
+                if phase == .active { Task { await peopleHome.load() } }  // who is due moves on with the day
             }
             .onDisappear { searchViewModel.cancel() }
     }
@@ -281,9 +282,9 @@ struct BrainHomeView: View {
                     if !modules.isEmpty { BrainHomeDivider() }
                     link(.prep(.home)) {
                         BrainRow(
-                            leading: { BrainModuleIcon(systemName: dailyAsk?.isLocked == true ? "lock.fill" : "target", paper: .knowledge) },
+                            leading: { BrainModuleIcon(systemName: dailyAsk?.isLocked == true ? "lock.fill" : "target", paper: .prep) },
                             title: "Interview prep",
-                            subtitle: dailyAsk?.isLocked == true ? "After today's Ask" : "Today's run and your tracks",
+                            subtitle: dailyAsk?.isLocked == true ? "After today's Ask" : "Today's run, mocks and stories",
                             subtitleLineLimit: 1
                         )
                     }

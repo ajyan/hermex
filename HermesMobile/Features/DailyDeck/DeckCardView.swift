@@ -18,6 +18,7 @@ struct DeckPageView: View {
     var isOpen = false
 
     @Environment(\.openBrainRoute) private var openBrainRoute
+    @Environment(DailyAskModel.self) private var askModel: DailyAskModel?
 
     var body: some View {
         let palette = DeckPalette.of(page, inV2Weekly: viewModel.isSealedWeekly)
@@ -45,10 +46,16 @@ struct DeckPageView: View {
         }
     }
 
-    /// "Open the page" on an open card whose source is a Brain page.
+    /// "Open the page" on an open card whose source is a Brain page; "Open Prep" on today's Ask once it
+    /// is acted on.
     private var sourceAction: HXCardAction? {
-        guard case .card(let card) = page, let route = card.sourceRoute, openBrainRoute.isAvailable else { return nil }
+        guard case .card(let card) = page, openBrainRoute.isAvailable else { return nil }
         let (open, deck) = (openBrainRoute, viewModel)
+        if card.type == .ask, let askModel, askModel.isLive(for: viewModel.date),
+           case .loaded(let ask) = askModel.state, let outcome = ask.outcome, DailyAskBody.opensPrep(outcome) {
+            return HXCardAction(title: "Open Prep") { open(.prep(.home)) }
+        }
+        guard let route = card.sourceRoute else { return nil }
         return HXCardAction(title: DeckCard.openTitle(for: route)) {
             deck.opened("source", on: card.id)
             open(route)
@@ -1332,6 +1339,7 @@ private struct FollowUpRow: View {
     @State private var editedText: String?
     @FocusState private var isEditingText: Bool
     @Environment(\.openURL) private var openURL
+    @Environment(\.openBrainRoute) private var openBrainRoute
 
     private struct Compose: Identifiable {
         let id = UUID()
@@ -1413,7 +1421,15 @@ private struct FollowUpRow: View {
         }
     }
 
+    /// "Open their page" leads a person's follow-up, so their Catch up is a tap away before texting.
+    @ViewBuilder
     private func buttons(_ chosen: String?) -> some View {
+        if let route = card.sourceRoute, openBrainRoute.isAvailable {
+            ChoiceButton(title: DeckCard.openTitle(for: route), isSelected: false) {
+                viewModel.opened("source", on: card.id)
+                openBrainRoute(route)
+            }
+        }
         ForEach(card.actions) { action in
             let texted = action.message != nil && chosen == action.id
             ChoiceButton(title: texted ? "Texted" : action.label, isSelected: chosen == action.id) {

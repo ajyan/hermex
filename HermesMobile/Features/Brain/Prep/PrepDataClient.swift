@@ -8,7 +8,6 @@ import Foundation
 protocol PrepDataClient: Sendable {
     func home() async throws -> PrepHome
     func today(run: PrepRunKind, unit: String?) async throws -> PrepRun
-    func map(track: String) async throws -> PrepTrackMap
     func attempt(_ r: PrepAttemptRequest) async throws -> PrepAttemptResult
     func gaps() async throws -> [PrepGapSummary]
     func gap(id: String) async throws -> PrepGapDetail
@@ -76,12 +75,10 @@ struct APIClientPrepAdapter: PrepDataClient {
         try await get(run == .daily ? .tutorToday : .tutorRun(run: run.rawValue, unit: unit))
     }
 
-    func map(track: String) async throws -> PrepTrackMap {
-        try await get(.tutorMap(track: track))
-    }
-
+    /// Grading runs inside the request (up to two model calls on the local model), so it gets three
+    /// minutes rather than the default minute; a retry before it lands would grade the answer twice.
     func attempt(_ r: PrepAttemptRequest) async throws -> PrepAttemptResult {
-        let data = try await apiClient.sendData(endpoint: .tutorAttempt, method: "POST", body: r)
+        let data = try await apiClient.sendData(endpoint: .tutorAttempt, method: "POST", body: r, timeout: 180)
         return try decode(data)
     }
 

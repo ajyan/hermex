@@ -55,7 +55,15 @@ struct PrepStoryMicButton: View {
             }
         }
         .dictationLifecycle(dictation, text: text, isSubmitting: isSubmitting)
+        .preference(key: PrepMicBusyKey.self, value: dictation.isBusy)
     }
+}
+
+/// True while any Prep mic is listening, transcribing or tidying. Submitting then would cancel the
+/// dictation and send only what was typed, so the run screen holds Submit and Send until it settles.
+struct PrepMicBusyKey: PreferenceKey {
+    static let defaultValue = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) { value = value || nextValue() }
 }
 
 /// The answer field shared by the telling and the probes.

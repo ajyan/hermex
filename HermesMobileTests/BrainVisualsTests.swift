@@ -193,16 +193,42 @@ final class BrainVisualsTests: XCTestCase {
 
     // MARK: - Reader
 
-    func testReaderCoverIsSkippedOnPersonPagesAndPagesWithLinkCards() {
-        let person = BrainPerson(encounters: [], journal: [])
-        let people = BrainItem(module: .people, id: "people/ada-test.md", title: "Ada Test")
-        let wiki = BrainItem(module: .wiki, id: "self")
-        XCTAssertFalse(BrainReaderLayout.showsCover(for: BrainPage(item: people, person: person), hasLinkCards: false))
-        XCTAssertTrue(BrainReaderLayout.showsCover(for: BrainPage(item: people), hasLinkCards: false),
-                      "a person page without the person payload keeps the cover")
-        XCTAssertTrue(BrainReaderLayout.showsCover(for: BrainPage(item: wiki), hasLinkCards: false))
-        XCTAssertFalse(BrainReaderLayout.showsCover(for: BrainPage(item: wiki), hasLinkCards: true))
-        XCTAssertFalse(BrainReaderLayout.showsCover(for: BrainPage(item: people), hasLinkCards: true))
+    func testWikiMetaLineSaysHowLongAgoTheDateLabelApplies() throws {
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = try XCTUnwrap(TimeZone(identifier: "UTC"))
+        let today = try XCTUnwrap(utc.date(from: DateComponents(year: 2026, month: 10, day: 31, hour: 12)))
+        let updated = BrainItem(module: .wiki, id: "w", date: "2026-10-10", kind: "concept", dateLabel: "updated")
+        XCTAssertEqual(BrainReaderLayout.metaLine(for: updated, today: today, calendar: utc), "Concept · updated 3 wk ago")
+        let added = BrainItem(module: .wiki, id: "s", date: "2026-10-31", kind: "source", dateLabel: "added")
+        XCTAssertEqual(BrainReaderLayout.metaLine(for: added, today: today, calendar: utc), "Source · added today")
+        let us = Locale(identifier: "en_US")
+        let article = BrainItem(module: .articles, id: "a", date: "2026-10-06", kind: "article")
+        XCTAssertEqual(BrainReaderLayout.metaLine(for: article, today: today, calendar: utc, locale: us),
+                       "Article · Oct 6, 2026", "a page without a date label keeps the plain date")
+        let undated = BrainItem(module: .wiki, id: "u", date: "someday", kind: "concept", dateLabel: "updated")
+        XCTAssertEqual(BrainReaderLayout.metaLine(for: undated, today: today, calendar: utc, locale: us), "Concept · someday")
+    }
+
+    func testAHubSaysSoInItsMetaLine() throws {
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = try XCTUnwrap(TimeZone(identifier: "UTC"))
+        let today = try XCTUnwrap(utc.date(from: DateComponents(year: 2026, month: 10, day: 31, hour: 12)))
+        let item = BrainItem(module: .wiki, id: "h", date: "2026-10-10", kind: "concept", dateLabel: "updated")
+        XCTAssertEqual(BrainReaderLayout.metaLine(for: item, hubPageCount: 8, today: today, calendar: utc),
+                       "Hub · 8 pages · updated 3 wk ago")
+        let undated = BrainItem(module: .wiki, id: "h", kind: "entity")
+        XCTAssertEqual(BrainReaderLayout.metaLine(for: undated, hubPageCount: 5, today: today, calendar: utc), "Hub · 5 pages")
+    }
+
+    func testListAgeUsesThePeopleListSteps() throws {
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = try XCTUnwrap(TimeZone(identifier: "UTC"))
+        let today = try XCTUnwrap(utc.date(from: DateComponents(year: 2026, month: 10, day: 31, hour: 12)))
+        XCTAssertEqual(BrainListLayout.age("2026-10-31", today: today, calendar: utc), "today")
+        XCTAssertEqual(BrainListLayout.age("2026-10-25", today: today, calendar: utc), "6d")
+        XCTAssertEqual(BrainListLayout.age("2026-10-01", today: today, calendar: utc), "4 wk")
+        XCTAssertEqual(BrainListLayout.age("2026-05-01", today: today, calendar: utc), "6 mo")
+        XCTAssertNil(BrainListLayout.age("", today: today, calendar: utc))
     }
 
     func testReaderMetaLineCapitalisesKindAndOmitsEmptyDate() {
@@ -229,12 +255,6 @@ final class BrainVisualsTests: XCTestCase {
     func testReaderSectionTitles() {
         XCTAssertEqual(BrainReaderLayout.linkedFromTitle(.people), "Mentioned in")
         XCTAssertEqual(BrainReaderLayout.linkedFromTitle(.wiki), "Linked mentions")
-    }
-
-    func testReaderCoverUsesTheFirstTag() {
-        let item = BrainItem(module: .wiki, id: "wiki/virtues.md", tags: ["habits"])
-        XCTAssertEqual(BrainReaderLayout.cover(for: item), BrainCoverSpec.make(id: item.id, tag: "habits"))
-        XCTAssertEqual(BrainReaderLayout.cover(for: item).ramp, 2)
     }
 
     // MARK: - Final fix wave
@@ -269,17 +289,6 @@ final class BrainVisualsTests: XCTestCase {
         XCTAssertEqual(BrainCard.metaLine(for: undated, locale: us), "Daily Stoic")
     }
 
-    func testRefCoverUsesTheRefsFirstTag() {
-        let ref = BrainRef(module: .wiki, id: "wiki/virtues.md", title: "Virtues", tags: ["habits", "stoicism"])
-        XCTAssertEqual(BrainCoverSpec.make(ref: ref), BrainCoverSpec.make(id: ref.id, tag: "habits"))
-        XCTAssertEqual(BrainCoverSpec.make(ref: ref).ramp, 2)
-        let item = BrainItem(module: .wiki, id: "wiki/virtues.md", tags: ["habits"])
-        XCTAssertEqual(BrainCoverSpec.make(ref: ref), BrainReaderLayout.cover(for: item),
-                       "a ref's cover matches the page's own cover")
-        let untagged = BrainRef(module: .wiki, id: "wiki/x.md")
-        XCTAssertEqual(BrainCoverSpec.make(ref: untagged), BrainCoverSpec.make(id: "wiki/x.md", tag: nil))
-    }
-
     func testCachedCopyFooterSaysRemovedWhenMissing() {
         XCTAssertEqual(BrainReaderLayout.cachedCopyFooter(isMissing: false), "Offline, showing saved copy")
         XCTAssertEqual(BrainReaderLayout.cachedCopyFooter(isMissing: true), "Removed from the Brain · saved copy")
@@ -308,9 +317,40 @@ final class BrainConnectionsTests: XCTestCase {
         let page = BrainPage(item: BrainItem(module: .wiki, id: "self"),
                              links: [ref("a"), ref("self"), ref("b", .people), ref("a")])
         XCTAssertEqual(BrainConnectionsLayout.linkCards(page).map(\.id), ["a", "b"])
-        XCTAssertFalse(BrainConnectionsLayout.showsCover(page))
-        XCTAssertTrue(BrainConnectionsLayout.showsCover(BrainPage(item: BrainItem(module: .wiki, id: "self"),
-                                                                 links: [ref("self")])))
+    }
+
+    func testLinkCardsLeaveOutTheTrailHubAndAHubsOwnPages() {
+        let member = BrainPage(item: BrainItem(module: .wiki, id: "self"), links: [ref("hub"), ref("a")],
+                               hub: BrainHubContext(ref: ref("hub"), index: 0, count: 3))
+        XCTAssertEqual(BrainConnectionsLayout.linkCards(member).map(\.id), ["a"], "the trail already names the hub")
+        let hub = BrainPage(item: BrainItem(module: .wiki, id: "self"), links: [ref("a"), ref("b"), ref("c")],
+                            hubPages: [ref("a"), ref("b")])
+        XCTAssertEqual(BrainConnectionsLayout.linkCards(hub).map(\.id), ["c"], "In this hub lists a and b")
+    }
+
+    func testAHubInsideAHubListsItsPagesWithoutItsParent() {
+        let page = BrainPage(item: BrainItem(module: .wiki, id: "self"),
+                             hub: BrainHubContext(ref: ref("parent"), index: 2, count: 7),
+                             hubPages: [ref("parent"), ref("a"), ref("self"), ref("b")])
+        XCTAssertEqual(BrainConnectionsLayout.hubPages(page).map(\.id), ["a", "b"])
+    }
+
+    func testHubPagesDecodeOnThePageAndInTheHubContext() throws {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let json = #"""
+        {"item": {"module": "wiki", "id": "p1"},
+         "hub": {"ref": {"module": "wiki", "id": "h"}, "index": 0, "count": 2,
+                 "pages": [{"module": "wiki", "id": "p1", "snippet": "One."}, {"module": "nope", "id": "x"},
+                           {"module": "wiki", "id": "p2"}]},
+         "hub_pages": [{"module": "wiki", "id": "c1", "title": "C1", "snippet": "Gist."}]}
+        """#
+        let page = try decoder.decode(BrainPage.self, from: Data(json.utf8))
+        XCTAssertEqual(page.hub?.pages.map(\.id), ["p1", "p2"], "an unknown module drops one row, not the list")
+        XCTAssertEqual(page.hub?.pages.first?.snippet, "One.")
+        XCTAssertEqual(page.hubPages.map(\.snippet), ["Gist."])
+        let older = try decoder.decode(BrainPage.self, from: Data(#"{"item": {"module": "wiki", "id": "p"}}"#.utf8))
+        XCTAssertEqual(older.hubPages, [])
     }
 
     func testPagerShowsOnlyForAPageInItsHubWithANeighbour() {

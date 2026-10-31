@@ -12,11 +12,6 @@ import SwiftUI
 struct PrepMockSection: View {
     let mocks: PrepMocks
 
-    /// Whether the section shows: once the ladders load with at least one kind.
-    static func isShown(_ mocks: PrepMocks?) -> Bool {
-        PrepMockKind.allCases.contains { mocks?.ladder($0) != nil }
-    }
-
     private var rows: [(kind: PrepMockKind, ladder: PrepLadder)] {
         PrepMockKind.allCases.compactMap { kind in mocks.ladder(kind).map { (kind, $0) } }
     }
@@ -45,6 +40,42 @@ struct PrepMockSection: View {
     }
 }
 
+/// Leads Prep home when no voice mock was graded this week (`PrepMocks.weeklyDue`): the ladder's
+/// current level and Start call, which opens the call straight from home.
+struct PrepWeeklyMockCard: View {
+    let kind: PrepMockKind
+    let ladder: PrepLadder
+    let isStarting: Bool
+    let errorMessage: String?
+    let start: () -> Void
+
+    var body: some View {
+        let paper = HermexPaper.knowledge
+        HXCard(.wash(paper), title: "Call the interviewer", titleStyle: .title3, spacing: BrainStyle.m, kicker: {
+            HXChip(paper: paper, symbol: "phone.fill", label: "This week's mock")
+        }, content: {
+            if let level = ladder.current {
+                Text(verbatim: [kind.title, "\(level.level) \u{00B7} \(level.title)", PrepMockCopy.minutes(level.minutes)]
+                    .compactMap { $0 }.joined(separator: " \u{00B7} "))
+                    .font(BrainStyle.meta)
+                    .foregroundStyle(paper.glow)
+            }
+            Text(verbatim: "No graded mock in \(PrepMocks.weeklyDays) days. The loop is spoken, so practice it out loud.")
+                .font(BrainStyle.rowSubtitle)
+                .foregroundStyle(Color.hxTextPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let errorMessage {
+                Text(verbatim: errorMessage)
+                    .font(BrainStyle.meta)
+                    .foregroundStyle(Color.hxDanger)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }, footer: {
+            PrepStartCallButton(isStarting: isStarting, action: start)
+        })
+    }
+}
+
 /// A phone on a small tile in the Prep paper's wash.
 private struct PrepMockIcon: View {
     @ScaledMetric(relativeTo: .body) private var side: CGFloat = 32
@@ -64,8 +95,8 @@ private struct PrepMockIcon: View {
 // MARK: - Brief
 
 /// One ladder: the level a call takes (the current one, or any unlocked level picked to replay it),
-/// how long it runs and what is scored, Start call, the recent mocks of this kind, and the older text
-/// critique run. Pushed as `.prep(.mockLadder(kind))`.
+/// how long it runs and what is scored, Start call, and the recent mocks of this kind. Pushed as
+/// `.prep(.mockLadder(kind))`.
 struct PrepMockBriefView: View {
     let kind: PrepMockKind
     @State private var viewModel: PrepMockViewModel
@@ -101,15 +132,6 @@ struct PrepMockBriefView: View {
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
                     briefCard(mocks.ladder(kind))
                     recent(mocks.recent(for: kind), ladder: mocks.ladder(kind))
-                    VStack(alignment: .leading, spacing: BrainStyle.s) {
-                        BrainSectionHeader(title: "In text")
-                        SectionCard {
-                            NavigationLink(value: ShellPushDestination.brainRoute(.prep(.mock))) {
-                                BrainRow(title: "Mock interview", subtitle: "Full critique on what you've passed")
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
                 }
                 .padding(BrainStyle.l)
                 .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)

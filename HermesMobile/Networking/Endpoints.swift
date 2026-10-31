@@ -183,7 +183,6 @@ enum Endpoint {
     /// One behavioral story to review on its page.
     case tutorStory(id: String)
     case tutorDiagram(topic: String)
-    case tutorMap(track: String)
     case tutorAttempt
     case tutorGaps
     case tutorGap(id: String)
@@ -547,8 +546,6 @@ enum Endpoint {
             return "/api/tutor/story"
         case .tutorDiagram:
             return "/api/tutor/diagram"
-        case .tutorMap:
-            return "/api/tutor/map"
         case .tutorAttempt:
             return "/api/tutor/attempt"
         case .tutorGaps:
@@ -839,8 +836,6 @@ enum Endpoint {
             return items
         case let .brainHome(batch):
             return batch > 0 ? [URLQueryItem(name: "batch", value: String(batch))] : []
-        case let .tutorMap(track):
-            return [URLQueryItem(name: "track", value: track)]
         case let .tutorGap(id), let .tutorLesson(id), let .tutorStory(id):
             return [URLQueryItem(name: "id", value: id)]
         case let .tutorDiagram(topic):

@@ -175,6 +175,27 @@ struct PrepMocks: Decodable, Hashable, Sendable {
     func ladder(_ kind: PrepMockKind) -> PrepLadder? { ladders[kind.rawValue] }
 
     func recent(for kind: PrepMockKind) -> [PrepMockResult] { recent.filter { $0.kind == kind.rawValue } }
+
+    /// Days without a graded voice mock before Prep home leads with the weekly mock card.
+    static let weeklyDays = 7
+
+    /// The ladder the weekly mock card calls: nil when any mock was graded in the last `weeklyDays`
+    /// days (by the local day it started), otherwise the kind graded longest ago, a kind never graded
+    /// first, behavioral before design.
+    func weeklyDue(now: Date = .now, calendar: Calendar = .current) -> PrepMockKind? {
+        let format = DateFormatter()
+        format.calendar = calendar
+        format.timeZone = calendar.timeZone
+        format.locale = Locale(identifier: "en_US_POSIX")
+        format.dateFormat = "yyyy-MM-dd"
+        guard let earlier = calendar.date(byAdding: .day, value: -Self.weeklyDays, to: now) else { return nil }
+        let since = format.string(from: earlier)
+        let lastGraded = Dictionary(grouping: recent.filter { $0.status == "graded" }, by: \.kind)
+            .mapValues { $0.compactMap { $0.ts.map { String($0.prefix(10)) } }.max() ?? "" }
+        guard !lastGraded.values.contains(where: { $0 > since }) else { return nil }
+        return PrepMockKind.allCases.filter { ladder($0) != nil }
+            .min { (lastGraded[$0.rawValue] ?? "") < (lastGraded[$1.rawValue] ?? "") }
+    }
 }
 
 /// `POST /api/tutor/mock/start`: the brief the interviewer opens with, and the profile to call in.

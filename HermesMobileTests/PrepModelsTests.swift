@@ -21,12 +21,7 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertEqual(home.run.reps, 2)
         XCTAssertEqual(home.run.remaining, 2)
         XCTAssertEqual(home.run.focus, ["Arrays & Hashing"])
-        XCTAssertEqual(home.tracks.first?.id, "dsa")
-        XCTAssertEqual(home.tracks.first?.total, 18)
-        XCTAssertEqual(home.tracks.first?.subtitle, "0 of 18 mastered")
-        XCTAssertEqual(home.needsWork.first?.skill, "dsa.arrays_hashing")
-        XCTAssertEqual(home.needsWork.first?.detail, "Mixed up with Two Pointers")
-        XCTAssertNil(home.readiness)
+        XCTAssertNil(home.course, "the retired readiness, tracks and needs_work fields are read past")
     }
 
     func testDecodesApproachSpotBugTraceReps() throws {
@@ -51,6 +46,24 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertEqual(run.reps[2].item.fixes, ["f1", "f2", "f3"])
         XCTAssertEqual(run.reps[3].item.input, "[1, 2]")
         XCTAssertEqual(run.reps[3].item.options.map(\.id), ["1", "2", "3", "4"])
+    }
+
+    func testRepDecodesItsWordFloors() throws {
+        let json = #"""
+        {"date": "2026-11-01", "index": 0, "reps": [
+          {"index": 0, "block": "story", "drill": "story", "min_words": 150, "probe_min_words": 50, "item": {"id": "s1"}},
+          {"index": 1, "block": "review", "drill": "recall", "item": {"id": "u1.l1"}}
+        ]}
+        """#
+        let run = try decode(PrepRun.self, json)
+        XCTAssertEqual(run.reps.map(\.minWords), [150, 0], "an older server sends no floor")
+        XCTAssertEqual(run.reps.map(\.probeMinWords), [50, 0])
+    }
+
+    func testWordFloorCountsWordsAndTitlesSubmit() {
+        XCTAssertEqual(PrepWordFloor("  one two\nthree  ", floor: 5).submitTitle, "3 of 5 words")
+        XCTAssertTrue(PrepWordFloor("one two", floor: 2).isMet)
+        XCTAssertEqual(PrepWordFloor("", floor: 0).submitTitle, "Submit")
     }
 
     func testUnknownDrillKeptAsUnknown() throws {
@@ -155,38 +168,17 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertEqual(result.nextIndex, 3)
     }
 
-    func testMapDecodesLevelsAndSkillStates() throws {
-        let map = try decode(PrepTrackMap.self, #"""
-        {"track": "dsa", "title": "DSA patterns", "summary": {"mastered": 0, "total": 18, "problems": 150, "due": 0},
-         "levels": [
-          {"title": "Start here", "locked": false, "skills": [{"id": "dsa.arrays_hashing", "title": "Arrays & Hashing", "state": "in_progress", "mastery": 0.4, "detail": "9 problems"}]},
-          {"title": "Level 2", "locked": true, "skills": [{"id": "dsa.stack", "title": "Stack", "state": "locked", "mastery": 0.0, "detail": "x"},
-                                                           {"id": "dsa.q", "title": "Q", "state": "brand_new", "mastery": 0.0}]}]}
-        """#)
-        XCTAssertEqual(map.summary.problems, 150)
-        XCTAssertEqual(map.levels.count, 2)
-        XCTAssertTrue(map.levels[1].locked)
-        XCTAssertEqual(map.levels[0].skills[0].state, .inProgress)
-        XCTAssertEqual(map.levels[0].skills[0].mastery, 0.4, accuracy: 0.001)
-        XCTAssertEqual(map.levels[1].skills.map(\.state), [.locked, .unknown])
-    }
-
     func testMissingFieldsDefault() throws {
         let home = try decode(PrepHome.self, "{}")
         XCTAssertEqual(home.streak.days, 0)
         XCTAssertEqual(home.run.reps, 0)
-        XCTAssertTrue(home.tracks.isEmpty)
-        XCTAssertTrue(home.needsWork.isEmpty)
+        XCTAssertNil(home.course)
 
         let run = try decode(PrepRun.self, #"{"reps": [{"index": 0, "drill": "primer", "item": {}}]}"#)
         XCTAssertEqual(run.date, "")
         XCTAssertEqual(run.reps.first?.item.id, "")
         XCTAssertEqual(run.reps.first?.item.hints, [])
         XCTAssertTrue(run.reps.first?.item.links.isEmpty ?? false)
-
-        let map = try decode(PrepTrackMap.self, #"{"levels": [{"skills": [{"id": "s"}]}]}"#)
-        XCTAssertEqual(map.levels.first?.skills.first?.state, .unknown)
-        XCTAssertEqual(map.levels.first?.locked, false)
     }
 
     // MARK: - Anthropic track

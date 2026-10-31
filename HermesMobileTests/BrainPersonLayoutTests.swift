@@ -189,7 +189,7 @@ final class BrainPersonLayoutTests: XCTestCase {
                                             BrainFact(label: "Birthday", value: "1990-01-20")])
         XCTAssertEqual(layout.chips, ["Birthday Jan 20", "Orbit Labs", "Rivermont High"])
         XCTAssertEqual(layout.aboutSections.map(\.title), ["Family", "Work", "School", "Likes"])
-        XCTAssertEqual(layout.aboutSections[1].items, ["Old job"])
+        XCTAssertEqual(layout.aboutSections[1].items, ["Old job", "Robotics"], "Industry that isn't a chip stays in Work")
         XCTAssertEqual(layout.aboutSections[2].items, ["Night classes"])
     }
 
@@ -214,6 +214,24 @@ final class BrainPersonLayoutTests: XCTestCase {
         XCTAssertEqual(layout.chips, [String(repeating: "y", count: 32)])
         XCTAssertEqual(layout.aboutSections.map(\.id), ["work"])
         XCTAssertEqual(layout.aboutSections[0].items, [long])
+    }
+
+    func testIndustryAsAChipIsNotRepeatedInAbout() {
+        let layout = layout(BrainPerson(profile: [BrainProfileSection(label: "Work", items: ["robotics"])]),
+                            facts: [BrainFact(label: "Industry", value: "Robotics")])
+        XCTAssertEqual(layout.chips, ["Robotics"])
+        XCTAssertEqual(layout.aboutSections.map(\.items), [["robotics"]])
+        let named = self.layout(BrainPerson(profile: [BrainProfileSection(label: "Company", items: ["Orbit Labs"]),
+                                                      BrainProfileSection(label: "Work", items: ["Robotics"])]),
+                                facts: [BrainFact(label: "Industry", value: "Robotics")])
+        XCTAssertEqual(named.aboutSections.map(\.items), [["Robotics"]], "Work already says it")
+    }
+
+    func testBirthdayChipReadsAYearlessBirthday() {
+        XCTAssertEqual(layout(BrainPerson(), facts: [BrainFact(label: "Birthday", value: "11-01")]).chips, ["Birthday Nov 1"])
+        XCTAssertEqual(layout(BrainPerson(), facts: [BrainFact(label: "Birthday", value: "--02-29")]).chips, ["Birthday Feb 29"])
+        XCTAssertNil(BrainPersonLayout.monthDay("2026-02-30"), "an impossible date is not rolled into March")
+        XCTAssertNil(BrainPersonLayout.monthDay("13-01"))
     }
 
     func testBirthdayChipKeepsNonISOValue() {

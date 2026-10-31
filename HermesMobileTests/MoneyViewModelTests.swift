@@ -123,6 +123,33 @@ final class MoneyViewModelTests: XCTestCase {
         XCTAssertEqual(model.change, MoneyChange.between(model.points))
     }
 
+    func testRangesCountBackFromTheSnapshotNotThePhone() async throws {
+        // The phone is three days past the snapshot: the week is still the snapshot's week.
+        let later = Calendar.current.date(from: DateComponents(year: 2026, month: 10, day: 15, hour: 12))!
+        let store = DailyDeckStore(defaults: defaults)
+        store.setWorkspace("/vault", for: server)
+        let model = MoneyViewModel(server: server, client: try MockMoneyClient.withFixtures(), store: store, now: { later })
+        await model.load()
+        XCTAssertEqual(model.points.first?.d, model.snapshot?.week?.start)
+        XCTAssertEqual(model.points.last?.d, model.snapshot?.week?.end)
+    }
+
+    func testTrustWarningForAMissedRunAndBanksNotSyncing() async throws {
+        let fresh = makeModel(try MockMoneyClient.withFixtures())
+        await fresh.load()
+        XCTAssertNil(fresh.trustWarning)
+
+        let client = try MockMoneyClient.withFixtures()
+        client.files[MoneyPaths.snapshot] = client.files[MoneyPaths.snapshot]!
+            .replacingOccurrences(of: #""holdings_missing""#, with: #""missing": 2, "holdings_missing""#)
+        let later = Calendar.current.date(from: DateComponents(year: 2026, month: 10, day: 15, hour: 12))!
+        let store = DailyDeckStore(defaults: defaults)
+        store.setWorkspace("/vault", for: server)
+        let stale = MoneyViewModel(server: server, client: client, store: store, now: { later })
+        await stale.load()
+        XCTAssertEqual(stale.trustWarning, "Not updated since Oct 12 · 2 accounts not syncing")
+    }
+
     func testChangingRangeClearsScrub() async throws {
         let model = makeModel(try MockMoneyClient.withFixtures())
         await model.load()

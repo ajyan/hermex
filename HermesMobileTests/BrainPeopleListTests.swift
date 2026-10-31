@@ -51,6 +51,15 @@ final class BrainPeopleListTests: XCTestCase {
         XCTAssertNil(wiki.relationshipType)
     }
 
+    func testWikiItemDecodesItsDateLabelAndRoundTrips() throws {
+        let json = #"{"module": "wiki", "id": "w.md", "date": "2026-10-01", "date_label": "updated"}"#
+        let item = try snakeDecoder().decode(BrainItem.self, from: Data(json.utf8))
+        XCTAssertEqual(item.dateLabel, "updated")
+        XCTAssertEqual(try JSONDecoder().decode(BrainItem.self, from: JSONEncoder().encode(item)), item)
+        let older = try snakeDecoder().decode(BrainItem.self, from: Data(#"{"module": "wiki", "id": "w.md"}"#.utf8))
+        XCTAssertEqual(older.dateLabel, "", "an older server sends no label")
+    }
+
     // MARK: Sections
 
     func testElapsedBuckets() {
@@ -85,6 +94,29 @@ final class BrainPeopleListTests: XCTestCase {
         XCTAssertEqual(row.accessibilityLabel, "Ann, Dinner, seen 4 months ago, due for a catch-up")
     }
 
+    func testDueRowLeadsWithTheirUsualGap() {
+        let home = BrainPeopleHome(
+            due: [BrainPersonRow(id: "a", title: "Ann", subtitle: "Friend", lastSeen: "2026-06-14", headline: "Dinner",
+                                 cadenceDays: 21),
+                  BrainPersonRow(id: "b", title: "Bo", subtitle: "", lastSeen: "2026-06-14", cadenceDays: 90)],
+            recent: [BrainPersonRow(id: "c", title: "Cy", lastSeen: "2026-10-08", headline: "Lunch", cadenceDays: 21)])
+        let sections = BrainPeopleLayout.sections(home, today: today, calendar: calendar)
+        XCTAssertEqual(sections[0].rows.map(\.subtitle), ["Every 3 wk · Dinner", "Every 3 mo"])
+        XCTAssertEqual(sections[0].rows[0].accessibilityLabel,
+                       "Ann, Dinner, seen 4 months ago, due for a catch-up, usually every 3 weeks")
+        XCTAssertEqual(sections[1].rows[0].subtitle, "Lunch", "only due rows explain themselves")
+    }
+
+    func testCadenceBuckets() {
+        XCTAssertEqual(BrainPeopleLayout.cadence(days: 1).shown, "Every day")
+        XCTAssertEqual(BrainPeopleLayout.cadence(days: 5).shown, "Every 5 days")
+        XCTAssertEqual(BrainPeopleLayout.cadence(days: 21).shown, "Every 3 wk")
+        XCTAssertEqual(BrainPeopleLayout.cadence(days: 30).spoken, "every 4 weeks")
+        XCTAssertEqual(BrainPeopleLayout.cadence(days: 60).spoken, "every 2 months")
+        XCTAssertEqual(BrainPeopleLayout.cadence(days: 183).shown, "Every 6 mo")
+        XCTAssertEqual(BrainPeopleLayout.cadence(days: 800).spoken, "every 2 years")
+    }
+
     func testRecentRowFallsBackToRelationshipWithoutAHeadline() {
         let home = BrainPeopleHome(recent: [BrainPersonRow(id: "b", title: "Bo", subtitle: "Colleague", lastSeen: "2026-10-08")])
         let row = BrainPeopleLayout.sections(home, today: today, calendar: calendar)[0].rows[0]
@@ -100,9 +132,11 @@ final class BrainPeopleListTests: XCTestCase {
             BrainPersonRow(id: "b", title: "Bo", nextBirthday: "2026-10-15"),
             BrainPersonRow(id: "c", title: "Cy", nextBirthday: "2026-10-25"),
             BrainPersonRow(id: "d", title: "Di", nextBirthday: "soon"),
+            BrainPersonRow(id: "e", title: "Ed", nextBirthday: "2026-10-13"),
         ])
         let rows = BrainPeopleLayout.sections(home, today: today, calendar: calendar)[0].rows
-        XCTAssertEqual(rows.map(\.trailing), ["today", "tomorrow", "in 11d", ""])
+        // A birthday that has passed (a saved copy, or the app left open overnight) and an unreadable one are dropped.
+        XCTAssertEqual(rows.map(\.trailing), ["today", "tomorrow", "in 11d"])
         XCTAssertEqual(rows[2].accessibilityLabel, "Cy, birthday in 11 days")
         XCTAssertFalse(rows.contains(where: \.isDue))
     }
@@ -151,6 +185,22 @@ final class BrainPeopleListTests: XCTestCase {
         let offline = BrainPeopleHomeViewModel(client: client, cache: cache, now: { self.today })
         await offline.load()
         XCTAssertEqual(offline.sections, first.sections)
+    }
+
+    func testAFailedReloadRedoesTheDayMathOnTheSavedCopy() async throws {
+        let cache = try makeCache()
+        let client = FakeBrainClient()
+        client.peopleHomeResult = .success(BrainPeopleHome(birthdays: [BrainPersonRow(id: "a", title: "Ann", nextBirthday: "2026-10-15")]))
+        var now = today
+        let viewModel = BrainPeopleHomeViewModel(client: client, cache: cache, now: { now })
+        await viewModel.load()
+        XCTAssertEqual(viewModel.sections.first?.rows.map(\.trailing), ["tomorrow"])
+
+        // Back two days later with no connection: the birthday has passed, so its section goes.
+        now = calendar.date(byAdding: .day, value: 2, to: today)!
+        client.peopleHomeResult = .failure(URLError(.notConnectedToInternet))
+        await viewModel.load()
+        XCTAssertTrue(viewModel.sections.isEmpty)
     }
 
     func testViewModelOnAnOlderServerShowsNoSections() async {

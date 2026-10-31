@@ -11,7 +11,6 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
 
     var homeResults: [Result<PrepHome, Error>] = []
     var todayResults: [Result<PrepRun, Error>] = []
-    var mapResults: [Result<PrepTrackMap, Error>] = []
     var attemptResults: [Result<PrepAttemptResult, Error>] = []
     var gapsResults: [Result<[PrepGapSummary], Error>] = []
     var gapResults: [Result<PrepGapDetail, Error>] = []
@@ -62,7 +61,6 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
         let name = run == .daily ? "today" : "today:\(run.rawValue)" + (unit.map { ":\($0)" } ?? "")
         return try next(name, &todayResults)
     }
-    func map(track: String) async throws -> PrepTrackMap { try next("map:\(track)", &mapResults) }
 
     func attempt(_ r: PrepAttemptRequest) async throws -> PrepAttemptResult {
         lock.withLock { _attempts.append(r) }
@@ -161,53 +159,6 @@ private final class StreamingTrace {
 
 @MainActor
 final class PrepViewModelsTests: XCTestCase {
-    func testCodeExpandedHeightHugsContentUpToCap() {
-        XCTAssertEqual(PrepCode.expandedHeight(natural: 80, cap: 300), 80)
-        XCTAssertEqual(PrepCode.expandedHeight(natural: 500, cap: 300), 300)
-    }
-
-    func testCodeCanExpandNeedsExampleOrLongSummary() {
-        XCTAssertFalse(PrepCode.canExpand(summary: "Short", example: ""))
-        XCTAssertFalse(PrepCode.canExpand(summary: String(repeating: "a", count: 140), example: ""))
-        XCTAssertTrue(PrepCode.canExpand(summary: String(repeating: "a", count: 141), example: ""))
-        XCTAssertTrue(PrepCode.canExpand(summary: "", example: "x = 1"))
-    }
-
-    func testCodeClampedIndentCapsAtHalfWidth() {
-        XCTAssertEqual(PrepCode.clampedIndent(20, width: 300), 20)
-        XCTAssertEqual(PrepCode.clampedIndent(400, width: 300), 150)
-    }
-
-    func testCodeSplitCountsLeadingSpaces() {
-        let parts = PrepCode.split("    return x")
-        XCTAssertEqual(parts.indent, 4)
-        XCTAssertEqual(parts.text, "return x")
-    }
-
-    func testCodeSplitCountsTabsAsFourSpaces() {
-        let parts = PrepCode.split("\t  if x:")
-        XCTAssertEqual(parts.indent, 6)
-        XCTAssertEqual(parts.text, "if x:")
-    }
-
-    func testCodeSplitKeepsInnerSpacesAndTrailingText() {
-        let parts = PrepCode.split("a  =  b ")
-        XCTAssertEqual(parts.indent, 0)
-        XCTAssertEqual(parts.text, "a  =  b ")
-    }
-
-    func testCodeSplitOfBlankLine() {
-        let parts = PrepCode.split("   ")
-        XCTAssertEqual(parts.indent, 3)
-        XCTAssertEqual(parts.text, "")
-    }
-
-    func testCodeWordsRoundTrip() {
-        let text = "for i in  range(n):"
-        XCTAssertEqual(PrepCode.words(text).joined(), text)
-        XCTAssertEqual(PrepCode.words("a b"), ["a ", "b"])
-    }
-
     private func decode<T: Decodable>(_ type: T.Type, _ json: String) -> T {
         try! PrepDecoding.decode(type, from: Data(json.utf8))
     }
@@ -222,11 +173,6 @@ final class PrepViewModelsTests: XCTestCase {
 
     private func result(next: Int, streak: Bool = true) -> PrepAttemptResult {
         decode(PrepAttemptResult.self, #"{"verdict": "correct", "credit": 1.0, "next_index": \#(next)\#(streak ? #", "streak": {"days": 3, "freezes": 1}"# : "")}"#)
-    }
-
-    private func map(_ mastery: [(String, Double)]) -> PrepTrackMap {
-        let skills = mastery.map { #"{"id": "\#($0.0)", "title": "\#($0.0)", "state": "in_progress", "mastery": \#($0.1)}"# }
-        return decode(PrepTrackMap.self, #"{"track": "dsa", "title": "DSA", "levels": [{"title": "L1", "skills": [\#(skills.joined(separator: ","))]}]}"#)
     }
 
     private func http(_ code: Int) -> APIError { .http(statusCode: code, body: "") }
@@ -274,7 +220,6 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(client.attempts.first?.drill, .lesson)
         XCTAssertEqual(client.attempts.first?.run, .daily)
         XCTAssertNil(client.attempts.first?.unit)
-        XCTAssertFalse(client.log.contains { $0.hasPrefix("map") }, "course runs skip the skill map")
     }
 
     func testLessonXPTicks() async {
@@ -426,6 +371,17 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(vm.course?.units.count, 2)
         XCTAssertEqual(vm.course?.units.first?.lessons.first?.state, .next)
         XCTAssertTrue(client.log.contains("course"))
+    }
+
+    func testAFailedHomeRefreshKeepsTheLoadedHome() async {
+        let client = FakePrepClient()
+        client.homeResults = [.success(decode(PrepHome.self, #"{"streak": {"days": 3, "freezes": 0}}"#)),
+                              .failure(http(500))]
+        let vm = PrepHomeViewModel(client: client)
+        await vm.load()
+        await vm.load()
+        guard case let .loaded(home) = vm.state else { return XCTFail("state \(vm.state)") }
+        XCTAssertEqual(home.streak.days, 3)
     }
 
     func testHomeWithoutCourseSkipsCourseCall() async {
@@ -685,6 +641,11 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(PrepCopy.storyMarkLabel(.probes, nil), "Probes: no rep yet")
     }
 
+    func testLaterUnitsCollapseToOneLine() {
+        XCTAssertEqual(PrepUnitPath.moreUnitsLine(1), "1 more unit")
+        XCTAssertEqual(PrepUnitPath.moreUnitsLine(4), "4 more units")
+    }
+
     func testPathCopy() {
         XCTAssertEqual(PrepCopy.unitHeader(index: 1, title: "Prompt engineering"), "Unit 2 · Prompt engineering")
         XCTAssertEqual(PrepCopy.todayLine(days: 6, xp: 340), "6-day streak · 340 XP")
@@ -770,6 +731,32 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertTrue(vm.inDialogue)
         XCTAssertNil(vm.tutorStreaming)
         XCTAssertEqual(vm.tutorError, "The tutor couldn't reply. Try again.", "never a blank tutor screen")
+    }
+
+    func testTryAgainAfterA409AsksForTheTurnInsteadOfResending() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([questionRep(0)]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.success(dialogueResult("miss", attempt: "a1", hit: [], missed: ["r1", "r2"], followups: 0, open: true))]
+        let asked = [("tutor", "Where is the loss?")]
+        client.dialogueScripts = [
+            [.turn("Where is the loss?"),
+             .done(dialogueResult("miss", attempt: "a2", hit: [], missed: ["r1", "r2"], followups: 0, open: true, turns: asked))],
+            [.failed(status: 409, message: "the tutor hasn't asked anything yet")],
+            [],
+        ]
+        let vm = makeVM(client)
+        await vm.load()
+        vm.beginRecall()
+        vm.recallDraft = "Not sure"
+        await vm.submitRecall()
+        vm.tutorDraft = "Ranking"
+        await vm.sendTutorReply()
+        XCTAssertNil(vm.pendingReply, "the server already has the reply")
+        XCTAssertEqual(vm.tutorError, "The tutor couldn't reply. Try again.")
+        await vm.retryTutor()
+        XCTAssertEqual(client.dialogueCalls.count, 3)
+        XCTAssertNil(client.dialogueCalls.last?.1, "Try again asks for the turn, never resends the reply")
     }
 
     func testAReplyThatHitsEverythingEndsTheDialogue() async {
@@ -911,6 +898,24 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertTrue(vm.canSubmitRecall)
     }
 
+    func testRecallSubmitWaitsForTheWordFloor() async {
+        let client = FakePrepClient()
+        let rep = recallLessonRep(0, drill: "recall", block: "review").replacingOccurrences(
+            of: #""block": "review","#, with: #""block": "review", "min_words": 5,"#)
+        client.todayResults = [.success(courseRun([rep]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        let vm = makeVM(client)
+        await vm.load()
+        vm.recallDraft = "Tokens are word pieces"
+        XCTAssertFalse(vm.canSubmitRecall)
+        XCTAssertEqual(vm.answerFloor.submitTitle, "4 of 5 words")
+        await vm.submitRecall()
+        XCTAssertTrue(client.attempts.isEmpty)
+        vm.recallDraft = "Tokens are word pieces, roughly"
+        XCTAssertTrue(vm.canSubmitRecall)
+        XCTAssertEqual(vm.answerFloor.submitTitle, "Submit")
+    }
+
     func testDontKnowPostsWithoutText() async {
         let client = FakePrepClient()
         client.todayResults = [.success(courseRun([recallLessonRep(0, drill: "recall", block: "review")]))]
@@ -1039,31 +1044,18 @@ final class PrepViewModelsTests: XCTestCase {
         if case .failed = vm.state {} else { XCTFail("expected failed, got \(vm.state)") }
     }
 
-    func testTrackLoadsAndMaps404() async {
-        let client = FakePrepClient()
-        client.mapResults = [.success(map([("a", 0.1)]))]
-        let vm = PrepTrackViewModel(track: "dsa", client: client)
-        await vm.load()
-        XCTAssertEqual(client.log, ["map:dsa"])
-        if case .loaded = vm.state {} else { XCTFail("expected loaded") }
-        client.mapResults = [.failure(http(404))]
-        await vm.load()
-        XCTAssertEqual(vm.state, .unavailable)
-    }
-
     // MARK: Run
 
     func testRunStartsAtServerIndex() async {
         let client = FakePrepClient()
         // Stable indices have gaps: the server's index 4 is the first unanswered rep.
         client.todayResults = [.success(run(index: 4, reps: [rep(0), rep(4), rep(7)]))]
-        client.mapResults = [.success(map([("a", 0.1)]))]
         let vm = makeVM(client)
         await vm.load()
         guard case let .rep(rep, index) = vm.phase else { return XCTFail("phase \(vm.phase)") }
         XCTAssertEqual(rep.index, 4)
         XCTAssertEqual(index, 4)
-        XCTAssertEqual(client.log, ["today", "map:dsa"])
+        XCTAssertEqual(client.log, ["today"])
     }
 
     func testRun404IsUnavailable() async {
@@ -1074,18 +1066,13 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(vm.phase, .unavailable)
     }
 
-    func testChoosePostsElapsedAndHints() async {
+    func testChoosePostsElapsed() async {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 2, reps: [rep(2)]))]
-        client.mapResults = [.success(map([]))]
         client.attemptResults = [.success(result(next: 3))]
         var t = Date(timeIntervalSince1970: 1_000)
         let vm = makeVM(client, clock: { t })
         await vm.load()
-        vm.showHint()
-        vm.showHint()
-        vm.showHint() // capped at hints.count
-        XCTAssertEqual(vm.hintsShown, 2)
         t = t.addingTimeInterval(8.25)
         await vm.choose(.choice("dsa.stack"))
         let sent = try! XCTUnwrap(client.attempts.first)
@@ -1095,14 +1082,12 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(sent.date, "2026-10-09")
         XCTAssertEqual(sent.answer, .choice("dsa.stack"))
         XCTAssertEqual(sent.elapsedMS, 8250)
-        XCTAssertEqual(sent.hintsUsed, 2)
         if case .result = vm.phase {} else { XCTFail("phase \(vm.phase)") }
     }
 
     func testContinueFollowsNextIndexAndFinishes() async {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [rep(0), rep(3), rep(5)]))]
-        client.mapResults = [.success(map([("a", 0.1)]))]
         client.attemptResults = [.success(result(next: 1)), .success(result(next: 4)), .success(result(next: 6))]
         let vm = makeVM(client)
         await vm.load()
@@ -1116,14 +1101,13 @@ final class PrepViewModelsTests: XCTestCase {
         await vm.continue()
         guard case let .finished(summary) = vm.phase else { return XCTFail("phase \(vm.phase)") }
         XCTAssertEqual(summary.streak.days, 3)
-        XCTAssertEqual(summary.moved, [])
+        XCTAssertFalse(summary.isCourse)
         XCTAssertEqual(client.attempts.map(\.index), [0, 3, 5])
     }
 
     func testSubmitFailureKeepsAnswerAndDoesNotAdvance() async {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "complexity")]))]
-        client.mapResults = [.success(map([]))]
         client.attemptResults = [.failure(URLError(.notConnectedToInternet)), .success(result(next: 1))]
         let vm = makeVM(client)
         await vm.load()
@@ -1141,7 +1125,6 @@ final class PrepViewModelsTests: XCTestCase {
     func testAdvanceSkipsDroppedRepTheServerPointsAt() async {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [rep(0), rep(2)]))]
-        client.mapResults = [.success(map([]))]
         client.attemptResults = [.success(result(next: 1))]
         let vm = makeVM(client)
         await vm.load()
@@ -1153,7 +1136,6 @@ final class PrepViewModelsTests: XCTestCase {
     func testAdvanceNeverRepeatsTheAnsweredRep() async {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [rep(0), rep(2)]))]
-        client.mapResults = [.success(map([]))]
         // A server that points back at the rep just answered.
         client.attemptResults = [.success(result(next: 0))]
         let vm = makeVM(client)
@@ -1169,7 +1151,6 @@ final class PrepViewModelsTests: XCTestCase {
             .success(run(index: 0, reps: [rep(0)], date: "2026-10-08")),
             .success(run(index: 2, reps: [rep(0), rep(2)], date: "2026-10-09")),
         ]
-        client.mapResults = [.success(map([]))]
         client.attemptResults = [.failure(http(400))]
         let vm = makeVM(client)
         await vm.load()
@@ -1178,10 +1159,23 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(currentRep(vm)?.index, 2)
     }
 
+    func testABadAnswerKeepsTheDraftInsteadOfReloading() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([recallLessonRep(0, drill: "recall", block: "review")]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.failure(APIError.http(statusCode: 400, body: #"{"error": "bad answer"}"#))]
+        let vm = makeVM(client)
+        await vm.load()
+        vm.recallDraft = "my answer"
+        await vm.submitRecall()
+        XCTAssertEqual(vm.recallDraft, "my answer")
+        XCTAssertEqual(vm.submitError, "That answer couldn't be saved. Shorten it and try again.")
+        XCTAssertEqual(client.log.filter { $0 == "today" }.count, 1, "no reload")
+    }
+
     func testStaleSubmitErrorDoesNotLandOnReloadedRun() async {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [rep(0)]))]
-        client.mapResults = [.success(map([]))]
         client.attemptResults = [.failure(http(500))]
         let (started, startedCont) = AsyncStream<Void>.makeStream()
         let (release, releaseCont) = AsyncStream<Void>.makeStream()
@@ -1201,15 +1195,13 @@ final class PrepViewModelsTests: XCTestCase {
         let client = FakePrepClient()
         client.homeResults = [.failure(http(401))]
         client.todayResults = [.failure(http(401))]
-        client.mapResults = [.failure(http(401))]
         var seen = 0
         let handler: (Error) -> Void = { error in
             if case .http(401, _)? = error as? APIError { seen += 1 }
         }
         await PrepHomeViewModel(client: client, onAPIError: handler).load()
-        await PrepTrackViewModel(track: "dsa", client: client, onAPIError: handler).load()
         await PrepRunViewModel(client: client, onAPIError: handler).load()
-        XCTAssertEqual(seen, 3)
+        XCTAssertEqual(seen, 2)
     }
 
     func testChoiceMatchIgnoresCaseAndWhitespace() {
@@ -1221,7 +1213,6 @@ final class PrepViewModelsTests: XCTestCase {
     func testDoubleSubmitPostsOnce() async {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [rep(0)]))]
-        client.mapResults = [.success(map([]))]
         client.attemptResults = [.success(result(next: 1))]
         let (started, startedCont) = AsyncStream<Void>.makeStream()
         let (release, releaseCont) = AsyncStream<Void>.makeStream()
@@ -1244,7 +1235,6 @@ final class PrepViewModelsTests: XCTestCase {
             .success(run(index: 0, reps: [rep(0)], date: "2026-10-08")),
             .success(run(index: 2, reps: [rep(0), rep(2)], date: "2026-10-09")),
         ]
-        client.mapResults = [.success(map([]))]
         client.attemptResults = [.failure(http(409))]
         let vm = makeVM(client)
         await vm.load()
@@ -1254,74 +1244,18 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(currentRep(vm)?.index, 2)
     }
 
-    func testFinishedComputesMovedSkills() async {
+    func testFinishedOutsideTheCourseShowsTheStreak() async {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [rep(0)]))]
-        client.mapResults = [
-            .success(map([("a", 0.1), ("b", 0.5), ("c", 0.9)])),
-            .success(map([("a", 0.1), ("b", 0.7), ("c", 1.0)])),
-        ]
         client.attemptResults = [.success(result(next: 1))]
         let vm = makeVM(client)
         await vm.load()
         await vm.choose(.choice("a"))
         await vm.continue()
         guard case let .finished(summary) = vm.phase else { return XCTFail("phase \(vm.phase)") }
-        XCTAssertEqual(summary.moved.map(\.id), ["b", "c"])
         XCTAssertFalse(summary.isCourse)
-        XCTAssertEqual(client.log, ["today", "map:dsa", "attempt", "map:dsa"])
-    }
-
-    func testFinishedMovedEmptyWhenMapFetchFails() async {
-        let client = FakePrepClient()
-        client.todayResults = [.success(run(index: 0, reps: [rep(0)]))]
-        client.mapResults = [.success(map([("a", 0.1)])), .failure(http(500))]
-        client.attemptResults = [.success(result(next: 1))]
-        let vm = makeVM(client)
-        await vm.load()
-        await vm.choose(.choice("a"))
-        await vm.continue()
-        guard case let .finished(summary) = vm.phase else { return XCTFail("phase \(vm.phase)") }
-        XCTAssertEqual(summary.moved, [])
-    }
-
-    func testPrimerAcknowledgePostsSeen() async {
-        let client = FakePrepClient()
-        client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "primer")]))]
-        client.mapResults = [.success(map([]))]
-        client.attemptResults = [.success(result(next: 1))]
-        let vm = makeVM(client)
-        await vm.load()
-        await vm.acknowledgePrimer()
-        XCTAssertEqual(client.attempts.first?.answer, .choice("seen"))
-        XCTAssertEqual(client.attempts.first?.hintsUsed, 0)
-        XCTAssertEqual(client.attempts.first?.drill, .primer)
-    }
-
-    func testPrimerAcknowledgeAdvancesWithoutResult() async {
-        let client = FakePrepClient()
-        client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "primer"), rep(1)]))]
-        client.mapResults = [.success(map([]))]
-        client.attemptResults = [.success(result(next: 1))]
-        let vm = makeVM(client)
-        await vm.load()
-        await vm.acknowledgePrimer()
-        // Straight to the next rep: no result screen for a primer.
-        XCTAssertEqual(currentRep(vm)?.index, 1)
-        XCTAssertFalse(vm.isSubmitting)
-        XCTAssertNil(vm.submitError)
-
-        // A failed primer post keeps the primer up with the inline error.
-        let failing = FakePrepClient()
-        failing.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "primer"), rep(1)]))]
-        failing.mapResults = [.success(map([]))]
-        failing.attemptResults = [.failure(http(500))]
-        let failingVM = makeVM(failing)
-        await failingVM.load()
-        await failingVM.acknowledgePrimer()
-        XCTAssertEqual(currentRep(failingVM)?.index, 0)
-        XCTAssertEqual(failingVM.submitError, "Couldn't save. Try again.")
-        XCTAssertFalse(failingVM.isSubmitting)
+        XCTAssertEqual(summary.streak.days, 3)
+        XCTAssertEqual(client.log, ["today", "attempt"])
     }
 
     // MARK: Cancellation, conflict, re-entry
@@ -1329,14 +1263,10 @@ final class PrepViewModelsTests: XCTestCase {
     func testCancelledLoadLeavesStateUntouched() async {
         let client = FakePrepClient()
         client.homeResults = [.failure(CancellationError())]
-        client.mapResults = [.failure(URLError(.cancelled))]
         client.todayResults = [.failure(CancellationError())]
         let home = PrepHomeViewModel(client: client)
         await home.load()
         XCTAssertEqual(home.state, .loading)
-        let track = PrepTrackViewModel(track: "dsa", client: client)
-        await track.load()
-        XCTAssertEqual(track.state, .loading)
         let vm = makeVM(client)
         await vm.load()
         XCTAssertEqual(vm.phase, .loading)
@@ -1345,7 +1275,6 @@ final class PrepViewModelsTests: XCTestCase {
     func testCancelledSubmitSetsNoError() async {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [rep(0)]))]
-        client.mapResults = [.success(map([]))]
         client.attemptResults = [.failure(CancellationError())]
         let vm = makeVM(client)
         await vm.load()
@@ -1358,7 +1287,6 @@ final class PrepViewModelsTests: XCTestCase {
     func testConflictThenTodayFailureFails() async {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [rep(0)])), .failure(http(500))]
-        client.mapResults = [.success(map([]))]
         client.attemptResults = [.failure(http(409))]
         let vm = makeVM(client)
         await vm.load()
@@ -1370,7 +1298,6 @@ final class PrepViewModelsTests: XCTestCase {
     func testContinueIsNotReentrant() async {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [rep(0)]))]
-        client.mapResults = [.success(map([("a", 0.1)]))]
         client.attemptResults = [.success(result(next: 1, streak: false))]
         client.homeResults = [.success(decode(PrepHome.self, #"{"streak": {"days": 2, "freezes": 0}, "run": {}, "tracks": []}"#))]
         let vm = makeVM(client)
@@ -1390,19 +1317,18 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(summary.streak.days, 2)
     }
 
-    // MARK: New drills
+    // MARK: Open answers
 
-    func testApproachSubmitShowsGradingThenResult() async {
+    func testOpenAnswerSubmitShowsGradingThenResult() async {
         let client = FakePrepClient()
-        client.todayResults = [.success(run(index: 0, reps: [rep(0), rep(1)]))]
-        client.mapResults = [.success(map([]))]
+        client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "judgment"), rep(1)]))]
         client.attemptResults = [.success(result(next: 1))]
         let (started, startedCont) = AsyncStream<Void>.makeStream()
         let (release, releaseCont) = AsyncStream<Void>.makeStream()
         client.gate = (startedCont, release)
         let vm = makeVM(client)
         await vm.load()
-        let submit = Task { await vm.submitApproach("Hash map of seen values") }
+        let submit = Task { await vm.submitJudgment("Hash map of seen values") }
         for await _ in started { break }
         // Grading: the rep stays up and submitting is on.
         XCTAssertTrue(vm.isSubmitting)
@@ -1413,18 +1339,17 @@ final class PrepViewModelsTests: XCTestCase {
         guard case let .result(rep, _, _) = vm.phase else { return XCTFail("phase \(vm.phase)") }
         XCTAssertEqual(rep.index, 0)
         XCTAssertEqual(client.attempts.first?.answer, .choice("Hash map of seen values"))
-        XCTAssertEqual(client.attempts.first?.drill, .approach)
+        XCTAssertEqual(client.attempts.first?.drill, .judgment)
     }
 
     func testUngradedResultShown() async {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [rep(0)]))]
-        client.mapResults = [.success(map([]))]
         client.attemptResults = [.success(decode(PrepAttemptResult.self,
             #"{"verdict": "ungraded", "next_index": 1, "grade": {"verdict": "ungraded"}}"#))]
         let vm = makeVM(client)
         await vm.load()
-        await vm.submitApproach("Two pointers")
+        await vm.submitJudgment("Two pointers")
         guard case let .result(_, result, _) = vm.phase else { return XCTFail("phase \(vm.phase)") }
         XCTAssertTrue(result.isUngraded)
         XCTAssertNil(vm.submitError)
@@ -1433,11 +1358,10 @@ final class PrepViewModelsTests: XCTestCase {
     func testGradeFailureKeepsRepWithSubmitError() async {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [rep(0)]))]
-        client.mapResults = [.success(map([]))]
         client.attemptResults = [.failure(URLError(.timedOut))]
         let vm = makeVM(client)
         await vm.load()
-        await vm.submitApproach("Binary search on the answer")
+        await vm.submitJudgment("Binary search on the answer")
         XCTAssertEqual(currentRep(vm)?.index, 0)
         XCTAssertEqual(vm.submitError, "Couldn't save. Try again.")
         XCTAssertFalse(vm.isSubmitting)
@@ -1446,7 +1370,6 @@ final class PrepViewModelsTests: XCTestCase {
     func testLateGradeAfterLeaveIsIgnored() async {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [rep(0), rep(1)]))]
-        client.mapResults = [.success(map([]))]
         client.attemptResults = [.success(result(next: 1))]
         let (started, startedCont) = AsyncStream<Void>.makeStream()
         let (release, releaseCont) = AsyncStream<Void>.makeStream()
@@ -1454,7 +1377,7 @@ final class PrepViewModelsTests: XCTestCase {
         let vm = makeVM(client)
         await vm.load()
         let before = vm.phase
-        let submit = Task { await vm.submitApproach("Stack of indices") }
+        let submit = Task { await vm.submitJudgment("Stack of indices") }
         for await _ in started { break }
         vm.leave()
         releaseCont.yield()
@@ -1467,7 +1390,6 @@ final class PrepViewModelsTests: XCTestCase {
     func testSkipUnknownAdvancesWithoutPost() async {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "mock"), rep(1)]))]
-        client.mapResults = [.success(map([]))]
         let vm = makeVM(client)
         await vm.load()
         XCTAssertEqual(currentRep(vm)?.drill, .unknown)
@@ -1477,24 +1399,20 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertFalse(client.log.contains("attempt"))
     }
 
-    func testBugFixAnswerPosted() async throws {
+    func testRetiredDrillFromAnOldPlanIsSkippedWithoutPost() async {
         let client = FakePrepClient()
-        client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "spot_bug")]))]
-        client.mapResults = [.success(map([]))]
-        client.attemptResults = [.success(result(next: 1))]
+        client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "spot_bug"), rep(1, drill: "judgment")]))]
         let vm = makeVM(client)
         await vm.load()
-        await vm.submitBugFix(line: 2, fix: "while lo <= hi:")
-        let sent = try XCTUnwrap(client.attempts.first)
-        XCTAssertEqual(sent.drill, .spotBug)
-        XCTAssertEqual(sent.answer, .bugFix(line: 2, fix: "while lo <= hi:"))
-        if case .result = vm.phase {} else { XCTFail("phase \(vm.phase)") }
+        XCTAssertEqual(currentRep(vm)?.drill, .spotBug)
+        await vm.skip()
+        XCTAssertEqual(currentRep(vm)?.index, 1)
+        XCTAssertTrue(client.attempts.isEmpty)
     }
 
     func testShownAtResetsForEachRepAndTimesTheAnswer() async {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [rep(0), rep(1)]))]
-        client.mapResults = [.success(map([]))]
         client.attemptResults = [.success(result(next: 1))]
         var t = Date(timeIntervalSince1970: 1_000)
         let vm = makeVM(client, clock: { t })
@@ -1502,21 +1420,11 @@ final class PrepViewModelsTests: XCTestCase {
         await vm.load()
         XCTAssertEqual(vm.shownAt, Date(timeIntervalSince1970: 1_005), "the clock starts when the rep is shown")
         t = t.addingTimeInterval(42)
-        await vm.submitApproach("Monotonic stack")
+        await vm.submitJudgment("Monotonic stack")
         XCTAssertEqual(client.attempts.first?.elapsedMS, 42_000)
         t = t.addingTimeInterval(3)
         await vm.continue()
         XCTAssertEqual(vm.shownAt, Date(timeIntervalSince1970: 1_050))
-    }
-
-    func testApproachClockCountsDownThenOver() {
-        XCTAssertEqual(PrepCopy.approachClock(elapsed: 0).text, "1:30")
-        XCTAssertEqual(PrepCopy.approachClock(elapsed: 31.4).text, "0:59")
-        XCTAssertFalse(PrepCopy.approachClock(elapsed: 90).isOver)
-        XCTAssertEqual(PrepCopy.approachClock(elapsed: 90).text, "0:00")
-        XCTAssertTrue(PrepCopy.approachClock(elapsed: 95).isOver)
-        XCTAssertEqual(PrepCopy.approachClock(elapsed: 95).text, "+0:05")
-        XCTAssertEqual(PrepCopy.approachClock(elapsed: 161).text, "+1:11")
     }
 
     func testApproachDraftIsCappedAtTheServerLimit() {
@@ -1529,11 +1437,6 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(PrepCopy.cappedApproach(flags).unicodeScalars.count, 4000)
         XCTAssertFalse(PrepCopy.isAtApproachLimit("short"))
         XCTAssertTrue(PrepCopy.isAtApproachLimit(PrepCopy.cappedApproach(long)))
-    }
-
-    func testRubricTitle() {
-        XCTAssertEqual(PrepCopy.rubricTitle("edge_cases"), "Edge cases")
-        XCTAssertEqual(PrepCopy.rubricTitle("pattern"), "Pattern")
     }
 
     // MARK: - PrepCopy
@@ -1550,12 +1453,6 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(PrepCopy.runAction(reps: 14, remaining: 14), .start)
         XCTAssertEqual(PrepCopy.runAction(reps: 14, remaining: 3), .resume)
         XCTAssertEqual(PrepCopy.runAction(reps: 14, remaining: 0), .done)
-    }
-
-    func testRunSubtitleRoundsMinutesAndDropsEmptyFocus() {
-        XCTAssertEqual(PrepCopy.runSubtitle(minutes: 31.6, reps: 14, focus: ["Sliding window", "Stack"]),
-                       "32 min · 14 reps · Sliding window, Stack")
-        XCTAssertEqual(PrepCopy.runSubtitle(minutes: 30, reps: 12, focus: []), "30 min · 12 reps")
     }
 
     func testBlockTitles() {
@@ -1589,11 +1486,6 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(PrepCopy.feedbackParts("It's O(n log n)").lead, "It's O(n log n)")
     }
 
-    func testSkillLabel() {
-        XCTAssertEqual(PrepCopy.skillLabel(title: "Sliding Window", state: .weak, detail: "Mixed up with two pointers"),
-                       "Sliding Window, weak, Mixed up with two pointers")
-    }
-
     // MARK: Anthropic drills
 
     private func judgmentResult(next: Int, gap: Bool = true, logged: Bool = false) -> PrepAttemptResult {
@@ -1620,16 +1512,6 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertNil(PrepCopy.gapCallout(match: [], logged: false))
     }
 
-    func testAnthRunLoadsAnthMap() async {
-        let client = FakePrepClient()
-        let anthRep = #"{"index": 0, "block": "warmup", "drill": "judgment", "item": {"id": "anth.j.0001"}}"#
-        client.todayResults = [.success(run(index: 0, reps: [anthRep]))]
-        client.mapResults = [.success(map([]))]
-        let vm = makeVM(client)
-        await vm.load()
-        XCTAssertEqual(client.log, ["today", "map:anth"])
-    }
-
     // MARK: Gaps
 
     private func gapSummary(_ id: String, status: String, misses: Int = 3, hits: Int = 0) -> PrepGapSummary {
@@ -1640,14 +1522,14 @@ final class PrepViewModelsTests: XCTestCase {
         decode(PrepHome.self, #"{"streak": {"days": 1, "freezes": 0}, "run": {"minutes": 30, "reps": 9, "remaining": 9}, "tracks": [], "needs_work": [{"skill": "s", "title": "T", "detail": "d"}]}"#)
     }
 
-    func testHomeFallsBackToNeedsWorkOn404() async {
+    func testHomeLoadsWithoutGapsOn404() async {
         let client = FakePrepClient()
         client.homeResults = [.success(homeValue)]
         client.gapsResults = [.failure(http(404))]
         let vm = PrepHomeViewModel(client: client)
         await vm.load()
         XCTAssertNil(vm.gaps)
-        if case let .loaded(home) = vm.state { XCTAssertEqual(home.needsWork.count, 1) } else { XCTFail("\(vm.state)") }
+        if case .loaded = vm.state {} else { XCTFail("\(vm.state)") }
     }
 
     func testGapsLoadedAlongsideHome() async {
@@ -1709,7 +1591,6 @@ final class PrepViewModelsTests: XCTestCase {
     func testJudgmentSubmitsJudgmentDrill() async {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "judgment")]))]
-        client.mapResults = [.success(map([]))]
         client.attemptResults = [.success(judgmentResult(next: 1))]
         let vm = makeVM(client)
         await vm.load()
@@ -1724,7 +1605,6 @@ final class PrepViewModelsTests: XCTestCase {
     func testClozeSubmitsTrimmedText() async {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "fact", extra: #", "format": "cloze""#)]))]
-        client.mapResults = [.success(map([]))]
         client.attemptResults = [.success(result(next: 1))]
         let vm = makeVM(client)
         await vm.load()
@@ -1737,7 +1617,6 @@ final class PrepViewModelsTests: XCTestCase {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [
             rep(0, drill: "judgment"), rep(1, drill: "judgment", extra: #", "origin": "coach""#)]))]
-        client.mapResults = [.success(map([]))]
         client.attemptResults = [.success(judgmentResult(next: 1)), .success(judgmentResult(next: 2))]
         let vm = makeVM(client)
         await vm.load()
@@ -1757,7 +1636,6 @@ final class PrepViewModelsTests: XCTestCase {
     func testFlagFailureLeavesItFlaggable() async {
         let client = FakePrepClient()
         client.todayResults = [.success(run(index: 0, reps: [rep(0, drill: "judgment", extra: #", "origin": "coach""#)]))]
-        client.mapResults = [.success(map([]))]
         client.attemptResults = [.success(judgmentResult(next: 1))]
         client.flagResults = [.failure(http(500))]
         let vm = makeVM(client)
@@ -2084,7 +1962,6 @@ final class PrepDrillViewsTests: XCTestCase {
                    "fixes": ["    lo, hi = 0, len(nums) - 1", "    while lo <= hi:"]}}]}
         """#
         client.todayResults = [.success(try PrepDecoding.decode(PrepRun.self, from: Data(run.utf8)))]
-        client.mapResults = [.failure(URLError(.badServerResponse))]
         let vm = PrepRunViewModel(client: client)
         let probe = "Prep hosted accessibility probe"
         let window = try show(VStack(spacing: 0) {

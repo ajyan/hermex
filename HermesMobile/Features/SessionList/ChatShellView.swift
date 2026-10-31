@@ -740,6 +740,16 @@ struct ChatShellView: View {
                 onAPIError: authManager.handleAPIError,
                 push: { navigation.path.append(.brainRoute($0)) }
             )
+        case .pageInHub(let module, let id, let hub):
+            BrainReaderView(
+                module: module,
+                id: id,
+                hub: hub,
+                server: server,
+                modelContext: modelContext,
+                onAPIError: authManager.handleAPIError,
+                push: { navigation.path.append(.brainRoute($0)) }
+            )
         case .bite(let module, let id, let idea):
             if BrainHighlightsBookView.isBook(module: module, id: id) {
                 BrainHighlightsBookView(id: id, server: server, modelContext: modelContext, onAPIError: authManager.handleAPIError)
@@ -769,11 +779,6 @@ struct ChatShellView: View {
                 PrepHomeView(server: server, onAPIError: authManager.handleAPIError)
                     .adaptiveSecondaryNavigationTitle()
             }
-        case .prep(.track(let track)):
-            PrepGate {
-                PrepTrackView(track: track, server: server, onAPIError: authManager.handleAPIError)
-                    .adaptiveSecondaryNavigationTitle()
-            }
         case .prep(.run):
             PrepGate {
                 PrepRunView(server: server, onAPIError: authManager.handleAPIError, ask: askAtlas)
@@ -791,10 +796,6 @@ struct ChatShellView: View {
         case .prep(.testout(let unit)):
             PrepGate {
                 PrepRunView(server: server, run: .testout, unit: unit, onAPIError: authManager.handleAPIError, ask: askAtlas)
-            }
-        case .prep(.mock):
-            PrepGate {
-                PrepRunView(server: server, run: .mock, onAPIError: authManager.handleAPIError, ask: askAtlas)
             }
         case .prep(.bonus):
             PrepGate {

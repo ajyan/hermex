@@ -72,9 +72,10 @@ enum BrainListLayout {
         return top
     }
 
-    /// Wiki's concept group, shown as a cover grid; every other group is rows.
-    static func isGridSection(_ title: String) -> Bool {
-        title.caseInsensitiveCompare("Concepts") == .orderedSame
+    /// How long ago an ISO day was, as the People list says it ("today", "6d", "3 wk",
+    /// "4 mo"); nil when the date is missing or not an ISO day.
+    static func age(_ iso: String, today: Date = Date(), calendar: Calendar = .current) -> String? {
+        BrainPersonLayout.DayMath(today: today, calendar: calendar).daysAgo(iso).map(BrainPeopleLayout.elapsed)
     }
 
     /// One grid row of cards, identified by its first item's id.
@@ -146,6 +147,7 @@ struct BrainModuleListView: View {
     /// People only: Everyone narrowed to one `relationship_type`.
     @State private var relationship: String?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.scenePhase) private var scenePhase
 
     init(
         module: BrainModuleID,
@@ -178,6 +180,10 @@ struct BrainModuleListView: View {
                 guard !didLoad || viewModel.state == .loading else { return }
                 didLoad = true
                 await reload()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                // Back from the background (often the next day): "6d" and "Birthdays soon" move on.
+                if phase == .active, module == .people { Task { await peopleHome.load() } }
             }
             .onChange(of: viewModel.list) { _, list in
                 guard hasChipBar, viewModel.selectedTag == nil, let list, !list.tags.isEmpty else { return }
@@ -358,16 +364,12 @@ struct BrainModuleListView: View {
         let lastID = sections.last?.items.last?.id
         return ForEach(sections, id: \.title) { section in
             Section {
-                if BrainListLayout.isGridSection(section.title) {
-                    cardRows(section.items, columns: 2, lastID: lastID)
-                } else {
-                    ForEach(section.items, id: \.id) { item in
-                        NavigationLink(value: link(item.id)) {
-                            BrainCoverRow(item: item)
-                        }
-                        .brainListRow()
-                        .onAppear { if item.id == lastID { loadMore() } }
+                ForEach(section.items, id: \.id) { item in
+                    NavigationLink(value: link(item.id)) {
+                        BrainWikiRow(item: item)
                     }
+                    .brainListRow()
+                    .onAppear { if item.id == lastID { loadMore() } }
                 }
             } header: {
                 if !section.title.isEmpty {
@@ -603,6 +605,23 @@ struct BrainPeopleRow: View {
             subtitle: item.subtitle,
             badge: item.badge
         )
+    }
+}
+
+/// A wiki page in its list: the title, what it's about (the server's gist), and how long
+/// since it was updated. No thumbnail: every row is the same kind of thing.
+struct BrainWikiRow: View {
+    let item: BrainItem
+    /// Built once per row, never in `body`.
+    private let age: String?
+
+    init(item: BrainItem, today: Date = Date()) {
+        self.item = item
+        self.age = BrainListLayout.age(item.date, today: today)
+    }
+
+    var body: some View {
+        BrainRow(title: item.title, subtitle: item.preview, trailing: age)
     }
 }
 

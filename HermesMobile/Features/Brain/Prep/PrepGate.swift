@@ -4,9 +4,12 @@ import SwiftUI
 /// opens only once today's Daily Ask is acted on or skipped with a reason; the Ask sits right here
 /// so it unlocks in place. It reads the shell's one `DailyAskModel`: the first load shows a spinner
 /// (rather than starting a Prep screen the lock would then replace), later pushes refresh quietly,
-/// and a server without the job search, a failure or a timeout leaves Prep open.
+/// and a server without the job search, a failure or a timeout leaves Prep open. The gate decides once per
+/// screen: a screen that has opened stays open, so a later refresh (after midnight, or before the morning's
+/// Ask lands) never swaps a run in progress, and its unsent answers, for the lock.
 struct PrepGate<Content: View>: View {
     @Environment(DailyAskModel.self) private var model: DailyAskModel?
+    @State private var opened = false
     private let content: Content
 
     init(@ViewBuilder content: () -> Content) {
@@ -18,7 +21,9 @@ struct PrepGate<Content: View>: View {
 
     var body: some View {
         Group {
-            if let model, Self.showsSpinner(model) {
+            if opened {
+                content
+            } else if let model, Self.showsSpinner(model) {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let model, Self.shouldGate(model), case .loaded(let ask) = model.state {
                 ScrollView {
@@ -40,7 +45,7 @@ struct PrepGate<Content: View>: View {
                 .hxNavigationTitle("Interview prep")
                 .background(Color.hxCanvas.ignoresSafeArea())
             } else {
-                content
+                content.onAppear { opened = true }
             }
         }
         // Every Prep screen answers in text fields, multi-line ones included.
