@@ -232,7 +232,7 @@ final class BrainVisualsTests: XCTestCase {
     func testPagerPlaceLineSaysWhenAStepFailed() {
         let hub = BrainHubContext(ref: BrainRef(module: .wiki, id: "h"), index: 0, count: 7)
         XCTAssertEqual(BrainConnectionsLayout.placeLine(hub, failed: false), "1 of 7")
-        XCTAssertEqual(BrainConnectionsLayout.placeLine(hub, failed: true), "Couldn't open it · try again")
+        XCTAssertEqual(BrainConnectionsLayout.placeLine(hub, failed: true), "Couldn't open it · tap to retry")
     }
 
     func testWikiMatchesTitleOrGistWordPrefixesWithoutRepeats() {
@@ -386,6 +386,13 @@ final class BrainConnectionsTests: XCTestCase {
         let groups = BrainReaderLayout.furtherGroups(refs)
         XCTAssertEqual(groups.sources.map(\.id), ["s"])
         XCTAssertEqual(groups.tagged.map(\.id), ["t", "old"], "an older server's reasons still land in Also tagged")
+    }
+
+    func testTagsLinkToTheListsThatFilterByTag() {
+        XCTAssertTrue(BrainReaderLayout.tagsFilter(.wiki))
+        XCTAssertTrue(BrainReaderLayout.tagsFilter(.articles))
+        XCTAssertFalse(BrainReaderLayout.tagsFilter(.people))
+        XCTAssertFalse(BrainReaderLayout.tagsFilter(.journal))
     }
 
     func testReaderTagsReadAsOneMetaLine() {

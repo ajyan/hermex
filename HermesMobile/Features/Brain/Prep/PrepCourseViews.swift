@@ -3,7 +3,7 @@ import SwiftUI
 // Prep home's course: the readiness card and the path of units and lesson nodes. Passed units
 // collapse to a row with their stars, the unit being taught opens to its nodes and boss, other open
 // units fold to one row until tapped, the next unit waits locked with Test out, and the rest are
-// counted in one line. The path wears the `.knowledge` paper; only real controls are Nous blue (Start
+// counted in one line. The path wears the `.prep` paper; only real controls are Nous blue (Start
 // and Start call on the readiness card); rewards are gold marks only.
 
 /// Today's done/total as a ring, the number inside.
@@ -25,7 +25,7 @@ struct PrepDayRing: View {
             Circle().stroke(Color.hxSeparator, lineWidth: line)
             Circle()
                 .trim(from: 0, to: fraction)
-                .stroke(HermexPaper.knowledge.glow, style: StrokeStyle(lineWidth: line, lineCap: .round))
+                .stroke(HermexPaper.prep.glow, style: StrokeStyle(lineWidth: line, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             Text(verbatim: "\(done)/\(total)")
                 .font(AppFont.caption(weight: .semibold))
@@ -60,7 +60,7 @@ struct PrepReadinessCard: View {
     var mock: DueMock?
 
     var body: some View {
-        let paper = HermexPaper.knowledge
+        let paper = HermexPaper.prep
         HXCard(.wash(paper), title: mock == nil ? PrepCopy.runCardTitle(runAction) : "Call the interviewer",
                titleStyle: .title3, spacing: BrainStyle.m, kicker: { EmptyView() }, content: {
             if let mock, let line = PrepCopy.mockLine(mock.kind, level: mock.ladder.current) {
@@ -254,7 +254,7 @@ private struct PrepLockedUnitRow: View {
             .foregroundStyle(Color.hxTextSecondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             NavigationLink(value: ShellPushDestination.brainRoute(.prep(.testout(unit.id)))) {
-                HXChip(paper: .knowledge, label: "Test out") { EmptyView() }
+                HXChip(paper: .prep, label: "Test out") { EmptyView() }
                     .frame(minHeight: BrainStyle.minTapTarget)
             }
             .buttonStyle(.plain)
@@ -277,7 +277,7 @@ private struct PrepCurrentUnit: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(verbatim: PrepCopy.unitHeader(index: index, title: unit.title))
                         .font(AppFont.display(style: .headline))
-                        .foregroundStyle(HermexPaper.knowledge.glow)
+                        .foregroundStyle(HermexPaper.prep.glow)
                     Text(verbatim: PrepCopy.readyLine(ready: unit.readyCount, total: unit.lessonsTotal))
                         .font(BrainStyle.meta)
                         .foregroundStyle(Color.hxTextPrimary)
@@ -285,7 +285,7 @@ private struct PrepCurrentUnit: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if unit.boss != .ready {
                     NavigationLink(value: ShellPushDestination.brainRoute(.prep(.testout(unit.id)))) {
-                        HXChip(paper: .knowledge, label: "Test out") { EmptyView() }
+                        HXChip(paper: .prep, label: "Test out") { EmptyView() }
                             .frame(minHeight: BrainStyle.minTapTarget)
                     }
                     .buttonStyle(.plain)
@@ -293,7 +293,7 @@ private struct PrepCurrentUnit: View {
                 }
             }
             .padding(BrainStyle.l)
-            .glowSurface(.knowledge, cornerRadius: HXRadius.xl, opaque: true)
+            .glowSurface(.prep, cornerRadius: HXRadius.xl, opaque: true)
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(unit.lessons.enumerated()), id: \.element.id) { offset, lesson in
                     PrepPathRow(offset: x(offset), next: x(offset + 1)) {
@@ -331,7 +331,7 @@ private struct PrepPathRow<Content: View>: View {
                             p.move(to: CGPoint(x: offset + node / 2, y: node))
                             p.addLine(to: CGPoint(x: next + node / 2, y: proxy.size.height))
                         }
-                        .stroke(HermexPaper.knowledge.edge, style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [2, 7]))
+                        .stroke(HermexPaper.prep.edge, style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [2, 7]))
                     }
                     .accessibilityHidden(true)
                 }
@@ -348,7 +348,7 @@ private struct PrepNodeDisc: View {
     @ScaledMetric(relativeTo: .body) private var side: CGFloat = 44
 
     var body: some View {
-        let paper = HermexPaper.knowledge
+        let paper = HermexPaper.prep
         let size = kind == .next ? side * 1.2 : side
         ZStack {
             switch kind {
@@ -432,10 +432,10 @@ private struct PrepLessonNodeLink: View {
                 if kind == .shaky {
                     Text(verbatim: "In reviews").font(BrainStyle.meta).foregroundStyle(Color.hxTextSecondary)
                 } else if kind == .next {
-                    Text(verbatim: "Up next in today's run").font(BrainStyle.meta).foregroundStyle(HermexPaper.knowledge.glow)
+                    Text(verbatim: "Up next in today's run").font(BrainStyle.meta).foregroundStyle(HermexPaper.prep.glow)
                 } else if lesson.reteach {
                     Text(verbatim: "Another way to see it is waiting").font(BrainStyle.meta)
-                        .foregroundStyle(HermexPaper.knowledge.glow)
+                        .foregroundStyle(HermexPaper.prep.glow)
                 }
             }
         }

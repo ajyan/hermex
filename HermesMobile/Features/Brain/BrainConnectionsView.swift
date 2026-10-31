@@ -32,7 +32,7 @@ enum BrainConnectionsLayout {
 
     /// The pager's second line: "4 of 14", or what went wrong with the last step.
     static func placeLine(_ hub: BrainHubContext, failed: Bool) -> String? {
-        failed ? "Couldn't open it · try again" : position(hub)
+        failed ? "Couldn't open it · tap to retry" : position(hub)
     }
 
     /// "4 of 14", the page's place among its hub's pages.
@@ -81,7 +81,8 @@ struct BrainTrail: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        HStack(spacing: BrainStyle.xs) {
+        // First-baseline, so "Brain ›" lines up with a hub name that wraps.
+        HStack(alignment: .firstTextBaseline, spacing: BrainStyle.xs) {
             Button { openBrainRoute.openHome() } label: {
                 Text(verbatim: "Brain")
                     .foregroundStyle(Color.accentColor)
@@ -272,14 +273,17 @@ struct BrainHubPager: View {
     var onShowPages: (() -> Void)?
     /// The step being loaded (-1 or +1); its arrow shows a spinner meanwhile.
     var pendingStep: Int?
-    /// The last step couldn't load; the place line says so until the next try.
+    /// The last step couldn't load; the place line says so, and tapping it tries again.
     var stepFailed = false
+    var onRetry: (() -> Void)?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         HStack(spacing: 0) {
             stepButton(-1, ref: hub.prev, symbol: "chevron.backward", label: "Previous")
-            Button { onShowPages?() } label: {
+            Button {
+                if stepFailed, let onRetry { onRetry() } else { onShowPages?() }
+            } label: {
                 VStack(spacing: 1) {
                     Text(verbatim: hub.ref.title)
                         .font(AppFont.caption(weight: .semibold))
@@ -297,9 +301,9 @@ struct BrainHubPager: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .disabled(onShowPages == nil || hub.pages.isEmpty)
+            .disabled(!stepFailed && (onShowPages == nil || hub.pages.isEmpty))
             .accessibilityElement(children: .combine)
-            .accessibilityHint(Text(verbatim: "Lists the pages in this hub"))
+            .accessibilityHint(Text(verbatim: stepFailed ? "Tries the page again" : "Lists the pages in this hub"))
             stepButton(1, ref: hub.next, symbol: "chevron.forward", label: "Next")
         }
         .padding(.horizontal, BrainStyle.xs)

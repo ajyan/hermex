@@ -649,13 +649,16 @@ struct BrainHome: Codable, Hashable, Sendable {
     let bites: [BrainBite]
     let batch: Int
     let hasMore: Bool
+    /// The server's day the deck was dealt for ("2026-10-31"); nil from an older server.
+    let day: String?
 
-    private enum CodingKeys: String, CodingKey { case bites, batch, hasMore }
+    private enum CodingKeys: String, CodingKey { case bites, batch, hasMore, day }
 
-    init(bites: [BrainBite] = [], batch: Int = 0, hasMore: Bool = false) {
+    init(bites: [BrainBite] = [], batch: Int = 0, hasMore: Bool = false, day: String? = nil) {
         self.bites = bites
         self.batch = batch
         self.hasMore = hasMore
+        self.day = day
     }
 
     init(from decoder: Decoder) throws {
@@ -663,6 +666,7 @@ struct BrainHome: Codable, Hashable, Sendable {
         bites = c.lossy(BrainBite.self, .bites).filter { $0.kind != .unknown }
         batch = c.int(.batch)
         hasMore = (c.optional(Bool.self, .hasMore)) ?? false
+        day = c.optional(String.self, .day)
     }
 
     var isEmpty: Bool { bites.isEmpty }
@@ -701,13 +705,15 @@ struct BrainPersonRow: Codable, Hashable, Sendable {
     let headline: String?
     let cadenceDays: Int?
     let nextBirthday: String?
+    /// Why now: the first open thread of their current Catch up digest; nil without one.
+    let hook: String?
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, subtitle, lastSeen, headline, cadenceDays, nextBirthday
+        case id, title, subtitle, lastSeen, headline, cadenceDays, nextBirthday, hook
     }
 
     init(id: String, title: String, subtitle: String = "", lastSeen: String? = nil, headline: String? = nil,
-         cadenceDays: Int? = nil, nextBirthday: String? = nil) {
+         cadenceDays: Int? = nil, nextBirthday: String? = nil, hook: String? = nil) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
@@ -715,6 +721,7 @@ struct BrainPersonRow: Codable, Hashable, Sendable {
         self.headline = headline
         self.cadenceDays = cadenceDays
         self.nextBirthday = nextBirthday
+        self.hook = hook
     }
 
     init(from decoder: Decoder) throws {
@@ -726,6 +733,7 @@ struct BrainPersonRow: Codable, Hashable, Sendable {
         headline = c.optional(String.self, .headline)
         cadenceDays = c.optional(Int.self, .cadenceDays)
         nextBirthday = c.optional(String.self, .nextBirthday)
+        hook = c.optional(String.self, .hook)
     }
 }
 
@@ -762,6 +770,8 @@ extension BrainModuleID {
 enum BrainRoute: Hashable, Sendable {
     /// One module's browsable list.
     case module(BrainModuleID)
+    /// A module's list opened on one tag (a page's tag tapped in the reader).
+    case moduleTagged(BrainModuleID, tag: String)
     /// One page, by module and item id.
     case page(BrainModuleID, String)
     /// One page opened from its hub's list, so its trail and pager stay in that hub.

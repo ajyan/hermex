@@ -731,6 +731,16 @@ struct ChatShellView: View {
                 push: { navigation.path.append(.brainRoute($0)) }
             )
             .adaptiveSecondaryNavigationTitle()
+        case .moduleTagged(let module, let tag):
+            BrainModuleListView(
+                module: module,
+                tag: tag,
+                server: server,
+                modelContext: modelContext,
+                onAPIError: authManager.handleAPIError,
+                push: { navigation.path.append(.brainRoute($0)) }
+            )
+            .adaptiveSecondaryNavigationTitle()
         case .module(let module):
             BrainModuleListView(
                 module: module,

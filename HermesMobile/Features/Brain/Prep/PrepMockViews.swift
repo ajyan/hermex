@@ -3,7 +3,7 @@ import Observation
 import SwiftUI
 
 // The voice mock ladders: two rows on Prep home, a brief screen per ladder with Start call, and the
-// graded result after hang-up. Cards are `.knowledge` wash cards like every Prep card; Start call is
+// graded result after hang-up. Cards are `.prep` wash cards like every Prep card; Start call is
 // a control, so it alone wears Nous blue. Only the candidate's own quoted words are serif.
 
 // MARK: - Home section
@@ -45,7 +45,7 @@ private struct PrepMockIcon: View {
     @ScaledMetric(relativeTo: .body) private var side: CGFloat = 32
 
     var body: some View {
-        let paper = HermexPaper.knowledge
+        let paper = HermexPaper.prep
         Image(systemName: "phone.fill")
             .font(AppFont.caption(weight: .semibold))
             .foregroundStyle(paper.glow)
@@ -105,7 +105,7 @@ struct PrepMockBriefView: View {
     }
 
     private func briefCard(_ ladder: PrepLadder?) -> some View {
-        let paper = HermexPaper.knowledge
+        let paper = HermexPaper.prep
         let chosen = viewModel.level(for: kind)
         let level = ladder?.levels.first { $0.level == chosen } ?? ladder?.current
         return HXCard(.wash(paper), title: level.map { "\($0.level) \u{00B7} \($0.title)" } ?? kind.title,
@@ -306,7 +306,7 @@ struct PrepMockResultView: View {
         Label {
             Text(verbatim: title)
         } icon: {
-            Image(systemName: symbol).foregroundStyle(HermexPaper.knowledge.glow)
+            Image(systemName: symbol).foregroundStyle(HermexPaper.prep.glow)
         }
         .font(AppFont.display(style: .headline))
         .foregroundStyle(Color.hxTextPrimary)
@@ -350,7 +350,7 @@ private struct PrepMockGradedView: View {
     }
 
     var body: some View {
-        let paper = HermexPaper.knowledge
+        let paper = HermexPaper.prep
         HXCard(.wash(paper), title: "\(PrepMockCopy.score(result.score ?? 0)) of 5", titleStyle: .title2,
                spacing: BrainStyle.s, kicker: {
             HXChip(paper: paper, symbol: "phone.fill", label: PrepMockCopy.levelTitle(result.level, in: ladder))

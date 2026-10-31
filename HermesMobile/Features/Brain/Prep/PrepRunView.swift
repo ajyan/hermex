@@ -50,6 +50,7 @@ struct PrepRunView: View {
     var body: some View {
         content
             .onPreferenceChange(PrepMicBusyKey.self) { micBusy = $0 }
+            .environment(\.prepUndoOverride, PrepUndoOverrideAction { Task { await viewModel.undoOverride() } })
             .environment(\.prepDiagramLoader, viewModel.diagramLoader)
             .hxNavigationTitle(title)
             .navigationBarBackButtonHidden(true)
@@ -247,7 +248,7 @@ struct PrepRunView: View {
                 if let lesson = rep.item.lesson {
                     PrepRunCard {
                         Text(verbatim: "Warm-up · \(lesson.title)").font(BrainStyle.meta)
-                            .foregroundStyle(HermexPaper.knowledge.glow)
+                            .foregroundStyle(HermexPaper.prep.glow)
                         PrepCheckResult(check: lesson.check, result: result,
                                         chosenID: chosen?.rep == rep.index ? chosen?.id : nil,
                                         typedAnswer: draft(for: rep).text, xp: viewModel.lastXP)
@@ -416,7 +417,7 @@ struct PrepRunView: View {
         case .lesson where Self.usesRecall(rep), .recall where Self.usesRecall(rep):
             if let lesson = rep.item.lesson, let recall = lesson.recall {
                 if let label = rep.label {
-                    HXChip(paper: .knowledge, symbol: "arrow.uturn.backward", label: label)
+                    HXChip(paper: .prep, symbol: "arrow.uturn.backward", label: label)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 if viewModel.lessonStage == .reading {
@@ -443,7 +444,7 @@ struct PrepRunView: View {
             if let lesson = rep.item.lesson {
                 PrepRunCard {
                     Text(verbatim: "Warm-up · \(lesson.title)").font(BrainStyle.meta)
-                        .foregroundStyle(HermexPaper.knowledge.glow)
+                        .foregroundStyle(HermexPaper.prep.glow)
                     PrepCheckPrompt(check: lesson.check)
                     if Self.isCloze(rep) {
                         PrepClozeView(

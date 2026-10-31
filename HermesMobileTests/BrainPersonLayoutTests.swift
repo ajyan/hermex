@@ -36,7 +36,9 @@ final class BrainPersonLayoutTests: XCTestCase {
                       BrainJournalMention(id: "2026-09-10", date: "2026-09-10", snippet: "Earlier")])
         let layout = layout(person)
         XCTAssertEqual(layout.timeline.map(\.id), ["e-new", "e-mid", "journal:2026-09-24", "journal:2026-09-10", "e-old"])
-        XCTAssertEqual(layout.timeline[0].kicker, "Encounter · Oct 8 · 6 days ago")
+        XCTAssertEqual(layout.timeline[0].kicker, "Note · Oct 8 · 6 days ago")
+        XCTAssertEqual(layout.timeline[0].when, "Oct 8 · 6 days ago")
+        XCTAssertEqual(layout.timeline.map(\.symbol), ["person.2.fill", "person.2.fill", "book.closed.fill", "book.closed.fill", "person.2.fill"])
         XCTAssertEqual(layout.timeline[2].kicker, "Journal · Sep 24 · 2 weeks ago")
         XCTAssertEqual(layout.timeline[2].headline, "Dinner")
     }
@@ -72,7 +74,32 @@ final class BrainPersonLayoutTests: XCTestCase {
 
     func testFutureEncounterClampsToToday() {
         let layout = layout(BrainPerson(encounters: [BrainEncounter(id: "e", date: "2026-10-20", title: "Soon")]))
-        XCTAssertEqual(layout.timeline[0].kicker, "Encounter · Oct 20 · today")
+        XCTAssertEqual(layout.timeline[0].kicker, "Note · Oct 20 · today")
+    }
+
+    func testSourceLinesAndInvisibleMarksStayOffThePage() {
+        let person = BrainPerson(encounters: [
+            BrainEncounter(id: "e", date: "2026-10-12", bullets: ["\u{FFFC} Coming on November 12"],
+                           body: "- \u{FFFC} Coming on November 12\n\n_Source: followups touch_\n\nThey stayed late."),
+        ])
+        let entry = layout(person).timeline[0]
+        XCTAssertEqual(entry.headline, "Coming on November 12")
+        XCTAssertEqual(entry.extra, "They stayed late.", "where the note came from is the pipeline's")
+    }
+
+    func testALoggedTextReadsAsTheMessage() {
+        let person = BrainPerson(encounters: [
+            BrainEncounter(id: "t", date: "2026-10-12", bullets: ["Texted: \"Drinks Friday?\""]),
+            BrainEncounter(id: "u", date: "2026-10-11", title: "Texted: Running late", bullets: ["He said fine"]),
+            BrainEncounter(id: "n", date: "2026-10-10", bullets: ["Texted him about the move"]),
+        ])
+        let timeline = layout(person).timeline
+        XCTAssertEqual(timeline.map(\.kicker), ["Texted · Oct 12 · 2 days ago", "Texted · Oct 11 · 3 days ago",
+                                                "Note · Oct 10 · 4 days ago"])
+        XCTAssertEqual(timeline.map(\.headline), ["\u{201C}Drinks Friday?\u{201D}", "\u{201C}Running late\u{201D}",
+                                                  "Texted him about the move"], "only a `Texted:` line is a text")
+        XCTAssertEqual(timeline.map(\.symbol), ["message.fill", "message.fill", "person.2.fill"])
+        XCTAssertEqual(timeline[1].bullets, ["He said fine"])
     }
 
     func testEmptyIDsAreDropped() {
@@ -129,7 +156,7 @@ final class BrainPersonLayoutTests: XCTestCase {
         let entry = layout(BrainPerson(encounters: [encounter])).timeline[0]
         XCTAssertEqual(entry.headline, "Walk")
         XCTAssertEqual(entry.bullets, ["a", "b", "c\n  continued", "d"])
-        XCTAssertEqual(entry.extra, "#### Later\nprose line\n_Source: invented note_")
+        XCTAssertEqual(entry.extra, "#### Later\nprose line", "the `_Source:` line stays off the page")
     }
 
     func testExtraSkipsTheHeadlineAndProseShownAsItems() {
@@ -148,7 +175,7 @@ final class BrainPersonLayoutTests: XCTestCase {
         XCTAssertEqual(timeline[1].extra, "Afterthought")
         XCTAssertEqual(timeline[2].headline, "a")
         XCTAssertEqual(timeline[2].bullets, ["b"])
-        XCTAssertEqual(timeline[2].extra, "_Source: x_")
+        XCTAssertEqual(timeline[2].extra, "")
     }
 
     func testNestedContinuationStaysInsideItsBullet() {
@@ -163,14 +190,7 @@ final class BrainPersonLayoutTests: XCTestCase {
     func testKickerFallsBackToTheRawDate() {
         let person = BrainPerson(encounters: [BrainEncounter(id: "e", date: "spring", title: "Hike")],
                                  journal: [BrainJournalMention(id: "j", date: "", snippet: "Saw Ada.")])
-        XCTAssertEqual(layout(person).timeline.map(\.kicker), ["Encounter · spring", "Journal"])
-    }
-
-    func testPositionReadsAsOneBased() {
-        XCTAssertEqual(BrainPersonLayout.position(index: 0, count: 5), "1 of 5")
-        XCTAssertEqual(BrainPersonLayout.position(index: 4, count: 5), "5 of 5")
-        XCTAssertEqual(BrainPersonLayout.position(index: 9, count: 5), "5 of 5")
-        XCTAssertEqual(BrainPersonLayout.position(index: 0, count: 0), "0 of 0")
+        XCTAssertEqual(layout(person).timeline.map(\.kicker), ["Note · spring", "Journal"])
     }
 
     func testNestedBulletKeepsNewlines() {

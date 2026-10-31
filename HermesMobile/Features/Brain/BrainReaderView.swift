@@ -38,6 +38,11 @@ enum BrainReaderLayout {
         (refs.filter { $0.reason == "source" }, refs.filter { $0.reason != "source" })
     }
 
+    /// Whether a page's tags open its module's list filtered to them: the lists with a tag bar.
+    static func tagsFilter(_ module: BrainModuleID) -> Bool {
+        module == .wiki || module == .articles
+    }
+
     /// The reader's tags as one meta line, "#habits · #self".
     static func tagLine(_ tags: [String]) -> String {
         displayTags(tags).map { "#\($0)" }.joined(separator: " · ")
@@ -111,6 +116,8 @@ struct BrainReaderView: View {
     /// The pager step in flight (-1 or +1), and whether the last one failed.
     @State private var pendingStep: Int?
     @State private var stepFailed = false
+    /// The step that failed, so the pager can try it again.
+    @State private var failedMove: (target: BrainRef, edge: Edge)?
     /// A person page's Log sheet, and the Messages sheet its Text button opens.
     @State private var showsLog = false
     @State private var texting: DeckMessage?
@@ -158,7 +165,7 @@ struct BrainReaderView: View {
             .safeAreaInset(edge: .bottom) {
                 if let hub = viewModel.page?.hub, BrainConnectionsLayout.showsPager(hub) {
                     BrainHubPager(hub: hub, onStep: step, onShowPages: { showsHubPages = true },
-                                  pendingStep: pendingStep, stepFailed: stepFailed)
+                                  pendingStep: pendingStep, stepFailed: stepFailed, onRetry: retry)
                         .padding(.horizontal, BrainStyle.l)
                         .padding(.bottom, BrainStyle.s)
                 } else if let page = viewModel.page, let person = page.person {
@@ -261,11 +268,18 @@ struct BrainReaderView: View {
         move(to: target, in: hub, from: before ? .leading : .trailing)
     }
 
+    /// Tries the step that failed again.
+    private func retry() {
+        guard let failedMove, let hub = viewModel.page?.hub else { return }
+        move(to: failedMove.target, in: hub, from: failedMove.edge)
+    }
+
     private func move(to target: BrainRef, in hub: BrainHubContext, from edge: Edge) {
         let current = viewModel
         stepTask?.cancel()
         pendingStep = edge == .leading ? -1 : 1
         stepFailed = false
+        failedMove = nil
         stepTask = Task {
             let next = await current.loadedSibling(module: target.module, id: target.id, hub: hub.ref.id)
             guard !Task.isCancelled else { return }
@@ -273,6 +287,7 @@ struct BrainReaderView: View {
             guard let next else {
                 failedSteps += 1
                 stepFailed = true
+                failedMove = (target, edge)
                 return
             }
             stepEdge = edge
@@ -350,6 +365,9 @@ struct BrainReaderContent: View {
     private let unlinkedTotal: Int
     @State private var showsAllBacklinks = false
     @State private var showsAllHubPages = false
+    /// Bumped by the hub's meta line; scrolls down to its pages.
+    @State private var jumpsToHubPages = 0
+    private static let hubPagesAnchor = "hub-pages"
     /// The page's diagram sheet, while open.
     @State private var showsDiagram = false
 
@@ -379,6 +397,11 @@ struct BrainReaderContent: View {
     var body: some View {
         ScrollViewReader { proxy in
             scrollContent
+                .onChange(of: jumpsToHubPages) { _, _ in
+                    withAnimation(reduceMotion ? nil : .default) {
+                        proxy.scrollTo(Self.hubPagesAnchor, anchor: .top)
+                    }
+                }
                 .task(id: page.item.id) {
                     guard let focusIdea, digest?.ideas.contains(where: { $0.number == focusIdea }) == true else { return }
                     withAnimation(reduceMotion ? nil : .default) {
@@ -518,7 +541,22 @@ struct BrainReaderContent: View {
             Text(verbatim: page.item.title)
                 .brainText(.readerTitle)
                 .accessibilityAddTraits(.isHeader)
-            if !meta.isEmpty {
+            if !hubPages.isEmpty {
+                // A hub's pages sit after its words; its meta line is the way down to them.
+                Button { jumpsToHubPages += 1 } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: BrainStyle.xs) {
+                        Text(verbatim: meta)
+                        Image(systemName: "arrow.down")
+                            .accessibilityHidden(true)
+                    }
+                    // The meta size in Nous blue: `brainText(.meta)` would set its own grey.
+                    .font(BrainStyle.Role.meta.font)
+                    .foregroundStyle(Color.accentColor)
+                }
+                .buttonStyle(.plain)
+                .contentShape(.interaction, Rectangle().inset(by: -11))
+                .accessibilityHint(Text(verbatim: "Jumps to the hub's pages"))
+            } else if !meta.isEmpty {
                 Text(verbatim: meta)
                     .brainText(.meta)
             }
@@ -526,12 +564,31 @@ struct BrainReaderContent: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// The page's tags as meta text ("#habits · #self"): they don't act, so they don't look
-    /// like the list's filter chips, and they wrap at any text size.
+    /// The page's tags at meta size. On a page whose module filters by tag (wiki, articles)
+    /// each is a link to that list filtered to it; elsewhere they're one line of text.
+    @ViewBuilder
     private var tagRow: some View {
-        Text(verbatim: BrainReaderLayout.tagLine(page.item.tags))
-            .brainText(.meta)
+        let tags = BrainReaderLayout.displayTags(page.item.tags)
+        if BrainReaderLayout.tagsFilter(page.item.module) {
+            FlowRow(spacing: BrainStyle.m) {
+                ForEach(tags, id: \.self) { tag in
+                    Button { push(.moduleTagged(page.item.module, tag: tag)) } label: {
+                        Text(verbatim: "#\(tag)")
+                            .font(BrainStyle.Role.meta.font)
+                            .foregroundStyle(Color.accentColor)
+                    }
+                    .buttonStyle(.plain)
+                    .contentShape(.interaction, Rectangle().inset(by: -8))
+                    .accessibilityLabel(Text(verbatim: "Tag \(tag)"))
+                    .accessibilityHint(Text(verbatim: "Shows the \(page.item.module.defaultTitle) list filtered to it"))
+                }
+            }
             .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            Text(verbatim: BrainReaderLayout.tagLine(page.item.tags))
+                .brainText(.meta)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     /// Pages that link here, each with the words around its link.
@@ -579,6 +636,7 @@ struct BrainReaderContent: View {
             // Every row is a wiki page, so a kind tile would only repeat itself.
             showsIcons: false
         )
+        .id(Self.hubPagesAnchor)
     }
 
     /// Further reading as two sections: Sources, each with its gist, then Also tagged, each

@@ -8,14 +8,18 @@ struct BrainPersonLayout: Equatable {
         /// The encounter id, or `"journal:" + journal id`.
         let id: String
         let kind: Kind
-        /// "Encounter · Oct 8 · 6 days ago" or "Journal · Sep 25 · 3 weeks ago": the deck card's
-        /// first line. The relative part drops when the date is not an ISO day.
+        /// "Note · Oct 8 · 6 days ago", "Texted · Oct 28 · 3 days ago" or "Journal · Sep 25 · 3 weeks
+        /// ago": the open card's first line. The relative part drops when the date is not an ISO day.
         let kicker: String
+        /// The kicker without its kind ("Oct 8 · 6 days ago"): a timeline row's second line.
+        let when: String
+        /// The kind's SF Symbol on the row's tile: a note, a text, a journal day.
+        let symbol: String
         /// An encounter's title (else its first bullet); a journal day's snippet.
         let headline: String
         /// The bullets after the headline (encounters only).
         let bullets: [String]
-        /// The body's other lines (prose, `_Source:` lines, `####` subheads), joined by newlines;
+        /// The body's other lines (prose, `####` subheads; never `_Source:` lines), joined by newlines;
         /// shown as Markdown under the bullets. Empty when there are none.
         let extra: String
         /// A journal day with the encounter's date, opened from the card's footer instead of
@@ -82,11 +86,6 @@ struct BrainPersonLayout: Equatable {
     /// "Seen in 4 of the last 12 months"; empty without a rhythm.
     var rhythmAccessibilityLabel: String {
         rhythm.isEmpty ? "" : "Seen in \(rhythm.filter(\.seen).count) of the last 12 months"
-    }
-
-    /// The timeline header's "3 of 8" for the card at `index`.
-    static func position(index: Int, count: Int) -> String {
-        "\(min(index + 1, count)) of \(count)"
     }
 
     /// "Father: Bo Test" as a role and a value, when the text before the first ": " is a short
@@ -370,15 +369,20 @@ struct BrainPersonLayout: Equatable {
             headline = bullets.first ?? ""
             items = Array(bullets.dropFirst())
         }
+        // A text logged from the deck or the page (`Texted: "…"`) reads as the message itself.
+        let texted = headline.wholeMatch(of: #/Texted:\s*"?(.*?)"?\s*/#).map { String($0.1) }
+        let day = when(encounter.date, days: days)
         return Entry(id: encounter.id, kind: .encounter(encounter),
-                     kicker: kicker("Encounter", date: encounter.date, days: days), headline: headline,
+                     kicker: [texted == nil ? "Note" : "Texted", day].filter { !$0.isEmpty }.joined(separator: " · "),
+                     when: day, symbol: texted == nil ? "person.2.fill" : "message.fill",
+                     headline: texted.map { "\u{201C}\($0)\u{201D}" } ?? headline,
                      bullets: items,
                      extra: extraLines(encounter.body, shown: Set(bullets + [headline])), journal: journal)
     }
 
     /// The body's non-blank lines that are not bullets (a column-0 `-` or `*` and the indented
-    /// lines after it), thematic breaks, or text already `shown` (the headline, or prose lines the
-    /// server made the items), trimmed and joined by newlines.
+    /// lines after it), thematic breaks, `_Source:` lines, or text already `shown` (the headline, or
+    /// prose lines the server made the items), trimmed and joined by newlines.
     private static func extraLines(_ body: String, shown: Set<String>) -> String {
         var inBullet = false
         var lines: [String] = []
@@ -392,6 +396,8 @@ struct BrainPersonLayout: Equatable {
                 inBullet = true
             } else if inBullet && indented {
                 continue
+            } else if text.range(of: #"^_Source: .+_$"#, options: .regularExpression) != nil {
+                inBullet = false  // where the note came from ("followups touch") is the pipeline's, not his
             } else {
                 inBullet = false
                 if !shown.contains(text) { lines.append(text) }
@@ -401,23 +407,24 @@ struct BrainPersonLayout: Equatable {
     }
 
     private static func journalEntry(_ mention: BrainJournalMention, days: DayMath) -> Entry {
-        Entry(id: "journal:" + mention.id, kind: .journal(mention),
-              kicker: kicker("Journal", date: mention.date, days: days),
-              headline: stripMarker(mention.snippet), bullets: [], extra: "", journal: nil)
+        let day = when(mention.date, days: days)
+        return Entry(id: "journal:" + mention.id, kind: .journal(mention),
+                     kicker: ["Journal", day].filter { !$0.isEmpty }.joined(separator: " · "),
+                     when: day, symbol: "book.closed.fill",
+                     headline: stripMarker(mention.snippet), bullets: [], extra: "", journal: nil)
     }
 
-    /// "Encounter · Oct 8 · 6 days ago"; a date that is not an ISO day shows as sent, without
-    /// the relative part.
-    private static func kicker(_ kind: String, date: String, days: DayMath) -> String {
+    /// "Oct 8 · 6 days ago"; a date that is not an ISO day shows as sent, without the relative part.
+    private static func when(_ date: String, days: DayMath) -> String {
         let raw = date.trimmingCharacters(in: .whitespacesAndNewlines)
-        var parts = [kind, monthDay(raw) ?? raw]
+        var parts = [monthDay(raw) ?? raw]
         if let ago = days.daysAgo(raw) { parts.append(relative(daysAgo: ago)) }
         return parts.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
     /// Drops one leading "- " or "* " list marker; nested lines after the first newline are kept.
     private static func stripMarker(_ text: String) -> String {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = text.withoutInvisibleMarks
         for marker in ["- ", "* "] where trimmed.hasPrefix(marker) {
             return String(trimmed.dropFirst(marker.count)).trimmingCharacters(in: .whitespaces)
         }
@@ -493,5 +500,14 @@ private extension String {
         guard trimmed.count >= 10 else { return nil }
         let head = String(trimmed.prefix(10))
         return head.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil ? head : nil
+    }
+}
+
+extension String {
+    /// Trimmed, without U+FFFC (what iOS text input leaves for a dictation or attachment placeholder)
+    /// or zero-width marks, which read as a stray leading space ("￼ Julian is coming…").
+    var withoutInvisibleMarks: String {
+        String(unicodeScalars.filter { !["\u{FFFC}", "\u{200B}", "\u{200C}", "\u{200D}", "\u{2060}", "\u{FEFF}"].contains($0) })
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
