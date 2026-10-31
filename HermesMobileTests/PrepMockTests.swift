@@ -100,6 +100,39 @@ private let designStart = PrepMockStart(
 final class PrepMockTests: APIClientTestCase {
     // MARK: Decoding
 
+    // MARK: Weekly mock
+
+    private func day(_ ymd: String) -> Date {
+        var parts = DateComponents(calendar: newYork, timeZone: newYork.timeZone, hour: 12)
+        let n = ymd.split(separator: "-").compactMap { Int($0) }
+        (parts.year, parts.month, parts.day) = (n[0], n[1], n[2])
+        return parts.date!
+    }
+
+    private var newYork: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/New_York")!
+        return calendar
+    }
+
+    func testWeeklyMockWaitsWhileAMockWasGradedThisWeek() throws {
+        let view = try decodeMocks(mocksJSON)  // D1 graded 10-18; B1 only started
+        XCTAssertNil(view.weeklyDue(now: day("2026-10-24"), calendar: newYork))
+        XCTAssertEqual(view.weeklyDue(now: day("2026-10-25"), calendar: newYork), .behavioral,
+                       "seven days on, the never-graded ladder is due")
+    }
+
+    func testWeeklyMockPicksTheLadderGradedLongestAgo() throws {
+        let json = mocksJSON
+            .replacingOccurrences(of: #""status": "started""#, with: #""status": "graded""#)
+            .replacingOccurrences(of: "2026-10-18T14:41:59.485006", with: "2026-10-20T09:00:00.000000")
+        XCTAssertEqual(try decodeMocks(json).weeklyDue(now: day("2026-10-31"), calendar: newYork), .design)
+    }
+
+    func testWeeklyMockNeedsALadder() throws {
+        XCTAssertNil(try mocks(status: "started").weeklyDue(now: day("2026-10-31"), calendar: newYork))
+    }
+
     func testDecodesMocksView() throws {
         let view = try decodeMocks(mocksJSON)
 
