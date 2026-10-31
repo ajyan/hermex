@@ -75,26 +75,9 @@ struct DeckMandarinCard: View {
         if let fix = practice.currentFix {
             let key = "fix:\(fix.said)"
             let isRevealed = revealed.contains(key)
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    if fix.en != nil {
-                        Text(verbatim: "How would you say")
-                            .font(AppFont.caption(weight: .semibold))
-                            .foregroundStyle(palette.ink)
-                    }
-                    headingRow(fix.en.map { "“\($0)”" } ?? "Say it the natural way",
-                               pips: practice.fixes.count, at: practice.fixes.firstIndex(of: fix) ?? 0)
-                }
-                if !isRevealed {
-                    Button { change { _ = revealed.insert(key) } } label: {
-                        Text(verbatim: "Show me")
-                            .font(AppFont.subheadline(weight: .semibold))
-                            .foregroundStyle(palette.ink)
-                            .frame(minWidth: 44, minHeight: 44)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
+            askHeading(fix.en.map { "“\($0)”" } ?? "Say it the natural way", pips: practice.fixes.count,
+                       at: practice.fixes.firstIndex(of: fix) ?? 0,
+                       showMe: isRevealed ? nil : { change { _ = revealed.insert(key) } })
             VStack(alignment: .leading, spacing: 4) {
                 Text(verbatim: "Yesterday you said")
                     .font(AppFont.caption(weight: .semibold))
@@ -106,24 +89,11 @@ struct DeckMandarinCard: View {
             }
             .accessibilityElement(children: .combine)
             if isRevealed {
-                if let tried = attempts[key] {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(verbatim: "You tried")
-                            .font(AppFont.caption(weight: .semibold))
-                            .foregroundStyle(palette.ink)
-                        Text(verbatim: tried).font(AppFont.body()).fixedSize(horizontal: false, vertical: true)
-                    }
-                    .accessibilityElement(children: .combine)
-                }
+                attempt(key)
                 takeaway("Natural", fix.natural, pinyin: fix.naturalPinyin, note: fix.why)
                 actions(primary: ("Next", "arrow.right", { change { practice.nextFix() } }))
             } else {
-                MandarinMic(prompt: "Say it in Mandarin", palette: palette, onListen: { speaker.stop() }) { text in
-                    attempts[key] = text
-                    change { _ = revealed.insert(key) }
-                    return true
-                }
-                .id(key)
+                tryMic(key, prompt: "Say it in Mandarin")
             }
         } else if practice.fixes.isEmpty, let yesterday {
             heading("Yesterday, said naturally", detail: nil)
@@ -158,42 +128,53 @@ struct DeckMandarinCard: View {
 
     // MARK: Recall
 
+    /// One due phrase from his English: say it, see it, then use it in a sentence of his own (checked
+    /// like Make it yours), and Got it or Again. The finished list comes back as a review.
     @ViewBuilder
     private var recallStep: some View {
         if let phrase = practice.currentRecall {
             let key = "recall:\(phrase.hanzi)"
-            heading(phrase.en ?? phrase.hanzi, detail: "Say it out loud, then check.")
-            if revealed.contains(key) {
-                takeaway(source(phrase), phrase.hanzi, pinyin: phrase.pinyin, note: phrase.en == nil ? nil : phrase.en)
+            let isRevealed = revealed.contains(key)
+            askHeading(phrase.en.map { "“\($0)”" } ?? phrase.hanzi, pips: card.recall.count,
+                       at: card.recall.firstIndex(of: phrase) ?? 0,
+                       showMe: isRevealed ? nil : { change { _ = revealed.insert(key) } })
+            if isRevealed {
+                attempt(key)
+                takeaway(source(phrase), phrase.hanzi, pinyin: phrase.pinyin, note: nil)
+                if let checked = practice.record.versions[phrase.hanzi] { versionsBlock(checked) }
+                MandarinMic(prompt: sentencePrompt(practice.record.versions[phrase.hanzi], phrase: phrase),
+                            palette: palette, isBusy: practice.checkingCue == phrase.hanzi,
+                            onListen: { speaker.stop() }) { text in
+                    await practice.checkVersions(of: phrase, text)
+                }
+                .id("sentence:\(phrase.hanzi)")
+                if let error = practice.versionsError {
+                    Text(verbatim: error).font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
+                }
                 actions(primary: ("Got it", "checkmark", { Task { await practice.recall(phrase, got: true) } }),
                         secondary: ("Again", "arrow.counterclockwise", { Task { await practice.recall(phrase, got: false) } }),
-                        busy: practice.isSavingRecall)
+                        busy: practice.isSavingRecall || practice.checkingCue != nil)
             } else {
-                actions(primary: ("Show me", "eye", { change { _ = revealed.insert(key) } }))
+                tryMic(key, prompt: "Say it in Mandarin")
             }
             if let error = practice.recallError {
                 Text(verbatim: error).font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
             }
         } else {
             heading("All recalled", detail: "They come back on their own schedule.")
-        }
-        VStack(alignment: .leading, spacing: 0) {
             ForEach(card.recall, id: \.hanzi) { phrase in
                 let got = practice.record.recalled[phrase.hanzi]
-                HStack(spacing: 10) {
-                    Image(systemName: got == true ? "checkmark.circle.fill" : got == false ? "arrow.counterclockwise.circle" : "circle")
-                        .foregroundStyle(got == nil ? Color.hxTextSecondary : palette.ink)
-                        .accessibilityHidden(true)
-                    Text(verbatim: got == nil ? (phrase.en ?? "…") : "\(phrase.en.map { "\($0) · " } ?? "")\(phrase.hanzi)")
-                        .font(AppFont.footnote())
-                        .foregroundStyle(got == nil ? Color.hxTextSecondary : Color.hxTextPrimary)
-                    Spacer(minLength: 0)
-                }
-                .padding(.vertical, 7)
-                .accessibilityElement(children: .combine)
-                .accessibilityValue(Text(verbatim: got == true ? "Got it" : got == false ? "Again" : "Not yet"))
+                row(got == false ? "Again tomorrow" : phrase.en ?? source(phrase), phrase.hanzi, pinyin: phrase.pinyin, note: nil)
+                if let checked = practice.record.versions[phrase.hanzi] { versionsBlock(checked) }
             }
         }
+    }
+
+    /// What the sentence mic asks for: one with the phrase, another, or one that really uses it.
+    private func sentencePrompt(_ checked: MandarinVersionsResponse?, phrase: DeckPhrase) -> String {
+        guard let checked else { return "Now use it in a sentence about your week" }
+        if !checked.used { return "Try one with \(phrase.hanzi)" }
+        return "Another, or Got it"
     }
 
     private func source(_ phrase: DeckPhrase) -> String {
@@ -223,8 +204,8 @@ struct DeckMandarinCard: View {
                 .buttonStyle(.plain)
                 .disabled(practice.checkingCue != nil)
             }
-            takeaway([cue.kindLabel, cue.hanzi].compactMap { $0 }.joined(separator: " · "), example,
-                     pinyin: cue.examplePinyin, note: cue.exampleEn)
+            takeaway(cue.kindLabel ?? "Phrase", cue.hanzi, pinyin: cue.pinyin, note: cue.en)
+            row("Example", example, pinyin: cue.examplePinyin, note: cue.exampleEn)
             if let checked { versionsBlock(checked) }
             MandarinMic(prompt: yoursPrompt(checked, cue: cue), palette: palette,
                         isBusy: practice.checkingCue == cue.hanzi, onListen: { speaker.stop() }) { text in
@@ -250,10 +231,10 @@ struct DeckMandarinCard: View {
 
     /// What the mic asks for next: the example and two of his own, one more, or one that uses the cue.
     private func yoursPrompt(_ checked: MandarinVersionsResponse?, cue: DeckPhrase) -> String {
-        guard let checked else { return "Say it, then two of your own about this week" }
+        guard let checked else { return "Say the example, then two of your own with \(cue.hanzi)" }
         if !checked.used { return "Now one with \(cue.hanzi)" }
-        if checked.versions.count < 2 { return "One more of your own" }
-        return "Say another, or tap Next"
+        if checked.versions.count < 2 { return "One more with \(cue.hanzi)" }
+        return "Another with \(cue.hanzi), or Next"
     }
 
     /// Two clean versions: a beat to see the checks, then the next cue (unless he has already moved).
@@ -389,6 +370,51 @@ struct DeckMandarinCard: View {
     }
 
     // MARK: Parts
+
+    /// "How would you say" over his English as the heading, with pips and, until it shows, Show me.
+    private func askHeading(_ text: String, pips count: Int, at index: Int, showMe: (() -> Void)?) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(verbatim: "How would you say")
+                    .font(AppFont.caption(weight: .semibold))
+                    .foregroundStyle(palette.ink)
+                headingRow(text, pips: count, at: index)
+            }
+            if let showMe {
+                Button(action: showMe) {
+                    Text(verbatim: "Show me")
+                        .font(AppFont.subheadline(weight: .semibold))
+                        .foregroundStyle(palette.ink)
+                        .frame(minWidth: 44, minHeight: 44)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    /// The mic for a first try: what he says is kept beside the answer it then shows.
+    private func tryMic(_ key: String, prompt: String) -> some View {
+        MandarinMic(prompt: prompt, palette: palette, onListen: { speaker.stop() }) { text in
+            attempts[key] = text
+            change { _ = revealed.insert(key) }
+            return true
+        }
+        .id(key)
+    }
+
+    /// His first try, once the answer shows.
+    @ViewBuilder
+    private func attempt(_ key: String) -> some View {
+        if let tried = attempts[key] {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(verbatim: "You tried")
+                    .font(AppFont.caption(weight: .semibold))
+                    .foregroundStyle(palette.ink)
+                Text(verbatim: tried).font(AppFont.body()).fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
+        }
+    }
 
     private func heading(_ text: String, detail: String?) -> some View {
         VStack(alignment: .leading, spacing: 4) {

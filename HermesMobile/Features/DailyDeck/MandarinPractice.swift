@@ -180,8 +180,9 @@ final class MandarinPractice {
         if isDone(.recall) { step = firstOpenStep }
     }
 
-    /// Checks his versions of a cue's example, added to the ones already checked so "one more" builds
-    /// toward two. An empty check (the model couldn't) is an error to retry, never kept. Returns whether
+    /// Checks his sentences with a phrase (a cue's versions of its example, or a recall phrase used in a
+    /// sentence), added to the ones already checked so "one more"
+    /// builds toward two. An empty check (the model couldn't) is an error to retry, never kept. Returns whether
     /// they were checked, so the caller keeps his words when not.
     @discardableResult
     func checkVersions(of cue: DeckPhrase, _ text: String) async -> Bool {
