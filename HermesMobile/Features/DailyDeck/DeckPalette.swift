@@ -121,6 +121,9 @@ struct DeckPalette: Equatable {
         case .monthInsight: (card.month?.symbol ?? "sparkles", "Insight")
         case .monthSleep: ("moon.zzz", "Sleep this month")
         case .monthQuestion: ("pencil.line", "Reflect")
+        case .weekHeld: ("checkmark.seal", "Did it hold?")
+        case .weekPlan: ("scope", "Next week's intention")
+        case .weekLetter: ("envelope", "A letter to next year")
         case .value: ("heart.circle", "Value")
         case .prompt: ("pencil.line", "Reflect")
         case .close: ("checkmark.seal", "Close")
@@ -152,7 +155,8 @@ struct DeckPalette: Equatable {
         case .changes: return .changes
         case .cover, .lastIntention, .value, .intention, .keepsakes: return .week
         case .training: return .training
-        case .monthCover, .monthWeeks, .monthDots, .monthInsight, .monthSleep, .monthQuestion: return month(card)
+        case .monthCover, .monthWeeks, .monthDots, .monthInsight, .monthSleep, .monthQuestion, .weekHeld, .weekPlan, .weekLetter:
+            return month(card)
         case .item, .unknown:
             switch card.itemKind {
             case "theme": return .theme

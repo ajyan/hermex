@@ -34,6 +34,19 @@ struct DeckMonth: Decodable, Equatable {
     let tiles: [Tile]
     /// The sleep card's month (`MonthSleepCard`).
     let sleep: Sleep?
+    /// A weekly cover's days, one row each, to star the week's real moments.
+    let dayLines: [DayLine]
+    /// The calendar's column letters when they aren't S–S (a week runs M–S); with them, day 1 is column 1.
+    let labels: [String]
+    /// A weekly value card asks for a 1–10 score.
+    let scored: Bool?
+    /// The weekly review puts the card's answer (slider or words) right under its title, with the
+    /// evidence below it to read if he wants.
+    let inputFirst: Bool?
+    /// The weekly "Did it hold?" card: last week's intention and what might have got in the way.
+    let held: Held?
+    /// The weekly intention Atlas proposes for next week, accepted or tweaked with a tap.
+    let proposal: Proposal?
     /// What kept coming up in his entries, each a few words and a line on where it showed.
     let themes: [Theme]
     /// Quotes and highlights he saved in his second brain that speak to the card.
@@ -94,6 +107,26 @@ struct DeckMonth: Decodable, Equatable {
         let source: String?
     }
 
+    struct DayLine: Decodable, Equatable, Identifiable {
+        let day: String
+        let date: String?
+        let line: String
+        let value: String?
+        var id: String { day }
+    }
+
+    struct Held: Decodable, Equatable {
+        let intention: String
+        let ifThen: String?
+        let reasons: [String]
+    }
+
+    struct Proposal: Decodable, Equatable {
+        let intention: String
+        let obstacle: String?
+        let ifThen: String?
+    }
+
     struct Theme: Decodable, Equatable {
         let title: String
         let line: String?
@@ -152,6 +185,7 @@ struct DeckMonth: Decodable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case name, totals, weeks, firstWeekday, daysInMonth, rows, pips, symbol, stat, days
         case marked, weekScores, year, months, snippets, advisors, tiles, sleep, themes, library
+        case dayLines, labels, scored, inputFirst, held, proposal
     }
 
     init(from decoder: Decoder) throws {
@@ -179,6 +213,12 @@ struct DeckMonth: Decodable, Equatable {
         sleep = try? c.decodeIfPresent(Sleep.self, forKey: .sleep)
         themes = list(.themes)
         library = list(.library)
+        dayLines = list(.dayLines)
+        labels = (try? c.decodeIfPresent([String].self, forKey: .labels)) ?? []
+        scored = try? c.decodeIfPresent(Bool.self, forKey: .scored)
+        inputFirst = try? c.decodeIfPresent(Bool.self, forKey: .inputFirst)
+        held = try? c.decodeIfPresent(Held.self, forKey: .held)
+        proposal = try? c.decodeIfPresent(Proposal.self, forKey: .proposal)
     }
 }
 

@@ -72,6 +72,9 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         /// The monthly review's own cards (`MonthlyReview*.swift`): the cover, the weeks arc, the month
         /// in dots, an insight, the month's sleep, and a reflection question with what led to it.
         case monthCover, monthWeeks, monthDots, monthInsight, monthSleep, monthQuestion
+        /// The weekly review's own cards in the monthly format (`WeeklyWrappedCards.swift`): did last week's
+        /// intention hold, and next week's intention as Atlas proposes it.
+        case weekHeld, weekPlan, weekLetter
         case unknown(String)
 
         init(_ raw: String) {
@@ -102,6 +105,9 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case "month_insight": self = .monthInsight
             case "month_sleep": self = .monthSleep
             case "month_question": self = .monthQuestion
+            case "week_held": self = .weekHeld
+            case "week_plan": self = .weekPlan
+            case "week_letter": self = .weekLetter
             default: self = .unknown(raw)
             }
         }
@@ -359,7 +365,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         case .prompt, .reflect, .item, .unknown: true
         case .headline, .decision, .sleep, .goal, .changes, .ask, .dinner, .meals, .section, .close, .front: false
         case .cover, .lastIntention, .value, .intention, .keepsakes, .training: false
-        case .monthCover, .monthWeeks, .monthDots, .monthInsight, .monthSleep, .monthQuestion: false
+        case .monthCover, .monthWeeks, .monthDots, .monthInsight, .monthSleep, .monthQuestion, .weekHeld, .weekPlan, .weekLetter: false
         }
     }
 
@@ -1409,6 +1415,8 @@ struct DeckCardText: Equatable {
         case .monthQuestion:
             lead = card.question
             leadIsQuestion = true
+        case .weekHeld, .weekPlan, .weekLetter:
+            lead = card.title
         case .lastIntention:
             lead = card.text
             detail = card.fact?.line
