@@ -89,8 +89,12 @@ extension HermexPaper {
     static let feedback = HermexPaper.notes
     /// Meals: the Daily Brief's dinner and week-of-dinners cards.
     static let meal = HermexPaper.kitchen
-    /// Body: workouts, lifts, Baki's notes and proposals.
-    static let training = HermexPaper.body
+    /// Body: workouts, lifts, Baki's notes and proposals. Cyan, since `body`'s teal read as Brain's
+    /// mint beside it in the drawer.
+    static let training = HermexPaper.video
+    /// Interview prep's way in: its drawer row and Brain home row. Coral, so it never reads as
+    /// Brain's mint; Prep's own screens stay `knowledge`.
+    static let prep = HermexPaper.mandarin
 
     static func forTool(_ kind: ToolCallSummaryFormatter.Kind) -> HermexPaper {
         switch kind {
