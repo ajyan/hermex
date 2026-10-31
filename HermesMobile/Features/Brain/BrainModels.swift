@@ -355,15 +355,18 @@ struct BrainPerson: Codable, Hashable, Sendable {
     let rhythm: [Int]
     /// The month `rhythm` ends with ("2026-10"); nil from an older server.
     let rhythmEnd: String?
+    /// Their iMessage number or email (the contact's `imessage:`), for the page's Text button; nil without one.
+    let imessage: String?
 
     private enum CodingKeys: String, CodingKey {
         case encounters, profile, questions, other, journal, lastSeen, nextBirthday, catchup, threads, rhythm, rhythmEnd
+        case imessage
     }
 
     init(encounters: [BrainEncounter] = [], profile: [BrainProfileSection] = [], questions: [String] = [],
          other: String = "", lastSeen: String? = nil, nextBirthday: String? = nil,
          journal: [BrainJournalMention] = [], catchup: String? = nil, threads: [String] = [], rhythm: [Int] = [],
-         rhythmEnd: String? = nil) {
+         rhythmEnd: String? = nil, imessage: String? = nil) {
         self.encounters = encounters
         self.profile = profile
         self.questions = questions
@@ -375,6 +378,7 @@ struct BrainPerson: Codable, Hashable, Sendable {
         self.threads = threads
         self.rhythm = rhythm
         self.rhythmEnd = rhythmEnd
+        self.imessage = imessage
     }
 
     init(from decoder: Decoder) throws {
@@ -390,6 +394,7 @@ struct BrainPerson: Codable, Hashable, Sendable {
         threads = c.lossy(String.self, .threads)
         rhythm = c.lossy(Int.self, .rhythm)
         rhythmEnd = c.optional(String.self, .rhythmEnd)
+        imessage = c.optional(String.self, .imessage).flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
     }
 }
 

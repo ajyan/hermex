@@ -476,3 +476,145 @@ private struct BrainBulletList: View {
     }
 }
 #endif
+
+// MARK: Acting on a person
+
+/// A person page's foot, on the hub pager's glass capsule: Text (with their iMessage number), Log a
+/// catch-up, and Ask Atlas. Text is the one filled control, in Nous blue; the others are its tint.
+struct BrainPersonActionBar: View {
+    let firstName: String
+    let canText: Bool
+    let canAsk: Bool
+    let onText: () -> Void
+    let onLog: () -> Void
+    let onAsk: () -> Void
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        // Every label when they fit; else Log and Ask Atlas keep only their symbols (VoiceOver keeps the words).
+        ViewThatFits(in: .horizontal) {
+            row(compact: dynamicTypeSize.isAccessibilitySize)
+            row(compact: true)
+        }
+        .padding(BrainStyle.xs)
+        // Opaque under the glass, so body text scrolling beneath never shows through the labels.
+        .background(Color.hxSurface, in: Capsule())
+        .adaptiveGlass(isInteractive: true, tint: Color.hxSurface, in: Capsule())
+        .hxShadow(.float)
+    }
+
+    private func row(compact: Bool) -> some View {
+        HStack(spacing: BrainStyle.xs) {
+            if canText {
+                Button(action: onText) {
+                    label("Text \(firstName)", symbol: "message.fill", compact: false)
+                        .foregroundStyle(Color.hxOnAccent)
+                        .background(Color.accentColor, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(Text(verbatim: "Opens Messages; the catch-up is logged once it sends"))
+            }
+            Button(action: onLog) {
+                label("Log", symbol: "square.and.pencil", compact: compact).foregroundStyle(Color.accentColor)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(verbatim: "Log a catch-up"))
+            if canAsk {
+                Button(action: onAsk) {
+                    label("Ask Atlas", symbol: "bubble.left.and.text.bubble.right", compact: compact)
+                        .foregroundStyle(Color.accentColor)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(verbatim: "Ask Atlas"))
+                .accessibilityHint(Text(verbatim: "Starts a new chat about \(firstName)"))
+            }
+        }
+    }
+
+    private func label(_ title: String, symbol: String, compact: Bool) -> some View {
+        Group {
+            if compact {
+                Image(systemName: symbol)
+            } else {
+                Label { Text(verbatim: title) } icon: { Image(systemName: symbol) }
+            }
+        }
+        .font(AppFont.subheadline(weight: .semibold))
+        .lineLimit(1)
+        .fixedSize()
+        .padding(.horizontal, BrainStyle.m)
+        .frame(minWidth: BrainStyle.minTapTarget, minHeight: BrainStyle.minTapTarget)
+        .contentShape(Capsule())
+    }
+}
+
+/// "Log a catch-up": what happened, in his words, written to the contact through the vault's
+/// `crm log`. The words stay put on a failure, with the reason, so nothing typed is lost.
+struct BrainPersonLogSheet: View {
+    let name: String
+    let save: (String) async throws -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+    @State private var isSaving = false
+    @State private var failure: String?
+    @FocusState private var isFocused: Bool
+
+    private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: BrainStyle.m) {
+                TextField(text: $text, axis: .vertical) {
+                    Text(verbatim: "What happened with \(name)?")
+                }
+                .font(AppFont.body())
+                .lineLimit(4...12)
+                .focused($isFocused)
+                .withDictation($text, isSubmitting: isSaving)
+                .padding(BrainStyle.m)
+                .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous).strokeBorder(Color.hxSeparator, lineWidth: 0.5))
+                if let failure {
+                    Label { Text(verbatim: failure) } icon: { Image(systemName: "exclamationmark.triangle.fill") }
+                        .font(AppFont.footnote())
+                        .foregroundStyle(Color.hxDanger)
+                }
+                Text(verbatim: "Saved to their page as today's note.")
+                    .brainText(.meta)
+                Spacer(minLength: 0)
+            }
+            .padding(BrainStyle.l)
+            .background(Color.hxCanvas.ignoresSafeArea())
+            .navigationTitle(Text(verbatim: "Log a catch-up"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button { dismiss() } label: { Text(verbatim: "Cancel") }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if isSaving {
+                        ProgressView()
+                    } else {
+                        Button { Task { await submit() } } label: { Text(verbatim: "Save").bold() }
+                            .disabled(trimmed.isEmpty)
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .interactiveDismissDisabled(isSaving || !trimmed.isEmpty)
+        .onAppear { isFocused = true }
+    }
+
+    private func submit() async {
+        isSaving = true
+        failure = nil
+        do {
+            try await save(trimmed)
+            dismiss()
+        } catch {
+            failure = "Couldn't save: \(error.localizedDescription)"
+        }
+        isSaving = false
+    }
+}

@@ -972,6 +972,11 @@ struct DeckMessage: Decodable, Equatable {
     let body: String?
 }
 
+/// A Messages sheet is presented per recipient.
+extension DeckMessage: Identifiable {
+    var id: String { to }
+}
+
 extension DeckMessage {
     /// `sms:` to the same recipient and words, for a device without the Messages sheet (the
     /// simulator). A phone number keeps only its digits and a leading `+`, so "+1 (555) 010-0100"

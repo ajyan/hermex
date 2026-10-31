@@ -1413,9 +1413,9 @@ private struct FollowUpRow: View {
             }
         }
         .sheet(item: $composing) { compose in
-            MessageComposer(message: compose.message) { sent in
+            MessageComposer(message: compose.message) { sent, body in
                 composing = nil
-                if sent { viewModel.markTexted(compose.action, body: compose.message.body, for: card) }
+                if sent { viewModel.markTexted(compose.action, body: body ?? compose.message.body, for: card) }
             }
             .ignoresSafeArea()
         }
@@ -1469,11 +1469,12 @@ private struct FollowUpRow: View {
     }
 }
 
-/// The system Messages compose sheet, prefilled. Reports whether the text was actually sent:
-/// `false` for a cancel or a failure.
-private struct MessageComposer: UIViewControllerRepresentable {
+/// The system Messages compose sheet, prefilled (a Daily Brief follow-up, a person page's Text).
+/// Reports whether the text was actually sent (`false` for a cancel or a failure) and the words
+/// it went out with, which may differ from the prefilled ones.
+struct MessageComposer: UIViewControllerRepresentable {
     let message: DeckMessage
-    let onFinish: (Bool) -> Void
+    let onFinish: (_ sent: Bool, _ body: String?) -> Void
 
     static var canSend: Bool { MFMessageComposeViewController.canSendText() }
 
@@ -1490,13 +1491,13 @@ private struct MessageComposer: UIViewControllerRepresentable {
     func updateUIViewController(_ controller: MFMessageComposeViewController, context: Context) {}
 
     final class Coordinator: NSObject, MFMessageComposeViewControllerDelegate {
-        let onFinish: (Bool) -> Void
+        let onFinish: (Bool, String?) -> Void
 
-        init(onFinish: @escaping (Bool) -> Void) { self.onFinish = onFinish }
+        init(onFinish: @escaping (Bool, String?) -> Void) { self.onFinish = onFinish }
 
         func messageComposeViewController(_ controller: MFMessageComposeViewController,
                                           didFinishWith result: MessageComposeResult) {
-            onFinish(result == .sent)
+            onFinish(result == .sent, controller.body)
         }
     }
 }
