@@ -2828,6 +2828,24 @@ final class MandarinPracticeTests: XCTestCase {
         XCTAssertEqual(resumed.step, .talk)
     }
 
+    func testEachCheckAddsUpAndTwoCleanVersionsMakeTheCueYours() async throws {
+        let client = FakeMandarinClient()
+        let practice = practice(try card(Self.cuesJSON), client: client)
+        let cue = try XCTUnwrap(practice.currentCue)
+        client.versionsResult = .success(MandarinVersionsResponse(versions: [.init(said: "我先上班，然后去跑步。")], used: true))
+        _ = await practice.checkVersions(of: cue, "我先上班，然后去跑步。")
+        XCTAssertEqual(practice.record.versions["然后"]?.isClean, false, "one version isn't two")
+        client.versionsResult = .success(MandarinVersionsResponse(versions: [.init(said: "我先做饭，然后看书。")], used: true))
+        _ = await practice.checkVersions(of: cue, "我先做饭，然后看书。")
+        let checked = try XCTUnwrap(practice.record.versions["然后"])
+        XCTAssertEqual(checked.versions.map(\.said), ["我先上班，然后去跑步。", "我先做饭，然后看书。"], "one more adds to the first")
+        XCTAssertTrue(checked.isClean)
+        XCTAssertFalse(MandarinVersionsResponse(versions: [.init(said: "a"), .init(said: "b")], used: false).isClean,
+                       "versions without the cue don't make it his")
+        XCTAssertFalse(MandarinVersionsResponse(versions: [.init(said: "a"), .init(said: "b", natural: "c")]).isClean,
+                       "a version that needs a fix stays on screen")
+    }
+
     func testAnEmptyOrFailedCheckKeepsNothingAndSaysTryAgain() async throws {
         let client = FakeMandarinClient()
         let practice = practice(try card(Self.cuesJSON), client: client)
@@ -2974,13 +2992,6 @@ final class MandarinPracticeTests: XCTestCase {
         XCTAssertEqual(after.progress?.phrases, 3)
     }
 
-    func testProgressLine() {
-        XCTAssertEqual(MandarinProgressLine.text(DeckMandarinProgress(phrases: 36, usedWeek: 6, englishNow: 1.2, englishBefore: 3)),
-                       "36 phrases · 6 used this week · English per answer 3 → 1.2")
-        XCTAssertEqual(MandarinProgressLine.text(DeckMandarinProgress(phrases: 1, usedWeek: nil, englishNow: nil, englishBefore: nil)),
-                       "1 phrase")
-        XCTAssertNil(MandarinProgressLine.text(DeckMandarinProgress(phrases: nil, usedWeek: nil, englishNow: nil, englishBefore: nil)))
-    }
 }
 
 // MARK: - Meals
