@@ -262,7 +262,8 @@ final class BrainListViewModel {
         var groups = first.groups
         for group in next.groups {
             if let index = groups.firstIndex(where: { $0.title == group.title }) {
-                groups[index] = BrainGroup(title: group.title, ids: groups[index].ids + group.ids)
+                groups[index] = BrainGroup(title: group.title, ids: groups[index].ids + group.ids,
+                                           total: group.total ?? groups[index].total)
             } else {
                 groups.append(group)
             }

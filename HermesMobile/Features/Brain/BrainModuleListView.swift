@@ -8,6 +8,11 @@ enum BrainListLayout {
     struct Section: Equatable {
         let title: String
         let items: [BrainItem]
+        /// The group's size across the whole list; nil when the server doesn't say.
+        var total: Int?
+
+        /// What the header counts: the whole group, else the rows loaded.
+        var count: Int { max(total ?? 0, items.count) }
     }
 
     /// How many tags the chip bar offers besides "All".
@@ -38,7 +43,7 @@ enum BrainListLayout {
         }
         return list.groups.compactMap { group in
             let items = resolve(group.ids, in: list.items)
-            return items.isEmpty ? nil : Section(title: group.title, items: items)
+            return items.isEmpty ? nil : Section(title: group.title, items: items, total: group.total)
         }
     }
 
@@ -70,6 +75,29 @@ enum BrainListLayout {
             top.append(selected)
         }
         return top
+    }
+
+    /// Wiki pages whose title or gist has a word starting with each typed word, ignoring
+    /// case and accents, without repeats ("Recently updated" repeats pages): title matches
+    /// first, then gist matches, each in list order.
+    static func wikiMatches(_ items: [BrainItem], query: String) -> [BrainItem] {
+        let typed = searchWords(query)
+        guard !typed.isEmpty else { return [] }
+        func matches(_ text: String) -> Bool {
+            let words = searchWords(text)
+            return typed.allSatisfy { word in words.contains { $0.hasPrefix(word) } }
+        }
+        let unique = uniqueItems(items)
+        let byTitle = unique.filter { matches($0.title) }
+        let titled = Set(byTitle.map(\.id))
+        return byTitle + unique.filter { !titled.contains($0.id) && matches($0.title + " " + $0.preview) }
+    }
+
+    private static func searchWords(_ text: String) -> [String] {
+        text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+            .lowercased()
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+            .map(String.init)
     }
 
     /// How long ago an ISO day was, as the People list says it ("today", "6d", "3 wk",
@@ -144,6 +172,7 @@ struct BrainModuleListView: View {
     @State private var chipTags: [String] = []
     /// People only: the name being looked up.
     @State private var peopleQuery = ""
+    @State private var wikiQuery = ""
     /// People only: Everyone narrowed to one `relationship_type`.
     @State private var relationship: String?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -171,6 +200,7 @@ struct BrainModuleListView: View {
         content
             .safeAreaInset(edge: .top, spacing: 0) {
                 if module == .people { peopleSearchField }
+                if module == .wiki { wikiSearchField }
             }
             .hxNavigationTitle(module.defaultTitle)
             .background(Color.hxCanvas.ignoresSafeArea())
@@ -321,26 +351,31 @@ struct BrainModuleListView: View {
 
     /// Pinned above the People list. Return opens the top match.
     private var peopleSearchField: some View {
+        listSearchField(prompt: "Search people", text: $peopleQuery) {
+            guard let list = viewModel.list,
+                  !peopleQuery.trimmingCharacters(in: .whitespaces).isEmpty,
+                  let top = peopleMatches(list).first
+            else { return }
+            push(.page(.people, top.id))
+        }
+    }
+
+    /// A search field pinned above a list, with a clear button; Return runs `onSubmit`.
+    private func listSearchField(prompt: String, text: Binding<String>, onSubmit: @escaping () -> Void) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
 
-            TextField("Search people", text: $peopleQuery)
+            TextField(prompt, text: text)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .submitLabel(.go)
-                .onSubmit {
-                    guard let list = viewModel.list,
-                          !peopleQuery.trimmingCharacters(in: .whitespaces).isEmpty,
-                          let top = peopleMatches(list).first
-                    else { return }
-                    push(.page(.people, top.id))
-                }
+                .onSubmit(onSubmit)
 
-            if !peopleQuery.isEmpty {
+            if !text.wrappedValue.isEmpty {
                 Button {
-                    peopleQuery = ""
+                    text.wrappedValue = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
@@ -359,7 +394,37 @@ struct BrainModuleListView: View {
 
     // MARK: Wiki
 
+    @ViewBuilder
     private func wikiSections(_ list: BrainList) -> some View {
+        let query = wikiQuery.trimmingCharacters(in: .whitespaces)
+        if query.isEmpty {
+            wikiGroups(list)
+        } else {
+            wikiMatches(list, query: query)
+        }
+    }
+
+    /// The pages whose title or gist match, then a row that searches their text too.
+    private func wikiMatches(_ list: BrainList, query: String) -> some View {
+        let matches = BrainListLayout.wikiMatches(list.items, query: query)
+        return Section {
+            ForEach(matches, id: \.id) { item in
+                NavigationLink(value: link(item.id)) {
+                    BrainWikiRow(item: item)
+                }
+                .brainListRow()
+            }
+            NavigationLink(value: ShellPushDestination.brainRoute(.searchAll(.wiki, query: query))) {
+                BrainRow(leading: { BrainModuleIcon(systemName: "text.magnifyingglass") },
+                         title: "Search inside pages for \u{201C}\(query)\u{201D}")
+            }
+            .brainListRow()
+        } header: {
+            BrainSectionHeader(title: matches.isEmpty ? "No titles match" : "Pages", count: matches.isEmpty ? nil : matches.count)
+        }
+    }
+
+    private func wikiGroups(_ list: BrainList) -> some View {
         let sections = BrainListLayout.sections(list)
         let lastID = sections.last?.items.last?.id
         return ForEach(sections, id: \.title) { section in
@@ -373,9 +438,20 @@ struct BrainModuleListView: View {
                 }
             } header: {
                 if !section.title.isEmpty {
-                    BrainSectionHeader(title: section.title, count: section.items.count)
+                    BrainSectionHeader(title: section.title, count: section.count)
                 }
             }
+        }
+    }
+
+    /// Pinned above the Wiki list: narrows it to pages whose title or gist match. Return
+    /// opens the top match.
+    private var wikiSearchField: some View {
+        listSearchField(prompt: "Search the wiki", text: $wikiQuery) {
+            guard let list = viewModel.list,
+                  let top = BrainListLayout.wikiMatches(list.items, query: wikiQuery).first
+            else { return }
+            push(.page(.wiki, top.id))
         }
     }
 
@@ -614,6 +690,7 @@ struct BrainWikiRow: View {
     let item: BrainItem
     /// Built once per row, never in `body`.
     private let age: String?
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     init(item: BrainItem, today: Date = Date()) {
         self.item = item
@@ -621,7 +698,9 @@ struct BrainWikiRow: View {
     }
 
     var body: some View {
-        BrainRow(title: item.title, subtitle: item.preview, trailing: age)
+        // At accessibility sizes the title wraps in full; two lines would cut most of it.
+        BrainRow(title: item.title, subtitle: item.preview, trailing: age,
+                 titleLineLimit: dynamicTypeSize.isAccessibilitySize ? nil : 2)
     }
 }
 
