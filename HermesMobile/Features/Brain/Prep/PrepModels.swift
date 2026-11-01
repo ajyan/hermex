@@ -90,14 +90,27 @@ struct PrepRunSummary: Decodable, Hashable, Sendable {
     let reps: Int
     let remaining: Int
     let focus: [String]
+    /// Reviews due today; more than `reviewHold` makes it a catch-up day: reviews fill the run, no new lessons.
+    let reviewsDue: Int
+    let catchingUp: Bool
+    let reviewHold: Int
 
-    private enum CodingKeys: String, CodingKey { case minutes, reps, remaining, focus }
+    private enum CodingKeys: String, CodingKey {
+        case minutes, reps, remaining, focus
+        case reviewsDue = "reviews_due"
+        case catchingUp = "catching_up"
+        case reviewHold = "review_hold"
+    }
 
-    init(minutes: Double = 0, reps: Int = 0, remaining: Int = 0, focus: [String] = []) {
+    init(minutes: Double = 0, reps: Int = 0, remaining: Int = 0, focus: [String] = [], reviewsDue: Int = 0,
+         catchingUp: Bool = false, reviewHold: Int = 5) {
         self.minutes = minutes
         self.reps = reps
         self.remaining = remaining
         self.focus = focus
+        self.reviewsDue = reviewsDue
+        self.catchingUp = catchingUp
+        self.reviewHold = reviewHold
     }
 
     init(from decoder: Decoder) throws {
@@ -106,24 +119,61 @@ struct PrepRunSummary: Decodable, Hashable, Sendable {
         reps = c.int(.reps)
         remaining = c.int(.remaining)
         focus = c.strings(.focus)
+        reviewsDue = c.int(.reviewsDue)
+        catchingUp = c.optional(Bool.self, .catchingUp) ?? false
+        reviewHold = c.optional(Int.self, .reviewHold) ?? 5
     }
 }
 
-/// `GET /api/tutor/home`. The server also sends `readiness`, `tracks` and `needs_work` from the
-/// retired DSA tracks; the app reads none of them.
+/// One clause of the mastery bar, from `/home`'s `readiness.checks`: `done` of `total` against `aim` (a share).
+struct PrepReadinessCheck: Decodable, Identifiable, Hashable, Sendable {
+    enum Kind: String, Hashable, Sendable { case course, retention, stories, mocks, unknown }
+
+    let id: String
+    let done: Int
+    let total: Int
+    let aim: Double
+    let met: Bool
+
+    var kind: Kind { Kind(rawValue: id) ?? .unknown }
+
+    private enum CodingKeys: String, CodingKey { case id, done, total, aim, met }
+
+    init(id: String, done: Int, total: Int, aim: Double = 1, met: Bool) {
+        (self.id, self.done, self.total, self.aim, self.met) = (id, done, total, aim, met)
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.string(.id)
+        done = c.int(.done)
+        total = c.int(.total)
+        aim = c.optional(Double.self, .aim) ?? 1
+        met = c.optional(Bool.self, .met) ?? false
+    }
+}
+
+/// `GET /api/tutor/home`. The server also sends `tracks` and `needs_work` from the retired DSA tracks;
+/// the app reads neither.
 struct PrepHome: Decodable, Hashable, Sendable {
     let streak: PrepStreak
     let run: PrepRunSummary
     /// The learn-first course path; nil on servers without a course.
     let course: PrepCourse?
+    /// The mastery bar's four checks; empty from an older server, which hides the readiness row.
+    let readiness: [PrepReadinessCheck]
 
-    private enum CodingKeys: String, CodingKey { case streak, run, course }
+    private enum CodingKeys: String, CodingKey { case streak, run, course, readiness }
+    private enum ReadinessKeys: String, CodingKey { case checks }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         streak = c.object(PrepStreak.self, .streak, default: PrepStreak())
         run = c.object(PrepRunSummary.self, .run, default: PrepRunSummary())
         course = c.optional(PrepCourse.self, .course)
+        let checks = (try? c.nestedContainer(keyedBy: ReadinessKeys.self, forKey: .readiness))
+            .flatMap { try? $0.decode([PrepReadinessCheck].self, forKey: .checks) } ?? []
+        readiness = checks.filter { $0.kind != .unknown }
     }
 }
 

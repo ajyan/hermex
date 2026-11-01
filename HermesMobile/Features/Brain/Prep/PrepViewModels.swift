@@ -1066,14 +1066,61 @@ enum PrepCopy {
 
     /// The ring card's line: the streak once there is one, then XP.
     /// The readiness card's one line of where practice stands: "0 of 8 stories ready · No graded mock yet · 10 open gaps".
-    static func readinessFacts(storiesReady: Int?, storiesTotal: Int?, gradedMocks: Int?, openGaps: Int?) -> String {
-        var parts: [String] = []
-        if let storiesReady, let storiesTotal, storiesTotal > 0 { parts.append("\(storiesReady) of \(storiesTotal) stories ready") }
-        if let gradedMocks {
-            parts.append(gradedMocks == 0 ? "No graded mock yet" : gradedMocks == 1 ? "1 graded mock" : "\(gradedMocks) graded mocks")
+    /// A readiness check's name under its pip.
+    static func readinessLabel(_ check: PrepReadinessCheck) -> String {
+        switch check.kind {
+        case .course: "Units"
+        case .retention: "Retention"
+        case .stories: "Stories"
+        case .mocks: "Mocks"
+        case .unknown: check.id
         }
-        if let openGaps { parts.append(openGaps == 1 ? "1 gap to close" : "\(openGaps) gaps to close") }
-        return parts.isEmpty ? "Practice out loud: a story, then the follow-ups." : parts.joined(separator: " · ")
+    }
+
+    /// Where a check stands, short enough for a quarter of the row: "0 of 14", "4%".
+    static func readinessValue(_ check: PrepReadinessCheck) -> String {
+        guard check.kind == .retention else { return "\(check.done) of \(check.total)" }
+        guard check.total > 0 else { return "No reviews" }
+        return "\(Int((Double(check.done) / Double(check.total) * 100).rounded()))%"
+    }
+
+    /// The bar under a check's value, when it isn't "all of them": "aim 90%".
+    static func readinessAim(_ check: PrepReadinessCheck) -> String? {
+        check.kind == .retention ? "aim \(Int((check.aim * 100).rounded()))%" : nil
+    }
+
+    /// What a check asks for, for VoiceOver: the bar it has to clear.
+    static func readinessGoal(_ check: PrepReadinessCheck) -> String {
+        switch check.kind {
+        case .course: "Every unit passed"
+        case .retention: "Lesson reviews over three weeks passing at \(Int((check.aim * 100).rounded()))%, on the grader's own verdicts"
+        case .stories: "Every active story ready"
+        case .mocks: "A passing voice mock of each kind in the last 30 days"
+        case .unknown: ""
+        }
+    }
+
+    /// The next lesson's line on the path: in today's run, or (on a catch-up day, which plans none) after the reviews.
+    static func nextLessonLine(catchingUp: Bool) -> String {
+        catchingUp ? "Next, once the reviews are done" : "Up next in today's run"
+    }
+
+    /// The Today card's title: "Catch-up day" when reviews fill the run, else today's run.
+    static func todayTitle(_ action: RunAction, catchingUp: Bool) -> String {
+        if action == .done { return "Today's run is done" }
+        return catchingUp ? "Catch-up day" : "Today's run"
+    }
+
+    /// The run's size: "11 reps · about 17 min".
+    static func runSize(reps: Int, minutes: Double) -> String {
+        let count = reps == 1 ? "1 rep" : "\(reps) reps"
+        let rounded = Int(minutes.rounded())
+        return rounded > 0 ? "\(count) · about \(rounded) min" : count
+    }
+
+    /// Why a catch-up day has no new lessons, and when they come back.
+    static func catchUpLine(reviewsDue: Int, hold: Int) -> String {
+        "\(reviewsDue) reviews are due, so today is reviews only. New lessons come back once \(hold) or fewer are due."
     }
 
     /// The streak counts days with an answer said out loud (a story, a probe or a voice mock).
@@ -1081,24 +1128,12 @@ enum PrepCopy {
         days == 0 ? "No speaking streak yet: tell a story to start one" : "\(days)-day speaking streak"
     }
 
-    /// The readiness card's title when today's run is its action.
-    static func runCardTitle(_ action: RunAction) -> String {
-        action == .done ? "Today's run is done" : "Today's run"
-    }
-
     static func runProgressLine(done: Int, total: Int) -> String { "Today's run · \(done) of \(total)" }
 
-    /// A due mock's level line: "Behavioral · B1 One story · About 6 minutes".
-    static func mockLine(_ kind: PrepMockKind, level: PrepMockLevel?) -> String? {
-        guard let level else { return nil }
-        return [kind.title, "\(level.level) \(level.title)", PrepMockCopy.minutes(level.minutes)]
-            .compactMap { $0 }.joined(separator: " · ")
-    }
-
-    /// An open unit folded to one row: what waits in it. "4 in reviews · boss back in a few days".
+    /// An open unit folded to one row: what waits in it. "4 missed last recall · boss back in a few days".
     static func foldedUnitLine(_ unit: PrepUnit) -> String {
         let reviewing = unit.lessons.filter { $0.state == .shaky }.count
-        var parts = reviewing > 0 ? ["\(reviewing) in reviews"] : [readyLine(ready: unit.readyCount, total: unit.lessonsTotal)]
+        var parts = reviewing > 0 ? ["\(reviewing) missed last recall"] : [readyLine(ready: unit.readyCount, total: unit.lessonsTotal)]
         switch unit.boss {
         case .ready: parts.append("boss comes up in a run")
         case .resting: parts.append("boss back in a few days")
@@ -1119,7 +1154,7 @@ enum PrepCopy {
     static func lessonStateWord(_ state: PrepLessonState) -> String {
         switch state {
         case .ready: "interview-ready"
-        case .shaky: "in reviews"
+        case .shaky: "missed last recall"
         case .learned: "learned"
         case .next: "next"
         case .locked, .unknown: "locked"
@@ -1285,12 +1320,11 @@ enum PrepCopy {
         }
     }
 
-    static func gapsHeader(open: Int, improving: Int) -> String {
-        switch (open, improving) {
-        case (0, 0): "None open"
-        case (_, 0): "\(open) open"
-        default: "\(open) open · \(improving) improving"
-        }
+    /// The weak spots' header count: "10 gaps · 3 missed lessons", "1 gap", "None open".
+    static func weakSpotsHeader(gaps: Int, missed: Int) -> String {
+        let parts = [gaps == 0 ? nil : gaps == 1 ? "1 gap" : "\(gaps) gaps",
+                     missed == 0 ? nil : missed == 1 ? "1 missed lesson" : "\(missed) missed lessons"].compactMap { $0 }
+        return parts.isEmpty ? "None open" : parts.joined(separator: " · ")
     }
 
     /// A reference point's id as a readable title: `p.harm-bearer` → "Harm bearer".

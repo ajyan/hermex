@@ -1,10 +1,10 @@
 import SwiftUI
 
-// Prep home's course: the readiness card and the path of units and lesson nodes. Passed units
-// collapse to a row with their stars, the unit being taught opens to its nodes and boss, other open
-// units fold to one row until tapped, the next unit waits locked with Test out, and the rest are
-// counted in one line. The path wears the `.prep` paper; only real controls are Nous blue (Start
-// and Start call on the readiness card); rewards are gold marks only.
+// Prep home's top and its course: the readiness pips, the Today card, and the path of units and lesson
+// nodes. The path shows the unit being taught; "All units" opens the rest (passed units as rows with
+// their stars, other open units folded to one row, the next unit locked with Test out, the rest counted
+// in one line). The path wears the `.prep` paper; only real controls are Nous blue (Start on the Today
+// card); rewards are gold marks only.
 
 /// Today's done/total as a ring, the number inside.
 struct PrepDayRing: View {
@@ -41,82 +41,107 @@ struct PrepDayRing: View {
     }
 }
 
-/// The top of Prep home: where interview practice stands (stories ready, graded mocks, open gaps,
-/// the speaking streak) and the one thing to do next. A due voice mock leads with Start call and
-/// today's run follows as a row under it; otherwise today's run is the card's action.
-struct PrepReadinessCard: View {
-    struct DueMock {
-        let kind: PrepMockKind
-        let ladder: PrepLadder
-        let isStarting: Bool
-        let errorMessage: String?
-        let start: () -> Void
-    }
-
-    let facts: String
-    let streakDays: Int
-    let today: PrepDayCount?
-    let runAction: PrepCopy.RunAction
-    var mock: DueMock?
+/// The top of Prep home: the mastery bar as four pips (units, retention, stories, mocks), each filled once its
+/// check is met, with where it stands under its name. Whether you'd pass the loop, at a glance.
+struct PrepReadinessRow: View {
+    let checks: [PrepReadinessCheck]
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        let paper = HermexPaper.prep
-        HXCard(.wash(paper), title: mock == nil ? PrepCopy.runCardTitle(runAction) : "Call the interviewer",
-               titleStyle: .title3, spacing: BrainStyle.m, kicker: { EmptyView() }, content: {
-            if let mock, let line = PrepCopy.mockLine(mock.kind, level: mock.ladder.current) {
-                Text(verbatim: line)
-                    .font(BrainStyle.meta)
-                    .foregroundStyle(paper.glow)
-            }
-            Text(verbatim: facts)
-                .font(BrainStyle.rowSubtitle)
-                .foregroundStyle(Color.hxTextPrimary)
-                .fixedSize(horizontal: false, vertical: true)
-            Label {
-                Text(verbatim: PrepCopy.speakingStreak(days: streakDays))
-            } icon: {
-                Image(systemName: "flame").foregroundStyle(HermexPaper.opener.glow)
-            }
-            .font(BrainStyle.meta)
-            .foregroundStyle(Color.hxTextSecondary)
-            if let message = mock?.errorMessage {
-                Text(verbatim: message)
-                    .font(BrainStyle.meta)
-                    .foregroundStyle(Color.hxDanger)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }, footer: {
-            VStack(spacing: BrainStyle.m) {
-                if let mock {
-                    PrepStartCallButton(isStarting: mock.isStarting, action: mock.start)
-                    PrepRunRow(today: today, action: runAction)
-                } else {
-                    if let today { PrepRunProgress(today: today) }
-                    PrepRunButton(action: runAction, fullWidth: true)
+        VStack(alignment: .leading, spacing: BrainStyle.s) {
+            BrainSectionHeader(title: "Interview-ready", trailing: "\(checks.filter(\.met).count) of \(checks.count)")
+            SectionCard {
+                let columns = dynamicTypeSize.isAccessibilitySize ? 2 : 4
+                Grid(alignment: .topLeading, horizontalSpacing: BrainStyle.m, verticalSpacing: BrainStyle.m) {
+                    ForEach(Array(stride(from: 0, to: checks.count, by: columns)), id: \.self) { start in
+                        GridRow {
+                            ForEach(checks[start..<min(start + columns, checks.count)]) { check in
+                                PrepReadinessPip(check: check)
+                            }
+                        }
+                    }
                 }
-            }
-        })
-    }
-}
-
-/// Today's run as one quiet row under a due mock: its ring, how far it got, and Start or Resume.
-private struct PrepRunRow: View {
-    let today: PrepDayCount?
-    let action: PrepCopy.RunAction
-
-    var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: BrainStyle.m) { progress; PrepRunButton(action: action, prominent: false) }
-            VStack(alignment: .leading, spacing: BrainStyle.s) {
-                progress
-                PrepRunButton(action: action, fullWidth: true, prominent: false)
+                .padding(.vertical, BrainStyle.s)
             }
         }
     }
+}
 
-    @ViewBuilder private var progress: some View {
-        if let today { PrepRunProgress(today: today).frame(maxWidth: .infinity, alignment: .leading) }
-        else { Spacer(minLength: 0) }
+/// One check: a pip in the Prep paper (filled when met, a ring while not), its name, and where it stands.
+private struct PrepReadinessPip: View {
+    let check: PrepReadinessCheck
+    @ScaledMetric(relativeTo: .body) private var side: CGFloat = 12
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BrainStyle.xs) {
+            Group {
+                if check.met {
+                    Circle().fill(HermexPaper.prep.glow)
+                } else {
+                    Circle().strokeBorder(HermexPaper.prep.glow, lineWidth: 1.5)
+                }
+            }
+            .frame(width: side, height: side)
+            Text(verbatim: PrepCopy.readinessLabel(check))
+                .font(BrainStyle.rowSubtitle.weight(.semibold))
+                .foregroundStyle(Color.hxTextPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Text(verbatim: PrepCopy.readinessValue(check))
+                .font(BrainStyle.meta)
+                .foregroundStyle(Color.hxTextSecondary)
+                .monospacedDigit()
+            if let aim = PrepCopy.readinessAim(check) {
+                Text(verbatim: aim)
+                    .font(BrainStyle.meta)
+                    .foregroundStyle(Color.hxTextSecondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: [PrepCopy.readinessLabel(check), PrepCopy.readinessValue(check),
+                                            PrepCopy.readinessAim(check), check.met ? "met" : "not yet"]
+            .compactMap { $0 }.joined(separator: ", ")))
+        .accessibilityHint(Text(verbatim: PrepCopy.readinessGoal(check)))
+    }
+}
+
+/// Today's run, honestly sized: catch-up day or not, how many reps and minutes, the speaking streak, how far it
+/// got, and its one action (Start, Resume, or Done for today).
+struct PrepTodayCard: View {
+    let run: PrepRunSummary
+    let streakDays: Int
+    let today: PrepDayCount?
+
+    var body: some View {
+        let action = PrepCopy.runAction(reps: run.reps, remaining: run.remaining)
+        HXCard(.wash(.prep), title: PrepCopy.todayTitle(action, catchingUp: run.catchingUp),
+               titleStyle: .title3, spacing: BrainStyle.m, kicker: { EmptyView() }, content: {
+            if action != .done {
+                Text(verbatim: PrepCopy.runSize(reps: run.reps, minutes: run.minutes))
+                    .font(BrainStyle.rowSubtitle)
+                    .foregroundStyle(Color.hxTextPrimary)
+            }
+            if run.catchingUp && action != .done {
+                Text(verbatim: PrepCopy.catchUpLine(reviewsDue: run.reviewsDue, hold: run.reviewHold))
+                    .font(BrainStyle.meta)
+                    .foregroundStyle(Color.hxTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Label {
+                Text(verbatim: PrepCopy.speakingStreak(days: streakDays))
+            } icon: {
+                Image(systemName: "flame").foregroundStyle(HermexPaper.prep.glow)
+            }
+            .font(BrainStyle.meta)
+            .foregroundStyle(Color.hxTextSecondary)
+        }, footer: {
+            VStack(spacing: BrainStyle.m) {
+                // Once started: how far it got. Before, the size line above already says it.
+                if let today, today.done > 0 { PrepRunProgress(today: today).frame(maxWidth: .infinity, alignment: .leading) }
+                PrepRunButton(action: action, fullWidth: true)
+            }
+        })
     }
 }
 
@@ -141,8 +166,12 @@ private struct PrepRunProgress: View {
 /// one quiet "N more units" line.
 struct PrepUnitPath: View {
     let course: PrepCourse
+    /// A catch-up day plans no new lessons, so the next lesson isn't in today's run.
+    var catchingUp = false
     /// Open units the user unfolded; the unit being taught is always open.
     @State private var unfolded: Set<String> = []
+    /// "All units": the whole path, not only the unit being taught.
+    @State private var showsAll = false
 
     /// The unit being taught: the one holding the next lesson, else the last open unit.
     private var teaching: String? {
@@ -159,21 +188,36 @@ struct PrepUnitPath: View {
             course.units[i].state != .passed && course.units[i].state != .current && i != nextLocked
         }.count
         VStack(alignment: .leading, spacing: BrainStyle.l) {
+            BrainSectionHeader(title: "Course")
             ForEach(Array(course.units.enumerated()), id: \.element.id) { index, unit in
-                if unit.state == .passed {
+                if unit.id == teaching {
+                    PrepCurrentUnit(index: index, unit: unit, catchingUp: catchingUp)
+                } else if !showsAll {
+                    EmptyView()
+                } else if unit.state == .passed {
                     PrepPassedUnitRow(index: index, unit: unit)
-                } else if unit.state == .current, unit.id == teaching || unfolded.contains(unit.id) {
-                    PrepCurrentUnit(index: index, unit: unit)
+                } else if unit.state == .current, unfolded.contains(unit.id) {
+                    PrepCurrentUnit(index: index, unit: unit, catchingUp: catchingUp)
                 } else if unit.state == .current {
                     PrepFoldedUnitRow(index: index, unit: unit) { unfolded.insert(unit.id) }
                 } else if index == nextLocked {
                     PrepLockedUnitRow(index: index, unit: unit)
                 }
             }
-            if later > 0 {
+            if showsAll, later > 0 {
                 Text(verbatim: Self.moreUnitsLine(later))
                     .font(BrainStyle.meta)
                     .foregroundStyle(Color.hxTextSecondary)
+            }
+            if course.units.count > 1 {
+                Button { showsAll.toggle() } label: {
+                    Text(verbatim: showsAll ? "Show only this unit" : "All \(course.units.count) units")
+                        .font(BrainStyle.rowSubtitle)
+                        .foregroundStyle(Color.accentColor)
+                        .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -267,6 +311,7 @@ private struct PrepLockedUnitRow: View {
 private struct PrepCurrentUnit: View {
     let index: Int
     let unit: PrepUnit
+    var catchingUp = false
     @ScaledMetric(relativeTo: .body) private var step: CGFloat = 30
 
     private static let pattern: [CGFloat] = [0, 1, 2, 1]
@@ -297,7 +342,7 @@ private struct PrepCurrentUnit: View {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(unit.lessons.enumerated()), id: \.element.id) { offset, lesson in
                     PrepPathRow(offset: x(offset), next: x(offset + 1)) {
-                        PrepLessonNodeLink(lesson: lesson)
+                        PrepLessonNodeLink(lesson: lesson, catchingUp: catchingUp)
                     }
                 }
                 PrepPathRow(offset: x(unit.lessons.count), next: nil) {
@@ -392,6 +437,7 @@ private struct PrepNodeDisc: View {
 /// coming up in today's run (Start on the readiness card begins it), so it opens nothing.
 private struct PrepLessonNodeLink: View {
     let lesson: PrepLessonNode
+    var catchingUp = false
 
     var body: some View {
         switch lesson.state {
@@ -403,7 +449,7 @@ private struct PrepLessonNodeLink: View {
         case .next:
             row
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(Text(verbatim: "\(lesson.title), up next in today's run"))
+                .accessibilityLabel(Text(verbatim: "\(lesson.title), \(PrepCopy.nextLessonLine(catchingUp: catchingUp).lowercased())"))
         case .locked, .unknown:
             row
                 .accessibilityElement(children: .ignore)
@@ -430,9 +476,10 @@ private struct PrepLessonNodeLink: View {
                     .foregroundStyle(kind == .locked ? Color.hxTextSecondary : Color.hxTextPrimary)
                     .lineLimit(2)
                 if kind == .shaky {
-                    Text(verbatim: "In reviews").font(BrainStyle.meta).foregroundStyle(Color.hxTextSecondary)
+                    Text(verbatim: "Missed last recall").font(BrainStyle.meta).foregroundStyle(Color.hxTextSecondary)
                 } else if kind == .next {
-                    Text(verbatim: "Up next in today's run").font(BrainStyle.meta).foregroundStyle(HermexPaper.prep.glow)
+                    Text(verbatim: PrepCopy.nextLessonLine(catchingUp: catchingUp)).font(BrainStyle.meta)
+                        .foregroundStyle(HermexPaper.prep.glow)
                 } else if lesson.reteach {
                     Text(verbatim: "Another way to see it is waiting").font(BrainStyle.meta)
                         .foregroundStyle(HermexPaper.prep.glow)
