@@ -174,8 +174,8 @@ struct ChatDrawerView<ServerMenu: View>: View {
     }
 
     /// A section row. A section with its own paper (Brief, Brain, People, Interview prep, Goals, Body,
-    /// Money) shows its icon on a solid tile in that paper's glow, so the hues stay apart in dark mode
-    /// too; the rest stay neutral so the colored ones stand out.
+    /// Money) shows its icon in that paper's glow on a faint wash tile; the rest stay neutral so the colored
+    /// ones stand out.
     private func drawerRow(
         _ title: String,
         systemImage: String,
@@ -186,9 +186,9 @@ struct ChatDrawerView<ServerMenu: View>: View {
             HStack(spacing: 12) {
                 Image(systemName: systemImage)
                     .font(AppFont.body())
-                    .foregroundStyle(paper?.onGlow ?? Color.hxTextPrimary)
+                    .foregroundStyle(paper?.glow ?? Color.hxTextPrimary)
                     .frame(width: 30, height: 30)
-                    .background(paper?.glow ?? .clear, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
+                    .background(paper?.wash ?? .clear, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
                     .accessibilityHidden(true)
                 Text(title)
                     .font(.body)
