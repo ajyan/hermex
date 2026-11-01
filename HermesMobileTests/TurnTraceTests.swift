@@ -64,6 +64,25 @@ final class TurnTraceTests: XCTestCase {
         XCTAssertEqual(json["detached"] as? Bool, true)
     }
 
+    func testVoiceFieldsEncodeOnlyWhenSet() throws {
+        let start = ContinuousClock.now
+        var upload = makeTrace(start: start).upload(outcome: .done, endedAt: start + .milliseconds(50))
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: encoder.encode(upload)) as? [String: Any])
+        XCTAssertNil(json["voice"])
+        XCTAssertNil(json["speech_end_to_audible_ms"])
+        XCTAssertNil(json["barge_in_ms"])
+
+        upload.voice = true
+        upload.speechEndToAudibleMs = 2840
+        upload.bargeInMs = 920
+        json = try XCTUnwrap(JSONSerialization.jsonObject(with: encoder.encode(upload)) as? [String: Any])
+        XCTAssertEqual(json["voice"] as? Bool, true)
+        XCTAssertEqual(json["speech_end_to_audible_ms"] as? Int, 2840)
+        XCTAssertEqual(json["barge_in_ms"] as? Int, 920)
+    }
+
     func testMissingMarksEncodeAsNull() throws {
         let start = ContinuousClock.now
         let trace = makeTrace(start: start)

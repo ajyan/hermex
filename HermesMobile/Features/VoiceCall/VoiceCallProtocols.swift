@@ -18,11 +18,19 @@ protocol SpeechListening: AnyObject {
     func endTurn()
 }
 
+/// Which voice played a stretch of speech, for the call's timing log.
+enum SpeechVoice: String {
+    case server, device
+}
+
 /// Speaks queued sentences in order. `onFinishedQueue` fires when the queue
 /// drains naturally, never after `stopNow()`.
 @MainActor
 protocol SpeechSpeaking: AnyObject {
     var onFinishedQueue: (() -> Void)? { get set }
+    /// Fires as audio for queued text starts playing, with that text (several sentences when
+    /// the server voice fetched them as one clip) and the voice playing it.
+    var onAudioStarted: ((String, SpeechVoice) -> Void)? { get set }
     var isSpeaking: Bool { get }
     func enqueue(_ sentence: String)
     func stopNow()
@@ -41,6 +49,9 @@ protocol VoiceCallChatDriving: AnyObject {
     /// The call's system audio is up (or gone). While it is up the app keeps running in
     /// the background, so the chat keeps its stream when a background task expires.
     func voiceCallDidChange(isActive: Bool)
+    /// The call's timing of the current turn, in milliseconds, for its turn trace: from the end
+    /// of the user's speech to the reply's first audible word, or from speech over the reply to silence.
+    func noteVoiceTiming(speechEndToAudibleMS: Int?, bargeInMS: Int?)
 }
 
 /// CallKit: the system call that keeps audio alive in the background and

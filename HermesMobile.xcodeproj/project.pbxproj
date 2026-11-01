@@ -126,6 +126,7 @@
 		18B144B4DEBF30306CB5306F /* VoiceApprovalMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85CD5EB62F24532DFA50A9BF /* VoiceApprovalMatcher.swift */; };
 		DA7A71AB914D0090DBA76517 /* TurnDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 050448814DCC3A3C78903E26 /* TurnDetector.swift */; };
 		57DACDD34211D8A97FD562AB /* VoiceCallTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80C9FC76FF354272B70675F1 /* VoiceCallTiming.swift */; };
+		0386A00C27B1A9E0AB8B42F5 /* VoiceCallMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3FAC7BEDE67768E3B52A61E /* VoiceCallMetrics.swift */; };
 		22CC867515827938246D8571 /* VoiceApprovalMatcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBF591C77B150A58C93FAB25 /* VoiceApprovalMatcherTests.swift */; };
 		5F3C973DF0918884E44A56F3 /* TurnDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01041E501EAAF703B6A601B6 /* TurnDetectorTests.swift */; };
 		AA0100000000000000000001 /* AtlasActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0200000000000000000001 /* AtlasActivity.swift */; };
@@ -1022,6 +1023,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		85CD5EB62F24532DFA50A9BF /* VoiceApprovalMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceApprovalMatcher.swift; sourceTree = "<group>"; };
 		050448814DCC3A3C78903E26 /* TurnDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurnDetector.swift; sourceTree = "<group>"; };
 		80C9FC76FF354272B70675F1 /* VoiceCallTiming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallTiming.swift; sourceTree = "<group>"; };
+		B3FAC7BEDE67768E3B52A61E /* VoiceCallMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallMetrics.swift; sourceTree = "<group>"; };
 		EBF591C77B150A58C93FAB25 /* VoiceApprovalMatcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceApprovalMatcherTests.swift; sourceTree = "<group>"; };
 		01041E501EAAF703B6A601B6 /* TurnDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurnDetectorTests.swift; sourceTree = "<group>"; };
 		B48200000000000000000001 /* BotProfileAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bots/BotProfileAppearance.swift; sourceTree = "<group>"; };
@@ -1901,6 +1903,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				85CD5EB62F24532DFA50A9BF /* VoiceApprovalMatcher.swift */,
 				050448814DCC3A3C78903E26 /* TurnDetector.swift */,
 				80C9FC76FF354272B70675F1 /* VoiceCallTiming.swift */,
+				B3FAC7BEDE67768E3B52A61E /* VoiceCallMetrics.swift */,
 			);
 			path = VoiceCall;
 			sourceTree = "<group>";
@@ -3363,6 +3366,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				18B144B4DEBF30306CB5306F /* VoiceApprovalMatcher.swift in Sources */,
 				DA7A71AB914D0090DBA76517 /* TurnDetector.swift in Sources */,
 				57DACDD34211D8A97FD562AB /* VoiceCallTiming.swift in Sources */,
+				0386A00C27B1A9E0AB8B42F5 /* VoiceCallMetrics.swift in Sources */,
 				A4790000000000000000E001 /* PushEnvironment.swift in Sources */,
 				A4790000000000000000E002 /* PushPairing.swift in Sources */,
 				559000000000000000000001 /* PushPreview.swift in Sources */,

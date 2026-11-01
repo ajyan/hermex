@@ -69,6 +69,38 @@ final class TurnTraceFlowTests: APIClientTestCase {
         XCTAssertGreaterThanOrEqual(firstToken, headers)
         XCTAssertGreaterThanOrEqual(rendered, firstToken)
         XCTAssertGreaterThanOrEqual(end, rendered)
+        XCTAssertNil(body["voice"], "only voice-call turns carry the call's timings")
+    }
+
+    /// A call learns when the reply became audible (and of any barge-in) after the stream can end, so its
+    /// turn's upload waits for the call and carries those timings.
+    @MainActor
+    func testVoiceCallTurnUploadWaitsForTheCallsTimings() async throws {
+        let recorder = RequestRecorder()
+        let uploaded = expectation(description: "turn uploaded")
+        recorder.onUpload = { uploaded.fulfill() }
+        let streamClient = ScriptedSSEStreamingClient(connectionScripts: [[
+            .init(.token("Hi"), lastEventID: "stream-123:1"),
+            .init(.done(DoneStreamEvent())),
+            .init(.streamEnd)
+        ]])
+        let viewModel = try makeViewModel(streamClient: streamClient, recorder: recorder)
+        viewModel.voiceCallDidChange(isActive: true)
+
+        let didStart = await viewModel.sendVoiceMessage("Say hi")
+        XCTAssertTrue(didStart)
+        streamClient.playArmedConnectionScript()
+        viewModel.noteVoiceTiming(speechEndToAudibleMS: 2840, bargeInMS: nil)
+        viewModel.noteVoiceTiming(speechEndToAudibleMS: nil, bargeInMS: 920)
+        viewModel.voiceCallDidChange(isActive: false)
+        await fulfillment(of: [uploaded], timeout: 5)
+
+        XCTAssertEqual(recorder.uploads.count, 1)
+        let body = try XCTUnwrap(recorder.uploads.first)
+        XCTAssertEqual(body["outcome"] as? String, "done")
+        XCTAssertEqual(body["voice"] as? Bool, true)
+        XCTAssertEqual(body["speech_end_to_audible_ms"] as? Int, 2840)
+        XCTAssertEqual(body["barge_in_ms"] as? Int, 920)
     }
 
     @MainActor

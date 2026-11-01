@@ -10,6 +10,7 @@ import AVFoundation
 @MainActor
 final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate {
     var onFinishedQueue: (() -> Void)?
+    var onAudioStarted: ((String, SpeechVoice) -> Void)?
     var isSpeaking: Bool { !queued.isEmpty || fetchTask != nil || !clips.isEmpty || player != nil || fallback.isSpeaking }
 
     /// Mirrors the server's per-client TTS rate limit (`_TtsRateLimiter`, 2 s).
@@ -24,7 +25,7 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
 
     /// Speech in order: fetched server audio, or text the server voice failed on.
     private enum Clip {
-        case audio(Data)
+        case audio(Data, text: String)
         case onDevice(String)
     }
 
@@ -52,6 +53,7 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
         self.log = log
         super.init()
         fallback.onFinishedQueue = { [weak self] in self?.fallbackFinished() }
+        fallback.onAudioStarted = { [weak self] text, voice in self?.onAudioStarted?(text, voice) }
     }
 
     func enqueue(_ sentence: String) {
@@ -104,7 +106,7 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
             log(String(format: "tts fetched %d sentence(s), %d chars in %.2fs",
                        sentences, text.count, ProcessInfo.processInfo.systemUptime - started))
             consecutiveFailures = 0
-            clips.append(.audio(data))
+            clips.append(.audio(data, text: text))
         } catch is CancellationError {
             return
         } catch APIError.http(statusCode: 429, _) {
@@ -130,17 +132,19 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
     private func playNextIfIdle() {
         guard player == nil, let next = clips.first else { return }
         let data: Data
+        let text: String
         switch next {
         case .onDevice(let text):
             clips.removeFirst()
             fallback.enqueue(text)
             playNextIfIdle()
             return
-        case .audio(let audio):
+        case .audio(let audio, let clipText):
             // After the on-device voice finishes, so the voices never overlap.
             guard !fallback.isSpeaking else { return }
             clips.removeFirst()
             data = audio
+            text = clipText
         }
         guard let player = try? AVAudioPlayer(data: data) else {
             log("tts audio undecodable; skipping clip")
@@ -156,6 +160,7 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
         }
         self.player = player
         startMeter()
+        onAudioStarted?(text, .server)
     }
 
     nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
