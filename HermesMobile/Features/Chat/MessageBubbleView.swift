@@ -72,6 +72,7 @@ struct MessageBubbleView: View {
     }
 
     var body: some View {
+        let _ = RenderProbe.hit(.messageBubble)
         if isLocalNotice {
             localNoticeRow
         } else if isLocalAssistant {
