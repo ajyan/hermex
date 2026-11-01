@@ -1775,7 +1775,7 @@ final class PrepViewModelsTests: XCTestCase {
         return makeVM(client, clock: clock)
     }
 
-    func testStoryRepStagesTellToTwoProbes() async {
+    func testStoryRepRunsTellThenBothProbesThenOneDebrief() async {
         let client = FakePrepClient()
         let first = storyResult(next: 0)
         let second = probeResult(next: 0, attempt: "probe-1", probe: #"{"id": "s1.p2", "attack": "What didn't it fix?"}"#)
@@ -1787,22 +1787,16 @@ final class PrepViewModelsTests: XCTestCase {
 
         vm.editStory("We disagreed about the rollout plan")
         await vm.submitStory()
-        XCTAssertEqual(vm.storyStage, .told(first))
-        XCTAssertFalse(vm.canFinishStory, "a told story with a probe goes on to it")
-
-        vm.beginProbe()
-        XCTAssertEqual(vm.storyStage, .probing(PrepProbe(id: "s1.p1", attack: "What was the number?"), number: 1))
+        XCTAssertEqual(vm.storyStage, .probing(PrepProbe(id: "s1.p1", attack: "What was the number?"), number: 1),
+                       "the first follow-up comes straight after the telling, with no score")
         XCTAssertEqual(vm.recallDraft, "", "each probe starts with an empty answer")
+        XCTAssertFalse(vm.canFinishStory)
         vm.editStory("It cut p99 latency by 40%")
         await vm.submitProbe()
-        XCTAssertEqual(vm.storyStage, .probed(second, number: 1))
-        XCTAssertFalse(vm.canFinishStory)
-
-        vm.beginProbe()
         XCTAssertEqual(vm.storyStage, .probing(PrepProbe(id: "s1.p2", attack: "What didn't it fix?"), number: 2))
         vm.editStory("The on-call load")
         await vm.submitProbe()
-        XCTAssertEqual(vm.storyStage, .probed(third, number: 2))
+        XCTAssertEqual(vm.storyStage, .debrief(told: first, probes: [second, third]))
         XCTAssertTrue(vm.canFinishStory)
         guard case .rep(let still, _) = vm.phase else { return XCTFail("phase \(vm.phase)") }
         XCTAssertEqual(still.index, 0, "the story stays on screen until Next")
@@ -1861,8 +1855,6 @@ final class PrepViewModelsTests: XCTestCase {
         await vm.load()
         vm.editStory("A story")
         await vm.submitStory()
-        t = t.addingTimeInterval(20)
-        vm.beginProbe()
         t = t.addingTimeInterval(7)
         vm.editStory("The number was 40%")
         await vm.submitProbe()
@@ -1871,7 +1863,7 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(probe?.item, "s1")
         XCTAssertEqual(probe?.parent, "story-att")
         XCTAssertEqual(probe?.probe, "s1.p1")
-        XCTAssertEqual(probe?.elapsedMS, 7_000, "a probe is timed from when it was asked")
+        XCTAssertEqual(probe?.elapsedMS, 7_000, "a probe is timed from when it was asked, as the telling's grade landed")
         XCTAssertEqual(probe?.answer, .choice("The number was 40%"))
         XCTAssertTrue(vm.canFinishStory, "a probe result with no next probe ends the rep")
     }
@@ -1889,6 +1881,9 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(client.attempts.first?.parent, "att-latest")
         XCTAssertEqual(client.attempts.first?.probe, "s1.p2")
         XCTAssertTrue(vm.canFinishStory)
+        guard case let .debrief(told, probes) = vm.storyStage else { return XCTFail("stage \(vm.storyStage)") }
+        XCTAssertNil(told, "a rep resumed at a probe has no telling to show")
+        XCTAssertEqual(probes.count, 1)
     }
 
     func testUngradedStoryShowsSavedForTonight() async {
@@ -1900,12 +1895,9 @@ final class PrepViewModelsTests: XCTestCase {
         await vm.load()
         vm.editStory("A story")
         await vm.submitStory()
-        XCTAssertEqual(vm.storyStage, .told(ungraded))
+        XCTAssertEqual(vm.storyStage, .debrief(told: ungraded, probes: []), "no probe to ask")
         XCTAssertEqual(PrepCopy.storyHeadline(ungraded), "Couldn't grade, saved for tonight")
-        XCTAssertNil(vm.nextProbe)
         XCTAssertTrue(vm.canFinishStory)
-        vm.beginProbe()
-        XCTAssertEqual(vm.storyStage, .told(ungraded), "no probe to begin")
         await vm.continue()
         XCTAssertEqual(currentRep(vm)?.index, 1)
     }
@@ -1935,10 +1927,14 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(client.attempts.count, 1, "a told story can't be posted again")
     }
 
-    func testStoryBeatOverrideRescoresAndKeepsTheProbe() async {
+    func testDebriefOverridesRescoreTheTellingOrTheProbeTheyBelongTo() async {
         let client = FakePrepClient()
-        client.attemptResults = [.success(storyResult(next: 0)),
-                                 .success(probeResult(next: 0, attempt: "probe-1", probe: nil))]
+        let probe = decode(PrepAttemptResult.self, #"""
+        {"verdict": "partial", "next_index": 0, "attempt": "probe-1",
+         "grade": {"points_hit": [{"point_id": "s1.p1.1", "quote": ""}], "points_missed": [{"point_id": "s1.p1.2", "why": "w"}]},
+         "probe": null}
+        """#)
+        client.attemptResults = [.success(storyResult(next: 0)), .success(probe)]
         client.overrideResults = [
             .success(decode(PrepAttemptResult.self, #"""
             {"verdict": "pass", "attempt": "story-att-2", "score": 5, "overridden": ["b.number"],
@@ -1954,22 +1950,20 @@ final class PrepViewModelsTests: XCTestCase {
         vm.editStory("A story")
         await vm.submitStory()
         await vm.overridePoint("b.number")
-        guard case let .told(told) = vm.storyStage else { return XCTFail("stage \(vm.storyStage)") }
-        XCTAssertEqual(told.score, 5, "the override re-scores the telling")
-        XCTAssertEqual(told.overridden, ["b.number"])
-        XCTAssertEqual(told.probe?.id, "s1.p1", "a re-scored story still goes on to its probes")
-        XCTAssertNil(vm.overridingPoint)
-        XCTAssertEqual(client.log.last, "override:story-att:b.number")
-
-        vm.beginProbe()
+        XCTAssertTrue(client.log.filter { $0.hasPrefix("override") }.isEmpty, "nothing to claim until the debrief")
         vm.editStory("The number")
         await vm.submitProbe()
-        XCTAssertEqual(client.attempts.last?.parent, "story-att", "probes still answer to the story attempt")
+        XCTAssertEqual(client.attempts.last?.parent, "story-att", "probes answer to the story attempt")
+
+        await vm.overridePoint("b.number")
+        XCTAssertEqual(client.log.last, "override:story-att:b.number")
         await vm.overridePoint("s1.p1.2")
-        guard case let .probed(probed, number) = vm.storyStage else { return XCTFail("stage \(vm.storyStage)") }
-        XCTAssertEqual(number, 1)
-        XCTAssertEqual(probed.overridden, ["s1.p1.2"])
         XCTAssertEqual(client.log.last, "override:probe-1:s1.p1.2")
+        guard case let .debrief(told, probes) = vm.storyStage else { return XCTFail("stage \(vm.storyStage)") }
+        XCTAssertEqual(told?.score, 5, "the override re-scores the telling")
+        XCTAssertEqual(told?.overridden, ["b.number"])
+        XCTAssertEqual(probes.first?.overridden, ["s1.p1.2"], "and the probe's on its own result")
+        XCTAssertNil(vm.overridingPoint)
     }
 
     func testStoryClockFreezesWhileGrading() async {

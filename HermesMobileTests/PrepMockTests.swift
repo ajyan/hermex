@@ -493,6 +493,34 @@ final class PrepMockTests: APIClientTestCase {
         XCTAssertEqual(PrepMockCopy.display(viewModel.result(mockID: "m1")), .grading)
     }
 
+    func testTheResultRefreshesWhileGradingAndStopsWhenGraded() async throws {
+        let client = FakeMockClient()
+        client.mocksResults = [.success(try mocks(status: "grading")), .success(try mocks(status: "grading")),
+                               .success(try mocks(status: "graded", score: 4.0))]
+        let viewModel = PrepMockViewModel(client: client)
+        await viewModel.load()
+        var naps = 0
+
+        await viewModel.refreshWhileGrading(mockID: "m1", sleep: { _ in naps += 1 })
+
+        XCTAssertEqual(client.log, ["mocks", "mocks", "mocks"])
+        XCTAssertEqual(naps, 2)
+        guard case .graded = PrepMockCopy.display(viewModel.result(mockID: "m1")) else {
+            return XCTFail("the grade should show once it lands")
+        }
+    }
+
+    func testTheGradingRefreshGivesUpAtItsLimit() async throws {
+        let client = FakeMockClient()
+        client.mocksResults = [.success(try mocks(status: "grading"))]
+        let viewModel = PrepMockViewModel(client: client)
+        await viewModel.load()
+
+        await viewModel.refreshWhileGrading(mockID: "m1", limit: 3, sleep: { _ in })
+
+        XCTAssertEqual(client.log.count, 4, "one load, then three refreshes")
+    }
+
     // MARK: The interviewer profile
 
     private func makeStore() -> PrepMockReturnStore {

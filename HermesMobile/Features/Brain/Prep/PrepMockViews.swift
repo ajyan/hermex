@@ -207,8 +207,8 @@ struct PrepStartCallButton: View {
 
 // MARK: - Result
 
-/// One mock after hang-up: "Grading your mock…" until the grader is done (refreshed on appear and
-/// by pulling, never polled), then the score, each scored dimension and frame point as ✓ or ◌ with
+/// One mock after hang-up: "Grading your mock…" until the grader is done (checked every few seconds
+/// while this screen is open, and on pull), then the score, each scored dimension and frame point as ✓ or ◌ with
 /// the words that showed it, the next level when it passed, and the median time to the first word.
 /// Pushed as `.prep(.mockResult(id))`.
 struct PrepMockResultView: View {
@@ -229,7 +229,10 @@ struct PrepMockResultView: View {
             .hxNavigationTitle("Mock result")
             .feedbackContext(FeedbackContext(feature: "Prep", screen: "Mock result"))
             .background(Color.hxCanvas.ignoresSafeArea())
-            .task { await viewModel.load() }
+            .task {
+                await viewModel.load()
+                await viewModel.refreshWhileGrading(mockID: mockID)
+            }
     }
 
     @ViewBuilder
@@ -248,7 +251,7 @@ struct PrepMockResultView: View {
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
                     switch PrepMockCopy.display(viewModel.result(mockID: mockID)) {
                     case .grading:
-                        statusCard(PrepMockCopy.grading, symbol: "hourglass", detail: "Pull down to check again.")
+                        statusCard(PrepMockCopy.grading, symbol: "hourglass", detail: "This updates when the grade lands.")
                     case .ungraded:
                         statusCard(PrepMockCopy.ungraded, symbol: "moon.zzz")
                     case .tooShort:
