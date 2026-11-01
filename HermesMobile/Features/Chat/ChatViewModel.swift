@@ -379,6 +379,9 @@ final class ChatViewModel {
         compressionReferenceCard = card
     }
     private(set) var liveToolCalls: [ToolCall] = []
+    /// The notes and people the server gave the agent for the current run (`context_sources`),
+    /// read by the call screen. Cleared when a turn is sent.
+    private(set) var liveContextSources: [ContextSourcesStreamEvent.Source] = []
     private(set) var liveReasoningText = ""
     private(set) var streamingAssistantMessageID: String? {
         didSet {
@@ -2718,6 +2721,7 @@ final class ChatViewModel {
         archiveLiveToolCallsIfNeeded()
         liveReasoningText = ""
         liveToolCalls = []
+        liveContextSources = []
         reasoningAnchorMessageID = nil
         toolCallAnchorMessageID = nil
         streamCoordinator.prepareForNewResponse()
@@ -5028,7 +5032,7 @@ final class ChatViewModel {
             activeBtwAnswer = "Error: \(message)"
             updateActiveBtwMessage(isLoading: false)
             finishBtwStream()
-        case .heartbeat, .ignored, .reasoning, .toolStarted, .toolCompleted, .title, .metering, .pendingSteerLeftover:
+        case .heartbeat, .ignored, .reasoning, .toolStarted, .toolCompleted, .contextSources, .title, .metering, .pendingSteerLeftover:
             break
         }
     }
@@ -6418,6 +6422,10 @@ extension ChatViewModel: ChatStreamCoordinatorDelegate {
     @discardableResult
     func streamCoordinatorCompleteToolCall(_ payload: ToolStreamEvent) -> Bool {
         completeToolCall(payload)
+    }
+
+    func streamCoordinatorApplyContextSources(_ payload: ContextSourcesStreamEvent) {
+        liveContextSources = payload.sources
     }
 
     @discardableResult

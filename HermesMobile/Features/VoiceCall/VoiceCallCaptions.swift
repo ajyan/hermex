@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Live captions for a call, shown over the orb: the user's words while they
+/// Live captions for a call, shown over the constellation: the user's words while they
 /// talk, then Atlas's reply under a one-line reminder of what was asked. The
-/// area is at most seven lines tall and shrinks to fit the orb's slot (large
+/// area is at most seven lines tall and shrinks to fit the cloud's slot (large
 /// Dynamic Type never pushes it into the call controls); long text scrolls,
 /// pinned to the newest words.
 struct VoiceCallCaptions: View {
@@ -80,7 +80,7 @@ struct VoiceCallCaptions: View {
                 Text(content.body)
                     .font(AppFont.title2())
                     .foregroundStyle(content.isActive ? Color.hxTextPrimary : Color.hxTextSecondary)
-                    // Short text sits centered on the orb; longer text fills the box and follows its end.
+                    // Short text sits centered on the cloud; longer text fills the box and follows its end.
                     .frame(maxWidth: .infinity, minHeight: box.size.height, alignment: .center)
             }
         }
