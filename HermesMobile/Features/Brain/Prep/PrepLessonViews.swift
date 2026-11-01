@@ -210,6 +210,7 @@ struct PrepDayCompleteView: View {
     var offersBonus = true
     let done: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.openBrainRoute) private var openBrainRoute
     @State private var closed = false
     @ScaledMetric(relativeTo: .largeTitle) private var ring: CGFloat = 132
 
@@ -274,12 +275,14 @@ struct PrepDayCompleteView: View {
                 }
                 VStack(spacing: BrainStyle.s) {
                     PrepPrimaryButton(title: "Done", action: done)
-                    if offersBonus {
-                        NavigationLink(value: ShellPushDestination.brainRoute(.prep(.bonus))) {
+                    if offersBonus && openBrainRoute.isAvailable {
+                        // Replaces this finished run, so Done on the bonus lands back on Prep, not on this screen.
+                        Button { openBrainRoute.replaceTop(.prep(.bonus)) } label: {
                             Text(verbatim: "One more round")
                                 .font(AppFont.body(weight: .semibold))
                                 .foregroundStyle(Color.accentColor)
                                 .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .accessibilityHint(Text(verbatim: "Up to five more recalls"))

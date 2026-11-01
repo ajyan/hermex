@@ -522,6 +522,7 @@ struct ChatShellView: View {
         draftChatOpener.handler = { selectDestination(PendingNewChatRoute(initialDraft: $0)) }
         mockCallOpener.handler = { try await openMockCall($0) }
         brainRouteOpener.homeHandler = { navigation.showBrainHome() }
+        brainRouteOpener.replaceHandler = { navigation.replaceTop(with: .brainRoute($0)) }
         return NavigationStack(path: $navigation.path) {
             rootView
                 .environment(\.openBrainRoute, brainRouteOpener)

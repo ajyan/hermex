@@ -122,9 +122,15 @@ struct PrepRunView: View {
 
     private var title: String {
         if case .finished = viewModel.phase { return "Run complete" }
-        // A boss rep carries no lesson object; its item's title is the lesson the question tests.
+        // A boss rep carries no lesson object; its item's title is the lesson the question tests. A review or
+        // unit check asks from memory, so the lesson's title (which often names the answer) waits for the result.
         return currentRep.map { rep in
-            PrepCopy.runTitle(block: rep.block, lessonTitle: rep.item.lesson?.title ?? (rep.drill == .boss ? rep.item.title : nil))
+            var answered = false
+            if case .result = viewModel.phase { answered = true }
+            let asksFromMemory = rep.drill == .recall || rep.drill == .boss
+            let lessonTitle = asksFromMemory && !answered ? nil
+                : rep.item.lesson?.title ?? (rep.drill == .boss ? rep.item.title : nil)
+            return PrepCopy.runTitle(block: rep.block, lessonTitle: lessonTitle)
         } ?? ""
     }
 
@@ -429,8 +435,7 @@ struct PrepRunView: View {
                 } else {
                     PrepRecallCard(
                         prompt: recall.prompt,
-                        label: PrepCopy.recallKicker(recall, lessonTitle: lesson.title, isReview: rep.drill == .recall,
-                                                     isInterview: rep.isInterview),
+                        label: PrepCopy.recallKicker(recall, isInterview: rep.isInterview),
                         draft: Binding(get: { viewModel.recallDraft }, set: { viewModel.recallDraft = $0 }),
                         isSubmitting: viewModel.isSubmitting,
                         dontKnow: { Task { await viewModel.dontKnow() } }

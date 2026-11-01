@@ -27,18 +27,18 @@ struct PrepGate<Content: View>: View {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let model, Self.shouldGate(model), case .loaded(let ask) = model.state {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: BrainStyle.l) {
                         Label { Text(verbatim: "Prep opens after today's Ask") } icon: { Image(systemName: "lock.fill") }
                             .font(AppFont.headline())
                         // The Ask on its own paper, as on the Deck.
                         DailyAskBody(model: model, ask: ask)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(24)
+                            .padding(BrainStyle.xl)
                             .foregroundStyle(DeckPalette.ask.ink)
                             .tint(DeckPalette.ask.ink)
                             .hxCardSurface(DeckPalette.ask.cardRole)
                     }
-                    .padding(16)
+                    .padding(BrainStyle.l)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .scrollDismissesKeyboard(.interactively)

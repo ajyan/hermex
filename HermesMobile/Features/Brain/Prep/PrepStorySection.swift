@@ -239,7 +239,7 @@ private struct PrepStoryRow: View {
         VStack(alignment: .leading, spacing: BrainStyle.xs) {
             BrainRow(
                 title: story.title,
-                subtitle: story.last.map { "Last told \(BrainStyle.displayDate($0))" },
+                subtitle: story.last.map { "Last told \(PrepCopy.daysAgo($0))" },
                 badge: story.ready ? "Ready" : nil)
             // One line when it fits; stacked at accessibility text sizes.
             ViewThatFits(in: .horizontal) {
@@ -358,7 +358,7 @@ struct PrepStoryPageView: View {
                 HStack(spacing: BrainStyle.m) { marks(page) }
                 VStack(alignment: .leading, spacing: BrainStyle.xs) { marks(page) }
             }
-            Text(verbatim: page.last.map { "Last told \(BrainStyle.displayDate($0))" } ?? "Not told yet")
+            Text(verbatim: page.last.map { "Last told \(PrepCopy.daysAgo($0))" } ?? "Not told yet")
                 .font(BrainStyle.meta)
                 .foregroundStyle(Color.hxTextSecondary)
         }

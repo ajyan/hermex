@@ -80,6 +80,11 @@ struct PrepRecallResultView: View {
     /// A pool question's rep, which carries the dialogue and a worked answer.
     private var isQuestion: Bool { result.dialogue != nil }
 
+    /// The worked answer opens on its own when something was missed (or "I don't know"): that's when it teaches.
+    static func opensWorked(_ result: PrepAttemptResult) -> Bool {
+        !result.isUngraded && !(result.judgment?.pointsMissed.isEmpty ?? true)
+    }
+
     var body: some View {
         PrepRunCard {
             if result.isUngraded {
@@ -93,7 +98,7 @@ struct PrepRecallResultView: View {
                     .foregroundStyle(HermexPaper.prep.glow)
                     .accessibilityAddTraits(.isHeader)
                 if isQuestion {
-                    Text(verbatim: "What you reasoned through")
+                    Text(verbatim: "Key points")
                         .font(BrainStyle.meta)
                         .foregroundStyle(Color.hxTextSecondary)
                 }
@@ -105,6 +110,7 @@ struct PrepRecallResultView: View {
                 }
             }
         }
+        .onAppear { if Self.opensWorked(result) { showsWorked = true } }
         .task(id: result.verdict + rows.map(\.id).joined()) {
             if reduceMotion {
                 shown = rows.count

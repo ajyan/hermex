@@ -821,6 +821,9 @@ final class OpenBrainRouteAction {
     var handler: ((BrainRoute) -> Void)?
     /// Shows the Brain home (`ShellNavigationState.showBrainHome`).
     var homeHandler: (() -> Void)?
+    /// Swaps the screen on top for a route (`ShellNavigationState.replaceTop`), so a finished run doesn't
+    /// stay underneath the next one.
+    var replaceHandler: ((BrainRoute) -> Void)?
 
     /// True when a shell is listening; without one, Brain links can't open.
     var isAvailable: Bool { handler != nil }
@@ -828,6 +831,9 @@ final class OpenBrainRouteAction {
     func callAsFunction(_ route: BrainRoute) { handler?(route) }
 
     func openHome() { homeHandler?() }
+
+    /// Replaces the top screen with `route`; pushes it when the shell can't replace.
+    func replaceTop(_ route: BrainRoute) { (replaceHandler ?? handler)?(route) }
 }
 
 struct OpenBrainRouteKey: EnvironmentKey {

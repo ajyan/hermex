@@ -94,13 +94,35 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertNil(PrepKeyPointRow.hitQuote(id: "p.b", hit: false, result: result))
     }
 
+    func testDatesReadRelative() {
+        let calendar = Calendar(identifier: .gregorian)
+        let today = DateComponents(calendar: calendar, year: 2026, month: 10, day: 31).date!
+        XCTAssertEqual(PrepCopy.daysAgo("2026-10-21", today: today, calendar: calendar), "10 days ago")
+        XCTAssertEqual(PrepCopy.daysAgo("2026-10-30", today: today, calendar: calendar), "yesterday")
+        XCTAssertEqual(PrepCopy.dueLine("2026-10-24", today: today, calendar: calendar), "Overdue")
+        XCTAssertEqual(PrepCopy.dueLine("2026-11-01", today: today, calendar: calendar), "Due tomorrow")
+        XCTAssertEqual(PrepCopy.dueLine("2026-11-04", today: today, calendar: calendar), "Due in 4 days")
+    }
+
+    func testTheWorkedAnswerOpensAfterAMiss() throws {
+        let missed = try decode(PrepAttemptResult.self, #"""
+        {"verdict": "partial", "attempt": "a", "grade": {"points_hit": [{"point_id": "r1", "quote": ""}],
+         "points_missed": [{"point_id": "r2", "why": "w"}], "strong_answer": "Worked."}}
+        """#)
+        let clean = try decode(PrepAttemptResult.self, #"""
+        {"verdict": "pass", "attempt": "b", "grade": {"points_hit": [{"point_id": "r1", "quote": ""}], "points_missed": []}}
+        """#)
+        XCTAssertTrue(PrepRecallResultView.opensWorked(missed))
+        XCTAssertFalse(PrepRecallResultView.opensWorked(clean))
+    }
+
     func testTheInterviewRepNamesNoLesson() throws {
         let rep = try decode(PrepRep.self, #"{"index": 11, "block": "interview", "drill": "recall", "label": "Interview question", "item": {"id": "u1.l1"}}"#)
         XCTAssertTrue(rep.isInterview)
         XCTAssertEqual(PrepCopy.runTitle(block: rep.block, lessonTitle: "Tokens and the context budget"), "Interview")
         let recall = try decode(PrepRecall.self, #"{"prompt": "How do you decide what goes in?", "question": "u1.l1.q5", "type": "open"}"#)
-        XCTAssertEqual(PrepCopy.recallKicker(recall, lessonTitle: "Tokens", isReview: true, isInterview: true), "Interview question")
-        XCTAssertEqual(PrepCopy.recallKicker(recall, lessonTitle: "Tokens", isReview: true), "Open question · Tokens")
+        XCTAssertEqual(PrepCopy.recallKicker(recall, isInterview: true), "Interview question")
+        XCTAssertEqual(PrepCopy.recallKicker(recall), "Open question", "a review never names its lesson")
     }
 
     func testARecallBlockQuestionReadsInYourOwnWords() {
