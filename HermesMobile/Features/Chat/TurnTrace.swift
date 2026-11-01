@@ -141,4 +141,9 @@ struct TurnTraceUpload: Encodable, Equatable, Sendable {
     let backgrounded: Bool
     let detached: Bool
     let marksMs: Marks
+    /// Voice-call turns only; absent otherwise. `speechEndToAudibleMs` runs from the end of the user's
+    /// speech to the reply's first audible word, `bargeInMs` from speech over the reply to silence.
+    var voice: Bool?
+    var speechEndToAudibleMs: Int?
+    var bargeInMs: Int?
 }

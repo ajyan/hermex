@@ -134,6 +134,13 @@ final class ChatStreamCoordinator {
     /// The turn `ChatViewModel.sendMessage` started, held until the response ends and then uploaded once.
     /// Reattached and replayed streams never carry one. Not observed: marks change on the token path.
     @ObservationIgnored private(set) var turnTrace: TurnTrace?
+    /// While a voice call is on, a finished turn's upload waits here for the call's timings of it (when
+    /// the reply became audible, any barge-in), which can come after the stream ends. The next turn's
+    /// start or the call's end sends it.
+    @ObservationIgnored private var holdsTurnUploadsForVoiceCall = false
+    @ObservationIgnored private var heldVoiceUpload: TurnTraceUpload?
+    @ObservationIgnored private var voiceAudibleMS: Int?
+    @ObservationIgnored private var voiceBargeInMS: Int?
 
     /// Retains hydration requirements through transport teardown, which can arrive
     /// before SwiftUI observes the successful completion.
@@ -255,6 +262,18 @@ final class ChatStreamCoordinator {
         turnTrace?.backgrounded = true
     }
 
+    /// A voice call started or ended; ending it sends the turn upload it held.
+    func voiceCallDidChange(isActive: Bool) {
+        holdsTurnUploadsForVoiceCall = isActive
+        if !isActive { sendHeldVoiceUpload() }
+    }
+
+    /// The call's timings of the current turn. The first of each wins.
+    func noteVoiceTiming(speechEndToAudibleMS: Int?, bargeInMS: Int?) {
+        voiceAudibleMS = voiceAudibleMS ?? speechEndToAudibleMS
+        voiceBargeInMS = voiceBargeInMS ?? bargeInMS
+    }
+
     func isTerminalFenceActiveForTesting() -> Bool {
         isTerminalContentFenceActive
     }
@@ -285,6 +304,7 @@ final class ChatStreamCoordinator {
         turnTrace newTrace: TurnTrace? = nil
     ) {
         if let newTrace {
+            sendHeldVoiceUpload()
             turnTrace = newTrace
         } else {
             turnTrace?.reconnects += 1
@@ -1188,6 +1208,28 @@ final class ChatStreamCoordinator {
         guard let trace = turnTrace else { return }
         turnTrace = nil
         let upload = trace.upload(outcome: outcome, endedAt: .now)
+        if holdsTurnUploadsForVoiceCall {
+            heldVoiceUpload = upload
+        } else {
+            sendUpload(upload)
+        }
+    }
+
+    /// Sends the voice turn's held upload with the call's timings of it, and clears them for the next turn.
+    private func sendHeldVoiceUpload() {
+        defer {
+            voiceAudibleMS = nil
+            voiceBargeInMS = nil
+        }
+        guard var upload = heldVoiceUpload else { return }
+        heldVoiceUpload = nil
+        upload.voice = true
+        upload.speechEndToAudibleMs = voiceAudibleMS
+        upload.bargeInMs = voiceBargeInMS
+        sendUpload(upload)
+    }
+
+    private func sendUpload(_ upload: TurnTraceUpload) {
         let client = client
         Task(priority: .utility) { await TurnTraceUploader.send(upload, client: client) }
     }

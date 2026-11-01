@@ -241,6 +241,7 @@ private final class FlowListener: SpeechListening {
 @MainActor
 private final class FlowSpeaker: SpeechSpeaking {
     var onFinishedQueue: (() -> Void)?
+    var onAudioStarted: ((String, SpeechVoice) -> Void)?
     var spoken: [String] = []
     private var queue: [String] = []
     var isSpeaking: Bool { !queue.isEmpty }

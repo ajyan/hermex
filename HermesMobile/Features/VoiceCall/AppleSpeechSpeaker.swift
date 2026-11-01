@@ -5,6 +5,7 @@ import AVFoundation
 @MainActor
 final class AppleSpeechSpeaker: SpeechSpeaking {
     var onFinishedQueue: (() -> Void)?
+    var onAudioStarted: ((String, SpeechVoice) -> Void)?
     var isSpeaking: Bool { !pending.isEmpty }
 
     private let synthesizer: ChatSpeechSynthesizing
@@ -13,8 +14,8 @@ final class AppleSpeechSpeaker: SpeechSpeaking {
     private var delegateProxy: VoiceCallSynthesizerDelegate?
     private let levels: VoiceCallAudioLevels?
     private let log: (String) -> Void
-    /// When each pending utterance was queued, so the log shows how long audio took to start.
-    private var enqueuedAt: [ObjectIdentifier: TimeInterval] = [:]
+    /// When each pending utterance was queued and what it says, so the log shows how long audio took to start.
+    private var enqueued: [ObjectIdentifier: (at: TimeInterval, text: String)] = [:]
 
     /// `levels` receives a beat per spoken word for the call visual.
     init(
@@ -46,13 +47,13 @@ final class AppleSpeechSpeaker: SpeechSpeaking {
         let utterance = AVSpeechUtterance(string: sentence)
         utterance.voice = voice
         pending.insert(ObjectIdentifier(utterance))
-        enqueuedAt[ObjectIdentifier(utterance)] = ProcessInfo.processInfo.systemUptime
+        enqueued[ObjectIdentifier(utterance)] = (ProcessInfo.processInfo.systemUptime, sentence)
         synthesizer.speak(utterance)
     }
 
     func stopNow() {
         pending.removeAll()
-        enqueuedAt.removeAll()
+        enqueued.removeAll()
         levels?.voiceStopped()
         synthesizer.stopSpeaking(at: .immediate)
     }
@@ -68,12 +69,13 @@ final class AppleSpeechSpeaker: SpeechSpeaking {
     private static let cueSound: SystemSoundID = 1103
 
     private func utteranceStarted(_ id: ObjectIdentifier) {
-        guard let queued = enqueuedAt[id] else { return }
-        log(String(format: "speaker audio started %.2fs after enqueue", ProcessInfo.processInfo.systemUptime - queued))
+        guard let queued = enqueued[id] else { return }
+        log(String(format: "speaker audio started %.2fs after enqueue", ProcessInfo.processInfo.systemUptime - queued.at))
+        onAudioStarted?(queued.text, .device)
     }
 
     private func utteranceEnded(_ id: ObjectIdentifier, finished: Bool) {
-        enqueuedAt[id] = nil
+        enqueued[id] = nil
         guard pending.remove(id) != nil, finished, pending.isEmpty else { return }
         levels?.voiceStopped()
         onFinishedQueue?()

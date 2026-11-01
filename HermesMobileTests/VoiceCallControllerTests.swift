@@ -60,6 +60,9 @@ private final class FakeListener: SpeechListening {
 @MainActor
 private final class FakeSpeaker: SpeechSpeaking {
     var onFinishedQueue: (() -> Void)?
+    var onAudioStarted: ((String, SpeechVoice) -> Void)?
+    /// Runs inside `stopNow`, so a test can let the stop take time.
+    var onStop: (() -> Void)?
     var spoken: [String] = []
     var queue: [String] = []
     var stopCount = 0
@@ -76,9 +79,15 @@ private final class FakeSpeaker: SpeechSpeaking {
     func stopNow() {
         stopCount += 1
         queue.removeAll()
+        onStop?()
     }
 
     func setThinkingCue(_ on: Bool) { cueStates.append(on) }
+
+    /// Audio starts on `text`, as the synthesizer or the server clip would report it.
+    func startAudio(_ text: String, voice: SpeechVoice = .device) {
+        onAudioStarted?(text, voice)
+    }
 
     /// Plays out the queue, as the synthesizer would.
     func drain() {
@@ -124,6 +133,14 @@ private final class FakeChat: VoiceCallChatDriving {
     }
 
     func voiceCallDidChange(isActive: Bool) { callActiveChanges.append(isActive) }
+
+    /// Every timing the call reported for its turn traces, in milliseconds.
+    var audibleTimings: [Int] = []
+    var bargeInTimings: [Int] = []
+    func noteVoiceTiming(speechEndToAudibleMS: Int?, bargeInMS: Int?) {
+        if let speechEndToAudibleMS { audibleTimings.append(speechEndToAudibleMS) }
+        if let bargeInMS { bargeInTimings.append(bargeInMS) }
+    }
 }
 
 @MainActor
@@ -1521,6 +1538,117 @@ final class VoiceCallControllerTests: XCTestCase {
         listener.onPartial?(". What are my current goals")
         XCTAssertEqual(controller.partialTranscript, "What are my current goals")
     }
+
+    // MARK: - Timing
+
+    /// Sends a turn and gets its reply's first sentence playing: the end of turn is 0.1s before the
+    /// send is accepted, first text 1.5s later, audio 0.7s after that.
+    private func timeOneTurn() async {
+        await say("what's the weather")
+        clock += 1.5
+        update(text: "Sunny all day. Highs")
+        clock += 0.7
+        speaker.startAudio("Sunny all day.")
+    }
+
+    func testTurnTimingRunsFromEndOfSpeechToTheRepliesFirstAudibleWord() async {
+        await controller.start()
+        await timeOneTurn()
+
+        let lines = logLines.filter { $0.hasPrefix("turn timing:") }
+        XCTAssertEqual(lines, ["turn timing: speech_end→audible 2.30s (send 0.10, first text 1.50, tts 0.70) voice=device tool=none"])
+        XCTAssertEqual(chat.audibleTimings, [2300])
+
+        // Later sentences of the same reply don't time the turn again.
+        speaker.startAudio("Sunny all day.")
+        speaker.startAudio("Highs near seventy.")
+        XCTAssertEqual(logLines.filter { $0.hasPrefix("turn timing:") }.count, 1)
+    }
+
+    func testTurnTimingSkipsHoldOnLinesAndNotesTheToolAndVoice() async {
+        await controller.start()
+        await say("check my calendar")
+        update(tool: "calendar")
+        XCTAssertEqual(speaker.spoken.last, VoiceCallPhrases.checking)
+        // "Let me check." is not the reply.
+        speaker.startAudio(VoiceCallPhrases.checking, voice: .server)
+        XCTAssertTrue(logLines.filter { $0.hasPrefix("turn timing:") }.isEmpty)
+
+        update(text: "You're free at noon. Then")
+        speaker.startAudio("You're free at noon.", voice: .server)
+        let line = logLines.first { $0.hasPrefix("turn timing:") }
+        XCTAssertEqual(line?.hasSuffix("voice=server tool=calendar"), true, line ?? "no line")
+    }
+
+    func testOpeningTurnIsNotTimed() async {
+        controller = makeController(openingTurn: "[mock brief] go")
+        await controller.start()
+        await controller.lastChatTask?.value
+        update(text: "Morning. Ready")
+        speaker.startAudio("Morning.")
+        XCTAssertTrue(logLines.filter { $0.hasPrefix("turn timing:") }.isEmpty)
+        XCTAssertTrue(chat.audibleTimings.isEmpty)
+    }
+
+    func testBargeInTimesTheFirstWordsOverTheReplyToSilence() async {
+        await startSpeaking()
+        speaker.onStop = { [unowned self] in clock += 0.07 }
+        voice(true, for: 0.2)
+        // Atlas's own words come back first; the timing starts there.
+        listener.onPartial?("first")
+        XCTAssertEqual(controller.state, .speaking)
+        clock += 0.3
+        listener.onPartial?("first what about")
+        XCTAssertEqual(controller.state, .listening)
+
+        let lines = logLines.filter { $0.hasPrefix("barge-in") }
+        XCTAssertEqual(lines, ["barge-in (talk-over): speech→silent 0.37s (detect 0.30, stop 0.07, vad→silent 0.57)"])
+        XCTAssertEqual(chat.bargeInTimings, [370])
+    }
+
+    func testTapInterruptTimesTheStop() async {
+        await startSpeaking()
+        speaker.onStop = { [unowned self] in clock += 0.05 }
+        controller.performTapAction()
+        XCTAssertEqual(logLines.filter { $0.hasPrefix("barge-in") }, ["barge-in (tap): tap→silent 0.05s"])
+        XCTAssertEqual(chat.bargeInTimings, [50])
+    }
+
+    func testCallSummaryAtHangUp() async {
+        await controller.start()
+        await timeOneTurn()
+        clock += VoiceCallTiming.talkOverGrace
+        speaker.onStop = { [unowned self] in clock += 0.07 }
+        voice(true, for: 0.2)
+        listener.onPartial?("sunny")
+        clock += 0.3
+        listener.onPartial?("sunny what about tomorrow")
+        speaker.onStop = nil
+        listener.onNeedsRestart?("route change")
+        await controller.lastListenerTask?.value
+
+        controller.end()
+
+        XCTAssertEqual(
+            logLines.first { $0.hasPrefix("call summary:") },
+            "call summary: turns 1, speech_end→audible p50 2.30s max 2.30s n=1, "
+                + "barge-ins 1 (spoken p50 0.37s max 0.37s n=1), echo ignored 1, listener restarts 1"
+        )
+    }
+
+    func testMetricsSummaryTakesTheLowerMiddleAsP50() {
+        var metrics = VoiceCallMetrics()
+        metrics.turnSent(speechEnd: nil)
+        for (end, audible) in [(0.0, 3.0), (10.0, 11.0), (20.0, 22.0), (30.0, 34.0)] {
+            metrics.turnSent(speechEnd: end)
+            metrics.replySentence("Hi.")
+            _ = metrics.audioStarted("Hi.", voice: .device, at: audible)
+        }
+        XCTAssertTrue(
+            metrics.summary.hasPrefix("call summary: turns 4, speech_end→audible p50 2.00s max 4.00s n=4, barge-ins 0 (spoken n=0)"),
+            metrics.summary
+        )
+    }
 }
 
 final class VoiceCallCaptionsTests: XCTestCase {
@@ -1564,6 +1692,14 @@ final class ServerSpeechSpeakerTests: XCTestCase {
             fallback: fallback,
             requestSpacing: 0
         )
+    }
+
+    func testOnDeviceFallbackAudioStartIsReportedAsTheDeviceVoice() {
+        let speaker = makeSpeaker { _ in Data() }
+        var started: [String] = []
+        speaker.onAudioStarted = { text, voice in started.append("\(voice.rawValue): \(text)") }
+        fallback.startAudio("One.")
+        XCTAssertEqual(started, ["device: One."])
     }
 
     func testFirstSentenceIsFetchedAloneAndLaterOnesAreBatched() async {

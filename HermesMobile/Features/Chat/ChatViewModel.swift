@@ -7278,9 +7278,14 @@ extension ServerTTSAudioPlayer: AVAudioPlayerDelegate {
 extension ChatViewModel: VoiceCallChatDriving {
     func voiceCallDidChange(isActive: Bool) {
         isVoiceCallActive = isActive
+        streamCoordinator.voiceCallDidChange(isActive: isActive)
         guard !isActive, backgroundSuspendDeferredForCall else { return }
         backgroundSuspendDeferredForCall = false
         suspendActiveStreamConnection()
+    }
+
+    func noteVoiceTiming(speechEndToAudibleMS: Int?, bargeInMS: Int?) {
+        streamCoordinator.noteVoiceTiming(speechEndToAudibleMS: speechEndToAudibleMS, bargeInMS: bargeInMS)
     }
 
     /// Sends one spoken turn. Unlike `sendMessage`, it never picks up the
