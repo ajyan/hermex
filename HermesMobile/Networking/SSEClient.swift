@@ -109,6 +109,9 @@ enum SSEEvent: Equatable {
     case reasoning(String)
     case toolStarted(ToolStreamEvent)
     case toolCompleted(ToolStreamEvent)
+    /// The notes and people the server put in front of the agent for this run (fork-only,
+    /// optional): at most once per run, before its first token or tool call.
+    case contextSources(ContextSourcesStreamEvent)
     case title(TitleStreamEvent)
     case metering(MeteringStreamEvent)
     case done(DoneStreamEvent)
@@ -189,6 +192,53 @@ struct ToolStreamEvent: Decodable, Equatable {
             container.decodeLossyStringIfPresent(forKey: .toolUseID),
             container.decodeLossyStringIfPresent(forKey: .callID)
         ].compactMap { $0?.nonEmptyToolStreamID }.first
+    }
+}
+
+/// `context_sources`: `{"sources":[{"kind","label","path"}]}`. Every field is optional and an
+/// entry that doesn't decode is skipped, so a new kind or a missing path never drops the rest.
+struct ContextSourcesStreamEvent: Decodable, Equatable {
+    struct Source: Decodable, Equatable {
+        /// journal, wiki, person, note, article, or book; anything else reads as a note.
+        let kind: String?
+        /// Already formatted by the server ("Journal · 22 Oct").
+        let label: String?
+        /// Vault-relative; absent for a person.
+        let path: String?
+
+        init(kind: String?, label: String?, path: String?) {
+            self.kind = kind
+            self.label = label
+            self.path = path
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            kind = container.decodeLossyStringIfPresent(forKey: .kind)
+            label = container.decodeLossyStringIfPresent(forKey: .label)
+            path = container.decodeLossyStringIfPresent(forKey: .path)
+        }
+
+        private enum CodingKeys: String, CodingKey { case kind, label, path }
+    }
+
+    let sources: [Source]
+
+    init(sources: [Source] = []) {
+        self.sources = sources
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let items = (try? container.decodeIfPresent([Lossy].self, forKey: .sources)) ?? []
+        sources = items.compactMap(\.source)
+    }
+
+    private enum CodingKeys: String, CodingKey { case sources }
+
+    private struct Lossy: Decodable {
+        let source: Source?
+        init(from decoder: Decoder) throws { source = try? Source(from: decoder) }
     }
 }
 
@@ -290,6 +340,9 @@ struct SSEEventDecoder {
         case "tool_complete":
             let payload = decodePayload(ToolStreamEvent.self, eventType: eventType, from: eventData, decoder: decoder)
             return .toolCompleted(payload ?? ToolStreamEvent())
+        case "context_sources":
+            let payload = decodePayload(ContextSourcesStreamEvent.self, eventType: eventType, from: eventData, decoder: decoder)
+            return .contextSources(payload ?? ContextSourcesStreamEvent())
         case "title":
             let payload = decodePayload(TitleStreamEvent.self, eventType: eventType, from: eventData, decoder: decoder)
             return .title(payload ?? TitleStreamEvent())

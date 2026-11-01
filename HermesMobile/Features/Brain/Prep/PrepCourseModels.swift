@@ -143,6 +143,8 @@ struct PrepUnit: Decodable, Identifiable, Hashable, Sendable {
     let lessonsDone: Int
     let lessonsTotal: Int
     let boss: PrepBossState
+    /// While the unit check rests: the day (yyyy-MM-dd) it comes back.
+    let bossBack: String?
     let mock: Bool
     let lessons: [PrepLessonNode]
     /// Lessons in this unit that are interview-ready.
@@ -153,6 +155,7 @@ struct PrepUnit: Decodable, Identifiable, Hashable, Sendable {
         case lessonsDone = "lessons_done"
         case lessonsTotal = "lessons_total"
         case readyCount = "ready_count"
+        case bossBack = "boss_back"
     }
 
     init(from decoder: Decoder) throws {
@@ -167,6 +170,7 @@ struct PrepUnit: Decodable, Identifiable, Hashable, Sendable {
         lessonsDone = c.int(.lessonsDone)
         lessonsTotal = c.int(.lessonsTotal)
         boss = c.optional(PrepBossState.self, .boss) ?? .unknown
+        bossBack = c.text(.bossBack)
         mock = c.bool(.mock)
         lessons = c.lossy(PrepLessonNode.self, .lessons)
         readyCount = c.int(.readyCount)

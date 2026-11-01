@@ -256,6 +256,8 @@ struct PrepProbeCard: View {
 /// that" on a miss), then the serif sample telling. An ungraded one says it was saved for tonight and shows no score.
 struct PrepStoryResultView: View {
     let result: PrepAttemptResult
+    /// The story the rep asked for, named here once the telling is in (the card asked the prompt alone).
+    var title = ""
     /// Story titles by id, to name the story told on a wrong-story result.
     let titles: [String: String]
     /// The missed beat whose "I had that" is saving; every claim waits until it lands.
@@ -274,6 +276,12 @@ struct PrepStoryResultView: View {
 
     var body: some View {
         PrepRunCard {
+            if !title.isEmpty {
+                Text(verbatim: title)
+                    .font(BrainStyle.meta)
+                    .foregroundStyle(HermexPaper.prep.glow)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Text(verbatim: PrepCopy.storyHeadline(result))
                 .font(AppFont.display(style: result.isUngraded ? .headline : .title3))
                 .foregroundStyle(result.isUngraded ? Color.hxTextPrimary : HermexPaper.prep.glow)
@@ -330,7 +338,7 @@ struct PrepProbeResultView: View {
                     .foregroundStyle(Color.hxTextPrimary)
             }
         } else {
-            PrepRecallResultView(result: result, xp: nil, canOverride: result.attemptID != nil,
+            PrepRecallResultView(result: result, canOverride: result.attemptID != nil,
                                  overridingPoint: overridingPoint, overrideMissed: overrideMissed)
         }
     }

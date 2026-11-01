@@ -94,6 +94,15 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertNil(PrepKeyPointRow.hitQuote(id: "p.b", hit: false, result: result))
     }
 
+    func testTheInterviewRepNamesNoLesson() throws {
+        let rep = try decode(PrepRep.self, #"{"index": 11, "block": "interview", "drill": "recall", "label": "Interview question", "item": {"id": "u1.l1"}}"#)
+        XCTAssertTrue(rep.isInterview)
+        XCTAssertEqual(PrepCopy.runTitle(block: rep.block, lessonTitle: "Tokens and the context budget"), "Interview")
+        let recall = try decode(PrepRecall.self, #"{"prompt": "How do you decide what goes in?", "question": "u1.l1.q5", "type": "open"}"#)
+        XCTAssertEqual(PrepCopy.recallKicker(recall, lessonTitle: "Tokens", isReview: true, isInterview: true), "Interview question")
+        XCTAssertEqual(PrepCopy.recallKicker(recall, lessonTitle: "Tokens", isReview: true), "Open question · Tokens")
+    }
+
     func testARecallBlockQuestionReadsInYourOwnWords() {
         XCTAssertEqual(PrepCopy.questionKicker("recall"), "In your own words")
     }

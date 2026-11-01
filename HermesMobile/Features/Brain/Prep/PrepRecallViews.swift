@@ -63,7 +63,6 @@ struct PrepRecallCard: View {
 /// "Go deeper in Atlas" opens a chat about it, which never changes the score.
 struct PrepRecallResultView: View {
     let result: PrepAttemptResult
-    let xp: Int?
     /// Starts a new Atlas chat with these words in the composer; nil hides the button.
     var goDeeper: ((String) -> Void)?
     /// False after "I don't know": there are no points to claim back.
@@ -104,9 +103,6 @@ struct PrepRecallResultView: View {
                             .transition(.opacity)
                     }
                 }
-            }
-            if let xp {
-                PrepXPTick(xp: xp)
             }
         }
         .task(id: result.verdict + rows.map(\.id).joined()) {
@@ -234,7 +230,7 @@ struct PrepKeyPointRow: View {
                     HStack(spacing: BrainStyle.s) {
                         Text(verbatim: "You had this").font(BrainStyle.meta).foregroundStyle(Color.hxTextSecondary)
                         if undoOverride.isAvailable {
-                            Button { undoOverride() } label: {
+                            Button { undoOverride(id) } label: {
                                 Text(verbatim: overridingPoint == id ? "Undoing…" : "Undo")
                                     .font(BrainStyle.meta).foregroundStyle(Color.accentColor)
                                     .frame(minHeight: BrainStyle.minTapTarget, alignment: .leading)
@@ -267,12 +263,13 @@ struct PrepKeyPointRow: View {
 /// Undo on the point an answer's "I had that" claimed. The run screen sets it while a result is
 /// shown, so every result view's key-point rows offer it without threading a closure through each.
 struct PrepUndoOverrideAction {
-    var handler: (@MainActor () -> Void)?
+    var handler: (@MainActor (String) -> Void)?
 
     var isAvailable: Bool { handler != nil }
 
+    /// Undoes the "I had that" on `point`.
     @MainActor
-    func callAsFunction() { handler?() }
+    func callAsFunction(_ point: String) { handler?(point) }
 }
 
 struct PrepUndoOverrideKey: EnvironmentKey {

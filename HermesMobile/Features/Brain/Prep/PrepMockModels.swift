@@ -386,6 +386,19 @@ final class PrepMockViewModel {
         }
     }
 
+    /// While `mockID` is still grading, reloads every `interval` until its status settles, `limit` reloads
+    /// pass (the server's own grading bound is 15 minutes), or the calling task is cancelled (the result
+    /// screen went away). `sleep` is injectable for tests.
+    func refreshWhileGrading(mockID: String, interval: Duration = .seconds(5), limit: Int = 180,
+                             sleep: (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) async {
+        for _ in 0..<limit {
+            guard case .grading = PrepMockCopy.display(result(mockID: mockID)) else { return }
+            do { try await sleep(interval) } catch { return }
+            guard !Task.isCancelled else { return }
+            await load()
+        }
+    }
+
     /// The unlocked levels of a ladder, in ladder order: the ones a call can take (spec §6.3).
     func replayableLevels(_ kind: PrepMockKind) -> [PrepMockLevel] {
         guard let ladder = mocks?.ladder(kind) else { return [] }

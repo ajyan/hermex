@@ -8,9 +8,11 @@ import SwiftUI
 
 // MARK: - Home section
 
-/// Prep home's two ladder rows, each opening its brief, with the last graded score.
+/// Prep home's practice out loud: the two ladder rows, each opening its brief, with the last graded score;
+/// the ladder whose weekly mock is due (none graded in 7 days) says so.
 struct PrepMockSection: View {
     let mocks: PrepMocks
+    var due: PrepMockKind?
 
     private var rows: [(kind: PrepMockKind, ladder: PrepLadder)] {
         PrepMockKind.allCases.compactMap { kind in mocks.ladder(kind).map { (kind, $0) } }
@@ -19,7 +21,7 @@ struct PrepMockSection: View {
     var body: some View {
         if !rows.isEmpty {
             VStack(alignment: .leading, spacing: BrainStyle.s) {
-                BrainSectionHeader(title: "Mock interviews")
+                BrainSectionHeader(title: "Practice out loud")
                 SectionCard {
                     VStack(spacing: 0) {
                         ForEach(Array(rows.enumerated()), id: \.element.kind) { offset, row in
@@ -28,7 +30,8 @@ struct PrepMockSection: View {
                                 BrainRow(
                                     leading: { PrepMockIcon() },
                                     title: PrepMockCopy.rowTitle(row.kind, ladder: row.ladder),
-                                    subtitle: row.ladder.best.map { "Passed through \($0)" },
+                                    subtitle: row.kind == due ? "Due: no mock graded this week"
+                                        : row.ladder.best.map { "Passed through \($0)" },
                                     trailing: row.ladder.lastScore.map { "Last \(PrepMockCopy.score($0))" })
                             }
                             .buttonStyle(.plain)
@@ -207,8 +210,8 @@ struct PrepStartCallButton: View {
 
 // MARK: - Result
 
-/// One mock after hang-up: "Grading your mock…" until the grader is done (refreshed on appear and
-/// by pulling, never polled), then the score, each scored dimension and frame point as ✓ or ◌ with
+/// One mock after hang-up: "Grading your mock…" until the grader is done (checked every few seconds
+/// while this screen is open, and on pull), then the score, each scored dimension and frame point as ✓ or ◌ with
 /// the words that showed it, the next level when it passed, and the median time to the first word.
 /// Pushed as `.prep(.mockResult(id))`.
 struct PrepMockResultView: View {
@@ -229,7 +232,10 @@ struct PrepMockResultView: View {
             .hxNavigationTitle("Mock result")
             .feedbackContext(FeedbackContext(feature: "Prep", screen: "Mock result"))
             .background(Color.hxCanvas.ignoresSafeArea())
-            .task { await viewModel.load() }
+            .task {
+                await viewModel.load()
+                await viewModel.refreshWhileGrading(mockID: mockID)
+            }
     }
 
     @ViewBuilder
@@ -248,7 +254,7 @@ struct PrepMockResultView: View {
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
                     switch PrepMockCopy.display(viewModel.result(mockID: mockID)) {
                     case .grading:
-                        statusCard(PrepMockCopy.grading, symbol: "hourglass", detail: "Pull down to check again.")
+                        statusCard(PrepMockCopy.grading, symbol: "hourglass", detail: "This updates when the grade lands.")
                     case .ungraded:
                         statusCard(PrepMockCopy.ungraded, symbol: "moon.zzz")
                     case .tooShort:

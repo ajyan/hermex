@@ -88,6 +88,13 @@ struct VoiceCallChatSnapshot: Equatable {
             toolActivity: runningTool.map(VoiceCallToolActivity.of)
         )
     }
+
+    /// The memories a run has used so far: the server's `context_sources` first, then what
+    /// finished tool calls read. Kept out of `make`, which runs on every streamed token; the call
+    /// screen reads it only when the run's sources or tool calls change.
+    static func sources(context: [ContextSourcesStreamEvent.Source], toolCalls: [ToolCall]) -> [VoiceCallSource] {
+        VoiceCallSources.merged(VoiceCallSources.from(context: context), VoiceCallSources.from(toolCalls: toolCalls))
+    }
 }
 
 /// What a finished call hands back to whoever opened it.
@@ -118,8 +125,10 @@ struct VoiceCallView: View {
     /// When the call first started listening, for the call timer.
     @State private var connectedAt: Date?
     @AppStorage(VoiceCallSettings.usesServerVoiceKey) private var usesServerVoice = false
-    /// The orb's slot in screen coordinates; the full-screen orb is centered on it.
+    /// The cloud's slot in screen coordinates; the full-screen starfield is centered on it.
     @State private var orbSlot: CGRect = .zero
+    /// Whether the user has spoken yet and this turn's memories, for the starfield.
+    @State private var scene = VoiceCallSceneTracker()
     @Environment(\.openURL) private var openURL
 
     init(chat: ChatViewModel, openingTurn: String? = nil, onTurnTimed: (([Int]) -> Void)? = nil,
@@ -210,7 +219,13 @@ struct VoiceCallView: View {
                     currentTool: snapshot.currentTool
                 )
             }
-            .onChange(of: controller?.state) { _, state in
+            .onChange(of: chat.liveToolCalls) { _, _ in absorbSources() }
+            .onChange(of: chat.liveContextSources) { _, _ in absorbSources() }
+            .onChange(of: controller?.partialTranscript ?? "") { _, partial in
+                if !scene.heardUser, !partial.isEmpty { scene.heard(partial) }
+            }
+            .onChange(of: controller?.state) { old, state in
+                if let old, let state { scene.stateChanged(from: old, to: state) }
                 if state == .listening, connectedAt == nil {
                     connectedAt = .now
                     openingTurnSent = true
@@ -250,6 +265,12 @@ struct VoiceCallView: View {
 
     private var snapshot: VoiceCallChatSnapshot {
         VoiceCallChatSnapshot.of(chat)
+    }
+
+    /// Adds what the running reply has drawn on to this turn's memories.
+    private func absorbSources() {
+        let found = VoiceCallChatSnapshot.sources(context: chat.liveContextSources, toolCalls: chat.liveToolCalls)
+        scene.absorb(found, isStreaming: chat.activeStreamID != nil)
     }
 
     private func startCall() async {
@@ -301,22 +322,22 @@ struct VoiceCallView: View {
 
     private var state: VoiceCallState { controller?.state ?? .idle }
 
-    private var mood: VoiceCallOrbMood {
-        switch state {
-        case .idle, .connecting, .reconnecting: .connecting
-        case .listening: controller?.isMuted == true ? .quiet : .listening
-        case .thinking: .thinking
-        case .speaking: .speaking
-        case .awaitingApproval: .attention
-        case .ended: .quiet
-        }
+    private var scenePhase: VoiceCallScenePhase {
+        .base(state: state, heardUser: scene.heardUser, sourceCount: scene.sources.count)
     }
 
-    /// The canvas under the breathing glow, which carries the speaker's color and form.
+    /// The canvas under the starfield, which says whose turn it is and what Atlas drew on.
     private var background: some View {
         ZStack {
             Color.hxCanvas
-            VoiceCallOrb(levels: levels, mood: mood, focus: orbSlot, interruptions: controller?.interruptions ?? 0)
+            VoiceCallStarfield(
+                levels: levels,
+                phase: scenePhase,
+                sources: scene.sources,
+                focus: orbSlot,
+                interruptions: controller?.interruptions ?? 0,
+                replyStarts: scene.replyStarts
+            )
         }
         .ignoresSafeArea()
     }
@@ -326,7 +347,7 @@ struct VoiceCallView: View {
             Text(verbatim: CallSystemBridge.handle)
                 .font(AppFont.headline(weight: .medium))
                 .foregroundStyle(Color.hxTextPrimary)
-            // The line keeps its height before the call connects, so the orb never shifts.
+            // The line keeps its height before the call connects, so the cloud never shifts.
             Group {
                 if let connectedAt, !isEnded {
                     Text(timerInterval: connectedAt...Date.distantFuture, countsDown: false)
@@ -342,7 +363,7 @@ struct VoiceCallView: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// The orb doubles as the one-tap shortcut: send now, take a turn back, or cut Atlas off.
+    /// The cloud doubles as the one-tap shortcut: send now, take a turn back, or cut Atlas off.
     /// Under it, whose turn it is.
     private var orb: some View {
         let action = controller?.tapAction
@@ -351,7 +372,7 @@ struct VoiceCallView: View {
                 Button {
                     controller?.performTapAction()
                 } label: {
-                    // The orb itself is drawn full screen behind everything, centered here.
+                    // The starfield itself is drawn full screen behind everything, centered here.
                     Color.clear
                         .aspectRatio(1, contentMode: .fit)
                         .frame(maxWidth: 380, maxHeight: 380)
@@ -363,14 +384,19 @@ struct VoiceCallView: View {
                 .accessibilityLabel(tapHint ?? "")
                 .accessibilityHidden(action == nil)
 
-                // Captions ride over the orb; taps go through to it. VoiceOver reads them on their own.
+                // Captions ride over the cloud; taps go through to it. VoiceOver reads them on their own.
                 captions
                     .padding(.horizontal, 12)
                     .allowsHitTesting(false)
             }
 
-            VoiceCallStatus(word: stateWord, activity: toolActivity, hint: tapHint)
+            VoiceCallStatus(word: stateWord, activity: toolActivity, sources: shownSources, hint: tapHint)
         }
+    }
+
+    /// The memories Atlas is answering from, as chips while it speaks.
+    private var shownSources: [VoiceCallSource] {
+        state == .speaking ? scene.sources : []
     }
 
     private var tapHint: String? {
@@ -461,7 +487,7 @@ struct VoiceCallView: View {
         return false
     }
 
-    /// Whose turn it is, in one word under the orb.
+    /// Whose turn it is, in one word under the cloud.
     private var stateWord: String {
         switch state {
         case .idle, .connecting: String(localized: "Connecting")
@@ -479,6 +505,9 @@ struct VoiceCallView: View {
         guard controller != nil else { return nil }
         if let failure = controller?.failure {
             return stateWord + ". " + Self.reason(for: failure)
+        }
+        if state == .speaking, let found = scene.foundAnnouncement {
+            return stateWord + ". " + found
         }
         return stateWord
     }
