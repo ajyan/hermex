@@ -181,12 +181,11 @@ final class PrepLessonViewModel {
     }
 }
 
-/// What a finished run shows. Course runs fill the XP, lessons and next-up fields; any other run
-/// shows just the streak.
+/// What a finished run shows. Course runs fill the lessons and next-up fields; any other run shows
+/// just the streak.
 struct PrepDaySummary: Equatable {
     var streak = PrepStreak()
     var isCourse = false
-    var xpGained = 0
     /// Titles of the lessons taught this run, in order.
     var learned: [String] = []
     var reviews = 0
@@ -261,8 +260,6 @@ final class PrepRunViewModel {
     private(set) var shownAt: Date
     /// A review rep opens on its check; "Show the idea" reveals the lesson above it.
     private(set) var revealedLesson = false
-    /// The XP the answer on screen earned, for the tick beside the result; nil when it earned none.
-    private(set) var lastXP: Int?
     /// A lesson rep starts on its teaching, then "I'm ready" hides it and asks for recall.
     enum LessonStage: Equatable { case reading, recalling }
     private(set) var lessonStage: LessonStage = .reading
@@ -325,7 +322,6 @@ final class PrepRunViewModel {
     @ObservationIgnored private var lastStreak: PrepStreak?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var isAdvancing = false
-    @ObservationIgnored private var xpBefore: Int?
     @ObservationIgnored private var homeBefore: PrepHome?
     @ObservationIgnored private var readyBefore: Set<String>?
     @ObservationIgnored private var tally = PrepDaySummary()
@@ -368,7 +364,6 @@ final class PrepRunViewModel {
         phase = .loading
         submitError = nil
         lastStreak = nil
-        xpBefore = nil
         tally = PrepDaySummary()
         do {
             let loaded = try await client.today(run: runKind, unit: unit)
@@ -476,7 +471,6 @@ final class PrepRunViewModel {
             guard token == generation, case let .result(current, _, _) = phase, current.index == rep.index else { return }
             let merged = PrepAttemptResult(merging: result, override: updated)
             phase = .result(rep, merged, index: index)
-            lastXP = Self.xp(for: rep, result: merged)
         } catch {
             guard token == generation, !prepIsCancellation(error) else { return }
             onAPIError(error)
@@ -596,7 +590,6 @@ final class PrepRunViewModel {
         guard case let .result(rep, result, index) = phase else { return }
         let merged = PrepAttemptResult(merging: result, override: step)
         phase = .result(rep, merged, index: index)
-        lastXP = Self.xp(for: rep, result: merged)
     }
 
     // MARK: Story reps
@@ -740,21 +733,6 @@ final class PrepRunViewModel {
         }
     }
 
-    /// The XP an answer earned, mirroring the server's rules: 10 for a new lesson and 5 more when its
-    /// check is right, 5 for a right review, 50 for the answer that passes a boss sitting.
-    static func xp(for rep: PrepRep, result: PrepAttemptResult) -> Int? {
-        if let xp = result.xp { return xp > 0 ? xp : nil }
-        switch rep.drill {
-        case .lesson where rep.block == "review":
-            return result.verdict == "pass" ? 5 : nil
-        case .lesson:
-            return result.verdict == "pass" ? 15 : 10
-        case .boss:
-            return result.sitting?.passed == true ? 50 : nil
-        default:
-            return nil
-        }
-    }
 
     /// The answered card was written by the coach and isn't flagged yet.
     var canFlag: Bool {
@@ -835,7 +813,7 @@ final class PrepRunViewModel {
         }
     }
 
-    /// What the end of a course run compares against: the XP and ready lessons before it. Non-fatal.
+    /// What the end of a course run compares against: the ready lessons before it. Non-fatal.
     private func snapshot(_ run: PrepRun, token: Int) async {
         if Self.isCourse(run, kind: runKind) {
             async let homeLoad = try? await client.home()
@@ -843,7 +821,6 @@ final class PrepRunViewModel {
             let (home, ready) = await (homeLoad, courseLoad)
             if token == generation {
                 homeBefore = home
-                xpBefore = home?.course?.xp
                 readyBefore = ready.map(Self.readyLessons)
                 tally.welcomeBack = PrepCopy.isWelcomeBack(lastDay: home?.streak.lastDay, today: now())
             }
@@ -878,7 +855,6 @@ final class PrepRunViewModel {
         recallDraft = ""
         answeredDontKnow = false
         overridingPoint = nil
-        lastXP = nil
         hintsShown = 0
         submitError = nil
         flagError = nil
@@ -936,7 +912,6 @@ final class PrepRunViewModel {
         } else {
             isSubmitting = false
             answeredDontKnow = dontKnow
-            lastXP = Self.xp(for: rep, result: result)
             count(rep, result)
             phase = .result(rep, result, index: rep.index)
             if result.dialogue?.open == true {
@@ -983,7 +958,6 @@ final class PrepRunViewModel {
     private func restart(token: Int) async {
         guard token == generation else { return }
         lastStreak = nil
-        xpBefore = nil
         tally = PrepDaySummary()
         do {
             let fresh = try await client.today(run: runKind, unit: unit)
@@ -1008,7 +982,6 @@ final class PrepRunViewModel {
             summary.isCourse = true
             summary.repCount = run.reps.count
             summary.streak = lastStreak ?? home?.streak ?? PrepStreak()
-            if let before = xpBefore, let after = home?.course?.xp { summary.xpGained = max(0, after - before) }
             summary.nextUp = PrepCopy.nextUp(home?.course)
             summary.readyCount = home?.course?.readyCount ?? 0
             summary.lessonTotal = home?.course?.lessonTotal ?? 0
@@ -1064,8 +1037,6 @@ enum PrepCopy {
 
     static func unitHeader(index: Int, title: String) -> String { "Unit \(index + 1) · \(title)" }
 
-    /// The ring card's line: the streak once there is one, then XP.
-    /// The readiness card's one line of where practice stands: "0 of 8 stories ready · No graded mock yet · 10 open gaps".
     /// A readiness check's name under its pip.
     static func readinessLabel(_ check: PrepReadinessCheck) -> String {
         switch check.kind {
@@ -1098,6 +1069,11 @@ enum PrepCopy {
         case .mocks: "A passing voice mock of each kind in the last 30 days"
         case .unknown: ""
         }
+    }
+
+    /// The course's interview-ready share, 0 to 1, for the done screen's ring.
+    static func readyShare(ready: Int, total: Int) -> Double {
+        total > 0 ? min(1, Double(ready) / Double(total)) : 0
     }
 
     /// The next lesson's line on the path: in today's run, or (on a catch-up day, which plans none) after the reviews.
@@ -1135,22 +1111,40 @@ enum PrepCopy {
         let reviewing = unit.lessons.filter { $0.state == .shaky }.count
         var parts = reviewing > 0 ? ["\(reviewing) missed last recall"] : [readyLine(ready: unit.readyCount, total: unit.lessonsTotal)]
         switch unit.boss {
-        case .ready: parts.append("boss comes up in a run")
-        case .resting: parts.append("boss back in a few days")
+        case .ready: parts.append("unit check due")
+        case .resting: parts.append("unit check \(backLine(unit.bossBack))")
         case .locked, .passed, .unknown: break
         }
         return parts.joined(separator: " · ")
     }
 
-    static func bossNode(_ state: PrepBossState) -> String {
+    /// The unit check's node on the path: due, back on a named day while it rests, or just its name.
+    static func bossNode(_ state: PrepBossState, back: String? = nil, today: Date = .now) -> String {
         switch state {
-        case .ready: "Boss quiz · comes up in a run"
-        case .resting: "Boss quiz · back in a few days"
-        case .locked, .passed, .unknown: "Boss quiz"
+        case .ready: "Unit check · due"
+        case .resting: "Unit check · \(backLine(back, today: today))"
+        case .locked, .passed, .unknown: "Unit check"
         }
     }
 
-    static func starsLabel(_ stars: Int) -> String { "\(stars) of 3 stars" }
+    /// When a resting unit check returns: "back tomorrow", "back Tuesday", "back Nov 9"; "resting" without a date.
+    static func backLine(_ back: String?, today: Date = .now, calendar: Calendar = .current) -> String {
+        let format = DateFormatter()
+        format.calendar = calendar
+        format.timeZone = calendar.timeZone
+        format.locale = Locale(identifier: "en_US_POSIX")
+        format.dateFormat = "yyyy-MM-dd"
+        guard let back, let day = format.date(from: back) else { return "resting" }
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: today), to: day).day ?? 0
+        if days <= 0 { return "back today" }
+        if days == 1 { return "back tomorrow" }
+        let out = DateFormatter()
+        out.calendar = calendar
+        out.timeZone = calendar.timeZone
+        out.locale = Locale(identifier: "en_US")
+        out.dateFormat = days < 7 ? "EEEE" : "MMM d"
+        return "back \(out.string(from: day))"
+    }
     static func lessonStateWord(_ state: PrepLessonState) -> String {
         switch state {
         case .ready: "interview-ready"
@@ -1279,30 +1273,30 @@ enum PrepCopy {
         return lastDay < formatter.string(from: yesterday)
     }
 
-    static func xpLabel(_ xp: Int) -> String { "+\(xp) XP" }
-    static func xpSpoken(_ xp: Int) -> String { "Plus \(xp) XP" }
     static func percent(_ score: Double) -> String { "\(Int((score * 100).rounded()))%" }
 
     static func sittingHeadline(_ sitting: PrepBossSitting) -> String {
         if sitting.score == nil { return "Grading tonight" }
-        return sitting.passed ? "Boss passed" : "Not yet"
+        return sitting.passed ? "Unit passed" : "Not yet"
     }
 
-    /// The line under a boss result. A failed test out changes nothing, so it points at the lessons instead.
-    static func unlockLine(_ sitting: PrepBossSitting, xp: Int?, testOut: Bool = false) -> String {
+    /// The line under a unit check's result. A failed test out changes nothing, so it points at the lessons instead.
+    static func unlockLine(_ sitting: PrepBossSitting, testOut: Bool = false) -> String {
         guard sitting.passed else {
-            if sitting.score == nil { return "Atlas grades it tonight; the unit unlocks if it passes." }
+            if sitting.score == nil { return testOut ? "Atlas grades it tonight; the unit passes if it does." : "Atlas grades it tonight." }
             return testOut ? "Not yet. Start with the lessons below."
-                : "The next unit keeps going. This boss comes back in a few days."
+                : "The next unit keeps going. This unit check comes back in \(bossRestDays) days."
         }
-        let parts = [sitting.unlocked.map { "\($0) unlocked" }, xp.map(xpLabel)].compactMap { $0 }
-        return parts.isEmpty ? "Unit passed" : parts.joined(separator: " · ")
+        return sitting.unlocked.map { "\($0) unlocked" } ?? "Unit passed"
     }
+
+    /// The days a unit check rests after a daily sitting that didn't pass (the server's BOSS_REST_DAYS).
+    static let bossRestDays = 3
 
     /// The done screen's "Tomorrow" line: the current unit's boss once it is ready, else its lessons.
     static func nextUp(_ course: PrepCourse?) -> String? {
         guard let unit = course?.currentUnit else { return nil }
-        if unit.boss == .ready { return "Boss quiz · \(unit.title)" }
+        if unit.boss == .ready { return "Unit check · \(unit.title)" }
         return "\(unit.title) · \(unit.lessonsDone) of \(unit.lessonsTotal) lessons"
     }
 
@@ -1399,7 +1393,7 @@ enum PrepCopy {
         case "new": "New"
         case "reteach": "Another way to see it"
         case "review": "Review"
-        case "boss": "Boss quiz"
+        case "boss": "Unit check"
         default: block.prefix(1).uppercased() + block.dropFirst()
         }
     }
@@ -1413,10 +1407,10 @@ enum PrepCopy {
     }
 
     /// A boss card's meta line: names the lesson its question tests, so a question from the unit's lessons
-    /// doesn't look unrelated to the day's review. Falls back to "Boss quiz" for an untitled item.
+    /// doesn't look unrelated to the day's review. Falls back to "Unit check" for an untitled item.
     static func bossMeta(lessonTitle: String) -> String {
         let title = lessonTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        return title.isEmpty ? "Boss quiz" : "Boss quiz · \(title)"
+        return title.isEmpty ? "Unit check" : "Unit check · \(title)"
     }
 
     /// The feedback split after its first sentence, so the lead can be set in bold.

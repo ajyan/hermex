@@ -338,7 +338,7 @@ struct PrepProbeResultView: View {
                     .foregroundStyle(Color.hxTextPrimary)
             }
         } else {
-            PrepRecallResultView(result: result, xp: nil, canOverride: result.attemptID != nil,
+            PrepRecallResultView(result: result, canOverride: result.attemptID != nil,
                                  overridingPoint: overridingPoint, overrideMissed: overrideMissed)
         }
     }

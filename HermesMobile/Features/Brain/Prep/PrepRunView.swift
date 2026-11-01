@@ -224,7 +224,7 @@ struct PrepRunView: View {
             .id(rep.index)
         case .result(let rep, let result, _) where Self.usesRecall(rep):
             scaffold(rep, hasAction: true) {
-                PrepRecallResultView(result: result, xp: viewModel.lastXP, goDeeper: ask,
+                PrepRecallResultView(result: result, goDeeper: ask,
                                      canOverride: viewModel.canOverride,
                                      overridingPoint: viewModel.overridingPoint) { point in
                     Task { await viewModel.overridePoint(point) }
@@ -251,7 +251,7 @@ struct PrepRunView: View {
                             .foregroundStyle(HermexPaper.prep.glow)
                         PrepCheckResult(check: lesson.check, result: result,
                                         chosenID: chosen?.rep == rep.index ? chosen?.id : nil,
-                                        typedAnswer: draft(for: rep).text, xp: viewModel.lastXP)
+                                        typedAnswer: draft(for: rep).text)
                     }
                 }
             } bottom: {
@@ -266,7 +266,7 @@ struct PrepRunView: View {
                     }
                     PrepCheckResult(check: lesson.check, result: result,
                                     chosenID: chosen?.rep == rep.index ? chosen?.id : nil,
-                                    typedAnswer: draft(for: rep).text, xp: viewModel.lastXP)
+                                    typedAnswer: draft(for: rep).text)
                     if lesson.isReteach {
                         PrepFlagCardButton(
                             isFlagged: viewModel.isFlagged(rep.item.id),
@@ -280,10 +280,7 @@ struct PrepRunView: View {
             .id(rep.index)
         case .result(let rep, let result, _) where rep.drill == .boss:
             scaffold(rep, hasAction: true) {
-                PrepBossResultView(result: result, xp: viewModel.lastXP, isTestOut: viewModel.runKind == .testout,
-                                   overridingPoint: viewModel.overridingPoint) { point in
-                    Task { await viewModel.overridePoint(point) }
-                }
+                PrepBossResultView(result: result, isTestOut: viewModel.runKind == .testout)
                 if let error = viewModel.submitError { PrepSubmitError(message: error) }
             } bottom: {
                 PrepPrimaryButton(title: "Continue") { Task { await viewModel.continue() } }

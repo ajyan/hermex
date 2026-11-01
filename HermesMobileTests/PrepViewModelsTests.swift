@@ -225,23 +225,6 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertNil(client.attempts.first?.unit)
     }
 
-    func testLessonXPTicks() async {
-        let client = FakePrepClient()
-        client.todayResults = [.success(courseRun([lessonRep(0), lessonRep(1), lessonRep(2, block: "review"), lessonRep(3, block: "review")]))]
-        client.homeResults = [.success(courseHome(xp: 0))]
-        client.attemptResults = [.success(checked("pass", next: 1)), .success(checked("miss", next: 2)),
-                                 .success(checked("pass", next: 3)), .success(checked("miss", next: 4))]
-        let vm = makeVM(client)
-        await vm.load()
-        var ticks: [Int?] = []
-        for _ in 0..<4 {
-            await vm.choose(.choice("A"))
-            ticks.append(vm.lastXP)
-            await vm.continue()
-        }
-        XCTAssertEqual(ticks, [15, 10, 5, nil])
-    }
-
     func testReviewStartsHiddenAndShowIdeaReveals() async {
         let client = FakePrepClient()
         client.todayResults = [.success(courseRun([lessonRep(0, block: "review"), lessonRep(1)]))]
@@ -277,7 +260,6 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(rep.drill, .boss)
         XCTAssertEqual(result.sitting?.stars, 2)
         XCTAssertEqual(result.revisit.map(\.lessonID), ["u2.l4"])
-        XCTAssertEqual(vm.lastXP, 50)
         XCTAssertEqual(client.attempts.first?.drill, .boss)
     }
 
@@ -338,12 +320,11 @@ final class PrepViewModelsTests: XCTestCase {
         }
         guard case let .finished(summary) = vm.phase else { return XCTFail("phase \(vm.phase)") }
         XCTAssertTrue(summary.isCourse)
-        XCTAssertEqual(summary.xpGained, 30)
         XCTAssertEqual(summary.learned, ["Lesson 0", "Lesson 1"])
         XCTAssertEqual(summary.reviews, 1)
         XCTAssertEqual(summary.missedChecks, 1)
         XCTAssertEqual(summary.streak.days, 7)
-        XCTAssertEqual(summary.nextUp, "Boss quiz · Prompt engineering")
+        XCTAssertEqual(summary.nextUp, "Unit check · Prompt engineering")
         XCTAssertEqual(summary.repCount, 3)
     }
 
@@ -371,24 +352,37 @@ final class PrepViewModelsTests: XCTestCase {
     }
 
     func testRewardCopy() {
-        XCTAssertEqual(PrepCopy.starsLabel(2), "2 of 3 stars")
-        XCTAssertEqual(PrepCopy.xpLabel(15), "+15 XP")
-        XCTAssertEqual(PrepCopy.xpSpoken(15), "Plus 15 XP")
         XCTAssertEqual(PrepCopy.percent(0.824), "82%")
+        XCTAssertEqual(PrepCopy.readyShare(ready: 3, total: 121), 3.0 / 121.0, accuracy: 0.0001,
+                       "the done ring draws the course's ready share, not a full circle")
+        XCTAssertEqual(PrepCopy.readyShare(ready: 0, total: 0), 0)
+    }
+
+    func testAUnitCheckSaysWhenItsBack() {
+        let calendar = Calendar(identifier: .gregorian)
+        let today = DateComponents(calendar: calendar, year: 2026, month: 10, day: 31).date!  // a Saturday
+        XCTAssertEqual(PrepCopy.backLine("2026-11-01", today: today, calendar: calendar), "back tomorrow")
+        XCTAssertEqual(PrepCopy.backLine("2026-11-03", today: today, calendar: calendar), "back Tuesday")
+        XCTAssertEqual(PrepCopy.backLine("2026-11-12", today: today, calendar: calendar), "back Nov 12")
+        XCTAssertEqual(PrepCopy.backLine(nil, today: today, calendar: calendar), "resting")
+        XCTAssertEqual(PrepCopy.bossNode(.ready), "Unit check · due")
+        XCTAssertEqual(PrepCopy.blockTitle("boss"), "Unit check")
     }
 
     func testSittingHeadline() {
-        XCTAssertEqual(PrepCopy.sittingHeadline(PrepBossSitting(score: 0.9, passed: true, stars: 2, unlocked: nil)), "Boss passed")
+        XCTAssertEqual(PrepCopy.sittingHeadline(PrepBossSitting(score: 0.9, passed: true, stars: 2, unlocked: nil)), "Unit passed")
         XCTAssertEqual(PrepCopy.sittingHeadline(PrepBossSitting(score: 0.5, passed: false, stars: 0, unlocked: nil)), "Not yet")
         XCTAssertEqual(PrepCopy.sittingHeadline(PrepBossSitting(score: nil, passed: false, stars: 0, unlocked: nil)), "Grading tonight")
-        XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: 0.9, passed: true, stars: 2, unlocked: "Agents and evals"), xp: 50),
-                       "Agents and evals unlocked · +50 XP")
-        XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: 0.5, passed: false, stars: 0, unlocked: nil), xp: nil),
-                       "The next unit keeps going. This boss comes back in a few days.")
-        XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: 0.5, passed: false, stars: 0, unlocked: nil), xp: nil,
+        XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: 0.9, passed: true, stars: 2, unlocked: "Agents and evals")),
+                       "Agents and evals unlocked")
+        XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: 0.5, passed: false, stars: 0, unlocked: nil)),
+                       "The next unit keeps going. This unit check comes back in 3 days.")
+        XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: 0.5, passed: false, stars: 0, unlocked: nil),
                                            testOut: true), "Not yet. Start with the lessons below.")
-        XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: 0.9, passed: true, stars: 2, unlocked: nil), xp: 50,
-                                           testOut: true), "+50 XP")
+        XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: 0.9, passed: true, stars: 2, unlocked: nil),
+                                           testOut: true), "Unit passed")
+        XCTAssertEqual(PrepCopy.unlockLine(PrepBossSitting(score: nil, passed: false, stars: 0, unlocked: nil)),
+                       "Atlas grades it tonight.", "a daily unit check unlocks nothing")
     }
 
     func testHomeExposesCourseWhenPresent() async {
@@ -683,9 +677,9 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(PrepCopy.unitHeader(index: 1, title: "Prompt engineering"), "Unit 2 · Prompt engineering")
         XCTAssertEqual(PrepCopy.speakingStreak(days: 6), "6-day speaking streak")
         XCTAssertEqual(PrepCopy.speakingStreak(days: 0), "No speaking streak yet: tell a story to start one")
-        XCTAssertEqual(PrepCopy.bossNode(.ready), "Boss quiz · comes up in a run")
-        XCTAssertEqual(PrepCopy.bossNode(.resting), "Boss quiz · back in a few days")
-        XCTAssertEqual(PrepCopy.bossNode(.locked), "Boss quiz")
+        XCTAssertEqual(PrepCopy.bossNode(.ready), "Unit check · due")
+        XCTAssertEqual(PrepCopy.bossNode(.resting), "Unit check · resting", "no date from an older server")
+        XCTAssertEqual(PrepCopy.bossNode(.locked), "Unit check")
     }
 
     // MARK: Recall
@@ -910,7 +904,6 @@ final class PrepViewModelsTests: XCTestCase {
         vm.recallDraft = "Routing goes to the fast tier"
         await vm.submitRecall()
         XCTAssertEqual(client.attempts.first?.drill, .lesson)
-        XCTAssertEqual(vm.lastXP, 10)
         await vm.continue()
         XCTAssertEqual(vm.lessonStage, .recalling, "a recall review starts on the recall card")
         XCTAssertEqual(vm.recallDraft, "", "each recall starts empty")
@@ -1045,7 +1038,6 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(result.overridden, ["p.b"])
         XCTAssertEqual(result.nextIndex, 1, "keeps the original next index")
         XCTAssertEqual(result.pointTexts["p.b"], "B", "keeps the point texts")
-        XCTAssertEqual(vm.lastXP, 15)
         XCTAssertEqual(client.log.last, "override:att-1:p.b")
     }
 
@@ -1074,7 +1066,6 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(result.verdict, "partial")
         XCTAssertEqual(result.overridden, [])
         XCTAssertEqual(result.attemptID, "att-3")
-        XCTAssertEqual(vm.lastXP, 10)
         XCTAssertEqual(client.log.last, "undo:att-2")
         XCTAssertTrue(PrepKeyPointRow.offersOverride(hit: false, canOverride: true, result: result),
                       "the answer's one I had that is free again")
@@ -1588,7 +1579,7 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(["warmup", "weak", "main", "new", "bonus"].map(PrepCopy.blockTitle),
                        ["Warm-up", "Weak spot", "Main rep", "New", "Bonus"])
         XCTAssertEqual(["reteach", "review", "boss"].map(PrepCopy.blockTitle),
-                       ["Another way to see it", "Review", "Boss quiz"])
+                       ["Another way to see it", "Review", "Unit check"])
         XCTAssertEqual(PrepCopy.reviewLine(reviews: 2, missed: 1), "2 reviews · 1 check to look at again")
         XCTAssertEqual(PrepCopy.reviewLine(reviews: 1, missed: 0), "1 review")
     }
@@ -1601,8 +1592,8 @@ final class PrepViewModelsTests: XCTestCase {
     }
 
     func testBossMetaNamesTheLessonItTests() {
-        XCTAssertEqual(PrepCopy.bossMeta(lessonTitle: "Tools are an interface"), "Boss quiz · Tools are an interface")
-        XCTAssertEqual(PrepCopy.bossMeta(lessonTitle: " "), "Boss quiz")
+        XCTAssertEqual(PrepCopy.bossMeta(lessonTitle: "Tools are an interface"), "Unit check · Tools are an interface")
+        XCTAssertEqual(PrepCopy.bossMeta(lessonTitle: " "), "Unit check")
         XCTAssertEqual(PrepCopy.runTitle(block: "boss", lessonTitle: "Tools are an interface"), "Tools are an interface")
     }
 
