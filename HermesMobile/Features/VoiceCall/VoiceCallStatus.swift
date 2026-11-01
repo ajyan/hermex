@@ -35,7 +35,8 @@ struct VoiceCallToolActivity: Equatable {
         VoiceCallToolActivity(kind: kind, label: String(localized: "Checking your notes"), symbol: "doc.text.magnifyingglass")
     }
 
-    private static func shellCommand(in args: [String: JSONValue]?) -> String? {
+    /// The shell command a terminal call ran, unwrapped from its `bash -lc` shell.
+    static func shellCommand(in args: [String: JSONValue]?) -> String? {
         for key in ["command", "cmd"] {
             if case .string(let command)? = args?[key], !command.isEmpty {
                 return ToolCallSummaryFormatter.unwrappingShellWrapper(command)
@@ -65,11 +66,14 @@ struct VoiceCallToolActivity: Equatable {
     }
 }
 
-/// Under the orb: whose turn it is in large type, what Atlas is doing in a tool chip, and what a
-/// tap on the orb does. The chip's and hint's lines are always reserved, so the orb never shifts.
+/// Under the cloud: whose turn it is in large type, what Atlas is doing in a tool chip (or, while
+/// it answers, the memories it drew on), and what a tap on the cloud does. The chip's and hint's
+/// lines are always reserved, so the cloud never shifts.
 struct VoiceCallStatus: View {
     let word: String
     let activity: VoiceCallToolActivity?
+    /// The turn's memories, each in its paper; shown when no tool is running.
+    var sources: [VoiceCallSource] = []
     let hint: String?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -83,9 +87,14 @@ struct VoiceCallStatus: View {
                 .minimumScaleFactor(0.7)
                 .accessibilityAddTraits(.isHeader)
 
-            chip
-                .opacity(activity == nil ? 0 : 1)
-                .accessibilityHidden(activity == nil)
+            ZStack {
+                chip
+                    .opacity(activity == nil ? 0 : 1)
+                    .accessibilityHidden(activity == nil)
+                if activity == nil, !sources.isEmpty {
+                    sourceChips
+                }
+            }
 
             Text(verbatim: hint ?? " ")
                 .font(AppFont.footnote(weight: .medium))
@@ -97,6 +106,33 @@ struct VoiceCallStatus: View {
         .dynamicTypeSize(...DynamicTypeSize.accessibility2)
         .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: activity)
         .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: hint)
+        .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: sources)
+    }
+
+    /// One line of memory chips: as many as fit, the rest behind `+N`.
+    private var sourceChips: some View {
+        ViewThatFits(in: .horizontal) {
+            sourceRow(3)
+            sourceRow(2)
+            sourceRow(1)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(String(localized: "Sources"))
+    }
+
+    /// The first `shown` memories; a lone chip may truncate instead of overflowing.
+    private func sourceRow(_ shown: Int) -> some View {
+        HStack(spacing: 6) {
+            ForEach(sources.prefix(shown)) { source in
+                HXChip(paper: source.kind.paper, symbol: source.kind.symbol, label: source.label)
+                    .fixedSize(horizontal: shown > 1, vertical: false)
+            }
+            if sources.count > shown {
+                HXChip(paper: .tool, label: "+\(sources.count - shown)")
+                    .fixedSize()
+                    .accessibilityLabel(String(localized: "\(sources.count - shown) more"))
+            }
+        }
     }
 
     private var chip: some View {

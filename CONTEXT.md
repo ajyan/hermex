@@ -143,3 +143,14 @@ _Avoid_: check-in, weekly summary, journal entry
 **Fork**:
 A chat created from another chat's history by Fork From Here or `/branch` (`/api/session/branch`). The server marks it `session_source: fork` with a `parent_session_id`, and Hermex shows a "Forked from" row that opens the parent. Agent child sessions (subagents, cron, CLI `/new`) also carry a parent but are not Forks.
 _Avoid_: Branch (for the chat), child session
+
+## Voice calls
+
+**Call memories**:
+The notes and people Atlas drew on for one call turn: the server's `context_sources` for the run, plus what its finished tool calls read (a `brain ask` answer's citations, a `crm show`, a file read or search). At most six, reset when the next turn is sent.
+_Avoid_: sources (alone, in product copy), citations
+
+**Constellation**:
+The call screen's starfield: a 3D cloud of stars that flocks out while Atlas thinks, lights each call memory as a node, and lands in that turn's shape when the reply starts. Each turn's memories get a fresh random layout.
+_Avoid_: orb (the earlier visual), graph
+

@@ -2,29 +2,33 @@
 import SwiftUI
 
 /// Debug-only call screen lab: loops a scripted conversation through the real
-/// orb, captions, and status in the call screen's layout, so turn changes can be
+/// starfield, captions, and status in the call screen's layout, so turn changes can be
 /// watched on a simulator without CallKit, a mic, or a server.
 /// `xcrun simctl launch <udid> <bundle id> --voice-call-lab`
 /// holds one state instead with `--voice-call-lab-phase <phase>`, one of
-/// listening, thinking, speaking, interrupted, dropped, or ended.
+/// idle, listening, thinking, tools, converge, speaking, interrupted, dropped, or ended.
+/// `--voice-call-lab-perf` prints the starfield's frame times every 240 frames.
 struct VoiceCallLab: View {
     private enum Phase: String, CaseIterable {
-        case listening, thinking, speaking, interrupted, dropped, ended
+        case idle, listening, thinking, tools, converge, speaking, interrupted, dropped, ended
 
-        var mood: VoiceCallOrbMood {
+        var scene: VoiceCallScenePhase {
             switch self {
-            case .listening, .interrupted: .listening
-            case .thinking: .thinking
-            case .speaking: .speaking
-            case .dropped, .ended: .quiet
+            case .idle, .dropped, .ended: .idle
+            case .listening: .listen
+            case .thinking: .think
+            case .tools: .tools
+            case .converge: .converge
+            case .speaking: .speak
+            case .interrupted: .interrupt
             }
         }
 
         var word: String {
             switch self {
-            case .listening, .interrupted: "Listening"
-            case .thinking: "Thinking"
-            case .speaking: "Speaking"
+            case .idle, .listening, .interrupted: "Listening"
+            case .thinking, .tools: "Thinking"
+            case .converge, .speaking: "Speaking"
             case .dropped: "Call dropped"
             case .ended: "Call ended"
             }
@@ -32,9 +36,10 @@ struct VoiceCallLab: View {
 
         var hint: String? {
             switch self {
+            case .idle: nil
             case .listening, .interrupted: "Tap to send"
-            case .thinking: "Tap to cancel"
-            case .speaking: "Tap to interrupt"
+            case .thinking, .tools: "Tap to cancel"
+            case .converge, .speaking: "Tap to interrupt"
             case .dropped, .ended: nil
             }
         }
@@ -55,8 +60,19 @@ struct VoiceCallLab: View {
     @State private var reply: String?
     @State private var activity: VoiceCallToolActivity?
     @State private var interruptions = 0
+    @State private var replyStarts = 0
+    @State private var sources: [VoiceCallSource] = []
     @State private var levels = VoiceCallAudioLevels()
     @State private var orbSlot: CGRect = .zero
+
+    /// A sample turn's memories, one of each kind the call colors.
+    private static let memories: [VoiceCallSource] = [
+        VoiceCallSources.source(path: "journal/2026/10-October/2026-10-22.md"),
+        VoiceCallSources.source(path: "wiki/running/taper-plan.md"),
+        VoiceCallSources.person(named: "Mitch Anderson"),
+        VoiceCallSources.source(path: "email_ingest/summaries/2026-10-06-marathon-fueling.md"),
+        VoiceCallSources.source(path: "book_highlights/born-to-run.md"),
+    ].compactMap { $0 }
 
     private static let lookup = VoiceCallToolActivity.of(
         ToolCall(name: "terminal", preview: nil, args: ["command": .string("brain crm show jane-doe")])
@@ -85,8 +101,11 @@ struct VoiceCallLab: View {
     var body: some View {
         ZStack {
             Color.hxCanvas.ignoresSafeArea()
-            VoiceCallOrb(levels: levels, mood: phase.mood, focus: orbSlot, interruptions: interruptions)
-                .ignoresSafeArea()
+            VoiceCallStarfield(
+                levels: levels, phase: phase.scene, sources: sources, focus: orbSlot,
+                interruptions: interruptions, replyStarts: replyStarts
+            )
+            .ignoresSafeArea()
             VStack(spacing: 0) {
                 VStack(spacing: 4) {
                     Text(verbatim: "Atlas")
@@ -107,12 +126,15 @@ struct VoiceCallLab: View {
                             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { orbSlot = $0 }
                         VoiceCallCaptions(
                             sent: sent, live: live, reply: reply,
-                            isReplying: phase == .thinking || phase == .speaking
+                            isReplying: [.thinking, .tools, .converge, .speaking].contains(phase)
                         )
                         .dynamicTypeSize(...DynamicTypeSize.accessibility2)
                         .padding(.horizontal, 12)
                     }
-                    VoiceCallStatus(word: phase.word, activity: activity, hint: phase.hint)
+                    VoiceCallStatus(
+                        word: phase.word, activity: activity,
+                        sources: phase == .converge || phase == .speaking ? sources : [], hint: phase.hint
+                    )
                 }
                 Spacer(minLength: 12)
                 if phase == .dropped {
@@ -127,7 +149,7 @@ struct VoiceCallLab: View {
         }
         .preferredColorScheme(.dark)
         .task {
-            if let held = Phase.held { hold(held) } else { await run() }
+            if let held = Phase.held { await hold(held) } else { await run() }
         }
     }
 
@@ -145,25 +167,42 @@ struct VoiceCallLab: View {
         .padding(.horizontal, 8)
     }
 
-    /// Sets one still state for a screenshot.
-    private func hold(_ held: Phase) {
+    /// Holds one state for a screenshot. Memory phases first find their memories in a tool
+    /// phase, as a call would, so the constellation is laid out; a held cut-off keeps cutting.
+    private func hold(_ held: Phase) async {
         let turn = Self.turns[1]
+        if [.tools, .converge, .speaking].contains(held) {
+            phase = .tools
+            sources = Self.memories
+        }
+        if held == .converge || held == .speaking {
+            try? await Task.sleep(for: .seconds(3))
+            replyStarts += 1
+        }
         phase = held
         switch held {
+        case .idle:
+            break
         case .listening:
             live = "When did I last see"
             levels.setMic(0.7)
-        case .thinking:
-            sent = turn.user
-            activity = turn.tool
-        case .speaking:
-            sent = Self.turns[0].user
-            reply = String(Self.turns[0].atlas.prefix(150))
-            levels.setVoice(0.7)
+        case .thinking, .tools:
+            sent = "What did I write about the taper, and did Mitch say anything about the race"
+            activity = held == .thinking ? turn.tool : nil
+        case .converge, .speaking:
+            sent = "What did I write about the taper, and did Mitch say anything about the race"
+            reply = "Your October 22nd entry says the taper is settling in, with sleep as the focus."
+            while !Task.isCancelled {
+                levels.setVoice(Float.random(in: 0.4...0.9))
+                try? await Task.sleep(for: .milliseconds(200))
+            }
         case .interrupted:
-            interruptions = 1
             live = "Wait, actually"
-            levels.setMic(0.6)
+            while !Task.isCancelled {
+                interruptions += 1
+                levels.setMic(Float.random(in: 0.4...0.8))
+                try? await Task.sleep(for: .seconds(0.6))
+            }
         case .dropped, .ended:
             sent = turn.user
             reply = turn.atlas
@@ -193,11 +232,21 @@ struct VoiceCallLab: View {
         try? await Task.sleep(for: .seconds(1))
         sent = user
         live = ""
+        sources = []
         phase = .thinking
         try? await Task.sleep(for: .seconds(1))
         activity = tool
-        try? await Task.sleep(for: .seconds(1.5))
+        if tool != nil {
+            let found = Self.memories.shuffled()
+            for count in 1...4 {
+                try? await Task.sleep(for: .seconds(0.7))
+                sources = Array(found.prefix(count))
+                phase = .tools
+            }
+        }
+        try? await Task.sleep(for: .seconds(1))
         activity = nil
+        replyStarts += 1
         phase = .speaking
         for words in Self.prefixes(of: atlas) {
             reply = words
