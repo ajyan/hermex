@@ -110,8 +110,8 @@ extension DeckCard {
     /// cover, the close, and any card off the weekly deck.
     var chapterLabel: String? {
         // A monthly card shows no chapter line: the header's "3 of 14" already says where he is.
-        if month != nil { return nil }
-        guard let chapter, !chapter.isEmpty else { return nil }
+        if self.month != nil { return nil }
+        guard let chapter = self.chapter, !chapter.isEmpty else { return nil }
         let name = chapter.prefix(1).uppercased() + chapter.dropFirst()
         guard let index = Self.weeklyChapters.firstIndex(of: chapter) else { return name }
         return "\(index + 1) · \(name)"
