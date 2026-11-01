@@ -59,6 +59,7 @@ struct DeckCheck: Decodable, Equatable {
 
 /// One card. Every field but `id` and `type` is optional so a newer deck never
 /// fails to decode; an unknown `type` renders its `fallback` text as a plain card.
+@dynamicMemberLookup
 struct DeckCard: Decodable, Equatable, Identifiable {
     enum CardType: Equatable {
         case headline, prompt, decision, reflect, item, sleep, goal, changes, ask, dinner, meals, section, close
@@ -113,153 +114,28 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         }
     }
 
-    let id: String
-    let type: CardType
-    /// For `item` cards: book, insight, video, youtube, media. A `prompt` card's is `letter` for the Dad card.
-    let itemKind: String?
-    let title: String?
-    let body: String?
-    let source: String?
-    let lines: [String]
-    let question: String?
-    let context: String?
-    /// Who speaks the `context` when it isn't the card's own voice: the day's advisor on the letter.
-    let contextFrom: String?
-    let voice: String?
-    let why: String?
-    let draft: DeckDraft?
-    let actions: [DeckAction]
-    let fallback: String?
-    /// Why the brief picked this card today ("fits today's thread · unseen 3 weeks").
-    let reason: String?
-    /// Other questions for the same material; Regenerate steps through them.
-    let altQuestions: [String]
-    /// On the headline card: one sentence about yesterday (a weekly review's: about the week), written by the brief.
-    let recap: String?
-    /// A recap's items (a review's days, answers, or last week's plan), each under an optional label;
-    /// on a weekly review's headline, the week's highlights under their days.
-    let entries: [DeckEntry]
-    /// A weekly review's mood card: energy and mood per weekday, nil where nothing was written.
-    let points: [DeckPoint]
-    /// A weekly review's goals card: one meter per commitment.
-    let meters: [DeckMeter]
-    /// A goals card's paper name ("wiki"), as its goal sets it.
-    let color: String?
-    /// A sleep card's rating labels, worst to best; the answer's `rating` is a 1-based index.
-    let scale: [String]
-    /// A sleep card's numbers from the user's watch.
-    let sleep: DeckSleep?
-    /// A sleep card's tags: what might have shaped the night, tapped beside the rating.
-    let tags: [DeckSleepTag]
-    /// A goal card's personal goals (slugs). The card checks in on them live through the Goals API;
-    /// `fallback` is the brief's text for when the server can't serve them.
-    let goals: [String]
-    /// A Mandarin card's three new phrases to work into the answer.
-    let phrases: [DeckPhrase]
-    /// A Mandarin card's phrasebook phrases due today, to recall from their English (Got it / Again).
-    let recall: [DeckPhrase]
-    /// A Mandarin card's feedback on the last answer filed.
-    let yesterday: DeckMandarinFeedback?
-    /// A Mandarin card's sentence pattern for the day, and the learner's progress as the deck was built.
-    let pattern: DeckMandarinPattern?
-    let progress: DeckMandarinProgress?
-    /// A Mandarin card's question (in `question`, as characters) in pinyin and in English.
-    let questionPinyin: String?
-    let questionEn: String?
-    /// A weekly review's What changed card: the fixes whose status moved this week, newest first.
-    let rows: [DeckChangeRow]
-    /// The headline's style rules learned or dropped since the last deck (`tools/style_learn.py`).
-    let learned: [DeckLearned]
-    /// The day's variant card: this card written two ways, picked between on the close card; nil on other cards.
-    let variant: DeckVariant?
-    /// A weekly card's chapter ("remember", "reflect", "values", "steer"); the cover and close have none.
-    let chapter: String?
-    /// A training card's headline, its short bullets, and Baki's proposals for next week.
-    let headline: String?
-    let bullets: [String]
-    let proposals: [BodyProposal]
-    /// The cover's week number, date range ("Oct 19–25"), and the note a year-ago self left.
-    let weekNumber: Int?
-    let range: String?
-    let noteFromPast: DeckPastNote?
-    /// The cover's moments of the week and the spares Swap brings in, and how the week ended.
-    let moments: [DeckMoment]
-    let spares: [DeckMoment]
-    let ended: String?
-    /// The v3 last-intention card's intention and its if-then plan, as last week sealed them.
-    let text: String?
-    let ifThen: String?
-    /// A v3 value card's value ("people", wire `value`) and its name ("Showed up for my people");
-    /// with the last-intention card, the week's `fact` beside it.
-    let valueID: String?
-    let name: String?
-    let fact: DeckFact?
-    /// A section divider's intention from Sunday's review; nil when empty.
-    let intention: DeckIntentionLine?
-    /// The v3 intention card's coach changes, one per goal.
-    let changes: [DeckGoalChange]
-    /// A Piece card's argument and quotes, from the long piece's map (the vault's tools/piece_view.py).
-    let piece: DeckPiece?
-    /// A dinner card's night ("2026-10-26"), the dinner it asks about.
-    let date: String?
-    /// A dinner card's choices: the week's dinners not yet logged, then "other" and "out". The pick
-    /// files as the answer's `action`, 👍/👎 as `rating` 2/1, and a cooking note as `text`. The close
-    /// card's three actions for today's one thing, and the headline's Done / Partly / Not today for
-    /// yesterday's, file the same way.
-    let options: [DeckSleepTag]
-    /// A Looking ahead card's choices for when a message to future him comes back ("1m", "6m", "1y", "5y"),
-    /// filed as the answer's `returns`; empty on every other card.
-    let returns: [DeckSleepTag]
-    /// A front divider's (and the week divider's) week: a row of day dots per daily commitment, pips for a count.
-    let weekRows: [DeckFrontRow]
-    /// A front divider's one thing to do today (wire `today`): "Outreach: Anthropic, from Today's Ask".
-    let todayAction: String?
-    /// The headline's pick from yesterday's close card (wire `yesterday_one`), asked whether it happened.
-    let yesterdayOne: DeckYesterdayOne?
-    /// The season front a card belongs to ("ai", "fatherhood", "living-well", "relationships", or "tail"
-    /// for "Also"); on a `front` divider, the front it opens.
-    let front: String?
-    /// The weekly review's intention card: the fronts to lead next week with, the suggested one in
-    /// `front`, and why it was suggested.
-    let fronts: [DeckSleepTag]
-    let frontReason: String?
-    /// The Sunday meals card's week of candidates, accepted live through /api/meals/accept.
-    let meals: DeckMealsPlan?
-    /// A monthly review card's month: the cover's totals, the weeks, the dots, an insight's stat (`DeckMonth`).
-    let month: DeckMonth?
+    /// The decoded fields, read as `card.title`. A card has ~75 of them, several KB inline, so they live
+    /// behind one reference: an unoptimized build's view bodies copy a card dozens of times per frame, and
+    /// inline copies overflowed the iPhone's 1 MB main-thread stack on opening the deck.
+    private final class Storage {
+        let fields: Fields
+        init(_ fields: Fields) { self.fields = fields }
+    }
 
-    /// The vault file the card came from (`ref.link`, "wiki/nyc-marathon"); nil for pooled
-    /// material with no page of its own (books, quotes, videos).
-    let link: String?
-    /// The pool item the brief picked (`ref.pool`, "media:kafka", "video:<id>"); nil for cards it didn't pick from a pool.
-    let pool: String?
+    private let storage: Storage
 
-    /// Which of the week's drafted questions this card's sources answer (`week.variant`, 0 the first);
-    /// nil on every card that isn't one of the week's sources.
-    let weekVariant: Int?
+    init(from decoder: Decoder) throws { storage = Storage(try Fields(from: decoder)) }
 
-    // Deck by job (vault 2026-10-27): every card but the headline and close names its act. A deck with
-    // no `act` anywhere is an older deck and renders as before.
+    var id: String { storage.fields.id }
 
-    /// The job this card belongs to: `today`, `ideas`, `writing`, `body`, or `people` (`DeckAct.order`).
-    let act: String?
-    /// The headline's tag lines, each with its kind of mark (wire `tags`, `{icon, text}`); a sleep card's
-    /// `tags` decode into `tags` instead.
-    let headlineTags: [DeckTag]
-    /// The headline's pick for today, with yesterday's own words behind it when there are some.
-    let todayOne: DeckTodayOne?
-    /// An idea card's one-sentence gist, its verbatim quotes, its labelled parts, and the week's question it serves.
-    let gist: String?
-    let quotes: [DeckPiece.Quote]
-    let parts: [DeckPart]
-    let weekQuestion: String?
-    /// A check-in's or letter's thread: yesterday's words it picks up from.
-    let thread: DeckThread?
-    /// A year-ago card's day, "Tue, Oct 28, 2025".
-    let dateLabel: String?
+    subscript<T>(dynamicMember keyPath: KeyPath<Fields, T>) -> T { storage.fields[keyPath: keyPath] }
+
+    static func == (lhs: DeckCard, rhs: DeckCard) -> Bool {
+        lhs.storage === rhs.storage || lhs.storage.fields == rhs.storage.fields
+    }
 
     /// The Brain page the card's source opens, by the vault folder its link lives in.
-    var sourceRoute: BrainRoute? { link.flatMap(Self.brainRoute(forLink:)) }
+    var sourceRoute: BrainRoute? { self.link.flatMap(Self.brainRoute(forLink:)) }
 
     /// A vault path as the Brain page it is: the folder decides the module (the server's
     /// `brain_catalog` scans the same folders) and the page id is the path with `.md`.
@@ -289,79 +165,79 @@ struct DeckCard: Decodable, Equatable, Identifiable {
 
     /// The front a `section` divider opens, by name ("Landing the AI role"), from its kicker "This week · <front>".
     var frontName: String? {
-        guard type == .section, let kicker = lines.first, let dot = kicker.range(of: " · ") else { return nil }
+        guard self.type == .section, let kicker = self.lines.first, let dot = kicker.range(of: " · ") else { return nil }
         return String(kicker[dot.upperBound...])
     }
 
         /// What VoiceOver reads for a `section` divider: "This week, Being a father, <the question>", then the intention line when it has one.
     /// `lines[0]` is "This week · <area>"; the question is the title.
-    var sectionSpokenLabel: String { sectionSpokenLabel(question: title) }
+    var sectionSpokenLabel: String { sectionSpokenLabel(question: self.title) }
 
     /// The same label for the question on screen, which Regenerate may have changed.
     func sectionSpokenLabel(question: String?) -> String {
-        let kicker = (lines.first ?? "This week").replacingOccurrences(of: " · ", with: ", ")
-        return [kicker, question, intention?.line].compactMap { $0 }.joined(separator: ", ")
+        let kicker = (self.lines.first ?? "This week").replacingOccurrences(of: " · ", with: ", ")
+        return [kicker, question, self.intention?.line].compactMap { $0 }.joined(separator: ", ")
     }
 
     /// The placeholder of a decision card's answer box once `chosen` (a text action) is picked:
     /// the card's own question (the Sunday view-take's "Your take, in a sentence"), else "Your answer".
     func answerPrompt(chosen: String) -> String {
-        chosen == "edit" ? "Your version" : (question ?? "Your answer")
+        chosen == "edit" ? "Your version" : (self.question ?? "Your answer")
     }
 
     /// The Sunday review's close of the week's question: his answers as `entries`, Still open / Settled.
-    var isViewTake: Bool { type == .decision && itemKind == "view_take" }
+    var isViewTake: Bool { self.type == .decision && self.itemKind == "view_take" }
 
     /// A decision that belongs on the shared follow-ups page: every decision but the view-take.
-    var isFollowUp: Bool { type == .decision && !isViewTake }
+    var isFollowUp: Bool { self.type == .decision && !isViewTake }
 
     /// The prose a decision row shows under its title: none when it repeats the title, and none
     /// when the card has `entries`, since `body` is only their plain copy for older builds.
     var decisionBody: String? {
-        guard entries.isEmpty, let body, body != title else { return nil }
+        guard self.entries.isEmpty, let body = self.body, body != self.title else { return nil }
         return body
     }
 
     /// The Dad card: a prompt to say something to his daughter, with the countdown to her birth
     /// (then her age) in `lines`. Its answer is filed as a letter to her, not into the journal.
-    var isLetter: Bool { type == .prompt && itemKind == "letter" }
+    var isLetter: Bool { self.type == .prompt && self.itemKind == "letter" }
 
     /// The Mandarin practice card: phrases to hear and a question to answer out loud. Its answer is
     /// filed to the vault's Mandarin log, which writes the feedback shown on the next one.
-    var isMandarin: Bool { type == .prompt && itemKind == "mandarin" }
+    var isMandarin: Bool { self.type == .prompt && self.itemKind == "mandarin" }
 
     /// A Mandarin card with cues asks for a short story: what happened, how he felt, what's next.
-    var mandarinTellsAStory: Bool { isMandarin && phrases.contains { $0.kind != nil } }
+    var mandarinTellsAStory: Bool { isMandarin && self.phrases.contains { $0.kind != nil } }
 
     /// The Looking back card: a question about a story, a friend, a time of his life, or something to let go.
     /// Its answer is filed to the vault's past/ folder, not the journal.
-    var isPast: Bool { type == .prompt && itemKind == "past" }
+    var isPast: Bool { self.type == .prompt && self.itemKind == "past" }
 
     /// The Looking ahead card: a question about who he's becoming, or a message to his future self (offering
     /// `returns`); on the day a message comes back, the message quoted in `thread`. Filed to the vault's future/.
-    var isFuture: Bool { type == .prompt && itemKind == "future" }
+    var isFuture: Bool { self.type == .prompt && self.itemKind == "future" }
 
     /// The return a Looking ahead message gets when he doesn't pick one (the vault files a missing `returns` as this).
     static let defaultReturn = "1y"
 
     /// One of Atlas's open questions from last night's self-review: `context` is its short title and
     /// the question follows. Its answer is filed into that night's dream log, which the next review reads.
-    var isDream: Bool { type == .prompt && itemKind == "dream" }
+    var isDream: Bool { self.type == .prompt && self.itemKind == "dream" }
 
     /// The weekly work-ethic card's traits, each rated 1–10 by tapping instead of typed. Keyed off
     /// the card's stable id, so decks already written get the picker too; the answer stays text.
     var selfRatings: [String]? {
-        type == .prompt && id == "q-hormozi" ? ["Consistency", "Intensity", "Focus", "Boredom tolerance", "Sacrifice"] : nil
+        self.type == .prompt && id == "q-hormozi" ? ["Consistency", "Intensity", "Focus", "Boredom tolerance", "Sacrifice"] : nil
     }
 
     /// Whether answering this card means typing (prompt and reflect cards, and a sleep or goal card's note).
     var takesText: Bool {
-        (type == .prompt && selfRatings == nil) || type == .reflect || type == .sleep || type == .goal || type == .dinner
+        (self.type == .prompt && selfRatings == nil) || self.type == .reflect || self.type == .sleep || self.type == .goal || self.type == .dinner
     }
 
     /// Whether "Not for Me" applies: material the brief chose, not the deck's own pages.
     var takesFeedback: Bool {
-        switch type {
+        switch self.type {
         case .prompt, .reflect, .item, .unknown: true
         case .headline, .decision, .sleep, .goal, .changes, .ask, .dinner, .meals, .section, .close, .front: false
         case .cover, .lastIntention, .value, .intention, .keepsakes, .training: false
@@ -369,131 +245,278 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         }
     }
 
-    private enum CodingKeys: String, CodingKey {
-        case id, type, title, body, source, lines, question, context, contextFrom, voice, why, draft, actions, fallback
-        case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
-        case phrases, recall, yesterday, pattern, progress, questionPinyin, questionEn, rows, week
-        case chapter, weekNumber, range, noteFromPast, headline, bullets, proposals
-        case piece, learned, variant, date, options, returns, meals, front, fronts, frontReason, weekRows, yesterdayOne
-        case todayAction = "today"
-        case moments, spares, ended, text, ifThen, name, fact, changes, intention
-        case act, todayOne, gist, quotes, parts, weekQuestion, thread, dateLabel, month
-        case valueID = "value"
-        case itemKind = "kind"
-    }
+    struct Fields: Decodable, Equatable {
+        let id: String
+        let type: CardType
+        /// For `item` cards: book, insight, video, youtube, media. A `prompt` card's is `letter` for the Dad card.
+        let itemKind: String?
+        let title: String?
+        let body: String?
+        let source: String?
+        let lines: [String]
+        let question: String?
+        let context: String?
+        /// Who speaks the `context` when it isn't the card's own voice: the day's advisor on the letter.
+        let contextFrom: String?
+        let voice: String?
+        let why: String?
+        let draft: DeckDraft?
+        let actions: [DeckAction]
+        let fallback: String?
+        /// Why the brief picked this card today ("fits today's thread · unseen 3 weeks").
+        let reason: String?
+        /// Other questions for the same material; Regenerate steps through them.
+        let altQuestions: [String]
+        /// On the headline card: one sentence about yesterday (a weekly review's: about the week), written by the brief.
+        let recap: String?
+        /// A recap's items (a review's days, answers, or last week's plan), each under an optional label;
+        /// on a weekly review's headline, the week's highlights under their days.
+        let entries: [DeckEntry]
+        /// A weekly review's mood card: energy and mood per weekday, nil where nothing was written.
+        let points: [DeckPoint]
+        /// A weekly review's goals card: one meter per commitment.
+        let meters: [DeckMeter]
+        /// A goals card's paper name ("wiki"), as its goal sets it.
+        let color: String?
+        /// A sleep card's rating labels, worst to best; the answer's `rating` is a 1-based index.
+        let scale: [String]
+        /// A sleep card's numbers from the user's watch.
+        let sleep: DeckSleep?
+        /// A sleep card's tags: what might have shaped the night, tapped beside the rating.
+        let tags: [DeckSleepTag]
+        /// A goal card's personal goals (slugs). The card checks in on them live through the Goals API;
+        /// `fallback` is the brief's text for when the server can't serve them.
+        let goals: [String]
+        /// A Mandarin card's three new phrases to work into the answer.
+        let phrases: [DeckPhrase]
+        /// A Mandarin card's phrasebook phrases due today, to recall from their English (Got it / Again).
+        let recall: [DeckPhrase]
+        /// A Mandarin card's feedback on the last answer filed.
+        let yesterday: DeckMandarinFeedback?
+        /// A Mandarin card's sentence pattern for the day, and the learner's progress as the deck was built.
+        let pattern: DeckMandarinPattern?
+        let progress: DeckMandarinProgress?
+        /// A Mandarin card's question (in `question`, as characters) in pinyin and in English.
+        let questionPinyin: String?
+        let questionEn: String?
+        /// A weekly review's What changed card: the fixes whose status moved this week, newest first.
+        let rows: [DeckChangeRow]
+        /// The headline's style rules learned or dropped since the last deck (`tools/style_learn.py`).
+        let learned: [DeckLearned]
+        /// The day's variant card: this card written two ways, picked between on the close card; nil on other cards.
+        let variant: DeckVariant?
+        /// A weekly card's chapter ("remember", "reflect", "values", "steer"); the cover and close have none.
+        let chapter: String?
+        /// A training card's headline, its short bullets, and Baki's proposals for next week.
+        let headline: String?
+        let bullets: [String]
+        let proposals: [BodyProposal]
+        /// The cover's week number, date range ("Oct 19–25"), and the note a year-ago self left.
+        let weekNumber: Int?
+        let range: String?
+        let noteFromPast: DeckPastNote?
+        /// The cover's moments of the week and the spares Swap brings in, and how the week ended.
+        let moments: [DeckMoment]
+        let spares: [DeckMoment]
+        let ended: String?
+        /// The v3 last-intention card's intention and its if-then plan, as last week sealed them.
+        let text: String?
+        let ifThen: String?
+        /// A v3 value card's value ("people", wire `value`) and its name ("Showed up for my people");
+        /// with the last-intention card, the week's `fact` beside it.
+        let valueID: String?
+        let name: String?
+        let fact: DeckFact?
+        /// A section divider's intention from Sunday's review; nil when empty.
+        let intention: DeckIntentionLine?
+        /// The v3 intention card's coach changes, one per goal.
+        let changes: [DeckGoalChange]
+        /// A Piece card's argument and quotes, from the long piece's map (the vault's tools/piece_view.py).
+        let piece: DeckPiece?
+        /// A dinner card's night ("2026-10-26"), the dinner it asks about.
+        let date: String?
+        /// A dinner card's choices: the week's dinners not yet logged, then "other" and "out". The pick
+        /// files as the answer's `action`, 👍/👎 as `rating` 2/1, and a cooking note as `text`. The close
+        /// card's three actions for today's one thing, and the headline's Done / Partly / Not today for
+        /// yesterday's, file the same way.
+        let options: [DeckSleepTag]
+        /// A Looking ahead card's choices for when a message to future him comes back ("1m", "6m", "1y", "5y"),
+        /// filed as the answer's `returns`; empty on every other card.
+        let returns: [DeckSleepTag]
+        /// A front divider's (and the week divider's) week: a row of day dots per daily commitment, pips for a count.
+        let weekRows: [DeckFrontRow]
+        /// A front divider's one thing to do today (wire `today`): "Outreach: Anthropic, from Today's Ask".
+        let todayAction: String?
+        /// The headline's pick from yesterday's close card (wire `yesterday_one`), asked whether it happened.
+        let yesterdayOne: DeckYesterdayOne?
+        /// The season front a card belongs to ("ai", "fatherhood", "living-well", "relationships", or "tail"
+        /// for "Also"); on a `front` divider, the front it opens.
+        let front: String?
+        /// The weekly review's intention card: the fronts to lead next week with, the suggested one in
+        /// `front`, and why it was suggested.
+        let fronts: [DeckSleepTag]
+        let frontReason: String?
+        /// The Sunday meals card's week of candidates, accepted live through /api/meals/accept.
+        let meals: DeckMealsPlan?
+        /// A monthly review card's month: the cover's totals, the weeks, the dots, an insight's stat (`DeckMonth`).
+        let month: DeckMonth?
 
-    private struct Week: Decodable {
-        let variant: Int?
+        /// The vault file the card came from (`ref.link`, "wiki/nyc-marathon"); nil for pooled
+        /// material with no page of its own (books, quotes, videos).
+        let link: String?
+        /// The pool item the brief picked (`ref.pool`, "media:kafka", "video:<id>"); nil for cards it didn't pick from a pool.
+        let pool: String?
 
-        init(from decoder: Decoder) throws {
-            variant = try? decoder.container(keyedBy: CodingKeys.self).decodeIfPresent(Int.self, forKey: .variant)
+        /// Which of the week's drafted questions this card's sources answer (`week.variant`, 0 the first);
+        /// nil on every card that isn't one of the week's sources.
+        let weekVariant: Int?
+
+        // Deck by job (vault 2026-10-27): every card but the headline and close names its act. A deck with
+        // no `act` anywhere is an older deck and renders as before.
+
+        /// The job this card belongs to: `today`, `ideas`, `writing`, `body`, or `people` (`DeckAct.order`).
+        let act: String?
+        /// The headline's tag lines, each with its kind of mark (wire `tags`, `{icon, text}`); a sleep card's
+        /// `tags` decode into `tags` instead.
+        let headlineTags: [DeckTag]
+        /// The headline's pick for today, with yesterday's own words behind it when there are some.
+        let todayOne: DeckTodayOne?
+        /// An idea card's one-sentence gist, its verbatim quotes, its labelled parts, and the week's question it serves.
+        let gist: String?
+        let quotes: [DeckPiece.Quote]
+        let parts: [DeckPart]
+        let weekQuestion: String?
+        /// A check-in's or letter's thread: yesterday's words it picks up from.
+        let thread: DeckThread?
+        /// A year-ago card's day, "Tue, Oct 28, 2025".
+        let dateLabel: String?
+
+        private enum CodingKeys: String, CodingKey {
+            case id, type, title, body, source, lines, question, context, contextFrom, voice, why, draft, actions, fallback
+            case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
+            case phrases, recall, yesterday, pattern, progress, questionPinyin, questionEn, rows, week
+            case chapter, weekNumber, range, noteFromPast, headline, bullets, proposals
+            case piece, learned, variant, date, options, returns, meals, front, fronts, frontReason, weekRows, yesterdayOne
+            case todayAction = "today"
+            case moments, spares, ended, text, ifThen, name, fact, changes, intention
+            case act, todayOne, gist, quotes, parts, weekQuestion, thread, dateLabel, month
+            case valueID = "value"
+            case itemKind = "kind"
         }
 
-        private enum CodingKeys: String, CodingKey { case variant }
-    }
+        private struct Week: Decodable {
+            let variant: Int?
 
-    private struct Ref: Decodable {
-        let link: String?
-        let pool: String?
+            init(from decoder: Decoder) throws {
+                variant = try? decoder.container(keyedBy: CodingKeys.self).decodeIfPresent(Int.self, forKey: .variant)
+            }
+
+            private enum CodingKeys: String, CodingKey { case variant }
+        }
+
+        private struct Ref: Decodable {
+            let link: String?
+            let pool: String?
+
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                link = try? c.decodeIfPresent(String.self, forKey: .link)
+                pool = try? c.decodeIfPresent(String.self, forKey: .pool)
+            }
+
+            private enum CodingKeys: String, CodingKey { case link, pool }
+        }
 
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
-            link = try? c.decodeIfPresent(String.self, forKey: .link)
-            pool = try? c.decodeIfPresent(String.self, forKey: .pool)
+            id = try c.decode(String.self, forKey: .id)
+            type = CardType((try? c.decode(String.self, forKey: .type)) ?? "")
+            itemKind = try? c.decodeIfPresent(String.self, forKey: .itemKind)
+            title = try? c.decodeIfPresent(String.self, forKey: .title)
+            body = try? c.decodeIfPresent(String.self, forKey: .body)
+            source = try? c.decodeIfPresent(String.self, forKey: .source)
+            lines = (try? c.decodeIfPresent([String].self, forKey: .lines)) ?? []
+            question = try? c.decodeIfPresent(String.self, forKey: .question)
+            context = try? c.decodeIfPresent(String.self, forKey: .context)
+            contextFrom = (try? c.decodeIfPresent(String.self, forKey: .contextFrom)).flatMap { $0.isEmpty ? nil : $0 }
+            voice = try? c.decodeIfPresent(String.self, forKey: .voice)
+            why = try? c.decodeIfPresent(String.self, forKey: .why)
+            draft = try? c.decodeIfPresent(DeckDraft.self, forKey: .draft)
+            actions = ((try? c.decodeIfPresent([Lossy<DeckAction>].self, forKey: .actions)) ?? []).compactMap(\.value)
+            fallback = try? c.decodeIfPresent(String.self, forKey: .fallback)
+            reason = try? c.decodeIfPresent(String.self, forKey: .reason)
+            recap = (try? c.decodeIfPresent(String.self, forKey: .recap))
+                .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+            altQuestions = (try? c.decodeIfPresent([String].self, forKey: .altQuestions)) ?? []
+            entries = ((try? c.decodeIfPresent([Lossy<DeckEntry>].self, forKey: .entries)) ?? []).compactMap(\.value)
+            points = ((try? c.decodeIfPresent([Lossy<DeckPoint>].self, forKey: .points)) ?? []).compactMap(\.value)
+            meters = ((try? c.decodeIfPresent([Lossy<DeckMeter>].self, forKey: .meters)) ?? []).compactMap(\.value)
+            color = try? c.decodeIfPresent(String.self, forKey: .color)
+            scale = (try? c.decodeIfPresent([String].self, forKey: .scale)) ?? []
+            sleep = try? c.decodeIfPresent(DeckSleep.self, forKey: .sleep)
+            tags = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .tags)) ?? []).compactMap(\.value)
+            goals = (try? c.decodeIfPresent([String].self, forKey: .goals)) ?? []
+            phrases = ((try? c.decodeIfPresent([Lossy<DeckPhrase>].self, forKey: .phrases)) ?? []).compactMap(\.value)
+            recall = ((try? c.decodeIfPresent([Lossy<DeckPhrase>].self, forKey: .recall)) ?? []).compactMap(\.value)
+            yesterday = try? c.decodeIfPresent(DeckMandarinFeedback.self, forKey: .yesterday)
+            pattern = try? c.decodeIfPresent(DeckMandarinPattern.self, forKey: .pattern)
+            progress = try? c.decodeIfPresent(DeckMandarinProgress.self, forKey: .progress)
+            questionPinyin = try? c.decodeIfPresent(String.self, forKey: .questionPinyin)
+            questionEn = try? c.decodeIfPresent(String.self, forKey: .questionEn)
+            rows = ((try? c.decodeIfPresent([Lossy<DeckChangeRow>].self, forKey: .rows)) ?? []).compactMap(\.value)
+            learned = ((try? c.decodeIfPresent([Lossy<DeckLearned>].self, forKey: .learned)) ?? []).compactMap(\.value)
+            variant = try? c.decodeIfPresent(DeckVariant.self, forKey: .variant)
+            weekVariant = (try? c.decodeIfPresent(Week.self, forKey: .week))?.variant
+            chapter = try? c.decodeIfPresent(String.self, forKey: .chapter)
+            headline = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .headline))
+            bullets = ((try? c.decodeIfPresent([Lossy<String>].self, forKey: .bullets)) ?? []).compactMap(\.value)
+            proposals = ((try? c.decodeIfPresent([Lossy<BodyProposal>].self, forKey: .proposals)) ?? []).compactMap(\.value)
+                .filter { !$0.id.isEmpty }
+            weekNumber = try? c.decodeIfPresent(Int.self, forKey: .weekNumber)
+            range = try? c.decodeIfPresent(String.self, forKey: .range)
+            noteFromPast = try? c.decodeIfPresent(DeckPastNote.self, forKey: .noteFromPast)
+            moments = ((try? c.decodeIfPresent([Lossy<DeckMoment>].self, forKey: .moments)) ?? []).compactMap(\.value)
+            spares = ((try? c.decodeIfPresent([Lossy<DeckMoment>].self, forKey: .spares)) ?? []).compactMap(\.value)
+            ended = try? c.decodeIfPresent(String.self, forKey: .ended)
+            text = try? c.decodeIfPresent(String.self, forKey: .text)
+            ifThen = try? c.decodeIfPresent(String.self, forKey: .ifThen)
+            valueID = try? c.decodeIfPresent(String.self, forKey: .valueID)
+            name = try? c.decodeIfPresent(String.self, forKey: .name)
+            fact = try? c.decodeIfPresent(DeckFact.self, forKey: .fact)
+            intention = (try? c.decodeIfPresent(DeckIntentionLine.self, forKey: .intention))
+                .flatMap { $0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+            changes = ((try? c.decodeIfPresent([Lossy<DeckGoalChange>].self, forKey: .changes)) ?? []).compactMap(\.value)
+            piece = (try? c.decodeIfPresent(DeckPiece.self, forKey: .piece)).flatMap { $0.steps.isEmpty ? nil : $0 }
+            date = try? c.decodeIfPresent(String.self, forKey: .date)
+            options = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .options)) ?? []).compactMap(\.value)
+            returns = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .returns)) ?? []).compactMap(\.value)
+            meals = (try? c.decodeIfPresent(DeckMealsPlan.self, forKey: .meals)).flatMap { $0.slots.isEmpty ? nil : $0 }
+            month = try? c.decodeIfPresent(DeckMonth.self, forKey: .month)
+            front = (try? c.decodeIfPresent(String.self, forKey: .front)).flatMap { $0.isEmpty ? nil : $0 }
+            fronts = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .fronts)) ?? []).compactMap(\.value)
+            frontReason = (try? c.decodeIfPresent(String.self, forKey: .frontReason)).flatMap { $0.isEmpty ? nil : $0 }
+            weekRows = ((try? c.decodeIfPresent([Lossy<DeckFrontRow>].self, forKey: .weekRows)) ?? []).compactMap(\.value)
+            todayAction = (try? c.decodeIfPresent(String.self, forKey: .todayAction)).flatMap { $0.isEmpty ? nil : $0 }
+            yesterdayOne = try? c.decodeIfPresent(DeckYesterdayOne.self, forKey: .yesterdayOne)
+            act = (try? c.decodeIfPresent(String.self, forKey: .act)).flatMap { $0.isEmpty ? nil : $0 }
+            headlineTags = ((try? c.decodeIfPresent([Lossy<DeckTag>].self, forKey: .tags)) ?? []).compactMap(\.value)
+            todayOne = try? c.decodeIfPresent(DeckTodayOne.self, forKey: .todayOne)
+            gist = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .gist))
+            quotes = ((try? c.decodeIfPresent([Lossy<DeckPiece.Quote>].self, forKey: .quotes)) ?? []).compactMap(\.value)
+                .filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            parts = ((try? c.decodeIfPresent([Lossy<DeckPart>].self, forKey: .parts)) ?? []).compactMap(\.value)
+            weekQuestion = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .weekQuestion))
+            thread = (try? c.decodeIfPresent(DeckThread.self, forKey: .thread)).flatMap { $0.quote.isEmpty ? nil : $0 }
+            dateLabel = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .dateLabel))
+            let ref = try? c.decodeIfPresent(Ref.self, forKey: .ref)
+            link = ref?.link.flatMap { $0.isEmpty ? nil : $0 }
+            pool = ref?.pool.flatMap { $0.isEmpty ? nil : $0 }
         }
 
-        private enum CodingKeys: String, CodingKey { case link, pool }
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = try c.decode(String.self, forKey: .id)
-        type = CardType((try? c.decode(String.self, forKey: .type)) ?? "")
-        itemKind = try? c.decodeIfPresent(String.self, forKey: .itemKind)
-        title = try? c.decodeIfPresent(String.self, forKey: .title)
-        body = try? c.decodeIfPresent(String.self, forKey: .body)
-        source = try? c.decodeIfPresent(String.self, forKey: .source)
-        lines = (try? c.decodeIfPresent([String].self, forKey: .lines)) ?? []
-        question = try? c.decodeIfPresent(String.self, forKey: .question)
-        context = try? c.decodeIfPresent(String.self, forKey: .context)
-        contextFrom = (try? c.decodeIfPresent(String.self, forKey: .contextFrom)).flatMap { $0.isEmpty ? nil : $0 }
-        voice = try? c.decodeIfPresent(String.self, forKey: .voice)
-        why = try? c.decodeIfPresent(String.self, forKey: .why)
-        draft = try? c.decodeIfPresent(DeckDraft.self, forKey: .draft)
-        actions = ((try? c.decodeIfPresent([Lossy<DeckAction>].self, forKey: .actions)) ?? []).compactMap(\.value)
-        fallback = try? c.decodeIfPresent(String.self, forKey: .fallback)
-        reason = try? c.decodeIfPresent(String.self, forKey: .reason)
-        recap = (try? c.decodeIfPresent(String.self, forKey: .recap))
-            .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
-        altQuestions = (try? c.decodeIfPresent([String].self, forKey: .altQuestions)) ?? []
-        entries = ((try? c.decodeIfPresent([Lossy<DeckEntry>].self, forKey: .entries)) ?? []).compactMap(\.value)
-        points = ((try? c.decodeIfPresent([Lossy<DeckPoint>].self, forKey: .points)) ?? []).compactMap(\.value)
-        meters = ((try? c.decodeIfPresent([Lossy<DeckMeter>].self, forKey: .meters)) ?? []).compactMap(\.value)
-        color = try? c.decodeIfPresent(String.self, forKey: .color)
-        scale = (try? c.decodeIfPresent([String].self, forKey: .scale)) ?? []
-        sleep = try? c.decodeIfPresent(DeckSleep.self, forKey: .sleep)
-        tags = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .tags)) ?? []).compactMap(\.value)
-        goals = (try? c.decodeIfPresent([String].self, forKey: .goals)) ?? []
-        phrases = ((try? c.decodeIfPresent([Lossy<DeckPhrase>].self, forKey: .phrases)) ?? []).compactMap(\.value)
-        recall = ((try? c.decodeIfPresent([Lossy<DeckPhrase>].self, forKey: .recall)) ?? []).compactMap(\.value)
-        yesterday = try? c.decodeIfPresent(DeckMandarinFeedback.self, forKey: .yesterday)
-        pattern = try? c.decodeIfPresent(DeckMandarinPattern.self, forKey: .pattern)
-        progress = try? c.decodeIfPresent(DeckMandarinProgress.self, forKey: .progress)
-        questionPinyin = try? c.decodeIfPresent(String.self, forKey: .questionPinyin)
-        questionEn = try? c.decodeIfPresent(String.self, forKey: .questionEn)
-        rows = ((try? c.decodeIfPresent([Lossy<DeckChangeRow>].self, forKey: .rows)) ?? []).compactMap(\.value)
-        learned = ((try? c.decodeIfPresent([Lossy<DeckLearned>].self, forKey: .learned)) ?? []).compactMap(\.value)
-        variant = try? c.decodeIfPresent(DeckVariant.self, forKey: .variant)
-        weekVariant = (try? c.decodeIfPresent(Week.self, forKey: .week))?.variant
-        chapter = try? c.decodeIfPresent(String.self, forKey: .chapter)
-        headline = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .headline))
-        bullets = ((try? c.decodeIfPresent([Lossy<String>].self, forKey: .bullets)) ?? []).compactMap(\.value)
-        proposals = ((try? c.decodeIfPresent([Lossy<BodyProposal>].self, forKey: .proposals)) ?? []).compactMap(\.value)
-            .filter { !$0.id.isEmpty }
-        weekNumber = try? c.decodeIfPresent(Int.self, forKey: .weekNumber)
-        range = try? c.decodeIfPresent(String.self, forKey: .range)
-        noteFromPast = try? c.decodeIfPresent(DeckPastNote.self, forKey: .noteFromPast)
-        moments = ((try? c.decodeIfPresent([Lossy<DeckMoment>].self, forKey: .moments)) ?? []).compactMap(\.value)
-        spares = ((try? c.decodeIfPresent([Lossy<DeckMoment>].self, forKey: .spares)) ?? []).compactMap(\.value)
-        ended = try? c.decodeIfPresent(String.self, forKey: .ended)
-        text = try? c.decodeIfPresent(String.self, forKey: .text)
-        ifThen = try? c.decodeIfPresent(String.self, forKey: .ifThen)
-        valueID = try? c.decodeIfPresent(String.self, forKey: .valueID)
-        name = try? c.decodeIfPresent(String.self, forKey: .name)
-        fact = try? c.decodeIfPresent(DeckFact.self, forKey: .fact)
-        intention = (try? c.decodeIfPresent(DeckIntentionLine.self, forKey: .intention))
-            .flatMap { $0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
-        changes = ((try? c.decodeIfPresent([Lossy<DeckGoalChange>].self, forKey: .changes)) ?? []).compactMap(\.value)
-        piece = (try? c.decodeIfPresent(DeckPiece.self, forKey: .piece)).flatMap { $0.steps.isEmpty ? nil : $0 }
-        date = try? c.decodeIfPresent(String.self, forKey: .date)
-        options = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .options)) ?? []).compactMap(\.value)
-        returns = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .returns)) ?? []).compactMap(\.value)
-        meals = (try? c.decodeIfPresent(DeckMealsPlan.self, forKey: .meals)).flatMap { $0.slots.isEmpty ? nil : $0 }
-        month = try? c.decodeIfPresent(DeckMonth.self, forKey: .month)
-        front = (try? c.decodeIfPresent(String.self, forKey: .front)).flatMap { $0.isEmpty ? nil : $0 }
-        fronts = ((try? c.decodeIfPresent([Lossy<DeckSleepTag>].self, forKey: .fronts)) ?? []).compactMap(\.value)
-        frontReason = (try? c.decodeIfPresent(String.self, forKey: .frontReason)).flatMap { $0.isEmpty ? nil : $0 }
-        weekRows = ((try? c.decodeIfPresent([Lossy<DeckFrontRow>].self, forKey: .weekRows)) ?? []).compactMap(\.value)
-        todayAction = (try? c.decodeIfPresent(String.self, forKey: .todayAction)).flatMap { $0.isEmpty ? nil : $0 }
-        yesterdayOne = try? c.decodeIfPresent(DeckYesterdayOne.self, forKey: .yesterdayOne)
-        act = (try? c.decodeIfPresent(String.self, forKey: .act)).flatMap { $0.isEmpty ? nil : $0 }
-        headlineTags = ((try? c.decodeIfPresent([Lossy<DeckTag>].self, forKey: .tags)) ?? []).compactMap(\.value)
-        todayOne = try? c.decodeIfPresent(DeckTodayOne.self, forKey: .todayOne)
-        gist = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .gist))
-        quotes = ((try? c.decodeIfPresent([Lossy<DeckPiece.Quote>].self, forKey: .quotes)) ?? []).compactMap(\.value)
-            .filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-        parts = ((try? c.decodeIfPresent([Lossy<DeckPart>].self, forKey: .parts)) ?? []).compactMap(\.value)
-        weekQuestion = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .weekQuestion))
-        thread = (try? c.decodeIfPresent(DeckThread.self, forKey: .thread)).flatMap { $0.quote.isEmpty ? nil : $0 }
-        dateLabel = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .dateLabel))
-        let ref = try? c.decodeIfPresent(Ref.self, forKey: .ref)
-        link = ref?.link.flatMap { $0.isEmpty ? nil : $0 }
-        pool = ref?.pool.flatMap { $0.isEmpty ? nil : $0 }
-    }
-
-    private static func nonEmpty(_ text: String?) -> String? {
-        guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-        return text
+        private static func nonEmpty(_ text: String?) -> String? {
+            guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            return text
+        }
     }
 }
 

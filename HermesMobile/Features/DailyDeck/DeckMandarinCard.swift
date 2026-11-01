@@ -535,8 +535,8 @@ struct DeckMandarinCard: View {
 extension DeckCard {
     /// The Mandarin card's question line: the deck's pinyin and English only belong to its own question.
     func mandarinQuestion(asked: String) -> (hanzi: String, pinyin: String?, english: String?) {
-        guard asked == question else { return (asked, nil, nil) }
-        return (asked, questionPinyin, questionEn)
+        guard asked == self.question else { return (asked, nil, nil) }
+        return (asked, self.questionPinyin, self.questionEn)
     }
 }
 

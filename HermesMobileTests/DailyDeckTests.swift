@@ -41,6 +41,16 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(deck.cards[6].lines, [])
     }
 
+    /// A card several KB inline overflowed the iPhone's 1 MB main-thread stack in a Debug build's
+    /// `DeckCardView.body`, so its fields stay behind one reference.
+    func testCardStaysOneReferenceOnTheStackAndComparesByValue() throws {
+        XCTAssertEqual(MemoryLayout<DeckCard>.size, MemoryLayout<AnyObject>.size)
+        let first = try DailyDeck.decode(Self.deckJSON).cards
+        let second = try DailyDeck.decode(Self.deckJSON).cards
+        XCTAssertEqual(first, second, "two decodes of the same deck are equal")
+        XCTAssertNotEqual(first[1], first[2])
+    }
+
     func testMorningChecksDecodeTolerantly() throws {
         let deck = try DailyDeck.decode(#"""
         {"date":"2026-10-04","kind":"morning","cards":[],"checks":[

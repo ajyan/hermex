@@ -14,20 +14,20 @@ extension DeckCard {
         if let idea {
             detail = "Idea \(idea.number) of \(idea.of)"
         } else if isLetter {
-            detail = lines.first
+            detail = self.lines.first
         } else if isPast || isFuture {
-            detail = title
-        } else if type == .prompt, !isDream {
-            detail = voice ?? advisor
+            detail = self.title
+        } else if self.type == .prompt, !isDream {
+            detail = self.voice ?? advisor
         } else {
-            detail = dateLabel
+            detail = self.dateLabel
         }
         guard let detail, !detail.isEmpty else { return palette.name }
         return "\(palette.name) · \(detail)"
     }
 
     /// Whether this card's question is its title (a check-in or a letter), so the ask below is the answer alone.
-    var asksInTitle: Bool { type == .prompt }
+    var asksInTitle: Bool { self.type == .prompt }
 
     /// `text` in curly quotes, unless it already wears quote marks.
     static func quoted(_ text: String) -> String {
