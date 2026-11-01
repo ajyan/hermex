@@ -82,6 +82,22 @@ final class PrepModelsTests: XCTestCase {
         XCTAssertFalse(PrepKeyPointRow.offersOverride(hit: true, canOverride: true, result: fresh))
     }
 
+    func testAHitShowsTheWordsThatEarnedIt() throws {
+        let result = try decode(PrepAttemptResult.self, #"""
+        {"verdict": "partial", "attempt": "a-1", "overridden": ["p.c"],
+         "grade": {"points_hit": [{"point_id": "p.a", "quote": "the window is a budget"},
+                                  {"point_id": "p.c", "quote": ""}],
+                   "points_missed": [{"point_id": "p.b", "why": "no cost"}]}}
+        """#)
+        XCTAssertEqual(PrepKeyPointRow.hitQuote(id: "p.a", hit: true, result: result), "the window is a budget")
+        XCTAssertNil(PrepKeyPointRow.hitQuote(id: "p.c", hit: true, result: result), "an I had that has no quote")
+        XCTAssertNil(PrepKeyPointRow.hitQuote(id: "p.b", hit: false, result: result))
+    }
+
+    func testARecallBlockQuestionReadsInYourOwnWords() {
+        XCTAssertEqual(PrepCopy.questionKicker("recall"), "In your own words")
+    }
+
     func testUnknownDrillKeptAsUnknown() throws {
         let json = #"""
         {"date": "d", "index": 0, "reps": [

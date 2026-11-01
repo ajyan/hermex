@@ -175,8 +175,8 @@ struct PrepRecallResultView: View {
     }
 }
 
-/// One key point of a graded answer: ✓ when hit, ◌ with "I had that" when missed, until the answer has
-/// used its one "I had that" (the server allows one per answer).
+/// One key point of a graded answer: ✓ with the words that earned it when hit, ◌ with "I had that" when
+/// missed, until the answer has used its one "I had that" (the server allows one per answer).
 struct PrepKeyPointRow: View {
     let result: PrepAttemptResult
     let id: String
@@ -191,6 +191,15 @@ struct PrepKeyPointRow: View {
     private var why: String? {
         guard showsWhy, !hit else { return nil }
         let line = result.judgment?.pointsMissed.first { $0.pointID == id }?.why ?? ""
+        return line.isEmpty ? nil : line
+    }
+
+    /// Under a hit, the words of the answer that earned it, as the grader quoted them.
+    private var quote: String? { Self.hitQuote(id: id, hit: hit, result: result) }
+
+    static func hitQuote(id: String, hit: Bool, result: PrepAttemptResult) -> String? {
+        guard hit else { return nil }
+        let line = result.judgment?.pointsHit.first { $0.pointID == id }?.quote ?? ""
         return line.isEmpty ? nil : line
     }
 
@@ -210,6 +219,11 @@ struct PrepKeyPointRow: View {
                     .font(BrainStyle.rowTitle)
                     .foregroundStyle(Color.hxTextPrimary)
                     .fixedSize(horizontal: false, vertical: true)
+                if let quote {
+                    Text(verbatim: "\u{201C}\(quote)\u{201D}")
+                        .brainText(.quote)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if let why {
                     Text(verbatim: why)
                         .font(BrainStyle.meta)
@@ -246,7 +260,7 @@ struct PrepKeyPointRow: View {
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(Text(verbatim: "\(hit ? "Hit" : "Missed"): \(text)"))
+        .accessibilityLabel(Text(verbatim: "\(hit ? "Hit" : "Missed"): \(text)\(quote.map { ". You said: \($0)" } ?? "")"))
     }
 }
 
