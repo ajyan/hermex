@@ -390,7 +390,7 @@ struct PrepGapView: View {
                         if offset > 0 { PrepRowDivider() }
                         BrainRow(
                             title: card.title,
-                            subtitle: card.due.map { "Due \($0)" },
+                            subtitle: card.due.map { PrepCopy.dueLine($0) },
                             badge: card.isCoachWritten ? "Atlas" : nil
                         )
                     }

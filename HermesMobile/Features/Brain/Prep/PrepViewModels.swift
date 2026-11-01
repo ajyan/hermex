@@ -1071,6 +1071,35 @@ enum PrepCopy {
         }
     }
 
+    /// A yyyy-MM-dd day as "today", "yesterday", "10 days ago", "3 weeks ago"; the raw text when it doesn't parse.
+    static func daysAgo(_ iso: String, today: Date = .now, calendar: Calendar = .current) -> String {
+        let format = DateFormatter()
+        format.calendar = calendar
+        format.timeZone = calendar.timeZone
+        format.locale = Locale(identifier: "en_US_POSIX")
+        format.dateFormat = "yyyy-MM-dd"
+        guard let day = format.date(from: String(iso.prefix(10))) else { return iso }
+        let days = calendar.dateComponents([.day], from: day, to: calendar.startOfDay(for: today)).day ?? 0
+        return BrainPersonLayout.relative(daysAgo: days)
+    }
+
+    /// When a gap's card comes back for review: "due today", "due tomorrow", "due in 4 days", "overdue".
+    static func dueLine(_ iso: String, today: Date = .now, calendar: Calendar = .current) -> String {
+        let format = DateFormatter()
+        format.calendar = calendar
+        format.timeZone = calendar.timeZone
+        format.locale = Locale(identifier: "en_US_POSIX")
+        format.dateFormat = "yyyy-MM-dd"
+        guard let day = format.date(from: String(iso.prefix(10))) else { return "Due \(iso)" }
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: today), to: day).day ?? 0
+        switch days {
+        case ..<0: return "Overdue"
+        case 0: return "Due today"
+        case 1: return "Due tomorrow"
+        default: return "Due in \(days) days"
+        }
+    }
+
     /// The course's interview-ready share, 0 to 1, for the done screen's ring.
     static func readyShare(ready: Int, total: Int) -> Double {
         total > 0 ? min(1, Double(ready) / Double(total)) : 0
@@ -1230,13 +1259,11 @@ enum PrepCopy {
             .joined(separator: "\n\n")
     }
 
-    /// The recall card's kicker: the question's type for a pool question ("Diagnose", "Diagnose · Tokens" on a
-    /// review), else "Recall" as before. The run's closing interview question names nothing, as an
-    /// interviewer wouldn't.
-    static func recallKicker(_ recall: PrepRecall, lessonTitle: String, isReview: Bool, isInterview: Bool = false) -> String {
+    /// The recall card's kicker: the question's type for a pool question ("Diagnose"), else "Recall". It never
+    /// names the lesson, whose title often states the answer; the run's closing interview question says only that.
+    static func recallKicker(_ recall: PrepRecall, isInterview: Bool = false) -> String {
         if isInterview { return "Interview question" }
-        let base = recall.isQuestion ? questionKicker(recall.type) : "Recall"
-        return isReview ? "\(base) · \(lessonTitle)" : base
+        return recall.isQuestion ? questionKicker(recall.type) : "Recall"
     }
 
     /// A question's type as a kicker ("Diagnose"); "Question" when the server sends none.

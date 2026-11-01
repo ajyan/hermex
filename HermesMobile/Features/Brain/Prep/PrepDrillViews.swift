@@ -15,7 +15,7 @@ struct PrepProblemCard: View {
         let item = rep.item
         switch rep.drill {
         case .boss:
-            meta = PrepCopy.bossMeta(lessonTitle: item.title)
+            meta = PrepCopy.bossMeta(lessonTitle: "")  // the lesson's title would name the answer
             title = item.summary
         case .judgment:
             meta = [PrepCopy.stageChip(item.stage) ?? "", item.skillTitle ?? item.title]
