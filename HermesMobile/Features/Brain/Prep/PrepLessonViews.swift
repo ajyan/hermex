@@ -75,26 +75,6 @@ struct PrepCheckPrompt: View {
     }
 }
 
-/// The XP an answer earned, faded in once (shown at once under Reduce Motion).
-struct PrepXPTick: View {
-    let xp: Int
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var shown = false
-
-    var body: some View {
-        Text(verbatim: PrepCopy.xpLabel(xp))
-            .font(AppFont.body(weight: .semibold))
-            .foregroundStyle(HermexPaper.prep.glow)
-            .monospacedDigit()
-            .opacity(shown ? 1 : 0)
-            .frame(maxWidth: .infinity, alignment: .trailing)
-            .onAppear {
-                withAnimation(HXMotion.reveal(reduceMotion: reduceMotion)) { shown = true }
-            }
-            .accessibilityLabel(Text(verbatim: PrepCopy.xpSpoken(xp)))
-    }
-}
-
 /// A lesson's check once graded: the right answer marked, why a wrong pick is wrong, and the
 /// explanation. Never a critique of the user.
 struct PrepCheckResult: View {
@@ -102,7 +82,6 @@ struct PrepCheckResult: View {
     let result: PrepAttemptResult
     let chosenID: String?
     let typedAnswer: String
-    let xp: Int?
 
     private var correct: String? {
         if case let .choice(text)? = result.correct { return text }
@@ -134,37 +113,14 @@ struct PrepCheckResult: View {
                 }
             }
         }
-        if let xp {
-            PrepXPTick(xp: xp)
-        }
     }
 }
 
-/// One to three stars in reward gold.
-struct PrepStars: View {
-    let stars: Int
-
-    var body: some View {
-        HStack(spacing: BrainStyle.xs) {
-            ForEach(0..<3, id: \.self) { index in
-                Image(systemName: index < stars ? "star.fill" : "star")
-                    .foregroundStyle(index < stars ? prepRewardGold : Color.hxSeparator)
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: PrepCopy.starsLabel(stars)))
-    }
-}
-
-/// A boss answer's result: the sitting (once complete), each key point hit or missed with
-/// "I had that" on the misses, the sample answer, and the lessons that teach the misses.
+/// A unit check answer's result: the sitting (once complete), each key point hit or missed, the sample
+/// answer, and the lessons that teach the misses.
 struct PrepBossResultView: View {
     let result: PrepAttemptResult
-    let xp: Int?
     var isTestOut = false
-    /// The point whose claim is saving; every "I had that" waits until it lands.
-    var overridingPoint: String?
-    let overrideMissed: (String) -> Void
 
     private var hits: [String] { result.judgment?.pointsHit.map(\.pointID) ?? [] }
     private var misses: [String] { result.judgment?.pointsMissed.map(\.pointID) ?? [] }
@@ -175,20 +131,17 @@ struct PrepBossResultView: View {
                 Image(systemName: "crown")
                     .font(AppFont.display(style: .title2))
                     .foregroundStyle(prepRewardGold)
-                    .accessibilityLabel(Text(verbatim: "Boss quiz"))
+                    .accessibilityLabel(Text(verbatim: "Unit check"))
                 Text(verbatim: PrepCopy.sittingHeadline(sitting))
                     .font(AppFont.display(style: .title3))
                     .foregroundStyle(HermexPaper.prep.glow)
                 if let score = sitting.score {
-                    HStack(spacing: BrainStyle.s) {
-                        PrepStars(stars: sitting.stars)
-                        Text(verbatim: PrepCopy.percent(score))
-                            .font(AppFont.body(weight: .semibold))
-                            .foregroundStyle(HermexPaper.prep.glow)
-                            .monospacedDigit()
-                    }
+                    Text(verbatim: PrepCopy.percent(score))
+                        .font(AppFont.body(weight: .semibold))
+                        .foregroundStyle(HermexPaper.prep.glow)
+                        .monospacedDigit()
                 }
-                Text(verbatim: PrepCopy.unlockLine(sitting, xp: xp, testOut: isTestOut))
+                Text(verbatim: PrepCopy.unlockLine(sitting, testOut: isTestOut))
                     .font(BrainStyle.rowSubtitle)
                     .foregroundStyle(Color.hxTextPrimary)
                     .multilineTextAlignment(.center)
@@ -212,8 +165,9 @@ struct PrepBossResultView: View {
                         ForEach(Array((hits.map { ($0, true) } + misses.map { ($0, false) }).enumerated()),
                                 id: \.element.0) { offset, row in
                             if offset > 0 { PrepRowDivider() }
-                            PrepKeyPointRow(result: result, id: row.0, hit: row.1,
-                                            overridingPoint: overridingPoint, overrideMissed: overrideMissed)
+                            // A unit check scores the grader's own verdicts, so a miss here takes no "I had that".
+                            PrepKeyPointRow(result: result, id: row.0, hit: row.1, canOverride: false,
+                                            overrideMissed: { _ in })
                                 .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
                         }
                     }
@@ -341,21 +295,22 @@ struct PrepDayCompleteView: View {
         }
     }
 
-    /// The day's ring closing once, the ready count inside, and what became interview-ready.
+    /// The course's interview-ready share as a ring (ready of all lessons, drawn once), the count inside, and
+    /// what became interview-ready today.
     private var hero: some View {
         PrepRunCard {
             VStack(spacing: BrainStyle.s) {
                 ZStack {
                     Circle().stroke(HermexPaper.prep.wash, lineWidth: ring * 0.09)
                     Circle()
-                        .trim(from: 0, to: closed ? 1 : 0)
+                        .trim(from: 0, to: closed ? PrepCopy.readyShare(ready: summary.readyCount, total: summary.lessonTotal) : 0)
                         .stroke(HermexPaper.prep.glow, style: StrokeStyle(lineWidth: ring * 0.09, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                     VStack(spacing: 0) {
                         Text(verbatim: "\(summary.readyCount)")
                             .font(AppFont.display(style: .largeTitle))
                             .foregroundStyle(Color.hxTextPrimary)
-                        Text(verbatim: "ready")
+                        Text(verbatim: "of \(summary.lessonTotal) ready")
                             .font(BrainStyle.meta)
                             .foregroundStyle(HermexPaper.prep.glow)
                     }
@@ -372,12 +327,6 @@ struct PrepDayCompleteView: View {
                         .font(BrainStyle.rowSubtitle)
                         .foregroundStyle(Color.hxTextPrimary)
                         .multilineTextAlignment(.center)
-                }
-                if summary.xpGained > 0 {
-                    Text(verbatim: PrepCopy.xpLabel(summary.xpGained))
-                        .font(BrainStyle.meta)
-                        .foregroundStyle(Color.hxTextSecondary)
-                        .accessibilityLabel(Text(verbatim: PrepCopy.xpSpoken(summary.xpGained)))
                 }
             }
             .frame(maxWidth: .infinity)

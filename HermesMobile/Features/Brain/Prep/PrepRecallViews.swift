@@ -63,7 +63,6 @@ struct PrepRecallCard: View {
 /// "Go deeper in Atlas" opens a chat about it, which never changes the score.
 struct PrepRecallResultView: View {
     let result: PrepAttemptResult
-    let xp: Int?
     /// Starts a new Atlas chat with these words in the composer; nil hides the button.
     var goDeeper: ((String) -> Void)?
     /// False after "I don't know": there are no points to claim back.
@@ -104,9 +103,6 @@ struct PrepRecallResultView: View {
                             .transition(.opacity)
                     }
                 }
-            }
-            if let xp {
-                PrepXPTick(xp: xp)
             }
         }
         .task(id: result.verdict + rows.map(\.id).joined()) {

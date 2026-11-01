@@ -2,7 +2,7 @@ import SwiftUI
 
 // Prep home's top and its course: the readiness pips, the Today card, and the path of units and lesson
 // nodes. The path shows the unit being taught; "All units" opens the rest (passed units as rows with
-// their stars, other open units folded to one row, the next unit locked with Test out, the rest counted
+// their ready count, other open units folded to one row, the next unit locked with Test out, the rest counted
 // in one line). The path wears the `.prep` paper; only real controls are Nous blue (Start on the Today
 // card); rewards are gold marks only.
 
@@ -243,7 +243,6 @@ private struct PrepPassedUnitRow: View {
                     .foregroundStyle(Color.hxTextSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            PrepStars(stars: unit.stars)
         }
         .frame(minHeight: BrainStyle.minTapTarget)
         .accessibilityElement(children: .combine)
@@ -328,7 +327,9 @@ private struct PrepCurrentUnit: View {
                         .foregroundStyle(Color.hxTextPrimary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                if unit.boss != .ready {
+                // Test out skips lessons not yet learned; once they are, the unit check itself is the test,
+                // and while it rests a test out would only skip the rest.
+                if unit.boss == .locked {
                     NavigationLink(value: ShellPushDestination.brainRoute(.prep(.testout(unit.id)))) {
                         HXChip(paper: .prep, label: "Test out") { EmptyView() }
                             .frame(minHeight: BrainStyle.minTapTarget)
@@ -495,7 +496,7 @@ private struct PrepBossNodeRow: View {
     let unit: PrepUnit
 
     var body: some View {
-        let label = PrepCopy.bossNode(unit.boss)
+        let label = PrepCopy.bossNode(unit.boss, back: unit.bossBack)
         let row = HStack(spacing: BrainStyle.m) {
             PrepNodeDisc(kind: .boss)
             Text(verbatim: label)
