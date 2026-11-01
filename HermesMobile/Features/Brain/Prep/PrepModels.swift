@@ -334,6 +334,10 @@ struct PrepRep: Decodable, Identifiable, Hashable, Sendable {
         probeMinWords = c.int(.probeMinWords)
         cuesHidden = c.optional(Bool.self, .cuesHidden) ?? false
     }
+
+    /// The run's closing rep: one question from a learned lesson asked cold, with one follow-up from the interviewer.
+    static let interviewBlock = "interview"
+    var isInterview: Bool { block == Self.interviewBlock }
 }
 
 /// An answer's word count against a rep's floor: Submit reads "12 of 50 words" until the floor is met.

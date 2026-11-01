@@ -234,7 +234,7 @@ struct PrepKeyPointRow: View {
                     HStack(spacing: BrainStyle.s) {
                         Text(verbatim: "You had this").font(BrainStyle.meta).foregroundStyle(Color.hxTextSecondary)
                         if undoOverride.isAvailable {
-                            Button { undoOverride() } label: {
+                            Button { undoOverride(id) } label: {
                                 Text(verbatim: overridingPoint == id ? "Undoing…" : "Undo")
                                     .font(BrainStyle.meta).foregroundStyle(Color.accentColor)
                                     .frame(minHeight: BrainStyle.minTapTarget, alignment: .leading)
@@ -267,12 +267,13 @@ struct PrepKeyPointRow: View {
 /// Undo on the point an answer's "I had that" claimed. The run screen sets it while a result is
 /// shown, so every result view's key-point rows offer it without threading a closure through each.
 struct PrepUndoOverrideAction {
-    var handler: (@MainActor () -> Void)?
+    var handler: (@MainActor (String) -> Void)?
 
     var isAvailable: Bool { handler != nil }
 
+    /// Undoes the "I had that" on `point`.
     @MainActor
-    func callAsFunction() { handler?() }
+    func callAsFunction(_ point: String) { handler?(point) }
 }
 
 struct PrepUndoOverrideKey: EnvironmentKey {

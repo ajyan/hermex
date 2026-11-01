@@ -272,13 +272,14 @@ final class PrepRunViewModel {
     private(set) var answeredDontKnow = false
     /// The missed point whose "I had that" is in flight; a second tap waits for it.
     private(set) var overridingPoint: String?
-    /// A story rep: told against the clock, graded, then up to two spoken follow-up probes. The
-    /// phase stays `.rep` throughout; "Next" leaves once `canFinishStory`.
+    /// A story rep runs like the interview: told against the clock, then up to two spoken follow-up
+    /// probes straight after, with no score in between; the debrief shows the telling's and the probes'
+    /// results together. `told` is nil when the rep resumed at a probe after a reload. The phase stays
+    /// `.rep` throughout; "Next" leaves from the debrief.
     enum StoryStage: Equatable {
         case telling
-        case told(PrepAttemptResult)
         case probing(PrepProbe, number: Int)
-        case probed(PrepAttemptResult, number: Int)
+        case debrief(told: PrepAttemptResult?, probes: [PrepAttemptResult])
     }
     private(set) var storyStage: StoryStage = .telling
     /// A question rep's tutor dialogue: up while the server keeps it open and "Show me" hasn't been tapped.
@@ -300,7 +301,7 @@ final class PrepRunViewModel {
         switch phase {
         case .rep:
             switch storyStage {
-            case .told, .probed: return false
+            case .debrief: return false
             case .telling, .probing: return typed(recallDraft)
             }
         case .result: return inDialogue && typed(tutorDraft)
@@ -330,6 +331,9 @@ final class PrepRunViewModel {
     @ObservationIgnored private var tally = PrepDaySummary()
     /// The story attempt the probes answer to, and when the probe on screen was asked.
     @ObservationIgnored private var storyParent: String?
+    /// The telling's result and each probe's, held back until the debrief.
+    @ObservationIgnored private var storyTold: PrepAttemptResult?
+    @ObservationIgnored private var storyProbeResults: [PrepAttemptResult] = []
     @ObservationIgnored private var probeShownAt: Date?
     /// When the telling was sent; the clock holds there while it is graded, and runs on if the send fails.
     private(set) var storySubmittedAt: Date?
@@ -441,19 +445,16 @@ final class PrepRunViewModel {
 
     /// Undo on the point "I had that" claimed, while its result is on screen: the grade goes back to
     /// what the grader said, and the answer's one override is free again.
-    func undoOverride() async {
+    func undoOverride(_ point: String? = nil) async {
         let shown: PrepAttemptResult?
         if case let .rep(rep, _) = phase, rep.drill == .story {
-            switch storyStage {
-            case let .told(result), let .probed(result, _): shown = result
-            case .telling, .probing: shown = nil
-            }
+            shown = point.flatMap(storyResult(holding:))
         } else if case let .result(_, result, _) = phase {
             shown = result
         } else {
             shown = nil
         }
-        guard let point = shown?.overridden.first else { return }
+        guard let point = point ?? shown?.overridden.first, shown?.overridden.contains(point) == true else { return }
         let client = self.client
         await changeOverride(point) { try await client.undoOverride(attempt: $0) }
     }
@@ -606,28 +607,29 @@ final class PrepRunViewModel {
         storyStartedAt.map { Self.milliseconds(from: $0, to: storySubmittedAt ?? now()) } ?? 0
     }
 
-    /// "I had that" (or its undo) on a told story's beat or a probe's point: re-scored by the server,
-    /// laid over the result on screen. The probe that result leads to is kept, so the rep goes on.
-    private func changeStoryOverride(_ point: String, _ send: @escaping (String) async throws -> PrepAttemptResult) async {
-        let shown: PrepAttemptResult
-        switch storyStage {
-        case let .told(result), let .probed(result, _): shown = result
-        case .telling, .probing: return
+    /// The debrief's result (the telling or a probe) that `point` belongs to: missed there, or claimed.
+    private func storyResult(holding point: String) -> PrepAttemptResult? {
+        guard case let .debrief(told, probes) = storyStage else { return nil }
+        return ([told].compactMap { $0 } + probes).first { result in
+            result.overridden.contains(point) || (result.judgment?.pointsMissed.contains { $0.pointID == point } ?? false)
         }
-        guard let attempt = shown.attemptID, !shown.isUngraded, overridingPoint == nil else { return }
+    }
+
+    /// "I had that" (or its undo) on a told story's beat or a probe's point in the debrief: re-scored by the
+    /// server and laid over that result.
+    private func changeStoryOverride(_ point: String, _ send: @escaping (String) async throws -> PrepAttemptResult) async {
+        guard let shown = storyResult(holding: point), let attempt = shown.attemptID, !shown.isUngraded,
+              overridingPoint == nil else { return }
         let token = generation
         let stage = storyStage
         overridingPoint = point
         defer { if token == generation { overridingPoint = nil } }
         do {
             let updated = try await send(attempt)
-            guard token == generation, storyStage == stage else { return }
+            guard token == generation, storyStage == stage, case let .debrief(told, probes) = stage else { return }
             let merged = PrepAttemptResult(merging: shown, override: updated)
-            switch stage {
-            case .told: storyStage = .told(merged)
-            case let .probed(_, number): storyStage = .probed(merged, number: number)
-            case .telling, .probing: break
-            }
+            let swap = { (r: PrepAttemptResult) in r.attemptID == attempt ? merged : r }
+            storyStage = .debrief(told: told.map(swap), probes: probes.map(swap))
         } catch {
             guard token == generation, !prepIsCancellation(error) else { return }
             onAPIError(error)
@@ -653,22 +655,21 @@ final class PrepRunViewModel {
         !recallDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && answerFloor.isMet && !isSubmitting
     }
 
-    /// The probe the result on screen leads to and its number; nil once the rep is done (two probes
-    /// answered, or a result with no next probe, which an ungraded story never has).
-    var nextProbe: (probe: PrepProbe, number: Int)? {
-        guard storyParent != nil else { return nil }
-        switch storyStage {
-        case let .told(result): return result.probe.map { ($0, 1) }
-        case let .probed(result, number) where number < 2: return result.probe.map { ($0, number + 1) }
-        default: return nil
-        }
-    }
-
     /// The story rep has nothing left to answer: "Next" moves the run on.
     var canFinishStory: Bool {
-        switch storyStage {
-        case .told, .probed: nextProbe == nil
-        case .telling, .probing: false
+        if case .debrief = storyStage { return true }
+        return false
+    }
+
+    /// After the telling or a probe is graded: the next probe straight away, while there is one and fewer
+    /// than two have been asked, else the debrief.
+    private func askNextProbe(after result: PrepAttemptResult, number: Int) {
+        if storyParent != nil, number < 2, let probe = result.probe {
+            recallDraft = ""
+            probeShownAt = now()
+            storyStage = .probing(probe, number: number + 1)
+        } else {
+            storyStage = .debrief(told: storyTold, probes: storyProbeResults)
         }
     }
 
@@ -695,16 +696,9 @@ final class PrepRunViewModel {
         storyDraftStash = nil
         isSubmitting = false
         storyParent = result.attemptID
-        storyStage = .told(result)
+        storyTold = result
+        askNextProbe(after: result, number: 0)
         if result.role == "wrong" { await loadStoryTitles(token: token) }
-    }
-
-    /// Asks the next follow-up probe, timed from now.
-    func beginProbe() {
-        guard !isSubmitting, let next = nextProbe else { return }
-        recallDraft = ""
-        probeShownAt = now()
-        storyStage = .probing(next.probe, number: next.number)
     }
 
     /// Posts the probe answer against the story attempt it follows.
@@ -723,7 +717,8 @@ final class PrepRunViewModel {
         guard let result = await post(request, token: generation) else { return }
         storyDraftStash = nil
         isSubmitting = false
-        storyStage = .probed(result, number: number)
+        storyProbeResults.append(result)
+        askNextProbe(after: result, number: number)
     }
 
     private func loadStoryTitles(token: Int) async {
@@ -815,9 +810,9 @@ final class PrepRunViewModel {
         switch (phase, storyStage) {
         case let (.result(_, result, index), _):
             (target, answered) = (result.nextIndex, index)
-        case let (.rep(rep, index), .told(result)) where rep.drill == .story && canFinishStory,
-             let (.rep(rep, index), .probed(result, _)) where rep.drill == .story && canFinishStory:
-            (target, answered) = (result.nextIndex, index)
+        case let (.rep(rep, index), .debrief(told, probes)) where rep.drill == .story:
+            guard let last = probes.last ?? told else { return }
+            (target, answered) = (last.nextIndex, index)
         default:
             return
         }
@@ -892,6 +887,8 @@ final class PrepRunViewModel {
         storySubmittedAt = nil
         storyCuesPeeked = false
         storyTitles = [:]
+        storyTold = nil
+        storyProbeResults = []
         if rep.drill == .story, let pending = rep.pending {
             // Told earlier with probes still open: resume at the next one.
             storyParent = pending.attempt
@@ -1205,8 +1202,10 @@ enum PrepCopy {
     }
 
     /// The recall card's kicker: the question's type for a pool question ("Diagnose", "Diagnose · Tokens" on a
-    /// review), else "Recall" as before.
-    static func recallKicker(_ recall: PrepRecall, lessonTitle: String, isReview: Bool) -> String {
+    /// review), else "Recall" as before. The run's closing interview question names nothing, as an
+    /// interviewer wouldn't.
+    static func recallKicker(_ recall: PrepRecall, lessonTitle: String, isReview: Bool, isInterview: Bool = false) -> String {
+        if isInterview { return "Interview question" }
         let base = recall.isQuestion ? questionKicker(recall.type) : "Recall"
         return isReview ? "\(base) · \(lessonTitle)" : base
     }
@@ -1374,6 +1373,7 @@ enum PrepCopy {
     /// A run's header for one rep: the lesson's title when the rep carries a lesson (a recall screen shows
     /// nothing else that names the topic), else its block's name.
     static func runTitle(block: String, lessonTitle: String?) -> String {
+        if block == PrepRep.interviewBlock { return "Interview" }  // the lesson's title would name the answer
         let title = lessonTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return title.isEmpty ? blockTitle(block) : title
     }

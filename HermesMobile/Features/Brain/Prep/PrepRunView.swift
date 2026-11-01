@@ -50,7 +50,7 @@ struct PrepRunView: View {
     var body: some View {
         content
             .onPreferenceChange(PrepMicBusyKey.self) { micBusy = $0 }
-            .environment(\.prepUndoOverride, PrepUndoOverrideAction { Task { await viewModel.undoOverride() } })
+            .environment(\.prepUndoOverride, PrepUndoOverrideAction { point in Task { await viewModel.undoOverride(point) } })
             .environment(\.prepDiagramLoader, viewModel.diagramLoader)
             .hxNavigationTitle(title)
             .navigationBarBackButtonHidden(true)
@@ -147,7 +147,7 @@ struct PrepRunView: View {
         case .story:
             switch viewModel.storyStage {
             case .telling, .probing: return .choice(viewModel.recallDraft)
-            case .told, .probed: return nil
+            case .debrief: return nil
             }
         // Skipped: the retired DSA drills and unknown ones. A probe only comes inside a story rep.
         case .approach, .complexity, .spotBug, .trace, .primer, .fact, .unknown, .probe:
@@ -416,7 +416,7 @@ struct PrepRunView: View {
         switch rep.drill {
         case .lesson where Self.usesRecall(rep), .recall where Self.usesRecall(rep):
             if let lesson = rep.item.lesson, let recall = lesson.recall {
-                if let label = rep.label {
+                if let label = rep.label, !rep.isInterview {
                     HXChip(paper: .prep, symbol: "arrow.uturn.backward", label: label)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -432,7 +432,8 @@ struct PrepRunView: View {
                 } else {
                     PrepRecallCard(
                         prompt: recall.prompt,
-                        label: PrepCopy.recallKicker(recall, lessonTitle: lesson.title, isReview: rep.drill == .recall),
+                        label: PrepCopy.recallKicker(recall, lessonTitle: lesson.title, isReview: rep.drill == .recall,
+                                                     isInterview: rep.isInterview),
                         draft: Binding(get: { viewModel.recallDraft }, set: { viewModel.recallDraft = $0 }),
                         isSubmitting: viewModel.isSubmitting,
                         dontKnow: { Task { await viewModel.dontKnow() } }
@@ -517,7 +518,7 @@ struct PrepRunView: View {
 
     // MARK: Story reps
 
-    /// The story rep's screen for its stage: the telling, its result, a probe, or a probe's result.
+    /// The story rep's screen for its stage: the telling, a probe, or the debrief of both.
     @ViewBuilder
     private func storyContent(_ rep: PrepRep) -> some View {
         let draft = Binding(get: { viewModel.recallDraft }, set: { viewModel.editStory($0) })
@@ -525,7 +526,9 @@ struct PrepRunView: View {
         case .telling:
             PrepStoryTellCard(
                 prompt: rep.item.prompt,
-                title: rep.item.title,
+                // A daily rep asks the prompt alone, as an interviewer would: picking the story is part of
+                // the rep. "Drill it" from a story's page already named it, so the title stays.
+                title: viewModel.runKind == .story ? rep.item.title : "",
                 signal: rep.item.signal,
                 cues: rep.item.cues,
                 script: rep.item.scriptMD,
@@ -537,17 +540,22 @@ struct PrepRunView: View {
                 cuesHidden: rep.cuesHidden,
                 peeked: viewModel.storyCuesPeeked,
                 peek: { viewModel.peekStoryCues() })
-        case .told(let result):
-            PrepStoryResultView(result: result, titles: viewModel.storyTitles,
-                                overridingPoint: viewModel.overridingPoint) { point in
-                Task { await viewModel.overridePoint(point) }
-            }
         case .probing(let probe, let number):
             PrepProbeCard(prompt: rep.item.prompt, probe: probe, number: number, draft: draft,
                           isSubmitting: viewModel.isSubmitting)
-        case .probed(let result, let number):
-            PrepProbeResultView(result: result, number: number, overridingPoint: viewModel.overridingPoint) { point in
-                Task { await viewModel.overridePoint(point) }
+        case .debrief(let told, let probes):
+            VStack(alignment: .leading, spacing: BrainStyle.xl) {
+                if let told {
+                    PrepStoryResultView(result: told, title: rep.item.title, titles: viewModel.storyTitles,
+                                        overridingPoint: viewModel.overridingPoint) { point in
+                        Task { await viewModel.overridePoint(point) }
+                    }
+                }
+                ForEach(Array(probes.enumerated()), id: \.offset) { offset, result in
+                    PrepProbeResultView(result: result, number: offset + 1, overridingPoint: viewModel.overridingPoint) { point in
+                        Task { await viewModel.overridePoint(point) }
+                    }
+                }
             }
         }
     }
@@ -562,12 +570,8 @@ struct PrepRunView: View {
         case .probing:
             PrepPrimaryButton(title: viewModel.answerFloor.submitTitle, enabled: viewModel.canSubmitStoryAnswer && !micBusy,
                               isGrading: viewModel.isSubmitting) { Task { await viewModel.submitProbe() } }
-        case .told, .probed:
-            if let next = viewModel.nextProbe {
-                PrepPrimaryButton(title: PrepCopy.probeLabel(next.number)) { viewModel.beginProbe() }
-            } else {
-                PrepPrimaryButton(title: "Next") { Task { await viewModel.continue() } }
-            }
+        case .debrief:
+            PrepPrimaryButton(title: "Next") { Task { await viewModel.continue() } }
         }
     }
 
