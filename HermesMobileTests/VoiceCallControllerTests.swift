@@ -151,7 +151,6 @@ final class VoiceCallControllerTests: XCTestCase {
     /// The wall clock each turn is tagged with, and that tag.
     private static let callTime = Date(timeIntervalSince1970: 1_791_900_000)
     private let tag = VoiceCallPhrases.voicePrefix(at: VoiceCallControllerTests.callTime)
-    private var suppressCue = false
     private var controller: VoiceCallController!
     private var logLines: [String] = []
 
@@ -162,7 +161,6 @@ final class VoiceCallControllerTests: XCTestCase {
         chat = FakeChat()
         bridge = FakeBridge()
         clock = 100
-        suppressCue = false
         controller = VoiceCallController(
             listener: listener,
             speaker: speaker,
@@ -170,7 +168,6 @@ final class VoiceCallControllerTests: XCTestCase {
             bridge: bridge,
             now: { [unowned self] in clock },
             clock: { Self.callTime },
-            suppressThinkingCue: { [unowned self] in suppressCue },
             tickInterval: nil,
             log: { [unowned self] in logLines.append($0) }
         )
@@ -235,7 +232,6 @@ final class VoiceCallControllerTests: XCTestCase {
             openingTurn: openingTurn,
             now: { [unowned self] in clock },
             clock: { Self.callTime },
-            suppressThinkingCue: { [unowned self] in suppressCue },
             tickInterval: nil,
             log: { [unowned self] in logLines.append($0) }
         )
@@ -650,6 +646,52 @@ final class VoiceCallControllerTests: XCTestCase {
         await controller.lastChatTask?.value
         XCTAssertEqual(chat.sent, [tag + "hello", tag + "hold on a second"])
         XCTAssertEqual(chat.cancelCount, 1)
+    }
+
+    func testCuttingAtlasOffCountsAsAnInterruption() async {
+        await startSpeaking()
+        XCTAssertEqual(controller.interruptions, 0)
+
+        // Talking over Atlas.
+        voice(true, for: 0.4)
+        listener.onPartial?("hold on a")
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertEqual(controller.interruptions, 1)
+
+        // A tap while Atlas speaks, and a tap taking back a turn it's working on.
+        listener.onFinal?("hold on a second")
+        voice(false, for: 0.9)
+        await controller.lastChatTask?.value
+        update(text: "Sure. Go")
+        clock += VoiceCallTiming.talkOverGrace
+        XCTAssertEqual(controller.tapAction, .interrupt)
+        controller.performTapAction()
+        XCTAssertEqual(controller.interruptions, 2)
+        await say("what time is it")
+        XCTAssertEqual(controller.tapAction, .cancel)
+        controller.performTapAction()
+        XCTAssertEqual(controller.interruptions, 3)
+        XCTAssertEqual(controller.state, .listening)
+    }
+
+    func testAFinishedReplyAndEchoAreNotInterruptions() async {
+        await startSpeaking()
+        // Atlas's own words heard back.
+        voice(true, for: 1.0)
+        listener.onPartial?("First sentence")
+        XCTAssertEqual(controller.state, .speaking)
+        update(text: "First sentence. Second sentence.", streaming: false)
+        speaker.drain()
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertEqual(controller.interruptions, 0)
+    }
+
+    func testAnApprovalReadBackCutShortIsNotAnInterruption() async {
+        await startSpeaking()
+        update(text: "First sentence. Second", approval: approval())
+        voice(true, for: 0.4)
+        listener.onPartial?("yes approve it")
+        XCTAssertEqual(controller.interruptions, 0)
     }
 
     func testTapSendsWhatWasSaidWithoutWaitingForThePause() async {
@@ -1111,6 +1153,43 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(controller.state, .listening)
     }
 
+    func testDroppedConnectionIsAFailureTheScreenCanShow() async {
+        await startSpeaking()
+        XCTAssertNil(controller.failure)
+        update(reconnecting: true)
+        clock += VoiceCallTiming.reconnectGiveUp + 0.1
+        controller.tick()
+        XCTAssertEqual(controller.failure, .connectionLost)
+        XCTAssertFalse(controller.isFinished)
+
+        // Leaving while the call says why ends the system call at once.
+        controller.end()
+        XCTAssertEqual(bridge.endCount, 1)
+        XCTAssertTrue(controller.isFinished)
+        speaker.drain()
+        XCTAssertEqual(bridge.endCount, 1)
+    }
+
+    func testHangingUpIsNotAFailure() async {
+        await startSpeaking()
+        controller.end()
+        XCTAssertNil(controller.failure)
+        XCTAssertTrue(controller.isFinished)
+        XCTAssertEqual(bridge.endCount, 1)
+        controller.end()
+        XCTAssertEqual(bridge.endCount, 1)
+    }
+
+    func testMicThatWontRestartIsAFailure() async {
+        await controller.start()
+        bridge.onMuteChanged?(true)
+        listener.startError = VoiceCallStartError.permissionDenied
+        bridge.onMuteChanged?(false)
+        await controller.lastListenerTask?.value
+        XCTAssertEqual(controller.failure, .microphoneStopped)
+        XCTAssertTrue(controller.isFinished)
+    }
+
     func testThinkingCueStartsAfter1500msWithoutToken() async {
         await controller.start()
         await say("hello")
@@ -1126,13 +1205,20 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(speaker.cueStates, [true, false])
     }
 
-    func testThinkingCueSuppressed() async {
-        suppressCue = true
+    func testThinkingCueNeverFollowsAHoldOnLine() async {
         await controller.start()
-        await say("hello")
-        clock += 2
+        await say("what's on my calendar")
+        clock += VoiceCallTiming.thinkingCueDelay
         controller.tick()
-        XCTAssertEqual(speaker.cueStates, [])
+        XCTAssertEqual(speaker.cueStates, [true])
+        clock += VoiceCallTiming.holdOnDelay
+        controller.tick()
+        XCTAssertEqual(speaker.cueStates, [true, false])
+        speaker.drain()
+        controller.tick()
+        clock += 1
+        controller.tick()
+        XCTAssertEqual(speaker.cueStates, [true, false])
     }
 
     func testCurrentToolShown() async {
@@ -1206,13 +1292,11 @@ final class VoiceCallControllerTests: XCTestCase {
         controller.tick()
         XCTAssertEqual(speaker.spoken, [VoiceCallPhrases.holdOn])
         XCTAssertEqual(speaker.cueStates.last, false)
-        // The cue waits while the line plays, then resumes.
-        controller.tick()
-        XCTAssertEqual(speaker.cueStates.last, false)
+        // The line is the reassurance from here; the cue doesn't come back.
         speaker.drain()
         XCTAssertEqual(controller.state, .thinking)
         controller.tick()
-        XCTAssertEqual(speaker.cueStates.last, true)
+        XCTAssertEqual(speaker.cueStates.last, false)
 
         clock += VoiceCallTiming.stillWorkingInterval + 0.1
         controller.tick()

@@ -2,7 +2,9 @@ import SwiftUI
 
 /// Live captions for a call, shown over the orb: the user's words while they
 /// talk, then Atlas's reply under a one-line reminder of what was asked. The
-/// area has a fixed height; long text scrolls, pinned to the newest words.
+/// area is at most seven lines tall and shrinks to fit the orb's slot (large
+/// Dynamic Type never pushes it into the call controls); long text scrolls,
+/// pinned to the newest words.
 struct VoiceCallCaptions: View {
     let sent: String?
     let live: String
@@ -45,21 +47,23 @@ struct VoiceCallCaptions: View {
         VStack(spacing: 8) {
             // Always takes its line, so the reply below never shifts.
             Text(content?.context ?? " ")
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
+                .font(AppFont.subheadline(weight: .medium))
+                .foregroundStyle(Color.hxTextSecondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .opacity(content?.context == nil ? 0 : 1)
                 .accessibilityHidden(content?.context == nil)
 
             ZStack(alignment: .bottom) {
+                // Holds the area's height with no words yet.
+                Color.clear
                 if let content {
                     caption(content)
                         .id(content.speaker)
                         .transition(.opacity)
                 }
             }
-            .frame(height: bodyHeight, alignment: .bottom)
+            .frame(maxHeight: bodyHeight, alignment: .bottom)
         }
         .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity)
@@ -71,12 +75,14 @@ struct VoiceCallCaptions: View {
     }
 
     private func caption(_ content: Content) -> some View {
-        ScrollView {
-            Text(content.body)
-                .font(.title2)
-                .foregroundStyle(content.isActive ? .primary : .secondary)
-                // Short text sits centered on the orb; longer text fills the box and follows its end.
-                .frame(maxWidth: .infinity, minHeight: bodyHeight, alignment: .center)
+        GeometryReader { box in
+            ScrollView {
+                Text(content.body)
+                    .font(AppFont.title2())
+                    .foregroundStyle(content.isActive ? Color.hxTextPrimary : Color.hxTextSecondary)
+                    // Short text sits centered on the orb; longer text fills the box and follows its end.
+                    .frame(maxWidth: .infinity, minHeight: box.size.height, alignment: .center)
+            }
         }
         .scrollIndicators(.hidden)
         // Follows the newest line as the text grows.
