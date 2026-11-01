@@ -29,6 +29,10 @@ enum AppFont {
         system(.title, weight: weight)
     }
 
+    static func title2(weight: Font.Weight? = nil) -> Font {
+        system(.title2, weight: weight)
+    }
+
     static func title3(weight: Font.Weight? = nil) -> Font {
         system(.title3, weight: weight)
     }

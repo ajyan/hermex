@@ -36,6 +36,30 @@ final class VoiceCallChatSnapshotTests: XCTestCase {
         XCTAssertNil(snapshot.currentTool)
     }
 
+    func testRunningToolReadsAsPlainWords() {
+        func activity(_ name: String, _ args: [String: JSONValue]? = nil) -> String? {
+            make([message("user", "[voice] hi", "u1")], tools: [ToolCall(name: name, preview: nil, args: args)])
+                .toolActivity?.label
+        }
+        XCTAssertEqual(activity("web_search"), "Searching the web")
+        XCTAssertEqual(activity("read_file", ["path": .string("people/jane-doe.md")]), "Checking your notes")
+        XCTAssertEqual(activity("search_files"), "Checking your notes")
+        XCTAssertEqual(activity("terminal", ["command": .string("brain crm show jane-doe")]), "Looking up Jane Doe")
+        XCTAssertEqual(activity("terminal", ["command": .string("bash -lc 'brain crm show \"Bo Test\"'")]), "Looking up Bo Test")
+        XCTAssertEqual(activity("terminal", ["command": .string("brain crm show people/sam_lee.md")]), "Looking up Sam Lee")
+        XCTAssertEqual(activity("terminal", ["command": .string("cd ~/vault && brain ask 'goals'")]), "Checking your notes")
+        XCTAssertEqual(activity("terminal", ["command": .string("ls -la")]), "Working")
+        XCTAssertEqual(activity("delegate_task"), "Working")
+        XCTAssertEqual(activity("mcp__linear__create_issue"), "Working")
+        XCTAssertEqual(activity("terminal")?.contains("terminal"), false)
+    }
+
+    func testRunningToolKeepsItsKindForTheChipColor() {
+        let snapshot = make([], tools: [ToolCall(name: "web_search", preview: nil, args: nil)])
+        XCTAssertEqual(snapshot.toolActivity?.kind, .web)
+        XCTAssertNil(make([], tools: [ToolCall(name: "web_search", preview: nil, args: nil, isCompleted: true)]).toolActivity)
+    }
+
     func testRecoveryStatesCountAsReconnecting() {
         for state: ActiveStreamRecoveryState in [.reconnecting, .waitingForNetwork] {
             XCTAssertTrue(make([], recovery: state).isReconnecting)

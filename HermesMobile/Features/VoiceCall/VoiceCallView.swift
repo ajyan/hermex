@@ -49,6 +49,8 @@ struct VoiceCallChatSnapshot: Equatable {
     var approval: ApprovalPromptState?
     var isReconnecting: Bool
     var currentTool: String?
+    /// The running tool call in plain words, for the call screen.
+    var toolActivity: VoiceCallToolActivity?
 
     @MainActor
     static func of(_ chat: ChatViewModel) -> VoiceCallChatSnapshot {
@@ -76,12 +78,14 @@ struct VoiceCallChatSnapshot: Equatable {
             .filter { $0.role == "assistant" }
             .compactMap(\.content)
             .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let runningTool = liveToolCalls.last(where: { !$0.isCompleted })
         return VoiceCallChatSnapshot(
             streamingText: parts.isEmpty ? nil : parts.joined(separator: "\n"),
             isStreaming: activeStreamID != nil,
             approval: approval,
             isReconnecting: recovery == .reconnecting || recovery == .waitingForNetwork,
-            currentTool: liveToolCalls.last(where: { !$0.isCompleted })?.name
+            currentTool: runningTool?.name,
+            toolActivity: runningTool.map(VoiceCallToolActivity.of)
         )
     }
 }
@@ -104,6 +108,10 @@ struct VoiceCallView: View {
 
     @State private var controller: VoiceCallController?
     @State private var startMessage: String?
+    /// Turn times from calls before a reconnect; the summary covers every call on this screen.
+    @State private var earlierTurnMS: [Int] = []
+    /// The opening turn goes out on the first call only, never again after a reconnect.
+    @State private var openingTurnSent = false
     /// The close paths overlap (a Close button, then its sheet's dismissal); report once.
     @State private var didReport = false
     @State private var levels = VoiceCallAudioLevels()
@@ -113,7 +121,6 @@ struct VoiceCallView: View {
     /// The orb's slot in screen coordinates; the full-screen orb is centered on it.
     @State private var orbSlot: CGRect = .zero
     @Environment(\.openURL) private var openURL
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(chat: ChatViewModel, openingTurn: String? = nil, onTurnTimed: (([Int]) -> Void)? = nil,
          onDismiss: @escaping (VoiceCallSummary) -> Void) {
@@ -123,14 +130,31 @@ struct VoiceCallView: View {
         self.onDismiss = onDismiss
     }
 
+    private var turnMS: [Int] { earlierTurnMS + (controller?.turnLatenciesMS ?? []) }
+
     /// Closes the screen, reporting how long each turn took to answer.
     private func onClose() {
         guard !didReport else { return }
         didReport = true
-        onDismiss(VoiceCallSummary(turnMS: controller?.turnLatenciesMS ?? []))
+        // A call still saying why it ended hangs up now.
+        controller?.end()
+        onDismiss(VoiceCallSummary(turnMS: turnMS))
+    }
+
+    /// Starts a fresh call on the same chat, after a failure or a start that didn't connect.
+    private func startOver() {
+        controller?.end()
+        earlierTurnMS = turnMS
+        controller = nil
+        connectedAt = nil
+        Task { await startCall() }
     }
 
     var body: some View {
+        presentations(callEvents(screen))
+    }
+
+    private var screen: some View {
         ZStack {
             background
 
@@ -163,42 +187,65 @@ struct VoiceCallView: View {
         }
         // A call is an immersive, dark surface in either appearance, like the Phone app.
         .preferredColorScheme(.dark)
-        .task { await startCall() }
-        .onChange(of: controller?.turnLatenciesMS ?? []) { _, turnMS in onTurnTimed?(turnMS) }
-        // However the screen goes away, its system call goes with it; a call left
-        // live blocks the next one from connecting.
-        .onDisappear {
-            guard let controller, !controller.isFinished else { return }
-            VoiceCallDiagnostics.write("call screen closed without hanging up; ending the call")
-            controller.end()
-        }
-        .onChange(of: snapshot) { _, snapshot in
-            controller?.chatDidUpdate(
-                streamingText: snapshot.streamingText,
-                isStreaming: snapshot.isStreaming,
-                approval: snapshot.approval,
-                isReconnecting: snapshot.isReconnecting,
-                currentTool: snapshot.currentTool
-            )
-        }
-        .onChange(of: controller?.state) { _, state in
-            if state == .listening, connectedAt == nil { connectedAt = .now }
-        }
-        .onChange(of: controller?.isFinished) { _, finished in
-            if finished == true, controller?.startError == nil { onClose() }
-        }
-        .sensoryFeedback(trigger: controller?.lastSentTurn) { _, sent in
-            sent == nil ? nil : .impact(weight: .light)
-        }
-        .sheet(isPresented: permissionSheetBinding, onDismiss: { onClose() }) {
-            permissionSheet
-        }
-        .alert(
-            startMessage ?? "",
-            isPresented: Binding(get: { startMessage != nil }, set: { if !$0 { startMessage = nil; onClose() } })
-        ) {
-            Button("OK", role: .cancel) {}
-        }
+    }
+
+    /// Feeds the controller the chat's state and follows the call's lifetime.
+    private func callEvents(_ content: some View) -> some View {
+        content
+            .task { await startCall() }
+            .onChange(of: controller?.turnLatenciesMS ?? []) { _, _ in onTurnTimed?(turnMS) }
+            // However the screen goes away, its system call goes with it; a call left
+            // live blocks the next one from connecting.
+            .onDisappear {
+                guard let controller, !controller.isFinished else { return }
+                VoiceCallDiagnostics.write("call screen closed without hanging up; ending the call")
+                controller.end()
+            }
+            .onChange(of: snapshot) { _, snapshot in
+                controller?.chatDidUpdate(
+                    streamingText: snapshot.streamingText,
+                    isStreaming: snapshot.isStreaming,
+                    approval: snapshot.approval,
+                    isReconnecting: snapshot.isReconnecting,
+                    currentTool: snapshot.currentTool
+                )
+            }
+            .onChange(of: controller?.state) { _, state in
+                if state == .listening, connectedAt == nil {
+                    connectedAt = .now
+                    openingTurnSent = true
+                }
+            }
+            // A call that ended on its own stays up to say why; one the user ended closes.
+            .onChange(of: controller?.isFinished) { _, finished in
+                if finished == true, controller?.startError == nil, controller?.failure == nil { onClose() }
+            }
+    }
+
+    /// Feedback for each turn, and the sheet and alert a failed start shows.
+    private func presentations(_ content: some View) -> some View {
+        content
+            .onChange(of: announcement) { _, announcement in
+                guard let announcement else { return }
+                AccessibilityNotification.Announcement(announcement).post()
+            }
+            .sensoryFeedback(trigger: controller?.lastSentTurn) { _, sent in
+                sent == nil ? nil : .impact(weight: .light)
+            }
+            // Cutting Atlas off answers in the hand at once.
+            .sensoryFeedback(trigger: controller?.interruptions ?? 0) { old, new in
+                new > old ? .impact(weight: .light) : nil
+            }
+            .sheet(isPresented: permissionSheetBinding, onDismiss: { onClose() }) {
+                permissionSheet
+            }
+            .alert(
+                startMessage ?? "",
+                isPresented: Binding(get: { startMessage != nil }, set: { if !$0 { startMessage = nil } })
+            ) {
+                Button("Retry") { startOver() }
+                Button("Back to chat", role: .cancel) { onClose() }
+            }
     }
 
     private var snapshot: VoiceCallChatSnapshot {
@@ -221,7 +268,7 @@ struct VoiceCallView: View {
             speaker: makeSpeaker(),
             chat: chat,
             bridge: CallSystemBridge(),
-            openingTurn: openingTurn,
+            openingTurn: openingTurnSent ? nil : openingTurn,
             log: VoiceCallDiagnostics.write
         )
         self.controller = controller
@@ -265,86 +312,80 @@ struct VoiceCallView: View {
         }
     }
 
-    /// Near-black under the breathing glow, which carries the speaker's color.
+    /// The canvas under the breathing glow, which carries the speaker's color and form.
     private var background: some View {
         ZStack {
-            Color(red: 0.02, green: 0.024, blue: 0.04)
-            VoiceCallOrb(levels: levels, mood: mood, focus: orbSlot)
+            Color.hxCanvas
+            VoiceCallOrb(levels: levels, mood: mood, focus: orbSlot, interruptions: controller?.interruptions ?? 0)
         }
         .ignoresSafeArea()
     }
 
     private var header: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 4) {
             Text(verbatim: CallSystemBridge.handle)
-                .font(.headline.weight(.medium))
-            HStack(spacing: 6) {
-                Text(stateLabel)
+                .font(AppFont.headline(weight: .medium))
+                .foregroundStyle(Color.hxTextPrimary)
+            // The line keeps its height before the call connects, so the orb never shifts.
+            Group {
                 if let connectedAt, !isEnded {
-                    Text(verbatim: "·").accessibilityHidden(true)
                     Text(timerInterval: connectedAt...Date.distantFuture, countsDown: false)
                         .monospacedDigit()
+                } else {
+                    Text(verbatim: " ").accessibilityHidden(true)
                 }
             }
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            if let tool = controller?.currentTool {
-                Label(tool, systemImage: "wrench.and.screwdriver")
-                    .font(.footnote.monospaced())
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .adaptiveGlass(fallbackMaterial: .ultraThinMaterial, in: Capsule())
-                    .padding(.top, 6)
-                    .transition(.opacity)
-            }
+            .font(AppFont.footnote())
+            .foregroundStyle(Color.hxTextSecondary)
         }
-        .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: controller?.currentTool)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
         .accessibilityElement(children: .combine)
     }
 
     /// The orb doubles as the one-tap shortcut: send now, take a turn back, or cut Atlas off.
+    /// Under it, whose turn it is.
     private var orb: some View {
         let action = controller?.tapAction
-        return VStack(spacing: 12) {
-            Button {
-                controller?.performTapAction()
-            } label: {
-                // The orb itself is drawn full screen behind everything, centered here.
-                Color.clear
-                    .aspectRatio(1, contentMode: .fit)
-                    .frame(maxWidth: 380, maxHeight: 380)
-                    .contentShape(Circle().scale(0.7))
-                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { orbSlot = $0 }
-            }
-            .buttonStyle(.plain)
-            // Captions ride over the orb; taps go through to it.
-            .overlay {
+        return VStack(spacing: 16) {
+            ZStack {
+                Button {
+                    controller?.performTapAction()
+                } label: {
+                    // The orb itself is drawn full screen behind everything, centered here.
+                    Color.clear
+                        .aspectRatio(1, contentMode: .fit)
+                        .frame(maxWidth: 380, maxHeight: 380)
+                        .contentShape(Circle().scale(0.7))
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { orbSlot = $0 }
+                }
+                .buttonStyle(.plain)
+                .disabled(action == nil)
+                .accessibilityLabel(tapHint ?? "")
+                .accessibilityHidden(action == nil)
+
+                // Captions ride over the orb; taps go through to it. VoiceOver reads them on their own.
                 captions
                     .padding(.horizontal, 12)
                     .allowsHitTesting(false)
             }
-            .disabled(action == nil)
-            .accessibilityLabel(tapHint ?? "")
-            .accessibilityHidden(action == nil)
 
-            Text(tapHint ?? " ")
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(.secondary)
-                .opacity(tapHint == nil ? 0 : 1)
-                .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: tapHint)
-                .accessibilityHidden(true)
+            VoiceCallStatus(word: stateWord, activity: toolActivity, hint: tapHint)
         }
     }
 
-    private var tapHint: LocalizedStringKey? {
+    private var tapHint: String? {
         switch controller?.tapAction {
-        case .send: "Tap to send"
-        case .interrupt: "Tap to interrupt"
-        case .cancel: "Tap to cancel"
-        case nil: controller?.isMuted == true ? "You're muted" : nil
+        case .send: String(localized: "Tap to send")
+        case .interrupt: String(localized: "Tap to interrupt")
+        case .cancel: String(localized: "Tap to cancel")
+        case nil: nil
         }
+    }
+
+    /// What Atlas is running, while it works on a reply.
+    private var toolActivity: VoiceCallToolActivity? {
+        guard controller?.currentTool != nil, state == .thinking || state == .speaking else { return nil }
+        return snapshot.toolActivity
     }
 
     private var captions: some View {
@@ -354,6 +395,7 @@ struct VoiceCallView: View {
             reply: replyCaption,
             isReplying: [.thinking, .speaking, .reconnecting].contains(state)
         )
+        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
     }
 
     /// Atlas's reply to the latest turn, as it would be spoken (no markdown).
@@ -363,7 +405,20 @@ struct VoiceCallView: View {
         return sentences.isEmpty ? nil : sentences.joined(separator: " ")
     }
 
+    @ViewBuilder
     private var controls: some View {
+        if let failure = controller?.failure {
+            VoiceCallFailurePanel(
+                reason: Self.reason(for: failure),
+                onReconnect: startOver,
+                onBack: onClose
+            )
+        } else {
+            callControls
+        }
+    }
+
+    private var callControls: some View {
         let isMuted = controller?.isMuted ?? false
         return HStack(alignment: .top) {
             CallControl(title: "Audio") {
@@ -406,15 +461,32 @@ struct VoiceCallView: View {
         return false
     }
 
-    private var stateLabel: LocalizedStringKey {
+    /// Whose turn it is, in one word under the orb.
+    private var stateWord: String {
         switch state {
-        case .idle, .connecting: "Connecting"
-        case .listening: controller?.isMuted == true ? "Muted" : "Listening"
-        case .thinking: "Thinking"
-        case .speaking: "Speaking"
-        case .awaitingApproval: "Waiting for your approval"
-        case .reconnecting: "Reconnecting"
-        case .ended: "Call ended"
+        case .idle, .connecting: String(localized: "Connecting")
+        case .listening: controller?.isMuted == true ? String(localized: "Muted") : String(localized: "Listening")
+        case .thinking: String(localized: "Thinking")
+        case .speaking: String(localized: "Speaking")
+        case .awaitingApproval: String(localized: "Waiting for your approval")
+        case .reconnecting: String(localized: "Reconnecting")
+        case .ended: controller?.failure == nil ? String(localized: "Call ended") : String(localized: "Call dropped")
+        }
+    }
+
+    /// What VoiceOver says as the turn changes: the state word, and why a call dropped.
+    private var announcement: String? {
+        guard controller != nil else { return nil }
+        if let failure = controller?.failure {
+            return stateWord + ". " + Self.reason(for: failure)
+        }
+        return stateWord
+    }
+
+    static func reason(for failure: VoiceCallFailure) -> String {
+        switch failure {
+        case .connectionLost: String(localized: "Lost the connection to Atlas.")
+        case .microphoneStopped: String(localized: "The microphone stopped working.")
         }
     }
 
@@ -432,7 +504,7 @@ struct VoiceCallView: View {
                 .foregroundStyle(Color.hxWarning)
                 .accessibilityHidden(true)
             Text("Atlas needs the microphone and speech recognition for calls")
-                .font(.headline)
+                .font(AppFont.headline())
                 .multilineTextAlignment(.center)
             Button("Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
@@ -443,46 +515,4 @@ struct VoiceCallView: View {
         .padding(24)
         .presentationDetents([.medium])
     }
-}
-
-/// One round call button with its caption underneath, Phone-app style.
-private struct CallControl<Content: View>: View {
-    let title: LocalizedStringKey
-    var isOn = false
-    var tint: Color?
-    @ViewBuilder let content: Content
-
-    /// The title is for VoiceOver; the round buttons speak for themselves on screen.
-    var body: some View {
-        button
-            .accessibilityLabel(title)
-            .frame(minWidth: 60)
-    }
-
-    /// Solid when it carries meaning (End, or a control that's on), glass otherwise.
-    @ViewBuilder
-    private var button: some View {
-        let face = content
-            .font(.title3)
-            .foregroundStyle(isOn ? Color.black : Color.white)
-            .frame(width: 60, height: 60)
-        if let solid = tint ?? (isOn ? Color.white : nil) {
-            face.background(solid, in: Circle())
-        } else {
-            face.adaptiveGlass(fallbackMaterial: .ultraThinMaterial, in: Circle())
-        }
-    }
-}
-
-/// The system audio route menu (speaker, receiver, AirPods) for the call.
-private struct CallAudioRoutePicker: UIViewRepresentable {
-    func makeUIView(context: Context) -> AVRoutePickerView {
-        let picker = AVRoutePickerView()
-        picker.tintColor = .white
-        picker.activeTintColor = .white
-        picker.prioritizesVideoDevices = false
-        return picker
-    }
-
-    func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
 }

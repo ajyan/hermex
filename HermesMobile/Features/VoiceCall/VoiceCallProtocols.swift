@@ -23,7 +23,7 @@ protocol SpeechSpeaking: AnyObject {
     var isSpeaking: Bool { get }
     func enqueue(_ sentence: String)
     func stopNow()
-    /// A soft repeating cue while Atlas is thinking.
+    /// A single soft cue that Atlas is working on a reply; `false` marks the wait over.
     func setThinkingCue(_ on: Bool)
 }
 

@@ -11,7 +11,6 @@ final class AppleSpeechSpeaker: SpeechSpeaking {
     private let voice: AVSpeechSynthesisVoice?
     private var pending: Set<ObjectIdentifier> = []
     private var delegateProxy: VoiceCallSynthesizerDelegate?
-    private var cueTask: Task<Void, Never>?
     private let levels: VoiceCallAudioLevels?
     private let log: (String) -> Void
     /// When each pending utterance was queued, so the log shows how long audio took to start.
@@ -58,16 +57,11 @@ final class AppleSpeechSpeaker: SpeechSpeaking {
         synthesizer.stopSpeaking(at: .immediate)
     }
 
+    /// Plays the cue once as it turns on. It never repeats: a tick every second or so reads as
+    /// anxious, and the call's hold-on lines cover a long wait.
     func setThinkingCue(_ on: Bool) {
-        cueTask?.cancel()
-        cueTask = nil
         guard on else { return }
-        cueTask = Task {
-            while !Task.isCancelled {
-                AudioServicesPlaySystemSound(Self.cueSound)
-                try? await Task.sleep(for: .milliseconds(1500))
-            }
-        }
+        AudioServicesPlaySystemSound(Self.cueSound)
     }
 
     /// "Tink": short and soft.
