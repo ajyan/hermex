@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import UIKit
 
 enum VoiceCallState: Equatable {
     case idle
@@ -11,6 +10,15 @@ enum VoiceCallState: Equatable {
     case awaitingApproval(String)
     case reconnecting
     case ended(String?)
+}
+
+/// Why a call ended on its own, when it wasn't the user hanging up. The call screen stays up
+/// to say so and offer a reconnect.
+enum VoiceCallFailure: Equatable {
+    /// The chat's stream dropped and didn't come back.
+    case connectionLost
+    /// The mic couldn't restart after a mute or hold.
+    case microphoneStopped
 }
 
 /// Spoken lines. English only: recognition and the approve phrases are English.
@@ -96,6 +104,11 @@ final class VoiceCallController {
     private(set) var startError: VoiceCallStartError?
     /// True once the system call is gone: the call screen can close.
     private(set) var isFinished = false
+    /// Set when the call ended on its own; the screen shows it instead of closing.
+    private(set) var failure: VoiceCallFailure?
+    /// Counts the times the user cut Atlas off (talking over it, saying "stop", or a tap), so the
+    /// call screen can answer each at once.
+    private(set) var interruptions = 0
 
     @ObservationIgnored private let listener: SpeechListening
     @ObservationIgnored private let speaker: SpeechSpeaking
@@ -104,7 +117,6 @@ final class VoiceCallController {
     @ObservationIgnored private let now: () -> TimeInterval
     /// Wall-clock time for the turn tag (`now` is uptime).
     @ObservationIgnored private let clock: () -> Date
-    @ObservationIgnored private let suppressThinkingCue: @MainActor () -> Bool
     @ObservationIgnored private let tickInterval: Duration?
     /// Diagnostics sink (Debug builds write it to a file on the device).
     @ObservationIgnored private let log: (String) -> Void
@@ -198,7 +210,6 @@ final class VoiceCallController {
         openingTurn: String? = nil,
         now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
         clock: @escaping () -> Date = Date.init,
-        suppressThinkingCue: @escaping @MainActor () -> Bool = { UIAccessibility.isReduceMotionEnabled },
         tickInterval: Duration? = .milliseconds(250),
         log: @escaping (String) -> Void = { _ in }
     ) {
@@ -210,7 +221,6 @@ final class VoiceCallController {
         self.bridge = bridge
         self.now = now
         self.clock = clock
-        self.suppressThinkingCue = suppressThinkingCue
         self.tickInterval = tickInterval
 
         listener.onPartial = { [weak self] in self?.handlePartial($0) }
@@ -252,8 +262,16 @@ final class VoiceCallController {
         }
     }
 
-    /// Ends the call. A run still streaming is left to finish on the server.
+    /// Ends the call. A run still streaming is left to finish on the server. While the call
+    /// is saying why it ended, this cuts that short and ends the system call now.
     func end() {
+        if isEnded, pendingSystemEnd {
+            pendingSystemEnd = false
+            speaker.stopNow()
+            bridge.endCall()
+            isFinished = true
+            return
+        }
         tearDown(endSystemCall: true, message: nil)
     }
 
@@ -288,6 +306,7 @@ final class VoiceCallController {
             submitTurn(tapped: true)
         case .interrupt:
             log("tap: interrupt")
+            interruptions += 1
             speaker.stopNow()
             cancelRunIfStreaming()
             replyActive = false
@@ -295,6 +314,7 @@ final class VoiceCallController {
             returnToListening()
         case .cancel:
             log("tap: cancel")
+            interruptions += 1
             // The send may not be accepted yet; cancel the run it starts, not nothing.
             cancelPendingRun()
             lastSentTurn = nil
@@ -396,7 +416,8 @@ final class VoiceCallController {
                     say(holdOnLinesSaid == 0 ? VoiceCallPhrases.holdOn : VoiceCallPhrases.stillWorking)
                     holdOnLinesSaid += 1
                     nextHoldOnAt = waited + VoiceCallTiming.stillWorkingInterval
-                } else if waited >= VoiceCallTiming.thinkingCueDelay, !speaker.isSpeaking, !suppressThinkingCue() {
+                } else if waited >= VoiceCallTiming.thinkingCueDelay, holdOnLinesSaid == 0, !speaker.isSpeaking {
+                    // One cue per turn; once a hold-on line has been said, the voice reassures instead.
                     setCue(true)
                 }
             }
@@ -406,6 +427,7 @@ final class VoiceCallController {
             }
         case .reconnecting:
             if let reconnectSince, time - reconnectSince >= VoiceCallTiming.reconnectGiveUp {
+                failure = .connectionLost
                 tearDown(endSystemCall: true, message: VoiceCallPhrases.connectionLost)
             }
         default:
@@ -483,6 +505,7 @@ final class VoiceCallController {
         }
         log("talk-over: \"\(heard)\" novel=\(novel)")
         speaker.stopNow()
+        if !isReadBack { interruptions += 1 }
         if isReadBack {
             beginApprovalListening(seed: heard)
         } else if command != nil {
@@ -1065,6 +1088,7 @@ final class VoiceCallController {
                 self.listenerDidStart()
             } catch {
                 self.log("listener start failed\(reason.map { " after \($0)" } ?? ""): \(error)")
+                self.failure = .microphoneStopped
                 self.tearDown(endSystemCall: true, message: nil)
             }
         }

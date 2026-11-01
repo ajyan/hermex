@@ -23,7 +23,7 @@ final class VoiceCallFlowTests: XCTestCase {
         clock = 100
         controller = VoiceCallController(
             listener: listener, speaker: speaker, chat: chat, bridge: FlowBridge(),
-            now: { [unowned self] in clock }, clock: { Self.callTime }, suppressThinkingCue: { true }, tickInterval: nil
+            now: { [unowned self] in clock }, clock: { Self.callTime }, tickInterval: nil
         )
         await controller.start()
     }
@@ -106,7 +106,7 @@ final class VoiceCallFlowTests: XCTestCase {
         let redial = FlowSpeaker()
         controller = VoiceCallController(
             listener: listener, speaker: redial, chat: chat, bridge: FlowBridge(),
-            now: { [unowned self] in clock }, clock: { Self.callTime }, suppressThinkingCue: { true }, tickInterval: nil
+            now: { [unowned self] in clock }, clock: { Self.callTime }, tickInterval: nil
         )
         await controller.start()
         feed()
