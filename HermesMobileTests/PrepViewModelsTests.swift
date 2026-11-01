@@ -932,13 +932,47 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertFalse(vm.hasUnsentText, "once graded, the answer is saved")
     }
 
-    func testReadinessFactsSayWherePracticeStands() {
-        XCTAssertEqual(PrepCopy.readinessFacts(storiesReady: 0, storiesTotal: 8, gradedMocks: 0, openGaps: 10),
-                       "0 of 8 stories ready · No graded mock yet · 10 gaps to close")
-        XCTAssertEqual(PrepCopy.readinessFacts(storiesReady: 2, storiesTotal: 8, gradedMocks: 1, openGaps: 1),
-                       "2 of 8 stories ready · 1 graded mock · 1 gap to close")
-        XCTAssertEqual(PrepCopy.readinessFacts(storiesReady: nil, storiesTotal: nil, gradedMocks: nil, openGaps: nil),
-                       "Practice out loud: a story, then the follow-ups.", "still loading: no zeros that aren't true")
+    func testReadinessChecksReadAtAGlance() {
+        let retention = PrepReadinessCheck(id: "retention", done: 2, total: 46, aim: 0.9, met: false)
+        XCTAssertEqual(PrepCopy.readinessValue(retention), "4%")
+        XCTAssertEqual(PrepCopy.readinessAim(retention), "aim 90%")
+        XCTAssertEqual(PrepCopy.readinessValue(PrepReadinessCheck(id: "retention", done: 0, total: 0, aim: 0.9, met: false)),
+                       "No reviews")
+        let course = PrepReadinessCheck(id: "course", done: 0, total: 14, met: false)
+        XCTAssertEqual(PrepCopy.readinessValue(course), "0 of 14")
+        XCTAssertNil(PrepCopy.readinessAim(course), "all of them needs no aim line")
+        XCTAssertEqual(PrepCopy.readinessLabel(PrepReadinessCheck(id: "course", done: 0, total: 14, met: false)), "Units")
+    }
+
+    func testTheTodayCardSaysWhenItsACatchUpDay() {
+        XCTAssertEqual(PrepCopy.todayTitle(.start, catchingUp: true), "Catch-up day")
+        XCTAssertEqual(PrepCopy.todayTitle(.resume, catchingUp: false), "Today's run")
+        XCTAssertEqual(PrepCopy.todayTitle(.done, catchingUp: true), "Today's run is done")
+        XCTAssertEqual(PrepCopy.runSize(reps: 11, minutes: 17.0), "11 reps · about 17 min")
+        XCTAssertEqual(PrepCopy.catchUpLine(reviewsDue: 27, hold: 5),
+                       "27 reviews are due, so today is reviews only. New lessons come back once 5 or fewer are due.")
+    }
+
+    func testHomeDecodesReadinessAndTheReviewLoad() throws {
+        let home = try JSONDecoder().decode(PrepHome.self, from: Data(#"""
+        {"streak": {"days": 0}, "run": {"minutes": 17.0, "reps": 11, "remaining": 11, "focus": [],
+          "reviews_due": 27, "catching_up": true, "review_hold": 5},
+         "readiness": {"checks": [{"id": "course", "done": 0, "total": 14, "aim": 1.0, "met": false},
+                                  {"id": "retention", "done": 2, "total": 46, "aim": 0.9, "met": false},
+                                  {"id": "future", "done": 1, "total": 1, "aim": 1.0, "met": true}]}}
+        """#.utf8))
+        XCTAssertEqual(home.readiness.map(\.id), ["course", "retention"], "an unknown check is left out")
+        XCTAssertTrue(home.run.catchingUp)
+        XCTAssertEqual(home.run.reviewsDue, 27)
+        let older = try JSONDecoder().decode(PrepHome.self, from: Data(#"{"streak": {"days": 0}, "run": {}, "readiness": null}"#.utf8))
+        XCTAssertTrue(older.readiness.isEmpty)
+        XCTAssertFalse(older.run.catchingUp)
+    }
+
+    func testWeakSpotsCountGapsAndMissedLessons() {
+        XCTAssertEqual(PrepCopy.weakSpotsHeader(gaps: 10, missed: 3), "10 gaps · 3 missed lessons")
+        XCTAssertEqual(PrepCopy.weakSpotsHeader(gaps: 1, missed: 0), "1 gap")
+        XCTAssertEqual(PrepCopy.weakSpotsHeader(gaps: 0, missed: 0), "None open")
     }
 
     func testAStorySignalThatRepeatsItsQuestionIsDropped() {
@@ -1651,12 +1685,6 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(PrepCopy.gapRowDetail(gapSummary("g", status: "open", misses: 3)), "Seen 3×")
         XCTAssertEqual(PrepCopy.gapRowDetail(gapSummary("g", status: "improving", hits: 1)), "1 of 3 hits")
         XCTAssertEqual(PrepCopy.gapRowDetail(gapSummary("g", status: "closed")), "Closed")
-    }
-
-    func testGapsHeaderCopy() {
-        XCTAssertEqual(PrepCopy.gapsHeader(open: 4, improving: 2), "4 open · 2 improving")
-        XCTAssertEqual(PrepCopy.gapsHeader(open: 1, improving: 0), "1 open")
-        XCTAssertEqual(PrepCopy.gapsHeader(open: 0, improving: 0), "None open")
     }
 
     func testGapDetailLoadStates() async {

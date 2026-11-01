@@ -8,9 +8,11 @@ import SwiftUI
 
 // MARK: - Home section
 
-/// Prep home's two ladder rows, each opening its brief, with the last graded score.
+/// Prep home's practice out loud: the two ladder rows, each opening its brief, with the last graded score;
+/// the ladder whose weekly mock is due (none graded in 7 days) says so.
 struct PrepMockSection: View {
     let mocks: PrepMocks
+    var due: PrepMockKind?
 
     private var rows: [(kind: PrepMockKind, ladder: PrepLadder)] {
         PrepMockKind.allCases.compactMap { kind in mocks.ladder(kind).map { (kind, $0) } }
@@ -19,7 +21,7 @@ struct PrepMockSection: View {
     var body: some View {
         if !rows.isEmpty {
             VStack(alignment: .leading, spacing: BrainStyle.s) {
-                BrainSectionHeader(title: "Mock interviews")
+                BrainSectionHeader(title: "Practice out loud")
                 SectionCard {
                     VStack(spacing: 0) {
                         ForEach(Array(rows.enumerated()), id: \.element.kind) { offset, row in
@@ -28,7 +30,8 @@ struct PrepMockSection: View {
                                 BrainRow(
                                     leading: { PrepMockIcon() },
                                     title: PrepMockCopy.rowTitle(row.kind, ladder: row.ladder),
-                                    subtitle: row.ladder.best.map { "Passed through \($0)" },
+                                    subtitle: row.kind == due ? "Due: no mock graded this week"
+                                        : row.ladder.best.map { "Passed through \($0)" },
                                     trailing: row.ladder.lastScore.map { "Last \(PrepMockCopy.score($0))" })
                             }
                             .buttonStyle(.plain)

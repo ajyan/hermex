@@ -1,13 +1,13 @@
 import SwiftUI
 
-/// Prep's landing screen: the readiness card (where practice stands and the one thing to do next), then
-/// interview practice (the voice mock ladders and the story bank), then the course's unit path and the gaps. Pushed as `.brainRoute(.prep(.home))`;
-/// owns no `NavigationStack`.
+/// Prep's landing screen, ordered by the goal: whether you're interview-ready (the mastery bar as four pips),
+/// today's run (its one action), the weak spots (open gaps and missed lessons), practice out loud (the voice
+/// mock ladders, a due one marked, and the story bank), then the course, folded to the unit being taught.
+/// Pushed as `.brainRoute(.prep(.home))`; owns no `NavigationStack`.
 struct PrepHomeView: View {
     @State private var viewModel: PrepHomeViewModel
     /// The voice mock ladders, loaded beside home; their section hides until they load.
     @State private var mockViewModel: PrepMockViewModel
-    @Environment(\.openMockCall) private var openMockCall
 
     init(server: URL, onAPIError: @escaping (Error) -> Void) {
         let client = APIClientPrepAdapter(apiClient: APIClient(baseURL: server))
@@ -46,15 +46,17 @@ struct PrepHomeView: View {
         case .loaded(let home):
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
-                    readinessCard(home)
-                    // Interview practice first: the mock ladders, then the story bank.
+                    if !home.readiness.isEmpty {
+                        PrepReadinessRow(checks: home.readiness)
+                    }
+                    PrepTodayCard(run: home.run, streakDays: home.streak.days, today: viewModel.course?.today)
+                    if viewModel.gaps != nil || viewModel.course != nil {
+                        PrepWeakSpotsSection(gaps: viewModel.gaps ?? [], missed: PrepWeakSpotsSection.missed(in: viewModel.course))
+                    }
                     mockSection
                     storiesSection
                     if let course = viewModel.course {
-                        PrepUnitPath(course: course)
-                    }
-                    if let gaps = viewModel.gaps {
-                        PrepGapsSection(gaps: gaps)
+                        PrepUnitPath(course: course, catchingUp: home.run.catchingUp)
                     }
                 }
                 .padding(BrainStyle.l)
@@ -64,32 +66,12 @@ struct PrepHomeView: View {
         }
     }
 
-    // MARK: Mocks
-
-    /// Where practice stands, and one action: a due voice mock (none graded in 7 days) first, else today's run.
-    private func readinessCard(_ home: PrepHome) -> some View {
-        let mocks = mockViewModel.mocks
-        let due: PrepReadinessCard.DueMock? = openMockCall.isAvailable
-            ? mocks.flatMap { m in m.weeklyDue().flatMap { kind in m.ladder(kind).map { ladder in
-                PrepReadinessCard.DueMock(kind: kind, ladder: ladder, isStarting: mockViewModel.isStarting,
-                                          errorMessage: mockViewModel.errorMessage) {
-                    Task { await mockViewModel.startCall(kind: kind, open: openMockCall) }
-                }
-            } } }
-            : nil
-        let facts = PrepCopy.readinessFacts(
-            storiesReady: viewModel.stories?.readyCount, storiesTotal: viewModel.stories?.activeTotal,
-            gradedMocks: mocks.map { $0.recent.filter { $0.status == "graded" }.count },
-            openGaps: viewModel.gaps.map { $0.filter { $0.status == .open || $0.status == .improving }.count })
-        return PrepReadinessCard(facts: facts, streakDays: home.streak.days, today: viewModel.course?.today,
-                                 runAction: PrepCopy.runAction(reps: home.run.reps, remaining: home.run.remaining),
-                                 mock: due)
-    }
+    // MARK: Practice out loud
 
     @ViewBuilder
     private var mockSection: some View {
         if let mocks = mockViewModel.mocks {
-            PrepMockSection(mocks: mocks)
+            PrepMockSection(mocks: mocks, due: mocks.weeklyDue())
         }
     }
 
@@ -188,51 +170,91 @@ struct PrepFailedView: View {
 
 // MARK: - Gaps
 
-/// The gap ledger on Prep home: the first three open or improving gaps (a filled amber dot, or an amber
-/// ring while improving), each pushing its detail, "See all N" for the rest, then a "Closed this week" count. Replaces "Needs work" when the server
-/// has the gaps route.
-struct PrepGapsSection: View {
+/// The weak spots on Prep home: open or improving gaps (a filled amber dot, or an amber ring while improving),
+/// then learned lessons whose last recall missed (each one "Try it now" away), the first three shown with
+/// "See all N" for the rest, and a "Closed this week" count.
+struct PrepWeakSpotsSection: View {
     let gaps: [PrepGapSummary]
+    let missed: [PrepLessonNode]
     @State private var showsAll = false
     private static let shown = 3
 
-    private var active: [PrepGapSummary] { gaps.filter { $0.status == .open || $0.status == .improving } }
+    /// The course's learned lessons whose latest recall wasn't a pass, in path order.
+    static func missed(in course: PrepCourse?) -> [PrepLessonNode] {
+        (course?.units ?? []).flatMap(\.lessons).filter { $0.state == .shaky }
+    }
+
+    private enum Spot: Identifiable {
+        case gap(PrepGapSummary)
+        case lesson(PrepLessonNode)
+        var id: String {
+            switch self {
+            case .gap(let gap): "gap-\(gap.id)"
+            case .lesson(let lesson): "lesson-\(lesson.id)"
+            }
+        }
+    }
+
+    private var spots: [Spot] {
+        gaps.filter { $0.status == .open || $0.status == .improving }.map(Spot.gap) + missed.map(Spot.lesson)
+    }
     private var closed: Int { gaps.filter { $0.status == .closed }.count }
 
     var body: some View {
+        let spots = spots
         VStack(alignment: .leading, spacing: BrainStyle.s) {
-            BrainSectionHeader(
-                title: "Gaps",
-                trailing: PrepCopy.gapsHeader(open: gaps.filter { $0.status == .open }.count,
-                                              improving: gaps.filter { $0.status == .improving }.count))
+            BrainSectionHeader(title: "Weak spots", trailing: PrepCopy.weakSpotsHeader(
+                gaps: gaps.filter { $0.status == .open || $0.status == .improving }.count, missed: missed.count))
             SectionCard {
                 VStack(spacing: 0) {
-                    if active.isEmpty {
-                        BrainRow(title: "No open gaps",
-                                 subtitle: "Atlas names a gap when the same point is missed across answers.")
+                    if spots.isEmpty {
+                        BrainRow(title: "Nothing open",
+                                 subtitle: "A gap opens when the same point is missed across answers.")
                     }
-                    ForEach(Array(active.prefix(showsAll ? active.count : Self.shown).enumerated()), id: \.element.id) { offset, gap in
+                    ForEach(Array(spots.prefix(showsAll ? spots.count : Self.shown).enumerated()), id: \.element.id) { offset, spot in
                         if offset > 0 { PrepRowDivider() }
-                        NavigationLink(value: ShellPushDestination.brainRoute(.prep(.gap(gap.id)))) {
-                            BrainRow(
-                                leading: { PrepGapStatusDot(status: gap.status) },
-                                title: gap.label,
-                                trailing: PrepCopy.gapRowDetail(gap)
-                            )
-                        }
-                        .buttonStyle(.plain)
+                        row(spot)
                     }
-                    if active.count > Self.shown {
+                    if spots.count > Self.shown {
                         PrepRowDivider()
-                        PrepShowAllButton(showsAll: $showsAll, count: active.count)
+                        PrepShowAllButton(showsAll: $showsAll, count: spots.count)
                     }
                     if closed > 0 {
                         PrepRowDivider()
-                        BrainRow(title: "Closed this week", trailing: "\(closed)")
+                        BrainRow(title: "Gaps closed this week", trailing: "\(closed)")
                     }
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func row(_ spot: Spot) -> some View {
+        switch spot {
+        case .gap(let gap):
+            NavigationLink(value: ShellPushDestination.brainRoute(.prep(.gap(gap.id)))) {
+                BrainRow(leading: { PrepGapStatusDot(status: gap.status) }, title: gap.label,
+                         trailing: PrepCopy.gapRowDetail(gap))
+            }
+            .buttonStyle(.plain)
+        case .lesson(let lesson):
+            NavigationLink(value: ShellPushDestination.brainRoute(.prep(.lessonRun(lesson.id)))) {
+                BrainRow(leading: { PrepMissedLessonMark() }, title: lesson.title, subtitle: "Missed last recall",
+                         trailing: "Try it now", trailingTint: Color.accentColor)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(Text(verbatim: "Asks one question on this lesson now"))
+        }
+    }
+}
+
+/// A lesson whose last recall missed: an amber dashed ring, beside the gaps' amber dots.
+private struct PrepMissedLessonMark: View {
+    var body: some View {
+        Circle()
+            .strokeBorder(Color.hxWarning, style: StrokeStyle(lineWidth: 1.5, dash: [2, 2]))
+            .frame(width: 9, height: 9)
+            .accessibilityHidden(true)
     }
 }
 
