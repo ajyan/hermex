@@ -232,6 +232,7 @@ private final class FlowListener: SpeechListening {
     var onPartial: ((String) -> Void)?
     var onFinal: ((String) -> Void)?
     var onVoiceActivity: ((Bool, TimeInterval) -> Void)?
+    var onNeedsRestart: ((String) -> Void)?
     func start() async throws {}
     func stop() {}
     func endTurn() {}

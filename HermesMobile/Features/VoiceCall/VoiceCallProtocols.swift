@@ -8,6 +8,9 @@ protocol SpeechListening: AnyObject {
     var onPartial: ((String) -> Void)? { get set }
     var onFinal: ((String) -> Void)? { get set }
     var onVoiceActivity: ((Bool, TimeInterval) -> Void)? { get set }
+    /// The mic stopped or changed under a running listener (a route change, an
+    /// interruption ending): stop and start it again. Carries the reason, for the log.
+    var onNeedsRestart: ((String) -> Void)? { get set }
     func start() async throws
     func stop()
     /// The user has paused: finalize what has been heard so far, so its final
@@ -30,9 +33,14 @@ protocol SpeechSpeaking: AnyObject {
 /// The chat a call drives: the open session's `ChatViewModel`.
 @MainActor
 protocol VoiceCallChatDriving: AnyObject {
+    /// True once the server sealed the session for compression: it refuses every later send.
+    var isCompressionRotated: Bool { get }
     func sendVoiceMessage(_ text: String) async -> Bool
     func cancelActiveStream() async -> Bool
     func respondToApproval(_ choice: ApprovalChoice) async -> Bool
+    /// The call's system audio is up (or gone). While it is up the app keeps running in
+    /// the background, so the chat keeps its stream when a background task expires.
+    func voiceCallDidChange(isActive: Bool)
 }
 
 /// CallKit: the system call that keeps audio alive in the background and

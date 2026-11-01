@@ -1510,6 +1510,82 @@ final class ChatViewModelSendTests: XCTestCase {
         XCTAssertEqual(viewModel.activeStreamID, "stream-new")
     }
 
+    /// A session sealed for compression refuses every later turn; a call reads the flag
+    /// from the first refused turn to end itself instead of failing every turn after.
+    @MainActor
+    func testRotatedVoiceTurnMarksTheSessionSealed() async throws {
+        var starts = 0
+        let viewModel = try makeViewModel { request in
+            switch request.url?.path {
+            case "/api/chat/start":
+                starts += 1
+                return apiTestJSONResponse(
+                    #"{"error":"Compressed","code":"session_rotated","continuation_session_id":"next"}"#,
+                    for: request, status: 409)
+            default:
+                return apiTestJSONResponse("{}", for: request)
+            }
+        }
+
+        let sent = await viewModel.sendVoiceMessage("[voice] keep going")
+
+        XCTAssertFalse(sent)
+        XCTAssertTrue(viewModel.isCompressionRotated)
+        XCTAssertEqual(starts, 1)
+    }
+
+    /// A call's audio session keeps the app running in the background, so background-task
+    /// expiry leaves the call's stream connected; if the call ends still in the background,
+    /// the stream is suspended then.
+    @MainActor
+    func testBackgroundExpiryDuringAVoiceCallKeepsTheStreamUntilTheCallEnds() async throws {
+        let streamClient = SpySSEStreamingClient()
+        let viewModel = try makeViewModel(streamClient: streamClient) { request in
+            switch request.url?.path {
+            case "/api/chat/start":
+                return apiTestJSONResponse(#"{"session_id":"session-abc","stream_id":"stream-123"}"#, for: request)
+            default:
+                return apiTestJSONResponse("{}", for: request)
+            }
+        }
+        viewModel.voiceCallDidChange(isActive: true)
+        let sent = await viewModel.sendVoiceMessage("[voice] what's next")
+        XCTAssertTrue(sent)
+        let stopsBefore = streamClient.stopCount
+
+        viewModel.suspendStreamForBackground()
+        XCTAssertFalse(viewModel.isActiveStreamConnectionSuspended)
+        XCTAssertEqual(streamClient.stopCount, stopsBefore)
+        XCTAssertEqual(viewModel.activeStreamID, "stream-123")
+
+        viewModel.voiceCallDidChange(isActive: false)
+        XCTAssertTrue(viewModel.isActiveStreamConnectionSuspended)
+    }
+
+    /// Foregrounding during the call cancels the held-off suspension: ending the call in
+    /// the foreground leaves the stream alone.
+    @MainActor
+    func testVoiceCallEndingInTheForegroundDoesNotSuspendTheStream() async throws {
+        let viewModel = try makeViewModel { request in
+            switch request.url?.path {
+            case "/api/chat/start":
+                return apiTestJSONResponse(#"{"session_id":"session-abc","stream_id":"stream-123"}"#, for: request)
+            default:
+                return apiTestJSONResponse("{}", for: request)
+            }
+        }
+        viewModel.voiceCallDidChange(isActive: true)
+        let sent = await viewModel.sendVoiceMessage("[voice] what's next")
+        XCTAssertTrue(sent)
+
+        viewModel.suspendStreamForBackground()
+        await viewModel.reconnectStreamIfNeeded()
+        viewModel.voiceCallDidChange(isActive: false)
+
+        XCTAssertFalse(viewModel.isActiveStreamConnectionSuspended)
+        XCTAssertEqual(viewModel.activeStreamID, "stream-123")
+    }
+
     /// Slash commands that send (`/queue` with nothing running, skill shortcuts)
     /// hand the failed send's text back, and ChatView sets it again.
     @MainActor

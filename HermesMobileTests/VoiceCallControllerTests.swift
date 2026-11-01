@@ -6,6 +6,7 @@ private final class FakeListener: SpeechListening {
     var onPartial: ((String) -> Void)?
     var onFinal: ((String) -> Void)?
     var onVoiceActivity: ((Bool, TimeInterval) -> Void)?
+    var onNeedsRestart: ((String) -> Void)?
     var startCount = 0
     var stopCount = 0
     var startError: Error?
@@ -93,6 +94,9 @@ private final class FakeChat: VoiceCallChatDriving {
     var cancelCount = 0
     var responses: [ApprovalChoice] = []
     var sendResult = true
+    var isCompressionRotated = false
+    /// Every `voiceCallDidChange`, in order.
+    var callActiveChanges: [Bool] = []
     /// When set, each send waits for `releaseSend()`, like a slow `chat/start`.
     var holdsSend = false
     private var pendingSend: CheckedContinuation<Void, Never>?
@@ -118,6 +122,8 @@ private final class FakeChat: VoiceCallChatDriving {
         responses.append(choice)
         return true
     }
+
+    func voiceCallDidChange(isActive: Bool) { callActiveChanges.append(isActive) }
 }
 
 @MainActor
@@ -746,6 +752,29 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(controller.partialTranscript, "Actually")
     }
 
+    func testBackchannelPairsDoNotInterruptAtlas() async {
+        await startSpeaking()
+        voice(true, for: 0.3)
+        listener.onPartial?("yeah okay")
+        listener.onFinal?("Yeah, okay.")
+        listener.onPartial?("mm right")
+        listener.onFinal?("Mm, right.")
+        XCTAssertEqual(controller.state, .speaking)
+        XCTAssertEqual(speaker.stopCount, 0)
+        XCTAssertEqual(chat.cancelCount, 0)
+    }
+
+    func testAQuestionStartingWithWaitInterruptsAtlas() async {
+        await startSpeaking()
+        voice(true, for: 0.4)
+        listener.onPartial?("wait what about Alex")
+        await controller.lastChatTask?.value
+        XCTAssertEqual(speaker.stopCount, 1)
+        XCTAssertEqual(chat.cancelCount, 1)
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertEqual(controller.partialTranscript, "wait what about Alex")
+    }
+
     func testCommandsAreWholeUtterancesOnly() {
         XCTAssertEqual(VoiceCallController.command(in: "Stop."), .stop)
         XCTAssertEqual(VoiceCallController.command(in: "okay, never mind"), .stop)
@@ -905,6 +934,35 @@ final class VoiceCallControllerTests: XCTestCase {
         update(text: "First sentence. Second part.", streaming: false)
         XCTAssertEqual(speaker.spoken.last, "Second part.")
         XCTAssertEqual(chat.sent, [tag + "hello"])
+    }
+
+    func testASessionSealedForCompressionEndsTheCallWithAReason() async {
+        await controller.start()
+        chat.sendResult = false
+        chat.isCompressionRotated = true
+        await say("what's next on my list")
+        XCTAssertEqual(controller.state, .ended(VoiceCallPhrases.chatTooLong))
+        XCTAssertEqual(speaker.spoken, [VoiceCallPhrases.chatTooLong + "."])
+        XCTAssertFalse(speaker.spoken.contains(VoiceCallPhrases.sendFailed))
+        XCTAssertEqual(bridge.endCount, 0)
+        speaker.drain()
+        XCTAssertEqual(bridge.endCount, 1)
+        XCTAssertTrue(controller.isFinished)
+    }
+
+    func testAnUnsealedSendFailureStillKeepsTheCall() async {
+        await controller.start()
+        chat.sendResult = false
+        await say("what's next on my list")
+        XCTAssertEqual(controller.state, .speaking)
+        XCTAssertEqual(speaker.spoken, [VoiceCallPhrases.sendFailed])
+    }
+
+    func testTheChatKnowsWhileTheCallsAudioIsUp() async {
+        await controller.start()
+        XCTAssertEqual(chat.callActiveChanges, [true])
+        controller.end()
+        XCTAssertEqual(chat.callActiveChanges, [true, false])
     }
 
     func testReconnectGivesUpAfter30s() async {
@@ -1076,6 +1134,64 @@ final class VoiceCallControllerTests: XCTestCase {
         await controller.lastListenerTask?.value
         XCTAssertTrue(listener.isRunning)
         XCTAssertEqual(listener.overlappingStarts, 0)
+    }
+
+    func testRouteChangeRestartsTheMicOnceAndLogsWhy() async {
+        await controller.start()
+        XCTAssertEqual(listener.startCount, 1)
+
+        listener.onNeedsRestart?("route change (reason 1); engine stopped")
+        // The engine's reconfiguration arrives with the route change: the same restart.
+        listener.onNeedsRestart?("engine configuration change; engine stopped")
+        await controller.lastListenerTask?.value
+        XCTAssertEqual(listener.stopCount, 1)
+        XCTAssertEqual(listener.startCount, 2)
+        XCTAssertEqual(listener.overlappingStarts, 0)
+        XCTAssertTrue(listener.isRunning)
+        XCTAssertTrue(logLines.contains("listener restarted after route change (reason 1); engine stopped"))
+        XCTAssertEqual(controller.state, .listening)
+    }
+
+    func testAChangeRightAfterARestartRestartsAgainOnceTheBurstPasses() async {
+        await controller.start()
+        listener.onNeedsRestart?("route change (reason 1); engine stopped")
+        await controller.lastListenerTask?.value
+        XCTAssertEqual(listener.startCount, 2)
+
+        // AirPods settling a moment later stop the engine again.
+        clock += 0.3
+        listener.onNeedsRestart?("route change (reason 1); engine stopped")
+        listener.onNeedsRestart?("engine configuration change; engine stopped")
+        controller.tick()
+        await controller.lastListenerTask?.value
+        XCTAssertEqual(listener.startCount, 2)
+
+        clock += VoiceCallTiming.listenerRestartDebounce
+        controller.tick()
+        await controller.lastListenerTask?.value
+        XCTAssertEqual(listener.startCount, 3)
+        XCTAssertEqual(listener.overlappingStarts, 0)
+        controller.tick()
+        await controller.lastListenerTask?.value
+        XCTAssertEqual(listener.startCount, 3)
+    }
+
+    func testRouteChangeWhileMutedOrHeldLeavesTheMicOff() async {
+        await controller.start()
+        bridge.onMuteChanged?(true)
+        listener.onNeedsRestart?("route change (reason 2); engine stopped")
+        await controller.lastListenerTask?.value
+        XCTAssertEqual(listener.startCount, 1)
+        XCTAssertFalse(listener.isRunning)
+
+        bridge.onMuteChanged?(false)
+        await controller.lastListenerTask?.value
+        bridge.onHoldChanged?(true)
+        clock += VoiceCallTiming.listenerRestartDebounce
+        listener.onNeedsRestart?("interruption ended")
+        await controller.lastListenerTask?.value
+        XCTAssertEqual(listener.startCount, 2)
+        XCTAssertFalse(listener.isRunning)
     }
 
     func testMuteStopsListeningNotSpeaking() async {
@@ -1400,17 +1516,46 @@ final class ServerSpeechSpeakerTests: XCTestCase {
         XCTAssertEqual(requests, ["One.", "One."])
     }
 
-    func testFailureHandsTheRestOfTheCallToTheOnDeviceVoice() async {
+    func testOneFailureUsesTheOnDeviceVoiceForThatSentenceOnly() async {
         let failed = expectation(description: "fell back")
-        let speaker = makeSpeaker { _ in throw URLError(.cannotConnectToHost) }
+        let secondFetched = expectation(description: "second request")
+        let speaker = makeSpeaker { count in
+            if count == 1 { throw URLError(.cannotConnectToHost) }
+            secondFetched.fulfill()
+            return Data()
+        }
         fallback.onEnqueue = { failed.fulfill() }
         speaker.enqueue("One.")
         await fulfillment(of: [failed], timeout: 5)
         fallback.onEnqueue = nil
         XCTAssertEqual(fallback.spoken, ["One."])
+
         speaker.enqueue("Two.")
-        XCTAssertEqual(fallback.spoken, ["One.", "Two."])
-        XCTAssertEqual(requests, ["One."])
+        await fulfillment(of: [secondFetched], timeout: 5)
+        // The server clip waits for the on-device voice, so the two never overlap.
+        XCTAssertTrue(speaker.isSpeaking)
+        let drained = expectation(description: "queue drained")
+        speaker.onFinishedQueue = { drained.fulfill() }
+        fallback.drain()
+        await fulfillment(of: [drained], timeout: 5)
+        XCTAssertEqual(requests, ["One.", "Two."])
+        XCTAssertEqual(fallback.spoken, ["One."])
+    }
+
+    func testThreeFailuresInARowHandTheRestOfTheCallToTheOnDeviceVoice() async {
+        let speaker = makeSpeaker { _ in throw URLError(.cannotConnectToHost) }
+        for sentence in ["One.", "Two.", "Three."] {
+            let failed = expectation(description: "fell back on \(sentence)")
+            fallback.onEnqueue = { failed.fulfill() }
+            speaker.enqueue(sentence)
+            await fulfillment(of: [failed], timeout: 5)
+        }
+        fallback.onEnqueue = nil
+        XCTAssertEqual(requests, ["One.", "Two.", "Three."])
+
+        speaker.enqueue("Four.")
+        XCTAssertEqual(fallback.spoken, ["One.", "Two.", "Three.", "Four."])
+        XCTAssertEqual(requests, ["One.", "Two.", "Three."])
 
         let drained = expectation(description: "queue drained")
         speaker.onFinishedQueue = { drained.fulfill() }
