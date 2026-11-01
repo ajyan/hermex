@@ -510,6 +510,9 @@ final class ChatViewModel {
     private(set) var isCompressionRotated = false
     @ObservationIgnored private var compressionRejectionMessage: String?
     @ObservationIgnored private var didHandOffCompressionDraft = false
+    /// True while a voice call's system audio is up; see `suspendStreamForBackground`.
+    @ObservationIgnored private var isVoiceCallActive = false
+    @ObservationIgnored private var backgroundSuspendDeferredForCall = false
     /// Whether the chat title offers rename: a live, server-backed session.
     var canRenameSession: Bool { sessionID != nil && !isViewingCachedData }
     /// The workspace this chat's session is pointed at. `/workspace` and the
@@ -4837,7 +4840,14 @@ final class ChatViewModel {
         }
     }
 
+    /// Drops the stream's connection when the background task that kept it alive expires.
+    /// A voice call's audio session keeps the app running, so during a call the stream
+    /// stays up; if the call ends while still in the background, it is dropped then.
     func suspendStreamForBackground() {
+        guard !isVoiceCallActive else {
+            backgroundSuspendDeferredForCall = true
+            return
+        }
         suspendActiveStreamConnection()
     }
 
@@ -4856,6 +4866,8 @@ final class ChatViewModel {
     }
 
     func reconnectStreamIfNeeded(modelContext: ModelContext? = nil) async {
+        // Back in the foreground: a suspension the call held off no longer applies.
+        backgroundSuspendDeferredForCall = false
         await streamCoordinator.reconnectIfNeeded(modelContext: modelContext)
     }
 
@@ -7264,6 +7276,13 @@ extension ServerTTSAudioPlayer: AVAudioPlayerDelegate {
 }
 
 extension ChatViewModel: VoiceCallChatDriving {
+    func voiceCallDidChange(isActive: Bool) {
+        isVoiceCallActive = isActive
+        guard !isActive, backgroundSuspendDeferredForCall else { return }
+        backgroundSuspendDeferredForCall = false
+        suspendActiveStreamConnection()
+    }
+
     /// Sends one spoken turn. Unlike `sendMessage`, it never picks up the
     /// composer's staged attachments.
     func sendVoiceMessage(_ text: String) async -> Bool {

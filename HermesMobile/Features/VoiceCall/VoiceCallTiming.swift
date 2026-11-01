@@ -17,7 +17,7 @@ enum VoiceCallTiming {
     /// A turn is forced to end this long after it started, so a stuck mic can't hang the call.
     static let monologueCap: TimeInterval = 30
     /// Words, not in what Atlas is saying, that must be heard before talking over Atlas interrupts it.
-    /// A backchannel ("yeah", "mm") needs one more, so agreeing doesn't cut Atlas off.
+    /// Backchannels ("yeah", "mm") never count, so agreeing doesn't cut Atlas off.
     static let bargeInNovelWords = 1
     /// New words heard while Atlas is still working on a reply that make them part of the
     /// turn just sent: the run is cancelled and the turn reopened with them.
@@ -50,6 +50,9 @@ enum VoiceCallTiming {
     static let connectTimeout: TimeInterval = 10
     /// How long to wait for a dropped stream to come back before ending the call.
     static let reconnectGiveUp: TimeInterval = 30
+    /// After the mic restarts for a route or session change, further changes this soon are
+    /// the same change (a route change and the engine's reconfiguration arrive together).
+    static let listenerRestartDebounce: TimeInterval = 1.0
 }
 
 enum VoiceCallSettings {

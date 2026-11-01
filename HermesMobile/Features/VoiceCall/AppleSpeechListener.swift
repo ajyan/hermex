@@ -11,10 +11,17 @@ final class AppleSpeechListener: SpeechListening {
     var onPartial: ((String) -> Void)?
     var onFinal: ((String) -> Void)?
     var onVoiceActivity: ((Bool, TimeInterval) -> Void)?
+    var onNeedsRestart: ((String) -> Void)?
 
     static let locale = Locale(identifier: "en-US")
 
-    private let engine = AVAudioEngine()
+    private var engine = AVAudioEngine()
+    /// Set when media services reset: the old engine is dead, so the next start makes a new one.
+    private var needsNewEngine = false
+    /// The input format the tap was installed with, to tell when a route change altered it.
+    private var tapFormat: AVAudioFormat?
+    /// True between an interruption's start and end; the mic can't run until it ends.
+    private var isInterrupted = false
     private var recognizer: CallRecognizer?
     private let levels: VoiceCallAudioLevels?
     private let vocabulary: () async -> [String]
@@ -79,6 +86,11 @@ final class AppleSpeechListener: SpeechListening {
             await recognizer?.setVocabulary(terms)
         }
 
+        if needsNewEngine {
+            engine = AVAudioEngine()
+            needsNewEngine = false
+        }
+        isInterrupted = false
         let input = engine.inputNode
         // Echo cancellation, so Atlas's own voice doesn't read as the user barging in.
         do {
@@ -96,6 +108,7 @@ final class AppleSpeechListener: SpeechListening {
             sink(buffer)
             meter.process(buffer)
         }
+        tapFormat = format
         engine.prepare()
         do {
             try engine.start()
@@ -110,28 +123,65 @@ final class AppleSpeechListener: SpeechListening {
         observeAudioSession()
     }
 
-    /// Logs the audio-session events that can silently stop the mic mid-call.
+    /// Watches the audio-session events that can stop the mic mid-call, and asks the
+    /// call to restart it (`onNeedsRestart`) when one has: the engine stopped, the
+    /// input format changed under the tap, or an interruption ended.
     private func observeAudioSession() {
         guard sessionObservers.isEmpty else { return }
         let center = NotificationCenter.default
         let log = log
         sessionObservers = [
-            center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { note in
+            center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
                 let type = (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt)
                     .flatMap(AVAudioSession.InterruptionType.init(rawValue:))
-                log("audio session interruption: \(type == .began ? "began" : type == .ended ? "ended" : "unknown")")
+                let options = AVAudioSession.InterruptionOptions(
+                    rawValue: note.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+                )
+                log("audio session interruption: \(type == .began ? "began" : type == .ended ? "ended" : "unknown")"
+                    + (options.contains(.shouldResume) ? " (should resume)" : ""))
+                MainActor.assumeIsolated {
+                    guard let self, let type else { return }
+                    self.isInterrupted = type == .began
+                    if type == .ended, options.contains(.shouldResume) { self.requestRestart("interruption ended") }
+                }
             },
-            center.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { note in
+            center.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] note in
                 let reason = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt ?? 0
                 log("audio route change: reason=\(reason)")
+                MainActor.assumeIsolated { self?.checkInput(after: "route change (reason \(reason))") }
             },
-            center.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: nil, queue: .main) { _ in
+            center.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: nil, queue: .main) { [weak self] _ in
                 log("audio media services were reset")
+                MainActor.assumeIsolated {
+                    guard let self, self.recognizer != nil else { return }
+                    self.needsNewEngine = true
+                    self.requestRestart("media services reset")
+                }
             },
             center.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
                 log("audio engine configuration change; running=\(self?.engine.isRunning ?? false)")
+                MainActor.assumeIsolated { self?.checkInput(after: "engine configuration change") }
             },
         ]
+    }
+
+    /// After a route or configuration change: restart if the engine stopped or the
+    /// input now delivers a format the tap and converter weren't built for.
+    private func checkInput(after change: String) {
+        guard recognizer != nil, !isInterrupted else { return }
+        if !engine.isRunning {
+            requestRestart("\(change); engine stopped")
+            return
+        }
+        let format = engine.inputNode.outputFormat(forBus: 0)
+        if let tapFormat, format.sampleRate != tapFormat.sampleRate || format.channelCount != tapFormat.channelCount {
+            requestRestart("\(change); input now \(format.sampleRate) Hz, \(format.channelCount) ch")
+        }
+    }
+
+    private func requestRestart(_ reason: String) {
+        log("listener: needs restart: \(reason)")
+        onNeedsRestart?(reason)
     }
 
     func endTurn() {
@@ -143,6 +193,7 @@ final class AppleSpeechListener: SpeechListening {
         sessionObservers = []
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
+        tapFormat = nil
         recognizer?.finish()
         recognizer = nil
         levels?.setMic(0)

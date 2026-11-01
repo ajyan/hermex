@@ -3,8 +3,10 @@ import AVFoundation
 /// Speaks call replies with the server's neural voice (`POST /api/tts`), one
 /// fetch at a time: the first sentence alone so it starts fast, then whatever
 /// has queued while it played. The server allows one TTS request per client
-/// every 2 s, which batching keeps under. If the server voice fails, the rest
-/// of the call falls back to `fallback`, which also plays the thinking cue.
+/// every 2 s, which batching keeps under. A fetch that fails is spoken by
+/// `fallback` (which also plays the thinking cue) and the next one tries the
+/// server again; after `maxConsecutiveFailures` in a row the rest of the call
+/// uses `fallback`.
 @MainActor
 final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate {
     var onFinishedQueue: (() -> Void)?
@@ -12,6 +14,7 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
 
     /// Mirrors the server's per-client TTS rate limit (`_TtsRateLimiter`, 2 s).
     static let serverRequestSpacing: TimeInterval = 2.05
+    static let maxConsecutiveFailures = 3
 
     private let synthesize: (String) async throws -> Data
     private let fallback: SpeechSpeaking
@@ -19,14 +22,21 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
     private let log: (String) -> Void
     private let requestSpacing: TimeInterval
 
+    /// Speech in order: fetched server audio, or text the server voice failed on.
+    private enum Clip {
+        case audio(Data)
+        case onDevice(String)
+    }
+
     private var queued: [String] = []
-    private var clips: [Data] = []
+    private var clips: [Clip] = []
     private var fetchTask: Task<Void, Never>?
     private var player: AVAudioPlayer?
     private var meterTask: Task<Void, Never>?
     private var lastRequestAt = -TimeInterval.infinity
-    /// Set once the server voice has failed; later sentences go to `fallback`.
-    private var usesFallback = false
+    /// Server-voice failures in a row; at `maxConsecutiveFailures` later sentences go to `fallback`.
+    private var consecutiveFailures = 0
+    private var usesFallback: Bool { consecutiveFailures >= Self.maxConsecutiveFailures }
 
     init(
         synthesize: @escaping (String) async throws -> Data,
@@ -41,7 +51,7 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
         self.levels = levels
         self.log = log
         super.init()
-        fallback.onFinishedQueue = { [weak self] in self?.finishIfDrained() }
+        fallback.onFinishedQueue = { [weak self] in self?.fallbackFinished() }
     }
 
     func enqueue(_ sentence: String) {
@@ -70,10 +80,10 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
     private func pump() {
         guard fetchTask == nil, !queued.isEmpty else { return }
         if usesFallback {
-            // Wait for server audio already fetched, so the voices never overlap.
-            guard player == nil, clips.isEmpty else { return }
-            queued.forEach(fallback.enqueue)
+            // After server audio already fetched, so the voices never overlap.
+            clips.append(contentsOf: queued.map(Clip.onDevice))
             queued = []
+            playNextIfIdle()
             return
         }
         let text = queued.joined(separator: " ")
@@ -93,7 +103,8 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
             guard !Task.isCancelled else { return }
             log(String(format: "tts fetched %d sentence(s), %d chars in %.2fs",
                        sentences, text.count, ProcessInfo.processInfo.systemUptime - started))
-            clips.append(data)
+            consecutiveFailures = 0
+            clips.append(.audio(data))
         } catch is CancellationError {
             return
         } catch APIError.http(statusCode: 429, _) {
@@ -102,9 +113,11 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
             queued.insert(text, at: 0)
         } catch {
             guard !Task.isCancelled else { return }
-            log("tts failed (\(error)); using the on-device voice")
-            usesFallback = true
-            queued.insert(text, at: 0)
+            consecutiveFailures += 1
+            log("tts failed (\(error)); " + (usesFallback
+                ? "using the on-device voice for the rest of the call"
+                : "using the on-device voice for this sentence"))
+            clips.append(.onDevice(text))
         }
         fetchTask = nil
         playNextIfIdle()
@@ -115,8 +128,20 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
     // MARK: - Playback
 
     private func playNextIfIdle() {
-        guard player == nil, !clips.isEmpty else { return }
-        let data = clips.removeFirst()
+        guard player == nil, let next = clips.first else { return }
+        let data: Data
+        switch next {
+        case .onDevice(let text):
+            clips.removeFirst()
+            fallback.enqueue(text)
+            playNextIfIdle()
+            return
+        case .audio(let audio):
+            // After the on-device voice finishes, so the voices never overlap.
+            guard !fallback.isSpeaking else { return }
+            clips.removeFirst()
+            data = audio
+        }
         guard let player = try? AVAudioPlayer(data: data) else {
             log("tts audio undecodable; skipping clip")
             playNextIfIdle()
@@ -142,6 +167,12 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
         guard let player, ObjectIdentifier(player) == id else { return }
         self.player = nil
         stopMeter()
+        playNextIfIdle()
+        pump()
+        finishIfDrained()
+    }
+
+    private func fallbackFinished() {
         playNextIfIdle()
         pump()
         finishIfDrained()

@@ -32,6 +32,7 @@ enum VoiceCallPhrases {
     static let holdOn = "One moment."
     static let checking = "Let me check."
     static let stillWorking = "Still working on it."
+    static let chatTooLong = "This chat got too long for a call; start a new call to keep going"
 
     /// The tag before each spoken turn, carrying the phone's local time (`[voice 2:41 PM] `)
     /// so Atlas can answer "what time is it?" without a tool call.
@@ -153,6 +154,10 @@ final class VoiceCallController {
     @ObservationIgnored private var isHeld = false
     /// True from a listener start the call kept until the next stop.
     @ObservationIgnored private var listenerIsOn = false
+    /// When the mic was last restarted for a route or session change, and a change that came
+    /// too soon after it, which `tick` restarts for once the burst has passed.
+    @ObservationIgnored private var listenerRestartedAt: TimeInterval?
+    @ObservationIgnored private var deferredListenerRestart: String?
     /// When the current turn's first speech was heard, so the log can show how long it took to send.
     @ObservationIgnored private var turnStartedAt: TimeInterval?
     /// When the transcript last changed, for ending a turn the level meter never heard.
@@ -221,6 +226,7 @@ final class VoiceCallController {
         listener.onPartial = { [weak self] in self?.handlePartial($0) }
         listener.onFinal = { [weak self] in self?.handleFinal($0) }
         listener.onVoiceActivity = { [weak self] in self?.handleVoiceActivity($0, at: $1) }
+        listener.onNeedsRestart = { [weak self] in self?.handleListenerNeedsRestart($0) }
         speaker.onFinishedQueue = { [weak self] in self?.handleSpeakerFinished() }
         bridge.onEnded = { [weak self] in self?.tearDown(endSystemCall: false, message: nil) }
         bridge.onMuteChanged = { [weak self] in self?.handleMuteChanged($0) }
@@ -239,6 +245,7 @@ final class VoiceCallController {
             try await bridge.startCall()
             log("system call connected \(since(startedAt))")
             guard state == .connecting else { return }
+            chat.voiceCallDidChange(isActive: true)
             // The connect timeout is for the system call; the listener's permission
             // prompts and speech download wait on the user, who can still end the call.
             connectingSince = nil
@@ -325,6 +332,7 @@ final class VoiceCallController {
     private func tearDown(endSystemCall: Bool, message: String?) {
         guard !isEnded else { return }
         state = .ended(message)
+        chat.voiceCallDidChange(isActive: false)
         ticker?.cancel()
         ticker = nil
         stopListener()
@@ -366,6 +374,11 @@ final class VoiceCallController {
             log(String(format: "main thread stalled: %.2fs between ticks", time - lastTickAt))
         }
         lastTickAt = time
+        if let reason = deferredListenerRestart, let listenerRestartedAt,
+           time - listenerRestartedAt >= VoiceCallTiming.listenerRestartDebounce {
+            deferredListenerRestart = nil
+            handleListenerNeedsRestart(reason)
+        }
         switch state {
         case .listening:
             if let awaitingFinalSince, time - awaitingFinalSince >= VoiceCallTiming.finalTranscriptWait {
@@ -483,9 +496,10 @@ final class VoiceCallController {
         let command = Self.command(in: heard)
         let substantive = novel.filter { !Self.backchannelWords.contains($0) }
         // Speech that carries over Atlas's words (echo) or the room's needs a second new word.
+        // Backchannels never count: "yeah okay" agrees, it doesn't take the floor.
         let carriesOver = words.contains { spokenWords.contains($0) || ambientWords.contains($0) }
         let needed = carriesOver ? 2 : VoiceCallTiming.bargeInNovelWords
-        guard substantive.count >= needed || novel.count >= 2 || command != nil else {
+        guard substantive.count >= needed || command != nil else {
             log("echo ignored: \"\(heard)\"")
             return true
         }
@@ -774,6 +788,12 @@ final class VoiceCallController {
             // The stream may have opened while the send was in flight.
             if sent, self.lastIsStreaming { self.runSeenStreaming = true }
             guard !sent, self.replyActive, self.state == .thinking else { return }
+            if self.chat.isCompressionRotated {
+                // The server refuses every later turn in this session; say so once and hang up.
+                self.log("session sealed for compression; ending the call")
+                self.tearDown(endSystemCall: true, message: VoiceCallPhrases.chatTooLong)
+                return
+            }
             self.replyActive = false
             self.setCue(false)
             self.say(VoiceCallPhrases.sendFailed)
@@ -1054,20 +1074,40 @@ final class VoiceCallController {
         }
     }
 
-    /// Starts the mic after mute or hold. Starts run one at a time and never on a
-    /// running listener: a second tap on the audio bus throws.
-    private func restartListener() {
+    /// Starts the mic after mute or hold, or after `reason` (a route or session change)
+    /// stopped it. Starts run one at a time and never on a running listener: a second
+    /// tap on the audio bus throws.
+    private func restartListener(after reason: String? = nil) {
         let previous = lastListenerTask
         lastListenerTask = Task { [weak self, listener] in
             await previous?.value
             guard let self, self.wantsListener, !self.listenerIsOn, self.state != .connecting else { return }
             do {
                 try await listener.start()
+                if let reason { self.log("listener restarted after \(reason)") }
                 self.listenerDidStart()
             } catch {
+                self.log("listener start failed\(reason.map { " after \($0)" } ?? ""): \(error)")
                 self.failure = .microphoneStopped
                 self.tearDown(endSystemCall: true, message: nil)
             }
         }
+    }
+
+    /// The audio route or session changed under a running mic (AirPods, Siri, another
+    /// app): rebuild it. A change right after a restart waits for `tick`, so a burst
+    /// restarts it at most once per `listenerRestartDebounce`.
+    private func handleListenerNeedsRestart(_ reason: String) {
+        guard wantsListener, listenerIsOn else { return }
+        let time = now()
+        if let listenerRestartedAt, time - listenerRestartedAt < VoiceCallTiming.listenerRestartDebounce {
+            if deferredListenerRestart == nil { log("listener restart for \(reason) deferred") }
+            deferredListenerRestart = reason
+            return
+        }
+        deferredListenerRestart = nil
+        listenerRestartedAt = time
+        stopListener()
+        restartListener(after: reason)
     }
 }
