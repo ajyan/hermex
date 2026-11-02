@@ -262,7 +262,8 @@ private struct GoalMilestonesSection: View {
     }
 }
 
-/// The check circle: empty until checked in, then filled in the goal's tint (or amber for Missed).
+/// The check circle: empty until checked in, then filled in the goal's tint; Missed is a neutral
+/// ring with its xmark.
 struct GoalCheckCircle: View {
     let status: GoalStatus?
     let tint: GoalTint
@@ -281,8 +282,9 @@ struct GoalCheckCircle: View {
                 Circle().fill(Color.hxSeparator.opacity(0.7))
                 Image(systemName: GoalDetailCopy.symbol(.skip)).font(AppFont.footnote(weight: .semibold)).foregroundStyle(Color.hxTextSecondary)
             case .some(.miss):
-                Circle().strokeBorder(Color.hxWarning, lineWidth: 2)
-                Image(systemName: GoalDetailCopy.symbol(.miss)).font(AppFont.footnote(weight: .bold)).foregroundStyle(Color.hxWarning)
+                // A miss is a fact, not an alarm: neutral ink and its mark, never amber.
+                Circle().strokeBorder(Color.hxSeparator, lineWidth: 2)
+                Image(systemName: GoalDetailCopy.symbol(.miss)).font(AppFont.footnote(weight: .bold)).foregroundStyle(Color.hxTextSecondary)
             default:
                 Circle().strokeBorder(tint.fill.opacity(0.7), lineWidth: 1.5)
             }
