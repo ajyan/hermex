@@ -244,12 +244,6 @@ enum PlanEditCopy {
     /// True when the unit has a number to type.
     static func hasWeight(_ unit: String) -> Bool { unit == "lb" || unit == "lb_each" }
 
-    /// "Build until Dec 27", "Starts Nov 23": one line for a phase.
-    static func phaseLine(_ spec: BodyPhaseSpec) -> String {
-        if let end = spec.end { return "\(shortDate(spec.start)) – \(shortDate(end))" }
-        return "From \(shortDate(spec.start))"
-    }
-
     /// "2026-11-09" reads "Nov 9"; the input unchanged when it isn't a date.
     static func shortDate(_ iso: String) -> String {
         guard let date = parse(iso) else { return iso }

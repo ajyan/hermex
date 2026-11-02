@@ -2,9 +2,6 @@ import SwiftUI
 
 /// The reader's connection decisions, kept out of the views so they can be tested.
 enum BrainConnectionsLayout {
-    /// Linked mentions shown before "Show all N".
-    static let mentionPreviewCount = 5
-
     /// The linked-page cards: the page's links without repeats or itself, in server order,
     /// and without what the page already shows elsewhere: its hub (the trail names it) and,
     /// on a hub, its own pages (In this hub lists them).
