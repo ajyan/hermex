@@ -345,6 +345,11 @@ struct GoalRecord: Decodable, Hashable, Sendable {
     }
 }
 
+extension GoalRecord {
+    /// Days with no check-in at all: not shown up, skipped or marked missed.
+    var unloggedDays: Int { max(0, days - shown - skipDays - missDays) }
+}
+
 /// `POST /api/goals/finish`: close the goal as achieved. `asOf` is the server's today from the
 /// screen's last load; the server answers 409 when its day has moved on.
 struct GoalFinishRequest: Encodable, Equatable, Sendable {
