@@ -123,6 +123,8 @@ struct GoalCommitmentProgress: Decodable, Hashable, Sendable, Identifiable {
     /// A day row's Mon–Sun as the Brief draws it (`DeckDot` states); empty for an item row, or
     /// from a server that doesn't send it.
     var weekDays: [DeckDay]
+    /// Last week's close, Mon–Sun, for Monday's hero; nil when the goal had no full last week.
+    var lastWeek: GoalLastWeek?
 
     var isItem: Bool { unit == "item" }
 
@@ -130,7 +132,7 @@ struct GoalCommitmentProgress: Decodable, Hashable, Sendable, Identifiable {
         case id, action, target, skips, cue, minimum, days, done, min, skipped, missed, hit, remaining, today, yesterday
         case unit, source, items
         case dueToday = "due_today", dueYesterday = "due_yesterday", sourceDays = "source_days"
-        case weekDays = "week_days"
+        case weekDays = "week_days", lastWeek = "last_week"
     }
 
     /// The status that counts for `date`: the explicit one the row shows for today or yesterday,
@@ -166,6 +168,26 @@ struct GoalCommitmentProgress: Decodable, Hashable, Sendable, Identifiable {
         sourceDays = c.optional([String].self, .sourceDays) ?? []
         items = c.lossy(GoalItem.self, .items)
         weekDays = c.lossy(DeckDay.self, .weekDays)
+        lastWeek = c.optional(GoalLastWeek.self, .lastWeek)
+    }
+}
+
+/// A commitment's last full week (`last_week`): its count against the target, and for a day
+/// commitment its Mon–Sun as `DeckDot` states. On Monday an unlogged Sunday is `ask`.
+struct GoalLastWeek: Decodable, Hashable, Sendable {
+    var target: Int
+    var done: Int
+    var hit: Bool
+    var days: [DeckDay]
+
+    private enum CodingKeys: String, CodingKey { case target, done, hit, days }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        target = c.int(.target)
+        done = c.int(.done)
+        hit = c.bool(.hit)
+        days = c.lossy(DeckDay.self, .days)
     }
 }
 

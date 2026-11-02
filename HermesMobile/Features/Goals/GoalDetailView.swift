@@ -92,8 +92,16 @@ struct GoalDetailView: View {
                         GoalHeroCard(
                             goal: detail.summary,
                             why: detail.why,
-                            selection: (detail.today, detail.yesterday, viewModel.day),
-                            onSelect: { viewModel.day = $0 }
+                            today: detail.today,
+                            checkIn: GoalHeroCheckIn(
+                                today: detail.today, yesterday: detail.yesterday,
+                                isPending: { viewModel.isPending(.commitment($0.id)) },
+                                checkIn: { row, day, status in
+                                    Task { await viewModel.checkIn(commitment: row.id, status: status, day: day) }
+                                },
+                                // Items count from their row below, where Add note and Undo follow.
+                                addOne: nil
+                            )
                         )
                         // Never miss twice: every commitment the server flags, not just the first.
                         ForEach(GoalDetailCopy.missTwiceRows(detail.summary)) { row in

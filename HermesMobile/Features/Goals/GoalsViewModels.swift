@@ -149,6 +149,15 @@ final class GoalDetailViewModel {
         }
     }
 
+    /// Checks a commitment in for `day` whichever day the Today section shows: the hero's dots.
+    func checkIn(commitment id: String, status: GoalStatus, day: GoalDay) async {
+        guard let base = edits?.base else { return }
+        await send(.commitment(id), on: day == .today ? base.today : base.yesterday,
+                   request: { .commitment(slug: self.slug, date: $0, asOf: $1, id: id, status: status) }) {
+            GoalCheckInEdit.apply(status, to: id, on: $1, today: $2, yesterday: $3, in: &$0)
+        }
+    }
+
     /// Counts one more item (with its optional note) on the selected day; true once the server has it.
     /// A +1 without a note then offers Add note and Undo for a few seconds (`recentItems`).
     @discardableResult

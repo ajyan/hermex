@@ -18,8 +18,11 @@ struct DeckDot: View {
     let ink: Color
     /// The fixed column the dot sits centered in.
     var column: CGFloat = DeckDots.column
+    /// The dot's diameter; large text grows it (`GoalDotMetrics`).
+    var size: CGFloat = DeckDots.dot
 
     var body: some View {
+        let plus = size * 7 / 16
         ZStack {
             switch state {
             case "done":
@@ -30,17 +33,17 @@ struct DeckDot: View {
                 Circle().strokeBorder(ink, lineWidth: 1.75)
             case "ask":
                 Circle().strokeBorder(ink, lineWidth: 1.75)
-                Capsule().fill(ink).frame(width: 7, height: 1.75)
-                Capsule().fill(ink).frame(width: 1.75, height: 7)
+                Capsule().fill(ink).frame(width: plus, height: 1.75)
+                Capsule().fill(ink).frame(width: 1.75, height: plus)
             case "ahead":
                 Circle().strokeBorder(ink.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
             case "off":
-                Circle().fill(ink.opacity(0.2)).frame(width: 4, height: 4)
+                Circle().fill(ink.opacity(0.2)).frame(width: size / 4, height: size / 4)
             default:  // missed
                 Circle().strokeBorder(ink.opacity(0.35), lineWidth: 1)
             }
         }
-        .frame(width: DeckDots.dot, height: DeckDots.dot)
+        .frame(width: size, height: size)
         .frame(width: column)
     }
 }

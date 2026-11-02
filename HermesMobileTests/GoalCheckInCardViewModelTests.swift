@@ -546,3 +546,96 @@ final class GoalQuickItemTests: XCTestCase {
     }
 }
 
+
+/// Monday's hero: each commitment's last week, with last Sunday still loggable as yesterday.
+@MainActor
+final class GoalsMondayLastWeekTests: XCTestCase {
+    private let slug = "nyc-marathon-2026"
+
+    /// Mon Oct 19 – Sun Oct 25, the week before Monday the 26th; Sunday unlogged.
+    private func lastWeek(sunday: String = "ask") -> [String: Any] {
+        let states = ["done", "done", "missed", "done", "done", "off", sunday]
+        return ["target": 6, "done": 4, "hit": false,
+                "days": states.enumerated().map { ["date": "2026-10-\(19 + $0.offset)", "state": $0.element] }]
+    }
+
+    /// This week, Mon Oct 26 – Sun Nov 1, on Monday the 26th.
+    private func thisWeek() -> [[String: Any]] {
+        let dates = ["2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01"]
+        return dates.enumerated().map { ["date": $0.element, "state": $0.offset == 0 ? "today" : "ahead"] }
+    }
+
+    private func monday(_ fields: [String: Any] = [:], today: String = "2026-10-26") throws -> GoalsHome {
+        let yesterday = today == "2026-10-26" ? "2026-10-25" : "2026-10-26"
+        return try home(homeJSON(today: today, yesterday: yesterday, commitments: [0: [
+            "week_days": thisWeek(), "last_week": lastWeek(), "due_yesterday": true,
+        ].merging(fields) { $1 }]))
+    }
+
+    func testLastWeekDecodesTolerantly() throws {
+        let row = try monday().goals[0].week.commitments[0]
+        XCTAssertEqual(row.lastWeek?.target, 6)
+        XCTAssertEqual(row.lastWeek?.done, 4)
+        XCTAssertEqual(row.lastWeek?.days.count, 7)
+        XCTAssertEqual(row.lastWeek?.days.last?.state, "ask")
+        let none = try home(homeJSON(commitments: [0: ["last_week": NSNull()]])).goals[0].week.commitments[0]
+        XCTAssertNil(none.lastWeek, "null when the goal had no full last week")
+        let junk = try home(homeJSON(commitments: [0: ["last_week": "soon"]])).goals[0].week.commitments[0]
+        XCTAssertNil(junk.lastWeek, "a shape it can't read drops alone")
+        let items = try home(homeJSON(commitments: [2: ["last_week": ["target": 5, "done": 3, "hit": false]]]))
+        XCTAssertEqual(items.goals[0].week.commitments[2].lastWeek?.days, [], "an item row has no days")
+    }
+
+    func testLastWeekShowsOnlyOnMonday() throws {
+        let row = try monday().goals[0].week.commitments[0]
+        XCTAssertTrue(GoalHeroLayout.showsLastWeek(row, today: "2026-10-26"))
+        XCTAssertFalse(GoalHeroLayout.showsLastWeek(row, today: "2026-10-27"), "Tuesday to Sunday it's gone")
+        XCTAssertFalse(GoalHeroLayout.showsLastWeek(row, today: nil))
+        var fresh = row
+        fresh.lastWeek = nil
+        XCTAssertFalse(GoalHeroLayout.showsLastWeek(fresh, today: "2026-10-26"), "a goal with no full last week")
+        let item = try home(homeJSON(today: "2026-10-26", yesterday: "2026-10-25", commitments: [
+            2: ["last_week": ["target": 5, "done": 3, "hit": false]],
+        ])).goals[0].week.commitments[2]
+        XCTAssertTrue(GoalHeroLayout.showsLastWeek(item, today: "2026-10-26"), "an item row reads Monday from the date")
+        XCTAssertFalse(GoalHeroLayout.showsLastWeek(item, today: "2026-10-28"))
+    }
+
+    func testLastWeekDotsAndCountFollowSundaysCheckIn() throws {
+        var row = try monday().goals[0].week.commitments[0]
+        let pips = GoalPips(lastWeekOf: row, name: "Stretch", today: "2026-10-26")
+        XCTAssertEqual(pips.states, ["done", "done", "missed", "done", "done", "off", "ask"])
+        XCTAssertEqual(pips.count, "4 of 6")
+        XCTAssertEqual(pips.spoken, "Stretch: 4 of 6 days, Sunday not logged yet")
+        row.yesterday = .done
+        let logged = GoalPips(lastWeekOf: row, name: "Stretch", today: "2026-10-26")
+        XCTAssertEqual(logged.states.last, "done", "a tap on Sunday shows at once")
+        XCTAssertEqual(logged.count, "5 of 6")
+        let item = try home(homeJSON(commitments: [2: ["last_week": ["target": 5, "done": 3, "hit": false]]]))
+            .goals[0].week.commitments[2]
+        XCTAssertEqual(GoalPips(lastWeekOf: item, name: "Outreach", today: "2026-10-26").states,
+                       ["done", "done", "done", "missed", "missed"])
+    }
+
+    func testSundaysDotChecksInYesterday() async throws {
+        let row = try monday().goals[0].week.commitments[0]
+        XCTAssertEqual(GoalHeroCheckIn.tappableDays(row, today: "2026-10-26", yesterday: "2026-10-25"), [.today, .yesterday],
+                       "last week's unlogged Sunday is yesterday's ringed +")
+        let off = try monday(["last_week": lastWeek(sunday: "off")]).goals[0].week.commitments[0]
+        XCTAssertEqual(GoalHeroCheckIn.tappableDays(off, today: "2026-10-26", yesterday: "2026-10-25"), [.today],
+                       "a Sunday it wasn't due stays put")
+
+        let client = FakeCardGoalsClient()
+        client.homeResults = [.success(try monday())]
+        client.checkInResults = [.failure(URLError(.timedOut))]
+        let vm = GoalsHomeViewModel(client: client)
+        await vm.load()
+        guard case .loaded(let h) = vm.state else { return XCTFail("not loaded") }
+        let checkIn = GoalHeroCheckIn(slug: slug, home: h, model: vm)
+        XCTAssertTrue(checkIn.actions(for: h.goals[0]).map(\.label).contains("Stretch done yesterday"))
+        await vm.checkIn(slug: slug, commitment: "stretch-pm", status: .done, day: .yesterday)
+        XCTAssertEqual(client.checkIns, [
+            .commitment(slug: slug, date: "2026-10-25", asOf: "2026-10-26", id: "stretch-pm", status: .done),
+        ])
+    }
+}

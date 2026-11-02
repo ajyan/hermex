@@ -167,6 +167,19 @@ final class GoalsViewModelsTests: XCTestCase {
         ])
     }
 
+    /// The hero's dots check in for their own day, whichever day the Today section shows.
+    func testHeroDotChecksInItsOwnDayWhateverTheSectionShows() async throws {
+        let client = FakeGoalsClient()
+        client.checkInResults = [.success(try result(done: 1, today: "done"))]
+        let vm = try await loadedViewModel(client)
+        vm.day = .today
+        await vm.checkIn(commitment: "stretch-pm", status: .done, day: .yesterday)
+        XCTAssertEqual(vm.day, .today, "the section keeps its day")
+        XCTAssertEqual(client.checkIns, [
+            .commitment(slug: "nyc-marathon-2026", date: "2026-10-12", asOf: "2026-10-13", id: "stretch-pm", status: .done),
+        ])
+    }
+
     func testOptimisticUpdateThenServerSummaryWins() async throws {
         let client = FakeGoalsClient()
         let (started, startedCont) = AsyncStream<Void>.makeStream()
@@ -751,7 +764,7 @@ final class GoalsCopyTests: XCTestCase {
         XCTAssertEqual(row.weekDays.count, 7)
         let pips = GoalPips(row, name: "Stretch", today: "2026-10-31")
         XCTAssertEqual(pips.states, ["done", "done", "done", "missed", "ask", "today", "ahead"])
-        XCTAssertEqual(pips.count, "3 of 6 · 1 skip")
+        XCTAssertEqual(pips.count, "3 of 6 · 1 skip left")
         XCTAssertEqual(pips.spoken, "Stretch: 3 of 6 days, 1 skip left")
         row.yesterday = .skip
         row.today = .done
