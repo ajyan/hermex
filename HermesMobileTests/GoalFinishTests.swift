@@ -188,6 +188,19 @@ final class GoalFinishTests: XCTestCase {
         XCTAssertEqual(GoalsFinishedCopy.lifetime(goals).map(\.value), ["3", "30", "3 / 6"])
     }
 
+    func testShelfShowsOneGoalInFullAndSeeAllOnlyForMany() throws {
+        let row: [String: Any] = ["slug": "nyc", "title": "Finish the NYC Marathon", "identity": "a New York City Marathon finisher",
+                                  "finished": "2026-11-01", "days": 23, "headline": ["value": "261.4", "label": "miles run in 2026"]]
+        let one = try PrepDecoding.decode(GoalFinishedSummary.self, from: JSONSerialization.data(withJSONObject: row))
+        XCTAssertFalse(GoalsFinishedCopy.showsSeeAll([one]))
+        XCTAssertTrue(GoalsFinishedCopy.showsSeeAll([one, one]))
+        XCTAssertEqual(GoalsFinishedCopy.rowLine(one), "Nov 1 · 261.4 miles run in 2026")
+        var plain = row
+        plain["headline"] = NSNull()
+        let bare = try PrepDecoding.decode(GoalFinishedSummary.self, from: JSONSerialization.data(withJSONObject: plain))
+        XCTAssertEqual(GoalsFinishedCopy.rowLine(bare), "Nov 1 · 23 days")
+    }
+
     // MARK: Flows
 
     func testFinishPromptShowsWhenDueAndHidesOnNotYet() async throws {

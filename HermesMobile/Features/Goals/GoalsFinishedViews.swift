@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Goals home's Finished shelf: a sideways row of small glow cards, newest first, each in its
-/// goal's paper with its headline number. Each opens the goal's record; See all opens the list.
+/// Goals home's Finished shelf, newest first, each goal a glow card in its paper that opens its
+/// record. One goal is one full-width card; two or more scroll sideways with See all.
 struct GoalsFinishedShelf: View {
     let goals: [GoalFinishedSummary]
 
@@ -9,36 +9,71 @@ struct GoalsFinishedShelf: View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
             HStack(alignment: .firstTextBaseline) {
                 BrainSectionHeader(title: "Finished", count: goals.count)
-                NavigationLink(value: ShellPushDestination.finishedGoals) {
-                    Text(verbatim: "See all").font(BrainStyle.meta)
-                }
-                .accessibilityHint(Text(verbatim: "Opens every finished goal"))
-            }
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: BrainStyle.s) {
-                    ForEach(goals) { goal in
-                        NavigationLink(value: ShellPushDestination.finishedGoal(goal.slug)) {
-                            GoalFinishedCard(goal: goal)
-                                .zoomSource(for: .finishedGoal(goal.slug), cornerRadius: HXRadius.lg)
-                        }
-                        .buttonStyle(.plain)
+                if GoalsFinishedCopy.showsSeeAll(goals) {
+                    NavigationLink(value: ShellPushDestination.finishedGoals) {
+                        Text(verbatim: "See all").font(BrainStyle.meta)
                     }
+                    .accessibilityHint(Text(verbatim: "Opens every finished goal"))
                 }
-                .padding(.vertical, BrainStyle.s)
             }
-            .scrollClipDisabled()
-            .fixedSize(horizontal: false, vertical: true)
+            if goals.count == 1, let goal = goals.first {
+                link(goal) { GoalFinishedRow(goal: goal) }
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: BrainStyle.s) {
+                        ForEach(goals) { goal in
+                            link(goal) { GoalFinishedCard(goal: goal) }
+                        }
+                    }
+                    .padding(.vertical, BrainStyle.s)
+                }
+                .scrollClipDisabled()
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func link(_ goal: GoalFinishedSummary, @ViewBuilder _ card: () -> some View) -> some View {
+        NavigationLink(value: ShellPushDestination.finishedGoal(goal.slug)) {
+            card()
+                .zoomSource(for: .finishedGoal(goal.slug), cornerRadius: HXRadius.xl)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(Text(verbatim: GoalsFinishedCopy.spoken(goal)))
+                .accessibilityHint(Text(verbatim: "Opens the record"))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// The only finished goal, full width: the medal, its name, then "Nov 1 · 261.4 miles run in 2026".
+private struct GoalFinishedRow: View {
+    let goal: GoalFinishedSummary
+
+    var body: some View {
+        let paper = GoalPaper.palette(named: goal.color, slug: goal.slug).colors
+        HXCard(.glow(paper), spacing: BrainStyle.xs) {
+            HStack(alignment: .firstTextBaseline, spacing: BrainStyle.s) {
+                Image(systemName: "medal.fill").foregroundStyle(HermexPaper.opener.glow)
+                Text(verbatim: GoalsFinishedCopy.name(goal))
+                    .font(AppFont.display(style: .headline, weight: .semibold))
+                    .foregroundStyle(paper.glow)
+            }
+            Text(verbatim: GoalsFinishedCopy.rowLine(goal))
+                .font(BrainStyle.meta)
+                .foregroundStyle(Color.hxTextPrimary)
+                .monospacedDigit()
         }
     }
 }
 
+/// One of several finished goals on the sideways shelf: the date and medal, the name, the headline.
 private struct GoalFinishedCard: View {
     let goal: GoalFinishedSummary
-    @ScaledMetric(relativeTo: .body) private var width: CGFloat = 156
+    @ScaledMetric(relativeTo: .body) private var width: CGFloat = 188
 
     var body: some View {
         let paper = GoalPaper.palette(named: goal.color, slug: goal.slug).colors
-        VStack(alignment: .leading, spacing: BrainStyle.xs) {
+        HXCard(.glow(paper), spacing: BrainStyle.xs) {
             HStack {
                 Text(verbatim: GoalFinishCopy.shortDate(goal.finished)).font(AppFont.caption(weight: .semibold))
                 Spacer(minLength: 0)
@@ -60,14 +95,7 @@ private struct GoalFinishedCard: View {
                     .lineLimit(1)
             }
         }
-        .frame(width: width, alignment: .leading)
-        .padding(BrainStyle.m)
-        .background(paper.card, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous).strokeBorder(paper.edge, lineWidth: 0.5))
-        .hxShadow(.paper)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text(verbatim: GoalsFinishedCopy.spoken(goal)))
-        .accessibilityHint(Text(verbatim: "Opens the record"))
+        .frame(width: width)
     }
 }
 
@@ -163,6 +191,16 @@ enum GoalsFinishedCopy {
         let name = words.joined(separator: " ")
         return name.prefix(1).uppercased() + name.dropFirst()
     }
+
+    /// The full-width row's line: "Nov 1 · 261.4 miles run in 2026", else "Nov 1 · 23 days".
+    static func rowLine(_ goal: GoalFinishedSummary) -> String {
+        let date = GoalFinishCopy.shortDate(goal.finished)
+        if let h = goal.headline, !h.value.isEmpty { return "\(date) · \(h.value) \(h.label)" }
+        return "\(date) · \(goal.days == 1 ? "1 day" : "\(goal.days) days")"
+    }
+
+    /// See all only when the shelf holds more than the one goal it already shows in full.
+    static func showsSeeAll(_ goals: [GoalFinishedSummary]) -> Bool { goals.count > 1 }
 
     static func spoken(_ goal: GoalFinishedSummary) -> String {
         var parts = [name(goal), "finished \(GoalFinishCopy.longDate(goal.finished))"]
