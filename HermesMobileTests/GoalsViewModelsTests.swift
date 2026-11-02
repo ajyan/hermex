@@ -683,6 +683,11 @@ final class GoalsCopyTests: XCTestCase {
         XCTAssertEqual(GoalsCopy.shortName("Saturday taper run (~12 mi easy)"), "Run")
     }
 
+    func testAgentGoalsFoldToOneLine() {
+        XCTAssertEqual(GoalsCopy.agentGoalsLine(1), "Atlas is working on 1 goal")
+        XCTAssertEqual(GoalsCopy.agentGoalsLine(2), "Atlas is working on 2 goals")
+    }
+
     func testStreakLineSaysWhenAtRisk() {
         XCTAssertEqual(GoalsCopy.streakLine(GoalStreak(days: 12)), "12-day show-up streak")
         XCTAssertEqual(GoalsCopy.streakLine(GoalStreak(days: 1, atRisk: true)),
