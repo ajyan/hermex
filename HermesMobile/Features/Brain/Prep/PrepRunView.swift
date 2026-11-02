@@ -438,7 +438,10 @@ struct PrepRunView: View {
                         label: PrepCopy.recallKicker(recall, isInterview: rep.isInterview),
                         draft: Binding(get: { viewModel.recallDraft }, set: { viewModel.recallDraft = $0 }),
                         isSubmitting: viewModel.isSubmitting,
-                        dontKnow: { Task { await viewModel.dontKnow() } }
+                        dontKnow: { Task { await viewModel.dontKnow() } },
+                        reread: viewModel.canReread ? {
+                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { viewModel.rereadLesson() }
+                        } : nil
                     )
                     .transition(.opacity)
                 }

@@ -8,8 +8,15 @@ struct PrepHomeView: View {
     @State private var viewModel: PrepHomeViewModel
     /// The voice mock ladders, loaded beside home; their section hides until they load.
     @State private var mockViewModel: PrepMockViewModel
+    /// The role goal's next dated milestone ("First recruiter screen", Dec 6), from Goals; nil hides it.
+    @State private var milestone: GoalMilestone?
+    private let goals: GoalsDataClient
+
+    /// The Goals goal whose milestones Prep counts down to.
+    static let roleGoal = "land-ai-role"
 
     init(server: URL, onAPIError: @escaping (Error) -> Void) {
+        goals = APIClientGoalsAdapter(apiClient: APIClient(baseURL: server))
         let client = APIClientPrepAdapter(apiClient: APIClient(baseURL: server))
         _viewModel = State(initialValue: PrepHomeViewModel(client: client, onAPIError: onAPIError))
         // Quiet: a server without mocks just has no section, and home reports its own failures.
@@ -28,7 +35,12 @@ struct PrepHomeView: View {
 
     private func load() async {
         async let mocks: Void = mockViewModel.load()
+        async let goal = try? goals.home()
         await viewModel.load()
+        // Quiet: no Goals server or no dated milestone just means no countdown.
+        if let home = await goal {
+            milestone = home.goals.first { $0.slug == Self.roleGoal }?.nextMilestone.flatMap { $0.due == nil ? nil : $0 }
+        }
         await mocks
     }
 
@@ -47,7 +59,8 @@ struct PrepHomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
                     if !home.readiness.isEmpty {
-                        PrepReadinessRow(checks: home.readiness) { check in
+                        PrepReadinessRow(checks: home.readiness,
+                                         countdown: milestone.flatMap { PrepCopy.countdown(title: $0.title, due: $0.due) }) { check in
                             PrepCopy.readinessRoute(check, runDone: home.run.remaining <= 0 && home.run.reps > 0,
                                                     dueMock: mockViewModel.mocks?.weeklyDue())
                         }

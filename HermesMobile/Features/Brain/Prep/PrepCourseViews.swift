@@ -45,6 +45,8 @@ struct PrepDayRing: View {
 /// check is met, with where it stands under its name. Whether you'd pass the loop, at a glance.
 struct PrepReadinessRow: View {
     let checks: [PrepReadinessCheck]
+    /// "First recruiter screen in 34 days", from the role goal's next milestone; nil hides it.
+    var countdown: String?
     /// The screen each check's pip opens, if any (`PrepCopy.readinessRoute`).
     var route: (PrepReadinessCheck) -> PrepRoute? = { _ in nil }
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -52,6 +54,11 @@ struct PrepReadinessRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
             BrainSectionHeader(title: "Interview-ready", trailing: "\(checks.filter(\.met).count) of \(checks.count)")
+            if let countdown {
+                Label { Text(verbatim: countdown) } icon: { Image(systemName: "calendar") }
+                    .font(BrainStyle.meta)
+                    .foregroundStyle(HermexPaper.prep.glow)
+            }
             SectionCard {
                 let columns = dynamicTypeSize.isAccessibilitySize ? 2 : 4
                 Grid(alignment: .topLeading, horizontalSpacing: BrainStyle.m, verticalSpacing: BrainStyle.m) {
@@ -309,13 +316,19 @@ private struct PrepLockedUnitRow: View {
 
     var body: some View {
         HStack(spacing: BrainStyle.m) {
-            Label {
-                Text(verbatim: PrepCopy.unitHeader(index: index, title: unit.title))
-            } icon: {
-                Image(systemName: "lock")
+            VStack(alignment: .leading, spacing: 2) {
+                Label {
+                    Text(verbatim: PrepCopy.unitHeader(index: index, title: unit.title))
+                } icon: {
+                    Image(systemName: "lock")
+                }
+                .font(BrainStyle.rowSubtitle)
+                .foregroundStyle(Color.hxTextSecondary)
+                // What Test out does, once, where it's offered.
+                Text(verbatim: "Pass its check to skip its lessons")
+                    .font(BrainStyle.meta)
+                    .foregroundStyle(Color.hxTextSecondary)
             }
-            .font(BrainStyle.rowSubtitle)
-            .foregroundStyle(Color.hxTextSecondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             NavigationLink(value: ShellPushDestination.brainRoute(.prep(.testout(unit.id)))) {
                 HXChip(paper: .prep, label: "Test out") { EmptyView() }

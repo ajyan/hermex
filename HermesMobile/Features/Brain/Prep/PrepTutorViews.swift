@@ -132,6 +132,8 @@ struct PrepTutorReplyBar: View {
     let isBusy: Bool
     let send: () -> Void
     let showMe: () -> Void
+    /// "Show me" over a typed reply asks first, since it ends the dialogue and drops the reply.
+    @State private var confirmingShowMe = false
 
     var body: some View {
         VStack(spacing: BrainStyle.s) {
@@ -148,7 +150,9 @@ struct PrepTutorReplyBar: View {
                 PrepStoryMicButton(text: $draft, isSubmitting: isBusy, prominent: false)  // Send leads this bar
                 PrepPrimaryButton(title: "Send", enabled: canSend, isGrading: isBusy, action: send)
             }
-            Button(action: showMe) {
+            Button {
+                if draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { showMe() } else { confirmingShowMe = true }
+            } label: {
                 Text(verbatim: "Show me")
                     .font(AppFont.body(weight: .semibold))
                     .foregroundStyle(Color.accentColor)
@@ -157,6 +161,11 @@ struct PrepTutorReplyBar: View {
             .buttonStyle(.plain)
             .disabled(isBusy && !canReply)
             .accessibilityHint(Text(verbatim: "Ends the follow-ups and shows the result"))
+            .confirmationDialog(Text(verbatim: "Drop your reply and show the answer?"), isPresented: $confirmingShowMe,
+                                titleVisibility: .visible) {
+                Button(role: .destructive, action: showMe) { Text(verbatim: "Show the answer") }
+                Button(role: .cancel) {} label: { Text(verbatim: "Keep my reply") }
+            }
         }
     }
 }

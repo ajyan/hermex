@@ -13,14 +13,15 @@ struct PrepRunCard<Content: View>: View {
     }
 }
 
-/// The question with an answer field (tap to talk, or type), and "I don't know, show me".
-/// Submit is the run's pinned button.
+/// The question with an answer field (tap to talk, or type), "I don't know, show me", and on a new
+/// lesson "Reread the lesson" (back to its cards, counted as a hint). Submit is the run's pinned button.
 struct PrepRecallCard: View {
     let prompt: String
     let label: String
     @Binding var draft: String
     let isSubmitting: Bool
     let dontKnow: () -> Void
+    var reread: (() -> Void)?
     @FocusState private var typing: Bool
 
     var body: some View {
@@ -54,6 +55,17 @@ struct PrepRecallCard: View {
         }
         .buttonStyle(.plain)
         .disabled(isSubmitting)
+        if let reread {
+            Button(action: reread) {
+                Text(verbatim: "Reread the lesson")
+                    .font(BrainStyle.rowTitle)
+                    .foregroundStyle(Color.accentColor)
+                    .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
+            }
+            .buttonStyle(.plain)
+            .disabled(isSubmitting)
+            .accessibilityHint(Text(verbatim: "Back to the lesson's cards. Counts as a hint."))
+        }
     }
 }
 
