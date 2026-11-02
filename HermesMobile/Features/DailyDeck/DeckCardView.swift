@@ -99,6 +99,9 @@ struct DeckCardView: View {
                 case .goal: goal
                 case .changes: DeckChangesCard(card: card, palette: palette, viewModel: viewModel)
                 case .ask: ask
+                case .search:
+                    DeckSearchCard(card: card, palette: palette, deckDate: viewModel.date)
+                    DeckFootnote(card: card, palette: palette)
                 case .dinner: dinner
                 case .meals: DeckMealsCard(card: card, palette: palette, viewModel: viewModel)
                 case .decision:

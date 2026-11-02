@@ -1,19 +1,22 @@
 import SwiftUI
 
 /// Prep's landing screen, ordered by the goal: whether you're interview-ready (the mastery bar as four pips),
-/// today's run (its one action), the weak spots (open gaps and missed lessons), practice out loud (the voice
+/// your search (the next interview and every application in motion), today's run (its one action), the weak spots (open gaps and missed lessons), practice out loud (the voice
 /// mock ladders, a due one marked, and the story bank), then the course, folded to the unit being taught.
 /// Pushed as `.brainRoute(.prep(.home))`; owns no `NavigationStack`.
 struct PrepHomeView: View {
     @State private var viewModel: PrepHomeViewModel
     /// The voice mock ladders, loaded beside home; their section hides until they load.
     @State private var mockViewModel: PrepMockViewModel
+    /// The job pipeline for Your search; the section hides until it loads, and on a server without one.
+    @State private var searchModel: JobPipelineModel
 
     init(server: URL, onAPIError: @escaping (Error) -> Void) {
         let client = APIClientPrepAdapter(apiClient: APIClient(baseURL: server))
         _viewModel = State(initialValue: PrepHomeViewModel(client: client, onAPIError: onAPIError))
         // Quiet: a server without mocks just has no section, and home reports its own failures.
         _mockViewModel = State(initialValue: PrepMockViewModel(client: client))
+        _searchModel = State(initialValue: JobPipelineModel(client: APIClientJobPipelineAdapter(apiClient: APIClient(baseURL: server))))
     }
 
     var body: some View {
@@ -28,8 +31,10 @@ struct PrepHomeView: View {
 
     private func load() async {
         async let mocks: Void = mockViewModel.load()
+        async let search: Void = searchModel.load()
         await viewModel.load()
         await mocks
+        await search
     }
 
     @ViewBuilder
@@ -52,6 +57,7 @@ struct PrepHomeView: View {
                                                     dueMock: mockViewModel.mocks?.weeklyDue())
                         }
                     }
+                    PrepSearchSection(model: searchModel)
                     PrepTodayCard(run: home.run, streakDays: home.streak.days, today: viewModel.course?.today)
                     if viewModel.gaps != nil || viewModel.course != nil {
                         PrepWeakSpotsSection(gaps: viewModel.gaps ?? [], missed: PrepWeakSpotsSection.missed(in: viewModel.course),

@@ -70,13 +70,17 @@ struct DailyAskRole: Decodable, Equatable, Identifiable, Sendable {
 }
 
 struct DailyAskOutcome: Decodable, Equatable, Sendable {
-    /// "applied", "sent" or "skip".
+    /// "applied", "sent", "skip", or "moved" (a forward move in the job pipeline: an application added, or a
+    /// later stage).
     let event: String
     let role: String?
     let company: String?
     let title: String?
     let reason: String?
     let name: String?
+    /// For "moved": the stage it moved to ("Technical"), and whether it was a new application.
+    var stage: String? = nil
+    var added: Bool? = nil
 }
 
 /// An application logged with "Applied elsewhere": a recruiter, LinkedIn or a startup outside the Ask.

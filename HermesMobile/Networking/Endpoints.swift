@@ -214,6 +214,11 @@ enum Endpoint {
     case goalReflection
     /// Today's job-search Ask (`api/vault_jobs.py`): GET today's three roles and lock state, POST an action.
     case jobsAsk
+    /// The job pipeline (`api/vault_jobs.py` over the vault's `tools/job_pipeline.py`): GET the search at a
+    /// glance, POST an action (add, stage, interview, note, reopen).
+    case jobsPipeline
+    /// One application in the pipeline, with its interview one-pager.
+    case jobsPipelineItem(id: String)
     /// Body, the lifting tracker (`api/vault_body.py` on this user's webui fork, over the vault's
     /// `tools/gym.py`): GET home, GET `prescription?day=`, GET `session?id=` or POST a session
     /// document to save it, POST `session/finish {id, check}`, GET `sessions?before=` (a bare
@@ -593,6 +598,10 @@ enum Endpoint {
             return "/api/goals/reflection"
         case .jobsAsk:
             return "/api/jobs/ask"
+        case .jobsPipeline:
+            return "/api/jobs/pipeline"
+        case let .jobsPipelineItem(id):
+            return "/api/jobs/pipeline/\(id)"
         case .bodyHome:
             return "/api/body/home"
         case .bodyPrescription:
