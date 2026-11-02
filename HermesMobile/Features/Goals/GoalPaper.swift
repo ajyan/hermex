@@ -3,28 +3,29 @@ import SwiftUI
 /// A goal's paper: one of the Daily Brief's palettes, named in the goal file (`color:`) or
 /// picked from its slug so a goal keeps the same colour everywhere.
 enum GoalPaper {
-    /// The papers a goal can take, in a fixed order the slug fallback indexes into.
+    /// The papers a goal can take, in a fixed order the slug fallback indexes into, and their names
+    /// in the goal file (`color:`). The widget reads the name back (`AtlasWidgetGoals.paper(named:)`).
     static let choices: [DeckPalette] = [.wiki, .quote, .book, .reading, .notes, .video, .past, .opener]
+    static let names = ["wiki", "quote", "book", "reading", "notes", "video", "past", "opener"]
 
     static func palette(named name: String, slug: String) -> DeckPalette {
-        switch name {
-        case "wiki": return .wiki
-        case "quote": return .quote
-        case "book": return .book
-        case "reading": return .reading
-        case "notes": return .notes
-        case "video": return .video
-        case "past": return .past
-        case "opener": return .opener
-        default:
-            // A stable hash (Swift's `hashValue` changes per launch).
-            let sum = slug.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0x7fff_ffff }
-            return choices[sum % choices.count]
-        }
+        choices[index(named: name, slug: slug)]
     }
 
     static func palette(for goal: GoalSummary) -> DeckPalette {
         palette(named: goal.color, slug: goal.slug)
+    }
+
+    /// The name of the paper `palette(for:)` gives the goal.
+    static func name(for goal: GoalSummary) -> String {
+        names[index(named: goal.color, slug: goal.slug)]
+    }
+
+    private static func index(named name: String, slug: String) -> Int {
+        if let i = names.firstIndex(of: name) { return i }
+        // A stable hash (Swift's `hashValue` changes per launch).
+        let sum = slug.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0x7fff_ffff }
+        return sum % choices.count
     }
 
     static func symbol(_ icon: String) -> String {

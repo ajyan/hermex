@@ -23,9 +23,9 @@ struct AtlasGoalsEntry: TimelineEntry {
     let date: Date
     let goals: AtlasWidgetGoals?
 
-    /// The phone's day has turned since the app saved the snapshot (`AtlasWidgetGoals.isStale`),
-    /// so its check-ins may land on a day the server has left.
-    var isStale: Bool { goals?.isStale(at: date) ?? false }
+    /// The snapshot for this entry's day: after midnight, rolled forward until the app loads the
+    /// new day (`AtlasWidgetGoals.rolled(at:)`), so the widget is alive at 6 am.
+    var shown: AtlasWidgetGoals? { goals?.rolled(at: date) }
 }
 
 struct AtlasGoalsProvider: TimelineProvider {
@@ -35,15 +35,18 @@ struct AtlasGoalsProvider: TimelineProvider {
         completion(AtlasGoalsEntry(date: .now, goals: AtlasWidgetGoalsStore().load()))
     }
 
-    /// The app reloads this when goals change; the midnight entry turns a finished
-    /// day's snapshot stale.
+    /// Now and the next local midnight, which rolls the day forward; then a fresh timeline for the
+    /// day after. The app reloads it whenever goals change.
     func getTimeline(in context: Context, completion: @escaping (Timeline<AtlasGoalsEntry>) -> Void) {
-        let goals = AtlasWidgetGoalsStore().load()
-        let midnight = Calendar.current.startOfDay(for: .now.addingTimeInterval(24 * 60 * 60))
-        completion(Timeline(
-            entries: [AtlasGoalsEntry(date: .now, goals: goals), AtlasGoalsEntry(date: midnight, goals: goals)],
-            policy: .never
-        ))
+        completion(Self.timeline(goals: AtlasWidgetGoalsStore().load(), now: .now))
+    }
+
+    static func timeline(goals: AtlasWidgetGoals?, now: Date, calendar: Calendar = .current) -> Timeline<AtlasGoalsEntry> {
+        let midnight = calendar.startOfDay(for: calendar.date(byAdding: .day, value: 1, to: now) ?? now)
+        return Timeline(
+            entries: [AtlasGoalsEntry(date: now, goals: goals), AtlasGoalsEntry(date: midnight, goals: goals)],
+            policy: .atEnd
+        )
     }
 }
 
@@ -53,7 +56,7 @@ private struct AtlasGoalsWidgetView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             header
-            if let goals = entry.goals, !entry.isStale {
+            if let goals = entry.shown {
                 if goals.items.isEmpty {
                     message("Nothing due today.")
                 } else {
@@ -61,8 +64,6 @@ private struct AtlasGoalsWidgetView: View {
                         AtlasGoalRow(item: item)
                     }
                 }
-            } else if entry.goals != nil {
-                message("Open Atlas to load today's goals.")
             } else {
                 message("Open Goals in Atlas to show them here.")
             }
@@ -80,12 +81,12 @@ private struct AtlasGoalsWidgetView: View {
                 .font(AppFont.subheadline(weight: .semibold))
                 .foregroundStyle(Color.hxTextPrimary)
             Spacer()
-            if let goals = entry.goals {
+            if let goals = entry.shown {
                 if goals.syncFailed {
                     Label("Couldn't sync", systemImage: "exclamationmark.triangle")
                         .font(AppFont.caption())
                         .foregroundStyle(Color.hxDanger)
-                } else if goals.streakDays > 0, !entry.isStale {
+                } else if goals.streakDays > 0 {
                     Text("\(goals.streakDays)-day streak")
                         .font(AppFont.caption())
                         .foregroundStyle(Color.hxTextSecondary)
@@ -126,7 +127,7 @@ private struct AtlasGoalRow: View {
                 .foregroundStyle(Color.hxTextPrimary)
                 .lineLimit(1)
             Spacer(minLength: 4)
-            AtlasGoalPips(done: item.weekCount, target: item.target, days: item.liveDays)
+            AtlasGoalPips(done: item.weekCount, target: item.target, days: item.liveDays, ink: item.paperColors.glow)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(AtlasGoalPips.spoken(done: item.weekCount, target: item.target))
         }
@@ -134,17 +135,9 @@ private struct AtlasGoalRow: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    @ViewBuilder
+    /// Today's dot in the goal's paper, the Brief's way: filled once done, ringed while due.
     private var mark: some View {
-        if item.isDone {
-            Image(systemName: "checkmark.circle.fill")
-                .font(AppFont.title3())
-                .foregroundStyle(Color.hxSuccess)
-        } else {
-            Image(systemName: "circle")
-                .font(AppFont.title3())
-                .foregroundStyle(Color.hxTextSecondary)
-        }
+        DeckDot(state: item.isDone ? "done" : "today", ink: item.paperColors.glow, column: 24, size: 18)
     }
 }
 
@@ -155,6 +148,8 @@ struct AtlasGoalPips: View {
     let target: Int
     /// The week as days (`DeckDot` states) when the row has them; else a pip per day of its target.
     var days: [String]? = nil
+    /// The goal's glow.
+    var ink: Color = HermexPaper.quote.glow
 
     /// At most this wide, so the commitment's name keeps its room.
     static let maxWidth: CGFloat = 140
@@ -164,7 +159,7 @@ struct AtlasGoalPips: View {
         let column = Self.column(count: states.count)
         HStack(spacing: 0) {
             ForEach(Array(states.enumerated()), id: \.offset) { _, state in
-                DeckDot(state: state, ink: Color.hxSuccess, column: column)
+                DeckDot(state: state, ink: ink, column: column)
             }
         }
     }

@@ -1,5 +1,6 @@
 import AppIntents
 import Foundation
+import SwiftUI
 import WidgetKit
 
 /// What the app publishes for one Home Screen widget. Each snapshot names the server
@@ -50,6 +51,9 @@ struct AtlasWidgetGoals: AtlasWidgetSnapshot {
         /// days (and in older snapshots), which shows count pips instead.
         var days: [String]?
         var todayIndex: Int?
+        /// The goal's paper name (`GoalPaper`'s "wiki", "quote", …), so the row's dots wear its
+        /// color; nil in older snapshots.
+        var paper: String?
 
         var id: String { Self.id(slug: slug, commitment: commitment) }
 
@@ -61,7 +65,7 @@ struct AtlasWidgetGoals: AtlasWidgetSnapshot {
 
     let server: URL
     /// The server's today (`yyyy-MM-dd`), sent back as a check-in's `date` and `as_of`.
-    let today: String
+    var today: String
     let streakDays: Int
     var items: [Item]
     var syncFailed = false
@@ -78,6 +82,53 @@ struct AtlasWidgetGoals: AtlasWidgetSnapshot {
 
     static func phoneDay(_ date: Date) -> String { phoneDayFormatter.string(from: date) }
 
+    /// Whole days between two `yyyy-MM-dd` days, counted in UTC so daylight saving never shortens one.
+    static func days(from start: String, to end: String) -> Int? {
+        guard let a = isoDayFormatter.date(from: start), let b = isoDayFormatter.date(from: end) else { return nil }
+        return isoCalendar.dateComponents([.day], from: a, to: b).day
+    }
+
+    static func isoDay(_ day: String, plus n: Int) -> String? {
+        guard let date = isoDayFormatter.date(from: day),
+              let moved = isoCalendar.date(byAdding: .day, value: n, to: date) else { return nil }
+        return isoDayFormatter.string(from: moved)
+    }
+
+    /// Monday 0 through Sunday 6.
+    static func weekdayIndex(_ day: String) -> Int? {
+        isoDayFormatter.date(from: day).map { (isoCalendar.component(.weekday, from: $0) + 5) % 7 }
+    }
+
+    private static let isoCalendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }()
+
+    private static let isoDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = isoCalendar
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    /// A goal's paper by the name `GoalPaper` gives it; nil for a name it doesn't know.
+    static func paper(named name: String?) -> HermexPaper? {
+        switch name {
+        case "wiki": .wiki
+        case "quote": .quote
+        case "book": .book
+        case "reading": .reading
+        case "notes": .notes
+        case "video": .video
+        case "past": .past
+        case "opener": .opener
+        default: nil
+        }
+    }
+
     private static let phoneDayFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
@@ -86,6 +137,24 @@ struct AtlasWidgetGoals: AtlasWidgetSnapshot {
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter
     }()
+
+    /// The snapshot as the phone's day at `date` reads it. While the day it was saved lasts, itself;
+    /// once the phone's day has turned (the widget at 6 am, before the app has loaded the new day),
+    /// rolled forward on its own: the server's day moved by as many days, every row unchecked, today's
+    /// dot ringed, the week's earlier days kept (the day before unlogged as the Brief's `ask`), and on
+    /// a new week a fresh one, its count back to zero. A row its days say isn't due today drops off.
+    func rolled(at date: Date) -> AtlasWidgetGoals {
+        let phone = Self.phoneDay(date)
+        let saved = savedDay ?? today
+        guard saved < phone, let n = Self.days(from: saved, to: phone), n > 0,
+              let newToday = Self.isoDay(today, plus: n) else { return self }
+        let newWeek = n >= 7 || (Self.weekdayIndex(newToday) ?? 0) < (Self.weekdayIndex(today) ?? 0)
+        var copy = self
+        copy.today = newToday
+        copy.savedDay = phone
+        copy.items = items.compactMap { $0.rolled(by: n, newWeek: newWeek, weekday: Self.weekdayIndex(newToday)) }
+        return copy
+    }
 
     /// The snapshot as it reads once `id` is ticked (`done`) or unticked, before the server confirms.
     func checking(_ id: String, done: Bool) -> AtlasWidgetGoals {
@@ -189,6 +258,35 @@ struct GoalWidgetCheckInIntent: LiveActivityIntent {
 }
 
 extension AtlasWidgetGoals.Item {
+    /// The row `n` days later (`AtlasWidgetGoals.rolled(at:)`): unchecked, today ringed, the days it
+    /// passed kept, the last of them `ask` and any before it missed; nil when today isn't due.
+    /// `weekday` is the new day's place in its week, for a row without days.
+    func rolled(by n: Int, newWeek: Bool, weekday: Int?) -> Self? {
+        var item = self
+        item.isDone = false
+        item.sourceCounted = false
+        if newWeek { item.weekCount = 0 }
+        guard let old = liveDays, old.count == 7, let todayIndex, old.indices.contains(todayIndex) else {
+            item.todayIndex = nil
+            return item
+        }
+        let index = newWeek ? (weekday ?? (todayIndex + n) % 7) : todayIndex + n
+        // A new week keeps only which days aren't due, from the last one.
+        var days = newWeek ? old.map { $0 == "off" ? "off" : "ahead" } : old
+        let passed = newWeek ? Array(0..<index) : Array(todayIndex..<index)
+        for i in passed where days[i] == "today" || days[i] == "ahead" {
+            days[i] = i == index - 1 ? "ask" : "missed"
+        }
+        guard days.indices.contains(index), days[index] != "off" else { return nil }
+        days[index] = "today"
+        item.days = days
+        item.todayIndex = index
+        return item
+    }
+
+    /// The row's dots and mark in its goal's paper; the Brief's quote blue for an older snapshot.
+    var paperColors: HermexPaper { AtlasWidgetGoals.paper(named: paper) ?? .quote }
+
     /// The row's days with today following its check mark, which a widget tap flips at once.
     var liveDays: [String]? {
         guard var days, let todayIndex, days.indices.contains(todayIndex) else { return days }
