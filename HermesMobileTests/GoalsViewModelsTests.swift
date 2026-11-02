@@ -131,6 +131,38 @@ final class GoalsViewModelsTests: XCTestCase {
         return d.summary.week.commitments.first { $0.id == "stretch-pm" }
     }
 
+    func testHeaderNamesTheGoalOnceLoaded() async throws {
+        let client = FakeGoalsClient()
+        client.detailResults = [.success(try detail())]
+        let vm = GoalDetailViewModel(slug: "nyc-marathon-2026", client: client)
+        XCTAssertEqual(vm.navigationTitle, "Goal")
+        await vm.load()
+        XCTAssertEqual(vm.navigationTitle, "Finish the NYC Marathon, uninjured")
+    }
+
+    func testYesterdayIsOfferedOnceTheGoalHadBegun() throws {
+        let started = try detail()  // first day Oct 10, yesterday Oct 12
+        XCTAssertTrue(GoalDetailViewModel.canCheckInYesterday(started))
+        var json = try JSONSerialization.jsonObject(with: Data(GoalsModelsTests.detailJSON().utf8)) as! [String: Any]
+        json["heatmap"] = [["date": "2026-10-13", "status": "none"]]
+        let dayOne = try PrepDecoding.decode(GoalDetail.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertFalse(GoalDetailViewModel.canCheckInYesterday(dayOne), "a goal begun today has no yesterday")
+        json["heatmap"] = []
+        let noHistory = try PrepDecoding.decode(GoalDetail.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertFalse(GoalDetailViewModel.canCheckInYesterday(noHistory))
+    }
+
+    func testYesterdayPickerWritesToYesterday() async throws {
+        let client = FakeGoalsClient()
+        let vm = try await loadedViewModel(client)
+        XCTAssertTrue(vm.canCheckInYesterday)
+        vm.day = .yesterday
+        client.checkInResults = [.failure(URLError(.notConnectedToInternet))]
+        await vm.checkIn(commitment: "stretch-pm", status: .done)
+        XCTAssertEqual(client.checkIns.first, .commitment(slug: "nyc-marathon-2026", date: "2026-10-12", asOf: "2026-10-13",
+                                                          id: "stretch-pm", status: .done))
+    }
+
     func testHome404IsUnavailable() async {
         let client = FakeGoalsClient()
         client.homeResults = [.failure(APIError.http(statusCode: 404, body: nil))]
@@ -810,6 +842,35 @@ final class GoalsCopyTests: XCTestCase {
         XCTAssertEqual(GoalDetailCopy.missTwice(item), "Short on outreach two weeks running. One today counts.")
         XCTAssertEqual(GoalPips.atRiskLabel(rows[0]), "Don't miss twice")
         XCTAssertEqual(GoalPips.atRiskLabel(item), "Short 2 weeks running")
+    }
+
+    /// On the detail screen the flag is said once: the hero's chip, then only what to do on the Today row.
+    func testMissTwiceActionOnlyOnFlaggedRowsToday() throws {
+        var goal = try PrepDecoding.decode(GoalsHome.self, from: Data(GoalsModelsTests.homeSample.utf8)).goals[0]
+        let stretch = goal.week.commitments[0], run = goal.week.commitments[1]
+        goal.flags.missTwice = [stretch.id]
+        XCTAssertEqual(GoalDetailCopy.missTwiceAction(stretch, in: goal, day: .today),
+                       "Missed yesterday. Even the 2-min version counts.")
+        XCTAssertNil(GoalDetailCopy.missTwiceAction(run, in: goal, day: .today), "an unflagged row says nothing")
+        XCTAssertNil(GoalDetailCopy.missTwiceAction(stretch, in: goal, day: .yesterday))
+        let item = try PrepDecoding.decode(GoalCommitmentProgress.self, from: Data(
+            #"{"id":"o","action":"Outreach","target":5,"unit":"item"}"#.utf8))
+        goal.flags.missTwice = ["o"]
+        let line = try XCTUnwrap(GoalDetailCopy.missTwiceAction(item, in: goal, day: .today))
+        XCTAssertEqual(line, "One today counts.")
+        XCTAssertFalse(line.contains("two weeks"), "the chip already says short two weeks running")
+    }
+
+    func testWatchForLeadsTodayAndPlanKeepsTheRest() throws {
+        XCTAssertEqual(GoalDetailCopy.watchFor("Late bedtime  "), "Watch for: Late bedtime")
+        XCTAssertNil(GoalDetailCopy.watchFor(" \n"))
+        XCTAssertTrue(GoalDetailCopy.hasPlan(try detail()), "objective and done-when stay in Plan")
+        var json = try JSONSerialization.jsonObject(with: Data(GoalsModelsTests.detailJSON().utf8)) as! [String: Any]
+        json["objective"] = ""
+        json["done_when"] = []
+        json["obstacle"] = "Late bedtime"
+        let onlyObstacle = try PrepDecoding.decode(GoalDetail.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertFalse(GoalDetailCopy.hasPlan(onlyObstacle), "no empty Plan once the obstacle moved up")
     }
 
     func testSourceErrorsLine() {

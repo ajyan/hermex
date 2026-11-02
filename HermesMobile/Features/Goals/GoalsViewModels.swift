@@ -32,8 +32,11 @@ final class GoalDetailViewModel {
     private(set) var error: String?
     /// The row whose check-in failed, so its section says so; nil for a screen-wide error.
     private(set) var errorRow: GoalRowKey?
-    /// The consistency calendar for what's on screen, rebuilt only when its days change.
+    /// The consistency calendar for what's on screen (the days so far and this week), rebuilt
+    /// only when its days change.
     private(set) var calendar = GoalCalendarModel.empty
+    /// "118 days to Sun Feb 28" under the calendar; nil without a deadline.
+    private(set) var countdown: String?
     static let refreshFailed = "Couldn't refresh. Pull to try again."
     static let dayChanged = "The day changed. Check in again."
     static let saveFailed = "Couldn't save. Try again."
@@ -43,6 +46,26 @@ final class GoalDetailViewModel {
     var finishDeferred = false
     /// The record once the server has closed the goal; the screen then shows it.
     private(set) var finished: GoalRecord?
+
+    /// The header: the goal's title without its parenthetical, or "Goal" until it loads.
+    var navigationTitle: String {
+        guard case .loaded(let detail) = state else { return "Goal" }
+        let title = GoalsCopy.shortTitle(detail.summary.title)
+        return title.isEmpty ? "Goal" : title
+    }
+
+    /// The Today section offers Yesterday too (on Monday that's last Sunday, outside the hero's week).
+    var canCheckInYesterday: Bool {
+        guard case .loaded(let detail) = state else { return false }
+        return Self.canCheckInYesterday(detail)
+    }
+
+    /// Yesterday is checkable once the goal had begun by then: its first day (the heatmap's
+    /// oldest) is on or before the server's yesterday.
+    static func canCheckInYesterday(_ detail: GoalDetail) -> Bool {
+        guard !detail.yesterday.isEmpty, let first = detail.heatmap.first?.date else { return false }
+        return first <= detail.yesterday
+    }
 
     /// Ask "I finished?" while the last milestone is due and he hasn't answered.
     var asksToFinish: Bool {
@@ -290,9 +313,10 @@ final class GoalDetailViewModel {
                                   deadline: shown.summary.deadline)
         if input != calendarInput {
             calendarInput = input
-            calendar = GoalCalendarModel(
+            countdown = GoalDetailCopy.countdown(today: input.today, deadline: input.deadline)
+            calendar = GoalCalendarModel.throughThisWeek(
                 heatmap: GoalCalendar.merged(heatmap: input.heatmap, week: input.week, today: input.today),
-                today: input.today, deadline: input.deadline)
+                today: input.today, deadline: input.deadline, countdown: countdown)
         }
     }
 

@@ -1,9 +1,11 @@
 import SwiftUI
 
-/// The streak and the calendar of every day, drawn from the view model's prepared calendar.
+/// This goal's own consistency: how many of its days he showed up, the calendar of the days so
+/// far, and one line counting down to the deadline. The all-goals streak lives on Goals home.
 struct GoalConsistencySection: View {
-    let streakDays: Int
     let calendar: GoalCalendarModel
+    /// "118 days to Sun Feb 28"; nil without a deadline.
+    let countdown: String?
     let tint: GoalTint
 
     var body: some View {
@@ -11,13 +13,13 @@ struct GoalConsistencySection: View {
             BrainSectionHeader(title: "Consistency")
             SectionCard {
                 VStack(alignment: .leading, spacing: BrainStyle.m) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(verbatim: GoalsCopy.streakTitle(streakDays)).brainText(.rowTitle)
-                        Spacer(minLength: BrainStyle.s)
-                        Text(verbatim: GoalDetailCopy.shownUpLine((calendar.shown, calendar.total)))
-                            .brainText(.meta).monospacedDigit()
-                    }
+                    Text(verbatim: GoalDetailCopy.shownUpLine((calendar.shown, calendar.total)))
+                        .brainText(.rowTitle)
+                        .monospacedDigit()
                     GoalCalendarGrid(calendar: calendar, tint: tint)
+                    if let countdown {
+                        Text(verbatim: countdown).brainText(.meta).monospacedDigit()
+                    }
                 }
                 .padding(.vertical, BrainStyle.xs)
             }
@@ -25,27 +27,91 @@ struct GoalConsistencySection: View {
     }
 }
 
-/// Every day from the goal's start to its deadline, Monday first, in the goal's tint.
+/// The calendar's days, Monday first, in the goal's tint, with the month named beside the row
+/// it starts in (and beside the first row).
 struct GoalCalendarGrid: View {
     let calendar: GoalCalendarModel
     let tint: GoalTint
+    @ScaledMetric(relativeTo: .caption2) private var monthWidth: CGFloat = 26
 
     var body: some View {
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 5), count: 7)
-        LazyVGrid(columns: columns, spacing: 5) {
-            ForEach(Array(DeckDots.weekdays.enumerated()), id: \.offset) { _, letter in
-                Text(verbatim: letter).font(AppFont.caption2()).foregroundStyle(Color.hxTextSecondary)
+        VStack(spacing: 5) {
+            HStack(spacing: 5) {
+                Color.clear.frame(width: monthWidth, height: 1)
+                ForEach(Array(DeckDots.weekdays.enumerated()), id: \.offset) { _, letter in
+                    Text(verbatim: letter)
+                        .font(AppFont.caption2())
+                        .foregroundStyle(Color.hxTextSecondary)
+                        .frame(maxWidth: .infinity)
+                }
             }
-            ForEach(calendar.slots) { slot in
-                if let day = slot.day {
-                    GoalCalendarCell(day: day, tint: tint)
-                } else {
-                    Color.clear.aspectRatio(1, contentMode: .fit)
+            ForEach(GoalCalendarRows.rows(calendar.slots)) { row in
+                HStack(spacing: 5) {
+                    Text(verbatim: row.month ?? "")
+                        .font(AppFont.caption2(weight: .semibold))
+                        .foregroundStyle(Color.hxTextSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .frame(width: monthWidth, alignment: .leading)
+                    ForEach(row.slots) { slot in
+                        Group {
+                            if let day = slot.day {
+                                GoalCalendarCell(day: day, tint: tint)
+                            } else {
+                                Color.clear.aspectRatio(1, contentMode: .fit)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
                 }
             }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: calendar.summary))
+    }
+}
+
+/// One week of the calendar and the month it names, if any.
+struct GoalCalendarRow: Identifiable, Equatable {
+    let id: String
+    /// "Nov" beside the row holding the 1st of a month, and beside the first row; else nil.
+    let month: String?
+    let slots: [GoalCalendarModel.Slot]
+}
+
+enum GoalCalendarRows {
+    private static let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+    /// The calendar's cells cut into weeks of seven, each naming the month it starts.
+    static func rows(_ slots: [GoalCalendarModel.Slot]) -> [GoalCalendarRow] {
+        stride(from: 0, to: slots.count, by: 7).map { start in
+            let week = Array(slots[start..<min(start + 7, slots.count)])
+            let days = week.compactMap(\.day)
+            let labelled = start == 0 ? days.first : days.first { $0.dayOfMonth == 1 }
+            return GoalCalendarRow(id: week.first?.id ?? "row-\(start)", month: labelled.flatMap { month($0.date) }, slots: week)
+        }
+    }
+
+    /// "2026-11-01" → "Nov".
+    static func month(_ iso: String) -> String? {
+        guard let number = Int(iso.dropFirst(5).prefix(2)), (1...12).contains(number) else { return nil }
+        return months[number - 1]
+    }
+}
+
+extension GoalCalendarModel {
+    /// The detail screen's calendar: the goal's days so far and the rest of this week, never the
+    /// weeks still ahead (the countdown line says how many are left). A goal without a deadline
+    /// keeps the calendar's cap of the last four weeks.
+    static func throughThisWeek(heatmap: [GoalHeatDay], today: String, deadline: String?,
+                                countdown: String?) -> GoalCalendarModel {
+        let full = GoalCalendarModel(heatmap: heatmap, today: today, deadline: deadline)
+        let summary = GoalDetailCopy.consistencySummary(shown: full.shown, total: full.total, countdown: countdown)
+        guard let index = full.slots.firstIndex(where: { $0.day?.isToday == true }) else {
+            return GoalCalendarModel(slots: full.slots, shown: full.shown, total: full.total, summary: summary)
+        }
+        let slots = Array(full.slots.prefix((index / 7 + 1) * 7))
+        return GoalCalendarModel(slots: slots, shown: full.shown, total: full.total, summary: summary)
     }
 }
 
@@ -55,13 +121,15 @@ private struct GoalCalendarCell: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous)
-        let filled = !day.isFuture && (day.status != .none || day.isToday)
+        let isEmpty = GoalHeroCopy.glyph(day.status) == nil
         ZStack {
             if day.isFuture {
                 shape.strokeBorder(Color.hxSeparator, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-            } else {
-                shape.fill(GoalPaper.fill(day.status, ink: tint.fill))
+            } else if !(day.isToday && isEmpty) {
+                // A missed day keeps the empty day's neutral fill and says so with its mark, never amber.
+                shape.fill(GoalPaper.fill(day.status == .miss ? .none : day.status, ink: tint.fill))
             }
+            // Today is a ring: filled once checked in, never the gray of a day gone by.
             if day.isToday { shape.strokeBorder(tint.fill, lineWidth: 2) }
             if day.isDeadline {
                 Image(systemName: "flag.checkered")
@@ -74,8 +142,10 @@ private struct GoalCalendarCell: View {
                     .foregroundStyle(Color.hxTextPrimary)
             } else {
                 Text(verbatim: "\(day.dayOfMonth)")
-                    .font(AppFont.caption2().monospacedDigit())
-                    .foregroundStyle(filled && day.status.isShown ? tint.on : Color.hxTextSecondary)
+                    .font(AppFont.caption2(weight: day.isToday ? .semibold : .regular).monospacedDigit())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .foregroundStyle(day.status.isShown ? tint.on : day.isToday ? tint.fill : Color.hxTextSecondary)
             }
         }
         .aspectRatio(1, contentMode: .fit)

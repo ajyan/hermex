@@ -139,6 +139,55 @@ final class GoalsDesignTests: XCTestCase {
 
     func testShownUpLineOnDayOne() {
         XCTAssertEqual(GoalDetailCopy.shownUpLine((0, 0)), "Starts today")
-        XCTAssertEqual(GoalDetailCopy.shownUpLine((5, 6)), "5 of 6 days")
+        XCTAssertEqual(GoalDetailCopy.shownUpLine((5, 6)), "Showed up 5 of 6 days")
+    }
+
+    /// Started Thu Oct 15, today Mon Nov 2, deadline Sun Feb 28: the weeks so far and this one.
+    private func detailCalendar(today: String = "2026-11-02", deadline: String? = "2027-02-28") throws -> GoalCalendarModel {
+        let heat = try (15...31).map { try day("2026-10-\($0)") } + [day("2026-11-01", "none"), day("2026-11-02", "none")]
+        return GoalCalendarModel.throughThisWeek(heatmap: heat, today: today, deadline: deadline,
+                                                 countdown: GoalDetailCopy.countdown(today: today, deadline: deadline))
+    }
+
+    func testDetailCalendarEndsWithThisWeek() throws {
+        let model = try detailCalendar()
+        XCTAssertEqual(model.slots.count, 28, "Oct 12 – Nov 8, none of the weeks ahead")
+        XCTAssertEqual(model.slots.last?.day?.date, "2026-11-08")
+        XCTAssertTrue(model.slots.last?.day?.isFuture ?? false)
+        XCTAssertFalse(model.slots.contains { $0.day?.isDeadline == true }, "the deadline is a line, not a cell")
+        XCTAssertEqual(model.shown, 17)
+        XCTAssertEqual(model.total, 18, "today isn't counted until it's shown")
+        XCTAssertEqual(model.summary, "Showed up 17 of 18 days. 118 days to Sun Feb 28")
+    }
+
+    func testDetailCalendarStopsAtADeadlineThisWeek() throws {
+        let model = try detailCalendar(today: "2026-10-28", deadline: "2026-10-30")
+        XCTAssertEqual(model.slots.count, 21)
+        XCTAssertTrue(model.slots.first { $0.id == "2026-10-30" }?.day?.isDeadline ?? false)
+        XCTAssertNil(model.slots.last?.day, "nothing after the deadline")
+    }
+
+    func testDetailCalendarWithoutDeadlineKeepsTheFourWeekCap() throws {
+        let heat = try (1...30).map { try day(String(format: "2026-09-%02d", $0)) }
+        let model = GoalCalendarModel.throughThisWeek(heatmap: heat, today: "2026-09-30", deadline: nil, countdown: nil)
+        XCTAssertEqual(model.slots.count, 28)
+        XCTAssertEqual(model.summary, "Showed up 30 of 30 days")
+    }
+
+    func testCalendarRowsNameTheMonthWhereItStarts() throws {
+        let rows = GoalCalendarRows.rows(try detailCalendar().slots)
+        XCTAssertEqual(rows.map(\.month), ["Oct", nil, "Nov", nil], "the first row, then the row holding Nov 1")
+        XCTAssertEqual(rows.map(\.slots.count), [7, 7, 7, 7])
+        XCTAssertEqual(Set(rows.map(\.id)).count, rows.count)
+        XCTAssertEqual(GoalCalendarRows.month("2026-12-25"), "Dec")
+        XCTAssertNil(GoalCalendarRows.month("later"))
+    }
+
+    func testCountdownLine() {
+        XCTAssertEqual(GoalDetailCopy.countdown(today: "2026-11-02", deadline: "2027-02-28"), "118 days to Sun Feb 28")
+        XCTAssertEqual(GoalDetailCopy.countdown(today: "2027-02-27", deadline: "2027-02-28"), "1 day to Sun Feb 28")
+        XCTAssertEqual(GoalDetailCopy.countdown(today: "2027-02-28", deadline: "2027-02-28"), "Due today, Sun Feb 28")
+        XCTAssertEqual(GoalDetailCopy.countdown(today: "2027-03-03", deadline: "2027-02-28"), "3 days past Sun Feb 28")
+        XCTAssertNil(GoalDetailCopy.countdown(today: "2026-11-02", deadline: nil))
     }
 }
