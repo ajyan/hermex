@@ -811,6 +811,18 @@ final class GoalsCopyTests: XCTestCase {
         XCTAssertFalse(line.contains("two weeks"), "the chip already says short two weeks running")
     }
 
+    func testWatchForLeadsTodayAndPlanKeepsTheRest() throws {
+        XCTAssertEqual(GoalDetailCopy.watchFor("Late bedtime  "), "Watch for: Late bedtime")
+        XCTAssertNil(GoalDetailCopy.watchFor(" \n"))
+        XCTAssertTrue(GoalDetailCopy.hasPlan(try detail()), "objective and done-when stay in Plan")
+        var json = try JSONSerialization.jsonObject(with: Data(GoalsModelsTests.detailJSON().utf8)) as! [String: Any]
+        json["objective"] = ""
+        json["done_when"] = []
+        json["obstacle"] = "Late bedtime"
+        let onlyObstacle = try PrepDecoding.decode(GoalDetail.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertFalse(GoalDetailCopy.hasPlan(onlyObstacle), "no empty Plan once the obstacle moved up")
+    }
+
     func testSourceErrorsLine() {
         XCTAssertNil(GoalDetailCopy.sourceErrors([]))
         XCTAssertEqual(GoalDetailCopy.sourceErrors(["prep.days: attempts file not found"]),

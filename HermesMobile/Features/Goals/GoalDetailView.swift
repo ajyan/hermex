@@ -112,7 +112,7 @@ struct GoalDetailView: View {
                         GoalMilestonesSection(milestones: detail.milestones, today: detail.today, tint: tint)
                     }
                     GoalConsistencySection(calendar: viewModel.calendar, countdown: viewModel.countdown, tint: tint)
-                    planSection(detail)
+                    if GoalDetailCopy.hasPlan(detail) { planSection(detail) }
                 }
                 .padding(BrainStyle.l)
                 .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
@@ -126,6 +126,10 @@ struct GoalDetailView: View {
     private func commitmentsSection(_ d: GoalDetail, tint: GoalTint) -> some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
             BrainSectionHeader(title: viewModel.day == .today ? "Today" : "Yesterday")
+            // The plan's obstacle, where it helps: right above the day's check-ins.
+            if let watchFor = GoalDetailCopy.watchFor(d.obstacle) {
+                Text(verbatim: watchFor).brainText(.meta).fixedSize(horizontal: false, vertical: true)
+            }
             SectionCard {
                 VStack(spacing: 0) {
                     ForEach(Array(d.summary.week.commitments.enumerated()), id: \.element.id) { offset, row in
@@ -211,7 +215,6 @@ struct GoalDetailView: View {
                                 .foregroundStyle(Color.hxTextSecondary)
                         }
                     }
-                    if !d.obstacle.isEmpty { Text(verbatim: "Watch for: \(d.obstacle)").brainText(.meta) }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, BrainStyle.s)
@@ -386,6 +389,17 @@ enum GoalDetailCopy {
     static let statusOptions: [(value: String, label: String)] = [
         ("done", "Done"), ("min", "2-min"), ("skip", "Skip"), ("miss", "Missed"),
     ]
+
+    /// "Watch for: Late bedtime…" over the Today check-ins; nil when the plan names no obstacle.
+    static func watchFor(_ obstacle: String) -> String? {
+        let text = obstacle.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : "Watch for: \(text)"
+    }
+
+    /// The Plan disclosure has something left once the obstacle moved up to Today.
+    static func hasPlan(_ detail: GoalDetail) -> Bool {
+        !detail.objective.isEmpty || !detail.doneWhen.isEmpty
+    }
 
     /// The commitments the server flags as never-miss-twice, in the week's order.
     static func missTwiceRows(_ goal: GoalSummary) -> [GoalCommitmentProgress] {
