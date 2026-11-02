@@ -458,6 +458,36 @@ final class GoalQuickItemTests: XCTestCase {
         return h.goals.first?.week.commitments.first { $0.id == "outreach" }
     }
 
+    /// The offer lasts 5 s, or 15 s while VoiceOver runs so there's time to reach Add note and Undo.
+    func testOfferLastsLongerWhileVoiceOverRuns() {
+        let key = GoalsHomeViewModel.key(slug, .commitment("outreach"))
+        let quick = GoalRecentItemWindow<GoalsHomeViewModel.Key>(duration: 5, isVoiceOverRunning: { false }, now: { self.clock })
+        let spoken = GoalRecentItemWindow<GoalsHomeViewModel.Key>(duration: 5, isVoiceOverRunning: { true }, now: { self.clock })
+        quick.open(key, date: "2026-10-14")
+        spoken.open(key, date: "2026-10-14")
+        clock = clock.addingTimeInterval(10)
+        XCTAssertNil(quick.date(for: key))
+        XCTAssertEqual(spoken.date(for: key), "2026-10-14")
+        clock = clock.addingTimeInterval(6)
+        XCTAssertNil(spoken.date(for: key))
+        quick.close()
+        spoken.close()
+    }
+
+    /// The success haptic follows saves the server took: a check-in or a +1, never a clear or a failure.
+    func testLandedCheckInsCountOnlySavedOnes() async throws {
+        let client = FakeCardGoalsClient()
+        client.checkInResults = [.success(try itemResult(done: 3))]
+        let vm = try await loaded(client)
+        await vm.addItem(slug: slug, commitment: "outreach", note: nil)
+        XCTAssertEqual(vm.landedCheckIns, 1)
+        await vm.checkIn(slug: slug, commitment: "stretch-pm", status: .clear, day: .today)
+        XCTAssertEqual(vm.landedCheckIns, 1, "a clear plays nothing")
+        client.checkInResults = [.failure(URLError(.timedOut))]
+        await vm.checkIn(slug: slug, commitment: "stretch-pm", status: .done, day: .today)
+        XCTAssertEqual(vm.landedCheckIns, 1, "nothing landed")
+    }
+
     func testPlusOneThenUndoSendsMinusOneForTheSameDay() async throws {
         let client = FakeCardGoalsClient()
         client.checkInResults = [.success(try itemResult(done: 3)), .success(try itemResult(done: 2))]

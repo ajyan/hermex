@@ -14,6 +14,9 @@ final class GoalsHomeViewModel {
     /// Each goal row with a check-in in flight; more taps on it are ignored.
     private(set) var pending: Set<Key> = []
     private(set) var error: String?
+    /// Counts check-ins and +1s the server has taken (not clears or misses), so a screen plays the
+    /// success haptic as each one lands (`.sensoryFeedback`).
+    private(set) var landedCheckIns = 0
 
     /// One row of one goal.
     struct Key: Hashable {
@@ -112,7 +115,7 @@ final class GoalsHomeViewModel {
 
     /// Checks a day commitment in for the server's today or yesterday.
     func checkIn(slug: String, commitment id: String, status: GoalStatus, day: GoalDay) async {
-        await send(slug: slug, row: .commitment(id), request: {
+        await send(slug: slug, row: .commitment(id), lands: status != .clear && status != .miss, request: {
             .commitment(slug: slug, date: day == .today ? $0.today : $0.yesterday, asOf: $0.today, id: id, status: status)
         }) { goal, home in
             GoalCheckInEdit.apply(status, to: id, on: day == .today ? home.today : home.yesterday, today: home.today,
@@ -157,7 +160,7 @@ final class GoalsHomeViewModel {
     /// One +1 or -1 on an item commitment, for `date` or else the server's today.
     @discardableResult
     private func sendItem(slug: String, commitment id: String, date: String?, n: Int, note: String?) async -> Bool {
-        await send(slug: slug, row: .commitment(id), request: {
+        await send(slug: slug, row: .commitment(id), lands: n > 0, request: {
             .item(slug: slug, date: date ?? $0.today, asOf: $0.today, id: id, n: n, note: note)
         }) { goal, home in
             GoalCheckInEdit.addItem(n, note: note, to: id, on: date ?? home.today, in: &goal)
@@ -165,7 +168,7 @@ final class GoalsHomeViewModel {
     }
 
     func checkIn(slug: String, check id: String, value: String) async {
-        await send(slug: slug, row: .check(id), request: {
+        await send(slug: slug, row: .check(id), lands: value != GoalCheckValue.clear, request: {
             .check(slug: slug, date: $0.today, asOf: $0.today, id: id, value: value)
         }) { goal, home in
             GoalCheckInEdit.setCheck(value, id: id, on: home.today, today: home.today, yesterday: home.yesterday,
@@ -181,11 +184,12 @@ final class GoalsHomeViewModel {
 
     /// Shows the tap at once, posts it, then takes the server's summary of that goal, or drops the
     /// tap (its rollback; other taps in flight stay). A 409 means the server's day moved on, so the
-    /// card reloads.
+    /// card reloads. `lands` counts a save toward `landedCheckIns`.
     @discardableResult
     private func send(
         slug: String,
         row: GoalRowKey,
+        lands: Bool = false,
         request makeRequest: (GoalsHome) -> GoalCheckInRequest,
         edit: @escaping (_ goal: inout GoalSummary, _ home: GoalsHome) -> Void
     ) async -> Bool {
@@ -205,6 +209,7 @@ final class GoalsHomeViewModel {
             let result = try await client.checkIn(request, clientID: UUID().uuidString)
             edits?.remove(key)
             take(result)
+            if lands { landedCheckIns += 1 }
             publish()
             if let home = edits?.base { onChange(home) }
             return true

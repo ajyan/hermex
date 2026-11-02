@@ -34,6 +34,7 @@ struct DeckGoalCard: View {
                 }
             }
         }
+        .sensoryFeedback(.success, trigger: model?.landedCheckIns ?? 0)
         .task(id: deckDate) {
             // Each time the card appears (and when the deck turns over to a new day), so a check-in
             // made elsewhere shows. A reload keeps the card's goals on screen until it lands.

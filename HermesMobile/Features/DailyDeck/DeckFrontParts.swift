@@ -236,7 +236,16 @@ struct DeckFrontWeek: View {
     let palette: DeckPalette
     let deckDate: String
 
+    @Environment(GoalsHomeViewModel.self) private var model: GoalsHomeViewModel?
+
     var body: some View {
+        // One stack, so the landing haptic plays once rather than once per part.
+        VStack(alignment: .leading, spacing: 0) { parts }
+            .sensoryFeedback(.success, trigger: model?.landedCheckIns ?? 0)
+    }
+
+    @ViewBuilder
+    private var parts: some View {
         if !card.weekRows.isEmpty {
             VStack(alignment: .leading, spacing: 16) {
                 ForEach(card.weekRows) { row in

@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UIKit
 
 /// The optimistic side of a check-in: what a goal's summary looks like once the server takes a
 /// tap. Shared by the goal screen and the Daily Deck's goal card, which replay these edits through
@@ -116,8 +117,9 @@ struct GoalPendingEdits<Value, Key: Hashable> {
 }
 
 /// The +1 just counted on an item row, offered "Add note · Undo" for a few seconds after the server
-/// takes it. A view model owns one; its timer only clears the offer, and `date(for:)` checks the clock
-/// too, so an Undo after the window never goes out.
+/// takes it (longer while VoiceOver runs, so there's time to reach the links). A view model owns one;
+/// its timer only clears the offer, and `date(for:)` checks the clock too, so an Undo after the window
+/// never goes out.
 @MainActor
 @Observable
 final class GoalRecentItemWindow<Key: Hashable> {
@@ -125,10 +127,16 @@ final class GoalRecentItemWindow<Key: Hashable> {
     @ObservationIgnored private var deadline: Date?
     @ObservationIgnored private var timer: Task<Void, Never>?
     @ObservationIgnored private let duration: TimeInterval
+    @ObservationIgnored private let voiceOverDuration: TimeInterval
+    @ObservationIgnored private let isVoiceOverRunning: @MainActor () -> Bool
     @ObservationIgnored private let now: () -> Date
 
-    nonisolated init(duration: TimeInterval = 5, now: @escaping () -> Date = Date.init) {
+    nonisolated init(duration: TimeInterval = 5, voiceOverDuration: TimeInterval = 15,
+                     isVoiceOverRunning: @escaping @MainActor () -> Bool = { UIAccessibility.isVoiceOverRunning },
+                     now: @escaping () -> Date = Date.init) {
         self.duration = duration
+        self.voiceOverDuration = voiceOverDuration
+        self.isVoiceOverRunning = isVoiceOverRunning
         self.now = now
     }
 
@@ -142,8 +150,8 @@ final class GoalRecentItemWindow<Key: Hashable> {
     func open(_ key: Key, date: String) {
         timer?.cancel()
         current = (key, date)
+        let duration = isVoiceOverRunning() ? max(duration, voiceOverDuration) : duration
         deadline = now().addingTimeInterval(duration)
-        let duration = duration
         timer = Task { [weak self] in
             try? await Task.sleep(for: .seconds(duration))
             guard !Task.isCancelled else { return }
