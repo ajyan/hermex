@@ -133,6 +133,17 @@ final class PrepMockTests: APIClientTestCase {
         XCTAssertNil(try mocks(status: "started").weeklyDue(now: day("2026-10-31"), calendar: newYork))
     }
 
+    func testAnAbandonedCallReadsAsNeverSentNotGrading() throws {
+        XCTAssertEqual(PrepMockCopy.display(try mocks(status: "abandoned").recent[0]), .notSent,
+                       "an unknown status would poll as grading for 15 minutes")
+    }
+
+    func testLadderLineSaysWhichStepALevelIs() throws {
+        let view = try decodeMocks(mocksJSON)
+        XCTAssertEqual(PrepMockCopy.ladderLine(try XCTUnwrap(view.ladder(.behavioral))), "Level 1 of 2")
+        XCTAssertEqual(PrepMockCopy.ladderLine(try XCTUnwrap(view.ladder(.design))), "Level 2 of 2 · passed through D1")
+    }
+
     func testDecodesMocksView() throws {
         let view = try decodeMocks(mocksJSON)
 

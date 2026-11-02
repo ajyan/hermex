@@ -63,6 +63,8 @@ struct DeckCheck: Decodable, Equatable {
 struct DeckCard: Decodable, Equatable, Identifiable {
     enum CardType: Equatable {
         case headline, prompt, decision, reflect, item, sleep, goal, changes, ask, dinner, meals, section, close
+        /// The job search at a glance: coming interviews and the pipeline's numbers, read live (`DeckSearchCard`).
+        case search
         /// A season front's divider: where it stands, its week as dots, and its one thing today.
         case front
         /// The weekly review's cards (`WeeklyReviewModels.swift`): the cover of moments, last week's
@@ -89,6 +91,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case "goal": self = .goal
             case "changes": self = .changes
             case "ask": self = .ask
+            case "search": self = .search
             case "dinner": self = .dinner
             case "meals": self = .meals
             case "section": self = .section
@@ -239,7 +242,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     var takesFeedback: Bool {
         switch self.type {
         case .prompt, .reflect, .item, .unknown: true
-        case .headline, .decision, .sleep, .goal, .changes, .ask, .dinner, .meals, .section, .close, .front: false
+        case .headline, .decision, .sleep, .goal, .changes, .ask, .search, .dinner, .meals, .section, .close, .front: false
         case .cover, .lastIntention, .value, .intention, .keepsakes, .training: false
         case .monthCover, .monthWeeks, .monthDots, .monthInsight, .monthSleep, .monthQuestion, .weekHeld, .weekPlan, .weekLetter: false
         }
@@ -1472,7 +1475,7 @@ struct DeckCardText: Equatable {
             lead = card.title
         case .training:
             lead = card.headline
-        case .goal, .changes, .ask, .meals:
+        case .goal, .changes, .ask, .search, .meals:
             // The check-ins, the week's fixes and the Ask are drawn (`DeckGoalCard`, `DeckChangesCard`,
             // `DeckAskCard`).
             lead = card.title ?? card.fallback

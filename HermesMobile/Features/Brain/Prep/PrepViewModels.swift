@@ -407,6 +407,20 @@ final class PrepRunViewModel {
         lessonStage = .recalling
     }
 
+    /// A new lesson's question can go back to the cards ("Reread the lesson"); a review can't, since
+    /// recalling without the lesson is its point.
+    var canReread: Bool {
+        guard case let .rep(rep, _) = phase, lessonStage == .recalling else { return false }
+        return rep.drill == .lesson && !isReview(rep)
+    }
+
+    /// Back to the lesson's cards from its question. The draft stays, and the answer counts one hint.
+    func rereadLesson() {
+        guard canReread else { return }
+        lessonStage = .reading
+        hintsShown += 1
+    }
+
     var canSubmitRecall: Bool {
         !recallDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && answerFloor.isMet && !isSubmitting
     }
@@ -1217,6 +1231,21 @@ enum PrepCopy {
     /// Under "Practice this gap": how long it is. "3 questions aimed at this gap".
     static func practiceDetail(_ reps: Int) -> String {
         reps == 1 ? "1 question aimed at this gap" : "\(reps) questions aimed at this gap"
+    }
+
+    /// The countdown to a dated milestone: "First recruiter screen in 34 days", "… tomorrow", "… today";
+    /// nil once it has passed or when the date doesn't read.
+    static func countdown(title: String, due: String?, today: Date = .now, calendar: Calendar = .current) -> String? {
+        guard let due, due.count >= 10 else { return nil }
+        let n = due.prefix(10).split(separator: "-").compactMap { Int($0) }
+        guard n.count == 3, let target = calendar.date(from: DateComponents(year: n[0], month: n[1], day: n[2])),
+              let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: today), to: target).day,
+              days >= 0 else { return nil }
+        switch days {
+        case 0: return "\(title) today"
+        case 1: return "\(title) tomorrow"
+        default: return "\(title) in \(days) days"
+        }
     }
 
     static func readyLine(ready: Int, total: Int) -> String { "\(ready) of \(total) ready" }

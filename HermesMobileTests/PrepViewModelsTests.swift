@@ -909,6 +909,38 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(vm.recallDraft, "", "each recall starts empty")
     }
 
+    func testRereadingANewLessonGoesBackToItsCardsAsAHint() async {
+        let client = FakePrepClient()
+        client.todayResults = [.success(courseRun([recallLessonRep(0), recallLessonRep(1, drill: "recall", block: "review")]))]
+        client.homeResults = [.success(courseHome(xp: 0))]
+        client.attemptResults = [.success(recallResult("pass", next: 1, missed: [])), .success(recallResult("pass", next: 2, missed: []))]
+        let vm = makeVM(client)
+        await vm.load()
+        vm.beginRecall()
+        XCTAssertTrue(vm.canReread)
+        vm.recallDraft = "Half an answer"
+        vm.rereadLesson()
+        XCTAssertEqual(vm.lessonStage, .reading)
+        XCTAssertEqual(vm.recallDraft, "Half an answer", "the draft waits while you reread")
+        vm.beginRecall()
+        await vm.submitRecall()
+        XCTAssertEqual(client.attempts.first?.hintsUsed, 1, "a reread is sent as a hint")
+        await vm.continue()
+        XCTAssertFalse(vm.canReread, "a review is recalled without the lesson")
+    }
+
+    func testCountdownToAMilestone() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/New_York")!
+        let nov2 = calendar.date(from: DateComponents(year: 2026, month: 11, day: 2, hour: 9))!
+        XCTAssertEqual(PrepCopy.countdown(title: "First recruiter screen", due: "2026-12-06", today: nov2, calendar: calendar),
+                       "First recruiter screen in 34 days")
+        XCTAssertEqual(PrepCopy.countdown(title: "Screen", due: "2026-11-03", today: nov2, calendar: calendar), "Screen tomorrow")
+        XCTAssertEqual(PrepCopy.countdown(title: "Screen", due: "2026-11-02", today: nov2, calendar: calendar), "Screen today")
+        XCTAssertNil(PrepCopy.countdown(title: "Screen", due: "2026-11-01", today: nov2, calendar: calendar), "past is hidden")
+        XCTAssertNil(PrepCopy.countdown(title: "Screen", due: nil, today: nov2, calendar: calendar))
+    }
+
     func testATypedRecallCountsAsUnsentUntilItIsGraded() async {
         let client = FakePrepClient()
         client.todayResults = [.success(courseRun([recallLessonRep(0, drill: "recall", block: "review")]))]

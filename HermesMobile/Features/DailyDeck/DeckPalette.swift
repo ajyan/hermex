@@ -97,6 +97,9 @@ struct DeckPalette: Equatable {
     /// The Daily Ask wears its goal's paper (`land-ai-role`, color `notes`).
     static let ask = DeckPalette(GoalPaper.palette(named: "notes", slug: "land-ai-role").colors,
                                  symbol: "briefcase", name: "Today's Ask", shortName: "Ask")
+    /// The search card wears the same goal's paper as the Ask.
+    static let search = DeckPalette(GoalPaper.palette(named: "notes", slug: "land-ai-role").colors,
+                                    symbol: "calendar", name: "Your job search", shortName: "Search")
 
     static func of(_ page: DeckPage) -> DeckPalette {
         switch page {
@@ -150,6 +153,7 @@ struct DeckPalette: Equatable {
             let goal = GoalPaper.palette(named: card.color ?? "", slug: card.goals.first ?? card.id)
             return DeckPalette(goal.colors, symbol: "flag", name: "Goals", shortName: "Goals")
         case .ask: return .ask
+        case .search: return .search
         case .dinner: return .dinner
         case .meals: return .meals
         case .decision: return card.isViewTake ? .weekQuestion : .followUps

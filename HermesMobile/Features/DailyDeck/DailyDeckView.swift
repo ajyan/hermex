@@ -24,6 +24,8 @@ struct DailyDeckView: View {
     @State private var goals: GoalsHomeViewModel
     /// The Ask card's live roles, read once per screen from /api/jobs/ask.
     @State private var dailyAsk: DailyAskModel
+    /// The search card's interviews and numbers, read once per screen from /api/jobs/pipeline.
+    @State private var search: JobPipelineModel
     /// The meals card's accepted week and Accept, through /api/meals.
     @State private var meals: MealsPlanModel
     @Environment(FeedbackAvailability.self) private var availability: FeedbackAvailability?
@@ -39,6 +41,7 @@ struct DailyDeckView: View {
             client: APIClientGoalsAdapter(apiClient: APIClient(baseURL: server)),
             onChange: { GoalsWidgetSync.update(server: server, home: $0) }))
         _dailyAsk = State(initialValue: DailyAskModel(client: APIClientDailyAskAdapter(apiClient: APIClient(baseURL: server))))
+        _search = State(initialValue: JobPipelineModel(client: APIClientJobPipelineAdapter(apiClient: APIClient(baseURL: server))))
         _meals = State(initialValue: MealsPlanModel(client: APIClientMealsAdapter(apiClient: APIClient(baseURL: server))))
         self.openSession = openSession
     }
@@ -55,6 +58,7 @@ struct DailyDeckView: View {
             .environment(showsLabels && viewModel.date == viewModel.today && !viewModel.isReview ? labelQueue : nil)
             .environment(goals)
             .environment(dailyAsk)
+            .environment(search)
             .environment(meals)
             .task(id: labelsAvailable) {
                 // Every deck's labels in one read, once per screen; a failed read retries on the next appear.

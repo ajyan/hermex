@@ -31,7 +31,7 @@ struct PrepMockSection: View {
                                     leading: { PrepMockIcon() },
                                     title: PrepMockCopy.rowTitle(row.kind, ladder: row.ladder),
                                     subtitle: row.kind == due ? "Due: no mock graded this week"
-                                        : row.ladder.best.map { "Passed through \($0)" },
+                                        : PrepMockCopy.ladderLine(row.ladder),
                                     trailing: row.ladder.lastScore.map { "Last \(PrepMockCopy.score($0))" })
                             }
                             .buttonStyle(.plain)
