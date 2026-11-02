@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Prep's landing screen, ordered by the goal: whether you're interview-ready (the mastery bar as four pips),
-/// today's run (its one action), the weak spots (open gaps and missed lessons), practice out loud (the voice
+/// your search (the next interview and every application in motion), today's run (its one action), the weak spots (open gaps and missed lessons), practice out loud (the voice
 /// mock ladders, a due one marked, and the story bank), then the course, folded to the unit being taught.
 /// Pushed as `.brainRoute(.prep(.home))`; owns no `NavigationStack`.
 struct PrepHomeView: View {
@@ -11,6 +11,8 @@ struct PrepHomeView: View {
     /// The role goal's next dated milestone ("First recruiter screen", Dec 6), from Goals; nil hides it.
     @State private var milestone: GoalMilestone?
     private let goals: GoalsDataClient
+    /// The job pipeline for Your search; the section hides until it loads, and on a server without one.
+    @State private var searchModel: JobPipelineModel
 
     /// The Goals goal whose milestones Prep counts down to.
     static let roleGoal = "land-ai-role"
@@ -21,6 +23,7 @@ struct PrepHomeView: View {
         _viewModel = State(initialValue: PrepHomeViewModel(client: client, onAPIError: onAPIError))
         // Quiet: a server without mocks just has no section, and home reports its own failures.
         _mockViewModel = State(initialValue: PrepMockViewModel(client: client))
+        _searchModel = State(initialValue: JobPipelineModel(client: APIClientJobPipelineAdapter(apiClient: APIClient(baseURL: server))))
     }
 
     var body: some View {
@@ -36,12 +39,14 @@ struct PrepHomeView: View {
     private func load() async {
         async let mocks: Void = mockViewModel.load()
         async let goal = try? goals.home()
+        async let search: Void = searchModel.load()
         await viewModel.load()
         // Quiet: no Goals server or no dated milestone just means no countdown.
         if let home = await goal {
             milestone = home.goals.first { $0.slug == Self.roleGoal }?.nextMilestone.flatMap { $0.due == nil ? nil : $0 }
         }
         await mocks
+        await search
     }
 
     @ViewBuilder
@@ -65,6 +70,7 @@ struct PrepHomeView: View {
                                                     dueMock: mockViewModel.mocks?.weeklyDue())
                         }
                     }
+                    PrepSearchSection(model: searchModel)
                     PrepTodayCard(run: home.run, streakDays: home.streak.days, today: viewModel.course?.today)
                     if viewModel.gaps != nil || viewModel.course != nil {
                         PrepWeakSpotsSection(gaps: viewModel.gaps ?? [], missed: PrepWeakSpotsSection.missed(in: viewModel.course),
