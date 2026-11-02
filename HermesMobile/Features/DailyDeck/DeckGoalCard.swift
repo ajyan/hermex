@@ -158,7 +158,8 @@ private struct GoalCheckInSection: View {
                 ForEach(cues) { row in
                     Text(verbatim: "\(GoalsCopy.shortTitle(row.action)): \(row.cue)")
                         .font(AppFont.subheadline())
-                        .foregroundStyle(Color.hxTextSecondary)
+                        // Supporting text on the paper is its glow, full strength: gray fails on dark cards.
+                        .foregroundStyle(palette.ink)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.bottom, 6)
                 }

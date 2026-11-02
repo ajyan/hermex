@@ -54,6 +54,13 @@ final class GoalsDesignTests: XCTestCase {
                           GoalDotMetrics.standard.pipColumn(pips: 13, addsOne: true))
     }
 
+    func testNotDueRowSaysSoInsteadOfFading() {
+        XCTAssertEqual(GoalCommitmentRow.notDueLabel(isDue: false, shown: nil, day: .today), "Not due today")
+        XCTAssertEqual(GoalCommitmentRow.notDueLabel(isDue: false, shown: nil, day: .yesterday), "Wasn't due yesterday")
+        XCTAssertNil(GoalCommitmentRow.notDueLabel(isDue: true, shown: nil, day: .today))
+        XCTAssertNil(GoalCommitmentRow.notDueLabel(isDue: false, shown: .done, day: .today), "a check-in speaks for itself")
+    }
+
     func testPaperNamedAndFallbackIsStable() {
         XCTAssertEqual(GoalPaper.palette(named: "wiki", slug: "x"), DeckPalette.wiki)
         XCTAssertEqual(GoalPaper.palette(named: "quote", slug: "x"), DeckPalette.quote)
