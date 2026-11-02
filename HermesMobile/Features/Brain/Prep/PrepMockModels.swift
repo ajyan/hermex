@@ -284,7 +284,8 @@ enum PrepMockCopy {
         case "graded": .graded(result)
         case "ungraded": .ungraded
         case "too_short": .tooShort
-        case "started": .notSent
+        // A call still marked started, or one the server calls abandoned (no session after an hour): never sent.
+        case "started", "abandoned": .notSent
         default: .grading
         }
     }
