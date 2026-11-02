@@ -47,11 +47,15 @@ struct PrepHomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
                     if !home.readiness.isEmpty {
-                        PrepReadinessRow(checks: home.readiness)
+                        PrepReadinessRow(checks: home.readiness) { check in
+                            PrepCopy.readinessRoute(check, runDone: home.run.remaining <= 0 && home.run.reps > 0,
+                                                    dueMock: mockViewModel.mocks?.weeklyDue())
+                        }
                     }
                     PrepTodayCard(run: home.run, streakDays: home.streak.days, today: viewModel.course?.today)
                     if viewModel.gaps != nil || viewModel.course != nil {
-                        PrepWeakSpotsSection(gaps: viewModel.gaps ?? [], missed: PrepWeakSpotsSection.missed(in: viewModel.course))
+                        PrepWeakSpotsSection(gaps: viewModel.gaps ?? [], missed: PrepWeakSpotsSection.missed(in: viewModel.course),
+                                             claims: home.claims)
                     }
                     mockSection
                     storiesSection
@@ -176,6 +180,8 @@ struct PrepFailedView: View {
 struct PrepWeakSpotsSection: View {
     let gaps: [PrepGapSummary]
     let missed: [PrepLessonNode]
+    /// This week's "I had that" claims as the overnight audit saw them; the row hides until one is audited.
+    var claims: PrepClaimsWeek?
     @State private var showsAll = false
     private static let shown = 3
 
@@ -222,6 +228,10 @@ struct PrepWeakSpotsSection: View {
                     if closed > 0 {
                         PrepRowDivider()
                         BrainRow(title: "Gaps closed this week", trailing: "\(closed)")
+                    }
+                    if let claims, claims.audited > 0 {
+                        PrepRowDivider()
+                        BrainRow(title: "Your \u{201C}I had that\u{201D} this week", subtitle: PrepCopy.claimsLine(claims))
                     }
                 }
             }
