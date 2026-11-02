@@ -47,6 +47,13 @@ final class GoalDetailViewModel {
     /// The record once the server has closed the goal; the screen then shows it.
     private(set) var finished: GoalRecord?
 
+    /// The header: the goal's title without its parenthetical, or "Goal" until it loads.
+    var navigationTitle: String {
+        guard case .loaded(let detail) = state else { return "Goal" }
+        let title = GoalsCopy.shortTitle(detail.summary.title)
+        return title.isEmpty ? "Goal" : title
+    }
+
     /// Ask "I finished?" while the last milestone is due and he hasn't answered.
     var asksToFinish: Bool {
         guard case .loaded(let detail) = state else { return false }

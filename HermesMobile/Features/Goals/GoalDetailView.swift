@@ -36,7 +36,7 @@ struct GoalDetailView: View {
                 content
             }
         }
-        .hxNavigationTitle(record == nil ? "Goal" : "Finished", subtitle: record?.subtitle)
+        .hxNavigationTitle(record == nil ? viewModel.navigationTitle : "Finished", subtitle: record?.subtitle)
         .background(Color.hxCanvas.ignoresSafeArea())
         .task { if record == nil { await viewModel.load() } }
         // Back from the background, the server's today may have moved on.

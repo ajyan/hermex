@@ -131,6 +131,15 @@ final class GoalsViewModelsTests: XCTestCase {
         return d.summary.week.commitments.first { $0.id == "stretch-pm" }
     }
 
+    func testHeaderNamesTheGoalOnceLoaded() async throws {
+        let client = FakeGoalsClient()
+        client.detailResults = [.success(try detail())]
+        let vm = GoalDetailViewModel(slug: "nyc-marathon-2026", client: client)
+        XCTAssertEqual(vm.navigationTitle, "Goal")
+        await vm.load()
+        XCTAssertEqual(vm.navigationTitle, "Finish the NYC Marathon, uninjured")
+    }
+
     func testHome404IsUnavailable() async {
         let client = FakeGoalsClient()
         client.homeResults = [.failure(APIError.http(statusCode: 404, body: nil))]
