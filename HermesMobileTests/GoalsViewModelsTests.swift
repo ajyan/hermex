@@ -794,6 +794,23 @@ final class GoalsCopyTests: XCTestCase {
         XCTAssertEqual(GoalPips.atRiskLabel(item), "Short 2 weeks running")
     }
 
+    /// On the detail screen the flag is said once: the hero's chip, then only what to do on the Today row.
+    func testMissTwiceActionOnlyOnFlaggedRowsToday() throws {
+        var goal = try PrepDecoding.decode(GoalsHome.self, from: Data(GoalsModelsTests.homeSample.utf8)).goals[0]
+        let stretch = goal.week.commitments[0], run = goal.week.commitments[1]
+        goal.flags.missTwice = [stretch.id]
+        XCTAssertEqual(GoalDetailCopy.missTwiceAction(stretch, in: goal, day: .today),
+                       "Missed yesterday. Even the 2-min version counts.")
+        XCTAssertNil(GoalDetailCopy.missTwiceAction(run, in: goal, day: .today), "an unflagged row says nothing")
+        XCTAssertNil(GoalDetailCopy.missTwiceAction(stretch, in: goal, day: .yesterday))
+        let item = try PrepDecoding.decode(GoalCommitmentProgress.self, from: Data(
+            #"{"id":"o","action":"Outreach","target":5,"unit":"item"}"#.utf8))
+        goal.flags.missTwice = ["o"]
+        let line = try XCTUnwrap(GoalDetailCopy.missTwiceAction(item, in: goal, day: .today))
+        XCTAssertEqual(line, "One today counts.")
+        XCTAssertFalse(line.contains("two weeks"), "the chip already says short two weeks running")
+    }
+
     func testSourceErrorsLine() {
         XCTAssertNil(GoalDetailCopy.sourceErrors([]))
         XCTAssertEqual(GoalDetailCopy.sourceErrors(["prep.days: attempts file not found"]),

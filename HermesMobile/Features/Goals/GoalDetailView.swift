@@ -95,12 +95,10 @@ struct GoalDetailView: View {
                             selection: (detail.today, detail.yesterday, viewModel.day),
                             onSelect: { viewModel.day = $0 }
                         )
-                        // Never miss twice: every commitment the server flags, not just the first.
-                        ForEach(GoalDetailCopy.missTwiceRows(detail.summary)) { row in
-                            GoalNote(systemImage: "exclamationmark.circle", tint: tint.fill, text: GoalDetailCopy.missTwice(row))
-                        }
+                        // Never miss twice is said once: the chip on the hero's commitment, and what
+                        // to do about it on its Today row. An escalation is a chip in the goal's paper.
                         ForEach(detail.summary.flags.escalations, id: \.check) { escalation in
-                            GoalNote(systemImage: "exclamationmark.triangle", tint: .hxWarning, text: escalation.say)
+                            HXChip(paper: tint.paper, symbol: "exclamationmark.circle", label: escalation.say, lines: 2)
                         }
                         ForEach(detail.summary.flags.unlockReady, id: \.id) { unlock in
                             GoalNote(systemImage: "sparkles", tint: tint.fill, text: GoalDetailCopy.unlockOffer(unlock, in: detail.summary))
@@ -132,12 +130,12 @@ struct GoalDetailView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(d.summary.week.commitments.enumerated()), id: \.element.id) { offset, row in
                         if offset > 0 { PrepRowDivider() }
+                        // The hero already wears the at-risk chip; the row says what to do today.
                         if row.isItem {
                             GoalItemRow(
                                 row: row,
                                 tint: tint,
                                 isPending: viewModel.isPending(.commitment(row.id)),
-                                atRisk: d.summary.flags.missTwice.contains(row.id),
                                 recentDate: viewModel.recentItems.date(for: .commitment(row.id)),
                                 actions: viewModel.itemActions(row.id)
                             )
@@ -147,11 +145,21 @@ struct GoalDetailView: View {
                                 day: viewModel.day,
                                 date: viewModel.day == .today ? d.today : d.yesterday,
                                 tint: tint,
-                                isPending: viewModel.isPending(.commitment(row.id)),
-                                atRisk: viewModel.day == .today && d.summary.flags.missTwice.contains(row.id)
+                                isPending: viewModel.isPending(.commitment(row.id))
                             ) { status in
                                 Task { await viewModel.checkIn(commitment: row.id, status: status) }
                             }
+                        }
+                        if let line = GoalDetailCopy.missTwiceAction(row, in: d.summary, day: viewModel.day) {
+                            Label {
+                                Text(verbatim: line)
+                            } icon: {
+                                Image(systemName: "exclamationmark.circle").accessibilityHidden(true)
+                            }
+                            .font(BrainStyle.meta)
+                            .foregroundStyle(tint.fill)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.bottom, BrainStyle.s)
                         }
                     }
                 }
@@ -356,7 +364,8 @@ private struct GoalMilestoneRow: View {
     }
 }
 
-/// A one-line note under the hero: an escalation or an unlock offer.
+/// A one-line note under the hero: an unlock offer (and, on the Daily Brief's goal card, the
+/// never-miss-twice nudge).
 struct GoalNote: View {
     let systemImage: String
     let tint: Color
@@ -381,8 +390,16 @@ enum GoalDetailCopy {
         goal.week.commitments.filter { goal.flags.missTwice.contains($0.id) }
     }
 
+    /// What to do about a never-miss-twice flag, under its row on the detail's Today list (the
+    /// hero's chip already says it's at risk): nil for an unflagged row, or when checking in for
+    /// yesterday.
+    static func missTwiceAction(_ row: GoalCommitmentProgress, in goal: GoalSummary, day: GoalDay) -> String? {
+        guard day == .today, goal.flags.missTwice.contains(row.id) else { return nil }
+        return row.isItem ? "One today counts." : "Missed yesterday. Even the 2-min version counts."
+    }
+
     /// The nudge before a second miss in a row: a day commitment missed yesterday, or an item
-    /// commitment short of its target two weeks running.
+    /// commitment short of its target two weeks running. The Daily Brief's goal card says it whole.
     static func missTwice(_ row: GoalCommitmentProgress) -> String {
         let name = GoalsCopy.shortName(row.action).lowercased()
         return row.isItem
