@@ -174,8 +174,9 @@ private struct GoalCheckInSection: View {
                 GoalNote(systemImage: "exclamationmark.circle", tint: tint.fill, text: GoalDetailCopy.missTwice(row))
                     .padding(.top, 12)
             }
+            // A nudge is the goal's own chip, like never-miss-twice, never amber.
             ForEach(goal.flags.escalations, id: \.check) { escalation in
-                GoalNote(systemImage: "exclamationmark.triangle", tint: .hxWarning, text: escalation.say)
+                HXChip(paper: tint.paper, symbol: "exclamationmark.circle", label: escalation.say, lines: 4)
                     .padding(.top, 12)
             }
             ForEach(goal.flags.unlockReady, id: \.id) { unlock in

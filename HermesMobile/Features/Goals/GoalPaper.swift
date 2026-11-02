@@ -31,14 +31,16 @@ enum GoalPaper {
         icon.isEmpty ? "flag" : icon
     }
 
-    /// Fill for a day square or strip cell, in the goal's ink.
-    static func fill(_ status: GoalStatus, ink: Color) -> Color {
+    /// Fill for a calendar day, in the goal's ink. A missed day is the empty gray and says so with
+    /// its `xmark` (`GoalHeroCopy.glyph`), never in amber; today with nothing yet is clear, since it
+    /// isn't missed (its cell draws the today ring).
+    static func fill(_ status: GoalStatus, ink: Color, isToday: Bool = false) -> Color {
         switch status {
         case .done: ink
         case .min: ink.opacity(0.45)
         case .skip: Color.hxTextSecondary.opacity(0.25)
-        case .miss: Color.hxWarning.opacity(0.55)
-        case .none, .clear, .unknown: Color.hxSeparator.opacity(0.6)
+        case .miss: Color.hxSeparator.opacity(0.6)
+        case .none, .clear, .unknown: isToday ? Color.clear : Color.hxSeparator.opacity(0.6)
         }
     }
 }
@@ -92,7 +94,7 @@ enum GoalCalendar {
         return calendar.date(byAdding: .day, value: -((weekday + 5) % 7), to: date)!
     }
 
-    /// Which check-in day tapping `date` in the week strip selects; only today and yesterday.
+    /// Which check-in day `date` is, if it is one: only today and yesterday.
     static func selectableDay(_ date: String, today: String, yesterday: String) -> GoalDay? {
         date == today ? .today : date == yesterday ? .yesterday : nil
     }

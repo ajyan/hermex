@@ -1,3 +1,4 @@
+import SwiftUI
 import XCTest
 @testable import HermesMobile
 
@@ -15,6 +16,18 @@ final class GoalsDesignTests: XCTestCase {
         let bare = try PrepDecoding.decode(GoalSummary.self, from: Data(#"{"slug":"m"}"#.utf8))
         XCTAssertEqual(bare.color, "")
         XCTAssertEqual(bare.week.days, [])
+    }
+
+    /// A day's state shows by its mark, never amber: a missed day is the empty gray with an xmark, and
+    /// today with nothing yet isn't gray at all.
+    func testMissedDayIsGrayNotAmberAndTodayIsNotMissed() {
+        let ink = Color.blue
+        XCTAssertEqual(GoalPaper.fill(.miss, ink: ink), GoalPaper.fill(.none, ink: ink))
+        XCTAssertNotEqual(GoalPaper.fill(.miss, ink: ink), Color.hxWarning.opacity(0.55))
+        XCTAssertEqual(GoalHeroCopy.glyph(.miss), "xmark", "the miss says so with its mark")
+        XCTAssertEqual(GoalPaper.fill(.none, ink: ink, isToday: true), Color.clear)
+        XCTAssertNotEqual(GoalPaper.fill(.none, ink: ink, isToday: true), GoalPaper.fill(.miss, ink: ink))
+        XCTAssertEqual(GoalPaper.fill(.done, ink: ink, isToday: true), ink, "today checked in still fills")
     }
 
     func testPaperNamedAndFallbackIsStable() {
