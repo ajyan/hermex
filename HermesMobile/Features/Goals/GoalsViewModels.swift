@@ -29,6 +29,8 @@ final class GoalDetailViewModel {
     var day: GoalDay = .today
     /// Rows with a check-in in flight; further taps on them are ignored.
     private(set) var pending: Set<GoalRowKey> = []
+    /// Counts each saved done, 2-min or +1, so the screen plays its success haptic as one lands.
+    private(set) var landedCheckIns = 0
     private(set) var error: String?
     /// The row whose check-in failed, so its section says so; nil for a screen-wide error.
     private(set) var errorRow: GoalRowKey?
@@ -167,18 +169,20 @@ final class GoalDetailViewModel {
     }
 
     func checkIn(commitment id: String, status: GoalStatus) async {
-        await send(.commitment(id), request: { .commitment(slug: self.slug, date: $0, asOf: $1, id: id, status: status) }) {
+        let saved = await send(.commitment(id), request: { .commitment(slug: self.slug, date: $0, asOf: $1, id: id, status: status) }) {
             GoalCheckInEdit.apply(status, to: id, on: $1, today: $2, yesterday: $3, in: &$0)
         }
+        if saved, status.isShown { landedCheckIns += 1 }
     }
 
     /// Checks a commitment in for `day` whichever day the Today section shows: the hero's dots.
     func checkIn(commitment id: String, status: GoalStatus, day: GoalDay) async {
         guard let base = edits?.base else { return }
-        await send(.commitment(id), on: day == .today ? base.today : base.yesterday,
-                   request: { .commitment(slug: self.slug, date: $0, asOf: $1, id: id, status: status) }) {
+        let saved = await send(.commitment(id), on: day == .today ? base.today : base.yesterday,
+                               request: { .commitment(slug: self.slug, date: $0, asOf: $1, id: id, status: status) }) {
             GoalCheckInEdit.apply(status, to: id, on: $1, today: $2, yesterday: $3, in: &$0)
         }
+        if saved, status.isShown { landedCheckIns += 1 }
     }
 
     /// Counts one more item (with its optional note) on the selected day; true once the server has it.
@@ -187,6 +191,7 @@ final class GoalDetailViewModel {
     func addItem(commitment id: String, note: String?) async -> Bool {
         guard let date = selectedDate else { return false }
         let saved = await sendItem(id, date: date, n: 1, note: note)
+        if saved { landedCheckIns += 1 }
         if saved, note == nil { recentItems.open(.commitment(id), date: date) }
         return saved
     }

@@ -39,6 +39,7 @@ struct GoalDetailView: View {
         .hxNavigationTitle(record == nil ? viewModel.navigationTitle : "Finished", subtitle: record?.subtitle)
         .background(Color.hxCanvas.ignoresSafeArea())
         .task { if record == nil { await viewModel.load() } }
+        .sensoryFeedback(.success, trigger: viewModel.landedCheckIns)
         // Back from the background, the server's today may have moved on.
         .onChange(of: scenePhase) { _, phase in
             if phase == .active, record == nil { Task { await viewModel.load() } }
