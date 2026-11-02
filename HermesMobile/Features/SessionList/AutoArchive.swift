@@ -3,7 +3,6 @@ import Foundation
 /// One server's auto-archive preferences. Stored per server in UserDefaults by
 /// `AutoArchiveStore`; Settings edits the same keys through `@AppStorage`.
 struct AutoArchiveSettings: Equatable {
-    static let idleDayOptions = [7, 14, 30, 60]
     static let defaultIdleDays = 30
 
     var isEnabled = true
