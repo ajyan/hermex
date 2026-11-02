@@ -30,6 +30,30 @@ final class GoalsDesignTests: XCTestCase {
         XCTAssertEqual(GoalPaper.fill(.done, ink: ink, isToday: true), ink, "today checked in still fills")
     }
 
+    /// At accessibility sizes a commitment stacks its name and count above its dots, Home's compact
+    /// cards drop the identity line, and the dots grow with the text without ever touching.
+    func testLargeTextStacksTheHeroAndCapsTheDots() {
+        XCTAssertFalse(GoalHeroLayout.stacks(.xxxLarge))
+        XCTAssertTrue(GoalHeroLayout.stacks(.accessibility1))
+        XCTAssertTrue(GoalHeroLayout.stacks(.accessibility5))
+        XCTAssertFalse(GoalHeroLayout.showsIdentity(isCompact: true, stacked: true))
+        XCTAssertTrue(GoalHeroLayout.showsIdentity(isCompact: false, stacked: true), "detail keeps it")
+        XCTAssertTrue(GoalHeroLayout.showsIdentity(isCompact: true, stacked: false))
+
+        XCTAssertEqual(GoalDotMetrics.scaled(DeckDots.dot), .standard)
+        let huge = GoalDotMetrics.scaled(60)
+        XCTAssertEqual(huge.dot, GoalDotMetrics.maxDot)
+        XCTAssertGreaterThan(huge.column, huge.dot, "air between neighbors")
+        XCTAssertLessThanOrEqual(huge.trailingWidth, 256, "seven columns fit an iPhone SE's card")
+        // Five pips and a + share the seven columns, and a long pip row shrinks its dots to fit.
+        let five = huge.pipColumn(pips: 5, addsOne: true)
+        XCTAssertLessThanOrEqual(five * 6, huge.trailingWidth)
+        let thirteen = huge.pipColumn(pips: 13, addsOne: true)
+        XCTAssertLessThan(huge.dot(in: thirteen), thirteen)
+        XCTAssertLessThan(GoalDotMetrics.standard.dot(in: GoalDotMetrics.standard.pipColumn(pips: 13, addsOne: true)),
+                          GoalDotMetrics.standard.pipColumn(pips: 13, addsOne: true))
+    }
+
     func testPaperNamedAndFallbackIsStable() {
         XCTAssertEqual(GoalPaper.palette(named: "wiki", slug: "x"), DeckPalette.wiki)
         XCTAssertEqual(GoalPaper.palette(named: "quote", slug: "x"), DeckPalette.quote)
