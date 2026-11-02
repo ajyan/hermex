@@ -113,7 +113,7 @@ struct GoalDetailView: View {
                     if !detail.milestones.isEmpty {
                         GoalMilestonesSection(milestones: detail.milestones, today: detail.today, tint: tint)
                     }
-                    GoalConsistencySection(streakDays: detail.streak.days, calendar: viewModel.calendar, tint: tint)
+                    GoalConsistencySection(calendar: viewModel.calendar, countdown: viewModel.countdown, tint: tint)
                     planSection(detail)
                 }
                 .padding(BrainStyle.l)
@@ -458,8 +458,36 @@ enum GoalDetailCopy {
         return "You held \(GoalsCopy.shortTitle(after).lowercased()) for a week. Ready to add \(unlock.action.lowercased())? Tell Atlas in chat."
     }
 
+    /// This goal's own consistency over its days so far: "Showed up 16 of 18 days".
     static func shownUpLine(_ shown: (shown: Int, total: Int)) -> String {
-        shown.total == 0 ? "Starts today" : "\(shown.shown) of \(shown.total) days"
+        shown.total == 0 ? "Starts today" : "Showed up \(shown.shown) of \(shown.total) days"
+    }
+
+    private static let deadlineFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "EEE MMM d"
+        return f
+    }()
+
+    /// Under the calendar, the days still ahead: "118 days to Sun Feb 28"; nil without a deadline.
+    static func countdown(today: String, deadline: String?) -> String? {
+        guard let deadline, let date = GoalCalendar.date(deadline),
+              let n = GoalCalendar.days(from: today, to: deadline) else { return nil }
+        let day = deadlineFormatter.string(from: date)
+        switch n {
+        case 0: return "Due today, \(day)"
+        case 1: return "1 day to \(day)"
+        case let n where n > 1: return "\(n) days to \(day)"
+        case -1: return "1 day past \(day)"
+        default: return "\(-n) days past \(day)"
+        }
+    }
+
+    /// The detail calendar for VoiceOver: "Showed up 16 of 18 days. 118 days to Sun Feb 28".
+    static func consistencySummary(shown: Int, total: Int, countdown: String?) -> String {
+        [shownUpLine((shown, total)), countdown].compactMap { $0 }.joined(separator: ". ")
     }
 
     static func calendarSummary(_ weeks: [[GoalCalendarDay?]]) -> String {

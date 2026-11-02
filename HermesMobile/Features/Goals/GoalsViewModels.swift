@@ -32,8 +32,11 @@ final class GoalDetailViewModel {
     private(set) var error: String?
     /// The row whose check-in failed, so its section says so; nil for a screen-wide error.
     private(set) var errorRow: GoalRowKey?
-    /// The consistency calendar for what's on screen, rebuilt only when its days change.
+    /// The consistency calendar for what's on screen (the days so far and this week), rebuilt
+    /// only when its days change.
     private(set) var calendar = GoalCalendarModel.empty
+    /// "118 days to Sun Feb 28" under the calendar; nil without a deadline.
+    private(set) var countdown: String?
     static let refreshFailed = "Couldn't refresh. Pull to try again."
     static let dayChanged = "The day changed. Check in again."
     static let saveFailed = "Couldn't save. Try again."
@@ -281,9 +284,10 @@ final class GoalDetailViewModel {
                                   deadline: shown.summary.deadline)
         if input != calendarInput {
             calendarInput = input
-            calendar = GoalCalendarModel(
+            countdown = GoalDetailCopy.countdown(today: input.today, deadline: input.deadline)
+            calendar = GoalCalendarModel.throughThisWeek(
                 heatmap: GoalCalendar.merged(heatmap: input.heatmap, week: input.week, today: input.today),
-                today: input.today, deadline: input.deadline)
+                today: input.today, deadline: input.deadline, countdown: countdown)
         }
     }
 
