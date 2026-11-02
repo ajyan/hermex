@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// One personal goal: its paper hero (with the week strip that picks today or yesterday),
-/// one-tap check-ins, daily checks, milestones, and a calendar of every day to the deadline.
+/// One personal goal: its paper hero, one-tap check-ins for today or yesterday, daily checks,
+/// milestones, and a calendar of its days so far with a countdown to the deadline.
 /// Pushed as `.goal(slug)`.
 struct GoalDetailView: View {
     @State private var viewModel: GoalDetailViewModel
