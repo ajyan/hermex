@@ -933,8 +933,34 @@ final class PrepViewModelsTests: XCTestCase {
                        "No reviews")
         let course = PrepReadinessCheck(id: "course", done: 0, total: 14, met: false)
         XCTAssertEqual(PrepCopy.readinessValue(course), "0 of 14")
-        XCTAssertNil(PrepCopy.readinessAim(course), "all of them needs no aim line")
+        XCTAssertEqual(PrepCopy.readinessAim(course), "every unit", "every pip prints its bar")
         XCTAssertEqual(PrepCopy.readinessLabel(PrepReadinessCheck(id: "course", done: 0, total: 14, met: false)), "Units")
+    }
+
+    func testEachPipOpensTheScreenThatMovesIt() {
+        let course = PrepReadinessCheck(id: "course", done: 0, total: 14, met: false)
+        let retention = PrepReadinessCheck(id: "retention", done: 13, total: 46, aim: 0.9, met: false)
+        let stories = PrepReadinessCheck(id: "stories", done: 0, total: 8, met: false, next: "s13")
+        let mocks = PrepReadinessCheck(id: "mocks", done: 0, total: 2, met: false)
+        XCTAssertEqual(PrepCopy.readinessRoute(course, runDone: false, dueMock: nil), .run)
+        XCTAssertNil(PrepCopy.readinessRoute(course, runDone: true, dueMock: nil), "unit checks only come in the day's run")
+        XCTAssertEqual(PrepCopy.readinessRoute(retention, runDone: true, dueMock: nil), .bonus)
+        XCTAssertEqual(PrepCopy.readinessRoute(stories, runDone: false, dueMock: nil), .story("s13"))
+        XCTAssertNil(PrepCopy.readinessRoute(PrepReadinessCheck(id: "stories", done: 8, total: 8, met: true),
+                                             runDone: false, dueMock: nil))
+        XCTAssertEqual(PrepCopy.readinessRoute(mocks, runDone: false, dueMock: .design), .mockLadder(.design))
+        XCTAssertEqual(PrepCopy.readinessRoute(mocks, runDone: false, dueMock: nil), .mockLadder(.behavioral))
+    }
+
+    func testHomeDecodesTheClaimsWeek() throws {
+        let home = try JSONDecoder().decode(PrepHome.self, from: Data(#"""
+        {"streak": {"days": 0}, "run": {}, "readiness": {"checks": [
+          {"id": "stories", "done": 0, "total": 8, "aim": 1.0, "met": false, "next": "s13"}],
+          "claims": {"audited": 5, "agreed": 3}}}
+        """#.utf8))
+        XCTAssertEqual(home.claims, PrepClaimsWeek(audited: 5, agreed: 3))
+        XCTAssertEqual(home.readiness.first?.next, "s13")
+        XCTAssertEqual(PrepCopy.claimsLine(PrepClaimsWeek(audited: 5, agreed: 3)), "Atlas agreed with 3 of 5")
     }
 
     func testTheTodayCardSaysWhenItsACatchUpDay() {

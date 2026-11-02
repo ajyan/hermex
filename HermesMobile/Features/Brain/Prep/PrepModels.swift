@@ -134,13 +134,15 @@ struct PrepReadinessCheck: Decodable, Identifiable, Hashable, Sendable {
     let total: Int
     let aim: Double
     let met: Bool
+    /// The stories check's story to work on next, which its pip opens.
+    let next: String?
 
     var kind: Kind { Kind(rawValue: id) ?? .unknown }
 
-    private enum CodingKeys: String, CodingKey { case id, done, total, aim, met }
+    private enum CodingKeys: String, CodingKey { case id, done, total, aim, met, next }
 
-    init(id: String, done: Int, total: Int, aim: Double = 1, met: Bool) {
-        (self.id, self.done, self.total, self.aim, self.met) = (id, done, total, aim, met)
+    init(id: String, done: Int, total: Int, aim: Double = 1, met: Bool, next: String? = nil) {
+        (self.id, self.done, self.total, self.aim, self.met, self.next) = (id, done, total, aim, met, next)
     }
 
     init(from decoder: Decoder) throws {
@@ -150,6 +152,24 @@ struct PrepReadinessCheck: Decodable, Identifiable, Hashable, Sendable {
         total = c.int(.total)
         aim = c.optional(Double.self, .aim) ?? 1
         met = c.optional(Bool.self, .met) ?? false
+        next = c.optional(String.self, .next).flatMap { $0.isEmpty ? nil : $0 }
+    }
+}
+
+/// This week's "I had that" claims after the overnight audit: how many were checked, and how many the grader,
+/// asked about that one point alone, agreed with.
+struct PrepClaimsWeek: Decodable, Hashable, Sendable {
+    let audited: Int
+    let agreed: Int
+
+    private enum CodingKeys: String, CodingKey { case audited, agreed }
+
+    init(audited: Int = 0, agreed: Int = 0) { (self.audited, self.agreed) = (audited, agreed) }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        audited = c.int(.audited)
+        agreed = c.int(.agreed)
     }
 }
 
@@ -162,18 +182,21 @@ struct PrepHome: Decodable, Hashable, Sendable {
     let course: PrepCourse?
     /// The mastery bar's four checks; empty from an older server, which hides the readiness row.
     let readiness: [PrepReadinessCheck]
+    /// This week's audited claims; nil from an older server.
+    let claims: PrepClaimsWeek?
 
     private enum CodingKeys: String, CodingKey { case streak, run, course, readiness }
-    private enum ReadinessKeys: String, CodingKey { case checks }
+    private enum ReadinessKeys: String, CodingKey { case checks, claims }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         streak = c.object(PrepStreak.self, .streak, default: PrepStreak())
         run = c.object(PrepRunSummary.self, .run, default: PrepRunSummary())
         course = c.optional(PrepCourse.self, .course)
-        let checks = (try? c.nestedContainer(keyedBy: ReadinessKeys.self, forKey: .readiness))
-            .flatMap { try? $0.decode([PrepReadinessCheck].self, forKey: .checks) } ?? []
+        let nested = try? c.nestedContainer(keyedBy: ReadinessKeys.self, forKey: .readiness)
+        let checks = nested.flatMap { try? $0.decode([PrepReadinessCheck].self, forKey: .checks) } ?? []
         readiness = checks.filter { $0.kind != .unknown }
+        claims = nested.flatMap { try? $0.decodeIfPresent(PrepClaimsWeek.self, forKey: .claims) }
     }
 }
 

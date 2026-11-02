@@ -1055,16 +1055,38 @@ enum PrepCopy {
         return "\(Int((Double(check.done) / Double(check.total) * 100).rounded()))%"
     }
 
-    /// The bar under a check's value, when it isn't "all of them": "aim 90%".
+    /// The bar a check has to clear, printed under its value: "every unit", "aim 90%", "all ready", "monthly".
     static func readinessAim(_ check: PrepReadinessCheck) -> String? {
-        check.kind == .retention ? "aim \(Int((check.aim * 100).rounded()))%" : nil
+        switch check.kind {
+        case .course: "every unit"
+        case .retention: "aim \(Int((check.aim * 100).rounded()))%"
+        case .stories: "all ready"
+        case .mocks: "monthly"
+        case .unknown: nil
+        }
     }
+
+    /// Where tapping a check goes: the screen that moves it. Units and retention move in the day's run (unit
+    /// checks and reviews come up there), or one more round once it's done; stories open the one to work on next;
+    /// mocks open the due ladder, else behavioral. Nil when there's nothing to open.
+    static func readinessRoute(_ check: PrepReadinessCheck, runDone: Bool, dueMock: PrepMockKind?) -> PrepRoute? {
+        switch check.kind {
+        case .course: runDone ? nil : .run
+        case .retention: runDone ? .bonus : .run
+        case .stories: check.next.map(PrepRoute.story)
+        case .mocks: .mockLadder(dueMock ?? .behavioral)
+        case .unknown: nil
+        }
+    }
+
+    /// The weak spots' claims row: "Atlas agreed with 3 of 5".
+    static func claimsLine(_ week: PrepClaimsWeek) -> String { "Atlas agreed with \(week.agreed) of \(week.audited)" }
 
     /// What a check asks for, for VoiceOver: the bar it has to clear.
     static func readinessGoal(_ check: PrepReadinessCheck) -> String {
         switch check.kind {
         case .course: "Every unit passed"
-        case .retention: "Lesson reviews over three weeks passing at \(Int((check.aim * 100).rounded()))%, on the grader's own verdicts"
+        case .retention: "Lesson reviews over three weeks at \(Int((check.aim * 100).rounded()))%: your first answer, before any help, at partial or better, or a claim Atlas agreed with"
         case .stories: "Every active story ready"
         case .mocks: "A passing voice mock of each kind in the last 30 days"
         case .unknown: ""

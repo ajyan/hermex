@@ -45,6 +45,8 @@ struct PrepDayRing: View {
 /// check is met, with where it stands under its name. Whether you'd pass the loop, at a glance.
 struct PrepReadinessRow: View {
     let checks: [PrepReadinessCheck]
+    /// The screen each check's pip opens, if any (`PrepCopy.readinessRoute`).
+    var route: (PrepReadinessCheck) -> PrepRoute? = { _ in nil }
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
@@ -56,7 +58,14 @@ struct PrepReadinessRow: View {
                     ForEach(Array(stride(from: 0, to: checks.count, by: columns)), id: \.self) { start in
                         GridRow {
                             ForEach(checks[start..<min(start + columns, checks.count)]) { check in
-                                PrepReadinessPip(check: check)
+                                if let destination = route(check) {
+                                    NavigationLink(value: ShellPushDestination.brainRoute(.prep(destination))) {
+                                        PrepReadinessPip(check: check, opens: true)
+                                    }
+                                    .buttonStyle(.plain)
+                                } else {
+                                    PrepReadinessPip(check: check)
+                                }
                             }
                         }
                     }
@@ -67,9 +76,11 @@ struct PrepReadinessRow: View {
     }
 }
 
-/// One check: a pip in the Prep paper (filled when met, a ring while not), its name, and where it stands.
+/// One check: a pip in the Prep paper (filled when met, a ring while not), its name, where it stands, and the bar
+/// it has to clear. `opens` marks a pip that is a link (its name carries a chevron).
 private struct PrepReadinessPip: View {
     let check: PrepReadinessCheck
+    var opens = false
     @ScaledMetric(relativeTo: .body) private var side: CGFloat = 12
 
     var body: some View {
@@ -82,11 +93,19 @@ private struct PrepReadinessPip: View {
                 }
             }
             .frame(width: side, height: side)
-            Text(verbatim: PrepCopy.readinessLabel(check))
-                .font(BrainStyle.rowSubtitle.weight(.semibold))
-                .foregroundStyle(Color.hxTextPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+            HStack(spacing: 2) {
+                Text(verbatim: PrepCopy.readinessLabel(check))
+                    .font(BrainStyle.rowSubtitle.weight(.semibold))
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                if opens {
+                    Image(systemName: "chevron.right")
+                        .font(BrainStyle.meta.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                        .accessibilityHidden(true)
+                }
+            }
             Text(verbatim: PrepCopy.readinessValue(check))
                 .font(BrainStyle.meta)
                 .foregroundStyle(Color.hxTextSecondary)
@@ -98,7 +117,9 @@ private struct PrepReadinessPip: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(opens ? .isButton : [])
         .accessibilityLabel(Text(verbatim: [PrepCopy.readinessLabel(check), PrepCopy.readinessValue(check),
                                             PrepCopy.readinessAim(check), check.met ? "met" : "not yet"]
             .compactMap { $0 }.joined(separator: ", ")))
