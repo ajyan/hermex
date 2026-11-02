@@ -199,6 +199,10 @@ final class GoalFinishTests: XCTestCase {
         plain["headline"] = NSNull()
         let bare = try PrepDecoding.decode(GoalFinishedSummary.self, from: JSONSerialization.data(withJSONObject: plain))
         XCTAssertEqual(GoalsFinishedCopy.rowLine(bare), "Nov 1 · 23 days")
+        var raced = row
+        raced["race"] = ["miles": 26.6, "seconds": 18814]
+        let race = try PrepDecoding.decode(GoalFinishedSummary.self, from: JSONSerialization.data(withJSONObject: raced))
+        XCTAssertEqual(GoalsFinishedCopy.rowLine(race), "Nov 1 · 26.6 mi in 5:13:34", "the race leads when there was one")
     }
 
     // MARK: Flows

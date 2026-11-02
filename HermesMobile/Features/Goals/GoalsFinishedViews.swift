@@ -192,9 +192,13 @@ enum GoalsFinishedCopy {
         return name.prefix(1).uppercased() + name.dropFirst()
     }
 
-    /// The full-width row's line: "Nov 1 · 261.4 miles run in 2026", else "Nov 1 · 23 days".
+    /// The full-width row's line: the race ("Nov 1 · 26.6 mi in 5:13:34"), else the headline
+    /// ("Nov 1 · 261.4 miles run in 2026"), else "Nov 1 · 23 days".
     static func rowLine(_ goal: GoalFinishedSummary) -> String {
         let date = GoalFinishCopy.shortDate(goal.finished)
+        if let race = goal.race, race.seconds > 0 {
+            return "\(date) · \(race.miles.formatted(.number.precision(.fractionLength(0...1)))) mi in \(GoalFinishCopy.clock(race.seconds))"
+        }
         if let h = goal.headline, !h.value.isEmpty { return "\(date) · \(h.value) \(h.label)" }
         return "\(date) · \(goal.days == 1 ? "1 day" : "\(goal.days) days")"
     }
