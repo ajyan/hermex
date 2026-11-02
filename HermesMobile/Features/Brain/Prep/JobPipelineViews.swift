@@ -1,0 +1,182 @@
+import SwiftUI
+
+/// Prep home's "Your search": the next interview pinned with its one-pager, then every open application with its
+/// stage as pips (Applied to Offer), each opening its company page, and Add a company. Hidden until the pipeline
+/// loads, and on a server without one.
+struct PrepSearchSection: View {
+    let model: JobPipelineModel
+    @State private var adding = false
+
+    var body: some View {
+        if let pipeline = model.pipeline, !pipeline.applications.isEmpty || !pipeline.upcoming.isEmpty {
+            VStack(alignment: .leading, spacing: BrainStyle.s) {
+                BrainSectionHeader(title: "Your search", count: pipeline.applications.count)
+                if let next = pipeline.upcoming.first {
+                    JobNextInterviewCard(slot: next)
+                }
+                SectionCard {
+                    VStack(spacing: 0) {
+                        ForEach(Array(pipeline.applications.enumerated()), id: \.element.id) { offset, row in
+                            if offset > 0 { PrepRowDivider() }
+                            NavigationLink(value: ShellPushDestination.brainRoute(.prep(.application(row.id)))) {
+                                HStack(spacing: BrainStyle.m) {
+                                    BrainRow(leading: { EmptyView() }, title: row.name,
+                                             subtitle: [row.role, JobCopy.stageLine(row)].compactMap { $0 }.joined(separator: " · "),
+                                             subtitleLineLimit: 2)
+                                    JobStagePips(step: row.step, count: pipeline.stages.count)
+                                }
+                                .accessibilityElement(children: .combine)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        PrepRowDivider()
+                        Button { adding = true } label: {
+                            Label { Text(verbatim: "Add a company") } icon: { Image(systemName: "plus") }
+                                .font(BrainStyle.rowSubtitle)
+                                .foregroundStyle(Color.accentColor)
+                                .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                if !pipeline.closed.isEmpty {
+                    Text(verbatim: "Closed: \(pipeline.closed.map(\.name).joined(separator: ", "))")
+                        .font(BrainStyle.meta)
+                        .foregroundStyle(Color.hxTextSecondary)
+                        .lineLimit(2)
+                }
+            }
+            .sheet(isPresented: $adding) { JobAddSheet(model: model) }
+        }
+    }
+}
+
+/// The next booked interview: who, when, and the way into its one-pager.
+struct JobNextInterviewCard: View {
+    let slot: JobInterviewSlot
+
+    var body: some View {
+        HXCard(.wash(.prep), title: "\(slot.company ?? "Interview") · \(slot.label.lowercased())", titleStyle: .title3,
+               spacing: BrainStyle.s, kicker: {
+            Text(verbatim: "Next interview · \(JobCopy.when(inDays: slot.inDays))")
+                .font(BrainStyle.meta)
+                .foregroundStyle(Color.hxTextSecondary)
+        }, content: {
+            Text(verbatim: [JobCopy.day(slot.on), slot.time, slot.role].compactMap { $0 }.joined(separator: " · "))
+                .font(BrainStyle.rowSubtitle)
+                .foregroundStyle(Color.hxTextPrimary)
+        }, footer: {
+            HStack(spacing: BrainStyle.s) {
+                NavigationLink(value: ShellPushDestination.brainRoute(.prep(.onePager(slot.id)))) {
+                    HXChip(paper: .prep, symbol: "doc.text", label: "One-pager")
+                }
+                NavigationLink(value: ShellPushDestination.brainRoute(.prep(.application(slot.id)))) {
+                    HXChip(paper: .prep, symbol: "list.bullet", label: "Prep plan")
+                }
+            }
+            .buttonStyle(.plain)
+        })
+    }
+}
+
+/// An application's stage as pips, Applied to Offer, filled through its stage; a closed one shows none.
+struct JobStagePips: View {
+    let step: Int?
+    let count: Int
+    @ScaledMetric(relativeTo: .body) private var side: CGFloat = 8
+
+    var body: some View {
+        if let step, count > 0 {
+            HStack(spacing: 4) {
+                ForEach(0..<count, id: \.self) { index in
+                    Group {
+                        if index <= step {
+                            Circle().fill(HermexPaper.prep.glow)
+                        } else {
+                            Circle().strokeBorder(HermexPaper.prep.glow, lineWidth: 1.2)
+                        }
+                    }
+                    .frame(width: side, height: side)
+                }
+            }
+            .accessibilityHidden(true)
+        }
+    }
+}
+
+/// Add a company: the company (optional when a recruiter brought it), the role, who it came through, the
+/// posting, and the stage it's at. A lead with no company starts at Recruiter screen.
+struct JobAddSheet: View {
+    let model: JobPipelineModel
+    @State private var company = ""
+    @State private var role = ""
+    @State private var via = ""
+    @State private var url = ""
+    @State private var stage: String?
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.openBrainRoute) private var openBrainRoute
+
+    private static let stages: [JobStage] = [
+        JobStage(id: "applied", name: "Applied"), JobStage(id: "screen", name: "Recruiter screen"),
+        JobStage(id: "technical", name: "Technical"), JobStage(id: "onsite", name: "Onsite"),
+        JobStage(id: "offer", name: "Offer"),
+    ]
+
+    var body: some View {
+        let c = trimmed(company), v = trimmed(via)
+        NavigationStack {
+            Form {
+                Section {
+                    TextField(text: $company) { Text(verbatim: "Company") }
+                    TextField(text: $role) { Text(verbatim: "Role") }
+                    TextField(text: $via) { Text(verbatim: "Via (recruiter, referral, LinkedIn)") }
+                    TextField(text: $url) { Text(verbatim: "Posting link") }
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                } footer: {
+                    Text(verbatim: "A recruiter lead can skip the company: it starts at Recruiter screen.")
+                }
+                Section {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 8)], alignment: .leading, spacing: 8) {
+                        ForEach(Self.stages, id: \.id) { option in
+                            ChoiceButton(title: option.name, isSelected: (stage ?? (c.isEmpty ? "screen" : "applied")) == option.id) {
+                                stage = option.id
+                            }
+                        }
+                    }
+                } header: {
+                    Text(verbatim: "Where it is now")
+                }
+                if let error = model.error {
+                    Text(verbatim: error).font(AppFont.footnote()).foregroundStyle(Color.hxDanger)
+                }
+            }
+            .hxNavigationTitle("Add a company")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    if model.pending {
+                        ProgressView().accessibilityLabel(Text(verbatim: "Saving"))
+                    } else {
+                        Button("Add") {
+                            Task {
+                                let action = JobPipelineAction.add(company: c.isEmpty ? nil : c, role: nonEmpty(role),
+                                                                   via: v.isEmpty ? nil : v, url: nonEmpty(url), stage: stage)
+                                if let id = await model.add(action) {
+                                    dismiss()
+                                    if openBrainRoute.isAvailable { openBrainRoute(.prep(.application(id))) }
+                                }
+                            }
+                        }
+                        .disabled(c.isEmpty && v.isEmpty)
+                    }
+                }
+            }
+        }
+        .presentationDetents([.large])
+    }
+
+    private func trimmed(_ text: String) -> String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private func nonEmpty(_ text: String) -> String? { trimmed(text).isEmpty ? nil : trimmed(text) }
+}

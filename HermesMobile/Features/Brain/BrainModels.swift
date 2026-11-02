@@ -811,6 +811,10 @@ enum PrepRoute: Hashable, Sendable {
     case gapRun(String)
     /// "Try it now": one recall of a lesson, by lesson id.
     case lessonRun(String)
+    /// One job application's company page, by its pipeline id.
+    case application(String)
+    /// One job application's interview one-pager, by its pipeline id.
+    case onePager(String)
 }
 
 /// Opens a Brain page on the shell's stack from outside Brain (a `brain://` link in a

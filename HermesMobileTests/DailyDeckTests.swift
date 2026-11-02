@@ -99,6 +99,19 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(DeckPalette.of(card).name, "Today's Ask")
     }
 
+    func testSearchCardDecodes() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"2026-11-02","kind":"morning","cards":[
+          {"id":"search","type":"search","title":"Your job search","reason":"From your job search",
+           "fallback":"Obin AI first round Tue Nov 10 · 11 applications open"}]}
+        """#)
+        let card = deck.cards[0]
+        XCTAssertEqual(card.type, .search)
+        XCTAssertFalse(card.takesText)
+        XCTAssertFalse(card.takesFeedback)
+        XCTAssertEqual(DeckPalette.of(card).name, "Your job search")
+    }
+
     // MARK: - What changed
 
     func testChangesCardDecodes() throws {

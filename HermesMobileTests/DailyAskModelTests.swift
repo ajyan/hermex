@@ -276,6 +276,16 @@ final class DailyAskModelTests: XCTestCase {
                        "Skipped: sick")
     }
 
+    func testAPipelineMoveIsTheDaysActionAndOpensPrep() throws {
+        let json = #"{"event": "moved", "company": "Rilla", "stage": "Technical", "added": false}"#
+        let moved = try PrepDecoding.decode(DailyAskOutcome.self, from: Data(json.utf8))
+        XCTAssertEqual(DailyAskBody.doneLine(moved), "Moved Rilla to Technical — Prep is open")
+        XCTAssertTrue(DailyAskBody.opensPrep(moved))
+        let added = DailyAskOutcome(event: "moved", role: nil, company: "Tenex", title: nil, reason: nil, name: nil,
+                                    stage: "Applied", added: true)
+        XCTAssertEqual(DailyAskBody.doneLine(added), "Added Tenex to your search — Prep is open")
+    }
+
     func testAppliedOrSentOffersOpenPrep() {
         func outcome(_ event: String) -> DailyAskOutcome {
             DailyAskOutcome(event: event, role: "r", company: "C", title: "T", reason: nil, name: nil)

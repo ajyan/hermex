@@ -835,6 +835,13 @@ struct ChatShellView: View {
             PrepGate {
                 PrepRunView(server: server, run: .lesson, unit: id, onAPIError: authManager.handleAPIError, ask: askAtlas)
             }
+        // Not gated: tracking the search, and a stage move there, is how a busy day's Ask gets done.
+        case .prep(.application(let id)):
+            JobApplicationView(id: id, server: server, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
+        case .prep(.onePager(let id)):
+            JobOnePagerView(id: id, server: server, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
         case .prep(.storyPage(let id)):
             PrepGate {
                 PrepStoryPageView(id: id, server: server, onAPIError: authManager.handleAPIError, ask: askAtlas)
