@@ -125,7 +125,18 @@ struct GoalDetailView: View {
 
     private func commitmentsSection(_ d: GoalDetail, tint: GoalTint) -> some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
-            BrainSectionHeader(title: viewModel.day == .today ? "Today" : "Yesterday")
+            if viewModel.canCheckInYesterday {
+                BrainSectionHeader(title: "Check in")
+                Picker(selection: Binding(get: { viewModel.day }, set: { viewModel.day = $0 })) {
+                    Text(verbatim: "Today").tag(GoalDay.today)
+                    Text(verbatim: "Yesterday").tag(GoalDay.yesterday)
+                } label: {
+                    Text(verbatim: "Check in for")
+                }
+                .pickerStyle(.segmented)
+            } else {
+                BrainSectionHeader(title: viewModel.day == .today ? "Today" : "Yesterday")
+            }
             // The plan's obstacle, where it helps: right above the day's check-ins.
             if let watchFor = GoalDetailCopy.watchFor(d.obstacle) {
                 Text(verbatim: watchFor).brainText(.meta).fixedSize(horizontal: false, vertical: true)

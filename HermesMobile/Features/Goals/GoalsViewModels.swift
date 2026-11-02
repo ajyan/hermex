@@ -54,6 +54,19 @@ final class GoalDetailViewModel {
         return title.isEmpty ? "Goal" : title
     }
 
+    /// The Today section offers Yesterday too (on Monday that's last Sunday, outside the hero's week).
+    var canCheckInYesterday: Bool {
+        guard case .loaded(let detail) = state else { return false }
+        return Self.canCheckInYesterday(detail)
+    }
+
+    /// Yesterday is checkable once the goal had begun by then: its first day (the heatmap's
+    /// oldest) is on or before the server's yesterday.
+    static func canCheckInYesterday(_ detail: GoalDetail) -> Bool {
+        guard !detail.yesterday.isEmpty, let first = detail.heatmap.first?.date else { return false }
+        return first <= detail.yesterday
+    }
+
     /// Ask "I finished?" while the last milestone is due and he hasn't answered.
     var asksToFinish: Bool {
         guard case .loaded(let detail) = state else { return false }

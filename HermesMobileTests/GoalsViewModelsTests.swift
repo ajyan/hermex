@@ -140,6 +140,29 @@ final class GoalsViewModelsTests: XCTestCase {
         XCTAssertEqual(vm.navigationTitle, "Finish the NYC Marathon, uninjured")
     }
 
+    func testYesterdayIsOfferedOnceTheGoalHadBegun() throws {
+        let started = try detail()  // first day Oct 10, yesterday Oct 12
+        XCTAssertTrue(GoalDetailViewModel.canCheckInYesterday(started))
+        var json = try JSONSerialization.jsonObject(with: Data(GoalsModelsTests.detailJSON().utf8)) as! [String: Any]
+        json["heatmap"] = [["date": "2026-10-13", "status": "none"]]
+        let dayOne = try PrepDecoding.decode(GoalDetail.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertFalse(GoalDetailViewModel.canCheckInYesterday(dayOne), "a goal begun today has no yesterday")
+        json["heatmap"] = []
+        let noHistory = try PrepDecoding.decode(GoalDetail.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertFalse(GoalDetailViewModel.canCheckInYesterday(noHistory))
+    }
+
+    func testYesterdayPickerWritesToYesterday() async throws {
+        let client = FakeGoalsClient()
+        let vm = try await loadedViewModel(client)
+        XCTAssertTrue(vm.canCheckInYesterday)
+        vm.day = .yesterday
+        client.checkInResults = [.failure(URLError(.notConnectedToInternet))]
+        await vm.checkIn(commitment: "stretch-pm", status: .done)
+        XCTAssertEqual(client.checkIns.first, .commitment(slug: "nyc-marathon-2026", date: "2026-10-12", asOf: "2026-10-13",
+                                                          id: "stretch-pm", status: .done))
+    }
+
     func testHome404IsUnavailable() async {
         let client = FakeGoalsClient()
         client.homeResults = [.failure(APIError.http(statusCode: 404, body: nil))]
