@@ -35,8 +35,9 @@ Each paper is one hue rendered as a glow that adapts to the appearance:
 - `card`: a whole card's opaque fill, the hue at 20% over `hxCanvas`. **Warm hues** (`opener`, `reading`, `past`, `plain`) go 12% over `hxSurface` in dark mode instead, because warm mixed into navy reads as muddy brown.
 - `edge`: a 0.5 pt hairline in the hue, so a wash or card keeps its edge on the light canvas.
 - `onGlow`: text on a solid `glow` fill (a primary button).
+- `secondaryInk`: supporting text on a `card` or `wash`, never `hxTextSecondary`: the ink at 80% in light, the glow at 80% in dark (the light ink is dark-on-dark there).
 
-`glow` clears 4.5:1 on both `wash` and `card` in both appearances (`DesignSystemTests` checks every paper). `paper` and `ink` are the original light index-card values, kept as each hue's source.
+`glow` and `secondaryInk` clear 4.5:1 on both `wash` and `card` in both appearances (`DesignSystemTests` checks every paper). `paper` and `ink` are the original light index-card values, kept as each hue's source.
 
 | Paper | Paper / ink | Glow light / dark | Brief card |
 |---|---|---|---|

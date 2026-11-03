@@ -128,6 +128,23 @@ final class DesignSystemTests: XCTestCase {
         }
     }
 
+    func testSecondaryInkClearsAAOnCardAndWashInBothAppearances() {
+        for style in [UIUserInterfaceStyle.light, .dark] {
+            let traits = UITraitCollection(userInterfaceStyle: style)
+            let canvas = UIColor(Color.hxCanvas).resolvedColor(with: traits)
+            for paper in HermexPaper.all {
+                let ink = UIColor(paper.secondaryInk).resolvedColor(with: traits)
+                let name = String(paper.values.paper, radix: 16)
+                let wash = Self.composite(UIColor(paper.wash).resolvedColor(with: traits), over: canvas)
+                XCTAssertGreaterThanOrEqual(Self.contrast(Self.composite(ink, over: wash), wash), 4.5,
+                                            "\(style.rawValue) \(name) secondary ink on wash")
+                let card = UIColor(paper.card).resolvedColor(with: traits)
+                XCTAssertGreaterThanOrEqual(Self.contrast(Self.composite(ink, over: card), card), 4.5,
+                                            "\(style.rawValue) \(name) secondary ink on a whole card")
+            }
+        }
+    }
+
     private static func composite(_ top: UIColor, over bottom: UIColor) -> UIColor {
         var (tr, tg, tb, ta): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
         var (br, bg, bb, ba): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
