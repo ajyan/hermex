@@ -32,10 +32,21 @@ protocol SpeechSpeaking: AnyObject {
     /// the server voice fetched them as one clip) and the voice playing it.
     var onAudioStarted: ((String, SpeechVoice) -> Void)? { get set }
     var isSpeaking: Bool { get }
-    func enqueue(_ sentence: String)
+    /// Reply text audibly played since the last `resetHeardText()`: each sentence queued with
+    /// `isReply` that finished, then the words heard so far of the one playing. Other lines
+    /// (hold-on lines, read-backs) never count, and `stopNow()` drops only the one playing.
+    /// The call resets it as each reply begins and reads it as the user cuts in.
+    var heardText: String { get }
+    /// Queues `sentence`; `isReply` marks it as reply text, which counts toward `heardText`.
+    func enqueue(_ sentence: String, isReply: Bool)
+    func resetHeardText()
     func stopNow()
     /// A single soft cue that Atlas is working on a reply; `false` marks the wait over.
     func setThinkingCue(_ on: Bool)
+}
+
+extension SpeechSpeaking {
+    func enqueue(_ sentence: String) { enqueue(sentence, isReply: false) }
 }
 
 /// The chat a call drives: the open session's `ChatViewModel`.

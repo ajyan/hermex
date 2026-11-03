@@ -1,3 +1,4 @@
+import AVFoundation
 import XCTest
 @testable import HermesMobile
 
@@ -64,16 +65,27 @@ private final class FakeSpeaker: SpeechSpeaking {
     /// Runs inside `stopNow`, so a test can let the stop take time.
     var onStop: (() -> Void)?
     var spoken: [String] = []
+    /// The spoken sentences queued as reply text.
+    var replies: [String] = []
     var queue: [String] = []
     var stopCount = 0
     var cueStates: [Bool] = []
     var onEnqueue: (() -> Void)?
     var isSpeaking: Bool { !queue.isEmpty }
+    /// What the test says has been heard; `resetHeardText` clears it.
+    var heardText = ""
+    var resetCount = 0
 
-    func enqueue(_ sentence: String) {
+    func enqueue(_ sentence: String, isReply: Bool) {
         spoken.append(sentence)
+        if isReply { replies.append(sentence) }
         queue.append(sentence)
         onEnqueue?()
+    }
+
+    func resetHeardText() {
+        resetCount += 1
+        heardText = ""
     }
 
     func stopNow() {
@@ -668,7 +680,7 @@ final class VoiceCallControllerTests: XCTestCase {
         listener.onFinal?("hold on a second")
         voice(false, for: 0.9)
         await controller.lastChatTask?.value
-        XCTAssertEqual(chat.sent, [tag + "hello", tag + "hold on a second"])
+        XCTAssertEqual(chat.sent, [tag + "hello", tag + "[cut in before you spoke] hold on a second"])
         XCTAssertEqual(chat.cancelCount, 1)
     }
 
@@ -698,11 +710,12 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(controller.state, .listening)
     }
 
-    func testAFinishedReplyAndEchoAreNotInterruptions() async {
+    func testAFinishedReplyAndIgnoredSpeechAreNotInterruptions() async {
         await startSpeaking()
-        // Atlas's own words heard back.
+        // Noise and agreement heard over the reply.
         voice(true, for: 1.0)
-        listener.onPartial?("First sentence")
+        listener.onPartial?(".")
+        listener.onPartial?("yeah")
         XCTAssertEqual(controller.state, .speaking)
         update(text: "First sentence. Second sentence.", streaming: false)
         speaker.drain()
@@ -747,7 +760,7 @@ final class VoiceCallControllerTests: XCTestCase {
         update(text: "First sentence. Second sentence. Third.")
         XCTAssertEqual(speaker.spoken, ["First sentence."])
         await say("go on then")
-        XCTAssertEqual(chat.sent, [tag + "hello", tag + "go on then"])
+        XCTAssertEqual(chat.sent, [tag + "hello", tag + "[cut in before you spoke] go on then"])
     }
 
     func testTapInterruptAfterTheRunFinishedDoesNotCancel() async {
@@ -759,14 +772,104 @@ final class VoiceCallControllerTests: XCTestCase {
         XCTAssertEqual(controller.state, .listening)
     }
 
-    func testEchoOfOwnReplyDoesNotInterrupt() async {
+    func testOneWordAtlasJustSaidStillInterrupts() async {
+        // Echo cancellation keeps Atlas out of the mic, so its words heard are the user's.
         await startSpeaking()
-        voice(true, for: 1.0)
-        listener.onPartial?("First sentence")
-        listener.onFinal?("first sentence.")
+        voice(true, for: 0.3)
+        listener.onPartial?("first")
+        await controller.lastChatTask?.value
+        XCTAssertEqual(speaker.stopCount, 1)
+        XCTAssertEqual(chat.cancelCount, 1)
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertEqual(controller.partialTranscript, "first")
+    }
+
+    func testNoiseOverTheReplyIsIgnored() async {
+        await startSpeaking()
+        voice(true, for: 0.3)
+        listener.onPartial?(".")
+        listener.onFinal?(".")
         XCTAssertEqual(controller.state, .speaking)
         XCTAssertEqual(speaker.stopCount, 0)
-        XCTAssertEqual(chat.cancelCount, 0)
+        XCTAssertTrue(logLines.contains("echo ignored: \".\""))
+    }
+
+    // MARK: - Cut-in notes
+
+    /// The note the atlas-voice plugin parses, exactly as it matches it.
+    private static let cutInPattern = #/^\s*\[voice[^\]]*\]\s*\[cut in (after: "([^"\]]{0,300})"|before you spoke)\]/#
+
+    func testTheTurnAfterTalkingOverAtlasSaysWhatWasHeard() async {
+        await startSpeaking()
+        XCTAssertEqual(speaker.replies, ["First sentence."])
+        speaker.heardText = "Sure. The forecast says \"sunny and warm\" for the\n bay] all weekend, with highs near seventy"
+        voice(true, for: 0.4)
+        listener.onPartial?("what about")
+        listener.onFinal?("what about tomorrow")
+        voice(false, for: 0.9)
+        await controller.lastChatTask?.value
+
+        let sent = chat.sent.last ?? ""
+        XCTAssertEqual(
+            sent,
+            tag + "[cut in after: \"'sunny and warm' for the bay all weekend, with highs near seventy\"] what about tomorrow"
+        )
+        XCTAssertEqual(
+            sent.prefixMatch(of: Self.cutInPattern)?.output.2.map(String.init),
+            "'sunny and warm' for the bay all weekend, with highs near seventy"
+        )
+
+        // Only the next turn says so.
+        update(text: "Rain tomorrow.", streaming: false)
+        speaker.drain()
+        await say("thanks")
+        XCTAssertEqual(chat.sent.last, tag + "thanks")
+    }
+
+    func testStoppingAtlasBeforeAWordWasHeardSaysSo() async {
+        await startSpeaking()
+        voice(true, for: 0.3)
+        listener.onPartial?("stop")
+        await controller.lastChatTask?.value
+        listener.onFinal?("Stop.")
+        voice(false, for: 0.9)
+        await say("tell me a joke")
+        let sent = chat.sent.last ?? ""
+        XCTAssertEqual(sent, tag + "[cut in before you spoke] tell me a joke")
+        XCTAssertNotNil(sent.prefixMatch(of: Self.cutInPattern))
+    }
+
+    func testNoCutInNoteWithoutCuttingOffAReplyBeingSpoken() async {
+        // A reply that finished.
+        await startSpeaking()
+        speaker.heardText = "First sentence."
+        update(text: "First sentence. Second sentence.", streaming: false)
+        speaker.drain()
+        XCTAssertEqual(speaker.resetCount, 1)
+        await say("thanks")
+        XCTAssertEqual(chat.sent.last, tag + "thanks")
+
+        // A turn dropped while Atlas was still working on it.
+        listener.onFinal?("Stop.")
+        await controller.lastChatTask?.value
+        await say("what's the time")
+        XCTAssertEqual(chat.sent.last, tag + "what's the time")
+    }
+
+    func testAReopenedTurnKeepsItsCutInNote() async {
+        await startSpeaking()
+        speaker.heardText = "First"
+        controller.performTapAction()
+        await say("tell me an interesting fact")
+        voice(true, for: 0.4)
+        listener.onPartial?("about the Welsh flag")
+        listener.onFinal?("about the Welsh flag.")
+        voice(false, for: 0.9)
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.sent.suffix(2), [
+            tag + "[cut in after: \"First\"] tell me an interesting fact",
+            tag + "[cut in after: \"First\"] tell me an interesting fact about the Welsh flag.",
+        ])
     }
 
     func testStopSilencesAtlasAndIsNeverSent() async {
@@ -1595,11 +1698,11 @@ final class VoiceCallControllerTests: XCTestCase {
         await startSpeaking()
         speaker.onStop = { [unowned self] in clock += 0.07 }
         voice(true, for: 0.2)
-        // Atlas's own words come back first; the timing starts there.
-        listener.onPartial?("first")
+        // A backchannel comes first; the timing starts there.
+        listener.onPartial?("yeah")
         XCTAssertEqual(controller.state, .speaking)
         clock += 0.3
-        listener.onPartial?("first what about")
+        listener.onPartial?("yeah what about")
         XCTAssertEqual(controller.state, .listening)
 
         let lines = logLines.filter { $0.hasPrefix("barge-in") }
@@ -1621,9 +1724,9 @@ final class VoiceCallControllerTests: XCTestCase {
         clock += VoiceCallTiming.talkOverGrace
         speaker.onStop = { [unowned self] in clock += 0.07 }
         voice(true, for: 0.2)
-        listener.onPartial?("sunny")
+        listener.onPartial?("yeah")
         clock += 0.3
-        listener.onPartial?("sunny what about tomorrow")
+        listener.onPartial?("yeah what about tomorrow")
         speaker.onStop = nil
         listener.onNeedsRestart?("route change")
         await controller.lastListenerTask?.value
@@ -1897,9 +2000,146 @@ final class ServerSpeechSpeakerTests: XCTestCase {
         await fulfillment(of: [drained], timeout: 5)
     }
 
+    func testHeardTextCountsFinishedReplyClipsAndTheHeardPartOfThePlayingOne() async throws {
+        var gate: CheckedContinuation<Void, Never>?
+        let firstRequested = expectation(description: "first request")
+        var players: [ScriptedPlayer] = []
+        let started = [expectation(description: "first clip"), expectation(description: "second clip")]
+        var startCount = 0
+        var requestCount = 0
+        let wav = ScriptedPlayer.silentWAV
+        let speaker = ServerSpeechSpeaker(
+            synthesize: { _ in
+                requestCount += 1
+                if requestCount == 1 {
+                    await withCheckedContinuation { gate = $0; firstRequested.fulfill() }
+                }
+                return wav
+            },
+            fallback: fallback,
+            requestSpacing: 0,
+            makePlayer: { data in
+                let player = try ScriptedPlayer(data: data)
+                players.append(player)
+                return player
+            }
+        )
+        speaker.onAudioStarted = { _, _ in
+            started[startCount].fulfill()
+            startCount += 1
+        }
+        speaker.enqueue("It's sunny today.", isReply: true)
+        await fulfillment(of: [firstRequested], timeout: 5)
+        speaker.enqueue("Still working on it.")
+        speaker.enqueue("Highs near seventy, lows around fifty.", isReply: true)
+        gate?.resume()
+        await fulfillment(of: [started[0]], timeout: 5)
+        XCTAssertEqual(speaker.heardText, "", "no word has played yet")
+
+        players[0].audioTime = 2
+        speaker.audioPlayerDidFinishPlaying(players[0], successfully: true)
+        await fulfillment(of: [started[1]], timeout: 5)
+        // Ten words in the clip, seven of them played: the hold-on line's four, then three of the reply's.
+        players[1].audioTime = 1.4
+        XCTAssertEqual(speaker.heardText, "It's sunny today. Highs near seventy,")
+
+        speaker.stopNow()
+        XCTAssertEqual(speaker.heardText, "It's sunny today.", "a stop keeps what finished")
+        speaker.resetHeardText()
+        XCTAssertEqual(speaker.heardText, "")
+    }
+
+    func testHeardTextIncludesWhatTheOnDeviceVoiceSaid() async {
+        let failed = expectation(description: "fell back")
+        let speaker = makeSpeaker { _ in throw URLError(.cannotConnectToHost) }
+        fallback.onEnqueue = { failed.fulfill() }
+        speaker.enqueue("It's sunny.", isReply: true)
+        await fulfillment(of: [failed], timeout: 5)
+        XCTAssertEqual(fallback.replies, ["It's sunny."])
+        fallback.heardText = "It's sunny."
+        XCTAssertEqual(speaker.heardText, "It's sunny.")
+
+        // Once the on-device voice drains, its words join the finished ones.
+        fallback.drain()
+        XCTAssertEqual(fallback.resetCount, 1)
+        XCTAssertEqual(speaker.heardText, "It's sunny.")
+        speaker.resetHeardText()
+        XCTAssertEqual(speaker.heardText, "")
+    }
+
     func testThinkingCueUsesTheOnDeviceSpeaker() {
         let speaker = makeSpeaker { _ in Data() }
         speaker.setThinkingCue(true)
         XCTAssertEqual(fallback.cueStates, [true])
+    }
+}
+
+/// A clip player whose position the test sets; it never makes a sound.
+private final class ScriptedPlayer: AVAudioPlayer {
+    var audioTime: TimeInterval = 0
+    override var currentTime: TimeInterval {
+        get { audioTime }
+        set { audioTime = newValue }
+    }
+    override var duration: TimeInterval { 2 }
+    override func play() -> Bool { true }
+    override func stop() {}
+
+    /// A tenth of a second of silence, 16-bit mono 8 kHz, so `AVAudioPlayer(data:)` accepts it.
+    static let silentWAV: Data = {
+        let samples = 800
+        var data = Data()
+        func append<T: FixedWidthInteger>(_ value: T) { withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) } }
+        data.append(contentsOf: Array("RIFF".utf8)); append(UInt32(36 + samples * 2))
+        data.append(contentsOf: Array("WAVEfmt ".utf8)); append(UInt32(16)); append(UInt16(1)); append(UInt16(1))
+        append(UInt32(8000)); append(UInt32(16000)); append(UInt16(2)); append(UInt16(16))
+        data.append(contentsOf: Array("data".utf8)); append(UInt32(samples * 2))
+        data.append(Data(count: samples * 2))
+        return data
+    }()
+}
+
+private final class FakeSynthesizer: ChatSpeechSynthesizing {
+    var delegate: (any AVSpeechSynthesizerDelegate)?
+    var isSpeaking = false
+    var isPaused = false
+    var utterances: [AVSpeechUtterance] = []
+    func speak(_ utterance: AVSpeechUtterance) { utterances.append(utterance) }
+    func stopSpeaking(at boundary: AVSpeechBoundary) -> Bool { true }
+}
+
+@MainActor
+final class AppleSpeechSpeakerTests: XCTestCase {
+    /// Lets the delegate's main-actor hops run.
+    private func drainMainActor() async {
+        for _ in 0..<3 { await Task.yield() }
+        await Task { @MainActor in }.value
+    }
+
+    func testHeardTextIsFinishedRepliesAndTheSpokenPrefixOfTheCurrentOne() async {
+        let synthesizer = FakeSynthesizer()
+        let speaker = AppleSpeechSpeaker(synthesizer: synthesizer, voice: nil)
+        speaker.enqueue("One moment.")
+        speaker.enqueue("It's sunny today.", isReply: true)
+        speaker.enqueue("Highs near seventy.", isReply: true)
+        let (hold, first, second) = (synthesizer.utterances[0], synthesizer.utterances[1], synthesizer.utterances[2])
+        let delegate = synthesizer.delegate
+        let throwaway = AVSpeechSynthesizer()
+
+        delegate?.speechSynthesizer?(throwaway, willSpeakRangeOfSpeechString: NSRange(location: 4, length: 6), utterance: hold)
+        delegate?.speechSynthesizer?(throwaway, didFinish: hold)
+        delegate?.speechSynthesizer?(throwaway, willSpeakRangeOfSpeechString: NSRange(location: 0, length: 4), utterance: first)
+        await drainMainActor()
+        XCTAssertEqual(speaker.heardText, "", "hold-on lines and a word just starting aren't heard reply text")
+
+        delegate?.speechSynthesizer?(throwaway, didFinish: first)
+        delegate?.speechSynthesizer?(throwaway, willSpeakRangeOfSpeechString: NSRange(location: 11, length: 7), utterance: second)
+        await drainMainActor()
+        XCTAssertEqual(speaker.heardText, "It's sunny today. Highs near")
+
+        speaker.stopNow()
+        XCTAssertEqual(speaker.heardText, "It's sunny today.")
+        speaker.resetHeardText()
+        XCTAssertEqual(speaker.heardText, "")
     }
 }

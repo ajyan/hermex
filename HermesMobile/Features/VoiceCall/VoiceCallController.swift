@@ -47,29 +47,50 @@ enum VoiceCallPhrases {
         return "[voice \(time)] "
     }
 
-    /// A call's leading tag: `[voice 2:41 PM] `, or the legacy `[voice] ` in older history.
-    nonisolated(unsafe) private static let voiceTag = #/^\[voice(?: [^\]]{1,20})?\] ?/#
+    /// A call's leading tag: `[voice 2:41 PM] `, or the legacy `[voice] ` in older history, with
+    /// the `cutInNote` after it when the turn followed cutting Atlas off.
+    nonisolated(unsafe) private static let voiceTag =
+        #/^\[voice(?: [^\]]{1,20})?\] ?(?:\[cut in (?:after: "[^"\]]{0,300}"|before you spoke)\] ?)?/#
     private static let voiceTagOpening = "[voice"
+    private static let cutInOpening = "[cut in "
     /// The longest time a tag holds, matching `voiceTag`.
     private static let voiceTagTimeLimit = 20
+    /// The most words of what the user heard that a cut-in note quotes.
+    private static let cutInTailWords = 12
 
-    /// How many characters of `text` its leading call tag takes (with one trailing space),
-    /// or nil when it has none. Display matches the app's own lowercase tag; speech also
-    /// catches Atlas echoing it in another case.
+    /// The note after the tag on the turn that follows cutting Atlas off: the last words of its
+    /// reply the user heard (`[cut in after: "and highs near seventy"] `), or
+    /// `[cut in before you spoke] ` when none were. The atlas-voice plugin parses it exactly.
+    static func cutInNote(heard: String) -> String {
+        let words = heard.replacingOccurrences(of: "\"", with: "'").replacingOccurrences(of: "]", with: "")
+            .split(whereSeparator: \.isWhitespace).suffix(cutInTailWords)
+        guard !words.isEmpty else { return "[cut in before you spoke] " }
+        return "[cut in after: \"\(words.joined(separator: " ").suffix(300))\"] "
+    }
+
+    /// How many characters of `text` its leading call tag and any cut-in note take (with one
+    /// trailing space), or nil when it has no tag. Display matches the app's own lowercase tag;
+    /// speech also catches Atlas echoing it in another case.
     static func voiceTagLength(in text: Substring, ignoringCase: Bool = false) -> Int? {
         guard let match = text.prefixMatch(of: voiceTag.ignoresCase(ignoringCase)) else { return nil }
         return text.distance(from: match.range.lowerBound, to: match.range.upperBound)
     }
 
-    /// Whether streaming `text` could still grow into a call tag (`[voi`, `[voice 2:4`).
+    /// Whether streaming `text` could still grow into a call tag (`[voi`, `[voice 2:4`), or a
+    /// whole tag into one with a cut-in note (`[voice 2:41 PM] [cut in af`).
     static func isPartialVoiceTag(_ text: Substring) -> Bool {
+        if let tag = voiceTagLength(in: text, ignoringCase: true) {
+            let note = text.dropFirst(tag).lowercased()
+            guard note.hasPrefix("["), !note.contains("]") else { return false }
+            return cutInOpening.hasPrefix(note) || note.hasPrefix(cutInOpening)
+        }
         let lowered = text.lowercased()
         guard lowered.hasPrefix("["), !lowered.contains("]") else { return false }
         if voiceTagOpening.hasPrefix(lowered) { return true }
         return lowered.hasPrefix(voiceTagOpening + " ") && lowered.count <= voiceTagOpening.count + 1 + voiceTagTimeLimit
     }
 
-    /// `text` without a call's leading tag, for display.
+    /// `text` without a call's leading tag and cut-in note, for display.
     static func withoutVoiceTag(_ text: String) -> String {
         guard let length = voiceTagLength(in: text[...]) else { return text }
         return String(text.dropFirst(length))
@@ -142,12 +163,17 @@ final class VoiceCallController {
     /// Finals that arrive after a turn was sent (or while Atlas talks) belong to
     /// speech already handled; drop them until the next speech starts.
     @ObservationIgnored private var discardFinals = false
-    /// Words Atlas has said this reply; hearing them back is echo, not the user.
+    /// Words Atlas has said this reply (its hold-on lines, while it works on one); hearing them
+    /// back is not the user adding to the turn they sent.
     @ObservationIgnored private var spokenWords: Set<String> = []
     /// Words heard while Atlas worked on this reply (the room, or the user talking to
     /// someone else). The recognizer can deliver them late, once Atlas is already
     /// speaking; they are not the user talking over it.
     @ObservationIgnored private var ambientWords: Set<String> = []
+    /// Where the user last cut into a reply Atlas was saying (`VoiceCallPhrases.cutInNote`), for
+    /// the next turn sent; and the note the last turn was sent with, should it be reopened and resent.
+    @ObservationIgnored private var cutInNote: String?
+    @ObservationIgnored private var sentCutInNote: String?
     /// When `speaking` began, for the talk-over grace period.
     @ObservationIgnored private var speakingSince: TimeInterval?
     /// When the user said "wait" to take back a turn: it isn't sent again until they add
@@ -333,6 +359,7 @@ final class VoiceCallController {
             log("tap: interrupt")
             interruptions += 1
             let detected = now()
+            noteCutIn()
             speaker.stopNow()
             recordBargeIn("tap", heard: nil, detectedAt: detected)
             cancelRunIfStreaming()
@@ -517,10 +544,10 @@ final class VoiceCallController {
         if state == .listening, awaitingFinalSince != nil { submitTurn() }
     }
 
-    /// While Atlas talks, the mic also hears Atlas. Only words Atlas isn't saying
-    /// (one that isn't a backchannel like "yeah", or "stop"/"wait") mean the user is
-    /// talking over it. "Stop" and "wait" only silence Atlas; they are never sent.
-    /// Returns true when `heard` was consumed as talk-over (or echo).
+    /// While Atlas talks, one word that isn't a backchannel like "yeah" (or "stop"/"wait") means
+    /// the user is talking over it, even a word Atlas just said: echo cancellation keeps Atlas
+    /// out of the mic. "Stop" and "wait" only silence Atlas; they are never sent.
+    /// Returns true when `heard` was consumed as talk-over (or ignored).
     private func checkTalkOver(_ heard: String, isFinal: Bool = false) -> Bool {
         guard !isMuted, !isHeld else { return false }
         let isReadBack: Bool
@@ -536,12 +563,12 @@ final class VoiceCallController {
             return true
         }
         if !isReadBack, heardOverReplyAt == nil { heardOverReplyAt = now() }
-        let novel = words.filter { !spokenWords.contains($0) && !ambientWords.contains($0) }
+        let novel = words.filter { !ambientWords.contains($0) }
         let command = Self.command(in: heard)
         let substantive = novel.filter { !Self.backchannelWords.contains($0) }
-        // Speech that carries over Atlas's words (echo) or the room's needs a second new word.
+        // Speech that carries over the room's words from before the reply needs a second new word.
         // Backchannels never count: "yeah okay" agrees, it doesn't take the floor.
-        let carriesOver = words.contains { spokenWords.contains($0) || ambientWords.contains($0) }
+        let carriesOver = words.contains { ambientWords.contains($0) }
         let needed = carriesOver ? 2 : VoiceCallTiming.bargeInNovelWords
         guard substantive.count >= needed || command != nil else {
             log("echo ignored: \"\(heard)\"")
@@ -552,6 +579,7 @@ final class VoiceCallController {
         }
         log("talk-over: \"\(heard)\" novel=\(novel)")
         let detected = now()
+        if !isReadBack { noteCutIn() }
         speaker.stopNow()
         if !isReadBack {
             interruptions += 1
@@ -625,6 +653,7 @@ final class VoiceCallController {
 
     private func reopenTurn(_ sent: String, adding heard: String?) {
         log("turn reopened: \"\(heard ?? "")\"")
+        cutInNote = sentCutInNote
         cancelPendingRun()
         state = .listening
         restartTurn(seed: heard ?? "", keeping: sent)
@@ -854,12 +883,15 @@ final class VoiceCallController {
         latencyRecorded = false
         beginThinking()
         metrics.turnSent(speechEnd: speechEnd)
-        log("send: \"\(text)\"\(note)")
+        let cutIn = cutInNote ?? ""
+        sentCutInNote = cutInNote
+        cutInNote = nil
+        log("send: \"\(cutIn)\(text)\"\(note)")
         // A cancel queued for the turn this one replaces must land first, or it stops this run.
         let previous = lastChatTask
         lastChatTask = Task { [weak self, chat] in
             await previous?.value
-            let sent = await chat.sendVoiceMessage(VoiceCallPhrases.voicePrefix(at: clock()) + text)
+            let sent = await chat.sendVoiceMessage(VoiceCallPhrases.voicePrefix(at: clock()) + cutIn + text)
             self?.log("send \(sent ? "accepted" : "FAILED") \(self?.since(self?.sentAt) ?? "")")
             guard let self, self.sendCount == turn else { return }
             self.awaitingSendAcceptance = false
@@ -886,6 +918,7 @@ final class VoiceCallController {
         state = .thinking
         spokenWords = []
         ambientWords = []
+        speaker.resetHeardText()
         discardFinals = true
         clearTranscript()
         shaper = SpeechTextShaper()
@@ -1058,17 +1091,26 @@ final class VoiceCallController {
         start.map { String(format: "after %.2fs", now() - $0) } ?? ""
     }
 
-    /// Speaks reply text. Hold-on lines and read-backs go straight to `say`.
+    /// Speaks reply text, which counts toward what the user heard of it. Hold-on lines and
+    /// read-backs go straight to `say`.
     private func speak(_ sentences: [String]) {
         if let first = sentences.first { metrics.replySentence(first) }
-        for sentence in sentences { say(sentence) }
+        for sentence in sentences { say(sentence, isReply: true) }
     }
 
-    /// Everything the call speaks goes through here, so its words are known as echo.
-    private func say(_ sentence: String) {
+    /// Everything the call speaks goes through here, so its words are known.
+    private func say(_ sentence: String, isReply: Bool = false) {
         log("say: \"\(sentence)\"")
         spokenWords.formUnion(Self.words(in: sentence))
-        speaker.enqueue(sentence)
+        speaker.enqueue(sentence, isReply: isReply)
+    }
+
+    /// The user is cutting off a reply Atlas has started saying: the next turn sent says where.
+    /// Read before the speaker stops, which drops the sentence playing.
+    private func noteCutIn() {
+        guard replyActive, replyStarted else { return }
+        cutInNote = VoiceCallPhrases.cutInNote(heard: speaker.heardText)
+        log("cut in: \(cutInNote ?? "")")
     }
 
     /// Logs the turn's end-of-speech-to-audible line once audio starts on its reply's first sentence.

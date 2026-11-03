@@ -16,8 +16,9 @@ enum VoiceCallTiming {
     static let noReplyTextGrace: TimeInterval = 3
     /// A turn is forced to end this long after it started, so a stuck mic can't hang the call.
     static let monologueCap: TimeInterval = 30
-    /// Words, not in what Atlas is saying, that must be heard before talking over Atlas interrupts it.
-    /// Backchannels ("yeah", "mm") never count, so agreeing doesn't cut Atlas off.
+    /// Words that must be heard before talking over Atlas interrupts it (one more when the speech
+    /// carries over the room's words from before the reply). Backchannels ("yeah", "mm") never
+    /// count, so agreeing doesn't cut Atlas off.
     static let bargeInNovelWords = 1
     /// New words heard while Atlas is still working on a reply that make them part of the
     /// turn just sent: the run is cancelled and the turn reopened with them.
