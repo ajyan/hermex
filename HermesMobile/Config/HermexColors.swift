@@ -110,11 +110,11 @@ struct HermexPaper: Equatable {
     let edge: Color
     /// Text on a solid `glow` fill (a request's primary button).
     let onGlow: Color
+    /// Supporting text on a `card` or `wash`, never `hxTextSecondary`: the ink at 80% in light,
+    /// the glow at 80% in dark, since the light ink would vanish on a dark card.
+    let secondaryInk: Color
     /// The raw values, for surfaces that derive their own ramps (Brain covers).
     let values: (paper: UInt32, ink: UInt32, glowLight: UInt32, glowDark: UInt32, hue: UInt32)
-
-    /// Supporting text on the paper: the ink, lighter, never `hxTextSecondary`.
-    var secondaryInk: Color { ink.opacity(0.75) }
 
     private init(paper: UInt32, ink: UInt32, glowLight: UInt32, glowDark: UInt32, hue: UInt32, warm: Bool = false) {
         func color(_ rgb: UInt32, alpha: UInt32 = 0xFF) -> UIColor { HermexPalette.uiColor(rgb << 8 | alpha) }
@@ -129,6 +129,7 @@ struct HermexPaper: Equatable {
         card = dynamic(light: color(Self.mix(hue, over: 0xF8FAFF, 0.2)), dark: color(darkCard))
         edge = dynamic(light: color(glowLight, alpha: 0x4D), dark: color(glowDark, alpha: 0x47))
         onGlow = dynamic(light: color(0xFFFFFF), dark: color(ink))
+        secondaryInk = dynamic(light: color(ink, alpha: 0xCC), dark: color(glowDark, alpha: 0xCC))
         values = (paper, ink, glowLight, glowDark, hue)
     }
 
