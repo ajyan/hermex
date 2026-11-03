@@ -291,7 +291,8 @@ final class TurnTraceFlowTests: APIClientTestCase {
             streamClient: streamClient,
             approvalStreamClient: ScriptedSSEStreamingClient(),
             clarifyStreamClient: ScriptedSSEStreamingClient(),
-            btwStreamClient: ScriptedSSEStreamingClient()
+            btwStreamClient: ScriptedSSEStreamingClient(),
+            sessionEventsClient: SpySessionEventStream()
         )
         streamClient.flushPendingStreamingContent = { [weak viewModel] in
             viewModel?.flushPendingStreamingContent()

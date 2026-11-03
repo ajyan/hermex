@@ -53,6 +53,9 @@ enum VoiceCallTiming {
     /// After the mic restarts for a route or session change, further changes this soon are
     /// the same change (a route change and the engine's reconfiguration arrive together).
     static let listenerRestartDebounce: TimeInterval = 1.0
+    /// How long the call shows Atlas digging after it sends a background lookup off, if
+    /// the answer never comes back as a reply.
+    static let digPendingTimeout: TimeInterval = 180
 }
 
 enum VoiceCallSettings {

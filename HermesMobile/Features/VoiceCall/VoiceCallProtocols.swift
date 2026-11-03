@@ -49,6 +49,9 @@ protocol VoiceCallChatDriving: AnyObject {
     /// The call's system audio is up (or gone). While it is up the app keeps running in
     /// the background, so the chat keeps its stream when a background task expires.
     func voiceCallDidChange(isActive: Bool)
+    /// Set by the call: during it, the chat attached a turn the server started by itself
+    /// (a background dig coming back), with its stream id.
+    var onServerStartedReply: ((String) -> Void)? { get set }
     /// The call's timing of the current turn, in milliseconds, for its turn trace: from the end
     /// of the user's speech to the reply's first audible word, or from speech over the reply to silence.
     func noteVoiceTiming(speechEndToAudibleMS: Int?, bargeInMS: Int?)
