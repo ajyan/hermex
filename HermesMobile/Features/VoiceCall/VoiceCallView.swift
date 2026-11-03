@@ -408,10 +408,12 @@ struct VoiceCallView: View {
         }
     }
 
-    /// What Atlas is running, while it works on a reply.
+    /// What Atlas is running while it works on a reply; otherwise a lookup it sent off and is still waiting on.
     private var toolActivity: VoiceCallToolActivity? {
-        guard controller?.currentTool != nil, state == .thinking || state == .speaking else { return nil }
-        return snapshot.toolActivity
+        if controller?.currentTool != nil, state == .thinking || state == .speaking, let running = snapshot.toolActivity {
+            return running
+        }
+        return controller?.digPending == true ? .digging : nil
     }
 
     private var captions: some View {

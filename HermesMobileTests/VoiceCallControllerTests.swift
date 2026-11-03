@@ -133,6 +133,7 @@ private final class FakeChat: VoiceCallChatDriving {
     }
 
     func voiceCallDidChange(isActive: Bool) { callActiveChanges.append(isActive) }
+    var onServerStartedReply: ((String) -> Void)?
 
     /// Every timing the call reported for its turn traces, in milliseconds.
     var audibleTimings: [Int] = []
@@ -1648,6 +1649,119 @@ final class VoiceCallControllerTests: XCTestCase {
             metrics.summary.hasPrefix("call summary: turns 4, speech_end→audible p50 2.00s max 4.00s n=4, barge-ins 0 (spoken n=0)"),
             metrics.summary
         )
+    }
+
+    // MARK: - Server-started replies
+
+    /// A turn in which Atlas sends a lookup off and says so; the call is listening again after it.
+    private func digTurn() async {
+        await controller.start()
+        await say("dig into the offer")
+        update(tool: "delegate_task")
+        update(text: "Let me dig into that.")
+        update(text: "Let me dig into that.", streaming: false)
+        speaker.drain()
+    }
+
+    func testAFollowUpIsSpokenWhileListening() async {
+        await digTurn()
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertTrue(controller.digPending)
+        XCTAssertTrue(logLines.contains("dig started"))
+        let samples = controller.turnLatenciesMS
+
+        chat.onServerStartedReply?("stream-dig")
+        XCTAssertTrue(logLines.contains("follow-up stream stream-dig attached"))
+        XCTAssertFalse(controller.digPending)
+        XCTAssertEqual(controller.state, .thinking)
+        // Nobody asked: no thinking cue or hold-on line while it starts.
+        clock += VoiceCallTiming.holdOnDelay
+        controller.tick()
+        XCTAssertFalse(speaker.spoken.contains(VoiceCallPhrases.holdOn))
+
+        update(text: "The offer is 180 base. Want the equity")
+        XCTAssertEqual(controller.state, .speaking)
+        update(text: "The offer is 180 base. Want the equity too?", streaming: false)
+        XCTAssertEqual(Array(speaker.spoken.suffix(2)), ["The offer is 180 base.", "Want the equity too?"])
+        speaker.drain()
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertEqual(controller.turnLatenciesMS, samples)
+        XCTAssertEqual(chat.sent, [tag + "dig into the offer"])
+    }
+
+    func testSpeakingBeforeAFollowUpSaysAnythingCancelsItAndSendsTheUsersWords() async {
+        await digTurn()
+        chat.onServerStartedReply?("stream-dig")
+        XCTAssertEqual(controller.state, .thinking)
+
+        voice(true, for: 0.4)
+        listener.onPartial?("actually what about")
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.cancelCount, 1)
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertTrue(logLines.contains("follow-up replaced by user speech"))
+
+        // The cancelled run's text never plays; the user's turn goes out.
+        update(text: "The offer is 180 base.")
+        await say("actually what about tomorrow")
+        XCTAssertFalse(speaker.spoken.contains("The offer is 180 base."))
+        XCTAssertEqual(chat.sent, [tag + "dig into the offer", tag + "actually what about tomorrow"])
+        XCTAssertEqual(chat.cancelCount, 1)
+    }
+
+    func testAFollowUpArrivingMidSentenceWaitsAndLosesToTheFinishedTurn() async {
+        await digTurn()
+        voice(true, for: 0.6)
+        listener.onPartial?("what about")
+        chat.onServerStartedReply?("stream-dig")
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertEqual(controller.partialTranscript, "what about")
+
+        listener.onFinal?("what about the equity")
+        voice(false, for: 0.9)
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.cancelCount, 1)
+        XCTAssertEqual(chat.sent.last, tag + "what about the equity")
+        XCTAssertTrue(logLines.contains("follow-up replaced by user speech"))
+    }
+
+    func testTalkingOverAFollowUpIsAnOrdinaryBargeIn() async {
+        await digTurn()
+        chat.onServerStartedReply?("stream-dig")
+        update(text: "The offer is 180 base. Then")
+        XCTAssertEqual(controller.state, .speaking)
+        clock += VoiceCallTiming.talkOverGrace
+
+        voice(true, for: 0.4)
+        listener.onPartial?("hold on a")
+        await controller.lastChatTask?.value
+        XCTAssertEqual(chat.cancelCount, 1)
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertEqual(controller.interruptions, 1)
+    }
+
+    func testAFollowUpAfterTheCallEndsIsNotSpoken() async {
+        await digTurn()
+        let spoken = speaker.spoken
+        controller.end()
+        XCTAssertFalse(controller.digPending, "ending the call clears the chip")
+
+        chat.onServerStartedReply?("stream-dig")
+        update(text: "The offer is 180 base.")
+        XCTAssertEqual(speaker.spoken, spoken)
+        XCTAssertFalse(logLines.contains("follow-up stream stream-dig attached"))
+    }
+
+    func testDigChipClearsAfterItsTimeout() async {
+        await digTurn()
+        clock += VoiceCallTiming.digPendingTimeout - 1
+        controller.tick()
+        XCTAssertTrue(controller.digPending)
+
+        clock += 2
+        controller.tick()
+        XCTAssertFalse(controller.digPending)
+        XCTAssertTrue(logLines.contains("dig chip cleared (timeout)"))
     }
 }
 

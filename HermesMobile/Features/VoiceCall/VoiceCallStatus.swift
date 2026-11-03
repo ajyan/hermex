@@ -31,6 +31,11 @@ struct VoiceCallToolActivity: Equatable {
         }
     }
 
+    /// Between replies, while a background lookup Atlas sent off (`delegate_task`) is still out.
+    static let digging = VoiceCallToolActivity(
+        kind: .delegate, label: String(localized: "Digging"), symbol: "magnifyingglass"
+    )
+
     private static func checkingNotes(_ kind: ToolCallSummaryFormatter.Kind) -> VoiceCallToolActivity {
         VoiceCallToolActivity(kind: kind, label: String(localized: "Checking your notes"), symbol: "doc.text.magnifyingglass")
     }

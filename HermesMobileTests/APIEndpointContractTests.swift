@@ -110,6 +110,12 @@ final class ContractReadinessTests: XCTestCase {
                 path: "/api/chat/stream/status",
                 query: ["stream_id": "stream-123"]
             ),
+            .init(
+                name: "session events",
+                method: "GET",
+                endpoint: .sessionEvents(sessionID: "session-123"),
+                path: "/api/sessions/session-123/events"
+            ),
             .init(name: "chat steer", method: "POST", endpoint: .chatSteer, path: "/api/chat/steer"),
             .init(name: "goal", method: "POST", endpoint: .submitGoal, path: "/api/goal"),
             .init(

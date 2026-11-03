@@ -8,6 +8,7 @@ import XCTest
 @MainActor
 final class VoiceCallFlowTests: XCTestCase {
     private var stream: ScriptedSSEStreamingClient!
+    private var sessionEvents: SpySessionEventStream!
     private var chat: ChatViewModel!
     private var listener: FlowListener!
     private var speaker: FlowSpeaker!
@@ -17,6 +18,7 @@ final class VoiceCallFlowTests: XCTestCase {
 
     override func setUp() async throws {
         stream = ScriptedSSEStreamingClient()
+        sessionEvents = SpySessionEventStream()
         chat = try makeViewModel(streamClient: stream)
         listener = FlowListener()
         speaker = FlowSpeaker()
@@ -118,6 +120,55 @@ final class VoiceCallFlowTests: XCTestCase {
         XCTAssertTrue(redial.spoken.isEmpty)
     }
 
+    /// Atlas sends a lookup off and its turn ends; when the lookup is done the server starts a turn
+    /// by itself. The call hears that run on the session's events and speaks its reply.
+    func testADigsAnswerComingBackIsSpoken() async throws {
+        let prefix = VoiceCallPhrases.voicePrefix(at: Self.callTime)
+        MockURLProtocol.requestHandler = { request in
+            switch request.url?.path {
+            case "/api/chat/start":
+                return apiTestJSONResponse(#"{"session_id":"session-abc","stream_id":"stream-1"}"#, for: request)
+            case "/api/session":
+                return apiTestJSONResponse("""
+                {"session": {"session_id": "session-abc", "active_stream_id": "stream-dig", "messages": [
+                  {"role": "user", "content": "\(prefix)dig into the offer", "message_id": "srv-1"},
+                  {"role": "assistant", "content": "Let me dig into that.", "message_id": "srv-2"},
+                  {"role": "user", "content": "[Background task completed] the offer", "message_id": "srv-3"}
+                ]}}
+                """, for: request)
+            default:
+                return apiTestJSONResponse("{}", for: request)
+            }
+        }
+        await say("dig into the offer")
+        let dig = ToolStreamEvent(eventType: nil, name: "delegate_task", preview: nil, args: nil, duration: nil, isError: nil)
+        stream.emit(.toolStarted(dig))
+        feed()
+        XCTAssertTrue(controller.digPending)
+        stream.emit(.toolCompleted(dig))
+        stream.emit(.token("Let me dig into that."))
+        stream.emit(.done(DoneStreamEvent(session: try detail(reply: [("assistant", "Let me dig into that.")]))))
+        stream.emit(.streamEnd)
+        feed()
+        speaker.drain()
+        XCTAssertEqual(controller.state, .listening)
+        XCTAssertTrue(controller.digPending)
+
+        sessionEvents.emit("stream-1:9")
+        XCTAssertNil(chat.serverRunAttachTask, "the call's own run is not a new turn")
+        sessionEvents.emit("stream-dig:1")
+        await chat.serverRunAttachTask?.value
+        feed()
+        XCTAssertFalse(controller.digPending)
+        XCTAssertEqual(controller.state, .thinking)
+
+        stream.emit(.token("The offer is 180 base. "))
+        feed()
+        XCTAssertEqual(speaker.spoken, [VoiceCallPhrases.checking, "Let me dig into that.", "The offer is 180 base."])
+        XCTAssertEqual(controller.state, .speaking)
+        XCTAssertEqual(controller.turnLatenciesMS.count, 1, "a reply nobody asked for is not a turn sample")
+    }
+
     // MARK: - Helpers
 
     private func feed() {
@@ -185,7 +236,8 @@ final class VoiceCallFlowTests: XCTestCase {
             streamClient: streamClient,
             approvalStreamClient: ScriptedSSEStreamingClient(),
             clarifyStreamClient: ScriptedSSEStreamingClient(),
-            btwStreamClient: ScriptedSSEStreamingClient()
+            btwStreamClient: ScriptedSSEStreamingClient(),
+            sessionEventsClient: sessionEvents
         )
         // Tokens land in `messages` as they arrive (no word-reveal timer), so each
         // `feed()` sees exactly what the scripted stream has delivered.

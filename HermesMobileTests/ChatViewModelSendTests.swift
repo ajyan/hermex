@@ -11520,6 +11520,7 @@ final class ChatViewModelSendTests: XCTestCase {
             streamClient: resolvedStreamClient,
             approvalStreamClient: approvalStreamClient ?? SpySSEStreamingClient(),
             clarifyStreamClient: clarifyStreamClient ?? SpySSEStreamingClient(),
+            sessionEventsClient: SpySessionEventStream(),
             liveActivityManager: liveActivityManager,
             pollingIntervals: pollingIntervals,
             steeringConfirmationDismissDelay: steeringConfirmationDismissDelay,

@@ -39,6 +39,10 @@ enum Endpoint {
     case chatStream(streamID: String, replayAfterSeq: Int? = nil)
     case chatCancel(streamID: String)
     case chatStreamStatus(streamID: String)
+    /// SSE of every run in one session (fork): replays the session journal after the
+    /// `Last-Event-ID` cursor, then attaches to the active run, including ones the server
+    /// started by itself. The server closes it after each run's terminal event.
+    case sessionEvents(sessionID: String)
     case chatSteer
     case submitGoal
     case approvalPending(sessionID: String)
@@ -322,6 +326,8 @@ enum Endpoint {
             return "/api/chat/cancel"
         case .chatStreamStatus:
             return "/api/chat/stream/status"
+        case let .sessionEvents(sessionID):
+            return "/api/sessions/\(sessionID)/events"
         case .chatSteer:
             return "/api/chat/steer"
         case .submitGoal:
@@ -883,6 +889,8 @@ enum Endpoint {
     func url(relativeTo baseURL: URL) -> URL {
         let url: URL
         switch self {
+        case let .sessionEvents(sessionID):
+            url = segmentURL(relativeTo: baseURL, root: "/api/sessions", segment: sessionID, suffix: "/events")
         case let .kanbanCardDetail(request):
             url = kanbanTaskURL(relativeTo: baseURL, cardID: request.cardID)
         case let .kanbanEditBoard(request):
@@ -923,24 +931,22 @@ enum Endpoint {
     }
 
     private func kanbanTaskURL(relativeTo baseURL: URL, cardID: String, suffix: String = "") -> URL {
-        let root = baseURL.appending(path: "/api/kanban/tasks")
-        guard var components = URLComponents(url: root, resolvingAgainstBaseURL: false),
-              let encodedCardID = cardID.addingPercentEncoding(withAllowedCharacters: Self.pathSegmentAllowed)
-        else {
-            return root
-        }
-        components.percentEncodedPath += "/\(encodedCardID)\(suffix)"
-        return components.url ?? root
+        segmentURL(relativeTo: baseURL, root: "/api/kanban/tasks", segment: cardID, suffix: suffix)
     }
 
     private func kanbanBoardURL(relativeTo baseURL: URL, slug: String, suffix: String = "") -> URL {
-        let root = baseURL.appending(path: "/api/kanban/boards")
+        segmentURL(relativeTo: baseURL, root: "/api/kanban/boards", segment: slug, suffix: suffix)
+    }
+
+    /// `root/<segment><suffix>`, with the identifier encoded as one path segment.
+    private func segmentURL(relativeTo baseURL: URL, root path: String, segment: String, suffix: String) -> URL {
+        let root = baseURL.appending(path: path)
         guard var components = URLComponents(url: root, resolvingAgainstBaseURL: false),
-              let encodedSlug = slug.addingPercentEncoding(withAllowedCharacters: Self.pathSegmentAllowed)
+              let encodedSegment = segment.addingPercentEncoding(withAllowedCharacters: Self.pathSegmentAllowed)
         else {
             return root
         }
-        components.percentEncodedPath += "/\(encodedSlug)\(suffix)"
+        components.percentEncodedPath += "/\(encodedSegment)\(suffix)"
         return components.url ?? root
     }
 

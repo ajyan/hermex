@@ -33,6 +33,10 @@ extension APIClient {
         Endpoint.chatStream(streamID: streamID, replayAfterSeq: replayAfterSeq).url(relativeTo: baseURL)
     }
 
+    nonisolated func sessionEventsURL(sessionID: String) -> URL {
+        Endpoint.sessionEvents(sessionID: sessionID).url(relativeTo: baseURL)
+    }
+
     func cancelChat(streamID: String) async throws -> ChatCancelResponse {
         try await send(endpoint: .chatCancel(streamID: streamID), method: "GET")
     }

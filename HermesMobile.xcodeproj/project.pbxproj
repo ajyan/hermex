@@ -106,6 +106,7 @@
 		BF7E56FE3F4B476686A0DCEF /* VoiceCallChatSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC7685CE580C850A7254B14E /* VoiceCallChatSnapshotTests.swift */; };
 		5A7F1E1D000200000000B001 /* VoiceCallSceneTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A7F1E1D000200000000F001 /* VoiceCallSceneTests.swift */; };
 		5A7F1E1D000200000000B000 /* VoiceCallSourcesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A7F1E1D000200000000F000 /* VoiceCallSourcesTests.swift */; };
+		5D16C0DE0002000000000B00 /* SessionRunListenerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D16C0DE0002000000000F00 /* SessionRunListenerTests.swift */; };
 		847725A1C758CAFAB6320F5B /* VoiceCallDeepLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01C6B585C5AD096D1B24540 /* VoiceCallDeepLinkTests.swift */; };
 		983F200737186F6607CDB775 /* VoiceDisplayStripTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D86FF2CBCD33B4B3E7DC44EF /* VoiceDisplayStripTests.swift */; };
 		325135E0239A6B2D29978A89 /* CallSystemBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C1C41E4E055E24D8807B748 /* CallSystemBridge.swift */; };
@@ -585,6 +586,7 @@
 		C14900000000000000000009 /* APIClientKanbanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1490000000000000000000A /* APIClientKanbanTests.swift */; };
 		C1490000000000000000000B /* KanbanFeatureStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1490000000000000000000C /* KanbanFeatureStateTests.swift */; };
 		C15100000000000000000001 /* KanbanEventStreamClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C15100000000000000000002 /* KanbanEventStreamClient.swift */; };
+		5D16C0DE0001000000000B00 /* SessionEventStreamClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D16C0DE0001000000000F00 /* SessionEventStreamClient.swift */; };
 		C15100000000000000000003 /* KanbanEventStreamClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C15100000000000000000004 /* KanbanEventStreamClientTests.swift */; };
 		C15100000000000000000005 /* KanbanLiveUpdateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C15100000000000000000006 /* KanbanLiveUpdateTests.swift */; };
 		C15400000000000000000001 /* KanbanCardDetailState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C15400000000000000000002 /* KanbanCardDetailState.swift */; };
@@ -1008,6 +1010,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		CC7685CE580C850A7254B14E /* VoiceCallChatSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallChatSnapshotTests.swift; sourceTree = "<group>"; };
 		5A7F1E1D000200000000F001 /* VoiceCallSceneTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallSceneTests.swift; sourceTree = "<group>"; };
 		5A7F1E1D000200000000F000 /* VoiceCallSourcesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallSourcesTests.swift; sourceTree = "<group>"; };
+		5D16C0DE0002000000000F00 /* SessionRunListenerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRunListenerTests.swift; sourceTree = "<group>"; };
 		A01C6B585C5AD096D1B24540 /* VoiceCallDeepLinkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallDeepLinkTests.swift; sourceTree = "<group>"; };
 		D86FF2CBCD33B4B3E7DC44EF /* VoiceDisplayStripTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceDisplayStripTests.swift; sourceTree = "<group>"; };
 		4C1C41E4E055E24D8807B748 /* CallSystemBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallSystemBridge.swift; sourceTree = "<group>"; };
@@ -1523,6 +1526,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		C1490000000000000000000A /* APIClientKanbanTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientKanbanTests.swift; sourceTree = "<group>"; };
 		C1490000000000000000000C /* KanbanFeatureStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanFeatureStateTests.swift; sourceTree = "<group>"; };
 		C15100000000000000000002 /* KanbanEventStreamClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanEventStreamClient.swift; sourceTree = "<group>"; };
+		5D16C0DE0001000000000F00 /* SessionEventStreamClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionEventStreamClient.swift; sourceTree = "<group>"; };
 		C15100000000000000000004 /* KanbanEventStreamClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanEventStreamClientTests.swift; sourceTree = "<group>"; };
 		C15100000000000000000006 /* KanbanLiveUpdateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanLiveUpdateTests.swift; sourceTree = "<group>"; };
 		C15400000000000000000002 /* KanbanCardDetailState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanCardDetailState.swift; sourceTree = "<group>"; };
@@ -2028,6 +2032,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				CC7685CE580C850A7254B14E /* VoiceCallChatSnapshotTests.swift */,
 				5A7F1E1D000200000000F001 /* VoiceCallSceneTests.swift */,
 				5A7F1E1D000200000000F000 /* VoiceCallSourcesTests.swift */,
+				5D16C0DE0002000000000F00 /* SessionRunListenerTests.swift */,
 				A01C6B585C5AD096D1B24540 /* VoiceCallDeepLinkTests.swift */,
 				C7E5A1000000000000000012 /* IncomingURLRouteTests.swift */,
 				D86FF2CBCD33B4B3E7DC44EF /* VoiceDisplayStripTests.swift */,
@@ -2302,6 +2307,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C04000000000000000000019 /* APIClient+Upload.swift */,
 				C14900000000000000000004 /* APIClient+Kanban.swift */,
 				C15100000000000000000002 /* KanbanEventStreamClient.swift */,
+				5D16C0DE0001000000000F00 /* SessionEventStreamClient.swift */,
 				1A2B3C4D5E6F7000000000B8 /* Endpoints.swift */,
 				C03250000000000000F102 /* APIClient+Transcribe.swift */,
 				D1A7B0000000000000F001 /* APIClient+Brief.swift */,
@@ -3517,6 +3523,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C14900000000000000000001 /* Kanban.swift in Sources */,
 				C14900000000000000000003 /* APIClient+Kanban.swift in Sources */,
 				C15100000000000000000001 /* KanbanEventStreamClient.swift in Sources */,
+				5D16C0DE0001000000000B00 /* SessionEventStreamClient.swift in Sources */,
 				C14900000000000000000005 /* KanbanFeatureState.swift in Sources */,
 				C14900000000000000000007 /* KanbanLabView.swift in Sources */,
 				C15400000000000000000001 /* KanbanCardDetailState.swift in Sources */,
@@ -3830,6 +3837,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				BF7E56FE3F4B476686A0DCEF /* VoiceCallChatSnapshotTests.swift in Sources */,
 				5A7F1E1D000200000000B001 /* VoiceCallSceneTests.swift in Sources */,
 				5A7F1E1D000200000000B000 /* VoiceCallSourcesTests.swift in Sources */,
+				5D16C0DE0002000000000B00 /* SessionRunListenerTests.swift in Sources */,
 				847725A1C758CAFAB6320F5B /* VoiceCallDeepLinkTests.swift in Sources */,
 				C7E5A1000000000000000002 /* IncomingURLRouteTests.swift in Sources */,
 				983F200737186F6607CDB775 /* VoiceDisplayStripTests.swift in Sources */,

@@ -513,6 +513,15 @@ final class ChatViewModel {
     /// True while a voice call's system audio is up; see `suspendStreamForBackground`.
     @ObservationIgnored private var isVoiceCallActive = false
     @ObservationIgnored private var backgroundSuspendDeferredForCall = false
+    /// During a call, watches the session for runs the server starts by itself (a background dig finishing).
+    @ObservationIgnored private var sessionRunListener: SessionRunListener?
+    @ObservationIgnored private let sessionEventsClient: any SessionEventStreaming
+    /// Runs this chat started or attached; a session event from any other is a server-started turn.
+    @ObservationIgnored private var knownRunStreamIDs: Set<String> = []
+    /// The latest attach of a server-started run; tests await it.
+    @ObservationIgnored private(set) var serverRunAttachTask: Task<Void, Never>?
+    /// Told the stream id once a server-started turn's stream is attached during a call.
+    @ObservationIgnored var onServerStartedReply: ((String) -> Void)?
     /// Whether the chat title offers rename: a live, server-backed session.
     var canRenameSession: Bool { sessionID != nil && !isViewingCachedData }
     /// The workspace this chat's session is pointed at. `/workspace` and the
@@ -645,6 +654,7 @@ final class ChatViewModel {
         approvalStreamClient: SSEStreamingClient? = nil,
         clarifyStreamClient: SSEStreamingClient? = nil,
         btwStreamClient: SSEStreamingClient? = nil,
+        sessionEventsClient: (any SessionEventStreaming)? = nil,
         liveActivityManager: (any AgentLiveActivityManaging)? = nil,
         showsLiveActivityResponseExcerpts: Bool = false,
         pollingIntervals: ChatPollingIntervals = .standard,
@@ -695,6 +705,7 @@ final class ChatViewModel {
         )
         self.drafts = draftStore ?? .shared
         self.btwStreamClient = btwStreamClient ?? SSEClient()
+        self.sessionEventsClient = sessionEventsClient ?? SessionEventStreamClient()
         self.liveActivityManager = resolvedLiveActivityManager
         self.showsLiveActivityResponseExcerpts = showsLiveActivityResponseExcerpts
         self.pollingIntervals = pollingIntervals
@@ -2816,11 +2827,7 @@ final class ChatViewModel {
                 // assistant turn instead of creating a second bubble with only the tail.
                 await loadMessages(modelContext: modelContext)
                 guard generation == chatSendGeneration, !Task.isCancelled else { return false }
-                _ = restoreActiveStreamSnapshotIfAvailable(streamID: streamID)
-                streamingAssistantMessageID = TranscriptTurnClassifier
-                    .currentTurnAssistantAnchorIDs(in: messages, messageOffset: messagesOffset)
-                    .first
-                streamCoordinator.start(streamID: streamID)
+                joinLoadedRun(streamID: streamID)
                 // The server kept the earlier run, not this newly submitted text.
                 // Report an unaccepted send so ChatView restores the draft while
                 // the coordinator reconnects to the existing response.
@@ -2831,6 +2838,16 @@ final class ChatViewModel {
             sendErrorRuntimeStale = (error as? APIError)?.agentRuntimeStale
             return false
         }
+    }
+
+    /// Attaches to a run that started outside this view model, once `loadMessages` has
+    /// reconciled the transcript so its tokens land on the persisted assistant turn.
+    private func joinLoadedRun(streamID: String) {
+        _ = restoreActiveStreamSnapshotIfAvailable(streamID: streamID)
+        streamingAssistantMessageID = TranscriptTurnClassifier
+            .currentTurnAssistantAnchorIDs(in: messages, messageOffset: messagesOffset)
+            .first
+        streamCoordinator.start(streamID: streamID)
     }
 
     /// Loads the continuation a `session_rotated` 409 named, for
@@ -6376,6 +6393,7 @@ extension ChatViewModel: ChatStreamCoordinatorDelegate {
     }
 
     func streamCoordinatorDidStartConnection(isReplay: Bool) {
+        if let activeStreamID { knownRunStreamIDs.insert(activeStreamID) }
         // A fresh connection re-arms the pulse so a reply's first live token
         // always ticks, even when the previous reply pulsed less than an interval
         // ago. A replay continues the same reply, so its window carries over.
@@ -7279,6 +7297,12 @@ extension ChatViewModel: VoiceCallChatDriving {
     func voiceCallDidChange(isActive: Bool) {
         isVoiceCallActive = isActive
         streamCoordinator.voiceCallDidChange(isActive: isActive)
+        if isActive {
+            startSessionRunListener()
+        } else {
+            sessionRunListener?.stop()
+            sessionRunListener = nil
+        }
         guard !isActive, backgroundSuspendDeferredForCall else { return }
         backgroundSuspendDeferredForCall = false
         suspendActiveStreamConnection()
@@ -7286,6 +7310,48 @@ extension ChatViewModel: VoiceCallChatDriving {
 
     func noteVoiceTiming(speechEndToAudibleMS: Int?, bargeInMS: Int?) {
         streamCoordinator.noteVoiceTiming(speechEndToAudibleMS: speechEndToAudibleMS, bargeInMS: bargeInMS)
+    }
+
+    /// Listens to this session's runs for the length of the call. It belongs to this view
+    /// model's server and session, and stops when the call ends.
+    private func startSessionRunListener() {
+        guard sessionRunListener == nil, let sessionID else { return }
+        let listener = SessionRunListener(
+            url: client.sessionEventsURL(sessionID: sessionID),
+            stream: sessionEventsClient,
+            log: VoiceCallDiagnostics.write
+        ) { [weak self] streamID in
+            self?.sessionRunDidAppear(streamID)
+        }
+        sessionRunListener = listener
+        listener.start()
+    }
+
+    /// A run showed up in the session. One this chat doesn't know, starting while nothing
+    /// streams here, is a turn the server started by itself: attach and hand it to the call.
+    private func sessionRunDidAppear(_ streamID: String) {
+        guard isVoiceCallActive, !knownRunStreamIDs.contains(streamID) else { return }
+        // A send's own run can appear before `chat/start` answers with its id; the send attaches it.
+        guard activeStreamID == nil, !isStartingChat, serverRunAttachTask == nil else { return }
+        knownRunStreamIDs.insert(streamID)
+        serverRunAttachTask = Task { [weak self] in
+            await self?.attachServerStartedRun(streamID: streamID)
+            self?.serverRunAttachTask = nil
+        }
+    }
+
+    /// Joins the run the reloaded session reports. A run the journal replayed may already be
+    /// over; then the reload is all it needs.
+    private func attachServerStartedRun(streamID: String) async {
+        let generation = chatSendGeneration
+        await loadMessages()
+        guard generation == chatSendGeneration, let running = activeStreamID, isActiveStreamConnectionSuspended else {
+            VoiceCallDiagnostics.write("server-started run \(streamID) already over; transcript reloaded")
+            return
+        }
+        knownRunStreamIDs.insert(running)
+        joinLoadedRun(streamID: running)
+        if isVoiceCallActive { onServerStartedReply?(running) }
     }
 
     /// Sends one spoken turn. Unlike `sendMessage`, it never picks up the

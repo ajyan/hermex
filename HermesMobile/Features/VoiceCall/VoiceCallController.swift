@@ -112,6 +112,9 @@ final class VoiceCallController {
     /// Counts the times the user cut Atlas off (talking over it, saying "stop", or a tap), so the
     /// call screen can answer each at once.
     private(set) var interruptions = 0
+    /// True from Atlas sending a background lookup off (`delegate_task`) until its answer
+    /// comes back as a reply, the call ends, or `digPendingTimeout` passes.
+    private(set) var digPending = false
 
     @ObservationIgnored private let listener: SpeechListening
     @ObservationIgnored private let speaker: SpeechSpeaking
@@ -215,6 +218,13 @@ final class VoiceCallController {
     // Reconnect
     @ObservationIgnored private var reconnectSince: TimeInterval?
 
+    // Server-started replies
+    @ObservationIgnored private var digStartedAt: TimeInterval?
+    /// True while the reply is one the server started by itself, not an answer to a send.
+    @ObservationIgnored private var isFollowUp = false
+    /// A server-started reply is attached but waits for the user to finish speaking.
+    @ObservationIgnored private var pendingFollowUp = false
+
     init(
         listener: SpeechListening,
         speaker: SpeechSpeaking,
@@ -245,6 +255,7 @@ final class VoiceCallController {
         bridge.onEnded = { [weak self] in self?.tearDown(endSystemCall: false, message: nil) }
         bridge.onMuteChanged = { [weak self] in self?.handleMuteChanged($0) }
         bridge.onHoldChanged = { [weak self] in self?.handleHoldChanged($0) }
+        chat.onServerStartedReply = { [weak self] in self?.serverStartedReply($0) }
     }
 
     // MARK: - Lifetime
@@ -355,6 +366,8 @@ final class VoiceCallController {
         stopListener()
         setCue(false)
         replyActive = false
+        pendingFollowUp = false
+        clearDig()
         partialTranscript = ""
         if let message {
             // Say why, then hang up once it has been said.
@@ -391,10 +404,23 @@ final class VoiceCallController {
             log(String(format: "main thread stalled: %.2fs between ticks", time - lastTickAt))
         }
         lastTickAt = time
+        if digPending, let digStartedAt, time - digStartedAt >= VoiceCallTiming.digPendingTimeout {
+            clearDig()
+            log("dig chip cleared (timeout)")
+        }
         if let reason = deferredListenerRestart, let listenerRestartedAt,
            time - listenerRestartedAt >= VoiceCallTiming.listenerRestartDebounce {
             deferredListenerRestart = nil
             handleListenerNeedsRestart(reason)
+        }
+        // A server-started reply held for the user's words starts once they stop, if it is still going.
+        if pendingFollowUp, canBeginFollowUp {
+            if lastIsStreaming {
+                beginFollowUp()
+            } else {
+                pendingFollowUp = false
+                log("follow-up finished while the user spoke; left in the chat")
+            }
         }
         switch state {
         case .listening:
@@ -455,7 +481,7 @@ final class VoiceCallController {
     // MARK: - Listener
 
     private func handlePartial(_ text: String) {
-        if checkTalkOver(text) || checkContinuation(text) { return }
+        if checkTalkOver(text) || checkFollowUpInterruption(text) || checkContinuation(text) { return }
         noteAmbient(text)
         guard isHearing, !discardFinals else { return }
         // A "wait" after words already heard is for the call, not part of the turn.
@@ -473,7 +499,7 @@ final class VoiceCallController {
     }
 
     private func handleFinal(_ text: String) {
-        if checkTalkOver(text, isFinal: true) || checkContinuation(text) { return }
+        if checkTalkOver(text, isFinal: true) || checkFollowUpInterruption(text) || checkContinuation(text) { return }
         noteAmbient(text)
         guard isHearing, !discardFinals else { return }
         var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -575,6 +601,26 @@ final class VoiceCallController {
             reopenTurn(sent, adding: heard)
             return true
         }
+    }
+
+    /// Before a server-started reply says anything, the user talking takes the floor: the
+    /// follow-up is cancelled and their turn opens with the words heard ("stop" just drops it).
+    /// Returns true when `heard` was consumed that way.
+    private func checkFollowUpInterruption(_ heard: String) -> Bool {
+        guard state == .thinking, isFollowUp, replyActive, !replyStarted, !isMuted, !isHeld else { return false }
+        let command = Self.command(in: heard)
+        guard command != nil || Self.words(in: heard).contains(where: { !Self.backchannelWords.contains($0) }) else {
+            return false
+        }
+        log("follow-up replaced by user speech")
+        cancelPendingRun()
+        if command != nil {
+            returnToListening()
+        } else {
+            state = .listening
+            restartTurn(seed: heard)
+        }
+        return true
     }
 
     private func reopenTurn(_ sent: String, adding heard: String?) {
@@ -791,25 +837,22 @@ final class VoiceCallController {
     /// Hands `text` to the chat as the next turn and moves the call to `thinking`. `speechEnd` is
     /// when the user stopped speaking it (nil for the opening turn), for the turn timing line.
     private func send(_ text: String, note: String = "", speechEnd: TimeInterval? = nil) {
-        state = .thinking
-        spokenWords = []
-        ambientWords = []
-        discardFinals = true
-        clearTranscript()
-        shaper = SpeechTextShaper()
-        replyActive = true
+        if pendingFollowUp {
+            // The user finished speaking before a server-started reply could begin: their words win.
+            pendingFollowUp = false
+            log("follow-up replaced by user speech")
+            let earlier = lastChatTask
+            lastChatTask = Task { [chat] in
+                await earlier?.value
+                _ = await chat.cancelActiveStream()
+            }
+        }
+        prepareReply()
         awaitingSendAcceptance = true
         sendCount += 1
         let turn = sendCount
-        replyStarted = false
         latencyRecorded = false
-        runSeenStreaming = false
-        runFinished = false
-        runFinishedAt = nil
         beginThinking()
-        holdOnLinesSaid = 0
-        sentAt = now()
-        speechAfterSendAt = nil
         metrics.turnSent(speechEnd: speechEnd)
         log("send: \"\(text)\"\(note)")
         // A cancel queued for the turn this one replaces must land first, or it stops this run.
@@ -836,6 +879,61 @@ final class VoiceCallController {
             self.state = .speaking
             self.runFinished = true
         }
+    }
+
+    /// Moves the call to `thinking` with a fresh reply, for a send or a server-started turn.
+    private func prepareReply() {
+        state = .thinking
+        spokenWords = []
+        ambientWords = []
+        discardFinals = true
+        clearTranscript()
+        shaper = SpeechTextShaper()
+        replyActive = true
+        isFollowUp = false
+        replyStarted = false
+        runSeenStreaming = false
+        runFinished = false
+        runFinishedAt = nil
+        holdOnLinesSaid = 0
+        sentAt = now()
+        speechAfterSendAt = nil
+    }
+
+    /// The chat attached a turn the server started by itself, a dig's answer coming back.
+    /// It is spoken like a reply once the user isn't mid-sentence; if they finish a turn
+    /// first, theirs is sent instead.
+    func serverStartedReply(_ streamID: String) {
+        guard !isEnded, state != .idle, state != .connecting else { return }
+        log("follow-up stream \(streamID) attached")
+        clearDig()
+        pendingFollowUp = true
+        // The chat has just started this stream, whatever the last pushed state says.
+        if canBeginFollowUp { beginFollowUp() }
+    }
+
+    /// Listening, and the user isn't in the middle of saying something.
+    private var canBeginFollowUp: Bool {
+        state == .listening && !isHeld && pendingApproval == nil && partialTranscript.isEmpty
+            && !turnDetector.isInTurn && awaitingFinalSince == nil
+    }
+
+    private func beginFollowUp() {
+        pendingFollowUp = false
+        prepareReply()
+        isFollowUp = true
+        awaitingSendAcceptance = false
+        // Nobody asked, so no latency sample, thinking cue, or hold-on line.
+        latencyRecorded = true
+        thinkingSince = nil
+        runSeenStreaming = true
+        lastSentTurn = nil
+        metrics.turnSent(speechEnd: nil)
+    }
+
+    private func clearDig() {
+        digPending = false
+        digStartedAt = nil
     }
 
     private func bargeIn(seed: String) {
@@ -883,6 +981,11 @@ final class VoiceCallController {
                 log("tool: \(currentTool) \(since(sentAt))")
                 metrics.toolStarted(currentTool)
                 sayCheckingIfFirstWait()
+                if currentTool == "delegate_task", replyActive, !digPending {
+                    digPending = true
+                    digStartedAt = now()
+                    log("dig started")
+                }
             }
             self.currentTool = currentTool
         }
