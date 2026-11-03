@@ -3,9 +3,10 @@ import Foundation
 /// Turns a streaming reply into speakable sentences. Feed it the full text so
 /// far; it returns each newly complete sentence once.
 ///
-/// The first paragraph is spoken as it streams. Later paragraphs are held until
-/// `finish()` and spoken only when the reply has no fenced code and no `---`
-/// line: on a call, those mark the details Atlas put in the chat instead.
+/// Everything before a `---` line or fenced code is spoken as it streams: on a
+/// call, those mark the details Atlas put in the chat instead. Paragraphs count
+/// too, since the text Atlas writes around a tool call arrives as its own
+/// paragraph.
 struct SpeechTextShaper {
     private var emitted: [String] = []
     private var lastText = ""
@@ -109,6 +110,11 @@ struct SpeechTextShaper {
             if trimmed.isEmpty {
                 if !paragraphs[paragraphs.count - 1].isEmpty {
                     closeOpenBlock()
+                    // Code in the lead paragraph means the rest is details too.
+                    if sawDetailsMarker {
+                        stopped = true
+                        break
+                    }
                     paragraphs.append([])
                 }
                 continue
@@ -132,16 +138,11 @@ struct SpeechTextShaper {
             paragraphs[paragraphs.count - 1] = current
         }
 
-        if final || paragraphs.count > 1 || stopped {
-            for index in paragraphs[0].indices { paragraphs[0][index].closed = true }
+        let lastOpen = final || stopped ? paragraphs.count : paragraphs.count - 1
+        for paragraph in paragraphs.indices.prefix(lastOpen) {
+            for index in paragraphs[paragraph].indices { paragraphs[paragraph][index].closed = true }
         }
-        var result = paragraphs[0].flatMap(split)
-        if final, !sawDetailsMarker {
-            for paragraph in paragraphs.dropFirst() {
-                result += paragraph.map { Block(text: $0.text, closed: true) }.flatMap(split)
-            }
-        }
-        return result
+        return paragraphs.flatMap { $0.flatMap(split) }
     }
 
     private static func isRule(_ line: String) -> Bool {
