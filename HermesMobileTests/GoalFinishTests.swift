@@ -147,11 +147,15 @@ final class GoalFinishTests: XCTestCase {
         XCTAssertEqual(GoalMonthLevel(miles: 75.4, top: 75.4), .full)
         XCTAssertEqual(GoalMonthLevel(miles: 58.3, top: 75.4), .full)
         XCTAssertEqual(GoalMonthLevel(miles: 39, top: 75.4), .half)
-        XCTAssertEqual(GoalMonthLevel(miles: 21.3, top: 75.4), .ring)
+        XCTAssertEqual(GoalMonthLevel(miles: 21.3, top: 75.4), .light)
         XCTAssertEqual(GoalMonthLevel(miles: 0, top: 75.4), .none)
         XCTAssertEqual(GoalMonthLevel(miles: 0, top: 0), .none)
-        XCTAssertEqual([GoalMonthLevel.full, .half, .ring, .none].map(\.dotState), ["done", "skip", "today", "missed"])
-        XCTAssertEqual(GoalMonthLevel.legend(top: 75.4).map(\.label), ["50+ mi", "25+", "under 25"])
+        // Filled, half, the faint "missed" ring for a light month, the small off mark for none:
+        // never today's ring or yesterday's ringed +, which mean a day still waiting.
+        XCTAssertEqual([GoalMonthLevel.full, .half, .light, .none].map(\.dotState), ["done", "skip", "missed", "off"])
+        XCTAssertFalse([GoalMonthLevel.full, .half, .light, .none].map(\.dotState).contains { ["today", "ask"].contains($0) })
+        XCTAssertEqual(GoalMonthLevel.legend(top: 75.4).map(\.label), ["50+ mi", "25–49", "under 25"])
+        XCTAssertEqual(GoalMonthLevel.legend(top: 75.4).map(\.level), [.full, .half, .light])
     }
 
     func testStoryDropsTheStreakLine() throws {

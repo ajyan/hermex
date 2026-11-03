@@ -1,12 +1,17 @@
 import SwiftUI
 
 /// A goal's paper: one of the Daily Brief's palettes, named in the goal file (`color:`) or
-/// picked from its slug so a goal keeps the same colour everywhere.
+/// picked from its slug so a goal keeps the same colour everywhere. Never amber: `opener` means
+/// "waiting on you", so a goal file's `color: opener` wears `reading` instead.
 enum GoalPaper {
-    /// The papers a goal can take, in a fixed order the slug fallback indexes into, and their names
-    /// in the goal file (`color:`). The widget reads the name back (`AtlasWidgetGoals.paper(named:)`).
-    static let choices: [DeckPalette] = [.wiki, .quote, .book, .reading, .notes, .video, .past, .opener]
-    static let names = ["wiki", "quote", "book", "reading", "notes", "video", "past", "opener"]
+    /// The papers a goal can take, and their names in the goal file (`color:`). The widget reads the
+    /// name back (`AtlasWidgetGoals.paper(named:)`).
+    static let choices: [DeckPalette] = [.wiki, .quote, .book, .reading, .notes, .video, .past]
+    static let names = ["wiki", "quote", "book", "reading", "notes", "video", "past"]
+
+    /// Where an amber name lands: `reading`, the nearest warm hue that isn't amber, so a goal its
+    /// owner made warm stays warm.
+    static let amberStandIn = "reading"
 
     static func palette(named name: String, slug: String) -> DeckPalette {
         choices[index(named: name, slug: slug)]
@@ -22,10 +27,12 @@ enum GoalPaper {
     }
 
     private static func index(named name: String, slug: String) -> Int {
-        if let i = names.firstIndex(of: name) { return i }
-        // A stable hash (Swift's `hashValue` changes per launch).
+        if let i = names.firstIndex(of: name == "opener" ? amberStandIn : name) { return i }
+        // A stable hash (Swift's `hashValue` changes per launch), over the eight slots the fallback
+        // has always used, so a goal keeps its paper; the slot that was amber re-hashes into the rest.
         let sum = slug.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0x7fff_ffff }
-        return sum % choices.count
+        let slot = sum % (choices.count + 1)
+        return slot < choices.count ? slot : (sum / (choices.count + 1)) % choices.count
     }
 
     static func symbol(_ icon: String) -> String {

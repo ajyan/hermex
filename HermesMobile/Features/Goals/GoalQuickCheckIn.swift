@@ -92,7 +92,8 @@ struct GoalHeroCheckIn {
 }
 
 /// A commitment's dots on a hero card, in the week grid's fixed columns: today's and yesterday's
-/// check in where `GoalHeroCheckIn` allows, and an item row ends on a + that counts one (`addsOne`).
+/// check in where `GoalHeroCheckIn` allows. An item row's pips pack against the trailing edge
+/// (`GoalDotMetrics.packedPitch`), never under the weekdays, and end on a + that counts one (`addsOne`).
 /// `dates` is each dot's day, left to right. Each control is as tall as a 44 pt row; VoiceOver reaches
 /// them as the card's actions.
 struct GoalCheckInPipRow: View {
@@ -108,13 +109,13 @@ struct GoalCheckInPipRow: View {
         Group {
             if row.isItem {
                 let plus = addsOne && checkIn.addsOne
-                let column = metrics.pipColumn(pips: pips.states.count, addsOne: plus)
+                let pitch = metrics.packedPitch(pips: pips.states.count, addsOne: plus)
                 HStack(spacing: 0) {
                     ForEach(Array(pips.states.enumerated()), id: \.offset) { _, state in
-                        DeckDot(state: state, ink: ink, column: column, size: metrics.dot(in: column))
+                        DeckDot(state: state, ink: ink, column: pitch, size: metrics.dot(in: pitch))
                     }
                     if plus {
-                        GoalAddOneButton(ink: ink, column: column, hitHeight: BrainStyle.minTapTarget,
+                        GoalAddOneButton(ink: ink, column: metrics.column, hitHeight: BrainStyle.minTapTarget,
                                          isPending: checkIn.isPending(row), label: "Add one \(GoalsCopy.shortName(row.action).lowercased())") {
                             checkIn.addOne(row)
                         }
@@ -134,7 +135,7 @@ struct GoalCheckInPipRow: View {
                 }
             }
         }
-        .frame(width: metrics.trailingWidth, alignment: .leading)
+        .frame(width: metrics.trailingWidth, alignment: row.isItem ? .trailing : .leading)
         .accessibilityHidden(true)
     }
 

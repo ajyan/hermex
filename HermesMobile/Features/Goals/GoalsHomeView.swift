@@ -227,7 +227,7 @@ private struct GoalsAgentList: View {
                     Text(verbatim: goal.title)
                 }
             }
-            .navigationTitle(Text(verbatim: "Atlas is working on"))
+            .navigationTitle(Text(verbatim: "Atlas's projects"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -247,7 +247,7 @@ enum GoalsCopy {
 
     /// Goals home's one row for Atlas's own goals.
     static func agentGoalsLine(_ count: Int) -> String {
-        count == 1 ? "Atlas is working on 1 goal" : "Atlas is working on \(count) goals"
+        "Atlas's projects · \(count)"
     }
 
     static func streakTitle(_ days: Int) -> String {

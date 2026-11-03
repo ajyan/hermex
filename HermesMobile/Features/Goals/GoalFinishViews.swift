@@ -170,10 +170,9 @@ struct GoalCelebrationView: View {
     }
 }
 
-/// A grid of labelled numbers on a goal's paper (the Sleep screen's tiles).
+/// A grid of labelled numbers, set on the Finished list's neutral summary card.
 struct GoalStatGrid: View {
     let tiles: [GoalStatTile]
-    let paper: HermexPaper
 
     var body: some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: BrainStyle.s), GridItem(.flexible())], spacing: BrainStyle.s) {
@@ -181,7 +180,7 @@ struct GoalStatGrid: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(verbatim: tile.label)
                         .font(AppFont.caption(weight: .semibold))
-                        .foregroundStyle(paper.glow)
+                        .foregroundStyle(Color.hxTextSecondary)
                     Text(verbatim: tile.value)
                         .font(AppFont.display(style: .title3, weight: .semibold))
                         .foregroundStyle(Color.hxTextPrimary)
@@ -193,8 +192,7 @@ struct GoalStatGrid: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(BrainStyle.m)
-                .background(paper.wash, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
+                .padding(.vertical, BrainStyle.xs)
                 .accessibilityElement(children: .combine)
             }
         }

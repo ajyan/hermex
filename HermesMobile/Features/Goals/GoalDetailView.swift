@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// One personal goal: its paper hero, one-tap check-ins for today or yesterday, daily checks,
-/// milestones, and a calendar of its days so far with a countdown to the deadline.
+/// milestones, and a calendar of its days so far.
 /// Pushed as `.goal(slug)`.
 struct GoalDetailView: View {
     @State private var viewModel: GoalDetailViewModel
@@ -93,6 +93,7 @@ struct GoalDetailView: View {
                         GoalHeroCard(
                             goal: detail.summary,
                             why: detail.why,
+                            whyInSerif: true,
                             today: detail.today,
                             checkIn: GoalHeroCheckIn(
                                 today: detail.today, yesterday: detail.yesterday,
@@ -120,7 +121,7 @@ struct GoalDetailView: View {
                     if !detail.milestones.isEmpty {
                         GoalMilestonesSection(milestones: detail.milestones, today: detail.today, tint: tint)
                     }
-                    GoalConsistencySection(calendar: viewModel.calendar, countdown: viewModel.countdown, tint: tint)
+                    GoalConsistencySection(calendar: viewModel.calendar, tint: tint)
                     if GoalDetailCopy.hasPlan(detail) { planSection(detail) }
                 }
                 .padding(BrainStyle.l)
@@ -134,8 +135,13 @@ struct GoalDetailView: View {
 
     private func commitmentsSection(_ d: GoalDetail, tint: GoalTint) -> some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
+            BrainSectionHeader(title: GoalDetailCopy.checkInHeader(canCheckInYesterday: viewModel.canCheckInYesterday,
+                                                                    day: viewModel.day))
+            // The plan's obstacle, where it helps: under the header, before choosing the day.
+            if let watchFor = GoalDetailCopy.watchFor(d.obstacle) {
+                Text(verbatim: watchFor).brainText(.meta).fixedSize(horizontal: false, vertical: true)
+            }
             if viewModel.canCheckInYesterday {
-                BrainSectionHeader(title: "Check in")
                 Picker(selection: Binding(get: { viewModel.day }, set: { viewModel.day = $0 })) {
                     Text(verbatim: "Today").tag(GoalDay.today)
                     Text(verbatim: "Yesterday").tag(GoalDay.yesterday)
@@ -143,12 +149,6 @@ struct GoalDetailView: View {
                     Text(verbatim: "Check in for")
                 }
                 .pickerStyle(.segmented)
-            } else {
-                BrainSectionHeader(title: viewModel.day == .today ? "Today" : "Yesterday")
-            }
-            // The plan's obstacle, where it helps: right above the day's check-ins.
-            if let watchFor = GoalDetailCopy.watchFor(d.obstacle) {
-                Text(verbatim: watchFor).brainText(.meta).fixedSize(horizontal: false, vertical: true)
             }
             SectionCard {
                 VStack(spacing: 0) {
@@ -410,7 +410,12 @@ enum GoalDetailCopy {
         ("done", "Done"), ("min", "2-min"), ("skip", "Skip"), ("miss", "Missed"),
     ]
 
-    /// "Watch for: Late bedtime…" over the Today check-ins; nil when the plan names no obstacle.
+    /// The check-ins' header: "Check in" over the Today / Yesterday picker, else the one day.
+    static func checkInHeader(canCheckInYesterday: Bool, day: GoalDay) -> String {
+        canCheckInYesterday ? "Check in" : day == .today ? "Today" : "Yesterday"
+    }
+
+    /// "Watch for: Late bedtime…" under the check-ins' header; nil when the plan names no obstacle.
     static func watchFor(_ obstacle: String) -> String? {
         let text = obstacle.trimmingCharacters(in: .whitespacesAndNewlines)
         return text.isEmpty ? nil : "Watch for: \(text)"
@@ -514,33 +519,6 @@ enum GoalDetailCopy {
     /// This goal's own consistency over its days so far: "Showed up 16 of 18 days".
     static func shownUpLine(_ shown: (shown: Int, total: Int)) -> String {
         shown.total == 0 ? "Starts today" : "Showed up \(shown.shown) of \(shown.total) days"
-    }
-
-    private static let deadlineFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = TimeZone(identifier: "UTC")
-        f.dateFormat = "EEE MMM d"
-        return f
-    }()
-
-    /// Under the calendar, the days still ahead: "118 days to Sun Feb 28"; nil without a deadline.
-    static func countdown(today: String, deadline: String?) -> String? {
-        guard let deadline, let date = GoalCalendar.date(deadline),
-              let n = GoalCalendar.days(from: today, to: deadline) else { return nil }
-        let day = deadlineFormatter.string(from: date)
-        switch n {
-        case 0: return "Due today, \(day)"
-        case 1: return "1 day to \(day)"
-        case let n where n > 1: return "\(n) days to \(day)"
-        case -1: return "1 day past \(day)"
-        default: return "\(-n) days past \(day)"
-        }
-    }
-
-    /// The detail calendar for VoiceOver: "Showed up 16 of 18 days. 118 days to Sun Feb 28".
-    static func consistencySummary(shown: Int, total: Int, countdown: String?) -> String {
-        [shownUpLine((shown, total)), countdown].compactMap { $0 }.joined(separator: ". ")
     }
 
     static func calendarSummary(_ weeks: [[GoalCalendarDay?]]) -> String {

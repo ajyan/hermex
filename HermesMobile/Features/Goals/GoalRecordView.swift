@@ -271,30 +271,32 @@ private struct GoalRunningYear: View {
 }
 
 /// A month's miles against the biggest month: full from two thirds of it, half from a third,
-/// a ring below that, and a faint ring for a month with no miles.
+/// light below that, and none for a month with no miles. Its dots never borrow the day states
+/// that mean today or waiting (the ring, the ringed +).
 enum GoalMonthLevel: Equatable {
-    case full, half, ring, none
+    case full, half, light, none
 
     init(miles: Double, top: Double) {
         guard miles > 0, top > 0 else { self = .none; return }
         let share = miles / top
-        self = share >= 2.0 / 3 ? .full : share >= 1.0 / 3 ? .half : .ring
+        self = share >= 2.0 / 3 ? .full : share >= 1.0 / 3 ? .half : .light
     }
 
-    /// The `DeckDot` look: filled, half-strength, a ring, a faint ring.
+    /// The `DeckDot` look: filled, half-strength, a faint thin ring, the small "off" mark.
     var dotState: String {
         switch self {
         case .full: "done"
         case .half: "skip"
-        case .ring: "today"
-        case .none: "missed"
+        case .light: "missed"
+        case .none: "off"
         }
     }
 
-    /// "50+ mi", "25+", "under 25" for a 75 mi top month.
+    /// "50+ mi", "25–49", "under 25" for a 75 mi top month.
     static func legend(top: Double) -> [(level: GoalMonthLevel, label: String)] {
         let full = Int((top * 2 / 3).rounded()), half = Int((top / 3).rounded())
-        return [(.full, "\(full)+ mi"), (.half, "\(half)+"), (.ring, "under \(half)")]
+        let middle = full - 1 > half ? "\(half)–\(full - 1)" : "\(half)+"
+        return [(.full, "\(full)+ mi"), (.half, middle), (.light, "under \(half)")]
     }
 }
 
@@ -380,7 +382,14 @@ private struct GoalReflectionSection: View {
                     .padding(.top, BrainStyle.xs)
             }
             if let error = viewModel.error {
-                Text(verbatim: error).font(BrainStyle.meta).foregroundStyle(Color.hxWarning)
+                // On the glow card, in its glow: warning orange fails contrast on a light paper.
+                Label {
+                    Text(verbatim: error)
+                } icon: {
+                    Image(systemName: "exclamationmark.circle").accessibilityHidden(true)
+                }
+                .font(BrainStyle.meta)
+                .foregroundStyle(paper.glow)
             }
         } footer: {
             HStack(spacing: BrainStyle.s) {

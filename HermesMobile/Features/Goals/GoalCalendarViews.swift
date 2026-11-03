@@ -1,11 +1,9 @@
 import SwiftUI
 
-/// This goal's own consistency: how many of its days he showed up, the calendar of the days so
-/// far, and one line counting down to the deadline. The all-goals streak lives on Goals home.
+/// This goal's own consistency: how many of its days he showed up and the calendar of the days so
+/// far. The hero's kicker counts down to the deadline; the all-goals streak lives on Goals home.
 struct GoalConsistencySection: View {
     let calendar: GoalCalendarModel
-    /// "118 days to Sun Feb 28"; nil without a deadline.
-    let countdown: String?
     let tint: GoalTint
 
     var body: some View {
@@ -17,9 +15,6 @@ struct GoalConsistencySection: View {
                         .brainText(.rowTitle)
                         .monospacedDigit()
                     GoalCalendarGrid(calendar: calendar, tint: tint)
-                    if let countdown {
-                        Text(verbatim: countdown).brainText(.meta).monospacedDigit()
-                    }
                 }
                 .padding(.vertical, BrainStyle.xs)
             }
@@ -101,12 +96,11 @@ enum GoalCalendarRows {
 
 extension GoalCalendarModel {
     /// The detail screen's calendar: the goal's days so far and the rest of this week, never the
-    /// weeks still ahead (the countdown line says how many are left). A goal without a deadline
+    /// weeks still ahead (the hero's kicker says how many days are left). A goal without a deadline
     /// keeps the calendar's cap of the last four weeks.
-    static func throughThisWeek(heatmap: [GoalHeatDay], today: String, deadline: String?,
-                                countdown: String?) -> GoalCalendarModel {
+    static func throughThisWeek(heatmap: [GoalHeatDay], today: String, deadline: String?) -> GoalCalendarModel {
         let full = GoalCalendarModel(heatmap: heatmap, today: today, deadline: deadline)
-        let summary = GoalDetailCopy.consistencySummary(shown: full.shown, total: full.total, countdown: countdown)
+        let summary = GoalDetailCopy.shownUpLine((full.shown, full.total))
         guard let index = full.slots.firstIndex(where: { $0.day?.isToday == true }) else {
             return GoalCalendarModel(slots: full.slots, shown: full.shown, total: full.total, summary: summary)
         }

@@ -145,8 +145,7 @@ final class GoalsDesignTests: XCTestCase {
     /// Started Thu Oct 15, today Mon Nov 2, deadline Sun Feb 28: the weeks so far and this one.
     private func detailCalendar(today: String = "2026-11-02", deadline: String? = "2027-02-28") throws -> GoalCalendarModel {
         let heat = try (15...31).map { try day("2026-10-\($0)") } + [day("2026-11-01", "none"), day("2026-11-02", "none")]
-        return GoalCalendarModel.throughThisWeek(heatmap: heat, today: today, deadline: deadline,
-                                                 countdown: GoalDetailCopy.countdown(today: today, deadline: deadline))
+        return GoalCalendarModel.throughThisWeek(heatmap: heat, today: today, deadline: deadline)
     }
 
     func testDetailCalendarEndsWithThisWeek() throws {
@@ -157,7 +156,7 @@ final class GoalsDesignTests: XCTestCase {
         XCTAssertFalse(model.slots.contains { $0.day?.isDeadline == true }, "the deadline is a line, not a cell")
         XCTAssertEqual(model.shown, 17)
         XCTAssertEqual(model.total, 18, "today isn't counted until it's shown")
-        XCTAssertEqual(model.summary, "Showed up 17 of 18 days. 118 days to Sun Feb 28")
+        XCTAssertEqual(model.summary, "Showed up 17 of 18 days", "the hero's kicker says the days left")
     }
 
     func testDetailCalendarStopsAtADeadlineThisWeek() throws {
@@ -169,7 +168,7 @@ final class GoalsDesignTests: XCTestCase {
 
     func testDetailCalendarWithoutDeadlineKeepsTheFourWeekCap() throws {
         let heat = try (1...30).map { try day(String(format: "2026-09-%02d", $0)) }
-        let model = GoalCalendarModel.throughThisWeek(heatmap: heat, today: "2026-09-30", deadline: nil, countdown: nil)
+        let model = GoalCalendarModel.throughThisWeek(heatmap: heat, today: "2026-09-30", deadline: nil)
         XCTAssertEqual(model.slots.count, 28)
         XCTAssertEqual(model.summary, "Showed up 30 of 30 days")
     }
@@ -183,11 +182,48 @@ final class GoalsDesignTests: XCTestCase {
         XCTAssertNil(GoalCalendarRows.month("later"))
     }
 
-    func testCountdownLine() {
-        XCTAssertEqual(GoalDetailCopy.countdown(today: "2026-11-02", deadline: "2027-02-28"), "118 days to Sun Feb 28")
-        XCTAssertEqual(GoalDetailCopy.countdown(today: "2027-02-27", deadline: "2027-02-28"), "1 day to Sun Feb 28")
-        XCTAssertEqual(GoalDetailCopy.countdown(today: "2027-02-28", deadline: "2027-02-28"), "Due today, Sun Feb 28")
-        XCTAssertEqual(GoalDetailCopy.countdown(today: "2027-03-03", deadline: "2027-02-28"), "3 days past Sun Feb 28")
-        XCTAssertNil(GoalDetailCopy.countdown(today: "2026-11-02", deadline: nil))
+    /// Watch for sits under one header whether or not the Today / Yesterday picker shows.
+    func testCheckInHeader() {
+        XCTAssertEqual(GoalDetailCopy.checkInHeader(canCheckInYesterday: true, day: .yesterday), "Check in")
+        XCTAssertEqual(GoalDetailCopy.checkInHeader(canCheckInYesterday: false, day: .today), "Today")
+        XCTAssertEqual(GoalDetailCopy.checkInHeader(canCheckInYesterday: false, day: .yesterday), "Yesterday")
+    }
+
+    /// This week leads the hero; Monday's last week follows as compact 24 pt lines, which grow only
+    /// with large-text dots and stay shorter than a tap target (a Sunday that checks in overflows it).
+    func testHeroLeadsWithThisWeekThenACompactLastWeek() {
+        XCTAssertEqual(GoalHeroLayout.sections(hasLastWeek: true), [.thisWeek, .lastWeek])
+        XCTAssertEqual(GoalHeroLayout.sections(hasLastWeek: false), [.thisWeek])
+        XCTAssertEqual(GoalHeroLayout.lastWeekRowHeight(.standard), 24)
+        XCTAssertLessThan(GoalHeroLayout.lastWeekRowHeight(.standard), BrainStyle.minTapTarget)
+        let huge = GoalDotMetrics.scaled(60)
+        XCTAssertGreaterThan(GoalHeroLayout.lastWeekRowHeight(huge), huge.dot, "large dots still fit their line")
+    }
+
+    /// An item row's pips pack at their own pitch against the trailing edge, so "3 of 5" never lines
+    /// up under Mon–Wed; a long row still shrinks to fit beside its +.
+    func testItemPipsPackTighterThanTheDayColumns() {
+        let standard = GoalDotMetrics.standard
+        let pitch = standard.packedPitch(pips: 5, addsOne: true)
+        XCTAssertEqual(pitch, DeckDots.dot + GoalDotMetrics.packedGap)
+        XCTAssertLessThan(pitch, standard.column, "a different rhythm from the weekdays")
+        XCTAssertEqual(standard.packedPitch(pips: 5, addsOne: false), pitch)
+        let thirteen = standard.packedPitch(pips: 13, addsOne: true)
+        XCTAssertLessThanOrEqual(thirteen * 13 + standard.column, standard.trailingWidth)
+        XCTAssertLessThan(standard.dot(in: thirteen), thirteen, "air between pips")
+        let huge = GoalDotMetrics.scaled(60)
+        XCTAssertEqual(huge.packedPitch(pips: 5, addsOne: true), huge.dot + GoalDotMetrics.packedGap)
+        XCTAssertLessThan(huge.packedPitch(pips: 5, addsOne: true), huge.column)
+    }
+
+    /// No goal wears amber: it means waiting on you. A goal file's `color: opener` wears reading.
+    func testGoalPapersExcludeAmber() {
+        XCTAssertFalse(GoalPaper.choices.contains(.opener))
+        XCTAssertFalse(GoalPaper.names.contains("opener"))
+        XCTAssertEqual(GoalPaper.choices.count, GoalPaper.names.count)
+        XCTAssertEqual(GoalPaper.palette(named: "opener", slug: "x"), DeckPalette.reading)
+        for slug in ["land-ai-role", "nyc-marathon", "learn-piano"] + (0..<200).map({ "goal-\($0)" }) {
+            XCTAssertNotEqual(GoalPaper.palette(named: "", slug: slug), DeckPalette.opener, slug)
+        }
     }
 }

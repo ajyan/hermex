@@ -138,7 +138,10 @@ struct GoalsFinishedListView: View {
         case .loaded(let home):
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.l) {
-                    GoalStatGrid(tiles: GoalsFinishedCopy.lifetime(home.finished), paper: HermexPaper.opener)
+                    // The lifetime numbers summarize every goal, so they sit on the neutral summary card.
+                    HXCard(.summary) {
+                        GoalStatGrid(tiles: GoalsFinishedCopy.lifetime(home.finished))
+                    }
                     ForEach(GoalsFinishedCopy.byYear(home.finished), id: \.year) { group in
                         VStack(alignment: .leading, spacing: BrainStyle.s) {
                             BrainSectionHeader(title: group.year)

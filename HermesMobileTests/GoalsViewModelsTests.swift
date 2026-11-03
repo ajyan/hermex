@@ -716,8 +716,8 @@ final class GoalsCopyTests: XCTestCase {
     }
 
     func testAgentGoalsFoldToOneLine() {
-        XCTAssertEqual(GoalsCopy.agentGoalsLine(1), "Atlas is working on 1 goal")
-        XCTAssertEqual(GoalsCopy.agentGoalsLine(2), "Atlas is working on 2 goals")
+        XCTAssertEqual(GoalsCopy.agentGoalsLine(1), "Atlas's projects · 1")
+        XCTAssertEqual(GoalsCopy.agentGoalsLine(2), "Atlas's projects · 2")
     }
 
     func testStreakLineSaysWhenAtRisk() {
