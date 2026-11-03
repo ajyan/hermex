@@ -297,7 +297,9 @@ private final class FlowSpeaker: SpeechSpeaking {
     var spoken: [String] = []
     private var queue: [String] = []
     var isSpeaking: Bool { !queue.isEmpty }
-    func enqueue(_ sentence: String) { spoken.append(sentence); queue.append(sentence) }
+    let heardText = ""
+    func enqueue(_ sentence: String, isReply: Bool) { spoken.append(sentence); queue.append(sentence) }
+    func resetHeardText() {}
     func stopNow() { queue.removeAll() }
     func setThinkingCue(_ on: Bool) {}
     func drain() {

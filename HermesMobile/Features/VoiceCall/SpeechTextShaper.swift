@@ -48,14 +48,14 @@ struct SpeechTextShaper {
 
     static func sentences(in rawText: String, final: Bool) -> [String] {
         // Atlas sometimes echoes the call's "[voice 2:41 PM]" tag (or the legacy "[voice]"),
-        // or a bare "voice"; never say it.
+        // with its cut-in note, or a bare "voice"; never say it.
         var text = Substring(rawText.drop(while: \.isWhitespace))
         let lowered = text.lowercased()
-        if let tag = VoiceCallPhrases.voiceTagLength(in: text, ignoringCase: true) {
+        if !final, VoiceCallPhrases.isPartialVoiceTag(text) {
+            return []
+        } else if let tag = VoiceCallPhrases.voiceTagLength(in: text, ignoringCase: true) {
             text = text.dropFirst(tag)
             if text.first == ":" { text = text.dropFirst() }
-        } else if !final, VoiceCallPhrases.isPartialVoiceTag(text) {
-            return []
         } else if lowered.hasPrefix("voice") {
             let rest = text.dropFirst("voice".count)
             if !final, rest.allSatisfy(\.isWhitespace) { return [] }

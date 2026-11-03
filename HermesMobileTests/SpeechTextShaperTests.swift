@@ -80,6 +80,13 @@ final class SpeechTextShaperTests: XCTestCase {
         XCTAssertEqual(shaper.append("[voice 2:41 PM] Hi. The"), ["Hi."])
     }
 
+    func testEchoedCutInNoteIsNotSpoken() {
+        XCTAssertEqual(spoken("[voice 2:41 PM] [cut in after: \"highs near seventy\"] Tomorrow? Rain."), ["Tomorrow?", "Rain."])
+        var shaper = SpeechTextShaper()
+        XCTAssertEqual(shaper.append("[voice 2:41 PM] [cut in aft"), [], "a note still arriving is held")
+        XCTAssertEqual(shaper.append("[voice 2:41 PM] [cut in before you spoke] Sure. The"), ["Sure."])
+    }
+
     func testBareVoiceIsHeldWhileStreamingThenDropped() {
         var shaper = SpeechTextShaper()
         XCTAssertEqual(shaper.append("voice"), [])

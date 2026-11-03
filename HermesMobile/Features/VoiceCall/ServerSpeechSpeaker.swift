@@ -12,6 +12,16 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
     var onFinishedQueue: (() -> Void)?
     var onAudioStarted: ((String, SpeechVoice) -> Void)?
     var isSpeaking: Bool { !queued.isEmpty || fetchTask != nil || !clips.isEmpty || player != nil || fallback.isSpeaking }
+    /// Finished reply lines, then the playing clip's reply words in proportion to its progress,
+    /// then what the on-device voice has said since it last drained.
+    var heardText: String {
+        var parts = heard
+        if let player, player.duration > 0 {
+            parts.append(Self.replyWords(of: playing, through: player.currentTime / player.duration))
+        }
+        parts.append(fallback.heardText)
+        return parts.filter { !$0.isEmpty }.joined(separator: " ")
+    }
 
     /// Mirrors the server's per-client TTS rate limit (`_TtsRateLimiter`, 2 s).
     static let serverRequestSpacing: TimeInterval = 2.05
@@ -22,17 +32,27 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
     private let levels: VoiceCallAudioLevels?
     private let log: (String) -> Void
     private let requestSpacing: TimeInterval
+    private let makePlayer: (Data) throws -> AVAudioPlayer
 
-    /// Speech in order: fetched server audio, or text the server voice failed on.
-    private enum Clip {
-        case audio(Data, text: String)
-        case onDevice(String)
+    /// A queued sentence, and whether it is reply text (`SpeechSpeaking.heardText`).
+    private struct Line {
+        let text: String
+        let isReply: Bool
     }
 
-    private var queued: [String] = []
+    /// Speech in order: fetched server audio, or a line the server voice failed on.
+    private enum Clip {
+        case audio(Data, lines: [Line])
+        case onDevice(Line)
+    }
+
+    private var queued: [Line] = []
     private var clips: [Clip] = []
     private var fetchTask: Task<Void, Never>?
     private var player: AVAudioPlayer?
+    /// The lines `player` is playing, and the reply lines whose audio finished.
+    private var playing: [Line] = []
+    private var heard: [String] = []
     private var meterTask: Task<Void, Never>?
     private var lastRequestAt = -TimeInterval.infinity
     /// Server-voice failures in a row; at `maxConsecutiveFailures` later sentences go to `fallback`.
@@ -44,9 +64,11 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
         fallback: SpeechSpeaking,
         levels: VoiceCallAudioLevels? = nil,
         requestSpacing: TimeInterval = ServerSpeechSpeaker.serverRequestSpacing,
+        makePlayer: @escaping (Data) throws -> AVAudioPlayer = { try AVAudioPlayer(data: $0) },
         log: @escaping (String) -> Void = { _ in }
     ) {
         self.requestSpacing = requestSpacing
+        self.makePlayer = makePlayer
         self.synthesize = synthesize
         self.fallback = fallback
         self.levels = levels
@@ -56,9 +78,14 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
         fallback.onAudioStarted = { [weak self] text, voice in self?.onAudioStarted?(text, voice) }
     }
 
-    func enqueue(_ sentence: String) {
-        queued.append(sentence)
+    func enqueue(_ sentence: String, isReply: Bool) {
+        queued.append(Line(text: sentence, isReply: isReply))
         pump()
+    }
+
+    func resetHeardText() {
+        heard = []
+        fallback.resetHeardText()
     }
 
     func stopNow() {
@@ -68,6 +95,7 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
         clips = []
         player?.stop()
         player = nil
+        playing = []
         stopMeter()
         fallback.stopNow()
         levels?.voiceStopped()
@@ -88,13 +116,13 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
             playNextIfIdle()
             return
         }
-        let text = queued.joined(separator: " ")
-        let count = queued.count
+        let lines = queued
         queued = []
-        fetchTask = Task { [weak self] in await self?.fetch(text, sentences: count) }
+        fetchTask = Task { [weak self] in await self?.fetch(lines) }
     }
 
-    private func fetch(_ text: String, sentences: Int) async {
+    private func fetch(_ lines: [Line]) async {
+        let text = lines.map(\.text).joined(separator: " ")
         let wait = lastRequestAt + requestSpacing - ProcessInfo.processInfo.systemUptime
         if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
         guard !Task.isCancelled else { return }
@@ -104,22 +132,22 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
             let data = try await synthesize(text)
             guard !Task.isCancelled else { return }
             log(String(format: "tts fetched %d sentence(s), %d chars in %.2fs",
-                       sentences, text.count, ProcessInfo.processInfo.systemUptime - started))
+                       lines.count, text.count, ProcessInfo.processInfo.systemUptime - started))
             consecutiveFailures = 0
-            clips.append(.audio(data, text: text))
+            clips.append(.audio(data, lines: lines))
         } catch is CancellationError {
             return
         } catch APIError.http(statusCode: 429, _) {
             guard !Task.isCancelled else { return }
             log("tts rate limited; retrying")
-            queued.insert(text, at: 0)
+            queued.insert(contentsOf: lines, at: 0)
         } catch {
             guard !Task.isCancelled else { return }
             consecutiveFailures += 1
             log("tts failed (\(error)); " + (usesFallback
                 ? "using the on-device voice for the rest of the call"
                 : "using the on-device voice for this sentence"))
-            clips.append(.onDevice(text))
+            clips.append(contentsOf: lines.map(Clip.onDevice))
         }
         fetchTask = nil
         playNextIfIdle()
@@ -132,21 +160,21 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
     private func playNextIfIdle() {
         guard player == nil, let next = clips.first else { return }
         let data: Data
-        let text: String
+        let lines: [Line]
         switch next {
-        case .onDevice(let text):
+        case .onDevice(let line):
             clips.removeFirst()
-            fallback.enqueue(text)
+            fallback.enqueue(line.text, isReply: line.isReply)
             playNextIfIdle()
             return
-        case .audio(let audio, let clipText):
+        case .audio(let audio, let clipLines):
             // After the on-device voice finishes, so the voices never overlap.
             guard !fallback.isSpeaking else { return }
             clips.removeFirst()
             data = audio
-            text = clipText
+            lines = clipLines
         }
-        guard let player = try? AVAudioPlayer(data: data) else {
+        guard let player = try? makePlayer(data) else {
             log("tts audio undecodable; skipping clip")
             playNextIfIdle()
             return
@@ -159,8 +187,9 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
             return
         }
         self.player = player
+        playing = lines
         startMeter()
-        onAudioStarted?(text, .server)
+        onAudioStarted?(lines.map(\.text).joined(separator: " "), .server)
     }
 
     nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
@@ -171,6 +200,8 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
     private func clipFinished(_ id: ObjectIdentifier) {
         guard let player, ObjectIdentifier(player) == id else { return }
         self.player = nil
+        heard += playing.filter(\.isReply).map(\.text)
+        playing = []
         stopMeter()
         playNextIfIdle()
         pump()
@@ -178,6 +209,9 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
     }
 
     private func fallbackFinished() {
+        // The on-device voice is quiet until the next server clip; its words join the finished lines.
+        heard.append(fallback.heardText)
+        fallback.resetHeardText()
         playNextIfIdle()
         pump()
         finishIfDrained()
@@ -187,6 +221,16 @@ final class ServerSpeechSpeaker: NSObject, SpeechSpeaking, AVAudioPlayerDelegate
         guard !isSpeaking else { return }
         levels?.voiceStopped()
         onFinishedQueue?()
+    }
+
+    /// The reply words of `lines` heard `fraction` of the way through their clip, counting words
+    /// as evenly spaced in time.
+    private static func replyWords(of lines: [Line], through fraction: Double) -> String {
+        let words = lines.flatMap { line in
+            line.text.split(whereSeparator: \.isWhitespace).map { (word: $0, isReply: line.isReply) }
+        }
+        let count = Int((Double(words.count) * min(max(fraction, 0), 1)).rounded())
+        return words.prefix(count).filter(\.isReply).map(\.word).joined(separator: " ")
     }
 
     /// Drives the orb from the clip's measured loudness, about 30 times a second.

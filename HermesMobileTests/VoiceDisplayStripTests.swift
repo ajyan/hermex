@@ -23,6 +23,19 @@ final class VoiceDisplayStripTests: XCTestCase {
         )
     }
 
+    func testCutInNoteHiddenWithTheVoiceTag() {
+        let after = VoiceCallPhrases.voicePrefix(at: .now) + VoiceCallPhrases.cutInNote(heard: "highs near seventy") + "what about tomorrow"
+        XCTAssertEqual(VoiceCallPhrases.withoutVoiceTag(after), "what about tomorrow")
+        let before = "[voice 2:41 PM] " + VoiceCallPhrases.cutInNote(heard: " ") + "tell me a joke"
+        XCTAssertEqual(before, "[voice 2:41 PM] [cut in before you spoke] tell me a joke")
+        XCTAssertEqual(MessageBubbleView.displayText(forUserMessage: before), "tell me a joke")
+        XCTAssertEqual(
+            MessageBubbleView.displayText(forUserMessage: "[cut in before you spoke] hi"),
+            "[cut in before you spoke] hi",
+            "a note only hides after the call's tag"
+        )
+    }
+
     func testVoicePrefixCarriesTheLocalTime() {
         let date = Date(timeIntervalSince1970: 1_791_900_000)  // 2026-10-13 14:00 UTC
         let utc = TimeZone(identifier: "UTC")!
