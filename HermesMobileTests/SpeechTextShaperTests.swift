@@ -48,8 +48,21 @@ final class SpeechTextShaperTests: XCTestCase {
 
     func testStopsAtDetailsBreak() {
         XCTAssertEqual(spoken("Short answer.\n---\nLong details here."), ["Short answer."])
-        XCTAssertEqual(spoken("Lead.\n\nMore context.\n\n```\ncode\n```"), ["Lead."])
+        XCTAssertEqual(spoken("Lead.\n\nMore context.\n\n```\ncode\n```"), ["Lead.", "More context."])
+        XCTAssertEqual(spoken("Lead.\n\nMore.\n---\nDetails."), ["Lead.", "More."])
+        XCTAssertEqual(spoken("Run:\n```\nls\n```\n\nMore notes."), ["Run:"])
         XCTAssertEqual(spoken("One.\n\nTwo."), ["One.", "Two."])
+    }
+
+    /// Text written after a tool call joins the reply as a new paragraph; it is spoken as it
+    /// streams, not held until the run ends.
+    func testParagraphAfterToolCallIsSpokenAsItStreams() {
+        var shaper = SpeechTextShaper()
+        XCTAssertEqual(shaper.append("I'll look that up."), [])
+        XCTAssertEqual(shaper.append("I'll look that up.\n\nLet me check"), ["I'll look that up."])
+        XCTAssertEqual(shaper.append("I'll look that up.\n\nLet me check the notes. He likes"), ["Let me check the notes."])
+        XCTAssertEqual(shaper.append("I'll look that up.\n\nLet me check the notes. He likes DJing.\n---\n1. Details"), ["He likes DJing."])
+        XCTAssertEqual(shaper.finish(), [])
     }
 
     func testFinishFlushesTrailingFragment() {
