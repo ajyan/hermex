@@ -24,10 +24,13 @@ struct GoalCommitmentRow: View {
                 Text(verbatim: GoalsCopy.shortTitle(row.action)).brainText(.rowTitle)
                 if !row.cue.isEmpty { Text(verbatim: row.cue).brainText(.rowSubtitle).lineLimit(2) }
                 if fromSource { Text(verbatim: "Prep").brainText(.meta) }
+                if let notDue = GoalCommitmentRow.notDueLabel(isDue: isDue, shown: shown, day: day) {
+                    // In the goal's glow, which holds contrast on the Brief's paper too.
+                    Text(verbatim: notDue).font(BrainStyle.meta).foregroundStyle(tint.fill)
+                }
                 if atRisk { GoalAtRiskChip(row: row, paper: tint.paper) }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .opacity(isDue || shown != nil ? 1 : 0.55)
             Group {
                 if fromSource {
                     Menu { menuItems(explicit: explicit) } label: { circle(shown) }
@@ -48,6 +51,12 @@ struct GoalCommitmentRow: View {
         }
         .padding(.vertical, BrainStyle.s)
         .frame(minHeight: BrainStyle.minTapTarget)
+    }
+
+    /// A row shown on a day it isn't due says so in words, never by fading (faded text fails contrast).
+    static func notDueLabel(isDue: Bool, shown: GoalStatus?, day: GoalDay) -> String? {
+        guard !isDue, shown == nil else { return nil }
+        return day == .today ? "Not due today" : "Wasn't due yesterday"
     }
 
     private func circle(_ shown: GoalStatus?) -> some View {

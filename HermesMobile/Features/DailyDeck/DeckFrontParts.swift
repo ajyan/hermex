@@ -69,7 +69,7 @@ struct DeckFrontRowView: View {
                 Spacer(minLength: 8)
                 Text(verbatim: checkIn.countText)
                     .font(AppFont.caption())
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(palette.ink)
                     .monospacedDigit()
             }
             switch row.kind {
@@ -91,7 +91,7 @@ struct DeckFrontRowView: View {
                     checkIn.dot(day)
                     Text(verbatim: DeckDots.weekdays[index])
                         .font(AppFont.caption2())
-                        .foregroundStyle(Color.hxTextSecondary)
+                        .foregroundStyle(palette.ink)
                         .frame(width: DeckDots.column)
                 }
             }
@@ -236,7 +236,16 @@ struct DeckFrontWeek: View {
     let palette: DeckPalette
     let deckDate: String
 
+    @Environment(GoalsHomeViewModel.self) private var model: GoalsHomeViewModel?
+
     var body: some View {
+        // One stack, so the landing haptic plays once rather than once per part.
+        VStack(alignment: .leading, spacing: 0) { parts }
+            .sensoryFeedback(.success, trigger: model?.landedCheckIns ?? 0)
+    }
+
+    @ViewBuilder
+    private var parts: some View {
         if !card.weekRows.isEmpty {
             VStack(alignment: .leading, spacing: 16) {
                 ForEach(card.weekRows) { row in
@@ -285,7 +294,7 @@ struct DeckTodaysOne: View {
                     HStack(spacing: 10) {
                         Image(systemName: isPicked ? "checkmark.circle.fill" : front.symbol)
                             .font(AppFont.body())
-                            .foregroundStyle(isPicked ? palette.ink : Color.hxTextSecondary)
+                            .foregroundStyle(palette.ink)
                             .frame(width: 24)
                         Text(verbatim: option.label)
                             .font(AppFont.body(weight: isPicked ? .semibold : .regular))
@@ -295,7 +304,7 @@ struct DeckTodaysOne: View {
                         Spacer(minLength: 8)
                         Text(verbatim: front.shortName)
                             .font(AppFont.caption())
-                            .foregroundStyle(Color.hxTextSecondary)
+                            .foregroundStyle(palette.ink)
                     }
                     .padding(.vertical, 11)
                     .contentShape(Rectangle())

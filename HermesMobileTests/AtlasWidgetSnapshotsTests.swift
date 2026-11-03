@@ -180,6 +180,83 @@ final class GoalsWidgetSyncTests: XCTestCase {
         XCTAssertTrue(old.isStale(at: now), "an older snapshot falls back to the server's today")
     }
 
+    /// 10:00 on Wednesday Oct 14 and 06:00 the next morning, on the phone's clock.
+    private func local(_ day: Int, hour: Int, month: Int = 10) -> Date {
+        Calendar.current.date(from: DateComponents(year: 2026, month: month, day: day, hour: hour))!
+    }
+
+    private func item(_ commitment: String, days: [String], todayIndex: Int, done: Bool, count: Int = 3) -> AtlasWidgetGoals.Item {
+        AtlasWidgetGoals.Item(slug: "nyc-marathon-2026", commitment: commitment, action: commitment, weekCount: count,
+                              target: 6, isDone: done, sourceCounted: done, days: days, todayIndex: todayIndex, paper: "wiki")
+    }
+
+    private func wednesday(_ items: [AtlasWidgetGoals.Item]) -> AtlasWidgetGoals {
+        AtlasWidgetGoals(server: server, today: "2026-10-14", streakDays: 5, items: items,
+                         savedDay: AtlasWidgetGoals.phoneDay(local(14, hour: 10)))
+    }
+
+    func testWidgetRollsForwardAfterMidnight() {
+        let week = ["done", "missed", "today", "ahead", "ahead", "off", "ahead"]
+        let goals = wednesday([
+            item("stretch-pm", days: week, todayIndex: 2, done: true),
+            item("run", days: week, todayIndex: 2, done: false),
+            item("rest", days: ["done", "missed", "today", "off", "ahead", "ahead", "ahead"], todayIndex: 2, done: false),
+        ])
+        XCTAssertEqual(goals.rolled(at: local(14, hour: 23)), goals, "the day it was saved, nothing moves")
+
+        let thursday = goals.rolled(at: local(15, hour: 6))
+        XCTAssertEqual(thursday.today, "2026-10-15")
+        XCTAssertEqual(thursday.items.map(\.commitment), ["stretch-pm", "run"], "a row not due today drops off")
+        XCTAssertEqual(thursday.items[0].liveDays, ["done", "missed", "done", "today", "ahead", "off", "ahead"])
+        XCTAssertEqual(thursday.items[0].isDone, false)
+        XCTAssertEqual(thursday.items[0].isUndoable, false)
+        XCTAssertEqual(thursday.items[0].weekCount, 3, "the week's count stays")
+        XCTAssertEqual(thursday.items[1].liveDays?[2], "ask", "yesterday unlogged waits, never missed")
+        XCTAssertFalse(thursday.isStale(at: local(15, hour: 6)))
+        XCTAssertEqual(goals.rolled(at: local(16, hour: 6)).items[1].liveDays?[2], "missed", "two days on, it's missed")
+    }
+
+    func testWidgetStartsAFreshWeekOnMonday() {
+        let sunday = AtlasWidgetGoals(
+            server: server, today: "2026-10-18", streakDays: 5,
+            items: [item("stretch-pm", days: ["done", "done", "off", "done", "done", "done", "today"], todayIndex: 6, done: false, count: 5)],
+            savedDay: AtlasWidgetGoals.phoneDay(local(18, hour: 21)))
+        let monday = sunday.rolled(at: local(19, hour: 6))
+        XCTAssertEqual(monday.today, "2026-10-19")
+        XCTAssertEqual(monday.items.first?.liveDays, ["today", "ahead", "off", "ahead", "ahead", "ahead", "ahead"])
+        XCTAssertEqual(monday.items.first?.todayIndex, 0)
+        XCTAssertEqual(monday.items.first?.weekCount, 0)
+    }
+
+    func testWidgetTapAfterMidnightChecksInTheRolledDay() async throws {
+        store.save(wednesday([item("stretch-pm", days: ["done", "missed", "today", "ahead", "ahead", "ahead", "ahead"],
+                                   todayIndex: 2, done: true)]))
+        let client = WidgetGoalsClient()
+        client.homeResults = [.failure(URLError(.timedOut))]
+
+        await GoalsWidgetSync.checkIn(slug: "nyc-marathon-2026", commitment: "stretch-pm", done: true, store: store,
+                                      activeServerID: { self.server.absoluteString }, client: { _ in client },
+                                      now: local(15, hour: 6))
+
+        XCTAssertEqual(client.checkIns, [.commitment(
+            slug: "nyc-marathon-2026", date: "2026-10-15", asOf: "2026-10-15", id: "stretch-pm", status: .done
+        )])
+        XCTAssertEqual(store.load()?.today, "2026-10-15")
+        XCTAssertEqual(store.load()?.items.first?.liveDays?[3], "done", "the new day's dot fills")
+        XCTAssertEqual(store.load()?.items.first?.weekCount, 4)
+    }
+
+    func testWidgetRowsWearTheGoalsPaper() throws {
+        for name in GoalPaper.names {
+            XCTAssertEqual(AtlasWidgetGoals.paper(named: name), GoalPaper.palette(named: name, slug: "x").colors, name)
+        }
+        XCTAssertNil(AtlasWidgetGoals.paper(named: nil))
+        let home = try home()
+        let goals = AtlasWidgetGoals(server: server, home: home)
+        XCTAssertEqual(goals.items.first?.paper, GoalPaper.name(for: home.goals[0]))
+        XCTAssertEqual(goals.items.first?.paperColors, GoalPaper.palette(for: home.goals[0]).colors)
+    }
+
     func testCheckInPostsForTheSnapshotsDayAndTakesTheServersState() async throws {
         store.save(AtlasWidgetGoals(server: server, home: try home()))
         let client = WidgetGoalsClient()

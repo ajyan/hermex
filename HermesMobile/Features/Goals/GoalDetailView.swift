@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// One personal goal: its paper hero (with the week strip that picks today or yesterday),
-/// one-tap check-ins, daily checks, milestones, and a calendar of every day to the deadline.
+/// One personal goal: its paper hero, one-tap check-ins for today or yesterday, daily checks,
+/// milestones, and a calendar of its days so far.
 /// Pushed as `.goal(slug)`.
 struct GoalDetailView: View {
     @State private var viewModel: GoalDetailViewModel
@@ -36,9 +36,10 @@ struct GoalDetailView: View {
                 content
             }
         }
-        .hxNavigationTitle(record == nil ? "Goal" : "Finished", subtitle: record?.subtitle)
+        .hxNavigationTitle(record == nil ? viewModel.navigationTitle : "Finished", subtitle: record?.subtitle)
         .background(Color.hxCanvas.ignoresSafeArea())
         .task { if record == nil { await viewModel.load() } }
+        .sensoryFeedback(.success, trigger: viewModel.landedCheckIns)
         // Back from the background, the server's today may have moved on.
         .onChange(of: scenePhase) { _, phase in
             if phase == .active, record == nil { Task { await viewModel.load() } }
@@ -92,15 +93,22 @@ struct GoalDetailView: View {
                         GoalHeroCard(
                             goal: detail.summary,
                             why: detail.why,
-                            selection: (detail.today, detail.yesterday, viewModel.day),
-                            onSelect: { viewModel.day = $0 }
+                            whyInSerif: true,
+                            today: detail.today,
+                            checkIn: GoalHeroCheckIn(
+                                today: detail.today, yesterday: detail.yesterday,
+                                isPending: { viewModel.isPending(.commitment($0.id)) },
+                                checkIn: { row, day, status in
+                                    Task { await viewModel.checkIn(commitment: row.id, status: status, day: day) }
+                                },
+                                // Items count from their row below, where Add note and Undo follow.
+                                addOne: nil
+                            )
                         )
-                        // Never miss twice: every commitment the server flags, not just the first.
-                        ForEach(GoalDetailCopy.missTwiceRows(detail.summary)) { row in
-                            GoalNote(systemImage: "exclamationmark.circle", tint: tint.fill, text: GoalDetailCopy.missTwice(row))
-                        }
+                        // Never miss twice is said once: the chip on the hero's commitment, and what
+                        // to do about it on its Today row. An escalation is a chip in the goal's paper.
                         ForEach(detail.summary.flags.escalations, id: \.check) { escalation in
-                            GoalNote(systemImage: "exclamationmark.triangle", tint: .hxWarning, text: escalation.say)
+                            HXChip(paper: tint.paper, symbol: "exclamationmark.circle", label: escalation.say, lines: 2)
                         }
                         ForEach(detail.summary.flags.unlockReady, id: \.id) { unlock in
                             GoalNote(systemImage: "sparkles", tint: tint.fill, text: GoalDetailCopy.unlockOffer(unlock, in: detail.summary))
@@ -113,8 +121,8 @@ struct GoalDetailView: View {
                     if !detail.milestones.isEmpty {
                         GoalMilestonesSection(milestones: detail.milestones, today: detail.today, tint: tint)
                     }
-                    GoalConsistencySection(streakDays: detail.streak.days, calendar: viewModel.calendar, tint: tint)
-                    planSection(detail)
+                    GoalConsistencySection(calendar: viewModel.calendar, tint: tint)
+                    if GoalDetailCopy.hasPlan(detail) { planSection(detail) }
                 }
                 .padding(BrainStyle.l)
                 .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
@@ -127,17 +135,31 @@ struct GoalDetailView: View {
 
     private func commitmentsSection(_ d: GoalDetail, tint: GoalTint) -> some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
-            BrainSectionHeader(title: viewModel.day == .today ? "Today" : "Yesterday")
+            BrainSectionHeader(title: GoalDetailCopy.checkInHeader(canCheckInYesterday: viewModel.canCheckInYesterday,
+                                                                    day: viewModel.day))
+            // The plan's obstacle, where it helps: under the header, before choosing the day.
+            if let watchFor = GoalDetailCopy.watchFor(d.obstacle) {
+                Text(verbatim: watchFor).brainText(.meta).fixedSize(horizontal: false, vertical: true)
+            }
+            if viewModel.canCheckInYesterday {
+                Picker(selection: Binding(get: { viewModel.day }, set: { viewModel.day = $0 })) {
+                    Text(verbatim: "Today").tag(GoalDay.today)
+                    Text(verbatim: "Yesterday").tag(GoalDay.yesterday)
+                } label: {
+                    Text(verbatim: "Check in for")
+                }
+                .pickerStyle(.segmented)
+            }
             SectionCard {
                 VStack(spacing: 0) {
                     ForEach(Array(d.summary.week.commitments.enumerated()), id: \.element.id) { offset, row in
                         if offset > 0 { PrepRowDivider() }
+                        // The hero already wears the at-risk chip; the row says what to do today.
                         if row.isItem {
                             GoalItemRow(
                                 row: row,
                                 tint: tint,
                                 isPending: viewModel.isPending(.commitment(row.id)),
-                                atRisk: d.summary.flags.missTwice.contains(row.id),
                                 recentDate: viewModel.recentItems.date(for: .commitment(row.id)),
                                 actions: viewModel.itemActions(row.id)
                             )
@@ -147,11 +169,21 @@ struct GoalDetailView: View {
                                 day: viewModel.day,
                                 date: viewModel.day == .today ? d.today : d.yesterday,
                                 tint: tint,
-                                isPending: viewModel.isPending(.commitment(row.id)),
-                                atRisk: viewModel.day == .today && d.summary.flags.missTwice.contains(row.id)
+                                isPending: viewModel.isPending(.commitment(row.id))
                             ) { status in
                                 Task { await viewModel.checkIn(commitment: row.id, status: status) }
                             }
+                        }
+                        if let line = GoalDetailCopy.missTwiceAction(row, in: d.summary, day: viewModel.day) {
+                            Label {
+                                Text(verbatim: line)
+                            } icon: {
+                                Image(systemName: "exclamationmark.circle").accessibilityHidden(true)
+                            }
+                            .font(BrainStyle.meta)
+                            .foregroundStyle(tint.fill)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.bottom, BrainStyle.s)
                         }
                     }
                 }
@@ -203,7 +235,6 @@ struct GoalDetailView: View {
                                 .foregroundStyle(Color.hxTextSecondary)
                         }
                     }
-                    if !d.obstacle.isEmpty { Text(verbatim: "Watch for: \(d.obstacle)").brainText(.meta) }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, BrainStyle.s)
@@ -254,7 +285,8 @@ private struct GoalMilestonesSection: View {
     }
 }
 
-/// The check circle: empty until checked in, then filled in the goal's tint (or amber for Missed).
+/// The check circle: empty until checked in, then filled in the goal's tint; Missed is a neutral
+/// ring with its xmark.
 struct GoalCheckCircle: View {
     let status: GoalStatus?
     let tint: GoalTint
@@ -273,8 +305,9 @@ struct GoalCheckCircle: View {
                 Circle().fill(Color.hxSeparator.opacity(0.7))
                 Image(systemName: GoalDetailCopy.symbol(.skip)).font(AppFont.footnote(weight: .semibold)).foregroundStyle(Color.hxTextSecondary)
             case .some(.miss):
-                Circle().strokeBorder(Color.hxWarning, lineWidth: 2)
-                Image(systemName: GoalDetailCopy.symbol(.miss)).font(AppFont.footnote(weight: .bold)).foregroundStyle(Color.hxWarning)
+                // A miss is a fact, not an alarm: neutral ink and its mark, never amber.
+                Circle().strokeBorder(Color.hxSeparator, lineWidth: 2)
+                Image(systemName: GoalDetailCopy.symbol(.miss)).font(AppFont.footnote(weight: .bold)).foregroundStyle(Color.hxTextSecondary)
             default:
                 Circle().strokeBorder(tint.fill.opacity(0.7), lineWidth: 1.5)
             }
@@ -356,7 +389,8 @@ private struct GoalMilestoneRow: View {
     }
 }
 
-/// A one-line note under the hero: an escalation or an unlock offer.
+/// A one-line note under the hero: an unlock offer (and, on the Daily Brief's goal card, the
+/// never-miss-twice nudge).
 struct GoalNote: View {
     let systemImage: String
     let tint: Color
@@ -376,13 +410,37 @@ enum GoalDetailCopy {
         ("done", "Done"), ("min", "2-min"), ("skip", "Skip"), ("miss", "Missed"),
     ]
 
+    /// The check-ins' header: "Check in" over the Today / Yesterday picker, else the one day.
+    static func checkInHeader(canCheckInYesterday: Bool, day: GoalDay) -> String {
+        canCheckInYesterday ? "Check in" : day == .today ? "Today" : "Yesterday"
+    }
+
+    /// "Watch for: Late bedtime…" under the check-ins' header; nil when the plan names no obstacle.
+    static func watchFor(_ obstacle: String) -> String? {
+        let text = obstacle.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : "Watch for: \(text)"
+    }
+
+    /// The Plan disclosure has something left once the obstacle moved up to Today.
+    static func hasPlan(_ detail: GoalDetail) -> Bool {
+        !detail.objective.isEmpty || !detail.doneWhen.isEmpty
+    }
+
     /// The commitments the server flags as never-miss-twice, in the week's order.
     static func missTwiceRows(_ goal: GoalSummary) -> [GoalCommitmentProgress] {
         goal.week.commitments.filter { goal.flags.missTwice.contains($0.id) }
     }
 
+    /// What to do about a never-miss-twice flag, under its row on the detail's Today list (the
+    /// hero's chip already says it's at risk): nil for an unflagged row, or when checking in for
+    /// yesterday.
+    static func missTwiceAction(_ row: GoalCommitmentProgress, in goal: GoalSummary, day: GoalDay) -> String? {
+        guard day == .today, goal.flags.missTwice.contains(row.id) else { return nil }
+        return row.isItem ? "One today counts." : "Missed yesterday. Even the 2-min version counts."
+    }
+
     /// The nudge before a second miss in a row: a day commitment missed yesterday, or an item
-    /// commitment short of its target two weeks running.
+    /// commitment short of its target two weeks running. The Daily Brief's goal card says it whole.
     static func missTwice(_ row: GoalCommitmentProgress) -> String {
         let name = GoalsCopy.shortName(row.action).lowercased()
         return row.isItem
@@ -458,8 +516,9 @@ enum GoalDetailCopy {
         return "You held \(GoalsCopy.shortTitle(after).lowercased()) for a week. Ready to add \(unlock.action.lowercased())? Tell Atlas in chat."
     }
 
+    /// This goal's own consistency over its days so far: "Showed up 16 of 18 days".
     static func shownUpLine(_ shown: (shown: Int, total: Int)) -> String {
-        shown.total == 0 ? "Starts today" : "\(shown.shown) of \(shown.total) days"
+        shown.total == 0 ? "Starts today" : "Showed up \(shown.shown) of \(shown.total) days"
     }
 
     static func calendarSummary(_ weeks: [[GoalCalendarDay?]]) -> String {

@@ -56,9 +56,9 @@ extension GoalsHomeViewModel {
     }
 }
 
-/// An item commitment: its week as pips and latest notes, with a +1 chip that counts one at once
-/// and then offers Add note and Undo for a few seconds (`GoalItemFollowUp`); on long press,
-/// "Remove last".
+/// An item commitment: its week as pips and latest notes, with a +1 chip that counts one at once.
+/// For a few seconds after, Note and Undo take the +1's place (same height, so nothing below moves);
+/// Note opens an inline field under the row. On long press, "Remove last".
 struct GoalItemRow: View {
     let row: GoalCommitmentProgress
     let tint: GoalTint
@@ -68,6 +68,9 @@ struct GoalItemRow: View {
     /// The day of the +1 just counted while Add note and Undo are offered; nil otherwise.
     let recentDate: String?
     let actions: GoalItemActions
+
+    @State private var draft: GoalItemNoteDraft?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
@@ -92,21 +95,23 @@ struct GoalItemRow: View {
                 .accessibilityAction(named: Text(verbatim: "Remove last")) {
                     if !row.items.isEmpty { actions.removeLast() }
                 }
-                Button {
-                    Task { _ = await actions.add(nil) }
-                } label: {
-                    HXChip(paper: tint.paper, label: "+1")
-                        .frame(minWidth: BrainStyle.minTapTarget, minHeight: BrainStyle.minTapTarget)
-                        .contentShape(Rectangle())
+                Group {
+                    if recentDate != nil, draft == nil {
+                        GoalItemOffer(tint: tint, isPending: isPending, actions: actions, compact: true) { draft = $0 }
+                    } else {
+                        plusOne
+                    }
                 }
-                .buttonStyle(.plain)
-                .disabled(isPending)
-                .accessibilityLabel(Text(verbatim: "Add \(row.action)"))
-                .accessibilityHint(Text(verbatim: "Counts one now. Add a note or undo it right after."))
+                .transition(.opacity)
             }
-            GoalItemFollowUp(label: "Counted", tint: tint, isPending: isPending, recentDate: recentDate,
-                             actions: actions)
+            if draft != nil {
+                GoalItemNoteField(draft: $draft, tint: tint, isPending: isPending, actions: actions)
+                    .transition(.opacity)
+            }
         }
+        .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: recentDate != nil)
+        .animation(HXMotion.disclosure(reduceMotion: reduceMotion), value: draft != nil)
+        .announcesOffer(recentDate != nil, label: "Counted")
         .padding(.vertical, BrainStyle.s)
         .frame(minHeight: BrainStyle.minTapTarget)
         .contextMenu {
@@ -114,49 +119,51 @@ struct GoalItemRow: View {
                 .disabled(row.items.isEmpty || isPending)
         }
     }
+
+    private var plusOne: some View {
+        Button {
+            Task { _ = await actions.add(nil) }
+        } label: {
+            HXChip(paper: tint.paper, label: "+1")
+                .frame(minWidth: BrainStyle.minTapTarget, minHeight: BrainStyle.minTapTarget)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isPending)
+        .accessibilityLabel(Text(verbatim: "Add \(row.action)"))
+        .accessibilityHint(Text(verbatim: "Counts one now. Add a note or undo it right after."))
+    }
 }
 
-/// What follows a +1 on an item row: "Counted · Add note · Undo" while the offer lasts, then, after
-/// Add note, an inline note field. Saving it notes the item just counted (`GoalItemActions.note`); if
-/// the save fails the field comes back with the typed note, and if the item came off without its
-/// noted copy landing, saving again counts it anew with the note. Empty when there is nothing to offer.
-struct GoalItemFollowUp: View {
-    /// Leads the offer: "Counted", or "Outreach counted" off the row.
-    let label: String
+/// The note being written for a +1: the day of the item it notes (nil once that item came off, so
+/// saving counts a new one with the note), and the words so far.
+struct GoalItemNoteDraft: Equatable {
+    var date: String?
+    var text = ""
+}
+
+/// Add note and Undo for the +1 just counted, each a 44 pt link in the goal's glow. `compact` drops
+/// the leading label for the +1's own slot; `onNote` opens the field for the item's day.
+private struct GoalItemOffer: View {
+    var label: String?
     let tint: GoalTint
     let isPending: Bool
-    let recentDate: String?
     let actions: GoalItemActions
-
-    /// The day of the item the field notes; nil once it is a plain +1 with a note.
-    @State private var noteDate: String?
-    @State private var isNoting = false
-    @State private var note = ""
-    @FocusState private var noteFocused: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var compact = false
+    let onNote: (GoalItemNoteDraft) -> Void
 
     var body: some View {
-        Group {
-            if isNoting {
-                noteField.transition(.opacity)
-            } else if recentDate != nil {
-                offer.transition(.opacity)
-            }
-        }
-        .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: recentDate != nil)
-        .animation(HXMotion.disclosure(reduceMotion: reduceMotion), value: isNoting)
-    }
-
-    private var offer: some View {
         HStack(spacing: BrainStyle.s) {
-            Text(verbatim: label).brainText(.meta)
-            Text(verbatim: "·").brainText(.meta).accessibilityHidden(true)
-            link("Add note") {
-                guard let date = actions.takeRecent() else { return }
-                noteDate = date
-                isNoting = true
+            if let label {
+                Text(verbatim: label).brainText(.meta)
+                Text(verbatim: "·").brainText(.meta).accessibilityHidden(true)
             }
-            Text(verbatim: "·").brainText(.meta).accessibilityHidden(true)
+            link(compact ? "Note" : "Add note") {
+                guard let date = actions.takeRecent() else { return }
+                onNote(GoalItemNoteDraft(date: date))
+            }
+            .accessibilityLabel(Text(verbatim: "Add note"))
+            if !compact { Text(verbatim: "·").brainText(.meta).accessibilityHidden(true) }
             link("Undo", action: actions.undo)
         }
         .disabled(isPending)
@@ -172,20 +179,32 @@ struct GoalItemFollowUp: View {
         }
         .buttonStyle(.plain)
     }
+}
 
-    private var noteField: some View {
+/// The inline note field Add note opens. Saving notes the item just counted (`GoalItemActions.note`);
+/// if the save fails the field comes back with the typed note, and if the item came off without its
+/// noted copy landing, saving again counts it anew with the note. Leaving it empty closes it.
+private struct GoalItemNoteField: View {
+    @Binding var draft: GoalItemNoteDraft?
+    let tint: GoalTint
+    let isPending: Bool
+    let actions: GoalItemActions
+
+    @FocusState private var focused: Bool
+
+    var body: some View {
         HStack(spacing: BrainStyle.s) {
-            TextField("Note (optional)", text: $note)
+            TextField("Note (optional)", text: Binding(get: { draft?.text ?? "" }, set: { draft?.text = $0 }))
                 .font(BrainStyle.rowSubtitle)
-                .focused($noteFocused)
-                .onAppear { noteFocused = true }
+                .focused($focused)
+                .onAppear { focused = true }
                 .submitLabel(.done)
                 .onSubmit(save)
                 .padding(.horizontal, BrainStyle.m)
                 .frame(minHeight: BrainStyle.minTapTarget - 8)
                 .background(Color.hxSeparator.opacity(0.45), in: RoundedRectangle(cornerRadius: HXRadius.sm))
             Button(action: save) {
-                Text(verbatim: noteDate == nil ? "Add" : "Save")
+                Text(verbatim: draft?.date == nil ? "Add" : "Save")
                     .font(BrainStyle.rowSubtitle.weight(.semibold))
                     .foregroundStyle(tint.on)
                     .padding(.horizontal, BrainStyle.l)
@@ -197,39 +216,81 @@ struct GoalItemFollowUp: View {
             .buttonStyle(.plain)
             .disabled(isPending)
         }
-        .onChange(of: noteFocused) { _, focused in
+        .onChange(of: focused) { _, isFocused in
             // Leaving an empty field closes it; the item stays as it was counted.
-            if !focused, isNoting, note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { close() }
+            if !isFocused, let draft, draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { self.draft = nil }
         }
-    }
-
-    private func close() {
-        isNoting = false
-        noteDate = nil
-        note = ""
     }
 
     /// Notes the item just counted, or counts a new one with the note once that item came off.
     private func save() {
-        let typed = note
+        guard let current = draft else { return }
+        let typed = current.text
         let trimmed = typed.trimmingCharacters(in: .whitespacesAndNewlines)
-        let date = noteDate
-        guard !trimmed.isEmpty else { return close() }
-        note = ""
-        isNoting = false
-        noteFocused = false
-        Task {
-            if let date {
-                switch await actions.note(date, trimmed) {
-                case .saved: noteDate = nil; return
-                case .unchanged: noteDate = date
-                case .removed: noteDate = nil
+        draft = nil
+        focused = false
+        guard !trimmed.isEmpty else { return }
+        let actions = actions
+        Task { @MainActor in
+            var date = current.date
+            if let noted = date {
+                switch await actions.note(noted, trimmed) {
+                case .saved: return
+                case .unchanged: date = noted
+                case .removed: date = nil
                 }
             } else if await actions.add(trimmed) {
                 return
             }
-            if note.isEmpty { note = typed }
-            isNoting = true
+            draft = GoalItemNoteDraft(date: date, text: typed)
+        }
+    }
+}
+
+/// What follows a +1 counted from Goals home: "Outreach counted · Add note · Undo" while the offer
+/// lasts, then the note field, on a floating bar over the bottom of the screen so nothing on it moves.
+/// Empty when there is nothing to offer.
+struct GoalItemFollowUp: View {
+    /// Leads the offer: "Outreach counted".
+    let label: String
+    let tint: GoalTint
+    let isPending: Bool
+    let recentDate: String?
+    let actions: GoalItemActions
+
+    @State private var draft: GoalItemNoteDraft?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Group {
+            if draft != nil {
+                bar { GoalItemNoteField(draft: $draft, tint: tint, isPending: isPending, actions: actions) }
+            } else if recentDate != nil {
+                bar { GoalItemOffer(label: label, tint: tint, isPending: isPending, actions: actions) { draft = $0 } }
+            }
+        }
+        .animation(HXMotion.panel(reduceMotion: reduceMotion), value: recentDate != nil)
+        .animation(HXMotion.panel(reduceMotion: reduceMotion), value: draft != nil)
+        .announcesOffer(recentDate != nil, label: label)
+    }
+
+    private func bar(@ViewBuilder _ content: () -> some View) -> some View {
+        content()
+            .padding(.horizontal, BrainStyle.l)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous).strokeBorder(Color.hxSeparator, lineWidth: 0.5))
+            .hxShadow(.float)
+            .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
+    }
+}
+
+private extension View {
+    /// Tells VoiceOver the +1 landed and what it can do next, once each time the offer opens.
+    func announcesOffer(_ isOffered: Bool, label: String) -> some View {
+        onChange(of: isOffered) { _, offered in
+            guard offered else { return }
+            AccessibilityNotification.Announcement("\(label). Add note or undo.").post()
         }
     }
 }

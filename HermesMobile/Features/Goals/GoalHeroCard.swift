@@ -1,23 +1,30 @@
 import SwiftUI
 
-/// A goal on its Daily Brief paper: days left, serif title, identity, and this week as a
-/// strip of seven days. Goals home shows it compact with its commitments' dots checking in
-/// (`checkIn`); goal detail adds the why and lets the strip pick which day (today or yesterday)
-/// the check-ins below write to.
+/// A goal on its Daily Brief paper: days left, title, identity, then each commitment's week as the
+/// Brief's dots under one row of weekday letters (`DeckWeekGrid`'s columns, today's letter heavy). With
+/// `checkIn`, today's and yesterday's dots check in and an item row ends on a + (Goals home and goal
+/// detail alike). On Monday this week still leads, and a compact "Last week" follows it, one line per
+/// commitment, so Sunday can still be logged as yesterday.
 struct GoalHeroCard: View {
     let goal: GoalSummary
     var why: String = ""
+    /// The why is his own saved words: goal detail sets it in serif, as the record does.
+    var whyInSerif = false
     var isCompact = false
-    /// The server's today, so the strip can dash the days still ahead.
+    /// The server's today, for the live today and yesterday dots and Monday's last week.
     var today: String?
-    /// The day the detail screen checks in for; nil leaves the strip read-only.
-    var selection: (today: String, yesterday: String, selected: GoalDay)?
-    var onSelect: (GoalDay) -> Void = { _ in }
-    /// Goals home's one-tap check-ins on the commitments' dots; nil leaves them read-only.
+    /// One-tap check-ins on the dots; nil leaves them read-only.
     var checkIn: GoalHeroCheckIn?
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .caption) private var scaledDot: CGFloat = DeckDots.dot
 
     var body: some View {
         let palette = GoalPaper.palette(for: goal)
+        let stacked = GoalHeroLayout.stacks(dynamicTypeSize)
+        let metrics = stacked ? GoalDotMetrics.scaled(scaledDot) : .standard
+        let today = today ?? checkIn?.today
+        let lastWeek = goal.week.commitments.filter { GoalHeroLayout.showsLastWeek($0, today: today) }
         HXCard(.glow(palette.colors), title: goal.title, titleStyle: isCompact ? .title3 : .title,
                spacing: BrainStyle.s) {
             HStack(alignment: .firstTextBaseline) {
@@ -31,28 +38,38 @@ struct GoalHeroCard: View {
                     .accessibilityHidden(true)
             }
         } content: {
-            if !goal.identity.isEmpty {
+            if !goal.identity.isEmpty, GoalHeroLayout.showsIdentity(isCompact: isCompact, stacked: stacked) {
                 Text(verbatim: GoalHeroCopy.sentenceCase(goal.identity))
                     .font(AppFont.display(style: .subheadline, weight: .medium))
 
             }
             if !isCompact, !why.isEmpty {
                 Text(verbatim: why)
-                    .font(BrainStyle.rowSubtitle)
+                    .font(whyInSerif ? AppFont.serif(style: .subheadline) : BrainStyle.rowSubtitle)
 
                     .fixedSize(horizontal: false, vertical: true)
-            }
-            if !goal.week.days.isEmpty {
-                GoalWeekStrip(days: goal.week.days, ink: palette.ink, onInk: palette.onInk, today: today ?? selection?.today,
-                              selection: selection, onSelect: onSelect)
-                    .padding(.top, BrainStyle.xs)
             }
         } footer: {
             if !goal.week.commitments.isEmpty {
                 VStack(alignment: .leading, spacing: BrainStyle.s) {
-                    ForEach(goal.week.commitments) { row in
-                        GoalCommitmentWeek(row: row, atRisk: goal.flags.missTwice.contains(row.id), paper: palette.colors,
-                                           today: today ?? selection?.today, checkIn: checkIn)
+                    ForEach(GoalHeroLayout.sections(hasLastWeek: !lastWeek.isEmpty), id: \.self) { section in
+                        switch section {
+                        case .thisWeek:
+                            GoalWeekLetters(label: lastWeek.isEmpty ? nil : "This week", today: today, ink: palette.ink,
+                                            metrics: metrics, stacked: stacked)
+                            ForEach(goal.week.commitments) { row in
+                                GoalCommitmentWeek(row: row, atRisk: goal.flags.missTwice.contains(row.id),
+                                                   paper: palette.colors, today: today, checkIn: checkIn,
+                                                   metrics: metrics, stacked: stacked)
+                            }
+                        case .lastWeek:
+                            GoalWeekLabel(text: "Last week", ink: palette.ink)
+                                .padding(.top, BrainStyle.xs)
+                            ForEach(lastWeek) { row in
+                                GoalCommitmentWeek(row: row, atRisk: false, paper: palette.colors, today: today,
+                                                   checkIn: checkIn, isLastWeek: true, metrics: metrics, stacked: stacked)
+                            }
+                        }
                     }
                 }
             }
@@ -61,10 +78,136 @@ struct GoalHeroCard: View {
     }
 }
 
+/// How the hero lays a commitment out, by text size and day.
+enum GoalHeroLayout {
+    /// At accessibility sizes a commitment's name and count stack above its dots, which then get the
+    /// card's width to grow in.
+    static func stacks(_ size: DynamicTypeSize) -> Bool { size >= .accessibility1 }
+
+    /// Goals home's compact cards drop the identity line at accessibility sizes, so the dots stay near.
+    static func showsIdentity(isCompact: Bool, stacked: Bool) -> Bool { !(isCompact && stacked) }
+
+    /// The hero's weeks, top to bottom: this week always leads; Monday's last week follows it.
+    enum Section: Hashable { case thisWeek, lastWeek }
+
+    static func sections(hasLastWeek: Bool) -> [Section] {
+        hasLastWeek ? [.thisWeek, .lastWeek] : [.thisWeek]
+    }
+
+    /// A last-week line's height: one compact line, grown only as far as large text grows its dots.
+    /// A dot there that still checks in keeps its 44 pt hit height, overflowing the line.
+    static func lastWeekRowHeight(_ metrics: GoalDotMetrics) -> CGFloat { max(24, metrics.dot + 8) }
+
+    /// Monday (today opens the server's week) shows the commitment's last week, when it had one.
+    static func showsLastWeek(_ row: GoalCommitmentProgress, today: String?) -> Bool {
+        guard let today, row.lastWeek != nil else { return false }
+        if let first = row.weekDays.first { return first.date == today }
+        return GoalCalendar.weekdayIndex(today) == 0
+    }
+}
+
+/// The dots' sizes: the Brief's 16 pt in a 26 pt column, or at accessibility sizes grown with the text
+/// up to `maxDot`, each column keeping the same 10 pt of air so neighbors and the + never touch.
+struct GoalDotMetrics: Equatable {
+    var dot: CGFloat = DeckDots.dot
+    var column: CGFloat = DeckDots.column
+
+    static let standard = GoalDotMetrics()
+    /// Seven columns at this size still fit an iPhone SE's card.
+    static let maxDot: CGFloat = 26
+
+    static func scaled(_ dot: CGFloat) -> GoalDotMetrics {
+        let size = min(max(dot, DeckDots.dot), maxDot)
+        return GoalDotMetrics(dot: size, column: size + DeckDots.column - DeckDots.dot)
+    }
+
+    /// The seven day columns together.
+    var trailingWidth: CGFloat { column * CGFloat(DeckWeekGridLayout.dayCount) }
+
+    /// A counted row's pip column: the day columns' width shared by its pips and its +, never wider than a day's.
+    func pipColumn(pips: Int, addsOne: Bool) -> CGFloat {
+        let slots = pips + (addsOne ? 1 : 0)
+        guard slots > 0 else { return column }
+        return min(column, trailingWidth / CGFloat(slots))
+    }
+
+    /// The dot in a `column` that may be narrower than a day's, with air on each side.
+    func dot(in column: CGFloat) -> CGFloat { min(dot, column - 4) }
+
+    /// The air between an item row's packed pips.
+    static let packedGap: CGFloat = 6
+
+    /// An item row's pip pitch: packed tighter than a day column (a dot and `packedGap`) against the
+    /// dot area's trailing edge, the + after them in a full column, so a count never reads as weekdays.
+    /// Shrinks only when the pips would overflow the seven columns.
+    func packedPitch(pips: Int, addsOne: Bool) -> CGFloat {
+        let pitch = dot + Self.packedGap
+        guard pips > 0 else { return pitch }
+        return min(pitch, (trailingWidth - (addsOne ? column : 0)) / CGFloat(pips))
+    }
+}
+
+/// The small in-card label over a week's rows ("Last week", "This week").
+struct GoalWeekLabel: View {
+    let text: String
+    let ink: Color
+
+    var body: some View {
+        Text(verbatim: text)
+            .font(AppFont.caption(weight: .semibold))
+            .foregroundStyle(ink)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// M T W T F S S over the seven day columns, once per card, today's letter heavy; with a label
+/// ("Last week") in the name column.
+private struct GoalWeekLetters: View {
+    let label: String?
+    let today: String?
+    let ink: Color
+    let metrics: GoalDotMetrics
+    let stacked: Bool
+
+    var body: some View {
+        let todayIndex = today.flatMap(GoalCalendar.weekdayIndex)
+        let letters = HStack(spacing: 0) {
+            ForEach(Array(DeckDots.weekdays.enumerated()), id: \.offset) { index, letter in
+                Text(verbatim: letter)
+                    .font(AppFont.caption2(weight: index == todayIndex ? .bold : .regular))
+                    .foregroundStyle(ink)
+                    .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+                    .frame(width: metrics.column)
+            }
+        }
+        .frame(width: metrics.trailingWidth, alignment: .leading)
+        .accessibilityHidden(true)
+        if stacked {
+            VStack(alignment: .leading, spacing: BrainStyle.xs) {
+                if let label { GoalWeekLabel(text: label, ink: ink) }
+                letters
+            }
+        } else {
+            HStack(alignment: .lastTextBaseline, spacing: 0) {
+                Group {
+                    if let label { GoalWeekLabel(text: label, ink: ink) } else { Color.clear.frame(height: 0) }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.trailing, 6)
+                letters
+            }
+        }
+    }
+}
+
 /// A commitment's week on the hero, laid out like a row of the Brief's week grid (`DeckWeekGrid`):
-/// its name with a small count in the flexible column, then its pips in the seven fixed day columns,
-/// and a "Don't miss twice" chip under it when the server flags it. With `checkIn` (Goals home),
-/// today's and yesterday's dots check in and an item row ends on a + (`GoalCheckInPipRow`).
+/// its name with a small count in the flexible column, then its dots in the seven fixed day columns
+/// (stacked above them at accessibility sizes), and a "Don't miss twice" chip under it when the server
+/// flags it. With `checkIn`, today's and yesterday's dots check in and an item row ends on a +
+/// (`GoalCheckInPipRow`). `isLastWeek` draws the row's last week instead, where only an unlogged
+/// Sunday (yesterday, on Monday) checks in.
 struct GoalCommitmentWeek: View {
     let row: GoalCommitmentProgress
     let atRisk: Bool
@@ -72,36 +215,89 @@ struct GoalCommitmentWeek: View {
     /// The server's today, so today's and yesterday's dots follow a tap at once.
     var today: String?
     var checkIn: GoalHeroCheckIn?
+    var isLastWeek = false
+    var metrics: GoalDotMetrics = .standard
+    var stacked = false
 
     var body: some View {
-        let pips = GoalPips(row, name: GoalsCopy.shortName(row.action), today: today)
+        let name = GoalsCopy.shortName(row.action)
+        let pips = isLastWeek ? GoalPips(lastWeekOf: row, name: name, today: today) : GoalPips(row, name: name, today: today)
+        let dates = isLastWeek ? (row.lastWeek?.days.map(\.date) ?? []) : row.weekDays.map(\.date)
+        // A row with a dot to tap is a 44 pt row.
+        let tall = checkIn != nil
         VStack(alignment: .leading, spacing: BrainStyle.xs) {
-            HStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(verbatim: GoalsCopy.shortName(row.action))
-                        .font(AppFont.subheadline(weight: .semibold))
-                        .foregroundStyle(Color.hxTextPrimary)
-                        .lineLimit(2)
-                    Text(verbatim: pips.count)
-                        .font(AppFont.caption())
-                        .foregroundStyle(paper.glow)
-                        .monospacedDigit()
-                        .lineLimit(1)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.trailing, 6)
-                if let checkIn {
-                    GoalCheckInPipRow(row: row, pips: pips, ink: paper.glow, checkIn: checkIn)
+            Group {
+                if isLastWeek {
+                    lastWeekLine(pips, dates: dates)
+                } else if stacked {
+                    VStack(alignment: .leading, spacing: BrainStyle.xs) {
+                        label(pips)
+                        dots(pips, dates: dates)
+                    }
                 } else {
-                    GoalPipRow(pips: pips, ink: paper.glow)
+                    HStack(spacing: 0) {
+                        label(pips)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.trailing, 6)
+                        dots(pips, dates: dates)
+                    }
+                    .frame(minHeight: tall ? BrainStyle.minTapTarget : 24)
                 }
             }
-            .frame(minHeight: checkIn == nil ? 24 : BrainStyle.minTapTarget)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(Text(verbatim: pips.spoken))
+            .accessibilityLabel(Text(verbatim: isLastWeek ? "Last week, \(pips.spoken)" : pips.spoken))
             if atRisk {
                 GoalAtRiskChip(row: row, paper: paper)
             }
+        }
+    }
+
+    /// Last week as one line: the name in caption, its dots in the same columns, no count (VoiceOver
+    /// keeps it). The dots lay out in the line's height; a Sunday that still checks in overflows it
+    /// with its 44 pt hit area, which stays clear of the next line's dots.
+    @ViewBuilder
+    private func lastWeekLine(_ pips: GoalPips, dates: [String]) -> some View {
+        let name = Text(verbatim: GoalsCopy.shortName(row.action))
+            .font(AppFont.caption())
+            .foregroundStyle(Color.hxTextPrimary)
+            .lineLimit(1)
+        let line = dots(pips, dates: dates).frame(height: GoalHeroLayout.lastWeekRowHeight(metrics))
+        if stacked {
+            VStack(alignment: .leading, spacing: 2) {
+                name
+                line
+            }
+        } else {
+            HStack(spacing: 0) {
+                name
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.trailing, 6)
+                line
+            }
+        }
+    }
+
+    private func label(_ pips: GoalPips) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(verbatim: GoalsCopy.shortName(row.action))
+                .font(AppFont.subheadline(weight: .semibold))
+                .foregroundStyle(Color.hxTextPrimary)
+                .lineLimit(2)
+            Text(verbatim: pips.count)
+                .font(AppFont.caption())
+                .foregroundStyle(paper.glow)
+                .monospacedDigit()
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder
+    private func dots(_ pips: GoalPips, dates: [String]) -> some View {
+        if let checkIn {
+            GoalCheckInPipRow(row: row, pips: pips, dates: dates, ink: paper.glow, checkIn: checkIn,
+                              addsOne: !isLastWeek, metrics: metrics)
+        } else {
+            GoalPipRow(pips: pips, ink: paper.glow, metrics: metrics, packed: row.isItem)
         }
     }
 }
@@ -112,7 +308,7 @@ struct GoalAtRiskChip: View {
     let paper: HermexPaper
 
     var body: some View {
-        HXChip(paper: paper, symbol: "exclamationmark.circle", label: GoalPips.atRiskLabel(row))
+        HXChip(paper: paper, symbol: "exclamationmark.circle", label: GoalPips.atRiskLabel(row), lines: 3)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text(verbatim: GoalPips.atRiskSpoken(row)))
     }
@@ -144,7 +340,7 @@ struct GoalPips: Equatable {
             let left = max(0, row.skips - row.skipped)
             if row.weekDays.count == 7 {
                 states = Self.weekStates(row, today: today)
-                count = "\(shown) of \(row.target)" + (left == 0 ? "" : left == 1 ? " · 1 skip" : " · \(left) skips")
+                count = "\(shown) of \(row.target)" + (left == 0 ? "" : left == 1 ? " · 1 skip left" : " · \(left) skips left")
             } else {
                 states = (0..<max(row.target, shown)).map { $0 < shown ? "done" : "missed" }
                     + Array(repeating: "skip", count: used) + Array(repeating: "ahead", count: left)
@@ -153,6 +349,29 @@ struct GoalPips: Equatable {
             let skips = row.skips == 0 ? "" : left == 1 ? ", 1 skip left" : ", \(left) skips left"
             spoken = "\(name): \(shown) of \(row.target) day\(row.target == 1 ? "" : "s")\(skips)"
         }
+    }
+
+    /// A commitment's last week, for Monday's hero: its seven days (yesterday, last Sunday, following the
+    /// row's check-in) or, for an item row, a pip per item of its target; the count beside follows Sunday.
+    init(lastWeekOf row: GoalCommitmentProgress, name: String, today: String?) {
+        let week = row.lastWeek
+        let target = week?.target ?? 0
+        var done = week?.done ?? 0
+        if let week, !row.isItem, week.days.count == 7 {
+            let sunday = week.days[6]
+            let status = today.flatMap { row.effectiveStatus(sunday.date, today: $0, yesterday: sunday.date) }
+            let live = status == nil && sunday.state == "off"
+                ? "off" : DeckRowCheckIn.liveState(status, isToday: false, deckState: sunday.state)
+            // A Sunday logged since the server counted the week moves the count with it.
+            if sunday.state != "done", live == "done" { done += 1 }
+            if sunday.state == "done", live != "done" { done = max(0, done - 1) }
+            states = week.days.dropLast().map(\.state) + [live]
+            spoken = "\(name): \(done) of \(target) day\(target == 1 ? "" : "s")" + (live == "ask" ? ", Sunday not logged yet" : "")
+        } else {
+            states = (0..<max(target, done)).map { $0 < done ? "done" : "missed" }
+            spoken = "\(name): \(done) of \(target)"
+        }
+        count = "\(done) of \(target)"
     }
 
     /// The server's Mon–Sun, with today and yesterday read from the row's own check-ins (which an
@@ -181,87 +400,25 @@ struct GoalPips: Equatable {
     }
 }
 
-/// The pips in the seven fixed day columns of the Brief's week grid, sharing them when there are more.
+/// The pips in the seven fixed day columns of the Brief's week grid, sharing them when there are more;
+/// `packed` (an item row on the hero) packs them against the trailing edge instead (`packedPitch`).
 struct GoalPipRow: View {
     let pips: GoalPips
     let ink: Color
+    var metrics: GoalDotMetrics = .standard
+    var packed = false
 
     var body: some View {
-        let column = DeckWeekGridLayout.pipColumn(pips: pips.states.count, addsOne: false)
+        let column = packed
+            ? metrics.packedPitch(pips: pips.states.count, addsOne: false)
+            : metrics.pipColumn(pips: pips.states.count, addsOne: false)
         HStack(spacing: 0) {
             ForEach(Array(pips.states.enumerated()), id: \.offset) { _, state in
-                DeckDot(state: state, ink: ink, column: column)
+                DeckDot(state: state, ink: ink, column: column, size: metrics.dot(in: column))
             }
         }
-        .frame(width: DeckWeekGridLayout.trailingWidth, alignment: .leading)
+        .frame(width: metrics.trailingWidth, alignment: packed ? .trailing : .leading)
         .accessibilityHidden(true)
-    }
-}
-
-/// Monday to Sunday as seven cells filled by each day's best check-in. With a selection,
-/// today and yesterday are buttons and the selected one is outlined.
-private struct GoalWeekStrip: View {
-    let days: [GoalHeatDay]
-    let ink: Color
-    let onInk: Color
-    let today: String?
-    let selection: (today: String, yesterday: String, selected: GoalDay)?
-    let onSelect: (GoalDay) -> Void
-    @ScaledMetric(relativeTo: .caption) private var cellHeight: CGFloat = 22
-
-    var body: some View {
-        HStack(spacing: BrainStyle.xs) {
-            ForEach(days, id: \.date) { day in
-                cell(day)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func cell(_ day: GoalHeatDay) -> some View {
-        let choice = selection.flatMap { GoalCalendar.selectableDay(day.date, today: $0.today, yesterday: $0.yesterday) }
-        let isSelected = choice != nil && choice == selection?.selected
-        let isFuture = today.map { day.date > $0 } ?? false
-        let shape = RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous)
-        let content = VStack(spacing: 3) {
-            shape
-                .fill(isFuture ? Color.clear : GoalPaper.fill(day.status, ink: ink))
-                .overlay {
-                    if isFuture {
-                        shape.strokeBorder(ink.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                    } else if let glyph = GoalHeroCopy.glyph(day.status) {
-                        // The status as a mark too, so skip, miss and an empty day never differ by color alone.
-                        Image(systemName: glyph)
-                            .font(AppFont.caption2(weight: .bold))
-                            .foregroundStyle(day.status.isShown ? onInk : Color.hxTextPrimary)
-                    }
-                }
-                .overlay {
-                    if isSelected {
-                        RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
-                            .strokeBorder(ink, lineWidth: 2)
-                            .padding(-3)
-                    }
-                }
-                .frame(height: cellHeight)
-            Text(verbatim: GoalHeroCopy.weekdayLetter(day.date))
-                .font(AppFont.caption2(weight: isSelected ? .semibold : .regular))
-        }
-        .frame(maxWidth: .infinity)
-
-        if let choice {
-            Button { onSelect(choice) } label: {
-                content.frame(minHeight: BrainStyle.minTapTarget).contentShape(Rectangle())
-            }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text(verbatim: GoalHeroCopy.dayLabel(day, choice: choice)))
-                .accessibilityAddTraits(isSelected ? .isSelected : [])
-                .accessibilityHint(Text(verbatim: "Check in for this day"))
-        } else {
-            content
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(Text(verbatim: GoalHeroCopy.dayLabel(day, choice: nil)))
-        }
     }
 }
 
@@ -288,23 +445,11 @@ enum GoalHeroCopy {
         GoalCalendar.weekdayIndex(iso).map { DeckDots.weekdays[$0] } ?? ""
     }
 
-    /// A checked-in day's mark in the strip and calendar (`GoalDetailCopy.symbol`); nil for an empty day.
+    /// A checked-in day's mark in the calendar (`GoalDetailCopy.symbol`); nil for an empty day.
     static func glyph(_ status: GoalStatus) -> String? {
         switch status {
         case .done, .min, .skip, .miss: GoalDetailCopy.symbol(status)
         case .none, .clear, .unknown: nil
         }
-    }
-
-    static func dayLabel(_ day: GoalHeatDay, choice: GoalDay?) -> String {
-        let name = choice == .today ? "Today" : choice == .yesterday ? "Yesterday" : day.date
-        let state: String = switch day.status {
-        case .done: "done"
-        case .min: "2-minute version"
-        case .skip: "skipped"
-        case .miss: "missed"
-        case .none, .clear, .unknown: "not checked in"
-        }
-        return "\(name), \(state)"
     }
 }

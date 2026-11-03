@@ -28,10 +28,17 @@ extension GoalRecordViewModel {
         guard case .loaded(let record) = state else { return nil }
         return "Achieved \(GoalFinishCopy.shortDate(record.finished))"
     }
+
+    /// "Reopen NYC Marathon?" once loaded: the header's More menu offers Reopen only then.
+    var reopenQuestion: String? {
+        guard case .loaded(let record) = state else { return nil }
+        return "Reopen \(GoalsCopy.shortTitle(record.title))?"
+    }
 }
 
-/// The record, top to bottom: the finisher card, race day and the running year (Garmin goals),
-/// the story, every day, the totals, then his why and reflection, and Reopen.
+/// The record, top to bottom: the finisher card (who he became, the race, his first words),
+/// race day and the running year (Garmin goals), the story, every day, the totals, then his
+/// reflection and why. Reopen lives in the header's More menu, so the screen ends on his words.
 struct GoalRecordContent: View {
     @Bindable var viewModel: GoalRecordViewModel
     let onReopened: (GoalDetail) -> Void
@@ -56,54 +63,54 @@ struct GoalRecordContent: View {
             let palette = GoalPaper.palette(named: record.color, slug: record.slug)
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
+                    if let error = viewModel.reopenError {
+                        Text(verbatim: error).font(BrainStyle.meta).foregroundStyle(Color.hxDanger)
+                    }
                     finisherCard(record, paper: palette.colors)
                     if let race = record.runs?.race { GoalRaceSection(race: race, paper: palette.colors) }
                     if let runs = record.runs, runs.months.count > 1 { GoalRunningYear(runs: runs, paper: palette.colors) }
-                    if !record.story.isEmpty { GoalStorySection(record: record, ink: palette.ink) }
+                    let story = GoalRecordCopy.story(record)
+                    if !story.isEmpty { GoalStorySection(record: record, story: story, ink: palette.ink) }
                     everyDay(record, tint: GoalTint(palette, scheme: colorScheme))
                     totals(record)
                     GoalReflectionSection(viewModel: viewModel, record: record, paper: palette.colors)
-                    reopenSection(record)
                 }
                 .padding(BrainStyle.l)
                 .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
             }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) { moreMenu }
+            }
+            .confirmationDialog(Text(verbatim: viewModel.reopenQuestion ?? ""), isPresented: $confirmingReopen,
+                                titleVisibility: .visible) {
+                Button(role: .destructive) {
+                    Task { if let detail = await viewModel.reopen() { onReopened(detail) } }
+                } label: { Text(verbatim: "Reopen Goal") }
+                Button(role: .cancel) {} label: { Text(verbatim: "Cancel") }
+            } message: {
+                Text(verbatim: "Puts the goal back among your open goals and takes it out of Finished.")
+            }
         }
     }
 
-    /// Reopen, a quiet destructive row at the foot (after a confirmation that names what it undoes).
-    private func reopenSection(_ r: GoalRecord) -> some View {
-        VStack(alignment: .leading, spacing: BrainStyle.s) {
-            SectionCard {
+    /// The header's More menu: Reopen (after a confirmation that names what it undoes).
+    @ViewBuilder
+    private var moreMenu: some View {
+        if viewModel.isReopening {
+            ProgressView().accessibilityLabel(Text(verbatim: "Reopening"))
+        } else if viewModel.reopenQuestion != nil {
+            Menu {
                 Button(role: .destructive) { confirmingReopen = true } label: {
-                    HStack(spacing: BrainStyle.m) {
-                        Label { Text(verbatim: "Reopen goal") } icon: { Image(systemName: "arrow.uturn.backward") }
-                            .font(BrainStyle.rowTitle)
-                            .foregroundStyle(Color.hxDanger)
-                        Spacer(minLength: 0)
-                        if viewModel.isReopening { ProgressView().controlSize(.small) }
-                    }
-                    .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
-                    .contentShape(Rectangle())
+                    Label { Text(verbatim: "Reopen Goal") } icon: { Image(systemName: "arrow.uturn.backward") }
                 }
-                .buttonStyle(.plain)
-                .disabled(viewModel.isReopening)
+            } label: {
+                Image(systemName: "ellipsis.circle")
             }
-            if let error = viewModel.reopenError {
-                Text(verbatim: error).font(BrainStyle.meta).foregroundStyle(Color.hxDanger)
-            }
-        }
-        .confirmationDialog(Text(verbatim: "Reopen \(GoalsCopy.shortTitle(r.title))?"), isPresented: $confirmingReopen,
-                            titleVisibility: .visible) {
-            Button(role: .destructive) {
-                Task { if let detail = await viewModel.reopen() { onReopened(detail) } }
-            } label: { Text(verbatim: "Reopen goal") }
-            Button(role: .cancel) {} label: { Text(verbatim: "Cancel") }
-        } message: {
-            Text(verbatim: "Puts the goal back among your open goals and takes it out of Finished.")
+            .accessibilityLabel(Text(verbatim: "More"))
         }
     }
 
+    /// Who he became, the race (else how he showed up), and the first sentence of his reflection.
     private func finisherCard(_ r: GoalRecord, paper: HermexPaper) -> some View {
         HXCard(.glow(paper), title: GoalFinishCopy.identityTitle(r), titleStyle: .title, spacing: BrainStyle.s) {
             HStack {
@@ -113,11 +120,16 @@ struct GoalRecordContent: View {
             }
             .foregroundStyle(paper.glow)
         } content: {
-            Text(verbatim: r.runs?.race.map(GoalFinishCopy.raceLine) ?? r.title)
+            Text(verbatim: GoalRecordCopy.finisherLine(r))
                 .font(AppFont.display(style: .subheadline, weight: .medium))
                 .foregroundStyle(Color.hxTextPrimary)
-            GoalStatGrid(tiles: GoalFinishCopy.recordTiles(r), paper: paper)
-                .padding(.top, BrainStyle.xs)
+            if let lead = GoalRecordCopy.firstSentence(r.reflection) {
+                Text(verbatim: lead)
+                    .font(AppFont.serif())
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, BrainStyle.xs)
+            }
         } footer: { EmptyView() }
     }
 
@@ -162,8 +174,8 @@ struct GoalRecordContent: View {
     }
 }
 
-/// The race from Garmin: pace per mile (faster miles stand taller), heart rate, fastest mile
-/// and the halves.
+/// The race from Garmin: pace per mile (faster miles stand taller), then one line of pace,
+/// heart rate, fastest mile and the halves.
 private struct GoalRaceSection: View {
     let race: GoalRace
     let paper: HermexPaper
@@ -174,24 +186,11 @@ private struct GoalRaceSection: View {
             SectionCard {
                 VStack(alignment: .leading, spacing: BrainStyle.m) {
                     if race.splits.count > 1 { splits }
-                    GoalStatGrid(tiles: tiles, paper: paper)
+                    Text(verbatim: GoalRecordCopy.raceDayLine(race)).brainText(.meta)
                 }
                 .padding(.vertical, BrainStyle.s)
             }
         }
-    }
-
-    private var tiles: [GoalStatTile] {
-        var out = [GoalStatTile(label: "Pace", value: "\(GoalFinishCopy.pace(race.paceSeconds))/mi")]
-        if let hr = race.avgHR { out.append(GoalStatTile(label: "Avg heart rate", value: "\(hr) bpm")) }
-        if let fastest = race.fastestMileSeconds {
-            out.append(GoalStatTile(label: "Fastest mile", value: GoalFinishCopy.pace(fastest)))
-        }
-        if let halves = race.halvesSeconds {
-            let h = GoalFinishCopy.halves(halves)
-            out.append(GoalStatTile(label: "Halves", value: h.value, note: h.note))
-        }
-        return out
     }
 
     private var splits: some View {
@@ -210,7 +209,7 @@ private struct GoalRaceSection: View {
             HStack {
                 Text(verbatim: "Mile 1")
                 Spacer()
-                Text(verbatim: "Mile \(race.splits.count)")
+                Text(verbatim: GoalRecordCopy.splitsEnd(race))
             }
             .font(AppFont.caption2())
             .foregroundStyle(Color.hxTextSecondary)
@@ -220,49 +219,91 @@ private struct GoalRaceSection: View {
     }
 }
 
-/// Every run this year, month by month.
+/// Every run this year as month dots: full for the biggest months, half for the middle, a ring
+/// for the light ones (the monthly review's dots), with the month's letter under each.
 private struct GoalRunningYear: View {
     let runs: GoalRuns
     let paper: HermexPaper
 
     var body: some View {
-        let top = max(1, runs.months.map(\.miles).max() ?? 1)
+        let top = runs.months.map(\.miles).max() ?? 0
         VStack(alignment: .leading, spacing: BrainStyle.s) {
             BrainSectionHeader(title: "Your running year", trailing: "\(GoalFinishCopy.miles(runs.miles)) mi")
             SectionCard {
-                VStack(alignment: .leading, spacing: BrainStyle.s) {
-                    HStack(alignment: .bottom, spacing: BrainStyle.xs) {
+                VStack(alignment: .leading, spacing: BrainStyle.m) {
+                    HStack(spacing: 0) {
                         ForEach(runs.months, id: \.month) { m in
-                            VStack(spacing: 2) {
-                                Text(verbatim: GoalFinishCopy.miles(m.miles.rounded()))
-                                    .font(AppFont.caption2())
-                                    .foregroundStyle(Color.hxTextSecondary)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.6)
-                                RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous)
-                                    .fill(paper.glow)
-                                    .frame(height: max(2, 64 * m.miles / top))
-                                Text(verbatim: GoalFinishCopy.month(m.month))
-                                    .font(AppFont.caption2())
+                            VStack(spacing: BrainStyle.xs) {
+                                DeckDot(state: GoalMonthLevel(miles: m.miles, top: top).dotState, ink: paper.glow,
+                                        column: DeckDots.dot)
+                                Text(verbatim: String(GoalFinishCopy.month(m.month).prefix(1)))
+                                    .font(AppFont.caption2(weight: .semibold))
                                     .foregroundStyle(Color.hxTextSecondary)
                             }
                             .frame(maxWidth: .infinity)
                         }
                     }
-                    .frame(height: 104, alignment: .bottom)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(Text(verbatim: GoalRecordCopy.yearSummary(runs)))
+                    if top > 0 { legend(top) }
                     Text(verbatim: GoalRecordCopy.yearLine(runs)).brainText(.meta)
                 }
                 .padding(.vertical, BrainStyle.s)
             }
         }
     }
+
+    private func legend(_ top: Double) -> some View {
+        HStack(spacing: BrainStyle.m) {
+            ForEach(GoalMonthLevel.legend(top: top), id: \.label) { item in
+                HStack(spacing: BrainStyle.xs) {
+                    DeckDot(state: item.level.dotState, ink: paper.glow, column: DeckDots.dot)
+                        .scaleEffect(0.6)
+                        .frame(width: DeckDots.dot * 0.6, height: DeckDots.dot * 0.6)
+                    Text(verbatim: item.label)
+                }
+            }
+        }
+        .font(AppFont.caption(weight: .medium))
+        .foregroundStyle(Color.hxTextSecondary)
+        .accessibilityHidden(true)
+    }
+}
+
+/// A month's miles against the biggest month: full from two thirds of it, half from a third,
+/// light below that, and none for a month with no miles. Its dots never borrow the day states
+/// that mean today or waiting (the ring, the ringed +).
+enum GoalMonthLevel: Equatable {
+    case full, half, light, none
+
+    init(miles: Double, top: Double) {
+        guard miles > 0, top > 0 else { self = .none; return }
+        let share = miles / top
+        self = share >= 2.0 / 3 ? .full : share >= 1.0 / 3 ? .half : .light
+    }
+
+    /// The `DeckDot` look: filled, half-strength, a faint thin ring, the small "off" mark.
+    var dotState: String {
+        switch self {
+        case .full: "done"
+        case .half: "skip"
+        case .light: "missed"
+        case .none: "off"
+        }
+    }
+
+    /// "50+ mi", "25–49", "under 25" for a 75 mi top month.
+    static func legend(top: Double) -> [(level: GoalMonthLevel, label: String)] {
+        let full = Int((top * 2 / 3).rounded()), half = Int((top / 3).rounded())
+        let middle = full - 1 > half ? "\(half)–\(full - 1)" : "\(half)+"
+        return [(.full, "\(full)+ mi"), (.half, middle), (.light, "under \(half)")]
+    }
 }
 
 /// The story: moments from setting the goal to the finish, on a dotted line.
 private struct GoalStorySection: View {
     let record: GoalRecord
+    let story: [GoalStoryMoment]
     let ink: Color
 
     var body: some View {
@@ -270,8 +311,8 @@ private struct GoalStorySection: View {
             BrainSectionHeader(title: "The story", trailing: record.days == 1 ? "1 day" : "\(record.days) days")
             SectionCard {
                 VStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(record.story.enumerated()), id: \.offset) { offset, moment in
-                        row(moment, isLast: offset == record.story.count - 1)
+                    ForEach(Array(story.enumerated()), id: \.offset) { offset, moment in
+                        row(moment, isLast: offset == story.count - 1)
                     }
                 }
                 .padding(.vertical, BrainStyle.s)
@@ -341,7 +382,14 @@ private struct GoalReflectionSection: View {
                     .padding(.top, BrainStyle.xs)
             }
             if let error = viewModel.error {
-                Text(verbatim: error).font(BrainStyle.meta).foregroundStyle(Color.hxWarning)
+                // On the glow card, in its glow: warning orange fails contrast on a light paper.
+                Label {
+                    Text(verbatim: error)
+                } icon: {
+                    Image(systemName: "exclamationmark.circle").accessibilityHidden(true)
+                }
+                .font(BrainStyle.meta)
+                .foregroundStyle(paper.glow)
             }
         } footer: {
             HStack(spacing: BrainStyle.s) {
@@ -373,13 +421,62 @@ private struct GoalReflectionSection: View {
 }
 
 enum GoalRecordCopy {
-    /// "2 minimum days · 2 of 4 skips used · 1 missed day".
+    /// Under the calendar, counted honestly: "1 day not logged · 0 of 4 skips used", or
+    /// "Showed up every day". A day with no check-in is "not logged", never "no missed days".
     static func daysLine(_ r: GoalRecord) -> String {
         var parts: [String] = []
+        if r.missDays > 0 { parts.append(r.missDays == 1 ? "1 missed day" : "\(r.missDays) missed days") }
+        let unlogged = r.unloggedDays
+        if unlogged > 0 { parts.append(unlogged == 1 ? "1 day not logged" : "\(unlogged) days not logged") }
         if r.minDays > 0 { parts.append(r.minDays == 1 ? "1 minimum day" : "\(r.minDays) minimum days") }
         if r.skipsBudget > 0 || r.skipsUsed > 0 { parts.append("\(r.skipsUsed) of \(r.skipsBudget) skips used") }
-        parts.append(r.missDays == 1 ? "1 missed day" : "\(r.missDays) missed days")
+        if r.days > 0, r.shown == r.days { parts.insert("Showed up every day", at: 0) }
         return parts.joined(separator: " · ")
+    }
+
+    /// The finisher card's one line: the race ("26.6 mi in 5:13:34"), else how he showed up
+    /// ("Showed up 20 of 23 days · 3 of 3 weeks hit").
+    static func finisherLine(_ r: GoalRecord) -> String {
+        if let race = r.runs?.race { return GoalFinishCopy.raceLine(race) }
+        return GoalFinishCopy.showedUpLine(r)
+    }
+
+    /// The first sentence (or line) of his words, for the finisher card; nil when he wrote none.
+    static func firstSentence(_ text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let line = trimmed.split(whereSeparator: \.isNewline).first.map(String.init) ?? trimmed
+        var end = line.endIndex
+        for mark in [". ", "! ", "? "] {
+            if let r = line.range(of: mark), r.lowerBound < end { end = r.lowerBound }
+        }
+        return end == line.endIndex ? line : String(line[...end])
+    }
+
+    /// Race day in one line: "11:47/mi · 165 bpm avg · fastest mile 10:38 · second half 19:39 slower".
+    static func raceDayLine(_ race: GoalRace) -> String {
+        var parts = ["\(GoalFinishCopy.pace(race.paceSeconds))/mi"]
+        if let hr = race.avgHR { parts.append("\(hr) bpm avg") }
+        if let fastest = race.fastestMileSeconds { parts.append("fastest mile \(GoalFinishCopy.pace(fastest))") }
+        if let halves = race.halvesSeconds { parts.append(GoalFinishCopy.halvesLine(halves)) }
+        return parts.joined(separator: " · ")
+    }
+
+    /// The splits chart's right end: "Mile 26 of 26.6" when the race ran past its last full mile.
+    static func splitsEnd(_ race: GoalRace) -> String {
+        let n = race.splits.count
+        if race.miles > Double(n) + 0.05 { return "Mile \(n) of \(GoalFinishCopy.miles(race.miles))" }
+        if race.miles > 0, Double(n) > race.miles + 0.05 { return "\(GoalFinishCopy.miles(race.miles)) mi" }
+        return "Mile \(n)"
+    }
+
+    /// The story without its streak line: the all-goals streak lives on Goals home, and this
+    /// goal's days are counted under its calendar.
+    static func story(_ r: GoalRecord) -> [GoalStoryMoment] {
+        guard let streak = r.streak else { return r.story }
+        return r.story.filter { m in
+            !(!m.major && m.date == streak.start && m.title.hasSuffix("-day streak"))
+        }
     }
 
     /// Each commitment's total, each daily check's answers, and the milestones on time.

@@ -82,9 +82,9 @@ final class GoalFinishTests: XCTestCase {
         XCTAssertEqual(GoalFinishCopy.clock(2892), "48:12")
         XCTAssertEqual(GoalFinishCopy.pace(679), "11:19")
         XCTAssertEqual(GoalFinishCopy.hours(150120), "41 h 42 m")
-        XCTAssertEqual(GoalFinishCopy.halves(-72).value, "−1:12")
-        XCTAssertEqual(GoalFinishCopy.halves(-72).note, "negative split")
-        XCTAssertEqual(GoalFinishCopy.halves(30).value, "+0:30")
+        XCTAssertEqual(GoalFinishCopy.halvesLine(1179), "second half 19:39 slower")
+        XCTAssertEqual(GoalFinishCopy.halvesLine(-72), "second half 1:12 faster")
+        XCTAssertEqual(GoalFinishCopy.halvesLine(0), "even halves")
         XCTAssertEqual(GoalFinishCopy.miles(26.2), "26.2")
         XCTAssertEqual(GoalFinishCopy.miles(3), "3")
         XCTAssertEqual(GoalFinishCopy.month("2026-04"), "Apr")
@@ -97,27 +97,82 @@ final class GoalFinishTests: XCTestCase {
         XCTAssertEqual(GoalFinishCopy.identityTitle(r), "A New York City Marathon finisher")
         let plain = try Self.record(["identity": ""])
         XCTAssertEqual(GoalFinishCopy.headline(plain), "You finished Finish the NYC Marathon, uninjured")
-        XCTAssertEqual(GoalFinishCopy.raceLine(try XCTUnwrap(r.runs?.race)), "26.2 mi in 4:56:40 · 11:19/mi")
+        XCTAssertEqual(GoalFinishCopy.raceLine(try XCTUnwrap(r.runs?.race)), "26.2 mi in 4:56:40")
     }
 
-    func testTilesTellTheStory() throws {
-        let r = try Self.record()
-        XCTAssertEqual(GoalFinishCopy.recordTiles(r).map(\.value), ["20 / 23", "259.5", "20 days", "Never"])
-        XCTAssertEqual(GoalFinishCopy.recordTiles(r)[1].note, "27 runs since Apr 24")
-        XCTAssertEqual(GoalFinishCopy.celebrationTiles(r).map(\.label),
-                       ["Showed up", "Longest streak", "Weeks hit", "Missed twice"])
-        XCTAssertEqual(GoalFinishCopy.missedTwice(r).note, "1 miss, back next day")
-        XCTAssertEqual(GoalFinishCopy.recordTiles(try Self.record(["runs": NSNull()]))[1].label, "Weeks hit")
-        XCTAssertEqual(GoalFinishCopy.missedTwice(try Self.record(["missed_twice": 2, "miss_days": 5])).value, "2 times")
+    /// The live NYC record's day counts: 22 shown of 23, nothing skipped or marked missed.
+    private static func marathonDays() throws -> GoalRecord {
+        try record(["shown": 22, "min_days": 0, "skip_days": 0, "miss_days": 0, "skips": ["used": 0, "budget": 4]])
     }
 
-    func testRecordLines() throws {
-        let r = try Self.record()
-        XCTAssertEqual(GoalRecordCopy.daysLine(r), "2 minimum days · 2 of 4 skips used · 1 missed day")
-        let totals = GoalRecordCopy.totals(r)
-        XCTAssertEqual(totals.map(\.label), ["Nightly stretch", "Outreach", "Foot today", "Milestones"])
-        XCTAssertEqual(totals.map(\.value), ["20 days", "64", "16 better · 6 same · 1 worse", "2 of 2 on time"])
-        XCTAssertEqual(GoalRecordCopy.yearLine(try XCTUnwrap(r.runs)), "27 runs · 41 h 42 m since Apr 24 · PRs Aug 22, Oct 10")
+    func testFinisherCardIsWhoHeBecameTheRaceAndHisFirstSentence() throws {
+        let r = try Self.record(["reflection": "It was an inspirational start. Brooklyn was a breeze.\nThen I cramped."])
+        XCTAssertEqual(GoalRecordCopy.finisherLine(r), "26.2 mi in 4:56:40")
+        XCTAssertEqual(GoalRecordCopy.firstSentence(r.reflection), "It was an inspirational start.")
+        XCTAssertEqual(GoalRecordCopy.firstSentence("One line only\nsecond"), "One line only")
+        XCTAssertNil(GoalRecordCopy.firstSentence("  \n"))
+        XCTAssertEqual(GoalRecordCopy.finisherLine(try Self.record(["runs": NSNull()])), "Showed up 20 of 23 days · 3 of 3 weeks hit")
+    }
+
+    func testUnloggedDaysAreCountedNeverHiddenAsNoMisses() throws {
+        let r = try Self.marathonDays()
+        XCTAssertEqual(r.unloggedDays, 1)
+        XCTAssertEqual(GoalRecordCopy.daysLine(r), "1 day not logged · 0 of 4 skips used")
+        XCTAssertFalse(GoalRecordCopy.daysLine(r).contains("no missed"))
+        XCTAssertEqual(GoalRecordCopy.daysLine(try Self.record()), "1 missed day · 2 minimum days · 2 of 4 skips used")
+        let every = try Self.record(["shown": 23, "min_days": 0, "skip_days": 0, "miss_days": 0, "skips": NSNull()])
+        XCTAssertEqual(GoalRecordCopy.daysLine(every), "Showed up every day")
+    }
+
+    func testCelebrationIsOneLineNotTiles() throws {
+        XCTAssertEqual(GoalFinishCopy.celebrationLine(try Self.marathonDays()), "26.2 mi in 4:56:40 · showed up 22 of 23 days")
+        XCTAssertEqual(GoalFinishCopy.celebrationLine(try Self.record(["runs": NSNull()])), "Showed up 20 of 23 days · 3 of 3 weeks hit")
+    }
+
+    func testRaceDayIsOneLineAndTheChartEndsAtItsLastMile() throws {
+        let race = try XCTUnwrap(try Self.record().runs?.race)
+        XCTAssertEqual(GoalRecordCopy.raceDayLine(race), "11:19/mi · 151 bpm avg · fastest mile 10:31 · second half 1:12 faster")
+        var body = try JSONSerialization.jsonObject(with: Data(Self.recordSample.utf8)) as! [String: Any]
+        var runs = body["runs"] as! [String: Any]
+        runs["race"] = ["date": "2026-11-01", "miles": 26.6, "seconds": 18814, "pace_s": 707, "halves_s": 1179,
+                        "splits": Array(repeating: 700, count: 26)]
+        body["runs"] = runs
+        let nyc = try XCTUnwrap(try PrepDecoding.decode(GoalRecord.self, from: JSONSerialization.data(withJSONObject: body)).runs?.race)
+        XCTAssertEqual(GoalRecordCopy.splitsEnd(nyc), "Mile 26 of 26.6")
+        XCTAssertEqual(GoalRecordCopy.raceDayLine(nyc), "11:47/mi · second half 19:39 slower")
+        XCTAssertEqual(GoalRecordCopy.splitsEnd(race), "Mile 3 of 26.2")
+    }
+
+    func testRunningYearMonthsAreDotLevels() {
+        XCTAssertEqual(GoalMonthLevel(miles: 75.4, top: 75.4), .full)
+        XCTAssertEqual(GoalMonthLevel(miles: 58.3, top: 75.4), .full)
+        XCTAssertEqual(GoalMonthLevel(miles: 39, top: 75.4), .half)
+        XCTAssertEqual(GoalMonthLevel(miles: 21.3, top: 75.4), .light)
+        XCTAssertEqual(GoalMonthLevel(miles: 0, top: 75.4), .none)
+        XCTAssertEqual(GoalMonthLevel(miles: 0, top: 0), .none)
+        // Filled, half, the faint "missed" ring for a light month, the small off mark for none:
+        // never today's ring or yesterday's ringed +, which mean a day still waiting.
+        XCTAssertEqual([GoalMonthLevel.full, .half, .light, .none].map(\.dotState), ["done", "skip", "missed", "off"])
+        XCTAssertFalse([GoalMonthLevel.full, .half, .light, .none].map(\.dotState).contains { ["today", "ask"].contains($0) })
+        XCTAssertEqual(GoalMonthLevel.legend(top: 75.4).map(\.label), ["50+ mi", "25–49", "under 25"])
+        XCTAssertEqual(GoalMonthLevel.legend(top: 75.4).map(\.level), [.full, .half, .light])
+    }
+
+    func testStoryDropsTheStreakLine() throws {
+        let streakLine: [String: Any] = ["date": "2026-10-10", "title": "Started a 20-day streak",
+                                         "detail": "Showed up 20 days, Oct 10 – Nov 1", "major": false]
+        let set: [String: Any] = ["date": "2026-10-10", "title": "Set the goal", "detail": "", "major": true]
+        let r = try Self.record(["story": [set, streakLine]])
+        XCTAssertEqual(GoalRecordCopy.story(r).map(\.title), ["Set the goal"])
+        XCTAssertEqual(GoalRecordCopy.story(try Self.record(["streak": NSNull(), "story": [set, streakLine]])).count, 2)
+    }
+
+    func testReopenIsOfferedOnceTheRecordLoads() async throws {
+        let client = FinishClient()
+        let loading = GoalRecordViewModel(slug: "nyc-marathon-2026", client: client)
+        XCTAssertNil(loading.reopenQuestion)
+        let loaded = GoalRecordViewModel(slug: "nyc-marathon-2026", record: try Self.record(), client: client)
+        XCTAssertEqual(loaded.reopenQuestion, "Reopen Finish the NYC Marathon, uninjured?")
     }
 
     func testFinishedLogNamesAndGroups() throws {
@@ -135,6 +190,23 @@ final class GoalFinishTests: XCTestCase {
         XCTAssertEqual(GoalsFinishedCopy.byYear(goals).map(\.year), ["2027", "2026"])
         XCTAssertEqual(GoalsFinishedCopy.byYear(goals)[1].goals.map(\.slug), ["a", "c"])
         XCTAssertEqual(GoalsFinishedCopy.lifetime(goals).map(\.value), ["3", "30", "3 / 6"])
+    }
+
+    func testShelfShowsOneGoalInFullAndSeeAllOnlyForMany() throws {
+        let row: [String: Any] = ["slug": "nyc", "title": "Finish the NYC Marathon", "identity": "a New York City Marathon finisher",
+                                  "finished": "2026-11-01", "days": 23, "headline": ["value": "261.4", "label": "miles run in 2026"]]
+        let one = try PrepDecoding.decode(GoalFinishedSummary.self, from: JSONSerialization.data(withJSONObject: row))
+        XCTAssertFalse(GoalsFinishedCopy.showsSeeAll([one]))
+        XCTAssertTrue(GoalsFinishedCopy.showsSeeAll([one, one]))
+        XCTAssertEqual(GoalsFinishedCopy.rowLine(one), "Nov 1 · 261.4 miles run in 2026")
+        var plain = row
+        plain["headline"] = NSNull()
+        let bare = try PrepDecoding.decode(GoalFinishedSummary.self, from: JSONSerialization.data(withJSONObject: plain))
+        XCTAssertEqual(GoalsFinishedCopy.rowLine(bare), "Nov 1 · 23 days")
+        var raced = row
+        raced["race"] = ["miles": 26.6, "seconds": 18814]
+        let race = try PrepDecoding.decode(GoalFinishedSummary.self, from: JSONSerialization.data(withJSONObject: raced))
+        XCTAssertEqual(GoalsFinishedCopy.rowLine(race), "Nov 1 · 26.6 mi in 5:13:34", "the race leads when there was one")
     }
 
     // MARK: Flows

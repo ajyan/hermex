@@ -51,8 +51,9 @@ struct GoalFinishPrompt: View {
     }
 }
 
-/// The one-time celebration after "I finished": who he became, four numbers, his why, and a
-/// place for a few words that save to the record.
+/// The one-time celebration after "I finished": who he became, one line of what he did, his
+/// why, and a place for a few words that save to the record, so it ends on his words. See the
+/// record sits in the toolbar.
 struct GoalCelebrationView: View {
     @Bindable var viewModel: GoalRecordViewModel
     let onSeeRecord: () -> Void
@@ -72,9 +73,8 @@ struct GoalCelebrationView: View {
             .background(Color.hxCanvas.ignoresSafeArea())
             .scrollDismissesKeyboard(.interactively)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(action: onSeeRecord) { Image(systemName: "xmark") }
-                        .accessibilityLabel(Text(verbatim: "Close"))
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(action: onSeeRecord) { Text(verbatim: "See the Record") }
                 }
             }
         }
@@ -101,7 +101,11 @@ struct GoalCelebrationView: View {
             }
             .foregroundStyle(paper.glow)
             .frame(maxWidth: .infinity)
-            GoalStatGrid(tiles: GoalFinishCopy.celebrationTiles(record), paper: paper)
+            Text(verbatim: GoalFinishCopy.celebrationLine(record))
+                .font(AppFont.display(style: .subheadline, weight: .medium))
+                .foregroundStyle(Color.hxTextPrimary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
             if !record.why.isEmpty {
                 HXCard(.glow(paper), spacing: BrainStyle.xs) {
                     Text(verbatim: "Your why").font(AppFont.caption(weight: .semibold)).foregroundStyle(paper.glow)
@@ -110,8 +114,6 @@ struct GoalCelebrationView: View {
                 } footer: { EmptyView() }
             }
             reflection(record, paper: paper)
-            Button(action: onSeeRecord) { Text(verbatim: "See the record") }
-                .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
         }
         .padding(BrainStyle.l)
         .environment(\.hxPaper, paper)
@@ -168,10 +170,9 @@ struct GoalCelebrationView: View {
     }
 }
 
-/// A grid of labelled numbers on a goal's paper (the Sleep screen's tiles).
+/// A grid of labelled numbers, set on the Finished list's neutral summary card.
 struct GoalStatGrid: View {
     let tiles: [GoalStatTile]
-    let paper: HermexPaper
 
     var body: some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: BrainStyle.s), GridItem(.flexible())], spacing: BrainStyle.s) {
@@ -179,7 +180,7 @@ struct GoalStatGrid: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(verbatim: tile.label)
                         .font(AppFont.caption(weight: .semibold))
-                        .foregroundStyle(paper.glow)
+                        .foregroundStyle(Color.hxTextSecondary)
                     Text(verbatim: tile.value)
                         .font(AppFont.display(style: .title3, weight: .semibold))
                         .foregroundStyle(Color.hxTextPrimary)
@@ -191,8 +192,7 @@ struct GoalStatGrid: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(BrainStyle.m)
-                .background(paper.wash, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
+                .padding(.vertical, BrainStyle.xs)
                 .accessibilityElement(children: .combine)
             }
         }
@@ -223,56 +223,29 @@ enum GoalFinishCopy {
         days == 1 ? "1 day from the day you set it" : "\(days) days from the day you set it"
     }
 
-    static func celebrationTiles(_ r: GoalRecord) -> [GoalStatTile] {
-        [showedUp(r), streak(r),
-         GoalStatTile(label: "Weeks hit", value: "\(r.weeks.weeksHit) / \(r.weeks.weeks)",
-                      note: r.weeks.weeks > 0 && r.weeks.weeksHit == r.weeks.weeks ? "every plan kept" : "plans kept"),
-         missedTwice(r)]
+    /// The celebration's one line: "26.6 mi in 5:13:34 · showed up 22 of 23 days", else
+    /// "Showed up 20 of 23 days · 3 of 3 weeks hit".
+    static func celebrationLine(_ r: GoalRecord) -> String {
+        guard let race = r.runs?.race else { return showedUpLine(r) }
+        return "\(raceLine(race)) · showed up \(r.shown) of \(r.days) days"
     }
 
-    /// The finisher card's tiles: miles this year in place of weeks when Garmin ran.
-    static func recordTiles(_ r: GoalRecord) -> [GoalStatTile] {
-        var tiles = [showedUp(r)]
-        if let runs = r.runs {
-            tiles.append(GoalStatTile(label: "Miles this year", value: miles(runs.miles),
-                                      note: "\(runs.count) runs since \(shortDate(runs.first))"))
-        } else {
-            tiles.append(GoalStatTile(label: "Weeks hit", value: "\(r.weeks.weeksHit) / \(r.weeks.weeks)"))
-        }
-        tiles.append(streak(r))
-        tiles.append(missedTwice(r))
-        return tiles
+    /// "Showed up 20 of 23 days · 3 of 3 weeks hit" (weeks only when any were planned).
+    static func showedUpLine(_ r: GoalRecord) -> String {
+        var line = "Showed up \(r.shown) of \(r.days) days"
+        if r.weeks.weeks > 0 { line += " · \(r.weeks.weeksHit) of \(r.weeks.weeks) weeks hit" }
+        return line
     }
 
-    static func showedUp(_ r: GoalRecord) -> GoalStatTile {
-        let percent = r.days > 0 ? Int((Double(r.shown) / Double(r.days) * 100).rounded()) : 0
-        return GoalStatTile(label: "Showed up", value: "\(r.shown) / \(r.days)", note: "\(percent)% of days")
-    }
-
-    static func streak(_ r: GoalRecord) -> GoalStatTile {
-        guard let s = r.streak else { return GoalStatTile(label: "Longest streak", value: "—") }
-        return GoalStatTile(label: "Longest streak", value: s.days == 1 ? "1 day" : "\(s.days) days",
-                            note: "\(shortDate(s.start)) – \(shortDate(s.end))")
-    }
-
-    static func missedTwice(_ r: GoalRecord) -> GoalStatTile {
-        let value = r.missedTwice == 0 ? "Never" : r.missedTwice == 1 ? "Once" : "\(r.missedTwice) times"
-        let note = r.missDays == 0 ? "no missed days"
-            : r.missedTwice == 0 ? (r.missDays == 1 ? "1 miss, back next day" : "\(r.missDays) misses, back each time")
-            : "\(r.missDays) missed days"
-        return GoalStatTile(label: "Missed twice", value: value, note: note)
-    }
-
-    /// "26.2 mi in 4:56:50 · 11:20/mi".
+    /// "26.6 mi in 5:13:34" (race day's line carries the pace).
     static func raceLine(_ race: GoalRace) -> String {
-        "\(miles(race.miles)) mi in \(clock(race.seconds)) · \(pace(race.paceSeconds))/mi"
+        "\(miles(race.miles)) mi in \(clock(race.seconds))"
     }
 
-    /// "−0:06" with "negative split", or "+1:12" with "positive split".
-    static func halves(_ seconds: Int) -> (value: String, note: String) {
-        if seconds == 0 { return ("0:00", "even split") }
-        let sign = seconds < 0 ? "−" : "+"
-        return ("\(sign)\(pace(abs(seconds)))", seconds < 0 ? "negative split" : "positive split")
+    /// The halves in plain words: "second half 19:39 slower", "second half 1:12 faster", "even halves".
+    static func halvesLine(_ seconds: Int) -> String {
+        if seconds == 0 { return "even halves" }
+        return "second half \(clock(abs(seconds))) \(seconds < 0 ? "faster" : "slower")"
     }
 
     static func miles(_ value: Double) -> String {

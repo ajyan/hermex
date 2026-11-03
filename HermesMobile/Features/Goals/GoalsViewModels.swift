@@ -29,10 +29,13 @@ final class GoalDetailViewModel {
     var day: GoalDay = .today
     /// Rows with a check-in in flight; further taps on them are ignored.
     private(set) var pending: Set<GoalRowKey> = []
+    /// Counts each saved done, 2-min or +1, so the screen plays its success haptic as one lands.
+    private(set) var landedCheckIns = 0
     private(set) var error: String?
     /// The row whose check-in failed, so its section says so; nil for a screen-wide error.
     private(set) var errorRow: GoalRowKey?
-    /// The consistency calendar for what's on screen, rebuilt only when its days change.
+    /// The consistency calendar for what's on screen (the days so far and this week), rebuilt
+    /// only when its days change.
     private(set) var calendar = GoalCalendarModel.empty
     static let refreshFailed = "Couldn't refresh. Pull to try again."
     static let dayChanged = "The day changed. Check in again."
@@ -43,6 +46,26 @@ final class GoalDetailViewModel {
     var finishDeferred = false
     /// The record once the server has closed the goal; the screen then shows it.
     private(set) var finished: GoalRecord?
+
+    /// The header: the goal's title without its parenthetical, or "Goal" until it loads.
+    var navigationTitle: String {
+        guard case .loaded(let detail) = state else { return "Goal" }
+        let title = GoalsCopy.shortTitle(detail.summary.title)
+        return title.isEmpty ? "Goal" : title
+    }
+
+    /// The Today section offers Yesterday too (on Monday that's last Sunday, outside the hero's week).
+    var canCheckInYesterday: Bool {
+        guard case .loaded(let detail) = state else { return false }
+        return Self.canCheckInYesterday(detail)
+    }
+
+    /// Yesterday is checkable once the goal had begun by then: its first day (the heatmap's
+    /// oldest) is on or before the server's yesterday.
+    static func canCheckInYesterday(_ detail: GoalDetail) -> Bool {
+        guard !detail.yesterday.isEmpty, let first = detail.heatmap.first?.date else { return false }
+        return first <= detail.yesterday
+    }
 
     /// Ask "I finished?" while the last milestone is due and he hasn't answered.
     var asksToFinish: Bool {
@@ -144,9 +167,20 @@ final class GoalDetailViewModel {
     }
 
     func checkIn(commitment id: String, status: GoalStatus) async {
-        await send(.commitment(id), request: { .commitment(slug: self.slug, date: $0, asOf: $1, id: id, status: status) }) {
+        let saved = await send(.commitment(id), request: { .commitment(slug: self.slug, date: $0, asOf: $1, id: id, status: status) }) {
             GoalCheckInEdit.apply(status, to: id, on: $1, today: $2, yesterday: $3, in: &$0)
         }
+        if saved, status.isShown { landedCheckIns += 1 }
+    }
+
+    /// Checks a commitment in for `day` whichever day the Today section shows: the hero's dots.
+    func checkIn(commitment id: String, status: GoalStatus, day: GoalDay) async {
+        guard let base = edits?.base else { return }
+        let saved = await send(.commitment(id), on: day == .today ? base.today : base.yesterday,
+                               request: { .commitment(slug: self.slug, date: $0, asOf: $1, id: id, status: status) }) {
+            GoalCheckInEdit.apply(status, to: id, on: $1, today: $2, yesterday: $3, in: &$0)
+        }
+        if saved, status.isShown { landedCheckIns += 1 }
     }
 
     /// Counts one more item (with its optional note) on the selected day; true once the server has it.
@@ -155,6 +189,7 @@ final class GoalDetailViewModel {
     func addItem(commitment id: String, note: String?) async -> Bool {
         guard let date = selectedDate else { return false }
         let saved = await sendItem(id, date: date, n: 1, note: note)
+        if saved { landedCheckIns += 1 }
         if saved, note == nil { recentItems.open(.commitment(id), date: date) }
         return saved
     }
@@ -281,7 +316,7 @@ final class GoalDetailViewModel {
                                   deadline: shown.summary.deadline)
         if input != calendarInput {
             calendarInput = input
-            calendar = GoalCalendarModel(
+            calendar = GoalCalendarModel.throughThisWeek(
                 heatmap: GoalCalendar.merged(heatmap: input.heatmap, week: input.week, today: input.today),
                 today: input.today, deadline: input.deadline)
         }

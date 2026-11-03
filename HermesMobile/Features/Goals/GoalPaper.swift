@@ -1,44 +1,54 @@
 import SwiftUI
 
 /// A goal's paper: one of the Daily Brief's palettes, named in the goal file (`color:`) or
-/// picked from its slug so a goal keeps the same colour everywhere.
+/// picked from its slug so a goal keeps the same colour everywhere. Never amber: `opener` means
+/// "waiting on you", so a goal file's `color: opener` wears `reading` instead.
 enum GoalPaper {
-    /// The papers a goal can take, in a fixed order the slug fallback indexes into.
-    static let choices: [DeckPalette] = [.wiki, .quote, .book, .reading, .notes, .video, .past, .opener]
+    /// The papers a goal can take, and their names in the goal file (`color:`). The widget reads the
+    /// name back (`AtlasWidgetGoals.paper(named:)`).
+    static let choices: [DeckPalette] = [.wiki, .quote, .book, .reading, .notes, .video, .past]
+    static let names = ["wiki", "quote", "book", "reading", "notes", "video", "past"]
+
+    /// Where an amber name lands: `reading`, the nearest warm hue that isn't amber, so a goal its
+    /// owner made warm stays warm.
+    static let amberStandIn = "reading"
 
     static func palette(named name: String, slug: String) -> DeckPalette {
-        switch name {
-        case "wiki": return .wiki
-        case "quote": return .quote
-        case "book": return .book
-        case "reading": return .reading
-        case "notes": return .notes
-        case "video": return .video
-        case "past": return .past
-        case "opener": return .opener
-        default:
-            // A stable hash (Swift's `hashValue` changes per launch).
-            let sum = slug.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0x7fff_ffff }
-            return choices[sum % choices.count]
-        }
+        choices[index(named: name, slug: slug)]
     }
 
     static func palette(for goal: GoalSummary) -> DeckPalette {
         palette(named: goal.color, slug: goal.slug)
     }
 
+    /// The name of the paper `palette(for:)` gives the goal.
+    static func name(for goal: GoalSummary) -> String {
+        names[index(named: goal.color, slug: goal.slug)]
+    }
+
+    private static func index(named name: String, slug: String) -> Int {
+        if let i = names.firstIndex(of: name == "opener" ? amberStandIn : name) { return i }
+        // A stable hash (Swift's `hashValue` changes per launch), over the eight slots the fallback
+        // has always used, so a goal keeps its paper; the slot that was amber re-hashes into the rest.
+        let sum = slug.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0x7fff_ffff }
+        let slot = sum % (choices.count + 1)
+        return slot < choices.count ? slot : (sum / (choices.count + 1)) % choices.count
+    }
+
     static func symbol(_ icon: String) -> String {
         icon.isEmpty ? "flag" : icon
     }
 
-    /// Fill for a day square or strip cell, in the goal's ink.
-    static func fill(_ status: GoalStatus, ink: Color) -> Color {
+    /// Fill for a calendar day, in the goal's ink. A missed day is the empty gray and says so with
+    /// its `xmark` (`GoalHeroCopy.glyph`), never in amber; today with nothing yet is clear, since it
+    /// isn't missed (its cell draws the today ring).
+    static func fill(_ status: GoalStatus, ink: Color, isToday: Bool = false) -> Color {
         switch status {
         case .done: ink
         case .min: ink.opacity(0.45)
         case .skip: Color.hxTextSecondary.opacity(0.25)
-        case .miss: Color.hxWarning.opacity(0.55)
-        case .none, .clear, .unknown: Color.hxSeparator.opacity(0.6)
+        case .miss: Color.hxSeparator.opacity(0.6)
+        case .none, .clear, .unknown: isToday ? Color.clear : Color.hxSeparator.opacity(0.6)
         }
     }
 }
@@ -92,7 +102,7 @@ enum GoalCalendar {
         return calendar.date(byAdding: .day, value: -((weekday + 5) % 7), to: date)!
     }
 
-    /// Which check-in day tapping `date` in the week strip selects; only today and yesterday.
+    /// Which check-in day `date` is, if it is one: only today and yesterday.
     static func selectableDay(_ date: String, today: String, yesterday: String) -> GoalDay? {
         date == today ? .today : date == yesterday ? .yesterday : nil
     }

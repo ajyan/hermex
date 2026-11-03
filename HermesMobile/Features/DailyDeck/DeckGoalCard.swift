@@ -34,6 +34,7 @@ struct DeckGoalCard: View {
                 }
             }
         }
+        .sensoryFeedback(.success, trigger: model?.landedCheckIns ?? 0)
         .task(id: deckDate) {
             // Each time the card appears (and when the deck turns over to a new day), so a check-in
             // made elsewhere shows. A reload keeps the card's goals on screen until it lands.
@@ -158,7 +159,8 @@ private struct GoalCheckInSection: View {
                 ForEach(cues) { row in
                     Text(verbatim: "\(GoalsCopy.shortTitle(row.action)): \(row.cue)")
                         .font(AppFont.subheadline())
-                        .foregroundStyle(Color.hxTextSecondary)
+                        // Supporting text on the paper is its glow, full strength: gray fails on dark cards.
+                        .foregroundStyle(palette.ink)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.bottom, 6)
                 }
@@ -174,8 +176,9 @@ private struct GoalCheckInSection: View {
                 GoalNote(systemImage: "exclamationmark.circle", tint: tint.fill, text: GoalDetailCopy.missTwice(row))
                     .padding(.top, 12)
             }
+            // A nudge is the goal's own chip, like never-miss-twice, never amber.
             ForEach(goal.flags.escalations, id: \.check) { escalation in
-                GoalNote(systemImage: "exclamationmark.triangle", tint: .hxWarning, text: escalation.say)
+                HXChip(paper: tint.paper, symbol: "exclamationmark.circle", label: escalation.say, lines: 4)
                     .padding(.top, 12)
             }
             ForEach(goal.flags.unlockReady, id: \.id) { unlock in

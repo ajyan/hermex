@@ -42,6 +42,20 @@ struct GoalHeadline: Decodable, Hashable, Sendable {
 }
 
 /// An achieved goal in the Finished log.
+/// A finished running goal's race on the Finished list: its miles and time.
+struct GoalFinishedRace: Decodable, Hashable, Sendable {
+    let miles: Double
+    let seconds: Int
+
+    private enum CodingKeys: String, CodingKey { case miles, seconds }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        miles = c.optional(Double.self, .miles) ?? 0
+        seconds = c.int(.seconds)
+    }
+}
+
 struct GoalFinishedSummary: Decodable, Hashable, Sendable, Identifiable {
     let slug: String
     let title: String
@@ -55,11 +69,13 @@ struct GoalFinishedSummary: Decodable, Hashable, Sendable, Identifiable {
     let headline: GoalHeadline?
     let milestones: Int
     let milestonesOnTime: Int
+    /// The race of a running goal; nil otherwise, or from a server that doesn't send it.
+    let race: GoalFinishedRace?
 
     var id: String { slug }
 
     private enum CodingKeys: String, CodingKey {
-        case slug, title, identity, color, icon, started, finished, days, shown, headline, milestones
+        case slug, title, identity, color, icon, started, finished, days, shown, headline, milestones, race
         case milestonesOnTime = "milestones_on_time"
     }
 
@@ -77,6 +93,7 @@ struct GoalFinishedSummary: Decodable, Hashable, Sendable, Identifiable {
         headline = c.optional(GoalHeadline.self, .headline)
         milestones = c.int(.milestones)
         milestonesOnTime = c.int(.milestonesOnTime)
+        race = c.optional(GoalFinishedRace.self, .race)
     }
 }
 
@@ -343,6 +360,11 @@ struct GoalRecord: Decodable, Hashable, Sendable {
         headline = c.optional(GoalHeadline.self, .headline)
         story = c.lossy(GoalStoryMoment.self, .story)
     }
+}
+
+extension GoalRecord {
+    /// Days with no check-in at all: not shown up, skipped or marked missed.
+    var unloggedDays: Int { max(0, days - shown - skipDays - missDays) }
 }
 
 /// `POST /api/goals/finish`: close the goal as achieved. `asOf` is the server's today from the

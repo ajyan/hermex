@@ -23,7 +23,8 @@ extension AtlasWidgetGoals {
                             isDone: c.effectiveStatus(home.today, today: home.today, yesterday: home.yesterday)?.isShown == true,
                             sourceCounted: c.sourceDays.contains(home.today),
                             days: c.weekDays.count == 7 ? GoalPips.weekStates(c, today: home.today) : nil,
-                            todayIndex: c.weekDays.firstIndex { $0.date == home.today }
+                            todayIndex: c.weekDays.firstIndex { $0.date == home.today },
+                            paper: GoalPaper.name(for: goal)
                         )
                     }
             }
@@ -118,21 +119,24 @@ enum GoalsWidgetSync {
         store.remove(except: server)
     }
 
-    /// Ticks (`done`) or unticks one row at once and posts it for the snapshot's day. Once the
-    /// server has it, its state replaces the snapshot, or the tick stays when that read fails.
-    /// When the post fails, only this row goes back, flagged; a 409 (the server's day moved on)
-    /// shows the new day, flagged.
+    /// Ticks (`done`) or unticks one row at once and posts it for the snapshot's day: after midnight,
+    /// before the app has loaded the new day, the day the widget rolled forward to
+    /// (`AtlasWidgetGoals.rolled(at:)`). Once the server has it, its state replaces the snapshot, or
+    /// the tick stays when that read fails. When the post fails, only this row goes back, flagged; a
+    /// 409 (the server's day isn't the one posted) shows the server's today, flagged.
     static func checkIn(
         slug: String,
         commitment: String,
         done: Bool = true,
         store: AtlasWidgetGoalsStore = AtlasWidgetGoalsStore(),
         activeServerID: () -> String? = { ServerRegistry.shared.activeServerID },
-        client makeClient: (URL) -> GoalsDataClient = { client(for: $0) }
+        client makeClient: (URL) -> GoalsDataClient = { client(for: $0) },
+        now: Date = Date()
     ) async {
-        guard let snapshot = store.load() else { return }
+        guard let saved = store.load() else { return }
+        let snapshot = saved.rolled(at: now)
         guard snapshot.server.absoluteString == activeServerID() else {
-            store.save(snapshot.failed())
+            store.save(saved.failed())
             return
         }
         let id = AtlasWidgetGoals.Item.id(slug: slug, commitment: commitment)
