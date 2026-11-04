@@ -9,8 +9,8 @@ import SwiftUI
 /// Phases (`VoiceCallScenePhase`) blend over about a third of a second: listening is cooler
 /// and shimmers with the mic; thinking sends the stars out as a flock; each memory Atlas finds
 /// lights as a node in its paper and part of the flock streams to it; when the reply starts
-/// the flock lands in the shape of this turn's constellation; speaking is warmer, swells with
-/// Atlas's voice, and pulses the memories in turn. A cut-off snaps at once. Every new set of
+/// the flock lands in the shape of this turn's constellation; speaking is warmer, sends a ripple
+/// out through the cloud on each rise in Atlas's voice, and pulses the memories in turn. A cut-off snaps at once. Every new set of
 /// memories gets a fresh random layout, so no two turns draw the same constellation.
 ///
 /// `focus` is the cloud's slot in this view's coordinates; the flock flies past it. Reduce
@@ -54,6 +54,37 @@ struct VoiceCallStarfield: View {
     }
 }
 
+/// Ripples from Atlas's voice. Each rise in its loudness (a word, or a loud syllable) of at least
+/// `rise` over its last dip sends one out from the core, at most one per `spacing`; a steady voice
+/// sends none. A ripple's front runs out at 0.95 cloud radii a second and fades over `life`.
+struct VoiceRipples {
+    static let rise = 0.16
+    static let spacing = 0.14
+    static let life = 1.4
+
+    /// When each ripple left the core and how loud the voice was.
+    private(set) var started: [(at: Double, strength: Double)] = []
+    private var floor = 0.0
+
+    mutating func step(voice: Double, at clock: Double, dt: Double, cutOff: Bool) {
+        started.removeAll { clock - $0.at > Self.life || cutOff }
+        if voice - floor > Self.rise, clock - (started.last?.at ?? -.infinity) > Self.spacing {
+            started.append((clock, 0.4 + 0.6 * min(voice, 1)))
+            floor = voice
+        }
+        // The floor follows a dip at once and creeps back up, so the next rise counts from it.
+        floor = min(voice, floor + dt * 1.5)
+    }
+
+    /// Each ripple's front (in cloud radii from the core) and its fading strength.
+    func fronts(at clock: Double) -> [(front: Double, strength: Double)] {
+        started.map { ripple in
+            let age = clock - ripple.at
+            return (age * 0.95, ripple.strength * max(0, 1 - age / Self.life))
+        }
+    }
+}
+
 /// What the starfield reads from the call each frame.
 struct StarfieldInput {
     var phase: VoiceCallScenePhase
@@ -84,6 +115,8 @@ private struct Star {
     var drift = SIMD3<Double>.zero
     /// The flock's wander, minus 0.5, refreshed with `drift`.
     var wander = SIMD2<Double>.zero
+    /// How hard the voice's ripples press on the star this frame: it is pushed out and brightens.
+    var wave = 0.0
 }
 
 /// A memory lit in the constellation.
@@ -139,6 +172,7 @@ final class StarfieldModel {
     private var mic = 0.0
     private var voice = 0.0
     private var impulse = 0.0
+    private var ripples = VoiceRipples()
     private var yaw = 0.0
     private var interruptions: Int?
     private var replyStarts: Int?
@@ -240,6 +274,7 @@ final class StarfieldModel {
             mic = 0
             voice = 0
             impulse = 0
+            ripples = VoiceRipples()
             return 0
         }
         phase = VoiceCallScenePhase.resolved(
@@ -255,6 +290,7 @@ final class StarfieldModel {
         mic += ((hearing ? Double(raw.mic) : 0) - mic) * (1 - exp(-dt * 16))
         voice += ((phase == .speak ? Double(raw.voice) : 0) - voice) * (1 - exp(-dt * (phase == .interrupt ? 40 : 16)))
         impulse *= exp(-dt * 3.2)
+        ripples.step(voice: phase == .speak ? Double(raw.voice) : 0, at: clock, dt: dt, cutOff: phase == .interrupt)
         yaw += dt * (0.16 + 0.55 * mic * weights.listen + 0.3 * voice * weights.speak) + impulse * dt * 3
         return dt
     }
@@ -307,7 +343,7 @@ final class StarfieldModel {
             fh = height * 0.22
             sc = m / 420 + 0.4
             let w = model.weights
-            swell = 1 + 0.06 * model.voice * w.speak + 0.03 * model.mic * w.listen - 0.08 * model.impulse
+            swell = 1 + 0.02 * model.voice * w.speak + 0.03 * model.mic * w.listen - 0.08 * model.impulse
             ca = cos(model.yaw)
             sa = sin(model.yaw)
             let pitch = 0.42 + 0.12 * sin(model.clock * 0.21)
@@ -359,6 +395,8 @@ final class StarfieldModel {
         let landing = phase == .converge ? 2.3 : 1
         let shape = shape
         let tick = Int32(truncatingIfNeeded: Int(clock * 20))
+        // Each ripple's front (in cloud radii, from the core) and its fading strength.
+        let fronts = ripples.fronts(at: clock).map { (front: $0.front, strength: $0.strength * w.speak) }
         let driftTime = clock * 0.05, wanderTime = clock * 0.22
 
         stars.withUnsafeMutableBufferPointer { buffer in
@@ -374,6 +412,15 @@ final class StarfieldModel {
                     }
                 }
                 let home = Self.home(of: star, base: base, amp: amp)
+                star.wave = 0
+                if !fronts.isEmpty {
+                    let d = (home.x * home.x + home.y * home.y + home.z * home.z).squareRoot()
+                    for ripple in fronts {
+                        let off = d - ripple.front
+                        if abs(off) < 0.3 { star.wave += ripple.strength * exp(-off * off / 0.01) }
+                    }
+                    star.wave = min(star.wave, 1.5)
+                }
                 let projected = scene.project(home * scene.swell)
                 var tx = projected.x, ty = projected.y
                 if jitter > 0 {
@@ -576,10 +623,14 @@ final class StarfieldModel {
                 let alpha = starLerp((star.role == 3 ? 0.4 : 0.85) * twinkle,
                                  roleAlpha[star.role] * (0.25 + 0.75 * depth) * twinkle, inShape)
                 guard alpha >= 0.01 else { continue }
+                // A passing ripple pushes the star out from the core and brightens it, on top of its eased spot.
+                let push = 1 + 0.2 * star.wave
+                let x = scene.cx + (star.x - scene.cx) * push, y = scene.cy + (star.y - scene.cy) * push
                 let size = starLerp(star.size * 5.2,
-                                roleSize[star.role] * star.size * star.p * star.p * (0.75 + 0.5 * depth), inShape) * scene.sc
-                let rect = CGRect(x: star.x - size / 2, y: star.y - size / 2, width: size, height: size)
-                context.opacity = min(alpha, 1)
+                                roleSize[star.role] * star.size * star.p * star.p * (0.75 + 0.5 * depth), inShape)
+                    * scene.sc * (1 + 0.25 * star.wave)
+                let rect = CGRect(x: x - size / 2, y: y - size / 2, width: size, height: size)
+                context.opacity = min(alpha * (1 + 0.9 * star.wave), 1)
                 // A few knot stars wear their memory's paper once it's lit.
                 if star.role == 0, star.k < 0.3, inShape > 0.3, !spots.isEmpty {
                     let node = spots[star.j % spots.count]

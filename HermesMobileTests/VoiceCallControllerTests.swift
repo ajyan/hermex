@@ -1869,23 +1869,40 @@ final class VoiceCallControllerTests: XCTestCase {
 }
 
 final class VoiceCallCaptionsTests: XCTestCase {
-    private func content(sent: String? = nil, live: String = "", reply: String? = nil, replying: Bool = false)
-        -> VoiceCallCaptions.Content? {
-        VoiceCallCaptions.content(sent: sent, live: live, reply: reply, isReplying: replying)
+    private func line(
+        sent: String? = nil, live: String = "", reply: String? = nil, heard: String = "",
+        speaking: Bool = false, replying: Bool = false
+    ) -> VoiceCallCaptions.Line? {
+        VoiceCallCaptions.line(sent: sent, live: live, reply: reply, heard: heard, isSpeaking: speaking, isReplying: replying)
     }
 
-    func testCaptionsFollowATurn() {
-        XCTAssertNil(content(reply: "an older chat reply"))
-        XCTAssertEqual(content(live: "what time"), .init(speaker: .user, body: "what time", isActive: true))
-        // Sent, Atlas hasn't answered yet: the question stays in place, dimmed.
-        XCTAssertEqual(content(sent: "what time is it", replying: true),
-                       .init(speaker: .user, body: "what time is it", isActive: false))
-        XCTAssertEqual(content(sent: "what time is it", reply: "It's 2:37.", replying: true),
-                       .init(speaker: .atlas, context: "what time is it", body: "It's 2:37.", isActive: true))
-        // Done: the reply stays, dimmed, until the user's next words.
-        XCTAssertEqual(content(sent: "what time is it", reply: "It's 2:37."),
-                       .init(speaker: .atlas, context: "what time is it", body: "It's 2:37.", isActive: false))
-        XCTAssertEqual(content(live: "thanks", reply: "It's 2:37.")?.body, "thanks")
+    func testSubtitlesFollowATurn() {
+        XCTAssertNil(line(reply: "an older chat reply"))
+        XCTAssertEqual(line(live: "what time"), .init(words: ["what", "time"], lit: 2, isActive: true))
+        // Sent, Atlas's voice hasn't started: the question waits, dimmed, even as reply text streams in.
+        XCTAssertEqual(line(sent: "what time is it", reply: "It's 2:37.", replying: true),
+                       .init(words: ["what", "time", "is", "it"], lit: 4, isActive: false))
+        // Speaking: the word being said lights with the ones before it.
+        XCTAssertEqual(line(sent: "q", reply: "It's 2:37. Anything else?", heard: "", speaking: true, replying: true),
+                       .init(words: ["It's", "2:37."], lit: 1, isActive: true))
+        // The next sentence takes the line once its first word is said.
+        XCTAssertEqual(line(sent: "q", reply: "It's 2:37. Anything else?", heard: "It's 2:37.", speaking: true, replying: true),
+                       .init(words: ["Anything", "else?"], lit: 1, isActive: true))
+        // Done: the last piece stays, dimmed, until the user's next words.
+        XCTAssertEqual(line(sent: "q", reply: "It's 2:37. Anything else?", heard: "It's 2:37. Anything else?"),
+                       .init(words: ["Anything", "else?"], lit: 2, isActive: false))
+        XCTAssertEqual(line(sent: "q", live: "thanks", reply: "It's 2:37.")?.words, ["thanks"])
+    }
+
+    func testLongSentenceShowsInEvenPieces() {
+        let sentence = (1...15).map { "w\($0)" }.joined(separator: " ") + "."
+        let first = line(sent: "q", reply: sentence, heard: "w1 w2", speaking: true, replying: true)
+        XCTAssertEqual(first?.words.count, 8)
+        XCTAssertEqual(first?.lit, 3)
+        let second = line(sent: "q", reply: sentence, heard: (1...9).map { "w\($0)" }.joined(separator: " "),
+                          speaking: true, replying: true)
+        XCTAssertEqual(second?.words.first, "w9")
+        XCTAssertEqual(second?.lit, 2)
     }
 }
 

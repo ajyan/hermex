@@ -136,6 +136,8 @@ final class VoiceCallController {
     /// True from Atlas sending a background lookup off (`delegate_task`) until its answer
     /// comes back as a reply, the call ends, or `digPendingTimeout` passes.
     private(set) var digPending = false
+    /// The latest reply as heard so far, for the subtitles. Not observed: they re-read it while Atlas speaks.
+    var heardReply: String { speaker.heardText }
 
     @ObservationIgnored private let listener: SpeechListening
     @ObservationIgnored private let speaker: SpeechSpeaking
