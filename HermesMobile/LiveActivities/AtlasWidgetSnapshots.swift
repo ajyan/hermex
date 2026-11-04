@@ -184,6 +184,48 @@ struct AtlasWidgetGoals: AtlasWidgetSnapshot {
     }
 }
 
+/// Tonight's meal for the Tonight widget, on the phone's calendar. Built from `MealsHome` by the
+/// app-only `init(server:home:)` in `MealsWidgetSync.swift`.
+struct AtlasWidgetMeals: AtlasWidgetSnapshot {
+    static let storageKey = "atlasWidget.meals"
+    static let widgetKind = "AtlasMealsWidget"
+
+    struct Dish: Codable, Equatable {
+        let slug: String
+        let name: String
+    }
+
+    let server: URL
+    /// The phone's local day this snapshot is for (YYYY-MM-DD); another day shows no meal.
+    let day: String
+    /// Tonight's meal, main first; empty when nothing is planned.
+    let dishes: [Dish]
+    let servings: Int
+    var logged: Bool
+    var syncFailed: Bool = false
+
+    /// The meal as logged, waiting for the server to say so.
+    func logging() -> AtlasWidgetMeals {
+        var copy = self
+        copy.logged = true
+        copy.syncFailed = false
+        return copy
+    }
+
+    func failed() -> AtlasWidgetMeals {
+        var copy = self
+        copy.logged = false
+        copy.syncFailed = true
+        return copy
+    }
+
+    /// The phone's local calendar day, as `day` is written.
+    static func localDay(_ date: Date, calendar: Calendar = .current) -> String {
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
+}
+
 /// App-group storage for one widget snapshot, shared by the app and the widget extension.
 struct AtlasWidgetStore<Snapshot: AtlasWidgetSnapshot> {
     var defaults: UserDefaults? = {
@@ -223,6 +265,29 @@ struct AtlasWidgetStore<Snapshot: AtlasWidgetSnapshot> {
 
 typealias AtlasWidgetRecentsStore = AtlasWidgetStore<AtlasWidgetRecents>
 typealias AtlasWidgetGoalsStore = AtlasWidgetStore<AtlasWidgetGoals>
+typealias AtlasWidgetMealsStore = AtlasWidgetStore<AtlasWidgetMeals>
+
+/// The Tonight widget's Eating it button: logs tonight's meal. A `LiveActivityIntent` so the
+/// system performs it in the app's process, which holds the server's sign-in; the app installs
+/// `handler` at launch. Compiled into the widget too, where `handler` stays nil.
+struct MealsWidgetLogIntent: LiveActivityIntent {
+    static var title: LocalizedStringResource = "Log Tonight's Dinner"
+    static var isDiscoverable = false
+
+    init() {}
+
+    @MainActor static var handler: (() async -> Void)?
+
+    func perform() async throws -> some IntentResult {
+        if let handler = await Self.handler {
+            await handler()
+        } else {
+            let store = AtlasWidgetMealsStore()
+            if let snapshot = store.load() { store.save(snapshot.failed()) }
+        }
+        return .result()
+    }
+}
 
 /// The Goals widget's check button: ticks a row (`done`) or, on a done row, clears it. A
 /// `LiveActivityIntent` so the system performs it in the app's process, which holds the

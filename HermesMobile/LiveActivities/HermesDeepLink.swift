@@ -101,6 +101,22 @@ enum HermesDeepLink {
             && url.host?.lowercased() == goalsHost
     }
 
+    /// Host for "open Meals", used by the Tonight widget.
+    static let mealsHost = "meals"
+
+    /// `hermes-agent://meals` (scheme follows the active build).
+    static var mealsURL: URL? {
+        var components = URLComponents()
+        components.scheme = scheme
+        components.host = mealsHost
+        return components.url
+    }
+
+    static func isMealsURL(_ url: URL) -> Bool {
+        url.scheme?.lowercased() == scheme
+            && url.host?.lowercased() == mealsHost
+    }
+
     /// Host for "start a new chat and call Atlas on it", used by the session list's
     /// New call item and the "Call Atlas" App Intent.
     static let newCallHost = "new-call"

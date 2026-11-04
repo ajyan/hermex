@@ -687,6 +687,9 @@ struct ChatShellView: View {
         case .bodyWorkout(let day):
             WorkoutView(day: day, server: server, onAPIError: authManager.handleAPIError)
                 .id(day ?? "next")
+        case .meals:
+            MealsHomeView(server: server, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
         case .feedback:
             FeedbackInboxView(client: feedbackAvailability.client)
         case .brainRoute(let route):
