@@ -133,4 +133,22 @@ final class VoiceCallSourcesTests: XCTestCase {
         let sources = VoiceCallChatSnapshot.sources(context: context, toolCalls: [read, crm])
         XCTAssertEqual(sources.map(\.label), ["Wiki · Taper plan", "Mitch Anderson"])
     }
+
+    // MARK: Opening a memory
+
+    func testEachMemoryOpensItsBrainPage() throws {
+        let journal = try XCTUnwrap(VoiceCallSources.source(path: "/Users/a/second-brain/journal/2026/10/2026-10-22.md"))
+        XCTAssertEqual(journal.brainRoute, .page(.journal, "journal/2026/10/2026-10-22.md"))
+        let wiki = try XCTUnwrap(VoiceCallSources.source(path: "wiki/running/taper-plan.md"))
+        XCTAssertEqual(wiki.brainRoute, .page(.wiki, "wiki/running/taper-plan.md"))
+        let contact = try XCTUnwrap(VoiceCallSources.source(path: "/vault/crm/contacts/mitch-anderson.md"))
+        XCTAssertEqual(contact.brainRoute, .page(.people, "crm/contacts/mitch-anderson.md"))
+        // A person found by name opens by name; the server resolves it.
+        XCTAssertEqual(VoiceCallSources.person(named: "Jane Doe").brainRoute, .page(.people, "Jane Doe"))
+    }
+
+    func testNotesOutsideTheBrainDontOpen() throws {
+        XCTAssertNil(try XCTUnwrap(VoiceCallSources.source(path: "projects/plan.md")).brainRoute)
+        XCTAssertNil(try XCTUnwrap(VoiceCallSources.source(path: "book_highlights/all.md")).brainRoute)
+    }
 }

@@ -40,7 +40,17 @@ enum ConstellationLayout {
         points.map { SIMD3($0.x * 0.68, -$0.y * 0.68, Double.random(in: -1...1, using: &rng) * 0.45) }
     }
 
-    /// A fresh layout for one turn's memories.
+    /// Where a memory lights among a call's slots: its own slot from earlier in the call, else one
+    /// no memory has used, else the one used longest ago. `memory` is what each slot last showed
+    /// and when; a slot in `taken` (lit this turn) is never chosen.
+    static func slot(for id: String, memory: [(id: String, usedAt: Double)?], taken: Set<Int>) -> Int {
+        let free = memory.indices.filter { !taken.contains($0) }
+        if let own = free.first(where: { memory[$0]?.id == id }) { return own }
+        if let unused = free.first(where: { memory[$0] == nil }) { return unused }
+        return free.min { (memory[$0]?.usedAt ?? 0) < (memory[$1]?.usedAt ?? 0) } ?? 0
+    }
+
+    /// A fresh layout for a call's memories.
     static func turn<G: RandomNumberGenerator>(using rng: inout G) -> (slots: [SIMD2<Double>], shape: [SIMD3<Double>]) {
         let slots = scatter(count: VoiceCallSources.cap, rMin: 0.45, rMax: 1.0, minGap: 0.5, using: &rng)
         return (slots, shape(of: slots, using: &rng))

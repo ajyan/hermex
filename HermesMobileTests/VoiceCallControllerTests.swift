@@ -1887,10 +1887,10 @@ final class VoiceCallCaptionsTests: XCTestCase {
                        .init(words: ["It's", "2:37."], lit: 1, isActive: true))
         // The next sentence takes the line once its first word is said.
         XCTAssertEqual(line(sent: "q", reply: "It's 2:37. Anything else?", heard: "It's 2:37.", speaking: true, replying: true),
-                       .init(words: ["Anything", "else?"], lit: 1, isActive: true))
+                       .init(words: ["Anything", "else?"], lit: 1, isActive: true, previous: ["It's", "2:37."]))
         // Done: the last piece stays, dimmed, until the user's next words.
         XCTAssertEqual(line(sent: "q", reply: "It's 2:37. Anything else?", heard: "It's 2:37. Anything else?"),
-                       .init(words: ["Anything", "else?"], lit: 2, isActive: false))
+                       .init(words: ["Anything", "else?"], lit: 2, isActive: false, previous: ["It's", "2:37."]))
         XCTAssertEqual(line(sent: "q", live: "thanks", reply: "It's 2:37.")?.words, ["thanks"])
     }
 
@@ -1898,6 +1898,16 @@ final class VoiceCallCaptionsTests: XCTestCase {
         let question = "What did I write about the taper, and did Mitch say anything about the race"
         XCTAssertEqual(line(sent: question, replying: true)?.words.joined(separator: " "), question)
         XCTAssertEqual(line(live: question)?.words.count, 15)
+    }
+
+    func testTheLastPieceStaysAboveTheOneBeingSaid() {
+        let reply = "First sentence here. Second one now."
+        let first = line(sent: "q", reply: reply, heard: "First", speaking: true, replying: true)
+        XCTAssertEqual(first?.previous, [])
+        let second = line(sent: "q", reply: reply, heard: "First sentence here. Second", speaking: true, replying: true)
+        XCTAssertEqual(second?.words, ["Second", "one", "now."])
+        XCTAssertEqual(second?.previous, ["First", "sentence", "here."])
+        XCTAssertEqual(line(live: "hello there")?.previous, [])
     }
 
     func testLongSentenceShowsInEvenPieces() {
