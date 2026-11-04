@@ -1,20 +1,23 @@
 import OSLog
 import SwiftUI
 
-/// The call's centerpiece, the memory constellation (prototype: "Atlas Orb Study"). Atlas is a
-/// 3D cloud of stars with no drawn outline: knots of stars around each memory point, threads
-/// along the links between them, a soft halo, and faint dust on a thin shell that hints the
-/// sphere. A slow noise field drifts every star and the cloud turns in 3D with perspective.
+/// The call's centerpiece, a mind of stars. Atlas is a 3D cloud with no drawn outline: knots of
+/// stars around each memory point and threads along the links between them, every star joined to
+/// its nearest neighbors by faint fibers (`MindNetwork`), inside a geodesic membrane (`MindLattice`)
+/// with a soft rim of light. A slow noise field drifts every star and the cloud turns in 3D with
+/// perspective.
 ///
-/// Phases (`VoiceCallScenePhase`) blend over about a third of a second: listening is cooler
-/// and shimmers with the mic; thinking sends the stars out as a flock; each memory Atlas finds
-/// lights as a node in its paper and part of the flock streams to it; when the reply starts
-/// the flock lands in the shape of this turn's constellation; speaking is warmer, sends a ripple
-/// out through the cloud on each rise in Atlas's voice, and pulses the memories in turn. A cut-off snaps at once. Every new set of
-/// memories gets a fresh random layout, so no two turns draw the same constellation.
+/// Phases (`VoiceCallScenePhase`) blend over about a third of a second, and the ball never breaks:
+/// listening is cooler, the membrane trembles with the mic, and each word heard closes in from the
+/// surface as a shell of light; thinking sends seekers (`MindSeekers`) walking the network, lighting
+/// what they visit; each memory Atlas finds pulls signals in through the network until it ignites in
+/// its paper, and a fiber route grows from the last memory to it; as the reply starts, a pulse runs
+/// that chain and the network rings out from it once; speaking is warmer, and each phrase of
+/// Atlas's voice spreads hop by hop from the memory it's speaking from. A cut-off snaps at once.
+/// Every new set of memories gets a fresh random layout, so no two turns draw the same mind.
 ///
-/// `focus` is the cloud's slot in this view's coordinates; the flock flies past it. Reduce
-/// Motion pauses the timeline and draws each phase still, crossfading between them.
+/// `focus` is the cloud's slot in this view's coordinates. Reduce Motion pauses the timeline and
+/// draws each phase still, crossfading between them.
 struct VoiceCallStarfield: View {
     let levels: VoiceCallAudioLevels
     let phase: VoiceCallScenePhase
@@ -54,41 +57,6 @@ struct VoiceCallStarfield: View {
     }
 }
 
-/// Ripples from Atlas's voice. Each rise in its loudness (a word, or a loud syllable) of at least
-/// `rise` over its last dip sends one out from the core, at most one per `spacing`; a steady voice
-/// sends none. A ripple's front runs out at `speed` cloud radii a second, swells in over its
-/// first `attack`, and fades over `life`.
-struct VoiceRipples {
-    static let rise = 0.2
-    static let spacing = 0.32
-    static let life = 2.0
-    static let speed = 0.6
-    static let attack = 0.25
-
-    /// When each ripple left the core and how loud the voice was.
-    private(set) var started: [(at: Double, strength: Double)] = []
-    private var floor = 0.0
-
-    mutating func step(voice: Double, at clock: Double, dt: Double, cutOff: Bool) {
-        started.removeAll { clock - $0.at > Self.life || cutOff }
-        if voice - floor > Self.rise, clock - (started.last?.at ?? -.infinity) > Self.spacing {
-            started.append((clock, 0.4 + 0.6 * min(voice, 1)))
-            floor = voice
-        }
-        // The floor follows a dip at once and creeps back up, so the next rise counts from it.
-        floor = min(voice, floor + dt * 1.5)
-    }
-
-    /// Each ripple's front (in cloud radii from the core) and its fading strength.
-    func fronts(at clock: Double) -> [(front: Double, strength: Double)] {
-        started.map { ripple in
-            let age = clock - ripple.at
-            let fade = min(1, age / Self.attack) * max(0, 1 - age / Self.life)
-            return (age * Self.speed, ripple.strength * fade)
-        }
-    }
-}
-
 /// What the starfield reads from the call each frame.
 struct StarfieldInput {
     var phase: VoiceCallScenePhase
@@ -101,34 +69,41 @@ struct StarfieldInput {
 
 /// One star. Its role fixes where it lives in the cloud; `x`/`y` are its eased screen spot.
 private struct Star {
-    /// 0 knot (around a memory point), 1 thread (along a link), 2 halo, 3 dust (on the shell).
+    /// 0 knot (around a memory point), 1 thread (along a link), 2 halo.
     var role: Int
     var j: Int
     var t: Double
     var g: SIMD3<Double>
-    /// Dust only: its direction on the shell.
-    var dir: SIMD3<Double>
     var lag: Double
     var k: Double
-    var flockA: Double
-    var flockR: Double
     var size: Double
     var x = 0.0, y = 0.0, z = 0.0, p = 1.0
     var placed = false
-    /// The drift field at the star's home, minus 0.5 (dust uses `x`), refreshed every third frame.
+    /// The drift field at the star's home, minus 0.5, refreshed every third frame.
     var drift = SIMD3<Double>.zero
-    /// The flock's wander, minus 0.5, refreshed with `drift`.
-    var wander = SIMD2<Double>.zero
-    /// How hard the voice's ripples press on the star this frame: it is pushed out and brightens.
-    var wave = 0.0
+    /// How hard the star fires this frame: it brightens and swells.
+    var fire = 0.0
 }
 
 /// A memory lit in the constellation.
 private struct StarNode {
     var source: VoiceCallSource
-    var slot: SIMD2<Double>
     var litAt: Double
     var color: SIMD3<Double>
+}
+
+/// A phrase of Atlas's voice, spreading from the knot it was spoken from.
+private struct Phrase {
+    var at: Double
+    var strength: Double
+    var knot: Int
+}
+
+/// A spark running along one fiber.
+private struct Spark {
+    var link: Int
+    var at: Double
+    var life: Double
 }
 
 /// The phase blend: one weight per phase, `interrupt` folded into `listen`.
@@ -149,16 +124,15 @@ private struct PhaseWeights {
 /// The starfield's state, stepped and drawn from the Canvas on the main thread each frame.
 /// Deliberately not observable: only the Canvas redraws, never the call screen around it.
 final class StarfieldModel {
-    /// Stars in the cloud's knots, threads and halo, and faint ones on the shell.
     static let cloudCount = 2000
-    static let dustCount = 1400
-    /// Every fifth of the first stars, joined by faint lines while they flock.
-    private static let linkerCount = 170
     private static let stagger = 0.3
+    /// How long the linking pulse takes to run the chain, and how long the network then rings.
+    private static let chainSeconds = 0.8
+    private static let ringSeconds = 1.2
+    private static let seekerCount = 6
 
     private var stars: ContiguousArray<Star>
     private var nodes: [StarNode] = []
-    private var slots: [SIMD2<Double>]
     private var shapeSlots: [SIMD3<Double>]
     /// The knots the cloud folds around: this turn's memories, at least four.
     private var shape: [SIMD3<Double>]
@@ -167,16 +141,33 @@ final class StarfieldModel {
     private var awaitingTurn = false
     private var random = SystemRandomNumberGenerator()
 
+    private var network = MindNetwork()
+    private var networkShape: [SIMD3<Double>] = []
+    /// The shape being wired off the main thread, if any.
+    private var wiringShape: [SIMD3<Double>]?
+    private let lattice = MindLattice.shared
+    private var seekers = MindSeekers()
+    private var sparks: [Spark] = []
+    private var heard = VoicePulses(rise: 0.12, spacing: 0.22, life: 1.6)
+    private var spoken = VoicePulses(rise: 0.16, spacing: 1.1, life: 2.4)
+    private var phrases: [Phrase] = []
+    private var speakingKnot = 0
+    private var phrasesOnKnot = 0
+    private var lastPhraseAt = -Double.infinity
+    /// When this reply's linking started, and the hops from its chain for the ring that follows.
+    private var linkAt = -Double.infinity
+    private var ringHops: [UInt8] = []
+
     private var lastTime: TimeInterval?
     private var frame = 0
     private var clock = 0.0
     private var seed = SIMD3<Double>(11, 37, 63)
     private var weights = PhaseWeights()
-    private var form = 1.0
     private var mic = 0.0
+    /// Atlas's voice as the mind shows it: a slow swell per phrase (0.25 s up, ~0.9 s down),
+    /// never a flicker per word.
     private var voice = 0.0
     private var impulse = 0.0
-    private var ripples = VoiceRipples()
     private var yaw = 0.0
     private var interruptions: Int?
     private var replyStarts: Int?
@@ -199,27 +190,18 @@ final class StarfieldModel {
             return (-2 * log(u)).squareRoot() * cos(2 * .pi * uniform())
         }
         var stars = ContiguousArray<Star>()
-        stars.reserveCapacity(Self.cloudCount + Self.dustCount)
+        stars.reserveCapacity(Self.cloudCount)
         for _ in 0..<Self.cloudCount {
             let r = uniform()
             stars.append(Star(
                 role: r < 0.4 ? 0 : r < 0.68 ? 1 : 2, j: Int(uniform() * 12), t: uniform(),
-                g: SIMD3(gauss(), gauss(), gauss()), dir: .zero, lag: 1.1 + uniform() * 3.3, k: uniform(),
-                flockA: uniform() * 2 * .pi, flockR: 0.35 + uniform() * 0.75, size: 0.6 + uniform() * 0.8
-            ))
-        }
-        for _ in 0..<Self.dustCount {
-            let u = uniform() * 2 - 1, a = uniform() * 2 * .pi, r = (1 - u * u).squareRoot()
-            stars.append(Star(
-                role: 3, j: 0, t: 0, g: SIMD3(gauss(), gauss(), gauss()), dir: SIMD3(cos(a) * r, u, sin(a) * r),
-                lag: 0.9 + uniform() * 2.6, k: uniform(), flockA: uniform() * 2 * .pi,
-                flockR: 0.5 + uniform() * 0.7, size: 0.35 + uniform() * 0.45
+                g: SIMD3(gauss(), gauss(), gauss()), lag: 1.1 + uniform() * 3.3, k: uniform(),
+                size: 0.6 + uniform() * 0.8
             ))
         }
         self.stars = stars
         var system = SystemRandomNumberGenerator()
         let layout = ConstellationLayout.turn(using: &system)
-        slots = layout.slots
         shapeSlots = layout.shape
         shape = Array(layout.shape.prefix(4))
         seed = SIMD3(Double.random(in: 0..<90), Double.random(in: 0..<90), Double.random(in: 0..<90))
@@ -241,9 +223,10 @@ final class StarfieldModel {
         let started = CACurrentMediaTime()
         #endif
         let dt = advance(time: time, input: input, levels: levels, still: still)
+        rewireIfNeeded()
         let scene = Scene(size: size, focus: focus, model: self)
         let nodeSpots = place(scene: scene, dt: dt, still: still)
-        draw(in: &context, scene: scene, nodeSpots: nodeSpots)
+        draw(in: &context, scene: scene, nodeSpots: nodeSpots, still: still)
         frame += 1
         performanceSignposter.endInterval("Starfield Frame", interval)
         #if DEBUG
@@ -251,14 +234,14 @@ final class StarfieldModel {
         #endif
     }
 
-    /// Moves time, events, the phase blend and the levels forward; returns the frame's step.
+    /// Moves time, events, the phase blend, the levels and the searches forward; returns the frame's step.
     private func advance(time: TimeInterval, input: StarfieldInput, levels: VoiceCallAudioLevels, still: Bool) -> Double {
         let dt = still ? 0 : min(max(time - (lastTime ?? time), 0), 0.05)
         lastTime = still ? nil : time
         clock += dt
         syncNodes(to: input.sources)
 
-        // A cut-off kicks the cloud tight; a reply starting lands the flock with a new drift.
+        // A cut-off kicks the cloud tight; a reply starting links the memories and drifts anew.
         if let known = interruptions, input.interruptions > known, !still {
             impulse = 1
             interruptUntil = clock + VoiceCallScenePhase.interruptSeconds
@@ -267,6 +250,7 @@ final class StarfieldModel {
         if let known = replyStarts, input.replyStarts > known, !still {
             convergeUntil = clock + VoiceCallScenePhase.convergeSeconds
             seed = SIMD3(Double.random(in: 0..<90), Double.random(in: 0..<90), Double.random(in: 0..<90))
+            startLinking()
         }
         replyStarts = input.replyStarts
 
@@ -274,29 +258,85 @@ final class StarfieldModel {
             phase = input.phase
             weights = PhaseWeights(idle: 0)
             weights.ease(toward: phase, amount: 1)
-            form = 1
             mic = 0
             voice = 0
             impulse = 0
-            ripples = VoiceRipples()
+            heard.reset()
+            spoken.reset()
+            phrases = []
+            sparks = []
             return 0
         }
         phase = VoiceCallScenePhase.resolved(
             base: input.phase, now: clock, convergeUntil: convergeUntil, interruptUntil: interruptUntil
         )
         weights.ease(toward: phase, amount: 1 - exp(-dt * (phase == .interrupt ? 16 : 3.2)))
-        let flocking = phase == .think || phase == .tools
-        let formRate = phase == .converge ? 2.2 : flocking ? 1.7 : 3
-        form += ((flocking ? 0 : 1) - form) * (1 - exp(-dt * formRate))
 
         let raw = levels.read(at: ProcessInfo.processInfo.systemUptime)
         let hearing = phase == .listen || phase == .interrupt
         mic += ((hearing ? Double(raw.mic) : 0) - mic) * (1 - exp(-dt * 16))
-        voice += ((phase == .speak ? Double(raw.voice) : 0) - voice) * (1 - exp(-dt * (phase == .interrupt ? 40 : 16)))
         impulse *= exp(-dt * 3.2)
-        ripples.step(voice: phase == .speak ? Double(raw.voice) : 0, at: clock, dt: dt, cutOff: phase == .interrupt)
-        yaw += dt * (0.16 + 0.55 * mic * weights.listen + 0.3 * voice * weights.speak) + impulse * dt * 3
+        heard.step(level: hearing ? Double(raw.mic) : 0, at: clock, dt: dt)
+        if spoken.step(level: phase == .speak ? Double(raw.voice) : 0, at: clock, dt: dt, cutOff: phase == .interrupt) {
+            phraseStarted(strength: spoken.started.last?.strength ?? 0.7)
+        }
+        if phase == .interrupt { phrases = [] }
+        phrases.removeAll { clock - $0.at > spoken.life }
+        var swell = 0.0
+        for phrase in phrases {
+            let age = clock - phrase.at
+            swell += (1 - swell) * phrase.strength * 0.7 * min(1, age / 0.25) * exp(-age / 0.9)
+        }
+        voice = phase == .speak ? swell : 0
+
+        let searching = weights.think + weights.tools
+        if searching > 0.02 {
+            if seekers.walkers.isEmpty {
+                seekers.reset(count: Self.seekerCount, starCount: stars.count, at: clock, using: &random)
+            }
+            seekers.step(at: clock, network: network, using: &random)
+        }
+        stepSparks(searching: searching)
+        yaw += dt * (0.16 + 0.5 * mic * weights.listen + 0.1 * searching + 0.12 * voice * weights.speak) + impulse * dt * 3
         return dt
+    }
+
+    /// Each phrase spreads from the memory being spoken from; the voice moves to the next memory
+    /// after a pause or every third phrase.
+    private func phraseStarted(strength: Double) {
+        let knots = max(nodes.count, 1)
+        if clock - lastPhraseAt > 1.4 || phrasesOnKnot >= 3 {
+            speakingKnot = (speakingKnot + 1) % knots
+            phrasesOnKnot = 0
+        }
+        speakingKnot %= knots
+        phrasesOnKnot += 1
+        lastPhraseAt = clock
+        phrases.append(Phrase(at: clock, strength: strength, knot: speakingKnot))
+    }
+
+    /// The reply starts: the chain of found memories links up, and the voice starts on the first.
+    private func startLinking() {
+        rewireIfNeeded()
+        linkAt = clock
+        speakingKnot = 0
+        phrasesOnKnot = 0
+        lastPhraseAt = clock
+        let count = max(nodes.count, 1)
+        var sources = Array(network.hubs.prefix(count))
+        for route in network.routes.prefix(count - 1) { sources += route }
+        ringHops = network.breadthFirst(from: sources)
+    }
+
+    /// Sparks run along random fibers: rare and slow at rest, quick and many while Atlas searches.
+    private func stepSparks(searching: Double) {
+        sparks.removeAll { clock - $0.at > $0.life }
+        guard !network.links.isEmpty, sparks.count < 60 else { return }
+        if Double.random(in: 0..<1, using: &random) < 0.1 + 0.6 * searching {
+            sparks.append(Spark(
+                link: Int.random(in: 0..<network.links.count, using: &random), at: clock, life: starLerp(1, 0.45, searching)
+            ))
+        }
     }
 
     /// Matches the lit nodes to the turn's memories: a new turn's first memory reshuffles the
@@ -309,20 +349,35 @@ final class StarfieldModel {
         let continues = !awaitingTurn && nodes.count <= sources.count
             && zip(nodes, sources).allSatisfy { $0.source.id == $1.id }
         if !continues {
-            let layout = ConstellationLayout.turn(using: &random)
-            slots = layout.slots
-            shapeSlots = layout.shape
+            shapeSlots = ConstellationLayout.turn(using: &random).shape
             nodes = []
             awaitingTurn = false
         }
         guard nodes.count < sources.count else { return }
-        for source in sources[nodes.count...] where nodes.count < slots.count {
+        for source in sources[nodes.count...] where nodes.count < shapeSlots.count {
             let litAt = max(clock, (nodes.last?.litAt ?? clock - Self.stagger) + Self.stagger)
-            nodes.append(StarNode(
-                source: source, slot: slots[nodes.count], litAt: litAt, color: StarSprites.rgb(of: source.kind)
-            ))
+            nodes.append(StarNode(source: source, litAt: litAt, color: StarSprites.rgb(of: source.kind)))
         }
         shape = Array(shapeSlots.prefix(max(nodes.count, 4)))
+    }
+
+    /// Joins the stars anew whenever the cloud's shape changes. The wiring takes tens of
+    /// milliseconds, so it runs off the main thread; the old fibers stay until it lands.
+    private func rewireIfNeeded() {
+        guard shape != networkShape, shape != wiringShape else { return }
+        let shape = shape
+        let points = stars.map { Self.base(of: $0, shape: shape) }, bends = stars.map(\.k)
+        wiringShape = shape
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let network = MindNetwork(points: points, knots: shape, bends: bends)
+            DispatchQueue.main.async {
+                guard let self, self.wiringShape == shape else { return }
+                self.network = network
+                self.networkShape = shape
+                self.wiringShape = nil
+                self.sparks = []
+            }
+        }
     }
 
     private func lit(_ node: StarNode, still: Bool) -> Double {
@@ -333,7 +388,7 @@ final class StarfieldModel {
 
     /// The frame's screen geometry and the blend values every star reads.
     private struct Scene {
-        let width, height, m, cx, cy, radius, fw, fh, sc, swell: Double
+        let width, height, m, cx, cy, radius, sc, swell: Double
         let ca, sa, cb, sb: Double
 
         init(size: CGSize, focus: CGRect, model: StarfieldModel) {
@@ -343,8 +398,6 @@ final class StarfieldModel {
             cx = focus.midX
             cy = focus.midY
             radius = min(m * 0.34, focus.height * 0.46)
-            fw = width * 0.33
-            fh = height * 0.22
             sc = m / 420 + 0.4
             let w = model.weights
             swell = 1 + 0.02 * model.voice * w.speak + 0.03 * model.mic * w.listen - 0.08 * model.impulse
@@ -371,83 +424,64 @@ final class StarfieldModel {
         var color: SIMD3<Double>
         var kind: VoiceCallSourceKind
         var label: String
+        var litAt: Double
     }
 
-    /// Eases every star toward its spot this frame: home in the cloud, or out in the flock.
+    /// Eases every star toward its home in the cloud and works out how hard it fires.
     private func place(scene: Scene, dt: Double, still: Bool) -> [NodeSpot] {
         let w = weights, clock = clock, seed = seed, impulse = impulse
-        let homeK = starSmoothStep(form)
         let spots = nodes.enumerated().map { index, node in
             let projected = scene.project(shapeSlots[index] * scene.swell)
             return NodeSpot(
-                x: starLerp(scene.cx + node.slot.x * scene.fw, projected.x, homeK),
-                y: starLerp(scene.cy + node.slot.y * scene.fh, projected.y, homeK),
-                alpha: lit(node, still: still), color: node.color, kind: node.source.kind, label: node.source.label
+                x: projected.x, y: projected.y, alpha: lit(node, still: still), color: node.color,
+                kind: node.source.kind, label: node.source.label, litAt: node.litAt
             )
         }
-        let attractors = (
-            SIMD2(scene.cx + cos(clock * 0.55) * scene.fw * 0.55, scene.cy + sin(clock * 0.8) * scene.fh * 0.55),
-            SIMD2(scene.cx + cos(clock * 0.43 + 2.4) * scene.fw * 0.7, scene.cy + sin(clock * 0.61 + 1.1) * scene.fh * 0.7)
-        )
         let jitter = mic * w.listen * scene.m * 0.006
         let amp = 0.5 * w.idle + 0.3 * w.listen + 0.4 * w.think + 0.4 * w.tools + 0.35 * w.converge
             + (0.3 + 0.25 * voice) * w.speak
-        let flocking = homeK < 0.999
         let refreshAll = still || frame < 3 || wasStill
         wasStill = still
         let refreshLane = frame % 3
-        let landing = phase == .converge ? 2.3 : 1
         let shape = shape
         let tick = Int32(truncatingIfNeeded: Int(clock * 20))
-        // Each ripple's front (in cloud radii, from the core) and its fading strength.
-        let fronts = ripples.fronts(at: clock).map { (front: $0.front, strength: $0.strength * w.speak) }
-        let driftTime = clock * 0.05, wanderTime = clock * 0.22
+        let driftTime = clock * 0.05
+
+        // What fires this frame: words heard closing in from the surface, the seekers' visits,
+        // signals gathering into each memory as it's found, the ring after linking, and phrases.
+        let heardShells = still ? [] : heard.started.map {
+            (front: 0.97 - (clock - $0.at) * 0.75, strength: $0.strength * (1 - (clock - $0.at) / heard.life))
+        }
+        let scan = (w.think + w.tools) * (1 - 0.5 * w.converge)
+        let visited = seekers.visited
+        let gathering = still ? [] : nodes.enumerated().compactMap { index, node -> (hops: [UInt8], litAt: Double)? in
+            guard index < network.hops.count, clock - node.litAt < 0.4, node.litAt - clock < 0.8 else { return nil }
+            return (network.hops[index], node.litAt)
+        }
+        let ringAge = clock - linkAt - Self.chainSeconds
+        let ringHops = ringHops
+        let ringing = !still && ringAge >= 0 && ringAge < Self.ringSeconds && ringHops.count == stars.count
+        let spreading = still ? [] : phrases.compactMap { phrase -> (hops: [UInt8], age: Double, strength: Double)? in
+            guard phrase.knot < network.hops.count else { return nil }
+            return (network.hops[phrase.knot], clock - phrase.at, phrase.strength)
+        }
+        let wired = network.hops.first?.count == stars.count
 
         stars.withUnsafeMutableBufferPointer { buffer in
             for i in buffer.indices {
                 var star = buffer[i]
                 let refresh = refreshAll || i % 3 == refreshLane
                 let base = Self.base(of: star, shape: shape)
-                if refresh {
-                    star.drift = Self.drift(at: base, star: star, seed: seed, time: driftTime)
-                    if flocking {
-                        let x = Double(i) * 0.07
-                        star.wander = SIMD2(StarNoise.value(x, wanderTime, 1) - 0.5, StarNoise.value(x, wanderTime, 9) - 0.5)
-                    }
-                }
+                if refresh { star.drift = Self.drift(at: base, star: star, seed: seed, time: driftTime) }
                 let home = Self.home(of: star, base: base, amp: amp)
-                star.wave = 0
-                if !fronts.isEmpty {
-                    let d = (home.x * home.x + home.y * home.y + home.z * home.z).squareRoot()
-                    for ripple in fronts {
-                        let off = d - ripple.front
-                        if abs(off) < 0.45 { star.wave += ripple.strength * exp(-off * off / 0.03) }
-                    }
-                    star.wave = min(star.wave, 1.5)
-                }
                 let projected = scene.project(home * scene.swell)
-                var tx = projected.x, ty = projected.y
+                var tx = projected.x
+                let ty = projected.y
                 if jitter > 0 {
                     tx += (StarNoise.hash(Int32(truncatingIfNeeded: i), tick, 1) - 0.5) * jitter
                 }
-                if flocking {
-                    let attractor = star.k < 0.5 ? attractors.0 : attractors.1
-                    let orbit = star.flockA + clock * 0.3
-                    var fx = starLerp(attractor.x, scene.cx + cos(orbit) * scene.fw * star.flockR, 0.55) + star.wander.x * scene.m * 0.22
-                    var fy = starLerp(attractor.y, scene.cy + sin(orbit) * scene.fh * star.flockR, 0.55) + star.wander.y * scene.m * 0.22
-                    if w.tools > 0.02, !spots.isEmpty, star.k < 0.55 {
-                        let node = spots[i % spots.count]
-                        if node.alpha > 0 {
-                            let pull = node.alpha * w.tools * (0.55 + 0.45 * sin(clock * 1.6 + star.k * 9))
-                            fx = starLerp(fx, node.x + star.wander.x * scene.m * 0.07, pull)
-                            fy = starLerp(fy, node.y + star.wander.y * scene.m * 0.07, pull)
-                        }
-                    }
-                    tx = starLerp(fx, tx, homeK)
-                    ty = starLerp(fy, ty, homeK)
-                }
                 if star.placed, !still {
-                    let follow = 1 - exp(-dt * star.lag * landing * (1 + 7 * impulse))
+                    let follow = 1 - exp(-dt * star.lag * (1 + 7 * impulse))
                     star.x += (tx - star.x) * follow
                     star.y += (ty - star.y) * follow
                 } else {
@@ -457,10 +491,62 @@ final class StarfieldModel {
                 }
                 star.z = projected.z
                 star.p = projected.scale
+
+                var fire = 0.0
+                if !still {
+                    let d = (home * home).sum().squareRoot()
+                    for shell in heardShells {
+                        let off = d - shell.front
+                        fire += 0.7 * shell.strength * exp(-off * off / 0.012)
+                    }
+                    if scan > 0.02, i < visited.count {
+                        let age = clock - visited[i]
+                        if age < 1.2 { fire += 0.7 * scan * exp(-age / 0.45) }
+                    }
+                    if wired {
+                        for gather in gathering {
+                            let h = gather.hops[i]
+                            guard h <= 12 else { continue }
+                            let arrive = clock - (gather.litAt - Double(h) * 0.06) - 0.05
+                            if arrive > -0.15, arrive < 0.3 { fire += 0.9 * exp(-arrive * arrive / 0.006) * (1 - Double(h) / 24) }
+                        }
+                        if ringing {
+                            let h = ringHops[i]
+                            if h <= 10 {
+                                let ring = ringAge - Double(h) * 0.045
+                                if ring > -0.05, ring < 0.4 { fire += 0.9 * exp(-ring * ring / 0.003) * (1 - Double(h) / 12) }
+                            }
+                        }
+                        for phrase in spreading {
+                            let h = phrase.hops[i]
+                            guard h <= 14 else { continue }
+                            let wave = phrase.age - Double(h) * 0.12
+                            if wave > -0.2, wave < 0.7 { fire += phrase.strength * pow(0.9, Double(h)) * exp(-wave * wave / 0.03) }
+                        }
+                    }
+                }
+                star.fire = fire
                 buffer[i] = star
             }
         }
+        // The linking pulse lights the star it's passing.
+        if let head = chainHead(), head.star < stars.count { stars[head.star].fire += 1.2 }
         return spots
+    }
+
+    /// Where the linking pulse is on the chain of found routes: its star, which route, how far along.
+    private func chainHead() -> (star: Int, route: Int, position: Double)? {
+        let age = clock - linkAt
+        guard age >= 0, age < Self.chainSeconds, nodes.count > 1 else { return nil }
+        let routes = network.routes.prefix(nodes.count - 1)
+        let total = routes.reduce(0) { $0 + $1.count }
+        guard total > 0 else { return nil }
+        var head = age / Self.chainSeconds * Double(total)
+        for (index, route) in routes.enumerated() {
+            if head < Double(route.count) { return (route[Int(head)], index, head) }
+            head -= Double(route.count)
+        }
+        return nil
     }
 
     /// A star's place in the cloud before the drift: in a knot, along a thread, or in the halo.
@@ -474,19 +560,13 @@ final class StarfieldModel {
             let edge = star.j % (n - 1)
             let a = shape[edge], b = shape[edge + 1]
             return a + (b - a) * star.t + star.g * 0.045
-        case 2:
-            return star.g * 0.4
         default:
-            return star.dir
+            return star.g * 0.4
         }
     }
 
     @inline(__always)
     private static func drift(at p: SIMD3<Double>, star: Star, seed: SIMD3<Double>, time: Double) -> SIMD3<Double> {
-        if star.role == 3 {
-            let q = p * 1.5
-            return SIMD3(StarNoise.value(q.x + seed.x, q.y + seed.y, q.z + time) - 0.5, 0, 0)
-        }
         let q = p * 1.3
         return SIMD3(
             StarNoise.value(q.x + seed.x, q.y + seed.y, q.z + time) - 0.5,
@@ -497,10 +577,6 @@ final class StarfieldModel {
 
     @inline(__always)
     private static func home(of star: Star, base: SIMD3<Double>, amp: Double) -> SIMD3<Double> {
-        if star.role == 3 {
-            let radius = 0.9 + star.g.x * 0.035
-            return base * radius * (1 + 0.06 * star.drift.x * amp * 2)
-        }
         var p = base + star.drift * amp
         let r = (p.x * p.x + p.y * p.y + p.z * p.z).squareRoot()
         if r > 0.88 { p *= (0.88 + (r - 0.88) * 0.25) / r }
@@ -509,52 +585,57 @@ final class StarfieldModel {
 
     // MARK: Drawing
 
-    private func draw(in context: inout GraphicsContext, scene: Scene, nodeSpots: [NodeSpot]) {
+    private func draw(in context: inout GraphicsContext, scene: Scene, nodeSpots: [NodeSpot], still: Bool) {
         let w = weights
-        let flock = 1 - form
-        let inShape = starSmoothStep(form)
-        drawLinks(in: &context, scene: scene, alpha: flock * (w.think + 0.45 * w.tools))
-
         let resting = w.think * 0.5 + w.listen * 0.25 + w.idle * 0.25
         let constellation = max(w.tools, w.converge, w.speak * 0.85, nodeSpots.isEmpty ? 0 : resting) * (1 - 0.6 * impulse)
-        drawEdges(in: &context, spots: nodeSpots, alpha: constellation)
+        let hue = 236 - 22 * w.listen + 24 * w.speak + 10 * w.think
+        let tint = StarSprites.hsl(hue, 0.85, 0.62)
+        let scan = (w.think + w.tools) * (1 - 0.5 * w.converge)
 
         var light = context
         light.blendMode = .plusLighter
-        if inShape > 0.02 {
-            let hue = 236 - 22 * w.listen + 24 * w.speak + 10 * w.think
-            let rgb = StarSprites.hsl(hue, 0.85, 0.62)
-            let level = (0.1 + 0.1 * max(mic * w.listen, voice * w.speak)) * inShape
-            for point in shape {
-                let projected = scene.project(point * scene.swell)
-                let radius = scene.radius * 0.55 * projected.scale
-                let center = CGPoint(x: projected.x, y: projected.y)
-                light.fill(
-                    Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)),
-                    with: .radialGradient(
-                        Gradient(colors: [StarSprites.color(rgb, level), StarSprites.color(rgb, 0)]),
-                        center: center, startRadius: 0, endRadius: radius
-                    )
-                )
-            }
-        }
-        drawStars(in: &light, scene: scene, spots: nodeSpots, inShape: inShape)
+        drawGlow(in: &light, scene: scene, tint: tint)
+        drawFibers(in: &light, hue: hue, still: still)
+        drawSeekers(in: &light, scan: scan, still: still)
+        drawMembrane(in: &light, scene: scene, hue: hue, scan: scan, still: still)
+        drawRoutes(in: &light, spots: nodeSpots, constellation: constellation, still: still)
+        drawStars(in: &light, scene: scene, spots: nodeSpots, constellation: constellation)
 
         let speaking = voice * w.speak
-        let pulsing = nodeSpots.isEmpty ? -1 : Int(clock * 0.9) % nodeSpots.count
         for (index, spot) in nodeSpots.enumerated() {
             let alpha = spot.alpha * constellation
             guard alpha >= 0.01 else { continue }
-            let size = 26 * (1 + (index == pulsing ? 0.5 * speaking : 0)) * scene.sc
+            let flash = still || clock < spot.litAt ? 0 : exp(-(clock - spot.litAt) / 0.35)
+            let pulse = index == speakingKnot ? 0.5 * speaking : 0
+            let size = 26 * (1 + pulse + 1.2 * flash) * scene.sc
             light.opacity = min(alpha, 1)
             light.draw(StarSprites.resolved(spot.kind, in: light),
                        in: CGRect(x: spot.x - size / 2, y: spot.y - size / 2, width: size, height: size))
         }
 
-        // Labels name the memories while the flock is out; the chips under the cloud take over.
+        // The ring after linking blooms softly over the whole mind.
+        let ringAge = clock - linkAt - Self.chainSeconds
+        if !still, ringAge >= 0, ringAge < 1.4 {
+            let bloom = exp(-pow(ringAge - 0.3, 2) / 0.06) * 0.22
+            let radius = scene.radius * 1.25
+            let center = CGPoint(x: scene.cx, y: scene.cy)
+            let glow = SIMD3(220.0, 205, 255) / 255
+            light.opacity = 1
+            light.fill(
+                Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)),
+                with: .radialGradient(
+                    Gradient(colors: [StarSprites.color(glow, bloom), StarSprites.color(glow, 0)]),
+                    center: center, startRadius: scene.radius * 0.1, endRadius: radius
+                )
+            )
+        }
+
+        // Labels name the memories while Atlas searches; the chips under the cloud take over.
         var labels = context
+        let naming = max(w.think, w.tools, 0.6 * w.converge)
         for spot in nodeSpots {
-            let alpha = spot.alpha * flock * constellation
+            let alpha = spot.alpha * naming * constellation
             guard alpha >= 0.02 else { continue }
             let text = labels.resolve(
                 Text(verbatim: spot.label).font(AppFont.caption2(weight: .medium)).foregroundStyle(Color.hxTextPrimary)
@@ -566,85 +647,286 @@ final class StarfieldModel {
         }
     }
 
-    /// Faint lines between nearby flocking stars, bucketed by strength into a few paths.
-    private func drawLinks(in context: inout GraphicsContext, scene: Scene, alpha: Double) {
-        guard alpha > 0.02 else { return }
-        let threshold = scene.m * 0.085, threshold2 = threshold * threshold
-        let bucketCount = 6
-        var buckets = Array(repeating: Path(), count: bucketCount)
+    /// A soft glow around each knot.
+    private func drawGlow(in context: inout GraphicsContext, scene: Scene, tint: SIMD3<Double>) {
+        let w = weights
+        let level = 0.1 + 0.1 * max(mic * w.listen, voice * w.speak)
+        for point in shape {
+            let projected = scene.project(point * scene.swell)
+            let radius = scene.radius * 0.55 * projected.scale
+            let center = CGPoint(x: projected.x, y: projected.y)
+            context.fill(
+                Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)),
+                with: .radialGradient(
+                    Gradient(colors: [StarSprites.color(tint, level), StarSprites.color(tint, 0)]),
+                    center: center, startRadius: 0, endRadius: radius
+                )
+            )
+        }
+    }
+
+    /// The synapses: faint bowed fibers by depth, brighter where a signal is crossing, and sparks.
+    private func drawFibers(in context: inout GraphicsContext, hue: Double, still: Bool) {
+        guard !network.links.isEmpty else { return }
+        var depthPaths = [Path(), Path(), Path()]
+        var litPaths = [Path(), Path(), Path(), Path()]
+        let links = network.links
         stars.withUnsafeBufferPointer { buffer in
-            for i in 0..<Self.linkerCount {
-                let a = buffer[i * 5]
-                let shimmer = 0.55 + 0.45 * sin(clock * 2.2 + Double(i) * 0.7)
-                for j in (i + 1)..<Self.linkerCount {
-                    let b = buffer[j * 5]
-                    let dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy
-                    guard d2 <= threshold2 else { continue }
-                    let strength = (1 - d2.squareRoot() / threshold) * shimmer
-                    let bucket = min(bucketCount - 1, Int(strength * Double(bucketCount)))
-                    buckets[bucket].move(to: CGPoint(x: a.x, y: a.y))
-                    buckets[bucket].addLine(to: CGPoint(x: b.x, y: b.y))
+            for link in links {
+                let a = buffer[link.a], b = buffer[link.b]
+                let control = CGPoint(x: (a.x + b.x) / 2 - (b.y - a.y) * link.bend, y: (a.y + b.y) / 2 + (b.x - a.x) * link.bend)
+                let depth = 0.5 + 0.25 * (a.z + b.z)
+                let lane = depth < 0.4 ? 0 : depth < 0.7 ? 1 : 2
+                depthPaths[lane].move(to: CGPoint(x: a.x, y: a.y))
+                depthPaths[lane].addQuadCurve(to: CGPoint(x: b.x, y: b.y), control: control)
+                let fire = max(a.fire, b.fire)
+                if fire > 0.12 {
+                    let bucket = min(3, Int(min(fire * 0.5, 0.65) / 0.65 * 4))
+                    litPaths[bucket].move(to: CGPoint(x: a.x, y: a.y))
+                    litPaths[bucket].addQuadCurve(to: CGPoint(x: b.x, y: b.y), control: control)
                 }
             }
         }
-        for (index, path) in buckets.enumerated() where !path.isEmpty {
-            let strength = (Double(index) + 0.5) / Double(bucketCount)
-            context.stroke(path, with: .color(StarSprites.link.opacity(strength * 0.42 * alpha)), lineWidth: 0.6)
+        let fiber = StarSprites.hsl(hue + 8, 0.85, 0.74)
+        for (lane, alpha) in [0.03, 0.06, 0.1].enumerated() {
+            context.stroke(depthPaths[lane], with: .color(StarSprites.color(fiber, alpha)), lineWidth: 0.5)
+        }
+        let litColor = SIMD3(225.0, 205, 255) / 255
+        for (bucket, path) in litPaths.enumerated() where !path.isEmpty {
+            context.stroke(path, with: .color(StarSprites.color(litColor, (Double(bucket) + 0.5) / 4 * 0.65)), lineWidth: 0.9)
+        }
+        guard !still else { return }
+        let spark = SIMD3(235.0, 220, 255) / 255
+        for item in sparks where item.link < links.count {
+            let link = links[item.link]
+            let a = stars[link.a], b = stars[link.b]
+            let u = (clock - item.at) / item.life
+            let cx = (a.x + b.x) / 2 - (b.y - a.y) * link.bend, cy = (a.y + b.y) / 2 + (b.x - a.x) * link.bend
+            let x = (1 - u) * (1 - u) * a.x + 2 * (1 - u) * u * cx + u * u * b.x
+            let y = (1 - u) * (1 - u) * a.y + 2 * (1 - u) * u * cy + u * u * b.y
+            context.fill(Path(ellipseIn: CGRect(x: x - 1.1, y: y - 1.1, width: 2.2, height: 2.2)),
+                         with: .color(StarSprites.color(spark, sin(.pi * u) * 0.8)))
         }
     }
 
-    /// The constellation: each memory joined to the next in its colors, drawn as it lights.
-    private func drawEdges(in context: inout GraphicsContext, spots: [NodeSpot], alpha: Double) {
+    /// Thinking's seekers: a fading trail behind each and a bright head, sliding along its fiber.
+    private func drawSeekers(in context: inout GraphicsContext, scan: Double, still: Bool) {
+        guard scan > 0.02, !still else { return }
+        let violet = SIMD3(215.0, 195, 255) / 255
+        for walker in seekers.walkers {
+            let points = (walker.trail + [walker.at]).map { CGPoint(x: stars[$0].x, y: stars[$0].y) }
+            for index in points.indices.dropFirst() {
+                var segment = Path()
+                segment.move(to: points[index - 1])
+                segment.addLine(to: points[index])
+                let fade = Double(index) / Double(points.count)
+                context.stroke(segment, with: .color(StarSprites.color(violet, 0.7 * scan * fade)), lineWidth: 0.9)
+            }
+            var head = CGPoint(x: stars[walker.at].x, y: stars[walker.at].y)
+            if let next = walker.next {
+                let u = min(1, (clock - walker.stepStart) / MindSeekers.stepSeconds)
+                var segment = Path()
+                segment.move(to: head)
+                head = CGPoint(x: starLerp(head.x, stars[next].x, u), y: starLerp(head.y, stars[next].y, u))
+                segment.addLine(to: head)
+                context.stroke(segment, with: .color(StarSprites.color(violet, 0.7 * scan)), lineWidth: 0.9)
+            }
+            let radius = clock < walker.dwellUntil ? 12.0 : 6
+            context.fill(
+                Path(ellipseIn: CGRect(x: head.x - radius, y: head.y - radius, width: radius * 2, height: radius * 2)),
+                with: .radialGradient(
+                    Gradient(colors: [StarSprites.color(SIMD3(1, 1, 1), 0.9 * scan), StarSprites.color(violet, 0)]),
+                    center: head, startRadius: 0, endRadius: radius
+                )
+            )
+        }
+    }
+
+    /// The membrane: a geodesic net, brighter toward the limb, that trembles with the user's
+    /// voice, lights where seekers pass under it, takes on a found memory's color near it, brightens
+    /// as the network rings, and carries light outward from the memory Atlas is speaking from.
+    private func drawMembrane(in context: inout GraphicsContext, scene: Scene, hue: Double, scan: Double, still: Bool) {
+        let w = weights
+        let ringAge = clock - linkAt - Self.chainSeconds
+        let ring = !still && ringAge >= 0 ? 0.5 * exp(-pow(ringAge - 0.4, 2) / 0.03) : 0
+        let words = still ? 0 : heard.started.reduce(0) { $0 + 0.5 * $1.strength * exp(-(clock - $1.at) / 0.18) }
+        let probes: [SIMD3<Double>] = still || scan < 0.02 ? [] : seekers.walkers.map { walker in
+            let point = Self.base(of: stars[walker.at], shape: shape)
+            return point / max((point * point).sum().squareRoot(), 0.001)
+        }
+        let found = nodes.enumerated().compactMap { index, node -> (direction: SIMD3<Double>, strength: Double, color: Int)? in
+            guard index < shapeSlots.count else { return nil }
+            let strength = lit(node, still: still) * max(w.tools, w.converge * 0.8, w.speak * 0.35)
+            guard strength > 0 else { return nil }
+            let knot = shapeSlots[index]
+            return (knot / max((knot * knot).sum().squareRoot(), 0.001), strength, index)
+        }
+        var speakingDirection: SIMD3<Double>?
+        if !still, speakingKnot < shapeSlots.count, !phrases.isEmpty {
+            let knot = shapeSlots[speakingKnot]
+            speakingDirection = knot / max((knot * knot).sum().squareRoot(), 0.001)
+        }
+        let tremble = still ? 0 : mic * w.listen
+
+        var projected: [(x: Double, y: Double, z: Double)] = []
+        var fires: [Double] = []
+        var colors: [Int] = []
+        projected.reserveCapacity(lattice.points.count)
+        fires.reserveCapacity(lattice.points.count)
+        colors.reserveCapacity(lattice.points.count)
+        for point in lattice.points {
+            let unit = point / lattice.radius
+            var scale = 1.0
+            if tremble > 0.01 {
+                let lon = atan2(unit.z, unit.x), lat = asin(min(max(unit.y, -1), 1))
+                scale += tremble * 0.07 * (0.5 + 0.5 * sin(3 * lon + clock * 2.6) * cos(2 * lat - clock * 1.9))
+            }
+            let screen = scene.project(point * scale * scene.swell)
+            projected.append((screen.x, screen.y, screen.z))
+            var fire = tremble * 0.35 + words + ring
+            for probe in probes { fire += 0.6 * scan * pow(max(0, (unit * probe).sum()), 18) }
+            var color = -1, best = 0.15
+            for memory in found {
+                let near = memory.strength * pow(max(0, (unit * memory.direction).sum()), 10)
+                fire += 0.8 * near
+                if near > best {
+                    best = near
+                    color = memory.color
+                }
+            }
+            if let direction = speakingDirection {
+                let angle = acos(min(max((unit * direction).sum(), -1), 1))
+                for phrase in phrases where phrase.knot == speakingKnot {
+                    let wave = clock - phrase.at - angle * 0.55
+                    fire += phrase.strength * exp(-wave * wave / 0.05) * (1 - angle / 3.3)
+                }
+            }
+            fires.append(min(fire, 1.1))
+            colors.append(color)
+        }
+
+        // Edges in a few alpha buckets per color: the net's own violet, or a found memory's paper.
+        let groups = nodes.count + 1, buckets = 6
+        var edgePaths = Array(repeating: Path(), count: groups * buckets)
+        for edge in lattice.edges {
+            let a = projected[edge.a], b = projected[edge.b]
+            let limb = 1 - abs((a.z + b.z) / 2) / lattice.radius
+            let front = a.z + b.z > 0 ? 1.0 : 0.45
+            let fire = (fires[edge.a] + fires[edge.b]) / 2
+            let alpha = min(0.6, (0.025 + 0.11 * limb * limb) * front + 0.35 * fire * front)
+            guard alpha >= 0.012 else { continue }
+            let color = max(colors[edge.a], colors[edge.b])
+            let group = color >= 0 && color < nodes.count ? color + 1 : 0
+            let bucket = min(buckets - 1, Int(alpha / 0.6 * Double(buckets)))
+            edgePaths[group * buckets + bucket].move(to: CGPoint(x: a.x, y: a.y))
+            edgePaths[group * buckets + bucket].addLine(to: CGPoint(x: b.x, y: b.y))
+        }
+        let net = StarSprites.hsl(hue + 14, 0.8, 0.72)
+        for (index, path) in edgePaths.enumerated() where !path.isEmpty {
+            let group = index / buckets, bucket = index % buckets
+            let color = group == 0 ? net : nodes[group - 1].color
+            context.stroke(path, with: .color(StarSprites.color(color, (Double(bucket) + 0.5) / Double(buckets) * 0.6)), lineWidth: 0.5)
+        }
+        var dots = Path()
+        var brightDots = Path()
+        for (index, point) in projected.enumerated() {
+            let front = point.z > 0 ? 1.0 : 0.4
+            let radius = 0.8 + fires[index]
+            let rect = CGRect(x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2)
+            if fires[index] * front > 0.25 {
+                brightDots.addEllipse(in: rect)
+            } else if front > 0.5 {
+                dots.addEllipse(in: rect)
+            }
+        }
+        context.fill(dots, with: .color(StarSprites.color(SIMD3(210, 190, 255) / 255, 0.2)))
+        context.fill(brightDots, with: .color(StarSprites.color(SIMD3(225, 210, 255) / 255, 0.7)))
+    }
+
+    /// Each memory joined to the next along the network's own fibers, the route growing as the
+    /// next one ignites; while linking, a pulse runs the chain and each route flares as it passes.
+    private func drawRoutes(in context: inout GraphicsContext, spots: [NodeSpot], constellation: Double, still: Bool) {
         guard spots.count > 1 else { return }
-        for index in 1..<spots.count {
-            let a = spots[index - 1], b = spots[index]
-            let edge = min(a.alpha, b.alpha) * alpha
-            guard edge >= 0.01 else { continue }
-            let start = CGPoint(x: a.x, y: a.y)
-            let end = CGPoint(x: starLerp(a.x, b.x, b.alpha), y: starLerp(a.y, b.y, b.alpha))
+        let w = weights
+        let routes = network.routes
+        let total = Double(routes.prefix(spots.count - 1).reduce(0) { $0 + $1.count })
+        let linkAge = clock - linkAt
+        let head = still ? nil : chainHead()
+        var before = 0.0
+        for index in 1..<spots.count where index - 1 < routes.count {
+            let route = routes[index - 1]
+            defer { before += Double(route.count) }
+            let reveal = still ? 1 : min(spots[index - 1].alpha, starEaseOut((clock - spots[index].litAt) / 0.8))
+            let passed = !still && total > 0 && linkAge >= 0 ? linkAge - (before + Double(route.count)) / total * Self.chainSeconds : -1
+            let flare = passed >= 0 ? exp(-passed / 0.6) : 0
+            let alpha = min(1, reveal * constellation * (0.55 + 0.45 * w.converge) + 0.4 * flare * reveal)
+            guard alpha >= 0.01, route.count > 1 else { continue }
+            let upto = max(1, Int((Double(route.count) * reveal).rounded()))
             var path = Path()
-            path.move(to: start)
-            path.addLine(to: end)
+            for (step, star) in route.prefix(upto).enumerated() {
+                let point = CGPoint(x: stars[star].x, y: stars[star].y)
+                if step == 0 { path.move(to: point) } else { path.addLine(to: point) }
+            }
+            let start = CGPoint(x: stars[route[0]].x, y: stars[route[0]].y)
+            let end = CGPoint(x: stars[route[upto - 1]].x, y: stars[route[upto - 1]].y)
             context.stroke(path, with: .linearGradient(
-                Gradient(colors: [StarSprites.color(a.color, 0.75 * edge), StarSprites.color(b.color, 0.75 * edge)]),
-                startPoint: start, endPoint: CGPoint(x: b.x, y: b.y)
-            ), lineWidth: 1.1)
+                Gradient(colors: [StarSprites.color(spots[index - 1].color, 0.75 * alpha), StarSprites.color(spots[index].color, 0.75 * alpha)]),
+                startPoint: start, endPoint: end
+            ), lineWidth: 1.3 + 0.8 * flare)
+            guard let head, head.route == index - 1 else { continue }
+            let at = Int(head.position)
+            guard at + 1 < route.count else { continue }
+            let from = stars[route[at]], to = stars[route[at + 1]], u = head.position - Double(at)
+            let center = CGPoint(x: starLerp(from.x, to.x, u), y: starLerp(from.y, to.y, u))
+            context.fill(
+                Path(ellipseIn: CGRect(x: center.x - 8, y: center.y - 8, width: 16, height: 16)),
+                with: .radialGradient(
+                    Gradient(colors: [
+                        StarSprites.color(SIMD3(1, 1, 1), 0.95), StarSprites.color(spots[index].color, 0.6),
+                        StarSprites.color(spots[index].color, 0)
+                    ]),
+                    center: center, startRadius: 0, endRadius: 8
+                )
+            )
         }
     }
 
-    private func drawStars(in context: inout GraphicsContext, scene: Scene, spots: [NodeSpot], inShape: Double) {
+    private func drawStars(in context: inout GraphicsContext, scene: Scene, spots: [NodeSpot], constellation: Double) {
         let w = weights, clock = clock
         let hues = StarSprites.resolvedHues(in: context)
+        let spike = context.resolve(StarSprites.spikeImage)
         let papers = Dictionary(uniqueKeysWithValues: Set(spots.map(\.kind)).map { ($0, StarSprites.resolved($0, in: context)) })
-        let roleAlpha = [0.85, 0.75, 0.42, 0.46], roleSize = [3.6, 3.6, 2.6, 2.7]
+        let roleAlpha = [0.85, 0.75, 0.42], roleSize = [3.6, 3.6, 2.6]
         let hueBase = w.speak * 5 - w.listen * 2 + w.think
         let lastHue = Double(hues.count - 1)
+        let dim = 1 - 0.25 * (w.think + w.tools)
         stars.withUnsafeBufferPointer { buffer in
             for i in buffer.indices {
                 let star = buffer[i]
                 let depth = 0.5 + 0.5 * star.z
-                let twinkle = 0.7 + 0.3 * sin(clock * (1.3 + star.k * 2) + Double(i))
-                let alpha = starLerp((star.role == 3 ? 0.4 : 0.85) * twinkle,
-                                 roleAlpha[star.role] * (0.25 + 0.75 * depth) * twinkle, inShape)
+                let twinkle = 0.75 + 0.25 * sin(clock * (0.9 + star.k * 1.6) + Double(i))
+                let fire = min(star.fire, 1.3)
+                let alpha = roleAlpha[star.role] * (0.25 + 0.75 * depth) * twinkle * dim * (1 + 1.3 * fire)
                 guard alpha >= 0.01 else { continue }
-                // A passing ripple pushes the star out from the core and brightens it, on top of its eased spot.
-                let push = 1 + 0.14 * star.wave
-                let x = scene.cx + (star.x - scene.cx) * push, y = scene.cy + (star.y - scene.cy) * push
-                let size = starLerp(star.size * 5.2,
-                                roleSize[star.role] * star.size * star.p * star.p * (0.75 + 0.5 * depth), inShape)
-                    * scene.sc * (1 + 0.2 * star.wave)
-                let rect = CGRect(x: x - size / 2, y: y - size / 2, width: size, height: size)
-                context.opacity = min(alpha * (1 + 0.6 * star.wave), 1)
-                // A few knot stars wear their memory's paper once it's lit.
-                if star.role == 0, star.k < 0.3, inShape > 0.3, !spots.isEmpty {
+                let size = roleSize[star.role] * star.size * star.p * star.p * (0.75 + 0.5 * depth) * (1 + 0.3 * fire) * scene.sc
+                let rect = CGRect(x: star.x - size / 2, y: star.y - size / 2, width: size, height: size)
+                context.opacity = min(alpha, 1)
+                // Knot stars wear their memory's paper once it's lit.
+                if star.role == 0, star.k < 0.45, !spots.isEmpty {
                     let node = spots[star.j % spots.count]
-                    if node.alpha > 0.5, let sprite = papers[node.kind] {
+                    if node.alpha * constellation > 0.3, let sprite = papers[node.kind] {
                         context.draw(sprite, in: rect)
                         continue
                     }
                 }
                 let bucket = (3 + Double(star.role) * 2 + star.g.y * 1.5 + hueBase).rounded()
                 context.draw(hues[Int(min(max(bucket, 0), lastHue))], in: rect)
+                // The brightest few, facing us, catch thin diffraction spikes.
+                if star.role < 2, star.size > 1.32, depth > 0.45 {
+                    let spikeSize = size * 1.9
+                    context.opacity = min(alpha * 0.8, 1)
+                    context.draw(spike, in: CGRect(x: star.x - spikeSize / 2, y: star.y - spikeSize / 2, width: spikeSize, height: spikeSize))
+                }
             }
         }
     }
@@ -658,8 +940,8 @@ final class StarfieldModel {
         guard frameTimes.count >= 240 else { return }
         let mean = frameTimes.reduce(0, +) / Double(frameTimes.count)
         let sorted = frameTimes.sorted()
-        print(String(format: "starfield frame ms: mean %.2f p95 %.2f max %.2f (%d stars)",
-                     mean, sorted[Int(Double(sorted.count) * 0.95)], sorted.last ?? 0, stars.count))
+        print(String(format: "starfield frame ms: mean %.2f p95 %.2f max %.2f (%d stars, %d fibers)",
+                     mean, sorted[Int(Double(sorted.count) * 0.95)], sorted.last ?? 0, stars.count, network.links.count))
         frameTimes.removeAll(keepingCapacity: true)
     }
     #endif
