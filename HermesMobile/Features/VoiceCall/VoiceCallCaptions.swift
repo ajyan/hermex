@@ -1,99 +1,102 @@
 import SwiftUI
 
-/// Live captions for a call, shown over the constellation: the user's words while they
-/// talk, then Atlas's reply under a one-line reminder of what was asked. The
-/// area is at most seven lines tall and shrinks to fit the cloud's slot (large
-/// Dynamic Type never pushes it into the call controls); long text scrolls,
-/// pinned to the newest words.
+/// Subtitles for a call, between the status and the call buttons: the user's words while they
+/// talk, then the part of Atlas's reply it is saying, each word lit as it's heard. A long
+/// sentence shows in pieces of at most `pieceWords` words, so the line never scrolls; the area
+/// holds three lines and shrinks large text to fit rather than reach the controls.
 struct VoiceCallCaptions: View {
     let sent: String?
     let live: String
     /// Atlas's reply to `sent`, as spoken.
     let reply: String?
+    /// The reply as heard so far (`SpeechSpeaking.heardText`).
+    let heard: String
+    /// True while Atlas's voice is playing the reply.
+    let isSpeaking: Bool
     /// True while Atlas is still working on or saying `reply`.
     let isReplying: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// Seven lines of the caption font.
-    @ScaledMetric(relativeTo: .title2) private var bodyHeight: CGFloat = 205
-    @ScaledMetric(relativeTo: .title3) private var fadeHeight: CGFloat = 32
+    /// Three lines of the caption font.
+    @ScaledMetric(relativeTo: .title3) private var height: CGFloat = 78
 
-    struct Content: Equatable {
-        enum Speaker: Equatable { case user, atlas }
-        /// Whose words `body` is; a change of speaker crossfades.
-        var speaker: Speaker
-        /// What was asked, shown small above Atlas's reply.
-        var context: String?
-        var body: String
+    static let pieceWords = 12
+
+    struct Line: Equatable {
+        var words: [String]
+        /// How many of `words`, from the start, have been said.
+        var lit: Int
         /// Dimmed once the words are no longer being said.
         var isActive: Bool
     }
 
-    /// What the captions show. Atlas's last reply stays, dimmed, until the
-    /// user's next words are recognized.
-    static func content(sent: String?, live: String, reply: String?, isReplying: Bool) -> Content? {
+    /// What the subtitles show. The user's sent words wait, dimmed, until Atlas's voice starts;
+    /// Atlas's last piece stays, dimmed, until the user's next words are recognized.
+    static func line(
+        sent: String?, live: String, reply: String?, heard: String, isSpeaking: Bool, isReplying: Bool
+    ) -> Line? {
         if !live.isEmpty {
-            return Content(speaker: .user, body: live, isActive: true)
+            let words = pieces(of: words(in: live)).last ?? []
+            return Line(words: words, lit: words.count, isActive: true)
         }
         guard let sent else { return nil }
-        if let reply {
-            return Content(speaker: .atlas, context: sent, body: reply, isActive: isReplying)
+        let replyPieces = pieces(of: words(in: reply ?? ""))
+        if replyPieces.isEmpty || (isReplying && !isSpeaking) {
+            let words = pieces(of: words(in: sent)).last ?? []
+            return words.isEmpty ? nil : Line(words: words, lit: words.count, isActive: false)
         }
-        return Content(speaker: .user, body: sent, isActive: false)
+        let total = replyPieces.reduce(0) { $0 + $1.count }
+        let heardCount = min(words(in: heard).count, total)
+        // The piece holding the next word to be said, or the last once all of it was heard.
+        var start = 0
+        for (index, piece) in replyPieces.enumerated() {
+            if heardCount < start + piece.count || index == replyPieces.count - 1 {
+                // The word being said lights with the ones before it.
+                let said = isSpeaking ? min(heardCount + 1, total) : heardCount
+                return Line(words: piece, lit: min(max(said - start, 0), piece.count), isActive: isSpeaking)
+            }
+            start += piece.count
+        }
+        return nil
+    }
+
+    private static func words(in text: String) -> [String] {
+        text.split(whereSeparator: \.isWhitespace).map(String.init)
+    }
+
+    /// `words` split into even pieces of at most `pieceWords`, never across a sentence end.
+    private static func pieces(of words: [String]) -> [[String]] {
+        var sentences: [[String]] = [[]]
+        for word in words {
+            sentences[sentences.count - 1].append(word)
+            if let last = word.last, ".!?".contains(last) { sentences.append([]) }
+        }
+        return sentences.filter { !$0.isEmpty }.flatMap { sentence -> [[String]] in
+            let count = (sentence.count + pieceWords - 1) / pieceWords
+            let size = (sentence.count + count - 1) / count
+            return stride(from: 0, to: sentence.count, by: size).map { Array(sentence[$0..<min($0 + size, sentence.count)]) }
+        }
     }
 
     var body: some View {
-        let content = Self.content(sent: sent, live: live, reply: reply, isReplying: isReplying)
-        VStack(spacing: 8) {
-            // Always takes its line, so the reply below never shifts.
-            Text(content?.context ?? " ")
-                .font(AppFont.subheadline(weight: .medium))
-                .foregroundStyle(Color.hxTextSecondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .opacity(content?.context == nil ? 0 : 1)
-                .accessibilityHidden(content?.context == nil)
-
-            ZStack(alignment: .bottom) {
-                // Holds the area's height with no words yet.
-                Color.clear
-                if let content {
-                    caption(content)
-                        .id(content.speaker)
-                        .transition(.opacity)
-                }
-            }
-            .frame(maxHeight: bodyHeight, alignment: .bottom)
-        }
-        .multilineTextAlignment(.center)
-        .frame(maxWidth: .infinity)
-        // A soft dark halo around the letters keeps them legible over the glow.
-        .shadow(color: .black.opacity(0.55), radius: 10)
-        .shadow(color: .black.opacity(0.5), radius: 2)
-        .animation(HXMotion.swap(reduceMotion: reduceMotion), value: content?.speaker)
-        .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: content?.isActive)
+        let line = Self.line(sent: sent, live: live, reply: reply, heard: heard, isSpeaking: isSpeaking, isReplying: isReplying)
+        Text(line.map(styled) ?? AttributedString(" "))
+            .font(AppFont.title3(weight: .semibold))
+            .multilineTextAlignment(.center)
+            .lineLimit(3)
+            .minimumScaleFactor(0.7)
+            .contentTransition(.opacity)
+            .frame(maxWidth: .infinity, minHeight: height, maxHeight: height)
+            .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: line?.words)
     }
 
-    private func caption(_ content: Content) -> some View {
-        GeometryReader { box in
-            ScrollView {
-                Text(content.body)
-                    .font(AppFont.title2())
-                    .foregroundStyle(content.isActive ? Color.hxTextPrimary : Color.hxTextSecondary)
-                    // Short text sits centered on the cloud; longer text fills the box and follows its end.
-                    .frame(maxWidth: .infinity, minHeight: box.size.height, alignment: .center)
-            }
+    private func styled(_ line: Line) -> AttributedString {
+        var text = AttributedString()
+        for (index, word) in line.words.enumerated() {
+            var part = AttributedString(index == 0 ? word : " " + word)
+            part.foregroundColor = line.isActive && index < line.lit ? Color.hxTextPrimary : Color.hxTextSecondary
+            text.append(part)
         }
-        .scrollIndicators(.hidden)
-        // Follows the newest line as the text grows.
-        .defaultScrollAnchor(.bottom)
-        // Older lines fade out at the top instead of being cut through.
-        .mask {
-            VStack(spacing: 0) {
-                LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
-                    .frame(height: fadeHeight)
-                Color.black
-            }
-        }
+        return text
     }
 }

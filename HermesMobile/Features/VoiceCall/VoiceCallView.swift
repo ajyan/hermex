@@ -383,14 +383,10 @@ struct VoiceCallView: View {
                 .disabled(action == nil)
                 .accessibilityLabel(tapHint ?? "")
                 .accessibilityHidden(action == nil)
-
-                // Captions ride over the cloud; taps go through to it. VoiceOver reads them on their own.
-                captions
-                    .padding(.horizontal, 12)
-                    .allowsHitTesting(false)
             }
 
             VoiceCallStatus(word: stateWord, activity: toolActivity, sources: shownSources, hint: tapHint)
+            captions
         }
     }
 
@@ -416,13 +412,19 @@ struct VoiceCallView: View {
         return controller?.digPending == true ? .digging : nil
     }
 
+    /// Subtitles under the status. While Atlas speaks they re-read what it has said ten times a
+    /// second, which redraws only this text.
     private var captions: some View {
-        VoiceCallCaptions(
-            sent: controller?.lastSentTurn,
-            live: controller?.partialTranscript ?? "",
-            reply: replyCaption,
-            isReplying: [.thinking, .speaking, .reconnecting].contains(state)
-        )
+        TimelineView(.animation(minimumInterval: 0.1, paused: state != .speaking)) { _ in
+            VoiceCallCaptions(
+                sent: controller?.lastSentTurn,
+                live: controller?.partialTranscript ?? "",
+                reply: replyCaption,
+                heard: controller?.heardReply ?? "",
+                isSpeaking: state == .speaking,
+                isReplying: [.thinking, .speaking, .reconnecting].contains(state)
+            )
+        }
         .dynamicTypeSize(...DynamicTypeSize.accessibility2)
     }
 

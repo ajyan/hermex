@@ -124,17 +124,18 @@ struct VoiceCallLab: View {
                             .aspectRatio(1, contentMode: .fit)
                             .frame(maxWidth: 380, maxHeight: 380)
                             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { orbSlot = $0 }
-                        VoiceCallCaptions(
-                            sent: sent, live: live, reply: reply,
-                            isReplying: [.thinking, .tools, .converge, .speaking].contains(phase)
-                        )
-                        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
-                        .padding(.horizontal, 12)
                     }
                     VoiceCallStatus(
                         word: phase.word, activity: activity,
                         sources: phase == .converge || phase == .speaking ? sources : [], hint: phase.hint
                     )
+                    // The lab has no voice: a reply shows as fully heard.
+                    VoiceCallCaptions(
+                        sent: sent, live: live, reply: reply, heard: reply ?? "",
+                        isSpeaking: phase == .speaking,
+                        isReplying: [.thinking, .tools, .converge, .speaking].contains(phase)
+                    )
+                    .dynamicTypeSize(...DynamicTypeSize.accessibility2)
                 }
                 Spacer(minLength: 12)
                 if phase == .dropped {
