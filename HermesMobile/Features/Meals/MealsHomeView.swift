@@ -79,7 +79,9 @@ struct MealsHomeView: View {
                             .foregroundStyle(Color.hxDanger)
                     }
                     tonightCard(home)
+                    ForEach(home.occasions) { occasion in occasionCard(occasion, home: home) }
                     week(home)
+                    if !home.yearAgo.isEmpty { yearAgo(home.yearAgo) }
                     planButton
                 }
                 .padding(BrainStyle.l)
@@ -208,6 +210,63 @@ struct MealsHomeView: View {
                             .overlay(Capsule().strokeBorder(paper.edge, lineWidth: 0.5))
                     }
                     .accessibilityHint(Text(verbatim: "Trades tonight's meal with another night"))
+                }
+            }
+        }
+    }
+
+    // MARK: Occasions and a year ago
+
+    /// An occasion coming up that a dish is tagged for. On a night this week it offers to put the
+    /// dish there; further out, the planner will suggest it.
+    private func occasionCard(_ occasion: MealsOccasion, home: MealsHome) -> some View {
+        let night = home.days.first { $0.day == occasion.date }
+        let missing = occasion.dishes.first { dish in !(night?.night?.dishes.contains { $0.slug == dish.slug } ?? false) }
+        return VStack(alignment: .leading, spacing: 6) {
+            Text(verbatim: MealsCopy.occasionLine(occasion, today: home.day))
+                .font(AppFont.caption(weight: .semibold))
+                .foregroundStyle(paper.glow)
+            Text(verbatim: occasion.dishes.map(\.name).joined(separator: " · "))
+                .font(AppFont.subheadline(weight: .semibold))
+                .foregroundStyle(Color.hxTextPrimary)
+            if let night {
+                if let missing {
+                    Button {
+                        Task { await viewModel.add(MealsDish(slug: missing.slug, name: missing.name), to: night.day) }
+                    } label: {
+                        Text(verbatim: "Put \(missing.name) on \(MealsCopy.weekdayName(night.day))")
+                            .font(AppFont.subheadline(weight: .semibold))
+                            .frame(minHeight: 44)
+                    }
+                } else {
+                    Label { Text(verbatim: "On the plan") } icon: { Image(systemName: "checkmark") }
+                        .font(AppFont.footnote(weight: .semibold))
+                        .foregroundStyle(paper.glow)
+                }
+            } else {
+                Text(verbatim: "The planner will suggest it that night.")
+                    .font(AppFont.footnote())
+                    .foregroundStyle(paper.secondaryInk)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glowSurface(paper, cornerRadius: HXRadius.lg)
+    }
+
+    /// What he ate this week a year ago; each opens its recipe.
+    private func yearAgo(_ picks: [MealsSeasonPick]) -> some View {
+        let past = HermexPaper.past
+        return VStack(alignment: .leading, spacing: 8) {
+            HXSectionHeader(title: "A year ago this week")
+            FlowRow(spacing: 8) {
+                ForEach(picks) { pick in
+                    Button { onOpen(.mealsDish(MealsDishRoute(slug: pick.slug))) } label: {
+                        HXChip(paper: past, label: pick.name)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }

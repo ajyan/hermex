@@ -43,6 +43,8 @@ enum ShellPushDestination: Hashable {
     case mealsBook
     /// One dish's recipe, from Meals or the book, scaled to the night it was opened from.
     case mealsDish(MealsDishRoute)
+    /// A season's record (any day in it), from the recipe book.
+    case mealsSeason(String)
     case settings(SettingsScrollAnchor?)
 }
 
@@ -302,7 +304,7 @@ extension ShellPushDestination {
         switch self {
         case .brain, .brainRoute: true
         case .projects, .project, .tasks, .kanban, .dailyDeck, .goals, .goal, .finishedGoal, .finishedGoals, .money,
-             .feedback, .body, .bodyLift, .bodyPlan, .bodyWorkout, .meals, .mealsBook, .mealsDish, .settings: false
+             .feedback, .body, .bodyLift, .bodyPlan, .bodyWorkout, .meals, .mealsBook, .mealsDish, .mealsSeason, .settings: false
         }
     }
 
@@ -318,7 +320,7 @@ extension ShellPushDestination {
              .brainRoute(.prep(.story(_))), .brainRoute(.prep(.gapRun(_))), .brainRoute(.prep(.lessonRun(_))): false
         case .brainRoute: true
         case .projects, .project, .tasks, .kanban, .dailyDeck, .brain, .goals, .finishedGoals, .money, .feedback,
-             .body, .bodyLift, .bodyPlan, .bodyWorkout, .meals, .mealsBook, .mealsDish, .settings: false
+             .body, .bodyLift, .bodyPlan, .bodyWorkout, .meals, .mealsBook, .mealsDish, .mealsSeason, .settings: false
         }
     }
 }

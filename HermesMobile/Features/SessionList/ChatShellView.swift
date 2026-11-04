@@ -693,6 +693,9 @@ struct ChatShellView: View {
                 .adaptiveSecondaryNavigationTitle()
         case .mealsBook:
             MealsBookView(server: server, onAPIError: authManager.handleAPIError, onOpen: { navigation.push($0) })
+        case .mealsSeason(let day):
+            MealsSeasonView(day: day, server: server, onAPIError: authManager.handleAPIError,
+                            onOpen: { navigation.push($0) })
         case .mealsDish(let route):
             MealsDishView(route: route, server: server, onAPIError: authManager.handleAPIError,
                           onOpen: { navigation.push($0) },

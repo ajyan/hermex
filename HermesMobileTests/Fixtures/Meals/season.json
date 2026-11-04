@@ -1,0 +1,202 @@
+{
+ "name": "Winter 2026",
+ "start": "2026-12-01",
+ "end": "2027-02-28",
+ "dinners": 3,
+ "weeks": [
+  {
+   "week": "2026-11-30",
+   "days": [
+    "off",
+    "missed",
+    "skip",
+    "missed",
+    "missed",
+    "missed",
+    "missed"
+   ]
+  },
+  {
+   "week": "2026-12-07",
+   "days": [
+    "missed",
+    "done",
+    "done",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead"
+   ]
+  },
+  {
+   "week": "2026-12-14",
+   "days": [
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead"
+   ]
+  },
+  {
+   "week": "2026-12-21",
+   "days": [
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead"
+   ]
+  },
+  {
+   "week": "2026-12-28",
+   "days": [
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead"
+   ]
+  },
+  {
+   "week": "2027-01-04",
+   "days": [
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead"
+   ]
+  },
+  {
+   "week": "2027-01-11",
+   "days": [
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead"
+   ]
+  },
+  {
+   "week": "2027-01-18",
+   "days": [
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead"
+   ]
+  },
+  {
+   "week": "2027-01-25",
+   "days": [
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead"
+   ]
+  },
+  {
+   "week": "2027-02-01",
+   "days": [
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead"
+   ]
+  },
+  {
+   "week": "2027-02-08",
+   "days": [
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead"
+   ]
+  },
+  {
+   "week": "2027-02-15",
+   "days": [
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead"
+   ]
+  },
+  {
+   "week": "2027-02-22",
+   "days": [
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead",
+    "ahead"
+   ]
+  }
+ ],
+ "mains": [
+  {
+   "slug": "kabocha-with-pork-riblets",
+   "name": "Kabocha with pork riblets",
+   "count": 3
+  }
+ ],
+ "sides": [
+  {
+   "slug": "tomato-egg",
+   "name": "Tomato egg",
+   "count": 1
+  }
+ ],
+ "new": [
+  {
+   "slug": "tomato-egg",
+   "name": "Tomato egg"
+  }
+ ],
+ "loved": [
+  {
+   "slug": "kabocha-with-pork-riblets",
+   "name": "Kabocha with pork riblets"
+  }
+ ],
+ "occasions": [
+  {
+   "occasion": "New Year's Eve",
+   "date": "2026-12-31",
+   "ate": [],
+   "tagged": [
+    "Toshikoshi soba"
+   ]
+  }
+ ],
+ "prev": "2026-11-30",
+ "next": null
+}

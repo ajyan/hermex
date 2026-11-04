@@ -141,7 +141,9 @@ final class MealsPlanModel {
     func suggestion(for day: String, in home: MealsHome) -> MealsSuggestion? {
         var taken = Set(home.days.flatMap { $0.night?.dishes.map(\.slug) ?? [] })
         for open in home.days where open.night == nil {
-            let pick = suggestions.candidates.first {
+            let occasion = suggestions.occasions[open.day]
+            let forOccasion = (occasion?.dishes ?? []).map { MealsSuggestion(slug: $0.slug, name: $0.name, why: occasion?.occasion) }
+            let pick = (forOccasion + suggestions.candidates).first {
                 !taken.contains($0.slug) && !(passed[open.day]?.contains($0.slug) ?? false)
             }
             if open.day == day { return pick }

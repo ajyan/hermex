@@ -210,6 +210,22 @@ final class MealsPlanModelTests: XCTestCase {
         XCTAssertEqual(client.nights.last?.today, "2026-11-09", "edits answer the target week")
     }
 
+    func testAnOccasionsDishLeadsThatNight() async throws {
+        let client = try FakePlanClient()
+        client.suggestions = try PrepDecoding.decode(MealsSuggestions.self, from: Data("""
+            {"candidates": [{"slug": "galbijjim", "name": "Galbijjim"}],
+             "occasions": {"2026-11-12": {"occasion": "Thanksgiving", "date": "2026-11-12",
+                                          "dishes": [{"slug": "turkey", "name": "Turkey"}]}}}
+            """.utf8))
+        let model = model(client)
+        await model.startFill()
+        guard case .loaded(let home) = model.week.state else { return XCTFail("not loaded") }
+        let pick = model.suggestion(for: "2026-11-12", in: home)
+        XCTAssertEqual(pick?.slug, "turkey")
+        XCTAssertEqual(pick?.why, "Thanksgiving")
+        XCTAssertEqual(model.suggestion(for: "2026-11-10", in: home)?.slug, "galbijjim")
+    }
+
     func testFinishSendsRemindersAndAFailedSaveSaysSo() async throws {
         let client = try FakePlanClient()
         let model = model(client)

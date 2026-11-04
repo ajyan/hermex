@@ -14,21 +14,28 @@ struct MealsHome: Decodable, Equatable {
     let tonightLogged: Bool
     /// Tomorrow's dishes' prep lines, "Dish: step".
     let tomorrowPrep: [String]
+    /// Occasions in the next two weeks that a dish is tagged for.
+    let occasions: [MealsOccasion]
+    /// What he ate this week a year ago.
+    let yearAgo: [MealsSeasonPick]
 
     enum CodingKeys: String, CodingKey {
-        case day, week, days, tonight
+        case day, week, days, tonight, occasions
         case tonightLogged = "tonight_logged"
         case tomorrowPrep = "tomorrow_prep"
+        case yearAgo = "year_ago"
     }
 
     init(day: String, week: String, days: [MealsDay], tonight: MealsNight?, tonightLogged: Bool,
-         tomorrowPrep: [String]) {
+         tomorrowPrep: [String], occasions: [MealsOccasion] = [], yearAgo: [MealsSeasonPick] = []) {
         self.day = day
         self.week = week
         self.days = days
         self.tonight = tonight
         self.tonightLogged = tonightLogged
         self.tomorrowPrep = tomorrowPrep
+        self.occasions = occasions
+        self.yearAgo = yearAgo
     }
 
     init(from decoder: Decoder) throws {
@@ -39,6 +46,8 @@ struct MealsHome: Decodable, Equatable {
         tonight = try? c.decodeIfPresent(MealsNight.self, forKey: .tonight)
         tonightLogged = (try? c.decodeIfPresent(Bool.self, forKey: .tonightLogged)) ?? false
         tomorrowPrep = (try? c.decodeIfPresent([String].self, forKey: .tomorrowPrep)) ?? []
+        occasions = (try? c.decode([PrepLossy<MealsOccasion>].self, forKey: .occasions))?.compactMap(\.value) ?? []
+        yearAgo = (try? c.decode([PrepLossy<MealsSeasonPick>].self, forKey: .yearAgo))?.compactMap(\.value) ?? []
     }
 
     var today: MealsDay? { days.first { $0.day == day } }

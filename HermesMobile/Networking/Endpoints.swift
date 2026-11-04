@@ -263,6 +263,8 @@ enum Endpoint {
     case mealsPlanStart
     case mealsPlanGroceries(target: String)
     case mealsPlanFinish
+    /// A season's record for any `day` in it, its weeks drawn up to the phone's `today`.
+    case mealsSeason(day: String, today: String)
     /// Files a Daily Deck's answers without the model (this user's webui fork):
     /// POST `{date, kind, answers}`. Servers without it answer 404.
     case briefFile
@@ -678,6 +680,8 @@ enum Endpoint {
             return "/api/meals/plan/groceries"
         case .mealsPlanFinish:
             return "/api/meals/plan/finish"
+        case .mealsSeason:
+            return "/api/meals/season"
         case .briefFile:
             return "/api/brief/file"
         case .briefIntention:
@@ -926,6 +930,8 @@ enum Endpoint {
             return [URLQueryItem(name: "day", value: day)]
         case let .mealsRecipe(slug):
             return [URLQueryItem(name: "slug", value: slug)]
+        case let .mealsSeason(day, today):
+            return [URLQueryItem(name: "day", value: day), URLQueryItem(name: "today", value: today)]
         case let .mealsPlanLeft(target), let .mealsPlanGroceries(target):
             return [URLQueryItem(name: "target", value: target)]
         case let .labels(feature, item):
