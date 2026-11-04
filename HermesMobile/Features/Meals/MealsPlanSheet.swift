@@ -170,8 +170,8 @@ private struct MealsPlanReviewStep: View {
             VStack(alignment: .leading, spacing: BrainStyle.l) {
                 PlanLoadState(state: model.review, retry: model.loadReview) { review in
                     VStack(alignment: .leading, spacing: BrainStyle.l) {
-                        PlanHeading(title: "How was this week?",
-                                    detail: review.needs.isEmpty ? "Every night is filled in."
+                        PlanHeading(title: model.reviewsLastWeek ? "How was last week?" : "How was this week?",
+                                    detail: review.needs.isEmpty ? "Nothing needs a look."
                                         : "Nights you logged are filled in. Only the others need a look.")
                         if !review.needs.isEmpty { needs(review) }
                         dots(review)
@@ -239,7 +239,8 @@ private struct MealsPlanReviewStep: View {
             .accessibilityElement(children: .contain)
             .accessibilityLabel(Text(verbatim: MealsCopy.weekdayName(night.day)))
             if let answer, answer.choice != "ate" {
-                PlanChoice(title: "Carry to next week", symbol: answer.carry ? "✓" : nil, selected: answer.carry) {
+                PlanChoice(title: model.reviewsLastWeek ? "Carry to this week" : "Carry to next week",
+                           symbol: answer.carry ? "✓" : nil, selected: answer.carry) {
                     model.toggleCarry(night.day)
                 }
             }
@@ -250,7 +251,7 @@ private struct MealsPlanReviewStep: View {
     private func dots(_ review: MealsPlanReview) -> some View {
         let paper = PlanStyle.paper
         return VStack(alignment: .leading, spacing: 10) {
-            Text(verbatim: "Logged this week")
+            Text(verbatim: model.reviewsLastWeek ? "Logged last week" : "Logged this week")
                 .font(AppFont.subheadline(weight: .semibold))
                 .foregroundStyle(Color.hxTextPrimary)
             HStack(spacing: 0) {

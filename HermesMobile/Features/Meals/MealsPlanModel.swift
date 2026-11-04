@@ -33,6 +33,8 @@ final class MealsPlanModel {
     /// The target week's Monday (YYYY-MM-DD).
     let target: String
     let today: String
+    /// Monday to Thursday the planner fills this week, so it reviews last week.
+    var reviewsLastWeek: Bool { target <= today }
 
     @ObservationIgnored private let client: MealsPlanClient
     @ObservationIgnored private let onAPIError: (Error) -> Void

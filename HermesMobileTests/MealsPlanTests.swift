@@ -149,6 +149,7 @@ final class MealsPlanModelTests: XCTestCase {
         let client = try FakePlanClient()
         let model = model(client)
         XCTAssertEqual(model.target, "2026-11-09")
+        XCTAssertFalse(model.reviewsLastWeek, "a Saturday reviews this week")
         await model.loadReview()
         XCTAssertEqual(client.calls, ["review 2026-11-07"])
         XCTAssertEqual(model.answer(for: "2026-11-04"), MealsReviewAnswer(day: "2026-11-04", choice: "ate", carry: false))
