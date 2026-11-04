@@ -103,7 +103,6 @@ struct DeckCardView: View {
                     DeckSearchCard(card: card, palette: palette, deckDate: viewModel.date)
                     DeckFootnote(card: card, palette: palette)
                 case .dinner: dinner
-                case .meals: DeckMealsCard(card: card, palette: palette, viewModel: viewModel)
                 case .decision:
                     FollowUpRow(card: card, viewModel: viewModel, palette: palette, isPage: true)
                     // The week's question closes the Reflect chapter; other follow-ups carry no chapter.
@@ -277,7 +276,7 @@ struct DeckCardView: View {
     // MARK: Deck by job
 
     /// A deck by job's card drawn by the card anatomy (`jobReading`): every act card but the Mandarin card,
-    /// whose own view stays. Sleep, goals, meals, the Ask and follow-ups keep their views by type.
+    /// whose own view stays. Sleep, goals, the Ask and follow-ups keep their views by type.
     private var isJobCard: Bool { card.act != nil && !card.isMandarin }
 
     /// Whether the card names its kind in its first line rather than in the corner.

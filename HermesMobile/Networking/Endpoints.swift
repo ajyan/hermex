@@ -237,10 +237,6 @@ enum Endpoint {
     case bodyPlan
     case bodyProposal
     case bodySleep
-    /// The week's dinners (`api/vault_meals.py` on this user's webui fork): GET a week's accepted plan
-    /// (`?week=<monday>`), POST `{week, picks: [{dish, veg}], backup?}` to accept one.
-    case mealsWeek(week: String)
-    case mealsAccept
     /// The Meals screen (same fork module): GET the week around the phone's local `day`, GET the
     /// dish library, POST a week's nights, POST a logged night, POST a new dish without a recipe.
     case mealsHome(day: String)
@@ -257,6 +253,16 @@ enum Endpoint {
     case mealsFix
     case mealsLinkPreview
     case mealsLink
+    /// The weekend planner (same fork module): GET the review for the phone's local `day` and POST
+    /// his answers; GET what's left for the `target` week and POST what he ticked; POST start (places
+    /// carried meals, answers suggestions); GET the target week's groceries; POST finish.
+    case mealsPlanReview(day: String)
+    case mealsPlanReviewSave
+    case mealsPlanLeft(target: String)
+    case mealsPlanLeftSave
+    case mealsPlanStart
+    case mealsPlanGroceries(target: String)
+    case mealsPlanFinish
     /// Files a Daily Deck's answers without the model (this user's webui fork):
     /// POST `{date, kind, answers}`. Servers without it answer 404.
     case briefFile
@@ -642,10 +648,6 @@ enum Endpoint {
             return "/api/body/proposal"
         case .bodySleep:
             return "/api/body/sleep"
-        case .mealsWeek:
-            return "/api/meals/week"
-        case .mealsAccept:
-            return "/api/meals/accept"
         case .mealsHome:
             return "/api/meals/home"
         case .mealsDishes:
@@ -666,6 +668,16 @@ enum Endpoint {
             return "/api/meals/link/preview"
         case .mealsLink:
             return "/api/meals/link"
+        case .mealsPlanReview, .mealsPlanReviewSave:
+            return "/api/meals/plan/review"
+        case .mealsPlanLeft, .mealsPlanLeftSave:
+            return "/api/meals/plan/left"
+        case .mealsPlanStart:
+            return "/api/meals/plan/start"
+        case .mealsPlanGroceries:
+            return "/api/meals/plan/groceries"
+        case .mealsPlanFinish:
+            return "/api/meals/plan/finish"
         case .briefFile:
             return "/api/brief/file"
         case .briefIntention:
@@ -910,12 +922,12 @@ enum Endpoint {
             return before.map { [URLQueryItem(name: "before", value: $0)] } ?? []
         case let .bodyLift(id):
             return [URLQueryItem(name: "id", value: id)]
-        case let .mealsWeek(week):
-            return [URLQueryItem(name: "week", value: week)]
-        case let .mealsHome(day), let .mealsBook(day):
+        case let .mealsHome(day), let .mealsBook(day), let .mealsPlanReview(day):
             return [URLQueryItem(name: "day", value: day)]
         case let .mealsRecipe(slug):
             return [URLQueryItem(name: "slug", value: slug)]
+        case let .mealsPlanLeft(target), let .mealsPlanGroceries(target):
+            return [URLQueryItem(name: "target", value: target)]
         case let .labels(feature, item):
             var items: [URLQueryItem] = []
             if let feature { items.append(URLQueryItem(name: "feature", value: feature)) }

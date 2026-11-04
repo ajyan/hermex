@@ -659,11 +659,6 @@ final class DailyDeckViewModel {
         update(card) { $0.action = $0.action == option ? nil : option }
     }
 
-    /// Marks the meals card answered once its plan was accepted on the server, so the deck counts it.
-    func markAccepted(_ card: DeckCard) {
-        update(card) { $0.action = "accepted" }
-    }
-
     /// Chooses a decision action; choosing the chosen one again clears it.
     func choose(_ action: DeckAction, for card: DeckCard) {
         update(card) { answer in

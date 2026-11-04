@@ -1,0 +1,23 @@
+{
+ "target": "2026-11-09",
+ "items": [
+  {
+   "text": "frozen hamachi collar",
+   "why": "On hand",
+   "where": "freezer",
+   "checked": true
+  },
+  {
+   "text": "2 blocks firm tofu",
+   "why": "Thursday was skipped",
+   "where": "fridge",
+   "checked": true
+  },
+  {
+   "text": "1 bunch scallions",
+   "why": "Thursday was skipped",
+   "where": "fridge",
+   "checked": true
+  }
+ ]
+}

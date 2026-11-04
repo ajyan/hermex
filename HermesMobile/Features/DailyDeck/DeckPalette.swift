@@ -76,7 +76,6 @@ struct DeckPalette: Equatable {
     static let lookingAhead = DeckPalette(.dusk, symbol: "sunrise", name: "Looking ahead", shortName: "Ahead")
     static let mandarin = DeckPalette(.mandarin, symbol: "character.bubble", name: "Mandarin practice", shortName: "Mandarin")
     static let dinner = DeckPalette(.meal, symbol: "fork.knife", name: "Last night's dinner", shortName: "Dinner")
-    static let meals = DeckPalette(.meal, symbol: "basket", name: "This week's dinners", shortName: "Dinners")
     /// Atlas's questions from last night's review: Atlas's own system cards (like What changed) wear the plain paper.
     static let dream = DeckPalette(.plain, symbol: "moon.stars", name: "Atlas asks", shortName: "Atlas")
     static let plain = DeckPalette(.plain, symbol: "tray", name: "From your library", shortName: "Library")
@@ -155,7 +154,6 @@ struct DeckPalette: Equatable {
         case .ask: return .ask
         case .search: return .search
         case .dinner: return .dinner
-        case .meals: return .meals
         case .decision: return card.isViewTake ? .weekQuestion : .followUps
         case .changes: return .changes
         case .cover, .lastIntention, .value, .intention, .keepsakes: return .week
