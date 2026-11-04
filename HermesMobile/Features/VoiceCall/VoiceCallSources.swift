@@ -112,11 +112,7 @@ enum VoiceCallSources {
         let path = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
         let lower = path.lowercased()
         guard [".md", ".markdown", ".txt"].contains(where: lower.hasSuffix) else { return nil }
-        let key = roots.lazy.compactMap { root in
-            path.range(of: "(^|/)\(root)", options: .regularExpression).map { range in
-                String(path[range.lowerBound...]).trimmingPrefix("/")
-            }
-        }.first.map(String.init) ?? path
+        let key = vaultKey(of: path)
         let name = fileTitle(path)
 
         if key.hasPrefix("journal/") {
@@ -138,6 +134,16 @@ enum VoiceCallSources {
             return VoiceCallSource(id: key, label: "Book highlights", kind: .book, path: path)
         }
         return VoiceCallSource(id: key, label: "Notes · \(name)", kind: .note, path: path)
+    }
+
+    /// A note's path from its vault folder on (`journal/2026/10/2026-10-22.md`), which is also its
+    /// Brain page id; a path outside those folders as given.
+    static func vaultKey(of path: String) -> String {
+        roots.lazy.compactMap { root in
+            path.range(of: "(^|/)\(root)", options: .regularExpression).map { range in
+                String(path[range.lowerBound...]).trimmingPrefix("/")
+            }
+        }.first.map(String.init) ?? path
     }
 
     static func person(named name: String) -> VoiceCallSource {

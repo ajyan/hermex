@@ -12,9 +12,11 @@ import SwiftUI
 /// surface as a shell of light; thinking sends seekers (`MindSeekers`) walking the network, lighting
 /// what they visit; each memory Atlas finds pulls signals in through the network until it ignites in
 /// its paper, and a fiber route grows from the last memory to it; as the reply starts, a pulse runs
-/// that chain and the network rings out from it once; speaking is warmer, and each phrase of
-/// Atlas's voice spreads hop by hop from the memory it's speaking from. A cut-off snaps at once.
-/// Every new set of memories gets a fresh random layout, so no two turns draw the same mind.
+/// that chain and the network rings out from it once; speaking is warmer, the memory Atlas is
+/// speaking from breathes with its voice, and each phrase spreads hop by hop from it across the
+/// mind. A cut-off snaps at once; muted or reconnecting, the whole mind dims.
+/// Each call lays out a fresh mind, and a memory used again later in the call lights in the same
+/// place. Idle and listening draw at 30 fps, everything else at 60.
 ///
 /// `focus` is the cloud's slot in this view's coordinates. Reduce Motion pauses the timeline and
 /// draws each phase still, crossfading between them.
@@ -25,13 +27,16 @@ struct VoiceCallStarfield: View {
     let focus: CGRect
     var interruptions = 0
     var replyStarts = 0
+    /// Muted or reconnecting: the mind dims until the call can hear again.
+    var dimmed = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var model = StarfieldModel()
 
     var body: some View {
         ZStack {
-            TimelineView(.animation(minimumInterval: 1.0 / 60, paused: reduceMotion)) { timeline in
+            TimelineView(.animation(minimumInterval: phase == .idle || phase == .listen ? 1.0 / 30 : 1.0 / 60,
+                                    paused: reduceMotion)) { timeline in
                 Canvas { context, size in
                     guard !focus.isEmpty else { return }
                     model.render(
@@ -40,7 +45,8 @@ struct VoiceCallStarfield: View {
                         focus: focus,
                         time: timeline.date.timeIntervalSinceReferenceDate,
                         input: StarfieldInput(
-                            phase: phase, sources: sources, interruptions: interruptions, replyStarts: replyStarts
+                            phase: phase, sources: sources, interruptions: interruptions, replyStarts: replyStarts,
+                            dimmed: dimmed
                         ),
                         levels: levels,
                         still: reduceMotion
@@ -65,6 +71,7 @@ struct StarfieldInput {
     var sources: [VoiceCallSource]
     var interruptions: Int
     var replyStarts: Int
+    var dimmed = false
 }
 
 // MARK: - Simulation
@@ -90,6 +97,8 @@ private struct Star {
 /// A memory lit in the constellation.
 private struct StarNode {
     var source: VoiceCallSource
+    /// Its place in the call's layout (`shapeSlots`).
+    var slot: Int
     var litAt: Double
     var color: SIMD3<Double>
 }
@@ -135,11 +144,14 @@ final class StarfieldModel {
 
     private var stars: ContiguousArray<Star>
     private var nodes: [StarNode] = []
+    /// The call's layout: one place per memory a turn can show.
     private var shapeSlots: [SIMD3<Double>]
-    /// The knots the cloud folds around: this turn's memories, at least four.
+    /// The memory each slot last showed and when, so a memory used again lights where it was.
+    private var slotMemory: [(id: String, usedAt: Double)?]
+    /// The knots the cloud folds around: this turn's memories in order, at least four.
     private var shape: [SIMD3<Double>]
     /// Set once the call clears the turn's memories: the old constellation stays, dimmed, until
-    /// the next turn's first memory arrives with a fresh layout.
+    /// the next turn's first memory arrives.
     private var awaitingTurn = false
     private var random = SystemRandomNumberGenerator()
 
@@ -151,7 +163,7 @@ final class StarfieldModel {
     private var seekers = MindSeekers()
     private var sparks: [Spark] = []
     private var heard = VoicePulses(rise: 0.12, spacing: 0.22, life: 1.6)
-    private var spoken = VoicePulses(rise: 0.16, spacing: 1.1, life: 2.4)
+    private var spoken = VoicePulses(rise: 0.16, spacing: 1.1, life: 3.2)
     private var phrases: [Phrase] = []
     private var speakingKnot = 0
     private var phrasesOnKnot = 0
@@ -169,6 +181,11 @@ final class StarfieldModel {
     /// Atlas's voice as the mind shows it: a slow swell per phrase (0.25 s up, ~0.9 s down),
     /// never a flicker per word.
     private var voice = 0.0
+    /// Atlas's loudness smoothed over about 0.4 s: the memory it speaks from breathes with it
+    /// between phrases.
+    private var voiceBed = 0.0
+    /// Eases to 1 while the call is muted or reconnecting.
+    private var dim = 0.0
     private var impulse = 0.0
     private var yaw = 0.0
     private var interruptions: Int?
@@ -205,6 +222,7 @@ final class StarfieldModel {
         var system = SystemRandomNumberGenerator()
         let layout = ConstellationLayout.turn(using: &system)
         shapeSlots = layout.shape
+        slotMemory = Array(repeating: nil, count: layout.shape.count)
         shape = Array(layout.shape.prefix(4))
         seed = SIMD3(Double.random(in: 0..<90), Double.random(in: 0..<90), Double.random(in: 0..<90))
     }
@@ -228,7 +246,13 @@ final class StarfieldModel {
         rewireIfNeeded()
         let scene = Scene(size: size, focus: focus, model: self)
         let nodeSpots = place(scene: scene, dt: dt, still: still)
-        draw(in: &context, scene: scene, nodeSpots: nodeSpots, still: still)
+        let brightness = 1 - 0.55 * dim
+        if brightness < 0.99 {
+            context.opacity = brightness
+            context.drawLayer { layer in draw(in: &layer, scene: scene, nodeSpots: nodeSpots, still: still) }
+        } else {
+            draw(in: &context, scene: scene, nodeSpots: nodeSpots, still: still)
+        }
         frame += 1
         performanceSignposter.endInterval("Starfield Frame", interval)
         #if DEBUG
@@ -262,6 +286,8 @@ final class StarfieldModel {
             weights.ease(toward: phase, amount: 1)
             mic = 0
             voice = 0
+            voiceBed = 0
+            dim = input.dimmed ? 1 : 0
             impulse = 0
             heard.reset()
             spoken.reset()
@@ -277,6 +303,8 @@ final class StarfieldModel {
         let raw = levels.read(at: ProcessInfo.processInfo.systemUptime)
         let hearing = phase == .listen || phase == .interrupt
         mic += ((hearing ? Double(raw.mic) : 0) - mic) * (1 - exp(-dt * 16))
+        voiceBed += ((phase == .speak ? Double(raw.voice) : 0) - voiceBed) * (1 - exp(-dt * 2.5))
+        dim += ((input.dimmed ? 1 : 0) - dim) * (1 - exp(-dt * 4))
         impulse *= exp(-dt * 3.2)
         heard.step(level: hearing ? Double(raw.mic) : 0, at: clock, dt: dt)
         if spoken.step(level: phase == .speak ? Double(raw.voice) : 0, at: clock, dt: dt, cutOff: phase == .interrupt) {
@@ -287,7 +315,7 @@ final class StarfieldModel {
         var swell = 0.0
         for phrase in phrases {
             let age = clock - phrase.at
-            swell += (1 - swell) * phrase.strength * 0.7 * min(1, age / 0.25) * exp(-age / 0.9)
+            swell += (1 - swell) * phrase.strength * 0.9 * min(1, age / 0.25) * exp(-age / 0.9)
         }
         voice = phase == .speak ? swell : 0
 
@@ -341,8 +369,9 @@ final class StarfieldModel {
         }
     }
 
-    /// Matches the lit nodes to the turn's memories: a new turn's first memory reshuffles the
-    /// layout; later ones join it, each lighting a beat after the one before.
+    /// Matches the lit nodes to the turn's memories: a new turn's first memory starts them over;
+    /// later ones join, each lighting a beat after the one before, in its slot
+    /// (`ConstellationLayout.slot(for:memory:taken:)`).
     private func syncNodes(to sources: [VoiceCallSource]) {
         guard !sources.isEmpty else {
             awaitingTurn = !nodes.isEmpty
@@ -351,17 +380,21 @@ final class StarfieldModel {
         let continues = !awaitingTurn && nodes.count <= sources.count
             && zip(nodes, sources).allSatisfy { $0.source.id == $1.id }
         if !continues {
-            shapeSlots = ConstellationLayout.turn(using: &random).shape
             nodes = []
             awaitingTurn = false
         }
         guard nodes.count < sources.count else { return }
         for source in sources[nodes.count...] where nodes.count < shapeSlots.count {
             let litAt = max(clock, (nodes.last?.litAt ?? clock - Self.stagger) + Self.stagger)
-            nodes.append(StarNode(source: source, litAt: litAt, color: StarSprites.rgb(of: source.kind)))
+            let slot = ConstellationLayout.slot(for: source.id, memory: slotMemory, taken: Set(nodes.map(\.slot)))
+            slotMemory[slot] = (source.id, clock)
+            nodes.append(StarNode(source: source, slot: slot, litAt: litAt, color: StarSprites.rgb(of: source.kind)))
         }
-        shape = Array(shapeSlots.prefix(max(nodes.count, 4)))
+        let taken = Set(nodes.map(\.slot))
+        let fillers = shapeSlots.indices.filter { !taken.contains($0) }.prefix(max(0, 4 - nodes.count))
+        shape = nodes.map { shapeSlots[$0.slot] } + fillers.map { shapeSlots[$0] }
     }
+
 
     /// Joins the stars anew whenever the cloud's shape changes. The wiring takes tens of
     /// milliseconds, so it runs off the main thread; the old fibers stay until it lands.
@@ -433,7 +466,7 @@ final class StarfieldModel {
     private func place(scene: Scene, dt: Double, still: Bool) -> [NodeSpot] {
         let w = weights, clock = clock, seed = seed, impulse = impulse
         let spots = nodes.enumerated().map { index, node in
-            let projected = scene.project(shapeSlots[index] * scene.swell)
+            let projected = scene.project(shape[index] * scene.swell)
             return NodeSpot(
                 x: projected.x, y: projected.y, alpha: lit(node, still: still), color: node.color,
                 kind: node.source.kind, label: node.source.label, litAt: node.litAt
@@ -468,6 +501,8 @@ final class StarfieldModel {
             return (network.hops[phrase.knot], clock - phrase.at, phrase.strength)
         }
         let wired = network.hops.first?.count == stars.count
+        let bed = still ? 0 : voiceBed * w.speak
+        let bedHops = bed > 0.02 && speakingKnot < network.hops.count ? network.hops[speakingKnot] : nil
 
         stars.withUnsafeMutableBufferPointer { buffer in
             for i in buffer.indices {
@@ -521,10 +556,11 @@ final class StarfieldModel {
                         }
                         for phrase in spreading {
                             let h = phrase.hops[i]
-                            guard h <= 14 else { continue }
+                            guard h <= 22 else { continue }
                             let wave = phrase.age - Double(h) * 0.12
-                            if wave > -0.2, wave < 0.7 { fire += phrase.strength * pow(0.9, Double(h)) * exp(-wave * wave / 0.03) }
+                            if wave > -0.2, wave < 0.7 { fire += 1.6 * phrase.strength * pow(0.93, Double(h)) * exp(-wave * wave / 0.03) }
                         }
+                        if let bedHops, bedHops[i] <= 6 { fire += 0.45 * bed * pow(0.8, Double(bedHops[i])) }
                     }
                 }
                 star.fire = fire
@@ -609,7 +645,7 @@ final class StarfieldModel {
             let alpha = spot.alpha * constellation
             guard alpha >= 0.01 else { continue }
             let flash = still || clock < spot.litAt ? 0 : exp(-(clock - spot.litAt) / 0.35)
-            let pulse = index == speakingKnot ? 0.5 * speaking : 0
+            let pulse = index == speakingKnot ? 0.5 * speaking + 0.3 * voiceBed * w.speak : 0
             let size = 26 * (1 + pulse + 1.2 * flash) * scene.sc
             light.opacity = min(alpha, 1)
             light.draw(StarSprites.resolved(spot.kind, in: light),
@@ -661,9 +697,12 @@ final class StarfieldModel {
     private func drawGlow(in context: inout GraphicsContext, scene: Scene, tint: SIMD3<Double>) {
         let w = weights
         let level = 0.1 + 0.1 * max(mic * w.listen, voice * w.speak)
-        for point in shape {
+        let bed = voiceBed * w.speak
+        for (index, point) in shape.enumerated() {
+            let speaking = index == speakingKnot ? bed : 0
+            let level = level + 0.22 * speaking
             let projected = scene.project(point * scene.swell)
-            let radius = scene.radius * 0.55 * projected.scale
+            let radius = scene.radius * 0.55 * (1 + 0.15 * speaking) * projected.scale
             let center = CGPoint(x: projected.x, y: projected.y)
             context.fill(
                 Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)),
@@ -765,15 +804,16 @@ final class StarfieldModel {
             return point / max((point * point).sum().squareRoot(), 0.001)
         }
         let found = nodes.enumerated().compactMap { index, node -> (direction: SIMD3<Double>, strength: Double, color: Int)? in
-            guard index < shapeSlots.count else { return nil }
+            guard index < shape.count else { return nil }
             let strength = lit(node, still: still) * max(w.tools, w.converge * 0.8, w.speak * 0.35)
             guard strength > 0 else { return nil }
-            let knot = shapeSlots[index]
+            let knot = shape[index]
             return (knot / max((knot * knot).sum().squareRoot(), 0.001), strength, index)
         }
         var speakingDirection: SIMD3<Double>?
-        if !still, speakingKnot < shapeSlots.count, !phrases.isEmpty {
-            let knot = shapeSlots[speakingKnot]
+        let bed = still ? 0 : voiceBed * w.speak
+        if !still, speakingKnot < shape.count, !phrases.isEmpty || bed > 0.02 {
+            let knot = shape[speakingKnot]
             speakingDirection = knot / max((knot * knot).sum().squareRoot(), 0.001)
         }
         let tremble = still ? 0 : mic * w.listen
@@ -805,11 +845,13 @@ final class StarfieldModel {
                 }
             }
             if let direction = speakingDirection {
-                let angle = acos(min(max((unit * direction).sum(), -1), 1))
+                let facing = (unit * direction).sum()
+                let angle = acos(min(max(facing, -1), 1))
                 for phrase in phrases where phrase.knot == speakingKnot {
                     let wave = clock - phrase.at - angle * 0.55
-                    fire += phrase.strength * exp(-wave * wave / 0.05) * (1 - angle / 3.3)
+                    fire += 1.4 * phrase.strength * exp(-wave * wave / 0.05) * (1 - angle / 4.2)
                 }
+                fire += 0.3 * bed * pow(max(0, facing), 6)
             }
             fires.append(min(fire, 1.1))
             colors.append(color)

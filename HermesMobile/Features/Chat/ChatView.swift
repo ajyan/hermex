@@ -1044,7 +1044,7 @@ struct ChatView: View {
                     onMockCallEnded?(end)
                 }
             }) {
-                VoiceCallView(chat: viewModel, openingTurn: mockCall.openingTurn, onTurnTimed: reportMockProgress) { summary in
+                VoiceCallView(chat: viewModel, server: server, onAPIError: onAPIError, openingTurn: mockCall.openingTurn, onTurnTimed: reportMockProgress) { summary in
                     isVoiceCallPresented = false
                     if let end = mockCall.callEnded(sessionID: session.sessionId, turnMS: summary.turnMS) {
                         endedMockCall = end

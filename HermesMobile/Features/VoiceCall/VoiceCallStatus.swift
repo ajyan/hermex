@@ -80,6 +80,8 @@ struct VoiceCallStatus: View {
     /// The turn's memories, each in its paper; shown when no tool is running.
     var sources: [VoiceCallSource] = []
     let hint: String?
+    /// Opens a memory (or, for `+N`, nil: the list of them all). Without it the chips are labels.
+    var onOpen: ((VoiceCallSource?) -> Void)?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -129,14 +131,32 @@ struct VoiceCallStatus: View {
     private func sourceRow(_ shown: Int) -> some View {
         HStack(spacing: 6) {
             ForEach(sources.prefix(shown)) { source in
-                HXChip(paper: source.kind.paper, symbol: source.kind.symbol, label: source.label)
-                    .fixedSize(horizontal: shown > 1, vertical: false)
+                opening(source) {
+                    HXChip(paper: source.kind.paper, symbol: source.kind.symbol, label: source.label)
+                }
+                .fixedSize(horizontal: shown > 1, vertical: false)
             }
             if sources.count > shown {
-                HXChip(paper: .tool, label: "+\(sources.count - shown)")
-                    .fixedSize()
-                    .accessibilityLabel(String(localized: "\(sources.count - shown) more"))
+                opening(nil) {
+                    HXChip(paper: .tool, label: "+\(sources.count - shown)")
+                }
+                .fixedSize()
+                .accessibilityLabel(String(localized: "\(sources.count - shown) more"))
             }
+        }
+    }
+
+    /// A chip that opens `source`, its hit area grown to a fingertip without moving the row.
+    @ViewBuilder
+    private func opening(_ source: VoiceCallSource?, @ViewBuilder chip: () -> some View) -> some View {
+        if let onOpen {
+            Button { onOpen(source) } label: {
+                chip().contentShape(Rectangle().inset(by: -8))
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(source == nil ? String(localized: "Shows every source") : String(localized: "Opens the page"))
+        } else {
+            chip()
         }
     }
 
