@@ -87,6 +87,7 @@ struct HermesMobileApp: App {
         _ = RatingPromptState.shared
         NetworkPathMonitor.shared.start()
         GoalsWidgetSync.install()
+        MealsWidgetSync.install()
     }
 
     var body: some Scene {

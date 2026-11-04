@@ -150,6 +150,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
         }
         drawerRow("Goals", systemImage: "flag.checkered", paper: .goals) { onOpen(.goals) }
         drawerRow("Body", systemImage: "figure.strengthtraining.traditional", paper: .training) { onOpen(.body) }
+        drawerRow("Meals", systemImage: "fork.knife", paper: .meal) { onOpen(.meals) }
         drawerRow("Money", systemImage: "chart.line.uptrend.xyaxis", paper: .money) { onOpen(.money) }
         if sectionVisibility.feedback {
             drawerRow("Feedback", systemImage: "message") { onOpen(.feedback) }
@@ -174,7 +175,7 @@ struct ChatDrawerView<ServerMenu: View>: View {
     }
 
     /// A section row. A section with its own paper (Brief, Brain, People, Interview prep, Goals, Body,
-    /// Money) shows its icon in that paper's glow on a faint wash tile; the rest stay neutral so the colored
+    /// Meals, Money) shows its icon in that paper's glow on a faint wash tile; the rest stay neutral so the colored
     /// ones stand out.
     private func drawerRow(
         _ title: String,

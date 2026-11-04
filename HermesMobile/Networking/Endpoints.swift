@@ -241,6 +241,13 @@ enum Endpoint {
     /// (`?week=<monday>`), POST `{week, picks: [{dish, veg}], backup?}` to accept one.
     case mealsWeek(week: String)
     case mealsAccept
+    /// The Meals screen (same fork module): GET the week around the phone's local `day`, GET the
+    /// dish library, POST a week's nights, POST a logged night, POST a new dish without a recipe.
+    case mealsHome(day: String)
+    case mealsDishes
+    case mealsNights
+    case mealsLog
+    case mealsDish
     /// Files a Daily Deck's answers without the model (this user's webui fork):
     /// POST `{date, kind, answers}`. Servers without it answer 404.
     case briefFile
@@ -630,6 +637,16 @@ enum Endpoint {
             return "/api/meals/week"
         case .mealsAccept:
             return "/api/meals/accept"
+        case .mealsHome:
+            return "/api/meals/home"
+        case .mealsDishes:
+            return "/api/meals/dishes"
+        case .mealsNights:
+            return "/api/meals/nights"
+        case .mealsLog:
+            return "/api/meals/log"
+        case .mealsDish:
+            return "/api/meals/dish"
         case .briefFile:
             return "/api/brief/file"
         case .briefIntention:
@@ -876,6 +893,8 @@ enum Endpoint {
             return [URLQueryItem(name: "id", value: id)]
         case let .mealsWeek(week):
             return [URLQueryItem(name: "week", value: week)]
+        case let .mealsHome(day):
+            return [URLQueryItem(name: "day", value: day)]
         case let .labels(feature, item):
             var items: [URLQueryItem] = []
             if let feature { items.append(URLQueryItem(name: "feature", value: feature)) }

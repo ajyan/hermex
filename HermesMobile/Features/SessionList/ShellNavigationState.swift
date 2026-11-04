@@ -37,6 +37,8 @@ enum ShellPushDestination: Hashable {
     case bodyPlan
     /// A workout: the given day (push, legs, pull), or the next in the rotation when nil.
     case bodyWorkout(String?)
+    /// Meals: tonight and the week, from the drawer or the Tonight widget.
+    case meals
     case settings(SettingsScrollAnchor?)
 }
 
@@ -296,7 +298,7 @@ extension ShellPushDestination {
         switch self {
         case .brain, .brainRoute: true
         case .projects, .project, .tasks, .kanban, .dailyDeck, .goals, .goal, .finishedGoal, .finishedGoals, .money,
-             .feedback, .body, .bodyLift, .bodyPlan, .bodyWorkout, .settings: false
+             .feedback, .body, .bodyLift, .bodyPlan, .bodyWorkout, .meals, .settings: false
         }
     }
 
@@ -312,7 +314,7 @@ extension ShellPushDestination {
              .brainRoute(.prep(.story(_))), .brainRoute(.prep(.gapRun(_))), .brainRoute(.prep(.lessonRun(_))): false
         case .brainRoute: true
         case .projects, .project, .tasks, .kanban, .dailyDeck, .brain, .goals, .finishedGoals, .money, .feedback,
-             .body, .bodyLift, .bodyPlan, .bodyWorkout, .settings: false
+             .body, .bodyLift, .bodyPlan, .bodyWorkout, .meals, .settings: false
         }
     }
 }

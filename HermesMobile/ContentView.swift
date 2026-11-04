@@ -82,15 +82,17 @@ struct ContentView: View {
             }
     }
 
-    /// Keeps the Goals widget on the active webui server's today (throttled in `GoalsWidgetSync`).
+    /// Keeps the Goals and Tonight widgets on the active webui server's today (throttled in `GoalsWidgetSync`).
     /// While nothing here can load Goals (a Hermes server, or none signed in), another server's
     /// goals never stay on the widget.
     private func refreshGoalsWidget() async {
         guard case let .loggedIn(server) = authManager.state, authManager.kind(of: server) == .webui else {
             GoalsWidgetSync.clear(except: authManager.state.server)
+            MealsWidgetSync.clear(except: authManager.state.server)
             return
         }
         await GoalsWidgetSync.refresh(server: server)
+        await MealsWidgetSync.refresh(server: server)
     }
 
     private func reconcileOrphanedLiveActivities(notifiesOnCompletion: Bool) async {
@@ -159,6 +161,8 @@ struct ContentView: View {
             if reachWebuiServer() { pendingScreen = .dailyDeck }
         case .goals:
             if reachWebuiServer() { pendingScreen = .goals }
+        case .meals:
+            if reachWebuiServer() { pendingScreen = .meals }
         case .newCall:
             if reachWebuiServer() { pendingNewChatRequest = NewChatRequest(startsCall: true) }
         // The profile variant pins the new session to the chosen profile (#339).

@@ -1,0 +1,132 @@
+{
+ "day": "2026-11-03",
+ "week": "2026-11-02",
+ "days": [
+  {
+   "day": "2026-11-02",
+   "night": {
+    "day": "2026-11-02",
+    "servings": 3,
+    "dishes": [
+     {
+      "slug": "toshikoshi-soba",
+      "name": "Toshikoshi soba",
+      "kind": "main",
+      "source": "https://www.justonecookbook.com/toshikoshi-soba/",
+      "has_recipe": false,
+      "ingredients": []
+     }
+    ]
+   },
+   "logged": {
+    "out": false,
+    "dishes": [
+     {
+      "slug": "toshikoshi-soba",
+      "name": "Toshikoshi soba",
+      "rating": 1
+     }
+    ]
+   }
+  },
+  {
+   "day": "2026-11-03",
+   "night": {
+    "day": "2026-11-03",
+    "servings": 8,
+    "dishes": [
+     {
+      "slug": "fish-collar",
+      "name": "Fish collar",
+      "kind": "main",
+      "source": null,
+      "has_recipe": false,
+      "ingredients": [
+       "hamachi collar \u2014 2",
+       "lemon \u2014 1"
+      ]
+     },
+     {
+      "slug": "tomato-egg",
+      "name": "Tomato egg",
+      "kind": "side",
+      "source": null,
+      "has_recipe": false,
+      "ingredients": [
+       "egg \u2014 8"
+      ]
+     }
+    ]
+   },
+   "logged": null
+  },
+  {
+   "day": "2026-11-04",
+   "night": {
+    "day": "2026-11-04",
+    "servings": 3,
+    "dishes": [
+     {
+      "slug": "toshikoshi-soba",
+      "name": "Toshikoshi soba",
+      "kind": "main",
+      "source": "https://www.justonecookbook.com/toshikoshi-soba/",
+      "has_recipe": false,
+      "ingredients": []
+     }
+    ]
+   },
+   "logged": null
+  },
+  {
+   "day": "2026-11-05",
+   "night": null,
+   "logged": null
+  },
+  {
+   "day": "2026-11-06",
+   "night": null,
+   "logged": null
+  },
+  {
+   "day": "2026-11-07",
+   "night": null,
+   "logged": null
+  },
+  {
+   "day": "2026-11-08",
+   "night": null,
+   "logged": null
+  }
+ ],
+ "tonight": {
+  "day": "2026-11-03",
+  "servings": 8,
+  "dishes": [
+   {
+    "slug": "fish-collar",
+    "name": "Fish collar",
+    "kind": "main",
+    "source": null,
+    "has_recipe": false,
+    "ingredients": [
+     "hamachi collar \u2014 2",
+     "lemon \u2014 1"
+    ]
+   },
+   {
+    "slug": "tomato-egg",
+    "name": "Tomato egg",
+    "kind": "side",
+    "source": null,
+    "has_recipe": false,
+    "ingredients": [
+     "egg \u2014 8"
+    ]
+   }
+  ]
+ },
+ "tonight_logged": false,
+ "tomorrow_prep": [],
+ "unscheduled": []
+}
