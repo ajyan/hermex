@@ -7,6 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AEA15000000000000000002D /* MealsRecipeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA15000000000000000002C /* MealsRecipeTests.swift */; };
+		AEA15000000000000000002B /* MealsBookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA15000000000000000002A /* MealsBookView.swift */; };
+		AEA150000000000000000029 /* MealsAddLinkSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000028 /* MealsAddLinkSheet.swift */; };
+		AEA150000000000000000027 /* MealsRecipeEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000026 /* MealsRecipeEditor.swift */; };
+		AEA150000000000000000025 /* MealsDishView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000024 /* MealsDishView.swift */; };
+		AEA150000000000000000023 /* MealsRecipeViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000022 /* MealsRecipeViewModels.swift */; };
+		AEA150000000000000000021 /* MealsRecipeModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000020 /* MealsRecipeModels.swift */; };
 		AEA150000000000000000013 /* MealsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000012 /* MealsTests.swift */; };
 		AEA150000000000000000011 /* AtlasMealsWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000010 /* AtlasMealsWidget.swift */; };
 		AEA15000000000000000000F /* MealsWidgetSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA15000000000000000000E /* MealsWidgetSync.swift */; };
@@ -923,6 +930,13 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		AEA15000000000000000002C /* MealsRecipeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsRecipeTests.swift; sourceTree = "<group>"; };
+		AEA15000000000000000002A /* MealsBookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsBookView.swift; sourceTree = "<group>"; };
+		AEA150000000000000000028 /* MealsAddLinkSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsAddLinkSheet.swift; sourceTree = "<group>"; };
+		AEA150000000000000000026 /* MealsRecipeEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsRecipeEditor.swift; sourceTree = "<group>"; };
+		AEA150000000000000000024 /* MealsDishView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsDishView.swift; sourceTree = "<group>"; };
+		AEA150000000000000000022 /* MealsRecipeViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsRecipeViewModels.swift; sourceTree = "<group>"; };
+		AEA150000000000000000020 /* MealsRecipeModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsRecipeModels.swift; sourceTree = "<group>"; };
 		AEA150000000000000000012 /* MealsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsTests.swift; sourceTree = "<group>"; };
 		AEA150000000000000000010 /* AtlasMealsWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasMealsWidget.swift; sourceTree = "<group>"; };
 		AEA15000000000000000000E /* MealsWidgetSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsWidgetSync.swift; sourceTree = "<group>"; };
@@ -1846,6 +1860,12 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		AEA150000000000000000000 /* Meals */ = {
 			isa = PBXGroup;
 			children = (
+				AEA15000000000000000002A /* MealsBookView.swift */,
+				AEA150000000000000000028 /* MealsAddLinkSheet.swift */,
+				AEA150000000000000000026 /* MealsRecipeEditor.swift */,
+				AEA150000000000000000024 /* MealsDishView.swift */,
+				AEA150000000000000000022 /* MealsRecipeViewModels.swift */,
+				AEA150000000000000000020 /* MealsRecipeModels.swift */,
 				AEA15000000000000000000E /* MealsWidgetSync.swift */,
 				AEA15000000000000000000C /* MealsDishPicker.swift */,
 				AEA15000000000000000000A /* MealsLogSheet.swift */,
@@ -2027,6 +2047,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		1A2B3C4D5E6F700000000034 /* HermesMobileTests */ = {
 			isa = PBXGroup;
 			children = (
+				AEA15000000000000000002C /* MealsRecipeTests.swift */,
 				AEA150000000000000000012 /* MealsTests.swift */,
 				B0D700000000000000000006 /* BodyModelsTests.swift */,
 				B0D70000000000000000000F /* BodyHomeViewModelTests.swift */,
@@ -3270,6 +3291,12 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AEA15000000000000000002B /* MealsBookView.swift in Sources */,
+				AEA150000000000000000029 /* MealsAddLinkSheet.swift in Sources */,
+				AEA150000000000000000027 /* MealsRecipeEditor.swift in Sources */,
+				AEA150000000000000000025 /* MealsDishView.swift in Sources */,
+				AEA150000000000000000023 /* MealsRecipeViewModels.swift in Sources */,
+				AEA150000000000000000021 /* MealsRecipeModels.swift in Sources */,
 				AEA15000000000000000000F /* MealsWidgetSync.swift in Sources */,
 				AEA15000000000000000000D /* MealsDishPicker.swift in Sources */,
 				AEA15000000000000000000B /* MealsLogSheet.swift in Sources */,
@@ -3845,6 +3872,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AEA15000000000000000002D /* MealsRecipeTests.swift in Sources */,
 				AEA150000000000000000013 /* MealsTests.swift in Sources */,
 				B0D700000000000000000007 /* BodyModelsTests.swift in Sources */,
 				B0D70000000000000000000E /* BodyHomeViewModelTests.swift in Sources */,

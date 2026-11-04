@@ -2,13 +2,16 @@ import SwiftUI
 
 /// The Meals screen: tonight's meal on top, with Eating it and tomorrow's prep, then the week
 /// Monday to Sunday. A day's menu adds or removes dishes, sets servings, moves the meal to another
-/// day, or clears it. Pushed from the drawer as `.meals` and opened by the Tonight widget.
+/// day, or clears it. A dish opens its recipe at the night's servings, and the book button opens
+/// the recipe book. Pushed from the drawer as `.meals` and opened by the Tonight widget.
 struct MealsHomeView: View {
     @State private var viewModel: MealsHomeViewModel
     /// The day the dish picker adds to.
     @State private var pickingFor: PickerTarget?
+    private let onOpen: (ShellPushDestination) -> Void
 
-    init(server: URL, onAPIError: @escaping (Error) -> Void) {
+    init(server: URL, onAPIError: @escaping (Error) -> Void, onOpen: @escaping (ShellPushDestination) -> Void) {
+        self.onOpen = onOpen
         let client = APIClientMealsScreenAdapter(apiClient: APIClient(baseURL: server))
         _viewModel = State(initialValue: MealsHomeViewModel(client: client, onAPIError: onAPIError, onHome: { home in
             MealsWidgetSync.update(server: server, home: home)
@@ -21,6 +24,13 @@ struct MealsHomeView: View {
         content
             .hxNavigationTitle("Meals", subtitle: MealsCopy.short(viewModel.today))
             .background(Color.hxCanvas.ignoresSafeArea())
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { onOpen(.mealsBook) } label: {
+                        Image(systemName: "book.closed").accessibilityLabel(Text(verbatim: "Recipes"))
+                    }
+                }
+            }
             // Every appear refreshes, so a night logged from the widget shows on the way back.
             .task { await viewModel.load() }
             .sheet(item: $viewModel.logDraft) { draft in
@@ -84,10 +94,26 @@ struct MealsHomeView: View {
             }
         } content: {
             if let tonight = home.tonight {
-                ForEach(tonight.sides) { side in
-                    Text(verbatim: side.name)
-                        .font(AppFont.subheadline())
-                        .foregroundStyle(Color.hxTextPrimary)
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(tonight.sides) { side in
+                        Button { open(side, night: tonight) } label: {
+                            Text(verbatim: side.name)
+                                .font(AppFont.subheadline())
+                                .foregroundStyle(Color.hxTextPrimary)
+                                .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint(Text(verbatim: "Opens the recipe"))
+                    }
+                }
+                if let main = tonight.main {
+                    Button { open(main, night: tonight) } label: {
+                        Label { Text(verbatim: "Recipe") } icon: { Image(systemName: "book.closed") }
+                            .font(AppFont.footnote(weight: .semibold))
+                            .frame(minHeight: 32)
+                    }
+                    .accessibilityLabel(Text(verbatim: "\(main.name) recipe"))
                 }
                 if !home.tomorrowPrep.isEmpty { tomorrowPrep(home.tomorrowPrep) }
             } else if !home.tomorrowPrep.isEmpty {
@@ -186,11 +212,21 @@ struct MealsHomeView: View {
                     MealsDayRow(day: day, isToday: day.day == home.day, paper: paper) {
                         pickingFor = PickerTarget(day: day.day)
                     }
+                    .onTapGesture {
+                        if let night = day.night, let main = night.main { open(main, night: night) }
+                    }
+                    .accessibilityAction(named: Text(verbatim: "Open the recipe")) {
+                        if let night = day.night, let main = night.main { open(main, night: night) }
+                    }
                     .contextMenu { dayMenu(day, home: home) }
                 }
             }
             .hxCard()
         }
+    }
+
+    private func open(_ dish: MealsDish, night: MealsNight) {
+        onOpen(.mealsDish(MealsDishRoute(slug: dish.slug, servings: night.servings, day: night.day)))
     }
 
     @ViewBuilder
@@ -199,6 +235,13 @@ struct MealsHomeView: View {
             Label { Text(verbatim: "Add a dish") } icon: { Image(systemName: "plus") }
         }
         if let night = day.night {
+            Menu {
+                ForEach(night.dishes) { dish in
+                    Button(dish.name) { open(dish, night: night) }
+                }
+            } label: {
+                Label { Text(verbatim: "Recipes") } icon: { Image(systemName: "book.closed") }
+            }
             Menu {
                 ForEach(night.dishes) { dish in
                     Button(dish.name) { Task { await viewModel.remove(dish.slug, from: day.day) } }
