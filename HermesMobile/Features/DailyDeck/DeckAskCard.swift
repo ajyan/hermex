@@ -47,7 +47,7 @@ struct DailyAskBody: View {
 
     /// An application or outreach opens Prep for the day, so the open Ask card's foot offers Open Prep.
     static func opensPrep(_ outcome: DailyAskOutcome) -> Bool {
-        outcome.event == "applied" || outcome.event == "sent" || outcome.event == "moved"
+        ["applied", "sent", "moved", "prepped"].contains(outcome.event)
     }
 
     static func doneLine(_ outcome: DailyAskOutcome) -> String {
@@ -58,8 +58,11 @@ struct DailyAskBody: View {
             return "Reached out to \(who)\(outcome.company ?? "them") — Prep is open"
         case "moved":
             let company = outcome.company ?? "a job"
+            if outcome.booked == true { return "Booked \(company): \(outcome.stage ?? "an interview") — Prep is open" }
             return outcome.added == true ? "Added \(company) to your search — Prep is open"
                 : "Moved \(company) to \(outcome.stage ?? "its next stage") — Prep is open"
+        case "prepped":
+            return "Prepped for \(outcome.company ?? "an interview"): \(outcome.step ?? "a plan step") — Prep is open"
         default: return "Skipped: \(outcome.reason ?? "")"
         }
     }

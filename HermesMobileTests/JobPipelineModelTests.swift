@@ -68,6 +68,25 @@ final class JobPipelineModelTests: XCTestCase {
         XCTAssertEqual(app.plan.map(\.told), [true, false])
     }
 
+    func testTheRoundsPlanStepsDecodeAndRoute() throws {
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(Self.detailJSON.utf8)) as? [String: Any])
+        json["round"] = "Recruiter screen"
+        json["steps"] = [["id": "pitch", "kind": "pitch", "title": "Say your pitch", "subtitle": "Out loud", "done": true],
+                         ["id": "s9", "kind": "story", "title": "Tell Retrieval quality", "done": false],
+                         ["id": "mock", "kind": "mock", "title": "Mock Obin AI call", "done": false],
+                         ["id": "design", "kind": "ladder", "title": "System design mock", "done": false],
+                         ["kind": "story"]]
+        let app = try PrepDecoding.decode(JobApplication.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertEqual(app.round, "Recruiter screen")
+        XCTAssertEqual(app.steps.map(\.id), ["pitch", "s9", "mock", "design"])
+        XCTAssertEqual(app.steps.map(\.callPart), ["pitch", nil, "questions", nil])
+        XCTAssertEqual(app.steps.map(JobApplicationView.route), [nil, .storyPage("s9"), nil, .mockLadder(.design)])
+        XCTAssertEqual(JobApplicationView.planTitle(app), "Prep for First round")
+        let old = try PrepDecoding.decode(JobApplication.self, from: Data(Self.detailJSON.utf8))
+        XCTAssertTrue(old.steps.isEmpty)
+        XCTAssertEqual(JobApplicationView.planTitle(old), "Prep plan")
+    }
+
     func testAnApplicationWithoutAOnePagerDecodes() throws {
         let json = #"{"id": "x", "company": "X", "stage": "applied", "stage_name": "Applied", "since": "2026-11-02", "days": 0, "open": true, "step": 0, "onepager": null}"#
         let app = try PrepDecoding.decode(JobApplication.self, from: Data(json.utf8))

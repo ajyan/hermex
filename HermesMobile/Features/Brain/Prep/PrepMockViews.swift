@@ -171,7 +171,7 @@ struct PrepMockBriefView: View {
                             if offset > 0 { PrepRowDivider() }
                             NavigationLink(value: ShellPushDestination.brainRoute(.prep(.mockResult(result.mockID)))) {
                                 BrainRow(
-                                    title: "\(PrepMockCopy.levelTitle(result.level, in: ladder)) \u{00B7} \(PrepMockCopy.statusWord(result))",
+                                    title: "\(PrepMockCopy.name(result, in: ladder)) \u{00B7} \(PrepMockCopy.statusWord(result))",
                                     subtitle: result.ts.map { BrainStyle.displayDate($0) },
                                     trailing: result.score.map(PrepMockCopy.score))
                             }
@@ -359,7 +359,7 @@ private struct PrepMockGradedView: View {
         let paper = HermexPaper.prep
         HXCard(.wash(paper), title: "\(PrepMockCopy.score(result.score ?? 0)) of 5", titleStyle: .title2,
                spacing: BrainStyle.s, kicker: {
-            HXChip(paper: paper, symbol: "phone.fill", label: PrepMockCopy.levelTitle(result.level, in: ladder))
+            HXChip(paper: paper, symbol: "phone.fill", label: PrepMockCopy.name(result, in: ladder))
         }, content: {
             Text(verbatim: result.passed ? "Passed" : "Not yet: 4 out of 5 passes")
                 .font(BrainStyle.rowTitle.weight(.semibold))

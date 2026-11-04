@@ -33,6 +33,8 @@ protocol PrepDataClient: Sendable {
     /// brief and the profile to call in. 409 when the server has no interviewer profile.
     /// With a `story`, a behavioral mock that practices that one story (it never moves the ladder).
     func mockStart(kind: PrepMockKind, level: String?, story: String?) async throws -> PrepMockStart
+    /// Starts a company mock from a job application's one-pager: `part` is pitch or questions.
+    func companyMockStart(app: String, part: String) async throws -> PrepMockStart
     /// Hands a finished call to the grader (202 while it grades in the background).
     func mockGrade(mockID: String, sessionID: String, turnMS: [Int]) async throws
     /// One tutor dialogue step on a graded question rep: grades `answer` (a reply to the tutor's last question),
@@ -45,6 +47,8 @@ protocol PrepDataClient: Sendable {
 extension PrepDataClient {
     /// Test fakes that never open a story page.
     func story(id: String) async throws -> PrepStoryPage { throw CancellationError() }
+    /// Test fakes that never start a company mock.
+    func companyMockStart(app: String, part: String) async throws -> PrepMockStart { throw CancellationError() }
 
     /// Test fakes that never open a diagram.
     func diagram(topic: String) async throws -> PrepDiagram { throw CancellationError() }
@@ -141,6 +145,12 @@ struct APIClientPrepAdapter: PrepDataClient {
     func mockStart(kind: PrepMockKind, level: String?, story: String?) async throws -> PrepMockStart {
         let data = try await apiClient.sendData(endpoint: .tutorMockStart, method: "POST",
                                                 body: PrepMockStartRequest(kind: kind.rawValue, level: level, story: story))
+        return try decode(data)
+    }
+
+    func companyMockStart(app: String, part: String) async throws -> PrepMockStart {
+        let data = try await apiClient.sendData(endpoint: .tutorMockStart, method: "POST",
+                                                body: PrepMockStartRequest(kind: "company", level: nil, app: app, part: part))
         return try decode(data)
     }
 

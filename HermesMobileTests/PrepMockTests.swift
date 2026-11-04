@@ -261,6 +261,29 @@ final class PrepMockTests: APIClientTestCase {
         _ = try await APIClientPrepAdapter(apiClient: client).mockStart(kind: .design, level: nil, story: nil)
     }
 
+    func testCompanyMockStartSendsTheApplicationAndPart() async throws {
+        let client = makeClient { request in
+            let body = try apiTestJSONBody(from: request)
+            XCTAssertEqual(body["kind"] as? String, "company")
+            XCTAssertEqual(body["app"] as? String, "obin-ai")
+            XCTAssertEqual(body["part"] as? String, "pitch")
+            XCTAssertNil(body["level"])
+            XCTAssertNil(body["story"])
+            return apiTestJSONResponse(#"{"mock_id": "m1", "level": "obin-ai", "brief": "b", "profile": "interviewer", "title": "Pitch for Obin AI"}"#,
+                                       for: request)
+        }
+        let start = try await APIClientPrepAdapter(apiClient: client).companyMockStart(app: "obin-ai", part: "pitch")
+        XCTAssertEqual(start.title, "Pitch for Obin AI")
+    }
+
+    func testACompanyMockIsNamedByItsTitle() throws {
+        let json = #"{"ladders": {}, "recent": [{"mock_id": "m1", "kind": "company", "level": "obin-ai", "status": "graded", "score": 3.5, "title": "Obin AI mock"}, {"mock_id": "m2", "kind": "design", "level": "D1", "status": "started"}]}"#
+        let mocks = try PrepDecoding.decode(PrepMocks.self, from: Data(json.utf8))
+        XCTAssertEqual(PrepMockCopy.name(mocks.recent[0], in: nil), "Obin AI mock")
+        XCTAssertEqual(PrepMockCopy.name(mocks.recent[1], in: nil), "D1")
+        XCTAssertNil(mocks.weeklyDue(), "no ladder, so no weekly card from a company mock")
+    }
+
     func testBriefReplaysAnUnlockedLevel() async throws {
         let client = FakeMockClient()
         client.mocksResults = [.success(try decodeMocks(mocksJSON))]
