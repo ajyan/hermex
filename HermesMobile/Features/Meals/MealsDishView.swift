@@ -80,12 +80,12 @@ struct MealsDishView: View {
                     dishCard(recipe)
                     if let fix = recipe.fix, !fix.changes.isEmpty { fixCard(fix) }
                     if !recipe.goesWith.isEmpty { goesWith(recipe) }
-                    if recipe.hasRecipe {
-                        if !recipe.ingredients.isEmpty { ingredients(recipe) }
-                        if !recipe.steps.isEmpty { steps(recipe) }
-                        footer(recipe)
-                    } else {
+                    if !recipe.ingredients.isEmpty { ingredients(recipe) }
+                    if recipe.steps.isEmpty {
                         noRecipe(recipe)
+                    } else {
+                        steps(recipe)
+                        footer(recipe)
                     }
                     if !recipe.notes.isEmpty { notes(recipe) }
                 }
@@ -313,7 +313,7 @@ struct MealsDishView: View {
     }
 
     private func noRecipe(_ recipe: MealsRecipe) -> some View {
-        HXCard(.neutral, title: "No recipe yet", spacing: 10) {
+        HXCard(.neutral, title: recipe.ingredients.isEmpty ? "No recipe yet" : "No steps yet", spacing: 10) {
             Text(verbatim: "Recipes come in as you cook: save the link you cook from, write it down, or tell Atlas how you make it.")
                 .font(AppFont.footnote())
                 .foregroundStyle(Color.hxTextSecondary)

@@ -94,16 +94,18 @@ struct MealsHomeView: View {
             }
         } content: {
             if let tonight = home.tonight {
-                ForEach(tonight.sides) { side in
-                    Button { open(side, night: tonight) } label: {
-                        Text(verbatim: side.name)
-                            .font(AppFont.subheadline())
-                            .foregroundStyle(Color.hxTextPrimary)
-                            .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
-                            .contentShape(Rectangle())
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(tonight.sides) { side in
+                        Button { open(side, night: tonight) } label: {
+                            Text(verbatim: side.name)
+                                .font(AppFont.subheadline())
+                                .foregroundStyle(Color.hxTextPrimary)
+                                .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint(Text(verbatim: "Opens the recipe"))
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityHint(Text(verbatim: "Opens the recipe"))
                 }
                 if let main = tonight.main {
                     Button { open(main, night: tonight) } label: {
