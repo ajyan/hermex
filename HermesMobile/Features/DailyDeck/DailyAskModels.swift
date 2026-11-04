@@ -20,12 +20,14 @@ struct DailyAsk: Decodable, Equatable, Sendable {
     let steer: String?
     /// Applications made outside the Ask and logged today.
     let elsewhere: [DailyAskElsewhere]?
+    /// The soonest booked interview's prep plan: the lock offers it, and its steps open past the lock.
+    let prep: DailyAskPrep?
 
     var isReachFirst: Bool { lead == "reach" }
     var needsNeverMissTwice: Bool { previous == "skipped" || previous == "missed" }
 
     private enum CodingKeys: String, CodingKey {
-        case today, weekday, roles, lead, outcome, previous, locked, week, steer, elsewhere
+        case today, weekday, roles, lead, outcome, previous, locked, week, steer, elsewhere, prep
     }
 
     /// `roles` drops a role that fails to decode, so one bad role never fails the Ask (which
@@ -43,7 +45,50 @@ struct DailyAsk: Decodable, Equatable, Sendable {
         let note = try? c.decodeIfPresent(String.self, forKey: .steer)
         steer = note?.isEmpty == false ? note : nil
         elsewhere = (try? c.decodeIfPresent([PrepLossy<DailyAskElsewhere>].self, forKey: .elsewhere))?.compactMap(\.value)
+        prep = try? c.decodeIfPresent(DailyAskPrep.self, forKey: .prep)
     }
+}
+
+/// The interview the lock offers prep for: its application, the interview, and its plan's steps. Doing any
+/// step in Prep is the day's action.
+struct DailyAskPrep: Decodable, Equatable, Sendable {
+    let id: String
+    let company: String?
+    let label: String
+    let on: String
+    let steps: [DailyAskPrepStep]
+
+    private enum CodingKeys: String, CodingKey { case id, company, label, on, steps }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        company = try? c.decodeIfPresent(String.self, forKey: .company)
+        label = (try? c.decodeIfPresent(String.self, forKey: .label)) ?? "Interview"
+        on = try c.decode(String.self, forKey: .on)
+        steps = (try? c.decodeIfPresent([PrepLossy<DailyAskPrepStep>].self, forKey: .steps))?.compactMap(\.value) ?? []
+    }
+
+    /// Whether a Prep screen is one of the plan's steps, so it opens past the lock: a plan story's page or
+    /// drill, or a plan mock ladder. The pitch and company mock calls start from the company page, which is
+    /// never locked.
+    func opens(_ route: PrepRoute) -> Bool {
+        switch route {
+        case .story(let id), .storyPage(let id):
+            return steps.contains { $0.kind == "story" && $0.id == id }
+        case .mockLadder(let kind):
+            return steps.contains { $0.kind == "ladder" && $0.id == kind.rawValue }
+        default:
+            return false
+        }
+    }
+}
+
+/// One plan step: pitch, story (its id is the story's), mock, or ladder (its id is the ladder kind).
+struct DailyAskPrepStep: Decodable, Equatable, Sendable {
+    let id: String
+    let kind: String
+    let done: Bool
 }
 
 struct DailyAskRole: Decodable, Equatable, Identifiable, Sendable {
@@ -70,17 +115,21 @@ struct DailyAskRole: Decodable, Equatable, Identifiable, Sendable {
 }
 
 struct DailyAskOutcome: Decodable, Equatable, Sendable {
-    /// "applied", "sent", "skip", or "moved" (a forward move in the job pipeline: an application added, or a
-    /// later stage).
+    /// "applied", "sent", "skip", "moved" (a forward move in the job pipeline: an application added, a later
+    /// stage, or an interview booked), or "prepped".
     let event: String
     let role: String?
     let company: String?
     let title: String?
     let reason: String?
     let name: String?
-    /// For "moved": the stage it moved to ("Technical"), and whether it was a new application.
+    /// For "moved": the stage it moved to ("Technical"), and whether it was a new application. A booked
+    /// interview is a move too: `booked`, with the interview's label as `stage`.
     var stage: String? = nil
     var added: Bool? = nil
+    var booked: Bool? = nil
+    /// For "prepped" (a step of an interview's prep plan done in Prep): the step ("Tell Retrieval quality").
+    var step: String? = nil
 }
 
 /// An application logged with "Applied elsewhere": a recruiter, LinkedIn or a startup outside the Ask.

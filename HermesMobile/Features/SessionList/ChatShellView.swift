@@ -824,7 +824,7 @@ struct ChatShellView: View {
                 PrepRunView(server: server, run: .bonus, onAPIError: authManager.handleAPIError, ask: askAtlas)
             }
         case .prep(.story(let id)):
-            PrepGate {
+            PrepGate(route: .story(id)) {
                 PrepRunView(server: server, run: .story, unit: id, onAPIError: authManager.handleAPIError, ask: askAtlas)
             }
         case .prep(.gapRun(let id)):
@@ -843,20 +843,19 @@ struct ChatShellView: View {
             JobOnePagerView(id: id, server: server, onAPIError: authManager.handleAPIError)
                 .adaptiveSecondaryNavigationTitle()
         case .prep(.storyPage(let id)):
-            PrepGate {
+            PrepGate(route: .storyPage(id)) {
                 PrepStoryPageView(id: id, server: server, onAPIError: authManager.handleAPIError, ask: askAtlas)
                     .adaptiveSecondaryNavigationTitle()
             }
         case .prep(.mockLadder(let kind)):
-            PrepGate {
+            PrepGate(route: .mockLadder(kind)) {
                 PrepMockBriefView(kind: kind, server: server, onAPIError: authManager.handleAPIError)
                     .adaptiveSecondaryNavigationTitle()
             }
+        // Not gated: a call's result, which a company mock from the plan lands on before its grade unlocks the day.
         case .prep(.mockResult(let id, let unsent)):
-            PrepGate {
-                PrepMockResultView(mockID: id, unsent: unsent, server: server, onAPIError: authManager.handleAPIError)
-                    .adaptiveSecondaryNavigationTitle()
-            }
+            PrepMockResultView(mockID: id, unsent: unsent, server: server, onAPIError: authManager.handleAPIError)
+                .adaptiveSecondaryNavigationTitle()
         }
     }
 

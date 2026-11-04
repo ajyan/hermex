@@ -286,6 +286,42 @@ final class DailyAskModelTests: XCTestCase {
         XCTAssertEqual(DailyAskBody.doneLine(added), "Added Tenex to your search — Prep is open")
     }
 
+    func testABookedInterviewOrAPrepStepIsTheDaysAction() throws {
+        let booked = try PrepDecoding.decode(DailyAskOutcome.self, from: Data(
+            #"{"event": "moved", "company": "Obin AI", "stage": "First round", "added": false, "booked": true}"#.utf8))
+        XCTAssertEqual(DailyAskBody.doneLine(booked), "Booked Obin AI: First round — Prep is open")
+        let prepped = try PrepDecoding.decode(DailyAskOutcome.self, from: Data(
+            #"{"event": "prepped", "company": "Obin AI", "step": "Say your pitch"}"#.utf8))
+        XCTAssertEqual(DailyAskBody.doneLine(prepped), "Prepped for Obin AI: Say your pitch — Prep is open")
+        XCTAssertTrue(DailyAskBody.opensPrep(prepped))
+    }
+
+    func testThePlansStepsOpenPastTheLock() async throws {
+        let client = FakeDailyAskClient()
+        client.askResults = [.success(try Self.ask { $0["prep"] = [
+            "id": "obin-ai", "company": "Obin AI", "label": "First round", "on": "2026-11-10",
+            "steps": [["id": "pitch", "kind": "pitch", "done": true], ["id": "s9", "kind": "story", "done": false],
+                      ["id": "design", "kind": "ladder", "done": false], ["bad": 1]]] })]
+        let model = await loaded(client)
+        guard case .loaded(let ask) = model.state, let prep = ask.prep else { return XCTFail("no prep") }
+        XCTAssertEqual(prep.steps.map(\.id), ["pitch", "s9", "design"])
+        XCTAssertTrue(PrepGate<EmptyView>.shouldGate(model))
+        XCTAssertFalse(PrepGate<EmptyView>.shouldGate(model, route: .storyPage("s9")))
+        XCTAssertFalse(PrepGate<EmptyView>.shouldGate(model, route: .story("s9")))
+        XCTAssertFalse(PrepGate<EmptyView>.shouldGate(model, route: .mockLadder(.design)))
+        XCTAssertTrue(PrepGate<EmptyView>.shouldGate(model, route: .storyPage("s10")))
+        XCTAssertTrue(PrepGate<EmptyView>.shouldGate(model, route: .mockLadder(.behavioral)))
+        XCTAssertTrue(PrepGate<EmptyView>.shouldGate(model, route: .home))
+        XCTAssertEqual(PrepGateOffer.subtitle(done: 1, of: 3), "1 of 3 prep steps done. One more opens Prep for today.")
+    }
+
+    func testAnAskWithoutPrepStillLocksEveryRoute() async throws {
+        let client = FakeDailyAskClient()
+        client.askResults = [.success(try Self.ask())]
+        let model = await loaded(client)
+        XCTAssertTrue(PrepGate<EmptyView>.shouldGate(model, route: .storyPage("s9")))
+    }
+
     func testAppliedOrSentOffersOpenPrep() {
         func outcome(_ event: String) -> DailyAskOutcome {
             DailyAskOutcome(event: event, role: "r", company: "C", title: "T", reason: nil, name: nil)

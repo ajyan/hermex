@@ -1,18 +1,24 @@
 import SwiftUI
 
 /// One application's company page: where it stands (stage pips, Move stage, Close or Reopen), its interviews
-/// (book, move or cancel one), the prep plan (the one-pager and the stories it leans on, each opening its
-/// Prep page and checked once told), other roles to ask about, notes, and the timeline.
+/// (book, move or cancel one), the prep plan for the round it's in (the one-pager, then the plan's steps: the pitch
+/// and the company mock start their calls here, stories open their Prep pages, ladder mocks their briefs; each
+/// checked once done this round), other roles to ask about, notes, and the timeline.
 /// Pushed as `.brainRoute(.prep(.application(id)))`.
 struct JobApplicationView: View {
     @State private var model: JobApplicationModel
+    /// Starts the plan's company mock calls.
+    @State private var mock: PrepMockViewModel
     @State private var booking: JobInterviewDraft?
     @State private var note = ""
     @Environment(\.openURL) private var openURL
+    @Environment(\.openMockCall) private var openMockCall
 
     init(id: String, server: URL, onAPIError: @escaping (Error) -> Void) {
         _model = State(initialValue: JobApplicationModel(
             id: id, client: APIClientJobPipelineAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
+        _mock = State(initialValue: PrepMockViewModel(
+            client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
     }
 
     var body: some View {
@@ -160,8 +166,10 @@ struct JobApplicationView: View {
 
     private func plan(_ app: JobApplication) -> some View {
         let told = app.plan.filter(\.told).count
+        let trailing = !app.steps.isEmpty ? "\(app.steps.filter(\.done).count) of \(app.steps.count) done"
+            : app.plan.isEmpty ? nil : "\(told) of \(app.plan.count) told"
         return VStack(alignment: .leading, spacing: BrainStyle.s) {
-            BrainSectionHeader(title: "Prep plan", trailing: app.plan.isEmpty ? nil : "\(told) of \(app.plan.count) told")
+            BrainSectionHeader(title: Self.planTitle(app), trailing: trailing)
             SectionCard {
                 VStack(spacing: 0) {
                     if app.onepager != nil {
@@ -174,20 +182,73 @@ struct JobApplicationView: View {
                         BrainRow(leading: { Image(systemName: "doc.text").foregroundStyle(Color.hxTextSecondary) },
                                  title: "No one-pager yet", subtitle: "Ask Atlas to write one from the posting and your stories.")
                     }
-                    ForEach(app.plan) { story in
-                        PrepRowDivider()
-                        NavigationLink(value: ShellPushDestination.brainRoute(.prep(.storyPage(story.id)))) {
-                            BrainRow(leading: {
-                                Image(systemName: story.told ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(HermexPaper.prep.glow)
-                            }, title: "Tell \(story.name)", subtitle: story.title, trailing: "›")
+                    if app.steps.isEmpty {
+                        ForEach(app.plan) { story in
+                            PrepRowDivider()
+                            NavigationLink(value: ShellPushDestination.brainRoute(.prep(.storyPage(story.id)))) {
+                                stepRow(done: story.told, title: "Tell \(story.name)", subtitle: story.title, trailing: "›")
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityValue(Text(verbatim: story.told ? "Told" : "Not told yet"))
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityValue(Text(verbatim: story.told ? "Told" : "Not told yet"))
+                    }
+                    ForEach(app.steps) { step in
+                        PrepRowDivider()
+                        planStep(step, app: app)
                     }
                 }
             }
+            if let message = mock.errorMessage {
+                Text(verbatim: message)
+                    .font(BrainStyle.meta)
+                    .foregroundStyle(Color.hxDanger)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
+    }
+
+    /// A pitch or mock step starts its call here; a story opens its Prep page, a ladder mock its brief.
+    @ViewBuilder
+    private func planStep(_ step: JobPlanStep, app: JobApplication) -> some View {
+        if let part = step.callPart {
+            Button {
+                Task { await mock.startCompanyCall(app: app.row.id, part: part, open: openMockCall) }
+            } label: {
+                stepRow(done: step.done, title: step.title, subtitle: step.subtitle, trailing: mock.isStarting ? "Starting…" : "Call")
+            }
+            .buttonStyle(.plain)
+            .disabled(mock.isStarting || !openMockCall.isAvailable)
+            .accessibilityValue(Text(verbatim: step.done ? "Done" : "Not done yet"))
+        } else if let route = Self.route(step) {
+            NavigationLink(value: ShellPushDestination.brainRoute(.prep(route))) {
+                stepRow(done: step.done, title: step.title, subtitle: step.subtitle, trailing: "›")
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(Text(verbatim: step.done ? "Done" : "Not done yet"))
+        }
+    }
+
+    /// "Prep for First round" (the next interview), else the round ("Prep for the recruiter screen").
+    static func planTitle(_ app: JobApplication) -> String {
+        guard !app.steps.isEmpty else { return "Prep plan" }
+        if let next = app.row.next { return "Prep for \(next.label)" }
+        return app.round.map { "Prep for the \($0.lowercased())" } ?? "Prep plan"
+    }
+
+    /// The Prep screen a story or ladder step opens.
+    static func route(_ step: JobPlanStep) -> PrepRoute? {
+        switch step.kind {
+        case "story": return .storyPage(step.id)
+        case "ladder": return PrepMockKind(rawValue: step.id).map { .mockLadder($0) }
+        default: return nil
+        }
+    }
+
+    private func stepRow(done: Bool, title: String, subtitle: String?, trailing: String) -> some View {
+        BrainRow(leading: {
+            Image(systemName: done ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(HermexPaper.prep.glow)
+        }, title: title, subtitle: subtitle, trailing: trailing)
     }
 
     // MARK: Also, notes, timeline

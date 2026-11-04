@@ -129,6 +129,8 @@ struct PrepMockResult: Decodable, Identifiable, Hashable, Sendable {
     let hits: [PrepMockMiss]
     let ttftP50MS: Int?
     let ts: String?
+    /// A company mock's name ("Pitch for Obin AI"); a ladder mock is named by its level.
+    let title: String?
 
     var id: String { mockID }
 
@@ -138,7 +140,7 @@ struct PrepMockResult: Decodable, Identifiable, Hashable, Sendable {
     var passed: Bool { status == "graded" && (score ?? 0) >= Self.passMark }
 
     private enum CodingKeys: String, CodingKey {
-        case kind, level, status, score, dims, misses, hits, ts
+        case kind, level, status, score, dims, misses, hits, ts, title
         case mockID = "mock_id"
         case ttftP50MS = "ttft_p50_ms"
     }
@@ -155,6 +157,7 @@ struct PrepMockResult: Decodable, Identifiable, Hashable, Sendable {
         hits = c.lossy(PrepMockMiss.self, .hits)
         ttftP50MS = c.optional(Int.self, .ttftP50MS)
         ts = c.optional(String.self, .ts)
+        title = c.optional(String.self, .title)
     }
 }
 
@@ -239,6 +242,9 @@ struct PrepMockStartRequest: Encodable, Hashable, Sendable {
     let level: String?
     /// A behavioral story to practice on its own; omitted for a ladder mock.
     var story: String?
+    /// A company mock (kind "company"): the job application, and the part, pitch or questions.
+    var app: String?
+    var part: String?
 }
 
 struct PrepMockGradeRequest: Encodable, Hashable, Sendable {
@@ -303,6 +309,11 @@ enum PrepMockCopy {
     static func rowTitle(_ kind: PrepMockKind, ladder: PrepLadder) -> String {
         let level = [ladder.level, ladder.current?.title].compactMap { $0 }.filter { !$0.isEmpty }
         return ([kind.title] + [level.joined(separator: " ")].filter { !$0.isEmpty }).joined(separator: " \u{00B7} ")
+    }
+
+    /// The mock's name: a company mock's title, else its level.
+    static func name(_ result: PrepMockResult, in ladder: PrepLadder?) -> String {
+        result.title ?? levelTitle(result.level, in: ladder)
     }
 
     static func levelTitle(_ level: String, in ladder: PrepLadder?) -> String {
@@ -453,6 +464,37 @@ final class PrepMockViewModel {
         } catch {
             guard !Self.isCancellation(error) else { return }
             errorMessage = error.localizedDescription
+        }
+    }
+
+    /// A company mock call for a job application's prep plan: `part` is pitch or questions. The shell makes
+    /// the interviewer profile active, as for a ladder mock.
+    func startCompanyCall(app: String, part: String, open: OpenMockCallAction) async {
+        guard !isStarting else { return }
+        isStarting = true
+        errorMessage = nil
+        defer { isStarting = false }
+        do {
+            try await open { await self.startCompany(app: app, part: part) }
+        } catch {
+            guard !Self.isCancellation(error) else { return }
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func startCompany(app: String, part: String) async -> PrepMockStart? {
+        errorMessage = nil
+        do {
+            return try await client.companyMockStart(app: app, part: part)
+        } catch {
+            guard !Self.isCancellation(error) else { return nil }
+            if case .http(409, _)? = error as? APIError {
+                errorMessage = PrepMockCopy.noInterviewer
+            } else {
+                onAPIError(error)
+                errorMessage = error.localizedDescription
+            }
+            return nil
         }
     }
 

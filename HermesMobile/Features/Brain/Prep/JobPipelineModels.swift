@@ -123,9 +123,15 @@ struct JobApplication: Decodable, Equatable, Sendable {
     let onepager: JobOnePager?
     /// The one-pager's stories, each marked told once he has told it in Prep since the application was added.
     let plan: [JobPlanStory]
+    /// The round the plan prepares for ("Recruiter screen"), nil when there is nothing to prepare.
+    let round: String?
+    /// The round's prep plan in order: the pitch, the stories, the company mock, the ladder mocks.
+    let steps: [JobPlanStep]
     let stages: [JobStage]
 
-    private enum CodingKeys: String, CodingKey { case url, comp, location, also, interviews, timeline, onepager, plan, stages }
+    private enum CodingKeys: String, CodingKey {
+        case url, comp, location, also, interviews, timeline, onepager, plan, round, steps, stages
+    }
 
     init(from decoder: Decoder) throws {
         row = try JobApplicationRow(from: decoder)
@@ -138,6 +144,8 @@ struct JobApplication: Decodable, Equatable, Sendable {
         timeline = Self.lossy(c, .timeline)
         onepager = try? c.decodeIfPresent(JobOnePager.self, forKey: .onepager)
         plan = Self.lossy(c, .plan)
+        round = try? c.decodeIfPresent(String.self, forKey: .round)
+        steps = Self.lossy(c, .steps)
         stages = Self.lossy(c, .stages)
     }
 
@@ -164,6 +172,25 @@ struct JobPlanStory: Decodable, Equatable, Identifiable, Sendable {
     let name: String
     let title: String?
     let told: Bool
+}
+
+/// One step of an application's prep plan. `kind` is pitch or mock (a company mock call, started here),
+/// story (`id` is the story's), or ladder (`id` is the mock ladder's kind). Done once he did it in Prep this round.
+struct JobPlanStep: Decodable, Equatable, Identifiable, Sendable {
+    let id: String
+    let kind: String
+    let title: String
+    let subtitle: String?
+    let done: Bool
+
+    /// The company mock call's part for a pitch or mock step.
+    var callPart: String? {
+        switch kind {
+        case "pitch": "pitch"
+        case "mock": "questions"
+        default: nil
+        }
+    }
 }
 
 /// A story the one-pager leans on, by its Prep id, with the short name it shows.
