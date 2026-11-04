@@ -153,11 +153,13 @@ final class MealsHomeViewModelTests: XCTestCase {
         await vm.load()
         await vm.eatTonight()
         var draft = try XCTUnwrap(vm.logDraft)
-        XCTAssertTrue(await vm.finishLog(draft))
+        let closedEmpty = await vm.finishLog(draft)
+        XCTAssertTrue(closedEmpty)
         XCTAssertEqual(client.logRequests.count, 1, "nothing added, nothing posted")
         draft.dishes[1].rating = 1
         draft.dishes[0].note = "  less salt  "
-        XCTAssertTrue(await vm.finishLog(draft))
+        let saved = await vm.finishLog(draft)
+        XCTAssertTrue(saved)
         XCTAssertEqual(client.logRequests.last?.dishes, [MealsLogDish(dish: "fish-collar", note: "less salt"),
                                                          MealsLogDish(dish: "tomato-egg", rating: 1)])
         XCTAssertNil(vm.logDraft)
