@@ -128,7 +128,7 @@ struct VoiceCallLab: View {
                     }
                     VoiceCallStatus(
                         word: phase.word, activity: activity,
-                        sources: phase == .converge || phase == .speaking ? sources : [], hint: phase.hint
+                        sources: [.tools, .converge, .speaking].contains(phase) ? sources : [], hint: phase.hint
                     )
                     VoiceCallCaptions(
                         sent: sent, live: live, reply: reply, heard: heard,
@@ -154,16 +154,14 @@ struct VoiceCallLab: View {
         }
     }
 
-    /// Stand-ins for the call buttons: their size and place, not their behavior.
+    /// The call buttons as the call draws them, without their actions.
     private var controls: some View {
-        HStack {
-            ForEach(["Audio", "Mute", "End"], id: \.self) { title in
-                if title != "Audio" { Spacer() }
-                Circle()
-                    .fill(title == "End" ? Color.hxDanger : Color.hxTextPrimary.opacity(0.1))
-                    .frame(width: 60, height: 60)
-                    .frame(minWidth: 60)
-            }
+        HStack(alignment: .top) {
+            CallControl(title: "Audio") { Image(systemName: "airplayaudio") }
+            Spacer()
+            CallControl(title: "Mute") { Image(systemName: "mic.fill") }
+            Spacer()
+            CallControl(title: "End", tint: .hxDanger) { Image(systemName: "phone.down.fill") }
         }
         .padding(.horizontal, 8)
     }
