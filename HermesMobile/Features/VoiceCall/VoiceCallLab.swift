@@ -1,21 +1,23 @@
 #if DEBUG
 import SwiftUI
 
-/// Debug-only call screen lab: loops a scripted conversation through the real
-/// starfield, captions, and status in the call screen's layout, so turn changes can be
-/// watched on a simulator without CallKit, a mic, or a server.
+/// Debug-only call screen lab: loops a whole scripted call through the real starfield,
+/// captions, and status in the call screen's layout, so every state can be watched on a
+/// simulator without CallKit, a mic, or a server: rest, a turn with no memories, a turn that
+/// finds three, a follow-up that reuses one and is cut off, muted, reconnecting, dropped, ended.
+/// The state's name shows in the corner.
 /// `xcrun simctl launch <udid> <bundle id> --voice-call-lab`
-/// holds one state instead with `--voice-call-lab-phase <phase>`, one of
-/// idle, listening, thinking, tools, converge, speaking, interrupted, dropped, or ended.
+/// holds one state instead with `--voice-call-lab-phase <phase>`, one of idle, listening,
+/// thinking, tools, converge, speaking, interrupted, muted, reconnecting, dropped, or ended.
 /// `--voice-call-lab-perf` prints the starfield's frame times every 240 frames.
 struct VoiceCallLab: View {
     private enum Phase: String, CaseIterable {
-        case idle, listening, thinking, tools, converge, speaking, interrupted, dropped, ended
+        case idle, listening, thinking, tools, converge, speaking, interrupted, muted, reconnecting, dropped, ended
 
         var scene: VoiceCallScenePhase {
             switch self {
-            case .idle, .dropped, .ended: .idle
-            case .listening: .listen
+            case .idle, .reconnecting, .dropped, .ended: .idle
+            case .listening, .muted: .listen
             case .thinking: .think
             case .tools: .tools
             case .converge: .converge
@@ -29,6 +31,8 @@ struct VoiceCallLab: View {
             case .idle, .listening, .interrupted: "Listening"
             case .thinking, .tools: "Thinking"
             case .converge, .speaking: "Speaking"
+            case .muted: "Muted"
+            case .reconnecting: "Reconnecting"
             case .dropped: "Call dropped"
             case .ended: "Call ended"
             }
@@ -40,7 +44,7 @@ struct VoiceCallLab: View {
             case .listening, .interrupted: "Tap to send"
             case .thinking, .tools: "Tap to cancel"
             case .converge, .speaking: "Tap to interrupt"
-            case .dropped, .ended: nil
+            case .muted, .reconnecting, .dropped, .ended: nil
             }
         }
 
@@ -104,9 +108,16 @@ struct VoiceCallLab: View {
             Color.hxCanvas.ignoresSafeArea()
             VoiceCallStarfield(
                 levels: levels, phase: phase.scene, sources: sources, focus: orbSlot,
-                interruptions: interruptions, replyStarts: replyStarts
+                interruptions: interruptions, replyStarts: replyStarts,
+                dimmed: phase == .muted || phase == .reconnecting
             )
             .ignoresSafeArea()
+            Text(verbatim: "LAB · \(phase.rawValue)")
+                .font(AppFont.caption2(weight: .semibold))
+                .foregroundStyle(Color.hxTextSecondary)
+                .monospaced()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(.leading, 20)
             VStack(spacing: 0) {
                 VStack(spacing: 4) {
                     Text(verbatim: "Atlas")
@@ -159,7 +170,9 @@ struct VoiceCallLab: View {
         HStack(alignment: .top) {
             CallControl(title: "Audio") { Image(systemName: "airplayaudio") }
             Spacer()
-            CallControl(title: "Mute") { Image(systemName: "mic.fill") }
+            CallControl(title: phase == .muted ? "Unmute" : "Mute", isOn: phase == .muted) {
+                Image(systemName: phase == .muted ? "mic.slash.fill" : "mic.fill")
+            }
             Spacer()
             CallControl(title: "End", tint: .hxDanger) { Image(systemName: "phone.down.fill") }
         }
@@ -203,21 +216,61 @@ struct VoiceCallLab: View {
                 levels.setMic(Float.random(in: 0.4...0.8))
                 try? await Task.sleep(for: .seconds(0.6))
             }
-        case .dropped, .ended:
+        case .muted, .reconnecting, .dropped, .ended:
             sent = turn.user
             reply = turn.atlas
         }
     }
 
+    /// One whole call, over and over: rest, a turn with no memories, a turn that finds three,
+    /// a follow-up that reuses the journal day (it lights where it was) and is cut off, then
+    /// muted, reconnecting, dropped, and ended.
     private func run() async {
+        let journal = Self.memories[0], wiki = Self.memories[1], mitch = Self.memories[2], article = Self.memories[3]
         while !Task.isCancelled {
-            for turn in Self.turns {
-                await play(turn.user, turn.atlas, tool: turn.tool)
-            }
+            sent = nil
+            reply = nil
+            live = ""
+            sources = []
+            phase = .idle
+            try? await Task.sleep(for: .seconds(2.5))
+            let weather = Self.turns[0]
+            await play(weather.user, weather.atlas, tool: weather.tool, found: [])
+            await play(
+                "What did I write about the taper, and did Mitch say anything about the race",
+                "Your October 22nd entry says the taper is settling in, with sleep as the focus. "
+                    + "Mitch told you to keep Thursday easy and save your legs for the race.",
+                tool: Self.lookup, found: [journal, wiki, mitch]
+            )
+            await play(
+                "And what should I eat the night before",
+                "Your journal from the 22nd says pasta worked well before the half. The fueling article "
+                    + "suggests rice or potatoes, lightly salted, and nothing new the night before.",
+                tool: Self.lookup, found: [journal, article], cutOffAfter: 12
+            )
+            phase = .interrupted
+            interruptions += 1
+            live = "Wait, actually"
+            try? await Task.sleep(for: .seconds(VoiceCallScenePhase.interruptSeconds))
+            phase = .listening
+            try? await Task.sleep(for: .seconds(1.5))
+            live = ""
+            phase = .muted
+            try? await Task.sleep(for: .seconds(3))
+            phase = .reconnecting
+            try? await Task.sleep(for: .seconds(3))
+            phase = .dropped
+            try? await Task.sleep(for: .seconds(3.5))
+            phase = .ended
+            try? await Task.sleep(for: .seconds(2.5))
         }
     }
 
-    private func play(_ user: String, _ atlas: String, tool: VoiceCallToolActivity?) async {
+    /// One turn: the user's words, thinking (finding `found` one at a time under `tool`), and
+    /// Atlas's reply, cut off after `cutOffAfter` words if given.
+    private func play(
+        _ user: String, _ atlas: String, tool: VoiceCallToolActivity?, found: [VoiceCallSource], cutOffAfter: Int? = nil
+    ) async {
         phase = .listening
         try? await Task.sleep(for: .seconds(1.5))
         for word in Self.prefixes(of: user) {
@@ -236,29 +289,29 @@ struct VoiceCallLab: View {
         phase = .thinking
         try? await Task.sleep(for: .seconds(1))
         activity = tool
-        if tool != nil {
-            let found = Self.memories.shuffled()
-            for count in 1...4 {
-                try? await Task.sleep(for: .seconds(0.7))
-                sources = Array(found.prefix(count))
-                phase = .tools
-            }
+        try? await Task.sleep(for: .seconds(1.5))
+        for count in found.indices {
+            sources = Array(found.prefix(count + 1))
+            phase = .tools
+            try? await Task.sleep(for: .seconds(0.7))
         }
         try? await Task.sleep(for: .seconds(1))
         activity = nil
         replyStarts += 1
         phase = .speaking
         reply = atlas
-        await speak(atlas)
-        try? await Task.sleep(for: .seconds(1.5))
+        await speak(atlas, stopAfter: cutOffAfter)
+        if cutOffAfter == nil {
+            try? await Task.sleep(for: .seconds(1.5))
+        }
         levels.voiceStopped()
     }
 
     /// Says `text` a word at a time like the server voice: a loud attack and a dip per word,
     /// longer pauses after a sentence, with `heard` following along.
-    private func speak(_ text: String) async {
+    private func speak(_ text: String, stopAfter limit: Int? = nil) async {
         heard = ""
-        for words in Self.prefixes(of: text) {
+        for words in Self.prefixes(of: text).prefix(limit ?? .max) {
             levels.setVoice(Float.random(in: 0.55...0.9))
             try? await Task.sleep(for: .milliseconds(140))
             levels.setVoice(Float.random(in: 0.08...0.2))
