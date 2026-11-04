@@ -1878,10 +1878,10 @@ final class VoiceCallCaptionsTests: XCTestCase {
 
     func testSubtitlesFollowATurn() {
         XCTAssertNil(line(reply: "an older chat reply"))
-        XCTAssertEqual(line(live: "what time"), .init(words: ["what", "time"], lit: 2, isActive: true))
+        XCTAssertEqual(line(live: "what time"), .init(words: ["what", "time"], lit: 2, isActive: true, isUser: true))
         // Sent, Atlas's voice hasn't started: the question waits, dimmed, even as reply text streams in.
         XCTAssertEqual(line(sent: "what time is it", reply: "It's 2:37.", replying: true),
-                       .init(words: ["what", "time", "is", "it"], lit: 4, isActive: false))
+                       .init(words: ["what", "time", "is", "it"], lit: 4, isActive: false, isUser: true))
         // Speaking: the word being said lights with the ones before it.
         XCTAssertEqual(line(sent: "q", reply: "It's 2:37. Anything else?", heard: "", speaking: true, replying: true),
                        .init(words: ["It's", "2:37."], lit: 1, isActive: true))
@@ -1892,6 +1892,12 @@ final class VoiceCallCaptionsTests: XCTestCase {
         XCTAssertEqual(line(sent: "q", reply: "It's 2:37. Anything else?", heard: "It's 2:37. Anything else?"),
                        .init(words: ["Anything", "else?"], lit: 2, isActive: false))
         XCTAssertEqual(line(sent: "q", live: "thanks", reply: "It's 2:37.")?.words, ["thanks"])
+    }
+
+    func testTheUsersWordsShowWhole() {
+        let question = "What did I write about the taper, and did Mitch say anything about the race"
+        XCTAssertEqual(line(sent: question, replying: true)?.words.joined(separator: " "), question)
+        XCTAssertEqual(line(live: question)?.words.count, 15)
     }
 
     func testLongSentenceShowsInEvenPieces() {

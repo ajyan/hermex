@@ -52,6 +52,8 @@ struct VoiceCallStarfield: View {
             .transition(.opacity)
         }
         .animation(reduceMotion ? HXMotion.crossfade : nil, value: phase)
+        // Memory names inside the cloud stay small; the chips under it carry large text.
+        .dynamicTypeSize(...DynamicTypeSize.xLarge)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
@@ -632,18 +634,26 @@ final class StarfieldModel {
         }
 
         // Labels name the memories while Atlas searches; the chips under the cloud take over.
+        // A name goes under its memory, else over it, else is left out: names never overlap.
         var labels = context
         let naming = max(w.think, w.tools, 0.6 * w.converge)
+        var placed: [CGRect] = []
         for spot in nodeSpots {
             let alpha = spot.alpha * naming * constellation
             guard alpha >= 0.02 else { continue }
             let text = labels.resolve(
                 Text(verbatim: spot.label).font(AppFont.caption2(weight: .medium)).foregroundStyle(Color.hxTextPrimary)
             )
-            let half = text.measure(in: CGSize(width: scene.width, height: 40)).width / 2
-            let x = min(max(spot.x, half + 12), scene.width - half - 12)
+            let size = text.measure(in: CGSize(width: scene.width * 0.6, height: 40))
+            let x = min(max(spot.x, size.width / 2 + 12), scene.width - size.width / 2 - 12)
+            let offset = 18 * scene.sc
+            let spots = [spot.y + offset, spot.y - offset].map {
+                CGRect(x: x - size.width / 2 - 3, y: $0 - size.height / 2 - 1, width: size.width + 6, height: size.height + 2)
+            }
+            guard let rect = spots.first(where: { candidate in !placed.contains { $0.intersects(candidate) } }) else { continue }
+            placed.append(rect)
             labels.opacity = min(alpha, 1)
-            labels.draw(text, at: CGPoint(x: x, y: spot.y + 18 * scene.sc), anchor: .center)
+            labels.draw(text, at: CGPoint(x: rect.midX, y: rect.midY), anchor: .center)
         }
     }
 

@@ -390,9 +390,9 @@ struct VoiceCallView: View {
         }
     }
 
-    /// The memories Atlas is answering from, as chips while it speaks.
+    /// The memories Atlas has found, as chips: while it thinks (between tool calls) and while it speaks.
     private var shownSources: [VoiceCallSource] {
-        state == .speaking ? scene.sources : []
+        state == .speaking || state == .thinking ? scene.sources : []
     }
 
     private var tapHint: String? {

@@ -1,9 +1,10 @@
 import SwiftUI
 
 /// Subtitles for a call, between the status and the call buttons: the user's words while they
-/// talk, then the part of Atlas's reply it is saying, each word lit as it's heard. A long
-/// sentence shows in pieces of at most `pieceWords` words, so the line never scrolls; the area
-/// holds three lines and shrinks large text to fit rather than reach the controls.
+/// talk (whole, their latest three lines), then the part of Atlas's reply it is saying, each word
+/// lit as it's heard. A long sentence of Atlas's shows in pieces of at most `pieceWords` words, so
+/// the line never scrolls; the area holds three lines and shrinks large text to fit rather than
+/// reach the controls.
 struct VoiceCallCaptions: View {
     let sent: String?
     let live: String
@@ -27,6 +28,8 @@ struct VoiceCallCaptions: View {
         var lit: Int
         /// Dimmed once the words are no longer being said.
         var isActive: Bool
+        /// The user's own words: shown whole, cut at the start when they run past three lines.
+        var isUser = false
     }
 
     /// What the subtitles show. The user's sent words wait, dimmed, until Atlas's voice starts;
@@ -35,14 +38,14 @@ struct VoiceCallCaptions: View {
         sent: String?, live: String, reply: String?, heard: String, isSpeaking: Bool, isReplying: Bool
     ) -> Line? {
         if !live.isEmpty {
-            let words = pieces(of: words(in: live)).last ?? []
-            return Line(words: words, lit: words.count, isActive: true)
+            let words = words(in: live)
+            return Line(words: words, lit: words.count, isActive: true, isUser: true)
         }
         guard let sent else { return nil }
         let replyPieces = pieces(of: words(in: reply ?? ""))
         if replyPieces.isEmpty || (isReplying && !isSpeaking) {
-            let words = pieces(of: words(in: sent)).last ?? []
-            return words.isEmpty ? nil : Line(words: words, lit: words.count, isActive: false)
+            let words = words(in: sent)
+            return words.isEmpty ? nil : Line(words: words, lit: words.count, isActive: false, isUser: true)
         }
         let total = replyPieces.reduce(0) { $0 + $1.count }
         let heardCount = min(words(in: heard).count, total)
@@ -83,6 +86,7 @@ struct VoiceCallCaptions: View {
             .font(AppFont.title3(weight: .semibold))
             .multilineTextAlignment(.center)
             .lineLimit(3)
+            .truncationMode(line?.isUser == true ? .head : .tail)
             .minimumScaleFactor(0.7)
             // Pieces swap at once, as subtitles do; a crossfade overlaps two lines.
             .frame(maxWidth: .infinity, minHeight: height, maxHeight: height)

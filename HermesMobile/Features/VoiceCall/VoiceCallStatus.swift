@@ -206,11 +206,18 @@ struct CallControl<Content: View>: View {
     var tint: Color?
     @ViewBuilder let content: Content
 
-    /// The title is for VoiceOver; the round buttons speak for themselves on screen.
     var body: some View {
-        button
-            .accessibilityLabel(title)
-            .frame(minWidth: 60)
+        VStack(spacing: 8) {
+            button
+                .accessibilityLabel(title)
+            Text(title)
+                .font(AppFont.caption(weight: .medium))
+                .foregroundStyle(Color.hxTextSecondary)
+                .lineLimit(1)
+                .accessibilityHidden(true)
+        }
+        .frame(minWidth: 60)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
     }
 
     /// Solid when it carries meaning (End, or a control that's on), glass otherwise.
