@@ -1,0 +1,36 @@
+{
+ "target": "2026-11-09",
+ "dinners": 2,
+ "scaled": [
+  "Saturday scaled to 8"
+ ],
+ "stores": [
+  {
+   "store": "Weee!",
+   "items": [
+    {
+     "item": "korean radish",
+     "amount": "2 2/3"
+    }
+   ]
+  },
+  {
+   "store": "Whole Foods",
+   "items": [
+    {
+     "item": "firm tofu",
+     "amount": "2 block"
+    },
+    {
+     "item": "scallion",
+     "amount": "1 bunch"
+    },
+    {
+     "item": "short rib",
+     "amount": "10 2/3 lb"
+    }
+   ]
+  }
+ ],
+ "have": []
+}

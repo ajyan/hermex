@@ -688,7 +688,8 @@ struct ChatShellView: View {
             WorkoutView(day: day, server: server, onAPIError: authManager.handleAPIError)
                 .id(day ?? "next")
         case .meals:
-            MealsHomeView(server: server, onAPIError: authManager.handleAPIError, onOpen: { navigation.push($0) })
+            MealsHomeView(server: server, onAPIError: authManager.handleAPIError, onOpen: { navigation.push($0) },
+                          ask: { selectDestination(PendingNewChatRoute(initialDraft: $0)) })
                 .adaptiveSecondaryNavigationTitle()
         case .mealsBook:
             MealsBookView(server: server, onAPIError: authManager.handleAPIError, onOpen: { navigation.push($0) })

@@ -1,0 +1,42 @@
+{
+ "target": "2026-11-09",
+ "candidates": [
+  {
+   "slug": "galbijjim",
+   "name": "Galbijjim",
+   "why": "",
+   "tag": null
+  },
+  {
+   "slug": "fish-collar",
+   "name": "Fish collar",
+   "why": "uses frozen hamachi collar",
+   "tag": "uses on hand"
+  },
+  {
+   "slug": "kabocha-with-pork-riblets",
+   "name": "Kabocha with pork riblets",
+   "why": "in season: kabocha squash \u00b7 a fall dish",
+   "tag": null
+  }
+ ],
+ "sides": {
+  "fish-collar": [
+   {
+    "slug": "tomato-egg",
+    "name": "Tomato egg"
+   }
+  ]
+ },
+ "last_year": [
+  {
+   "slug": "galbijjim",
+   "name": "Galbijjim"
+  }
+ ],
+ "prep": {
+  "kabocha-with-pork-riblets": [
+   "marinate the riblets"
+  ]
+ }
+}

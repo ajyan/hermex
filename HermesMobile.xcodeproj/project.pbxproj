@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AEA150000000000000000037 /* MealsPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000036 /* MealsPlanTests.swift */; };
+		AEA150000000000000000035 /* MealsPlanSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000034 /* MealsPlanSheet.swift */; };
+		AEA150000000000000000033 /* MealsPlanModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000032 /* MealsPlanModel.swift */; };
+		AEA150000000000000000031 /* MealsPlanModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000030 /* MealsPlanModels.swift */; };
 		AEA15000000000000000002D /* MealsRecipeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA15000000000000000002C /* MealsRecipeTests.swift */; };
 		AEA15000000000000000002B /* MealsBookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA15000000000000000002A /* MealsBookView.swift */; };
 		AEA150000000000000000029 /* MealsAddLinkSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000028 /* MealsAddLinkSheet.swift */; };
@@ -797,7 +801,6 @@
 		B1D0B70B0000000000000002 /* DeckWeekGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D0B70B0000000000000001 /* DeckWeekGrid.swift */; };
 		AE625BAC72CC28032AA09722 /* DeckAskCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20F34E30177D3A494A9742C3 /* DeckAskCard.swift */; };
 		AF6622CA57DD85E38D602DB0 /* DeckSearchCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50E35E4D9B9E28B04ED6E7F /* DeckSearchCard.swift */; };
-		E59CE87523735D3C4DD69907 /* DeckMealsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D4B11B7B4571096494EF4D5 /* DeckMealsCard.swift */; };
 		900A2A32C06B243E5E952458 /* DailyAskModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE286E9D44D3D280A038AFAE /* DailyAskModel.swift */; };
 		754960F45562E3D0663233FC /* DailyAskModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 446FC64957B2A7BF327BEA73 /* DailyAskModels.swift */; };
 		2D040393A5D1598FA7E58E97 /* DeckMandarinCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E500908D2992BBA8212DC303 /* DeckMandarinCard.swift */; };
@@ -930,6 +933,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		AEA150000000000000000036 /* MealsPlanTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsPlanTests.swift; sourceTree = "<group>"; };
+		AEA150000000000000000034 /* MealsPlanSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsPlanSheet.swift; sourceTree = "<group>"; };
+		AEA150000000000000000032 /* MealsPlanModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsPlanModel.swift; sourceTree = "<group>"; };
+		AEA150000000000000000030 /* MealsPlanModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsPlanModels.swift; sourceTree = "<group>"; };
 		AEA15000000000000000002C /* MealsRecipeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsRecipeTests.swift; sourceTree = "<group>"; };
 		AEA15000000000000000002A /* MealsBookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsBookView.swift; sourceTree = "<group>"; };
 		AEA150000000000000000028 /* MealsAddLinkSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsAddLinkSheet.swift; sourceTree = "<group>"; };
@@ -1714,7 +1721,6 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		B1D0B70B0000000000000001 /* DeckWeekGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckWeekGrid.swift; sourceTree = "<group>"; };
 		20F34E30177D3A494A9742C3 /* DeckAskCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckAskCard.swift; sourceTree = "<group>"; };
 		C50E35E4D9B9E28B04ED6E7F /* DeckSearchCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckSearchCard.swift; sourceTree = "<group>"; };
-		0D4B11B7B4571096494EF4D5 /* DeckMealsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckMealsCard.swift; sourceTree = "<group>"; };
 		EE286E9D44D3D280A038AFAE /* DailyAskModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyAskModel.swift; sourceTree = "<group>"; };
 		446FC64957B2A7BF327BEA73 /* DailyAskModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyAskModels.swift; sourceTree = "<group>"; };
 		E500908D2992BBA8212DC303 /* DeckMandarinCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckMandarinCard.swift; sourceTree = "<group>"; };
@@ -1860,6 +1866,9 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		AEA150000000000000000000 /* Meals */ = {
 			isa = PBXGroup;
 			children = (
+				AEA150000000000000000034 /* MealsPlanSheet.swift */,
+				AEA150000000000000000032 /* MealsPlanModel.swift */,
+				AEA150000000000000000030 /* MealsPlanModels.swift */,
 				AEA15000000000000000002A /* MealsBookView.swift */,
 				AEA150000000000000000028 /* MealsAddLinkSheet.swift */,
 				AEA150000000000000000026 /* MealsRecipeEditor.swift */,
@@ -2047,6 +2056,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		1A2B3C4D5E6F700000000034 /* HermesMobileTests */ = {
 			isa = PBXGroup;
 			children = (
+				AEA150000000000000000036 /* MealsPlanTests.swift */,
 				AEA15000000000000000002C /* MealsRecipeTests.swift */,
 				AEA150000000000000000012 /* MealsTests.swift */,
 				B0D700000000000000000006 /* BodyModelsTests.swift */,
@@ -2991,7 +3001,6 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				B1D0B70B0000000000000001 /* DeckWeekGrid.swift */,
 				20F34E30177D3A494A9742C3 /* DeckAskCard.swift */,
 				C50E35E4D9B9E28B04ED6E7F /* DeckSearchCard.swift */,
-				0D4B11B7B4571096494EF4D5 /* DeckMealsCard.swift */,
 				EE286E9D44D3D280A038AFAE /* DailyAskModel.swift */,
 				446FC64957B2A7BF327BEA73 /* DailyAskModels.swift */,
 				E500908D2992BBA8212DC303 /* DeckMandarinCard.swift */,
@@ -3291,6 +3300,9 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AEA150000000000000000035 /* MealsPlanSheet.swift in Sources */,
+				AEA150000000000000000033 /* MealsPlanModel.swift in Sources */,
+				AEA150000000000000000031 /* MealsPlanModels.swift in Sources */,
 				AEA15000000000000000002B /* MealsBookView.swift in Sources */,
 				AEA150000000000000000029 /* MealsAddLinkSheet.swift in Sources */,
 				AEA150000000000000000027 /* MealsRecipeEditor.swift in Sources */,
@@ -3329,7 +3341,6 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				B1D0B70B0000000000000002 /* DeckWeekGrid.swift in Sources */,
 				AE625BAC72CC28032AA09722 /* DeckAskCard.swift in Sources */,
 				AF6622CA57DD85E38D602DB0 /* DeckSearchCard.swift in Sources */,
-				E59CE87523735D3C4DD69907 /* DeckMealsCard.swift in Sources */,
 				900A2A32C06B243E5E952458 /* DailyAskModel.swift in Sources */,
 				754960F45562E3D0663233FC /* DailyAskModels.swift in Sources */,
 				2D040393A5D1598FA7E58E97 /* DeckMandarinCard.swift in Sources */,
@@ -3872,6 +3883,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AEA150000000000000000037 /* MealsPlanTests.swift in Sources */,
 				AEA15000000000000000002D /* MealsRecipeTests.swift in Sources */,
 				AEA150000000000000000013 /* MealsTests.swift in Sources */,
 				B0D700000000000000000007 /* BodyModelsTests.swift in Sources */,

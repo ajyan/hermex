@@ -8,10 +8,18 @@ struct MealsHomeView: View {
     @State private var viewModel: MealsHomeViewModel
     /// The day the dish picker adds to.
     @State private var pickingFor: PickerTarget?
+    @State private var planning = false
+    private let server: URL
+    private let onAPIError: (Error) -> Void
     private let onOpen: (ShellPushDestination) -> Void
+    private let ask: (String) -> Void
 
-    init(server: URL, onAPIError: @escaping (Error) -> Void, onOpen: @escaping (ShellPushDestination) -> Void) {
+    init(server: URL, onAPIError: @escaping (Error) -> Void, onOpen: @escaping (ShellPushDestination) -> Void,
+         ask: @escaping (String) -> Void) {
+        self.server = server
+        self.onAPIError = onAPIError
         self.onOpen = onOpen
+        self.ask = ask
         let client = APIClientMealsScreenAdapter(apiClient: APIClient(baseURL: server))
         _viewModel = State(initialValue: MealsHomeViewModel(client: client, onAPIError: onAPIError, onHome: { home in
             MealsWidgetSync.update(server: server, home: home)
@@ -35,6 +43,9 @@ struct MealsHomeView: View {
             .task { await viewModel.load() }
             .sheet(item: $viewModel.logDraft) { draft in
                 MealsLogSheet(draft: draft, viewModel: viewModel)
+            }
+            .sheet(isPresented: $planning, onDismiss: { Task { await viewModel.load() } }) {
+                MealsPlanSheet(server: server, onAPIError: onAPIError, ask: ask)
             }
             .sheet(item: $pickingFor) { target in
                 MealsDishPicker(viewModel: viewModel, dayLabel: MealsCopy.weekdayName(target.day)) { dish in
@@ -69,6 +80,7 @@ struct MealsHomeView: View {
                     }
                     tonightCard(home)
                     week(home)
+                    planButton
                 }
                 .padding(BrainStyle.l)
                 .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
@@ -202,6 +214,18 @@ struct MealsHomeView: View {
     }
 
     // MARK: The week
+
+    /// Opens the weekend planner: next week from Friday on, else the rest of this week.
+    private var planButton: some View {
+        Button { planning = true } label: {
+            Label { Text(verbatim: MealsCopy.planTitle(Date())) } icon: { Image(systemName: "calendar.badge.plus") }
+                .font(AppFont.subheadline(weight: .semibold))
+                .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
+        .accessibilityHint(Text(verbatim: "Review this week, what's left, fill the nights and send groceries"))
+    }
 
     private func week(_ home: MealsHome) -> some View {
         VStack(alignment: .leading, spacing: 8) {
