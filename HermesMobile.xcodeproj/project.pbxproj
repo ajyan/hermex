@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AEA15000000000000000003B /* MealsRecordTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA15000000000000000003A /* MealsRecordTests.swift */; };
+		AEA150000000000000000039 /* MealsSeasonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000038 /* MealsSeasonView.swift */; };
 		AEA150000000000000000037 /* MealsPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000036 /* MealsPlanTests.swift */; };
 		AEA150000000000000000035 /* MealsPlanSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000034 /* MealsPlanSheet.swift */; };
 		AEA150000000000000000033 /* MealsPlanModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000032 /* MealsPlanModel.swift */; };
@@ -933,6 +935,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		AEA15000000000000000003A /* MealsRecordTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsRecordTests.swift; sourceTree = "<group>"; };
+		AEA150000000000000000038 /* MealsSeasonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsSeasonView.swift; sourceTree = "<group>"; };
 		AEA150000000000000000036 /* MealsPlanTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsPlanTests.swift; sourceTree = "<group>"; };
 		AEA150000000000000000034 /* MealsPlanSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsPlanSheet.swift; sourceTree = "<group>"; };
 		AEA150000000000000000032 /* MealsPlanModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsPlanModel.swift; sourceTree = "<group>"; };
@@ -1866,6 +1870,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		AEA150000000000000000000 /* Meals */ = {
 			isa = PBXGroup;
 			children = (
+				AEA150000000000000000038 /* MealsSeasonView.swift */,
 				AEA150000000000000000034 /* MealsPlanSheet.swift */,
 				AEA150000000000000000032 /* MealsPlanModel.swift */,
 				AEA150000000000000000030 /* MealsPlanModels.swift */,
@@ -2056,6 +2061,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		1A2B3C4D5E6F700000000034 /* HermesMobileTests */ = {
 			isa = PBXGroup;
 			children = (
+				AEA15000000000000000003A /* MealsRecordTests.swift */,
 				AEA150000000000000000036 /* MealsPlanTests.swift */,
 				AEA15000000000000000002C /* MealsRecipeTests.swift */,
 				AEA150000000000000000012 /* MealsTests.swift */,
@@ -3300,6 +3306,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AEA150000000000000000039 /* MealsSeasonView.swift in Sources */,
 				AEA150000000000000000035 /* MealsPlanSheet.swift in Sources */,
 				AEA150000000000000000033 /* MealsPlanModel.swift in Sources */,
 				AEA150000000000000000031 /* MealsPlanModels.swift in Sources */,
@@ -3883,6 +3890,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AEA15000000000000000003B /* MealsRecordTests.swift in Sources */,
 				AEA150000000000000000037 /* MealsPlanTests.swift in Sources */,
 				AEA15000000000000000002D /* MealsRecipeTests.swift in Sources */,
 				AEA150000000000000000013 /* MealsTests.swift in Sources */,

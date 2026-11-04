@@ -138,7 +138,7 @@ struct MealsBookView: View {
 
     @ViewBuilder
     private func seasonCard(_ season: MealsSeason) -> some View {
-        if season.mostMade != nil || season.goToSide != nil || !season.new.isEmpty {
+        if !season.name.isEmpty {
             HXCard(.glow(paper), title: season.name, titleStyle: .title2, spacing: 8) {
                 Text(verbatim: "Your season")
                     .font(AppFont.caption(weight: .semibold))
@@ -168,7 +168,11 @@ struct MealsBookView: View {
                     }
                 }
             } footer: {
-                EmptyView()
+                Button { if case .loaded(let book) = viewModel.state { onOpen(.mealsSeason(book.day)) } } label: {
+                    Text(verbatim: "Open the season")
+                        .font(AppFont.subheadline(weight: .semibold))
+                        .frame(minHeight: 44)
+                }
             }
         }
     }

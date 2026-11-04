@@ -105,13 +105,16 @@ struct MealsSuggestions: Decodable, Equatable {
     let sides: [String: [MealsSeasonPick]]
     let lastYear: [MealsSeasonPick]
     let prep: [String: [String]]
+    /// The target week's occasions a dish is tagged for, by date.
+    let occasions: [String: MealsOccasion]
 
     init(candidates: [MealsSuggestion] = [], sides: [String: [MealsSeasonPick]] = [:],
-         lastYear: [MealsSeasonPick] = [], prep: [String: [String]] = [:]) {
+         lastYear: [MealsSeasonPick] = [], prep: [String: [String]] = [:], occasions: [String: MealsOccasion] = [:]) {
         self.candidates = candidates
         self.sides = sides
         self.lastYear = lastYear
         self.prep = prep
+        self.occasions = occasions
     }
 
     init(from decoder: Decoder) throws {
@@ -120,10 +123,11 @@ struct MealsSuggestions: Decodable, Equatable {
         sides = (try? c.decodeIfPresent([String: [MealsSeasonPick]].self, forKey: .sides)) ?? [:]
         lastYear = (try? c.decode([PrepLossy<MealsSeasonPick>].self, forKey: .lastYear))?.compactMap(\.value) ?? []
         prep = (try? c.decodeIfPresent([String: [String]].self, forKey: .prep)) ?? [:]
+        occasions = (try? c.decodeIfPresent([String: MealsOccasion].self, forKey: .occasions)) ?? [:]
     }
 
     private enum CodingKeys: String, CodingKey {
-        case candidates, sides, prep
+        case candidates, sides, prep, occasions
         case lastYear = "last_year"
     }
 }
@@ -133,6 +137,12 @@ struct MealsSuggestion: Decodable, Equatable, Identifiable {
     let name: String
     let why: String?
     var id: String { slug }
+
+    init(slug: String, name: String, why: String?) {
+        self.slug = slug
+        self.name = name
+        self.why = why
+    }
 
     var dish: MealsDish { MealsDish(slug: slug, name: name) }
 }
