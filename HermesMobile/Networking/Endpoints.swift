@@ -248,6 +248,15 @@ enum Endpoint {
     case mealsNights
     case mealsLog
     case mealsDish
+    /// Recipes (same fork module): GET the recipe book for the phone's local `day`, GET a dish's
+    /// page (`?slug=`), POST `/api/meals/recipe` with his edits, POST a fix's Use this or Keep as
+    /// is, POST a link to preview or save.
+    case mealsBook(day: String)
+    case mealsRecipe(slug: String)
+    case mealsRecipeEdit
+    case mealsFix
+    case mealsLinkPreview
+    case mealsLink
     /// Files a Daily Deck's answers without the model (this user's webui fork):
     /// POST `{date, kind, answers}`. Servers without it answer 404.
     case briefFile
@@ -647,6 +656,16 @@ enum Endpoint {
             return "/api/meals/log"
         case .mealsDish:
             return "/api/meals/dish"
+        case .mealsBook:
+            return "/api/meals/book"
+        case .mealsRecipe, .mealsRecipeEdit:
+            return "/api/meals/recipe"
+        case .mealsFix:
+            return "/api/meals/fix"
+        case .mealsLinkPreview:
+            return "/api/meals/link/preview"
+        case .mealsLink:
+            return "/api/meals/link"
         case .briefFile:
             return "/api/brief/file"
         case .briefIntention:
@@ -893,8 +912,10 @@ enum Endpoint {
             return [URLQueryItem(name: "id", value: id)]
         case let .mealsWeek(week):
             return [URLQueryItem(name: "week", value: week)]
-        case let .mealsHome(day):
+        case let .mealsHome(day), let .mealsBook(day):
             return [URLQueryItem(name: "day", value: day)]
+        case let .mealsRecipe(slug):
+            return [URLQueryItem(name: "slug", value: slug)]
         case let .labels(feature, item):
             var items: [URLQueryItem] = []
             if let feature { items.append(URLQueryItem(name: "feature", value: feature)) }

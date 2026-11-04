@@ -12,7 +12,18 @@ protocol MealsScreenClient: Sendable {
     func addDish(name: String, side: Bool) async throws -> MealsDish
 }
 
-struct APIClientMealsScreenAdapter: MealsScreenClient {
+/// Recipes on the same fork module: the book, a dish's page, his edits, Atlas's fixes, and links.
+/// Every write answers the dish's page as saved.
+protocol MealsRecipeClient: Sendable {
+    func book(day: String) async throws -> MealsBook
+    func recipe(slug: String) async throws -> MealsRecipe
+    func editRecipe(_ request: MealsRecipeEditRequest) async throws -> MealsRecipe
+    func answerFix(_ request: MealsFixRequest) async throws -> MealsRecipe
+    func previewLink(url: String) async throws -> MealsLinkPreview
+    func saveLink(_ request: MealsLinkRequest) async throws -> MealsRecipe
+}
+
+struct APIClientMealsScreenAdapter: MealsScreenClient, MealsRecipeClient {
     let apiClient: APIClient
 
     func home(day: String) async throws -> MealsHome {
@@ -36,6 +47,32 @@ struct APIClientMealsScreenAdapter: MealsScreenClient {
     func addDish(name: String, side: Bool) async throws -> MealsDish {
         try decode(try await apiClient.sendData(
             endpoint: .mealsDish, method: "POST", body: MealsNewDishRequest(name: name, kind: side ? "side" : "main")))
+    }
+
+    func book(day: String) async throws -> MealsBook {
+        try decode(try await apiClient.sendData(endpoint: .mealsBook(day: day), method: "GET"))
+    }
+
+    func recipe(slug: String) async throws -> MealsRecipe {
+        try decode(try await apiClient.sendData(endpoint: .mealsRecipe(slug: slug), method: "GET"))
+    }
+
+    func editRecipe(_ request: MealsRecipeEditRequest) async throws -> MealsRecipe {
+        try decode(try await apiClient.sendData(endpoint: .mealsRecipeEdit, method: "POST", body: request))
+    }
+
+    func answerFix(_ request: MealsFixRequest) async throws -> MealsRecipe {
+        try decode(try await apiClient.sendData(endpoint: .mealsFix, method: "POST", body: request))
+    }
+
+    func previewLink(url: String) async throws -> MealsLinkPreview {
+        // A recipe page can be slow to fetch through the server.
+        try decode(try await apiClient.sendData(endpoint: .mealsLinkPreview, method: "POST",
+                                                body: MealsURLRequest(url: url), timeout: 45))
+    }
+
+    func saveLink(_ request: MealsLinkRequest) async throws -> MealsRecipe {
+        try decode(try await apiClient.sendData(endpoint: .mealsLink, method: "POST", body: request, timeout: 45))
     }
 
     private func decode<Value: Decodable>(_ data: Data) throws -> Value {

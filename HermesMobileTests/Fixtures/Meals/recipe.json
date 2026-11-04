@@ -1,0 +1,97 @@
+{
+ "slug": "kabocha-with-pork-riblets",
+ "name": "Kabocha with pork riblets",
+ "kind": "main",
+ "source": null,
+ "has_recipe": true,
+ "ingredients": [
+  {
+   "qty": 1.5,
+   "qty_to": null,
+   "unit": "lb",
+   "item": "pork riblets"
+  },
+  {
+   "qty": 1.0,
+   "qty_to": null,
+   "unit": "",
+   "item": "kabocha squash"
+  },
+  {
+   "qty": 1.0,
+   "qty_to": null,
+   "unit": "tbsp",
+   "item": "fermented black beans"
+  },
+  {
+   "qty": 2.0,
+   "qty_to": 3.0,
+   "unit": "clove",
+   "item": "garlic"
+  },
+  {
+   "qty": null,
+   "qty_to": null,
+   "unit": "",
+   "item": "scallions"
+  }
+ ],
+ "status": "library",
+ "serves": 3,
+ "seasons": [
+  "fall",
+  "winter"
+ ],
+ "occasions": [],
+ "made": 2,
+ "last": "2026-10-31",
+ "saved": null,
+ "lines": [
+  "1 1/2 lb pork riblets",
+  "1 kabocha squash",
+  "1 tbsp fermented black beans",
+  "2-3 cloves garlic",
+  "scallions"
+ ],
+ "steps": [
+  "Mash the black beans with the garlic.",
+  "Steam 20 minutes."
+ ],
+ "notes": [
+  {
+   "day": "2026-10-31",
+   "text": "More black beans, it needed 5 more minutes."
+  }
+ ],
+ "fix": {
+  "day": "2026-10-31",
+  "note": "More black beans, it needed 5 more minutes.",
+  "changes": [
+   {
+    "part": "ingredient",
+    "was": "1 tbsp fermented black beans",
+    "now": "2 tbsp fermented black beans"
+   },
+   {
+    "part": "step",
+    "was": "Steam 20 minutes.",
+    "now": "Steam 25 minutes, until the kabocha is soft."
+   }
+  ]
+ },
+ "fixes": [],
+ "goes_with": [
+  {
+   "slug": "yu-choy",
+   "name": "Yu choy",
+   "kind": "side",
+   "count": 2
+  },
+  {
+   "slug": "tomato-egg",
+   "name": "Tomato egg",
+   "kind": "side",
+   "count": 1
+  }
+ ]
+}

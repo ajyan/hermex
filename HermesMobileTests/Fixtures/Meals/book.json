@@ -1,0 +1,74 @@
+{
+ "day": "2026-11-04",
+ "season": {
+  "name": "Fall 2026",
+  "most_made": {
+   "slug": "kabocha-with-pork-riblets",
+   "name": "Kabocha with pork riblets",
+   "count": 2
+  },
+  "go_to_side": {
+   "slug": "yu-choy",
+   "name": "Yu choy",
+   "count": 2
+  },
+  "new": [
+   {
+    "slug": "kabocha-with-pork-riblets",
+    "name": "Kabocha with pork riblets"
+   },
+   {
+    "slug": "yu-choy",
+    "name": "Yu choy"
+   },
+   {
+    "slug": "tomato-egg",
+    "name": "Tomato egg"
+   }
+  ]
+ },
+ "dishes": [
+  {
+   "slug": "kabocha-with-pork-riblets",
+   "name": "Kabocha with pork riblets",
+   "kind": "main",
+   "status": "library",
+   "has_recipe": true,
+   "made": 2,
+   "last": "2026-10-31",
+   "seasons": [
+    "fall",
+    "winter"
+   ],
+   "occasions": [],
+   "saved": null,
+   "partners": 2
+  },
+  {
+   "slug": "tomato-egg",
+   "name": "Tomato egg",
+   "kind": "side",
+   "status": "library",
+   "has_recipe": false,
+   "made": 1,
+   "last": "2026-10-31",
+   "seasons": [],
+   "occasions": [],
+   "saved": null,
+   "partners": 2
+  },
+  {
+   "slug": "yu-choy",
+   "name": "Yu choy",
+   "kind": "side",
+   "status": "library",
+   "has_recipe": false,
+   "made": 2,
+   "last": "2026-10-31",
+   "seasons": [],
+   "occasions": [],
+   "saved": null,
+   "partners": 2
+  }
+ ]
+}

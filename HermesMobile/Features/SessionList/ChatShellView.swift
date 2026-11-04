@@ -688,8 +688,15 @@ struct ChatShellView: View {
             WorkoutView(day: day, server: server, onAPIError: authManager.handleAPIError)
                 .id(day ?? "next")
         case .meals:
-            MealsHomeView(server: server, onAPIError: authManager.handleAPIError)
+            MealsHomeView(server: server, onAPIError: authManager.handleAPIError, onOpen: { navigation.push($0) })
                 .adaptiveSecondaryNavigationTitle()
+        case .mealsBook:
+            MealsBookView(server: server, onAPIError: authManager.handleAPIError, onOpen: { navigation.push($0) })
+        case .mealsDish(let route):
+            MealsDishView(route: route, server: server, onAPIError: authManager.handleAPIError,
+                          onOpen: { navigation.push($0) },
+                          ask: { selectDestination(PendingNewChatRoute(initialDraft: $0)) })
+                .id(route)
         case .feedback:
             FeedbackInboxView(client: feedbackAvailability.client)
         case .brainRoute(let route):
