@@ -16,7 +16,6 @@ struct VoiceCallCaptions: View {
     /// True while Atlas is still working on or saying `reply`.
     let isReplying: Bool
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Three lines of the caption font.
     @ScaledMetric(relativeTo: .title3) private var height: CGFloat = 78
 
@@ -85,9 +84,8 @@ struct VoiceCallCaptions: View {
             .multilineTextAlignment(.center)
             .lineLimit(3)
             .minimumScaleFactor(0.7)
-            .contentTransition(.opacity)
+            // Pieces swap at once, as subtitles do; a crossfade overlaps two lines.
             .frame(maxWidth: .infinity, minHeight: height, maxHeight: height)
-            .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: line?.words)
     }
 
     private func styled(_ line: Line) -> AttributedString {

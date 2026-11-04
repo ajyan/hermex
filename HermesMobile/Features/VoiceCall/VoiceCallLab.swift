@@ -58,6 +58,7 @@ struct VoiceCallLab: View {
     @State private var sent: String?
     @State private var live = ""
     @State private var reply: String?
+    @State private var heard = ""
     @State private var activity: VoiceCallToolActivity?
     @State private var interruptions = 0
     @State private var replyStarts = 0
@@ -129,9 +130,8 @@ struct VoiceCallLab: View {
                         word: phase.word, activity: activity,
                         sources: phase == .converge || phase == .speaking ? sources : [], hint: phase.hint
                     )
-                    // The lab has no voice: a reply shows as fully heard.
                     VoiceCallCaptions(
-                        sent: sent, live: live, reply: reply, heard: reply ?? "",
+                        sent: sent, live: live, reply: reply, heard: heard,
                         isSpeaking: phase == .speaking,
                         isReplying: [.thinking, .tools, .converge, .speaking].contains(phase)
                     )
@@ -192,10 +192,11 @@ struct VoiceCallLab: View {
             activity = held == .thinking ? turn.tool : nil
         case .converge, .speaking:
             sent = "What did I write about the taper, and did Mitch say anything about the race"
-            reply = "Your October 22nd entry says the taper is settling in, with sleep as the focus."
+            let said = "Your October 22nd entry says the taper is settling in, with sleep as the focus."
+            reply = said
             while !Task.isCancelled {
-                levels.setVoice(Float.random(in: 0.4...0.9))
-                try? await Task.sleep(for: .milliseconds(200))
+                await speak(said)
+                try? await Task.sleep(for: .seconds(1))
             }
         case .interrupted:
             live = "Wait, actually"
@@ -249,13 +250,25 @@ struct VoiceCallLab: View {
         activity = nil
         replyStarts += 1
         phase = .speaking
-        for words in Self.prefixes(of: atlas) {
-            reply = words
-            levels.setVoice(Float.random(in: 0.35...0.85))
-            try? await Task.sleep(for: .milliseconds(220))
-        }
+        reply = atlas
+        await speak(atlas)
         try? await Task.sleep(for: .seconds(1.5))
         levels.voiceStopped()
+    }
+
+    /// Says `text` a word at a time like the server voice: a loud attack and a dip per word,
+    /// longer pauses after a sentence, with `heard` following along.
+    private func speak(_ text: String) async {
+        heard = ""
+        for words in Self.prefixes(of: text) {
+            levels.setVoice(Float.random(in: 0.55...0.9))
+            try? await Task.sleep(for: .milliseconds(140))
+            levels.setVoice(Float.random(in: 0.08...0.2))
+            heard = words
+            let pause = words.last.map { ".,?!".contains($0) } == true ? 260 : 90
+            try? await Task.sleep(for: .milliseconds(pause))
+        }
+        levels.setVoice(0)
     }
 
     private static func prefixes(of text: String) -> [String] {

@@ -77,7 +77,8 @@ enum StarSprites {
     static let paperImages: [VoiceCallSourceKind: Image] = Dictionary(
         uniqueKeysWithValues: VoiceCallSourceKind.allCases.map { ($0, Image(uiImage: render(rgb(of: $0)))) }
     )
-    static let link = color(SIMD3(200, 205, 255) / 255, 1)
+    /// Thin cross-shaped diffraction spikes, drawn over the brightest few stars.
+    static let spikeImage = Image(uiImage: renderSpikes())
 
     static func resolvedHues(in context: GraphicsContext) -> [GraphicsContext.ResolvedImage] {
         hueImages.map { context.resolve($0) }
@@ -110,6 +111,26 @@ enum StarSprites {
         return SIMD3(channel(h + 1.0 / 3), channel(h), channel(h - 1.0 / 3))
     }
 
+    /// A horizontal and a vertical hairline, white at the center and fading to nothing at the ends.
+    private static func renderSpikes() -> UIImage {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        return UIGraphicsImageRenderer(size: CGSize(width: 64, height: 64), format: format).image { renderer in
+            let space = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+            let edge = CGColor(colorSpace: space, components: [0.85, 0.78, 1, 0]) ?? CGColor(gray: 1, alpha: 0)
+            let colors = [edge, CGColor(gray: 1, alpha: 0.85), edge] as CFArray
+            guard let gradient = CGGradient(colorsSpace: space, colors: colors, locations: [0, 0.5, 1]) else { return }
+            let context = renderer.cgContext
+            context.saveGState()
+            context.clip(to: CGRect(x: 0, y: 31.4, width: 64, height: 1.2))
+            context.drawLinearGradient(gradient, start: CGPoint(x: 0, y: 32), end: CGPoint(x: 64, y: 32), options: [])
+            context.restoreGState()
+            context.clip(to: CGRect(x: 31.4, y: 0, width: 1.2, height: 64))
+            context.drawLinearGradient(gradient, start: CGPoint(x: 32, y: 0), end: CGPoint(x: 32, y: 64), options: [])
+        }
+    }
+
     /// White at the heart, the hue around it, fading out.
     private static func render(_ rgb: SIMD3<Double>) -> UIImage {
         let format = UIGraphicsImageRendererFormat()
@@ -129,7 +150,7 @@ enum StarSprites {
     }
 }
 
-/// 3D value noise for the drift and the flock's wander: smooth, cheap, and the same on every run.
+/// 3D value noise for the drift: smooth, cheap, and the same on every run.
 enum StarNoise {
     @inline(__always)
     static func hash(_ x: Int32, _ y: Int32, _ z: Int32) -> Double {
