@@ -47,15 +47,19 @@ final class VoiceRipplesTests: XCTestCase {
         clock = feed(&ripples, Array(repeating: 0.1, count: 6) + Array(repeating: 0.7, count: 6), from: clock)
         XCTAssertEqual(ripples.started.count, 2)
         XCTAssertEqual(ripples.started.last?.strength ?? 0, 0.82, accuracy: 0.001)
-        _ = feed(&ripples, Array(repeating: 0, count: 120), from: clock)
+        // Syllables closer than `spacing` share one ripple.
+        clock = feed(&ripples, Array(repeating: 0.1, count: 3) + Array(repeating: 0.7, count: 3), from: clock)
+        XCTAssertEqual(ripples.started.count, 2)
+        _ = feed(&ripples, Array(repeating: 0, count: 150), from: clock)
         XCTAssertTrue(ripples.started.isEmpty)
     }
 
     func testRipplesRunOutAndFade() {
         var ripples = VoiceRipples()
         ripples.step(voice: 1, at: 10, dt: 1.0 / 60, cutOff: false)
-        let front = ripples.fronts(at: 10.7)[0]
-        XCTAssertEqual(front.front, 0.665, accuracy: 0.001)
+        XCTAssertEqual(ripples.fronts(at: 10.1)[0].strength, 0.38, accuracy: 0.001)
+        let front = ripples.fronts(at: 11)[0]
+        XCTAssertEqual(front.front, 0.6, accuracy: 0.001)
         XCTAssertEqual(front.strength, 0.5, accuracy: 0.001)
     }
 

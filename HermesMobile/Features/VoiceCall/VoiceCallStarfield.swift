@@ -56,11 +56,14 @@ struct VoiceCallStarfield: View {
 
 /// Ripples from Atlas's voice. Each rise in its loudness (a word, or a loud syllable) of at least
 /// `rise` over its last dip sends one out from the core, at most one per `spacing`; a steady voice
-/// sends none. A ripple's front runs out at 0.95 cloud radii a second and fades over `life`.
+/// sends none. A ripple's front runs out at `speed` cloud radii a second, swells in over its
+/// first `attack`, and fades over `life`.
 struct VoiceRipples {
-    static let rise = 0.16
-    static let spacing = 0.14
-    static let life = 1.4
+    static let rise = 0.2
+    static let spacing = 0.32
+    static let life = 2.0
+    static let speed = 0.6
+    static let attack = 0.25
 
     /// When each ripple left the core and how loud the voice was.
     private(set) var started: [(at: Double, strength: Double)] = []
@@ -80,7 +83,8 @@ struct VoiceRipples {
     func fronts(at clock: Double) -> [(front: Double, strength: Double)] {
         started.map { ripple in
             let age = clock - ripple.at
-            return (age * 0.95, ripple.strength * max(0, 1 - age / Self.life))
+            let fade = min(1, age / Self.attack) * max(0, 1 - age / Self.life)
+            return (age * Self.speed, ripple.strength * fade)
         }
     }
 }
@@ -417,7 +421,7 @@ final class StarfieldModel {
                     let d = (home.x * home.x + home.y * home.y + home.z * home.z).squareRoot()
                     for ripple in fronts {
                         let off = d - ripple.front
-                        if abs(off) < 0.3 { star.wave += ripple.strength * exp(-off * off / 0.01) }
+                        if abs(off) < 0.45 { star.wave += ripple.strength * exp(-off * off / 0.03) }
                     }
                     star.wave = min(star.wave, 1.5)
                 }
@@ -624,13 +628,13 @@ final class StarfieldModel {
                                  roleAlpha[star.role] * (0.25 + 0.75 * depth) * twinkle, inShape)
                 guard alpha >= 0.01 else { continue }
                 // A passing ripple pushes the star out from the core and brightens it, on top of its eased spot.
-                let push = 1 + 0.2 * star.wave
+                let push = 1 + 0.14 * star.wave
                 let x = scene.cx + (star.x - scene.cx) * push, y = scene.cy + (star.y - scene.cy) * push
                 let size = starLerp(star.size * 5.2,
                                 roleSize[star.role] * star.size * star.p * star.p * (0.75 + 0.5 * depth), inShape)
-                    * scene.sc * (1 + 0.25 * star.wave)
+                    * scene.sc * (1 + 0.2 * star.wave)
                 let rect = CGRect(x: x - size / 2, y: y - size / 2, width: size, height: size)
-                context.opacity = min(alpha * (1 + 0.9 * star.wave), 1)
+                context.opacity = min(alpha * (1 + 0.6 * star.wave), 1)
                 // A few knot stars wear their memory's paper once it's lit.
                 if star.role == 0, star.k < 0.3, inShape > 0.3, !spots.isEmpty {
                     let node = spots[star.j % spots.count]
