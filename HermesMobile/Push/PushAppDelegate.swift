@@ -5,11 +5,14 @@ import UserNotifications
 /// notification taps, so this delegate hands tokens to `PushRegistrar`, relay taps to
 /// `PushNotificationRouter`, Daily Brief reminder taps to the brief, and local run alert taps to
 /// `ResponseCompletionNotificationRequest`. It also gives the scene `AppLockSceneDelegate`.
-/// It also supplies the recording-only iPhone orientation policy.
+/// It also supplies the iPhone orientation policy: portrait during a call, locked while recording.
 final class PushAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication,
                      supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
-        ComposerDictationLease.supportedOrientations(for: window)
+        if VoiceCallOrientationLock.isLocked, window?.traitCollection.userInterfaceIdiom == .phone {
+            return .portrait
+        }
+        return ComposerDictationLease.supportedOrientations(for: window)
     }
 
     func application(

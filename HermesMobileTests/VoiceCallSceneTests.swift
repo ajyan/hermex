@@ -116,6 +116,21 @@ final class VoiceCallSceneTests: XCTestCase {
         }
     }
 
+    func testAMemoryUsedAgainLightsInItsOwnSlot() {
+        let memory: [(id: String, usedAt: Double)?] = [("journal", 1), ("wiki", 2), nil, nil, nil, nil]
+        XCTAssertEqual(ConstellationLayout.slot(for: "wiki", memory: memory, taken: []), 1)
+        // A new memory takes a slot no memory has used, never one lit this turn.
+        XCTAssertEqual(ConstellationLayout.slot(for: "person", memory: memory, taken: [2]), 3)
+    }
+
+    func testANewMemoryTakesTheSlotUsedLongestAgoOnceAllAreUsed() {
+        let memory: [(id: String, usedAt: Double)?] = [("a", 5), ("b", 1), ("c", 3), ("d", 4), ("e", 6), ("f", 7)]
+        XCTAssertEqual(ConstellationLayout.slot(for: "new", memory: memory, taken: []), 1)
+        XCTAssertEqual(ConstellationLayout.slot(for: "new", memory: memory, taken: [1]), 2)
+        // Its own slot, lit this turn by something else, isn't taken from it.
+        XCTAssertEqual(ConstellationLayout.slot(for: "a", memory: memory, taken: [0]), 1)
+    }
+
     func testNoiseIsSmoothAndInRange() {
         for step in 0..<200 {
             let x = Double(step) * 0.037
