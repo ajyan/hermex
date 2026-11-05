@@ -1,20 +1,24 @@
 import SwiftUI
 
 /// Money: net worth from the vault's snapshot. A big number, a chart you scrub, the week's
-/// market card, then accounts. Amounts open hidden, show only from the eye button, and hide
+/// market card, the month's spending card, then accounts. Amounts open hidden, show only from the eye button, and hide
 /// again whenever the app or the screen goes away, so the app can be shown without showing them.
 /// Pushed from the drawer as `.money`.
 struct MoneyView: View {
     @State private var viewModel: MoneyViewModel
     @State private var showsMarket = false
+    @State private var showsSpending = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Starts a new chat with these words in the composer (the shell's Ask Atlas).
+    private let ask: (String) -> Void
 
-    init(server: URL) {
-        self.init(viewModel: MoneyViewModel(server: server))
+    init(server: URL, ask: @escaping (String) -> Void = { _ in }) {
+        self.init(viewModel: MoneyViewModel(server: server), ask: ask)
     }
 
-    init(viewModel: MoneyViewModel) {
+    init(viewModel: MoneyViewModel, ask: @escaping (String) -> Void = { _ in }) {
         _viewModel = State(initialValue: viewModel)
+        self.ask = ask
     }
 
     var body: some View {
@@ -34,11 +38,14 @@ struct MoneyView: View {
             .navigationDestination(isPresented: $showsMarket) {
                 MoneyMarketView(viewModel: viewModel)
             }
+            .navigationDestination(isPresented: $showsSpending) {
+                MoneySpendingView(viewModel: viewModel, ask: ask)
+            }
             .task { await viewModel.load() }
             .hidesMoneyOnResign(viewModel)
             .onDisappear {
-                // The market card is part of Money; anywhere else hides the amounts again.
-                if !showsMarket { viewModel.hide() }
+                // The market and spending cards are part of Money; anywhere else hides the amounts again.
+                if !showsMarket && !showsSpending { viewModel.hide() }
             }
     }
 
@@ -94,6 +101,11 @@ struct MoneyView: View {
                     whyCard(week)
                         .padding(.horizontal, 16)
                         .padding(.top, 18)
+                }
+                if let spending = viewModel.spending, let month = spending.month {
+                    spendingCard(spending, month)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
                 }
                 if snapshot.holdingsMissing {
                     Text(verbatim: "Add finance/sync/holdings.yaml in your vault to split out the market.")
@@ -224,6 +236,46 @@ struct MoneyView: View {
         }
         .font(AppFont.caption(weight: .medium))
         .monospacedDigit()
+    }
+
+    // MARK: Spending
+
+    private func spendingCard(_ spending: MoneySpending, _ month: MoneySpending.Month) -> some View {
+        Button { showsSpending = true } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Label { Text(verbatim: MoneySpendingCopy.monthTitle(month)) } icon: { Image(systemName: "cart") }
+                        .font(AppFont.display(style: .subheadline, weight: .semibold))
+                        .foregroundStyle(HermexPaper.money.glow)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(AppFont.footnote(weight: .semibold))
+                        .foregroundStyle(HermexPaper.money.glow)
+                }
+                Text(verbatim: MoneyFormat.amount(month.spent, hidden: viewModel.isHidden))
+                    .font(AppFont.display(style: .title2, weight: .semibold))
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .monospacedDigit()
+                Text(verbatim: MoneySpendingCopy.usualLine(spending, hidden: viewModel.isHidden))
+                    .font(AppFont.caption(weight: .medium))
+                    .foregroundStyle(Color.hxTextSecondary)
+                if let payday = spending.payday, let left = payday.left {
+                    Text(verbatim: "Payday \(MoneyPoint.label(day: payday.next)) · \(MoneyFormat.amount(left, hidden: viewModel.isHidden)) left after \(payday.due.count == 1 ? "1 bill" : "\(payday.due.count) bills")")
+                        .font(AppFont.caption(weight: .medium))
+                        .foregroundStyle(Color.hxTextPrimary)
+                }
+                if !spending.flags.isEmpty {
+                    HXChip(paper: .money, symbol: "exclamationmark.circle",
+                           label: spending.flags.count == 1 ? "1 thing worth a look" : "\(spending.flags.count) things worth a look")
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .glowSurface(.money, cornerRadius: HXRadius.md)
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(Text(verbatim: "Opens spending"))
     }
 
     // MARK: Accounts

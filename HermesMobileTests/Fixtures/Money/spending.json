@@ -1,0 +1,953 @@
+{
+  "version": 1,
+  "as_of": "2026-10-20T05:45:00-04:00",
+  "history_start": "2026-06-20",
+  "month": {
+    "start": "2026-10-01",
+    "end": "2026-10-20",
+    "spent": 3424.11,
+    "income": 5692.3,
+    "usual": {
+      "spent": 3113.48,
+      "months": 3
+    },
+    "categories": [
+      {
+        "key": "home",
+        "name": "Rent & utilities",
+        "amount": 2324.19,
+        "usual": 2313.11,
+        "count": 3,
+        "txns": [
+          "fx-checking:fx0218",
+          "fx-checking:fx0222",
+          "fx-checking:fx0238"
+        ]
+      },
+      {
+        "key": "food",
+        "name": "Food & drink",
+        "amount": 669.7,
+        "usual": 511.79,
+        "count": 16,
+        "txns": [
+          "fx-cashback:fx0247",
+          "fx-cashback:fx0236",
+          "fx-card:fx0228",
+          "fx-cashback:fx0221",
+          "fx-card:fx0254",
+          "fx-card:fx0229",
+          "fx-card:fx0240",
+          "fx-card:fx0244",
+          "fx-card:fx0243",
+          "fx-card:fx0249",
+          "fx-card:fx0216",
+          "fx-card:fx0253",
+          "fx-card:fx0245",
+          "fx-card:fx0241",
+          "fx-card:fx0226",
+          "fx-card:fx0235"
+        ]
+      },
+      {
+        "key": "subscriptions",
+        "name": "Subscriptions",
+        "amount": 216.48,
+        "usual": 27.48,
+        "count": 3,
+        "txns": [
+          "fx-card:fx0227",
+          "fx-cashback:fx0234",
+          "fx-cashback:fx0242"
+        ]
+      },
+      {
+        "key": "shopping",
+        "name": "Shopping",
+        "amount": 113.31,
+        "usual": 172.81,
+        "count": 1,
+        "txns": [
+          "fx-card:fx0224"
+        ]
+      },
+      {
+        "key": "transport",
+        "name": "Getting around",
+        "amount": 97.31,
+        "usual": 88.29,
+        "count": 13,
+        "txns": [
+          "fx-card:fx0255",
+          "fx-card:fx0230",
+          "fx-checking:fx0217",
+          "fx-checking:fx0220",
+          "fx-checking:fx0223",
+          "fx-checking:fx0225",
+          "fx-checking:fx0231",
+          "fx-checking:fx0233",
+          "fx-checking:fx0237",
+          "fx-checking:fx0239",
+          "fx-checking:fx0248",
+          "fx-checking:fx0251",
+          "fx-checking:fx0256"
+        ]
+      },
+      {
+        "key": "fees",
+        "name": "Fees & interest",
+        "amount": 3.12,
+        "usual": 0.0,
+        "count": 1,
+        "txns": [
+          "fx-card:fx0232"
+        ]
+      }
+    ]
+  },
+  "payday": {
+    "account": "fx-checking",
+    "last": "2026-10-16",
+    "next": "2026-10-30",
+    "every": 14,
+    "amount": 2846.15,
+    "balance": 3412.58,
+    "due": [
+      {
+        "day": "2026-10-21",
+        "name": "Dept Education Student",
+        "amount": 310.0,
+        "account": "fx-checking",
+        "group": "loans",
+        "every": 30,
+        "estimate": false,
+        "txns": [
+          "fx-checking:fx0062",
+          "fx-checking:fx0129",
+          "fx-checking:fx0196"
+        ]
+      },
+      {
+        "day": "2026-10-25",
+        "name": "Sapphire Card",
+        "amount": 1242.67,
+        "account": "fx-checking",
+        "group": "transfer",
+        "every": 30,
+        "estimate": true,
+        "txns": [
+          "fx-checking:fx0073",
+          "fx-checking:fx0141",
+          "fx-checking:fx0202"
+        ]
+      },
+      {
+        "day": "2026-10-26",
+        "name": "Lemonade Insurance",
+        "amount": 18.0,
+        "account": "fx-checking",
+        "group": "health",
+        "every": 30,
+        "estimate": false,
+        "txns": [
+          "fx-checking:fx0075",
+          "fx-checking:fx0143",
+          "fx-checking:fx0205"
+        ]
+      },
+      {
+        "day": "2026-10-28",
+        "name": "Goldman Sachs Bank",
+        "amount": 200.0,
+        "account": "fx-checking",
+        "group": "transfer",
+        "every": 30,
+        "estimate": false,
+        "txns": [
+          "fx-checking:fx0081",
+          "fx-checking:fx0149",
+          "fx-checking:fx0210"
+        ]
+      }
+    ],
+    "left": 1641.91
+  },
+  "due": [
+    {
+      "day": "2026-10-21",
+      "name": "Dept Education Student",
+      "amount": 310.0,
+      "account": "fx-checking",
+      "group": "loans",
+      "every": 30,
+      "estimate": false,
+      "txns": [
+        "fx-checking:fx0062",
+        "fx-checking:fx0129",
+        "fx-checking:fx0196"
+      ]
+    },
+    {
+      "day": "2026-10-22",
+      "name": "Verizon Wireless",
+      "amount": 85.0,
+      "account": "fx-card",
+      "group": "home",
+      "every": 30,
+      "estimate": false,
+      "txns": [
+        "fx-card:fx0065",
+        "fx-card:fx0132",
+        "fx-card:fx0198"
+      ]
+    },
+    {
+      "day": "2026-10-25",
+      "name": "Sapphire Card",
+      "amount": 1242.67,
+      "account": "fx-checking",
+      "group": "transfer",
+      "every": 30,
+      "estimate": true,
+      "txns": [
+        "fx-checking:fx0073",
+        "fx-checking:fx0141",
+        "fx-checking:fx0202"
+      ]
+    },
+    {
+      "day": "2026-10-26",
+      "name": "Lemonade Insurance",
+      "amount": 18.0,
+      "account": "fx-checking",
+      "group": "health",
+      "every": 30,
+      "estimate": false,
+      "txns": [
+        "fx-checking:fx0075",
+        "fx-checking:fx0143",
+        "fx-checking:fx0205"
+      ]
+    },
+    {
+      "day": "2026-10-28",
+      "name": "Goldman Sachs Bank",
+      "amount": 200.0,
+      "account": "fx-checking",
+      "group": "transfer",
+      "every": 30,
+      "estimate": false,
+      "txns": [
+        "fx-checking:fx0081",
+        "fx-checking:fx0149",
+        "fx-checking:fx0210"
+      ]
+    },
+    {
+      "day": "2026-11-01",
+      "name": "Rent Property Mgmt",
+      "amount": 2150.0,
+      "account": "fx-checking",
+      "group": "home",
+      "every": 30,
+      "estimate": false,
+      "txns": [
+        "fx-checking:fx0090",
+        "fx-checking:fx0158",
+        "fx-checking:fx0218"
+      ]
+    },
+    {
+      "day": "2026-11-03",
+      "name": "Con Edison",
+      "amount": 104.2,
+      "account": "fx-checking",
+      "group": "home",
+      "every": 30,
+      "estimate": false,
+      "txns": [
+        "fx-checking:fx0091",
+        "fx-checking:fx0159",
+        "fx-checking:fx0222"
+      ]
+    },
+    {
+      "day": "2026-11-09",
+      "name": "Netflix",
+      "amount": 15.49,
+      "account": "fx-cashback",
+      "group": "subscriptions",
+      "every": 30,
+      "estimate": false,
+      "txns": [
+        "fx-cashback:fx0102",
+        "fx-cashback:fx0171",
+        "fx-cashback:fx0234"
+      ]
+    },
+    {
+      "day": "2026-11-12",
+      "name": "Spectrum Internet",
+      "amount": 69.99,
+      "account": "fx-checking",
+      "group": "home",
+      "every": 30,
+      "estimate": false,
+      "txns": [
+        "fx-checking:fx0111",
+        "fx-checking:fx0176",
+        "fx-checking:fx0238"
+      ]
+    },
+    {
+      "day": "2026-11-14",
+      "name": "Spotify USA",
+      "amount": 11.99,
+      "account": "fx-cashback",
+      "group": "subscriptions",
+      "every": 30,
+      "estimate": false,
+      "txns": [
+        "fx-cashback:fx0114",
+        "fx-cashback:fx0180",
+        "fx-cashback:fx0242"
+      ]
+    },
+    {
+      "day": "2026-11-18",
+      "name": "Cash Back Card",
+      "amount": 432.09,
+      "account": "fx-checking",
+      "group": "transfer",
+      "every": 30,
+      "estimate": true,
+      "txns": [
+        "fx-checking:fx0123",
+        "fx-checking:fx0189",
+        "fx-checking:fx0252"
+      ]
+    }
+  ],
+  "flags": [
+    {
+      "kind": "twice",
+      "title": "Noodle Bar Brooklyn charged twice",
+      "amount": 42.8,
+      "day": "2026-10-15",
+      "detail": "$42.80 on Oct 14 and Oct 15 on Sapphire Card 1934",
+      "question": "Was I charged twice at Noodle Bar Brooklyn on Oct 14 and Oct 15?",
+      "txns": [
+        "fx-card:fx0240",
+        "fx-card:fx0244"
+      ]
+    },
+    {
+      "kind": "fee",
+      "title": "Monthly Service Fee",
+      "amount": 12.0,
+      "day": "2026-09-30",
+      "detail": "$12.00 on Sep 30 on Everyday Checking 4821",
+      "question": "What was the $12.00 Monthly Service Fee charge on Sep 30, and can I avoid it?",
+      "txns": [
+        "fx-checking:fx0213"
+      ]
+    },
+    {
+      "kind": "fee",
+      "title": "Foreign Transaction Fee",
+      "amount": 3.12,
+      "day": "2026-10-08",
+      "detail": "$3.12 on Oct 8 on Sapphire Card 1934",
+      "question": "What was the $3.12 Foreign Transaction Fee charge on Oct 8, and can I avoid it?",
+      "txns": [
+        "fx-card:fx0232"
+      ]
+    },
+    {
+      "kind": "creep",
+      "title": "Con Edison keeps going up",
+      "amount": 15.8,
+      "day": "2026-10-03",
+      "detail": "$88.40 in July, $104.20 in October",
+      "question": "Why does my Con Edison bill keep going up?",
+      "txns": [
+        "fx-checking:fx0029",
+        "fx-checking:fx0091",
+        "fx-checking:fx0159",
+        "fx-checking:fx0222"
+      ]
+    },
+    {
+      "kind": "unusual",
+      "title": "Blink Fitness Annual",
+      "amount": 189.0,
+      "day": "2026-10-06",
+      "detail": "$189.00 on Oct 6 \u00b7 Looks like a renewal",
+      "question": "What's the $189.00 Blink Fitness Annual charge on Oct 6?",
+      "txns": [
+        "fx-card:fx0227"
+      ]
+    }
+  ],
+  "cash_flow": [
+    {
+      "month": "2026-06",
+      "in": 2888.15,
+      "out": 1013.66,
+      "partial": true
+    },
+    {
+      "month": "2026-07",
+      "in": 5734.3,
+      "out": 3981.93,
+      "partial": false
+    },
+    {
+      "month": "2026-08",
+      "in": 5734.3,
+      "out": 4475.12,
+      "partial": false
+    },
+    {
+      "month": "2026-09",
+      "in": 5734.3,
+      "out": 3813.43,
+      "partial": false
+    },
+    {
+      "month": "2026-10",
+      "in": 5692.3,
+      "out": 3424.11,
+      "partial": true
+    }
+  ],
+  "weeks": [
+    {
+      "start": "2026-08-03",
+      "spent": 325.98
+    },
+    {
+      "start": "2026-08-10",
+      "spent": 586.9
+    },
+    {
+      "start": "2026-08-17",
+      "spent": 907.67
+    },
+    {
+      "start": "2026-08-24",
+      "spent": 347.26
+    },
+    {
+      "start": "2026-08-31",
+      "spent": 2499.96
+    },
+    {
+      "start": "2026-09-07",
+      "spent": 260.15
+    },
+    {
+      "start": "2026-09-14",
+      "spent": 207.47
+    },
+    {
+      "start": "2026-09-21",
+      "spent": 604.72
+    },
+    {
+      "start": "2026-09-28",
+      "spent": 2779.8
+    },
+    {
+      "start": "2026-10-05",
+      "spent": 436.62
+    },
+    {
+      "start": "2026-10-12",
+      "spent": 403.59
+    },
+    {
+      "start": "2026-10-19",
+      "spent": 111.93
+    }
+  ],
+  "interest": {
+    "since": "2026-06-20",
+    "total": 149.57,
+    "accounts": [
+      {
+        "account": "fx-card",
+        "amount": 149.57
+      }
+    ],
+    "txns": [
+      "fx-card:fx0017",
+      "fx-card:fx0080",
+      "fx-card:fx0148",
+      "fx-card:fx0208"
+    ]
+  },
+  "accounts": [
+    {
+      "id": "fx-checking",
+      "name": "Everyday Checking 4821",
+      "institution": "Harbor Bank",
+      "kind": "cash",
+      "last4": "4821",
+      "balance": 3412.58,
+      "limit": null
+    },
+    {
+      "id": "fx-savings",
+      "name": "High-Yield Savings 0057",
+      "institution": "Harbor Bank",
+      "kind": "cash",
+      "last4": "0057",
+      "balance": 12840.0,
+      "limit": null
+    },
+    {
+      "id": "fx-cashback",
+      "name": "Cash Back Card 7710",
+      "institution": "Summit Credit",
+      "kind": "credit",
+      "last4": "7710",
+      "balance": -412.06,
+      "limit": 5000.0
+    },
+    {
+      "id": "fx-card",
+      "name": "Sapphire Card 1934",
+      "institution": "Lakeside Card",
+      "kind": "credit",
+      "last4": "1934",
+      "balance": -1284.37,
+      "limit": 10000.0
+    }
+  ],
+  "transactions": [
+    {
+      "id": "fx-checking:fx0256",
+      "day": "2026-10-20",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0255",
+      "day": "2026-10-20",
+      "name": "Uber Trip",
+      "description": "UBER TRIP",
+      "amount": -34.35,
+      "group": "transport",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0254",
+      "day": "2026-10-20",
+      "name": "Sushi Counter",
+      "description": "SUSHI COUNTER",
+      "amount": -53.75,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0253",
+      "day": "2026-10-19",
+      "name": "Sushi Counter",
+      "description": "SUSHI COUNTER",
+      "amount": -20.93,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0251",
+      "day": "2026-10-18",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0249",
+      "day": "2026-10-18",
+      "name": "Corner Cafe",
+      "description": "CORNER CAFE",
+      "amount": -38.19,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0248",
+      "day": "2026-10-17",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0247",
+      "day": "2026-10-17",
+      "name": "Trader Joe's",
+      "description": "TRADER JOE'S #552",
+      "amount": -116.04,
+      "group": "food",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-checking:fx0246",
+      "day": "2026-10-16",
+      "name": "Acme Corp Payroll",
+      "description": "ACME CORP PAYROLL",
+      "amount": 2846.15,
+      "group": "income",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0245",
+      "day": "2026-10-16",
+      "name": "Corner Cafe",
+      "description": "CORNER CAFE",
+      "amount": -18.21,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0244",
+      "day": "2026-10-15",
+      "name": "Noodle Bar Brooklyn",
+      "description": "NOODLE BAR BROOKLYN",
+      "amount": -42.8,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0243",
+      "day": "2026-10-15",
+      "name": "Bagel Bakery",
+      "description": "BAGEL BAKERY",
+      "amount": -42.39,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-cashback:fx0242",
+      "day": "2026-10-14",
+      "name": "Spotify USA",
+      "description": "SPOTIFY USA",
+      "amount": -11.99,
+      "group": "subscriptions",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-card:fx0241",
+      "day": "2026-10-14",
+      "name": "Pizza Place Bklyn",
+      "description": "PIZZA PLACE BKLYN",
+      "amount": -9.58,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0240",
+      "day": "2026-10-14",
+      "name": "Noodle Bar Brooklyn",
+      "description": "NOODLE BAR BROOKLYN",
+      "amount": -42.8,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0239",
+      "day": "2026-10-13",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0238",
+      "day": "2026-10-12",
+      "name": "Spectrum Internet",
+      "description": "SPECTRUM INTERNET",
+      "amount": -69.99,
+      "group": "home",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0237",
+      "day": "2026-10-12",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0236",
+      "day": "2026-10-10",
+      "name": "Trader Joe's",
+      "description": "TRADER JOE'S #552",
+      "amount": -67.49,
+      "group": "food",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-card:fx0235",
+      "day": "2026-10-10",
+      "name": "Bagel Bakery",
+      "description": "BAGEL BAKERY",
+      "amount": -7.12,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-cashback:fx0234",
+      "day": "2026-10-09",
+      "name": "Netflix",
+      "description": "NETFLIX.COM",
+      "amount": -15.49,
+      "group": "subscriptions",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-checking:fx0233",
+      "day": "2026-10-08",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0232",
+      "day": "2026-10-08",
+      "name": "Foreign Transaction Fee",
+      "description": "FOREIGN TRANSACTION FEE",
+      "amount": -3.12,
+      "group": "fees",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0231",
+      "day": "2026-10-07",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0230",
+      "day": "2026-10-07",
+      "name": "Uber Trip",
+      "description": "UBER TRIP",
+      "amount": -31.06,
+      "group": "transport",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0229",
+      "day": "2026-10-07",
+      "name": "Pizza Place Bklyn",
+      "description": "PIZZA PLACE BKLYN",
+      "amount": -45.51,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0228",
+      "day": "2026-10-06",
+      "name": "Corner Cafe",
+      "description": "CORNER CAFE",
+      "amount": -63.11,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0227",
+      "day": "2026-10-06",
+      "name": "Blink Fitness Annual",
+      "description": "BLINK FITNESS ANNUAL MEMBERSHIP",
+      "amount": -189.0,
+      "group": "subscriptions",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0226",
+      "day": "2026-10-05",
+      "name": "Sushi Counter",
+      "description": "SUSHI COUNTER",
+      "amount": -8.92,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0225",
+      "day": "2026-10-04",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0224",
+      "day": "2026-10-04",
+      "name": "Uniqlo USA",
+      "description": "UNIQLO USA",
+      "amount": -113.31,
+      "group": "shopping",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0223",
+      "day": "2026-10-03",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0222",
+      "day": "2026-10-03",
+      "name": "Con Edison",
+      "description": "CON EDISON BILL PAY",
+      "amount": -104.2,
+      "group": "home",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0221",
+      "day": "2026-10-03",
+      "name": "Trader Joe's",
+      "description": "TRADER JOE'S #552",
+      "amount": -61.03,
+      "group": "food",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-checking:fx0220",
+      "day": "2026-10-02",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0219",
+      "day": "2026-10-02",
+      "name": "Acme Corp Payroll",
+      "description": "ACME CORP PAYROLL",
+      "amount": 2846.15,
+      "group": "income",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0218",
+      "day": "2026-10-01",
+      "name": "Rent Property Mgmt",
+      "description": "RENT PAYMENT PROPERTY MGMT",
+      "amount": -2150.0,
+      "group": "home",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0217",
+      "day": "2026-10-01",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0216",
+      "day": "2026-10-01",
+      "name": "Bagel Bakery",
+      "description": "BAGEL BAKERY",
+      "amount": -31.83,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0213",
+      "day": "2026-09-30",
+      "name": "Monthly Service Fee",
+      "description": "MONTHLY SERVICE FEE",
+      "amount": -12.0,
+      "group": "fees",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0208",
+      "day": "2026-09-28",
+      "name": "Interest Charge",
+      "description": "PURCHASE INTEREST CHARGE",
+      "amount": -41.5,
+      "group": "fees",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0159",
+      "day": "2026-09-03",
+      "name": "Con Edison",
+      "description": "CON EDISON BILL PAY",
+      "amount": -97.85,
+      "group": "home",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0148",
+      "day": "2026-08-28",
+      "name": "Interest Charge",
+      "description": "PURCHASE INTEREST CHARGE",
+      "amount": -38.12,
+      "group": "fees",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0091",
+      "day": "2026-08-03",
+      "name": "Con Edison",
+      "description": "CON EDISON BILL PAY",
+      "amount": -93.1,
+      "group": "home",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0080",
+      "day": "2026-07-28",
+      "name": "Interest Charge",
+      "description": "PURCHASE INTEREST CHARGE",
+      "amount": -36.2,
+      "group": "fees",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0029",
+      "day": "2026-07-03",
+      "name": "Con Edison",
+      "description": "CON EDISON BILL PAY",
+      "amount": -88.4,
+      "group": "home",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0017",
+      "day": "2026-06-28",
+      "name": "Interest Charge",
+      "description": "PURCHASE INTEREST CHARGE",
+      "amount": -33.75,
+      "group": "fees",
+      "account": "fx-card"
+    }
+  ]
+}

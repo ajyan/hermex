@@ -29,7 +29,8 @@ final class MoneyViewModelTests: XCTestCase {
         XCTAssertEqual(model.snapshot?.netWorth ?? 0, 184320.12, accuracy: 0.001)
         XCTAssertNotNil(model.market)
         XCTAssertEqual(model.points.first?.d, "2026-10-05")
-        XCTAssertEqual(client.readPaths, [MoneyPaths.snapshot, MoneyPaths.market])
+        XCTAssertEqual(client.readPaths, [MoneyPaths.snapshot, MoneyPaths.market, MoneyPaths.spending])
+        XCTAssertNotNil(model.spending)
     }
 
     func testMissingSnapshotIsNoSnapshot() async {
@@ -61,7 +62,7 @@ final class MoneyViewModelTests: XCTestCase {
         let model = makeModel(client, session: "deck-session")
         await model.load()
         XCTAssertEqual(client.createdSessions, 0)
-        XCTAssertEqual(client.readSessions, ["deck-session", "deck-session"])
+        XCTAssertEqual(client.readSessions, ["deck-session", "deck-session", "deck-session"])
     }
 
     func testCreatesAndStoresSessionWhenNone() async throws {
@@ -176,6 +177,7 @@ final class MockMoneyClient: MoneyDataClient, @unchecked Sendable {
         MockMoneyClient(files: [
             MoneyPaths.snapshot: String(decoding: try MoneyModelsTests.fixture("snapshot.json"), as: UTF8.self),
             MoneyPaths.market: String(decoding: try MoneyModelsTests.fixture("market.json"), as: UTF8.self),
+            MoneyPaths.spending: String(decoding: try MoneyModelsTests.fixture("spending.json"), as: UTF8.self),
         ])
     }
 
