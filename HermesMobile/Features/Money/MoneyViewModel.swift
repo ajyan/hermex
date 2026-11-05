@@ -5,9 +5,10 @@ import Observation
 enum MoneyPaths {
     static let snapshot = "finance/data/money/snapshot.json"
     static let market = "finance/data/money/market.json"
+    static let spending = "finance/data/money/spending.json"
 }
 
-/// What Money reads: two vault files through the session-scoped file API, the same way the
+/// What Money reads: three vault files through the session-scoped file API, the same way the
 /// Daily Deck reads `briefs/`.
 protocol MoneyDataClient: Sendable {
     func workspacePaths() async throws -> [String]
@@ -34,6 +35,8 @@ final class MoneyViewModel {
     private(set) var snapshot: MoneySnapshot?
     /// The market note, only when it describes the snapshot's week.
     private(set) var market: MoneyMarketNote?
+    /// Spending, when the vault's money run has written it; Money works without it.
+    private(set) var spending: MoneySpending?
     var range: MoneyRange = .week {
         didSet { if range != oldValue { scrubbed = nil } }
     }
@@ -135,6 +138,7 @@ final class MoneyViewModel {
             guard let text = try await read(MoneyPaths.snapshot, sessionID: sessionID) else {
                 snapshot = nil
                 market = nil
+                spending = nil
                 state = .noSnapshot
                 return
             }
@@ -142,8 +146,12 @@ final class MoneyViewModel {
             let note = (try? await read(MoneyPaths.market, sessionID: sessionID))
                 .flatMap { $0 }
                 .flatMap { try? MoneyMarketNote.decode(Data($0.utf8)) }
+            let spent = (try? await read(MoneyPaths.spending, sessionID: sessionID))
+                .flatMap { $0 }
+                .flatMap { try? MoneySpending.decode(Data($0.utf8)) }
             snapshot = decoded
             market = note?.matches(decoded.week) == true ? note : nil
+            spending = spent
             scrubbed = nil
             state = .ready
         } catch is CancellationError {
@@ -215,7 +223,7 @@ private struct APIClientMoneyAdapter: MoneyDataClient {
 }
 
 #if DEBUG
-/// Reads `snapshot.json` and `market.json` from a local folder, for simulator checks and demos
+/// Reads `snapshot.json`, `market.json` and `spending.json` from a local folder, for simulator checks and demos
 /// with synthetic data (`SIMCTL_CHILD_HERMEX_MONEY_FIXTURES=<folder>`).
 private struct FixtureMoneyDataClient: MoneyDataClient {
     let directory: URL

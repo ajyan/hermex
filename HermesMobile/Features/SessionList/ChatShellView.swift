@@ -675,7 +675,7 @@ struct ChatShellView: View {
         case .finishedGoals:
             GoalsFinishedListView(server: server, onAPIError: authManager.handleAPIError)
         case .money:
-            MoneyView(server: server)
+            MoneyView(server: server, ask: askAtlas)
         case .body:
             BodyHomeView(server: server, onAPIError: authManager.handleAPIError, onOpen: { navigation.push($0) })
                 .adaptiveSecondaryNavigationTitle()
