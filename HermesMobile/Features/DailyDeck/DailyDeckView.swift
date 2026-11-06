@@ -29,8 +29,10 @@ struct DailyDeckView: View {
     @Environment(FeedbackAvailability.self) private var availability: FeedbackAvailability?
     private let openSession: (String) -> Void
 
-    init(server: URL, openSession: @escaping (String) -> Void) {
-        _viewModel = State(initialValue: DailyDeckViewModel(server: server))
+    init(server: URL, openSession: @escaping (String) -> Void, ask: ((String) -> Void)? = nil) {
+        let deck = DailyDeckViewModel(server: server)
+        deck.askAtlas = ask
+        _viewModel = State(initialValue: deck)
         let labels = LabelsViewModel(client: APIClientLabelsAdapter(apiClient: APIClient(baseURL: server)))
         _labels = State(initialValue: labels)
         _labelQueue = State(initialValue: LabelQueueViewModel(

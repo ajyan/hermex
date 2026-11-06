@@ -2022,6 +2022,1097 @@
       }
     ]
   },
+  "week_details": [
+    {
+      "start": "2026-10-19",
+      "end": "2026-10-25",
+      "partial": true,
+      "spent": 111.93,
+      "usual": 309.1,
+      "headline": "A quiet week",
+      "bills": {
+        "spent": 0,
+        "count": 0,
+        "names": []
+      },
+      "trend": [
+        {
+          "start": "2026-08-31",
+          "spent": 252.11,
+          "partial": false
+        },
+        {
+          "start": "2026-09-07",
+          "spent": 190.16,
+          "partial": false
+        },
+        {
+          "start": "2026-09-14",
+          "spent": 207.47,
+          "partial": false
+        },
+        {
+          "start": "2026-09-21",
+          "spent": 209.72,
+          "partial": false
+        },
+        {
+          "start": "2026-09-28",
+          "spent": 472.1,
+          "partial": false
+        },
+        {
+          "start": "2026-10-05",
+          "spent": 244.5,
+          "partial": false
+        },
+        {
+          "start": "2026-10-12",
+          "spent": 333.6,
+          "partial": false
+        },
+        {
+          "start": "2026-10-19",
+          "spent": 111.93,
+          "partial": true
+        }
+      ],
+      "month": {
+        "month": "2026-10",
+        "spent": 907.8,
+        "days": 20,
+        "length": 31,
+        "pace": 1407.09,
+        "usual": 1339.45
+      },
+      "categories": [
+        {
+          "key": "food",
+          "name": "Food & drink",
+          "spent": 74.68,
+          "usual": 198.83,
+          "trend": [
+            215.38,
+            131.41,
+            182.27,
+            100.75,
+            116.95,
+            192.15,
+            310.01,
+            74.68
+          ],
+          "note": "Below usual"
+        },
+        {
+          "key": "shopping",
+          "name": "Shopping",
+          "spent": 0.0,
+          "usual": 74.72,
+          "trend": [
+            0.0,
+            0.0,
+            0.0,
+            79.37,
+            340.65,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "note": "Nothing for 3 weeks, after $341"
+        },
+        {
+          "key": "transport",
+          "name": "Getting around",
+          "spent": 37.25,
+          "usual": 25.06,
+          "trend": [
+            36.73,
+            43.26,
+            17.4,
+            11.6,
+            14.5,
+            36.86,
+            11.6,
+            37.25
+          ],
+          "note": "Above usual"
+        }
+      ],
+      "odd": [
+        {
+          "kind": "bigger",
+          "group": "food",
+          "title": "Sushi Counter",
+          "amount": 53.75,
+          "day": "2026-10-20",
+          "detail": "Oct 20. Usually about $19 there.",
+          "question": "Why was my Sushi Counter charge on Oct 20 bigger than usual?",
+          "txns": [
+            "fx-card:fx0254"
+          ]
+        }
+      ]
+    },
+    {
+      "start": "2026-10-12",
+      "end": "2026-10-18",
+      "partial": false,
+      "spent": 333.6,
+      "usual": 309.1,
+      "headline": "Food carried the week",
+      "bills": {
+        "spent": 69.99,
+        "count": 1,
+        "names": [
+          "Spectrum Internet"
+        ]
+      },
+      "trend": [
+        {
+          "start": "2026-08-24",
+          "spent": 309.14,
+          "partial": false
+        },
+        {
+          "start": "2026-08-31",
+          "spent": 252.11,
+          "partial": false
+        },
+        {
+          "start": "2026-09-07",
+          "spent": 190.16,
+          "partial": false
+        },
+        {
+          "start": "2026-09-14",
+          "spent": 207.47,
+          "partial": false
+        },
+        {
+          "start": "2026-09-21",
+          "spent": 209.72,
+          "partial": false
+        },
+        {
+          "start": "2026-09-28",
+          "spent": 472.1,
+          "partial": false
+        },
+        {
+          "start": "2026-10-05",
+          "spent": 244.5,
+          "partial": false
+        },
+        {
+          "start": "2026-10-12",
+          "spent": 333.6,
+          "partial": false
+        }
+      ],
+      "month": {
+        "month": "2026-10",
+        "spent": 795.87,
+        "days": 18,
+        "length": 31,
+        "pace": 1370.67,
+        "usual": 1339.45
+      },
+      "categories": [
+        {
+          "key": "food",
+          "name": "Food & drink",
+          "spent": 310.01,
+          "usual": 198.83,
+          "trend": [
+            276.64,
+            215.38,
+            131.41,
+            182.27,
+            100.75,
+            116.95,
+            192.15,
+            310.01
+          ],
+          "note": "Up 3 weeks in a row"
+        },
+        {
+          "key": "shopping",
+          "name": "Shopping",
+          "spent": 0.0,
+          "usual": 74.72,
+          "trend": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            79.37,
+            340.65,
+            0.0,
+            0.0
+          ],
+          "note": "Nothing for 2 weeks, after $341"
+        },
+        {
+          "key": "transport",
+          "name": "Getting around",
+          "spent": 11.6,
+          "usual": 25.06,
+          "trend": [
+            14.5,
+            36.73,
+            43.26,
+            17.4,
+            11.6,
+            14.5,
+            36.86,
+            11.6
+          ],
+          "note": "Below usual"
+        }
+      ],
+      "odd": [
+        {
+          "kind": "bigger",
+          "group": "food",
+          "title": "Trader Joe's",
+          "amount": 116.04,
+          "day": "2026-10-17",
+          "detail": "Oct 17. Usually about $71 there.",
+          "question": "Why was my Trader Joe's charge on Oct 17 bigger than usual?",
+          "txns": [
+            "fx-cashback:fx0247"
+          ]
+        },
+        {
+          "kind": "twice",
+          "group": "food",
+          "title": "Noodle Bar Brooklyn charged twice",
+          "amount": 42.8,
+          "day": "2026-10-15",
+          "detail": "$42.80 on Oct 14 and Oct 15 on Sapphire Card 1934",
+          "question": "Was I charged twice at Noodle Bar Brooklyn on Oct 14 and Oct 15?",
+          "txns": [
+            "fx-card:fx0240",
+            "fx-card:fx0244"
+          ]
+        }
+      ]
+    },
+    {
+      "start": "2026-10-05",
+      "end": "2026-10-11",
+      "partial": false,
+      "spent": 244.5,
+      "usual": 309.1,
+      "headline": "A quiet week, apart from Blink",
+      "bills": {
+        "spent": 3.12,
+        "count": 1,
+        "names": [
+          "Foreign Transaction Fee"
+        ]
+      },
+      "trend": [
+        {
+          "start": "2026-08-17",
+          "spent": 512.67,
+          "partial": false
+        },
+        {
+          "start": "2026-08-24",
+          "spent": 309.14,
+          "partial": false
+        },
+        {
+          "start": "2026-08-31",
+          "spent": 252.11,
+          "partial": false
+        },
+        {
+          "start": "2026-09-07",
+          "spent": 190.16,
+          "partial": false
+        },
+        {
+          "start": "2026-09-14",
+          "spent": 207.47,
+          "partial": false
+        },
+        {
+          "start": "2026-09-21",
+          "spent": 209.72,
+          "partial": false
+        },
+        {
+          "start": "2026-09-28",
+          "spent": 472.1,
+          "partial": false
+        },
+        {
+          "start": "2026-10-05",
+          "spent": 244.5,
+          "partial": false
+        }
+      ],
+      "month": {
+        "month": "2026-10",
+        "spent": 462.27,
+        "days": 11,
+        "length": 31,
+        "pace": 1302.76,
+        "usual": 1339.45
+      },
+      "categories": [
+        {
+          "key": "food",
+          "name": "Food & drink",
+          "spent": 192.15,
+          "usual": 198.83,
+          "trend": [
+            354.87,
+            276.64,
+            215.38,
+            131.41,
+            182.27,
+            100.75,
+            116.95,
+            192.15
+          ],
+          "note": "About usual"
+        },
+        {
+          "key": "shopping",
+          "name": "Shopping",
+          "spent": 0.0,
+          "usual": 74.72,
+          "trend": [
+            146.2,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            79.37,
+            340.65,
+            0.0
+          ],
+          "note": "Nothing, after $341 last week"
+        },
+        {
+          "key": "transport",
+          "name": "Getting around",
+          "spent": 36.86,
+          "usual": 25.06,
+          "trend": [
+            11.6,
+            14.5,
+            36.73,
+            43.26,
+            17.4,
+            11.6,
+            14.5,
+            36.86
+          ],
+          "note": "Up 2 weeks in a row"
+        }
+      ],
+      "odd": [
+        {
+          "kind": "one_time",
+          "group": "subscriptions",
+          "title": "Blink Fitness Annual",
+          "amount": 189.0,
+          "day": "2026-10-06",
+          "detail": "Oct 6. A renewal, left out of the totals above.",
+          "question": "What's the $189.00 Blink Fitness Annual charge on Oct 6?",
+          "txns": [
+            "fx-card:fx0227"
+          ]
+        },
+        {
+          "kind": "bigger",
+          "group": "food",
+          "title": "Corner Cafe",
+          "amount": 63.11,
+          "day": "2026-10-06",
+          "detail": "Oct 6. Usually about $39 there.",
+          "question": "Why was my Corner Cafe charge on Oct 6 bigger than usual?",
+          "txns": [
+            "fx-card:fx0228"
+          ]
+        },
+        {
+          "kind": "fee",
+          "group": "fees",
+          "title": "Foreign Transaction Fee",
+          "amount": 3.12,
+          "day": "2026-10-08",
+          "detail": "$3.12 on Oct 8 on Sapphire Card 1934",
+          "question": "What was the $3.12 Foreign Transaction Fee charge on Oct 8, and can I avoid it?",
+          "txns": [
+            "fx-card:fx0232"
+          ]
+        }
+      ]
+    },
+    {
+      "start": "2026-09-28",
+      "end": "2026-10-04",
+      "partial": false,
+      "spent": 472.1,
+      "usual": 309.1,
+      "headline": "Shopping carried the week",
+      "bills": {
+        "spent": 2307.7,
+        "count": 4,
+        "names": [
+          "Rent Property Mgmt",
+          "Con Edison"
+        ]
+      },
+      "trend": [
+        {
+          "start": "2026-08-10",
+          "spent": 516.91,
+          "partial": false
+        },
+        {
+          "start": "2026-08-17",
+          "spent": 512.67,
+          "partial": false
+        },
+        {
+          "start": "2026-08-24",
+          "spent": 309.14,
+          "partial": false
+        },
+        {
+          "start": "2026-08-31",
+          "spent": 252.11,
+          "partial": false
+        },
+        {
+          "start": "2026-09-07",
+          "spent": 190.16,
+          "partial": false
+        },
+        {
+          "start": "2026-09-14",
+          "spent": 207.47,
+          "partial": false
+        },
+        {
+          "start": "2026-09-21",
+          "spent": 209.72,
+          "partial": false
+        },
+        {
+          "start": "2026-09-28",
+          "spent": 472.1,
+          "partial": false
+        }
+      ],
+      "month": {
+        "month": "2026-10",
+        "spent": 217.77,
+        "days": 4,
+        "length": 31,
+        "pace": null,
+        "usual": 1339.45
+      },
+      "categories": [
+        {
+          "key": "shopping",
+          "name": "Shopping",
+          "spent": 340.65,
+          "usual": 74.72,
+          "trend": [
+            335.78,
+            146.2,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            79.37,
+            340.65
+          ],
+          "note": "Up 2 weeks in a row"
+        },
+        {
+          "key": "food",
+          "name": "Food & drink",
+          "spent": 116.95,
+          "usual": 198.83,
+          "trend": [
+            154.64,
+            354.87,
+            276.64,
+            215.38,
+            131.41,
+            182.27,
+            100.75,
+            116.95
+          ],
+          "note": "Below usual"
+        },
+        {
+          "key": "transport",
+          "name": "Getting around",
+          "spent": 14.5,
+          "usual": 25.06,
+          "trend": [
+            14.5,
+            11.6,
+            14.5,
+            36.73,
+            43.26,
+            17.4,
+            11.6,
+            14.5
+          ],
+          "note": "Below usual"
+        }
+      ],
+      "odd": [
+        {
+          "kind": "bigger",
+          "group": "shopping",
+          "title": "Uniqlo USA",
+          "amount": 147.36,
+          "day": "2026-09-28",
+          "detail": "Sep 28. Usually about $82 there.",
+          "question": "Why was my Uniqlo USA charge on Sep 28 bigger than usual?",
+          "txns": [
+            "fx-card:fx0209"
+          ]
+        },
+        {
+          "kind": "bigger",
+          "group": "shopping",
+          "title": "Amazon Mktpl",
+          "amount": 79.98,
+          "day": "2026-09-30",
+          "detail": "Sep 30. Usually about $29 there.",
+          "question": "Why was my Amazon Mktpl charge on Sep 30 bigger than usual?",
+          "txns": [
+            "fx-cashback:fx0212"
+          ]
+        },
+        {
+          "kind": "fee",
+          "group": "fees",
+          "title": "Monthly Service Fee",
+          "amount": 12.0,
+          "day": "2026-09-30",
+          "detail": "$12.00 on Sep 30 on Everyday Checking 4821",
+          "question": "What was the $12.00 Monthly Service Fee charge on Sep 30, and can I avoid it?",
+          "txns": [
+            "fx-checking:fx0213"
+          ]
+        }
+      ]
+    },
+    {
+      "start": "2026-09-21",
+      "end": "2026-09-27",
+      "partial": false,
+      "spent": 209.72,
+      "usual": 309.1,
+      "headline": "A quiet week",
+      "bills": {
+        "spent": 395.0,
+        "count": 2,
+        "names": [
+          "Dept Education Student",
+          "Verizon Wireless"
+        ]
+      },
+      "trend": [
+        {
+          "start": "2026-08-03",
+          "spent": 232.88,
+          "partial": false
+        },
+        {
+          "start": "2026-08-10",
+          "spent": 516.91,
+          "partial": false
+        },
+        {
+          "start": "2026-08-17",
+          "spent": 512.67,
+          "partial": false
+        },
+        {
+          "start": "2026-08-24",
+          "spent": 309.14,
+          "partial": false
+        },
+        {
+          "start": "2026-08-31",
+          "spent": 252.11,
+          "partial": false
+        },
+        {
+          "start": "2026-09-07",
+          "spent": 190.16,
+          "partial": false
+        },
+        {
+          "start": "2026-09-14",
+          "spent": 207.47,
+          "partial": false
+        },
+        {
+          "start": "2026-09-21",
+          "spent": 209.72,
+          "partial": false
+        }
+      ],
+      "month": {
+        "month": "2026-09",
+        "spent": 792.76,
+        "days": 27,
+        "length": 30,
+        "pace": 880.84,
+        "usual": 1339.45
+      },
+      "categories": [
+        {
+          "key": "food",
+          "name": "Food & drink",
+          "spent": 100.75,
+          "usual": 198.83,
+          "trend": [
+            126.78,
+            154.64,
+            354.87,
+            276.64,
+            215.38,
+            131.41,
+            182.27,
+            100.75
+          ],
+          "note": "Below usual"
+        },
+        {
+          "key": "shopping",
+          "name": "Shopping",
+          "spent": 79.37,
+          "usual": 74.72,
+          "trend": [
+            44.7,
+            335.78,
+            146.2,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            79.37
+          ],
+          "note": "About usual"
+        },
+        {
+          "key": "transport",
+          "name": "Getting around",
+          "spent": 11.6,
+          "usual": 25.06,
+          "trend": [
+            45.91,
+            14.5,
+            11.6,
+            14.5,
+            36.73,
+            43.26,
+            17.4,
+            11.6
+          ],
+          "note": "Down 2 weeks in a row"
+        }
+      ],
+      "odd": []
+    },
+    {
+      "start": "2026-09-14",
+      "end": "2026-09-20",
+      "partial": false,
+      "spent": 207.47,
+      "usual": 309.1,
+      "headline": "A quiet week",
+      "bills": {
+        "spent": 0,
+        "count": 0,
+        "names": []
+      },
+      "trend": [
+        {
+          "start": "2026-07-27",
+          "spent": 238.22,
+          "partial": false
+        },
+        {
+          "start": "2026-08-03",
+          "spent": 232.88,
+          "partial": false
+        },
+        {
+          "start": "2026-08-10",
+          "spent": 516.91,
+          "partial": false
+        },
+        {
+          "start": "2026-08-17",
+          "spent": 512.67,
+          "partial": false
+        },
+        {
+          "start": "2026-08-24",
+          "spent": 309.14,
+          "partial": false
+        },
+        {
+          "start": "2026-08-31",
+          "spent": 252.11,
+          "partial": false
+        },
+        {
+          "start": "2026-09-07",
+          "spent": 190.16,
+          "partial": false
+        },
+        {
+          "start": "2026-09-14",
+          "spent": 207.47,
+          "partial": false
+        }
+      ],
+      "month": {
+        "month": "2026-09",
+        "spent": 583.04,
+        "days": 20,
+        "length": 30,
+        "pace": 874.56,
+        "usual": 1339.45
+      },
+      "categories": [
+        {
+          "key": "food",
+          "name": "Food & drink",
+          "spent": 182.27,
+          "usual": 198.83,
+          "trend": [
+            223.72,
+            126.78,
+            154.64,
+            354.87,
+            276.64,
+            215.38,
+            131.41,
+            182.27
+          ],
+          "note": "About usual"
+        },
+        {
+          "key": "shopping",
+          "name": "Shopping",
+          "spent": -4.19,
+          "usual": 74.72,
+          "trend": [
+            0.0,
+            44.7,
+            335.78,
+            146.2,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "note": "Nothing for 4 weeks, after $146"
+        },
+        {
+          "key": "transport",
+          "name": "Getting around",
+          "spent": 17.4,
+          "usual": 25.06,
+          "trend": [
+            14.5,
+            45.91,
+            14.5,
+            11.6,
+            14.5,
+            36.73,
+            43.26,
+            17.4
+          ],
+          "note": "About usual"
+        }
+      ],
+      "odd": []
+    },
+    {
+      "start": "2026-09-07",
+      "end": "2026-09-13",
+      "partial": false,
+      "spent": 190.16,
+      "usual": 309.1,
+      "headline": "A quiet week",
+      "bills": {
+        "spent": 69.99,
+        "count": 1,
+        "names": [
+          "Spectrum Internet"
+        ]
+      },
+      "trend": [
+        {
+          "start": "2026-07-20",
+          "spent": 310.7,
+          "partial": false
+        },
+        {
+          "start": "2026-07-27",
+          "spent": 238.22,
+          "partial": false
+        },
+        {
+          "start": "2026-08-03",
+          "spent": 232.88,
+          "partial": false
+        },
+        {
+          "start": "2026-08-10",
+          "spent": 516.91,
+          "partial": false
+        },
+        {
+          "start": "2026-08-17",
+          "spent": 512.67,
+          "partial": false
+        },
+        {
+          "start": "2026-08-24",
+          "spent": 309.14,
+          "partial": false
+        },
+        {
+          "start": "2026-08-31",
+          "spent": 252.11,
+          "partial": false
+        },
+        {
+          "start": "2026-09-07",
+          "spent": 190.16,
+          "partial": false
+        }
+      ],
+      "month": {
+        "month": "2026-09",
+        "spent": 375.57,
+        "days": 13,
+        "length": 30,
+        "pace": 866.7,
+        "usual": 1339.45
+      },
+      "categories": [
+        {
+          "key": "food",
+          "name": "Food & drink",
+          "spent": 131.41,
+          "usual": 198.83,
+          "trend": [
+            278.2,
+            223.72,
+            126.78,
+            154.64,
+            354.87,
+            276.64,
+            215.38,
+            131.41
+          ],
+          "note": "Down 3 weeks in a row"
+        },
+        {
+          "key": "shopping",
+          "name": "Shopping",
+          "spent": 0.0,
+          "usual": 74.72,
+          "trend": [
+            0.0,
+            0.0,
+            44.7,
+            335.78,
+            146.2,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "note": "Nothing for 3 weeks, after $146"
+        },
+        {
+          "key": "transport",
+          "name": "Getting around",
+          "spent": 43.26,
+          "usual": 25.06,
+          "trend": [
+            14.5,
+            14.5,
+            45.91,
+            14.5,
+            11.6,
+            14.5,
+            36.73,
+            43.26
+          ],
+          "note": "Up 3 weeks in a row"
+        }
+      ],
+      "odd": []
+    },
+    {
+      "start": "2026-08-31",
+      "end": "2026-09-06",
+      "partial": false,
+      "spent": 252.11,
+      "usual": 309.1,
+      "headline": "A quiet week",
+      "bills": {
+        "spent": 2247.85,
+        "count": 2,
+        "names": [
+          "Rent Property Mgmt",
+          "Con Edison"
+        ]
+      },
+      "trend": [
+        {
+          "start": "2026-07-13",
+          "spent": 289.79,
+          "partial": false
+        },
+        {
+          "start": "2026-07-20",
+          "spent": 310.7,
+          "partial": false
+        },
+        {
+          "start": "2026-07-27",
+          "spent": 238.22,
+          "partial": false
+        },
+        {
+          "start": "2026-08-03",
+          "spent": 232.88,
+          "partial": false
+        },
+        {
+          "start": "2026-08-10",
+          "spent": 516.91,
+          "partial": false
+        },
+        {
+          "start": "2026-08-17",
+          "spent": 512.67,
+          "partial": false
+        },
+        {
+          "start": "2026-08-24",
+          "spent": 309.14,
+          "partial": false
+        },
+        {
+          "start": "2026-08-31",
+          "spent": 252.11,
+          "partial": false
+        }
+      ],
+      "month": {
+        "month": "2026-09",
+        "spent": 185.41,
+        "days": 6,
+        "length": 30,
+        "pace": null,
+        "usual": 1339.45
+      },
+      "categories": [
+        {
+          "key": "food",
+          "name": "Food & drink",
+          "spent": 215.38,
+          "usual": 198.83,
+          "trend": [
+            151.38,
+            278.2,
+            223.72,
+            126.78,
+            154.64,
+            354.87,
+            276.64,
+            215.38
+          ],
+          "note": "About usual"
+        },
+        {
+          "key": "shopping",
+          "name": "Shopping",
+          "spent": 0.0,
+          "usual": 74.72,
+          "trend": [
+            84.28,
+            0.0,
+            0.0,
+            44.7,
+            335.78,
+            146.2,
+            0.0,
+            0.0
+          ],
+          "note": "Nothing for 2 weeks, after $146"
+        },
+        {
+          "key": "transport",
+          "name": "Getting around",
+          "spent": 36.73,
+          "usual": 25.06,
+          "trend": [
+            42.14,
+            14.5,
+            14.5,
+            45.91,
+            14.5,
+            11.6,
+            14.5,
+            36.73
+          ],
+          "note": "Up 2 weeks in a row"
+        }
+      ],
+      "odd": [
+        {
+          "kind": "bigger",
+          "group": "food",
+          "title": "Bagel Bakery",
+          "amount": 63.8,
+          "day": "2026-08-31",
+          "detail": "Aug 31. Usually about $28 there.",
+          "question": "Why was my Bagel Bakery charge on Aug 31 bigger than usual?",
+          "txns": [
+            "fx-card:fx0155"
+          ]
+        },
+        {
+          "kind": "bigger",
+          "group": "food",
+          "title": "Sushi Counter",
+          "amount": 62.92,
+          "day": "2026-09-06",
+          "detail": "Sep 6. Usually about $22 there.",
+          "question": "Why was my Sushi Counter charge on Sep 6 bigger than usual?",
+          "txns": [
+            "fx-card:fx0164"
+          ]
+        }
+      ]
+    }
+  ],
   "transactions": [
     {
       "id": "fx-checking:fx0256",
