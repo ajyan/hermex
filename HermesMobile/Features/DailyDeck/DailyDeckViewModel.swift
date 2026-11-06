@@ -120,6 +120,8 @@ final class DailyDeckViewModel {
     @ObservationIgnored private var mandarinPractices: [String: MandarinPractice] = [:]
     /// Baki's proposals on the Sunday training card: Use and Not now go to the Body API.
     let training: WeekTrainingModel
+    /// Starts a chat with these words, from a card that asks Atlas (the money card's rows); nil does nothing.
+    @ObservationIgnored var askAtlas: ((String) -> Void)?
     private let now: () -> Date
 
     init(server: URL, client: any DailyDeckDataClient, store: DailyDeckStore = DailyDeckStore(),
@@ -541,6 +543,17 @@ final class DailyDeckViewModel {
         else { throw DailyDeckJournalError.missing }
         let text = try await client.fileContent(sessionID: sessionID, path: "\(folder)/\(day).md")
         return DailyDeckJournal.readable(text)
+    }
+
+    /// The money run's spending (`finance/data/money/spending.json`), or nil before Money is set up.
+    func spending() async throws -> MoneySpending? {
+        guard let sessionID else { return nil }
+        do {
+            let text = try await client.fileContent(sessionID: sessionID, path: MoneyPaths.spending)
+            return try MoneySpending.decode(Data(text.utf8))
+        } catch let error as APIError where error.isNotFound {
+            return nil
+        }
     }
 
     /// Every night's sleep numbers (`data/sleep/history.json`), or nil before the vault has written it.

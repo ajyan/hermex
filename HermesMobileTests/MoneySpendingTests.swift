@@ -256,6 +256,127 @@ final class MoneySpendingTests: XCTestCase {
         }
     }
 
+    // MARK: The week (the Sunday review's money card)
+
+    func testWeekDetailsDecodeNewestFirst() throws {
+        let s = try fixture()
+        XCTAssertEqual(s.weekDetails.count, 8)
+        XCTAssertEqual(s.weekDetails.first?.start, "2026-10-19")
+        XCTAssertTrue(s.weekDetails[0].partial)
+        let week = try XCTUnwrap(s.week(starting: "2026-10-12"))
+        XCTAssertEqual(week.end, "2026-10-18")
+        XCTAssertEqual(week.headline, "Food carried the week")
+        XCTAssertEqual(week.spent, 333.6, accuracy: 0.001)
+        XCTAssertEqual(week.trend.count, 8)
+        XCTAssertEqual(week.trend.last?.start, "2026-10-12")
+        XCTAssertEqual(week.categories.map(\.key), ["food", "shopping", "transport"])
+        XCTAssertEqual(week.categories.first?.note, "Up 3 weeks in a row")
+        XCTAssertEqual(week.odd.map(\.kind), ["bigger", "twice"])
+        XCTAssertEqual(week.month?.days, 18)
+        XCTAssertNil(s.week(starting: "2025-01-06"))
+    }
+
+    func testAFileWithoutWeeksHasNone() throws {
+        let s = try MoneySpending.decode(Data(#"{"version": 1, "weeks": [{"start": "2026-10-12", "spent": 10}]}"#.utf8))
+        XCTAssertTrue(s.weekDetails.isEmpty)
+    }
+
+    func testWeekWords() throws {
+        let s = try fixture()
+        let week = try XCTUnwrap(s.week(starting: "2026-10-12"))
+        XCTAssertEqual(MoneyWeekCopy.range(week), "Oct 12–18")
+        XCTAssertEqual(MoneyWeekCopy.lead(week, hidden: false), "$334 day to day, about $25 over a usual week.")
+        XCTAssertEqual(MoneyWeekCopy.lead(week, hidden: true), "Over a usual week, day to day.")
+        XCTAssertEqual(MoneyWeekCopy.bills(week, hidden: false), "Bills on top: $70 (Spectrum Internet).")
+        XCTAssertEqual(MoneyWeekCopy.bills(week, hidden: true), "Bills on top: \(MoneyFormat.mask) (Spectrum Internet).")
+        let month = try XCTUnwrap(week.month)
+        XCTAssertEqual(MoneyWeekCopy.monthMeta(month, hidden: false), "18 days in, on pace for about $1,371. A usual month is $1,339.")
+        XCTAssertEqual(MoneyWeekCopy.delta(month.pace ?? 0, usual: month.usual ?? 0, hidden: false), "About usual")
+        XCTAssertEqual(MoneyWeekCopy.delta(244.5, usual: 309.1, hidden: false), "−$65 under")
+        XCTAssertEqual(MoneyWeekCopy.delta(244.5, usual: 309.1, hidden: true), "Under")
+        XCTAssertEqual(MoneyWeekCopy.categoryMeta(week.categories[0], hidden: false), "Up 3 weeks in a row · usual $199")
+        XCTAssertEqual(MoneyWeekCopy.categoryMeta(week.categories[1], hidden: true),
+                       "Nothing for 2 weeks, after \(MoneyFormat.mask) · usual \(MoneyFormat.mask)")
+        let bigger = MoneyWeekCopy.odd(week.odd[0])
+        XCTAssertEqual(bigger.title, "Trader Joe's $116.04")
+        XCTAssertEqual(bigger.detail, "Bigger than usual · Oct 17. Usually about $71 there.")
+        let quiet = try XCTUnwrap(s.week(starting: "2026-10-05"))
+        XCTAssertEqual(quiet.headline, "A quiet week, apart from Blink")
+        XCTAssertEqual(MoneyWeekCopy.odd(quiet.odd[0]).detail, "One-time · Oct 6. A renewal, left out of the totals above.")
+        XCTAssertEqual(MoneyWeekCopy.range(try XCTUnwrap(s.week(starting: "2026-09-28"))), "Sep 28–Oct 4")
+    }
+
+    func testTrendLabelsEveryOtherWeekEndingOnThisOne() throws {
+        let trend = try XCTUnwrap(try fixture().week(starting: "2026-10-12")).trend
+        XCTAssertEqual(trend.indices.map { MoneyWeekCopy.trendLabel(trend, at: $0) },
+                       ["", "Aug 31", "", "Sep 14", "", "Sep 28", "", "Oct 12"])
+    }
+
+    func testTheDeckNamesTheMoneyCardsWeek() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"version": 4, "date": "2026-10-18", "kind": "weekly", "cards": [
+          {"id": "money", "type": "week_money", "title": "Your week in money", "color": "ledger", "week_start": "2026-10-12"}]}
+        """#)
+        let card = try XCTUnwrap(deck.cards.first)
+        XCTAssertEqual(card.type, .weekMoney)
+        XCTAssertEqual(card.weekStart, "2026-10-12")
+        XCTAssertEqual(DeckPalette.of(card), .money)
+        XCTAssertFalse(card.takesFeedback)
+    }
+
+    func testTheDeckReadsSpendingThroughItsSession() async throws {
+        let client = ScriptedDailyDeckClient(workspaces: ["/vault"], names: [], deck: "{}")
+        client.files[MoneyPaths.spending] = String(decoding: try MoneyModelsTests.fixture("spending.json"), as: UTF8.self)
+        let defaults = UserDefaults(suiteName: "MoneySpendingTests.deck")!
+        defaults.removePersistentDomain(forName: "MoneySpendingTests.deck")
+        let deck = DailyDeckViewModel(server: URL(string: "https://money-week-tests.invalid")!, client: client,
+                                      store: DailyDeckStore(defaults: defaults))
+        let before = try await deck.spending()
+        XCTAssertNil(before, "no session yet, nothing read")
+        await deck.load()
+        let spending = try await deck.spending()
+        XCTAssertEqual(spending?.week(starting: "2026-10-12")?.headline, "Food carried the week")
+        XCTAssertTrue(client.readPaths.contains(MoneyPaths.spending))
+    }
+
+    /// Writes the Sunday review's money card as PNGs for manual review, only when `MONEY_RENDERS` names a
+    /// folder. Synthetic fixtures only.
+    func testRenderWeekMoneyCardForReview() async throws {
+        guard let folder = ProcessInfo.processInfo.environment["MONEY_RENDERS"] else {
+            throw XCTSkip("Set TEST_RUNNER_MONEY_RENDERS to write review renders")
+        }
+        UIView.setAnimationsEnabled(false)
+        defer { UIView.setAnimationsEnabled(true) }
+        let directory = URL(fileURLWithPath: folder, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let spending = try fixture()
+        let deck = DailyDeckViewModel(server: URL(string: "https://money-week-tests.invalid")!,
+                                      client: ScriptedDailyDeckClient(workspaces: [], names: [], deck: "{}"))
+        let cases: [(String, String, UIUserInterfaceStyle, Bool)] = [
+            ("oct12-light-revealed", "2026-10-12", .light, true),
+            ("oct12-dark-hidden", "2026-10-12", .dark, false),
+            ("oct5-light-revealed", "2026-10-05", .light, true),
+        ]
+        for (name, start, style, revealed) in cases {
+            let card = try XCTUnwrap(try DailyDeck.decode(#"{"date": "2026-10-18", "kind": "weekly", "cards": [{"id": "money", "type": "week_money", "title": "Your week in money", "week_start": "\#(start)"}]}"#).cards.first)
+            let week = spending.week(starting: start)
+            try await host({ appeared in
+                ScrollView {
+                    WeekMoneyCard(card: card, palette: .money, viewModel: deck, week: week, revealed: revealed)
+                        .padding(.horizontal, 24).padding(.top, 28).padding(.bottom, 32)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .background(DeckPalette.money.paper, in: RoundedRectangle(cornerRadius: HXRadius.xl))
+                .environment(\.colorScheme, .light)
+                .padding(12)
+                .background(Color.hxCanvas)
+                .onAppear(perform: appeared)
+            }, size: CGSize(width: 402, height: 1500), style: style) { window in
+                try write(window, to: directory.appendingPathComponent("week-money-\(name).png"))
+            }
+        }
+    }
+
     // MARK: Helpers
 
     private func loaded(_ client: MockMoneyClient) async throws -> MoneyViewModel {

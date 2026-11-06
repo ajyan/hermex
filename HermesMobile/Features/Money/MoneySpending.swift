@@ -21,10 +21,12 @@ struct MoneySpending: Decodable, Equatable {
     /// Each month the log covers, newest first. Empty in a file from before months were written.
     var months: [MonthDetail] = []
     var year: Year?
+    /// The last weeks, newest first, for the Sunday review's money card (`MoneySpendingWeek.swift`).
+    var weekDetails: [WeekDetail] = []
     private var byID: [String: Transaction] = [:]
 
     enum CodingKeys: String, CodingKey {
-        case asOf, historyStart, month, payday, due, flags, cashFlow, weeks, interest, accounts, transactions, months, year
+        case asOf, historyStart, month, payday, due, flags, cashFlow, weeks, interest, accounts, transactions, months, year, weekDetails
     }
 
     init(from decoder: Decoder) throws {
@@ -43,6 +45,7 @@ struct MoneySpending: Decodable, Equatable {
         byID = Self.index(transactions)
         months = c.lossyArray(MonthDetail.self, .months)
         year = try? c.decodeIfPresent(Year.self, forKey: .year)
+        weekDetails = c.lossyArray(WeekDetail.self, .weekDetails)
     }
 
     private static func index(_ rows: [Transaction]) -> [String: Transaction] {

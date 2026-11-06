@@ -72,6 +72,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         case cover, lastIntention, value, intention, keepsakes
         /// The Sunday review's training card: Baki's read of the week's lifting and his proposals.
         case training
+        /// The Sunday review's money card: the week's spending, read live from `spending.json` (`WeekMoneyCard`).
+        case weekMoney
         /// The monthly review's own cards (`MonthlyReview*.swift`): the cover, the weeks arc, the month
         /// in dots, an insight, the month's sleep, and a reflection question with what led to it.
         case monthCover, monthWeeks, monthDots, monthInsight, monthSleep, monthQuestion
@@ -102,6 +104,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case "value": self = .value
             case "intention": self = .intention
             case "training": self = .training
+            case "week_money": self = .weekMoney
             case "month_cover": self = .monthCover
             case "month_weeks": self = .monthWeeks
             case "month_dots": self = .monthDots
@@ -242,7 +245,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         switch self.type {
         case .prompt, .reflect, .item, .unknown: true
         case .headline, .decision, .sleep, .goal, .changes, .ask, .search, .dinner, .section, .close, .front: false
-        case .cover, .lastIntention, .value, .intention, .keepsakes, .training: false
+        case .cover, .lastIntention, .value, .intention, .keepsakes, .training, .weekMoney: false
         case .monthCover, .monthWeeks, .monthDots, .monthInsight, .monthSleep, .monthQuestion, .weekHeld, .weekPlan, .weekLetter: false
         }
     }
@@ -313,6 +316,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         let headline: String?
         let bullets: [String]
         let proposals: [BodyProposal]
+        /// A money card's week, its Monday ("2026-10-12"): the `week_details` entry it shows.
+        let weekStart: String?
         /// The cover's week number, date range ("Oct 19–25"), and the note a year-ago self left.
         let weekNumber: Int?
         let range: String?
@@ -395,7 +400,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case id, type, title, body, source, lines, question, context, contextFrom, voice, why, draft, actions, fallback
             case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
             case phrases, recall, yesterday, pattern, progress, questionPinyin, questionEn, rows, week
-            case chapter, weekNumber, range, noteFromPast, headline, bullets, proposals
+            case chapter, weekNumber, range, noteFromPast, headline, bullets, proposals, weekStart
             case piece, learned, variant, date, options, returns, front, fronts, frontReason, weekRows, yesterdayOne
             case todayAction = "today"
             case moments, spares, ended, text, ifThen, name, fact, changes, intention
@@ -472,6 +477,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             bullets = ((try? c.decodeIfPresent([Lossy<String>].self, forKey: .bullets)) ?? []).compactMap(\.value)
             proposals = ((try? c.decodeIfPresent([Lossy<BodyProposal>].self, forKey: .proposals)) ?? []).compactMap(\.value)
                 .filter { !$0.id.isEmpty }
+            weekStart = try? c.decodeIfPresent(String.self, forKey: .weekStart)
             weekNumber = try? c.decodeIfPresent(Int.self, forKey: .weekNumber)
             range = try? c.decodeIfPresent(String.self, forKey: .range)
             noteFromPast = try? c.decodeIfPresent(DeckPastNote.self, forKey: .noteFromPast)
@@ -1403,6 +1409,8 @@ struct DeckCardText: Equatable {
             lead = card.title
         case .training:
             lead = card.headline
+        case .weekMoney:
+            lead = card.title
         case .goal, .changes, .ask, .search:
             // The check-ins, the week's fixes and the Ask are drawn (`DeckGoalCard`, `DeckChangesCard`,
             // `DeckAskCard`).

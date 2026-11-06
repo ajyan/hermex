@@ -305,6 +305,8 @@ struct MoneyAskRow: View {
     var group: String?
     var symbol: String?
     let hidden: Bool
+    /// The row's side padding: a card's inset, or none on a deck card that already has its margins.
+    var inset: CGFloat = 12
     let ask: () -> Void
 
     var body: some View {
@@ -334,7 +336,7 @@ struct MoneyAskRow: View {
                     .foregroundStyle(Color.accentColor)
                     .accessibilityHidden(true)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, inset)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())

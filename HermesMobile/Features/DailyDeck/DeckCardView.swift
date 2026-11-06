@@ -114,6 +114,7 @@ struct DeckCardView: View {
                 case .intention: WeekIntentionCard(card: card, palette: palette, viewModel: viewModel)
                 case .keepsakes: WeekKeepsakesCard(card: card, palette: palette, viewModel: viewModel)
                 case .training: WeekTrainingCard(card: card, palette: palette, model: viewModel.training)
+                case .weekMoney: WeekMoneyCard(card: card, palette: palette, viewModel: viewModel)
                 case .monthCover: MonthCoverCard(card: card, palette: palette, viewModel: viewModel)
                 case .monthWeeks: MonthWeeksCard(card: card, palette: palette, viewModel: viewModel)
                 case .monthDots: MonthDotsCard(card: card, palette: palette, viewModel: viewModel)
@@ -284,7 +285,7 @@ struct DeckCardView: View {
         switch card.type {
         case .close: DeckAct.isByJob(viewModel.visiblePages) && !card.weekRows.isEmpty
         case .prompt, .reflect, .item, .unknown: isJobCard
-        case .training: true
+        case .training, .weekMoney: true
         default: false
         }
     }

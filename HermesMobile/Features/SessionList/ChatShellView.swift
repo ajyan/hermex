@@ -647,9 +647,9 @@ struct ChatShellView: View {
             KanbanView(server: server, onAPIError: authManager.handleAPIError)
                 .adaptiveSecondaryNavigationTitle()
         case .dailyDeck:
-            DailyDeckView(server: server) { sessionID in
+            DailyDeckView(server: server, openSession: { sessionID in
                 Task { await openDeepLinkedSession(id: sessionID) }
-            }
+            }, ask: askAtlas)
         case .brain:
             BrainHomeView(
                 server: server,
