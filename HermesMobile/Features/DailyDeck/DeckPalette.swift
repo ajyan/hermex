@@ -94,12 +94,10 @@ struct DeckPalette: Equatable {
     static let changes = DeckPalette(.plain, symbol: "wrench.and.screwdriver", name: "What changed", shortName: "Changes")
     /// The v2 weekly review: every card of the week wears its paper, its two questions included.
     static let week = DeckPalette(.dusk, symbol: "sunset", name: "Your week", shortName: "Week")
-    /// The Daily Ask wears its goal's paper (`land-ai-role`, color `notes`).
-    static let ask = DeckPalette(GoalPaper.palette(named: "notes", slug: "land-ai-role").colors,
-                                 symbol: "briefcase", name: "Today's Ask", shortName: "Ask")
-    /// The search card wears the same goal's paper as the Ask.
-    static let search = DeckPalette(GoalPaper.palette(named: "notes", slug: "land-ai-role").colors,
-                                    symbol: "calendar", name: "Your job search", shortName: "Search")
+    /// The Daily Ask and the search card are the job search, kin to Interview prep: they wear its paper, so they no
+    /// longer read as "From your notes" (2026-11-06 review).
+    static let ask = DeckPalette(.prep, symbol: "briefcase", name: "Today's Ask", shortName: "Ask")
+    static let search = DeckPalette(.prep, symbol: "chart.bar", name: "Your job search", shortName: "Search")
 
     static func of(_ page: DeckPage) -> DeckPalette {
         switch page {

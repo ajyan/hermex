@@ -82,42 +82,8 @@ struct DeckTagLines: View {
     }
 }
 
-/// The opener's "Today's one": the day's pick, and yesterday's words behind it.
-struct DeckTodayOnePanel: View {
-    let one: DeckTodayOne
-    let palette: DeckPalette
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(verbatim: "Today's one")
-                .font(AppFont.caption(weight: .heavy))
-                .textCase(.uppercase)
-                .foregroundStyle(palette.ink.opacity(0.75))
-            Text(verbatim: one.label)
-                .font(AppFont.display(style: .title3, weight: .bold))
-                .foregroundStyle(Color.hxTextPrimary)
-                .fixedSize(horizontal: false, vertical: true)
-            if let quote = one.quote, !quote.isEmpty {
-                Text(verbatim: DeckCard.quoted(quote))
-                    .font(AppFont.serif(style: .subheadline))
-                    .italic()
-                    .foregroundStyle(Color.hxTextSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 2)
-                Text(verbatim: one.at ?? "You, yesterday")
-                    .font(AppFont.caption())
-                    .foregroundStyle(palette.ink.opacity(0.75))
-            }
-        }
-        .padding(.vertical, 14)
-        .padding(.horizontal, 16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
-        .accessibilityElement(children: .combine)
-    }
-}
-
-/// An idea card's body: where it's from, its gist, the source's own words, and its parts.
+/// An idea card's body: where it's from, its gist, the source's own words, its parts, and what he wrote that it
+/// links to.
 struct DeckIdeaBody: View {
     let card: DeckCard
     let palette: DeckPalette
@@ -150,6 +116,9 @@ struct DeckIdeaBody: View {
             }
             if !card.parts.isEmpty {
                 DeckPartsList(parts: card.parts.map { ($0.label, $0.text) }, palette: palette).padding(.top, 22)
+            }
+            if let linked = card.linked {
+                DeckThreadView(thread: linked, palette: palette).padding(.top, 20)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
