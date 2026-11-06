@@ -108,6 +108,22 @@ These papers carry more than one kind. Each group is related (a person, saved th
 
 Add a new kind of object here and in the code together. A failed tool step keeps its color and adds an `hxDanger` mark; the color never turns red.
 
+### Spending categories (`HermexSeries`, `Config/HermexColors.swift`)
+
+Spending's charts color data, not objects, so the categories have their own set outside the papers: the share ring, the legend, and the dot on every category, charge, place and stand-out row. A category keeps its color in every month and in the year, and the ring keeps their order, so a slice never moves or repaints when the month changes. There is no blue, so a slice never reads as a control, and amounts beside a dot stay in `hxTextPrimary`. The order passed a colorblind check (adjacent pairs, the ring's wrap included) in both appearances. Groups without their own color (loans, fees and interest, fun, travel, cash, other) share `rest` and fold into one "Everything else" slice.
+
+| Key | Category | Light | Dark |
+|---|---|---|---|
+| `home` | Rent & utilities | `#EB6834` | `#D95926` |
+| `food` | Food & drink | `#1BAF7A` | `#199E70` |
+| `shopping` | Shopping | `#EDA100` | `#C98500` |
+| `transport` | Getting around | `#E87BA4` | `#D55181` |
+| `subscriptions` | Subscriptions | `#008300` | `#008300` |
+| `health` | Health & insurance | `#6250D6` | `#9085E9` |
+| `rest` | Everything else | `#8B919C` | `#6E7681` |
+
+Money's own lines (the pace line, Spent on the year chart, the end dot) stay in the `ledger` glow, with usual and money in drawn quieter in `hxTextSecondary`. A month the log only partly covers is dashed or hollow.
+
 ## Components
 
 - **Card** (`HXCard`, `.hxCardSurface(_:)`, `HXCardRole` in `Config/HermexStyle.swift`): the one card. Its role decides the fill, edge, corners, and shadow: **glow** (one kind of thing: the paper's `card` fill and `edge`, `xl`, the `paper` shadow; Brief cards, review bites, timeline cards, Catch up, the Goal hero), **summary** (a neutral card that sits among glow cards: `hxSurface`, `hxSeparator` edge, `xl`, the `paper` shadow; the Brief opener, the review summary), **neutral** (`hxSurface`, `hxSeparator` edge, `lg`, flat; the same as `.hxCard()`), and **wash** (the paper's wash over `hxSurface` through `glowSurface`, `xl`, the `paper` shadow; Prep's run and home cards, whose controls take the paper's tint). `HXCard` stacks an optional kicker, a headline in `AppFont.display` semibold (in the glow on a colored card, `hxTextPrimary` on a neutral one, marked as a header), the body, and an optional footer, padded 16 pt; text keeps the colors its caller gives it. Cards whose words scroll inside them (Daily Deck cards, `BrainDeckCard`) use `.hxCardSurface(role, clipsContent: true)`, and a stack's bare papers fill `role.shape` with `role.fill`. Build new cards from these, never from a hand-rolled fill, stroke, and shadow. `scripts/check-design-drift` warns about fixed font sizes, numeric corner radii, raw materials, raw colors, and raw animation curves outside `Config/` (a documented exception ends its line with `// design-drift: allow`).

@@ -1,29 +1,44 @@
 import Charts
 import SwiftUI
 
-/// Spending, opened from Money's spending card: this month by category against the usual, what's
-/// left before payday, what looks off, what's due, money in and out, the weeks, and interest, each
-/// number one tap from the transactions behind it. The questions start a chat with Atlas, which
-/// answers from the same `spending.json`. Amounts follow Money's eye button.
+/// Spending, opened from Money's spending card. Month steps back through each month the log
+/// covers: the total against the usual, its pace, the share ring, what stood out, the biggest
+/// one-off charges, where it went and every transaction; this month adds what's left before
+/// payday, what looks off, what's due, the weeks and interest. Year sums up the year so far.
+/// Questions start a chat with Atlas, which answers from the same `spending.json`. Amounts follow
+/// Money's eye button.
 struct MoneySpendingView: View {
+    enum Span: String, CaseIterable, Identifiable {
+        case month = "Month", year = "Year"
+        var id: String { rawValue }
+    }
+
     let viewModel: MoneyViewModel
     let ask: (String) -> Void
-    @State private var open: Set<String> = []
+    @State private var span = Span.month
+    @State private var monthIndex = 0
+    @State private var picked: String?
+    @State private var showsAllLog = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    init(viewModel: MoneyViewModel, ask: @escaping (String) -> Void, span: Span = .month, monthIndex: Int = 0) {
+        self.viewModel = viewModel
+        self.ask = ask
+        _span = State(initialValue: span)
+        _monthIndex = State(initialValue: monthIndex)
+    }
 
     var body: some View {
         ScrollView {
             if let spending = viewModel.spending {
                 VStack(alignment: .leading, spacing: 22) {
-                    headline(spending)
+                    if spending.year != nil { spanPicker }
+                    if span == .year, let year = spending.year {
+                        MoneySpendingYearSections(year: year, hidden: hidden, ask: ask)
+                    } else {
+                        month(spending)
+                    }
                     questions
-                    if let month = spending.month, !month.categories.isEmpty { categories(month, spending) }
-                    if let payday = spending.payday { beforePayday(payday, spending) }
-                    if !spending.flags.isEmpty { flags(spending) }
-                    if !spending.due.isEmpty { comingUp(spending) }
-                    if !spending.completeMonths.isEmpty { inAndOut(spending) }
-                    if spending.weeks.count > 1 { weeks(spending.weeks) }
-                    if let interest = spending.interest, interest.total > 0 { interestSection(interest, spending) }
                     footer(spending)
                 }
                 .padding(16)
@@ -51,25 +66,55 @@ struct MoneySpendingView: View {
         return [viewModel.isFixture ? "Fixtures" : nil, updated].compactMap { $0 }.joined(separator: " · ")
     }
 
-    // MARK: Headline and questions
+    // MARK: Month and year
 
-    private func headline(_ spending: MoneySpending) -> some View {
-        let month = spending.month
-        return VStack(alignment: .leading, spacing: 2) {
-            Text(verbatim: MoneySpendingCopy.monthTitle(month))
-                .font(AppFont.footnote())
-                .foregroundStyle(Color.hxTextSecondary)
-            Text(verbatim: MoneyFormat.cents(month?.spent ?? 0, hidden: hidden))
-                .font(AppFont.display(style: .largeTitle, weight: .semibold))
-                .monospacedDigit()
-                .foregroundStyle(Color.hxTextPrimary)
-                .contentTransition(.numericText())
-            Text(verbatim: MoneySpendingCopy.usualLine(spending, hidden: hidden))
-                .font(AppFont.subheadline(weight: .medium))
-                .foregroundStyle(Color.hxTextSecondary)
+    /// The system segmented control, like Money's range: a control, so it wears the tint.
+    private var spanPicker: some View {
+        Picker(selection: $span) {
+            ForEach(Span.allCases) { Text(verbatim: $0.rawValue).tag($0) }
+        } label: {
+            Text(verbatim: "Span")
         }
-        .accessibilityElement(children: .combine)
+        .pickerStyle(.segmented)
     }
+
+    @ViewBuilder
+    private func month(_ spending: MoneySpending) -> some View {
+        let months = spending.monthDetails
+        if !months.isEmpty {
+            let index = min(monthIndex, months.count - 1)
+            let detail = months[index]
+            MoneySpendingMonthSections(
+                spending: spending, detail: detail, hidden: hidden,
+                older: index + 1 < months.count ? { step(to: index + 1) } : nil,
+                newer: index > 0 ? { step(to: index - 1) } : nil,
+                picked: $picked, showsAllLog: $showsAllLog, ask: ask
+            ) {
+                if detail.current, let payday = spending.payday { beforePayday(payday, spending) }
+            }
+            if detail.current { thisMonth(spending, detail) }
+        }
+    }
+
+    private func step(to index: Int) {
+        withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) {
+            monthIndex = index
+            picked = nil
+            showsAllLog = false
+        }
+    }
+
+    /// The sections only this month has, after its transactions.
+    @ViewBuilder
+    private func thisMonth(_ spending: MoneySpending, _ detail: MoneySpending.MonthDetail) -> some View {
+        let flags = MoneySpendingCopy.untold(spending.flags, detail)
+        if !flags.isEmpty { worthALook(flags) }
+        if !spending.due.isEmpty { comingUp(spending) }
+        if spending.weeks.count > 1 { weeks(spending.weeks) }
+        if let interest = spending.interest, interest.total > 0 { interestSection(interest, spending) }
+    }
+
+    // MARK: Questions
 
     /// The questions Personal Finance answers, each starting a chat with Atlas.
     private var questions: some View {
@@ -96,98 +141,6 @@ struct MoneySpendingView: View {
         }
         .buttonStyle(.plain)
         .accessibilityHint(Text(verbatim: "Starts a chat with Atlas"))
-    }
-
-    // MARK: Where it went
-
-    private func categories(_ month: MoneySpending.Month, _ spending: MoneySpending) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HXSectionHeader(title: "Where it went", trailing: month.usual.map { "against \($0.months == 1 ? "last month" : "the last \($0.months) months")" })
-            VStack(spacing: 0) {
-                ForEach(Array(month.categories.enumerated()), id: \.element.id) { offset, category in
-                    if offset > 0 { Divider().overlay(Color.hxSeparator).padding(.leading, 12) }
-                    categoryRow(category, spending)
-                }
-            }
-            .hxCard()
-        }
-    }
-
-    private func categoryRow(_ category: MoneySpending.Category, _ spending: MoneySpending) -> some View {
-        let isOpen = open.contains(category.key)
-        return VStack(spacing: 0) {
-            Button { toggle(category.key) } label: {
-                HStack(spacing: 10) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(verbatim: category.name)
-                            .font(AppFont.subheadline(weight: .medium))
-                            .foregroundStyle(Color.hxTextPrimary)
-                        Text(verbatim: category.count == 1 ? "1 transaction" : "\(category.count) transactions")
-                            .font(AppFont.caption())
-                            .foregroundStyle(Color.hxTextSecondary)
-                    }
-                    Spacer(minLength: 8)
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text(verbatim: MoneyFormat.cents(category.amount, hidden: hidden))
-                            .font(AppFont.subheadline())
-                            .foregroundStyle(Color.hxTextPrimary)
-                        if let usual = category.usual {
-                            Text(verbatim: MoneyFormat.versusUsual(category.amount, usual: usual, hidden: hidden))
-                                .font(AppFont.caption())
-                                .foregroundStyle(category.amount > usual * 1.05 + 5 ? Color.hxWarning : Color.hxTextSecondary)
-                        }
-                    }
-                    .monospacedDigit()
-                    Image(systemName: "chevron.right")
-                        .font(AppFont.caption(weight: .semibold))
-                        .foregroundStyle(Color.hxTextSecondary)
-                        .rotationEffect(.degrees(isOpen ? 90 : 0))
-                        .accessibilityHidden(true)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityElement(children: .combine)
-            .accessibilityHint(Text(verbatim: isOpen ? "Hides the transactions" : "Shows the transactions behind this number"))
-            if isOpen {
-                transactionList(spending.transactions(category.txns), spending)
-                    .padding(.bottom, 6)
-            }
-        }
-    }
-
-    private func toggle(_ key: String) {
-        withAnimation(HXMotion.quickState(reduceMotion: reduceMotion)) {
-            if open.contains(key) { open.remove(key) } else { open.insert(key) }
-        }
-    }
-
-    private func transactionList(_ rows: [MoneySpending.Transaction], _ spending: MoneySpending) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ForEach(rows) { row in
-                HStack(spacing: 8) {
-                    Text(verbatim: MoneyPoint.label(day: row.day))
-                        .foregroundStyle(Color.hxTextSecondary)
-                        .frame(minWidth: 48, alignment: .leading)
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(verbatim: row.name).foregroundStyle(Color.hxTextPrimary).lineLimit(1)
-                        if let account = spending.account(row.account) {
-                            Text(verbatim: account.label).font(AppFont.caption2()).foregroundStyle(Color.hxTextSecondary).lineLimit(1)
-                        }
-                    }
-                    Spacer(minLength: 6)
-                    Text(verbatim: MoneyFormat.cents(-row.amount, hidden: hidden))
-                        .foregroundStyle(row.amount > 0 ? Color.hxSuccess : Color.hxTextPrimary)
-                        .monospacedDigit()
-                }
-                .font(AppFont.caption())
-                .accessibilityElement(children: .combine)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.leading, 8)
     }
 
     // MARK: Before payday
@@ -242,44 +195,12 @@ struct MoneySpendingView: View {
 
     // MARK: Worth a look
 
-    private func flags(_ spending: MoneySpending) -> some View {
+    private func worthALook(_ flags: [MoneySpending.Flag]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            HXSectionHeader(title: "Worth a look", trailing: "\(spending.flags.count)")
-            VStack(spacing: 0) {
-                ForEach(Array(spending.flags.enumerated()), id: \.element.id) { offset, flag in
-                    if offset > 0 { Divider().overlay(Color.hxSeparator).padding(.leading, 40) }
-                    Button { ask(flag.question) } label: {
-                        HStack(alignment: .top, spacing: 10) {
-                            Image(systemName: flag.symbol)
-                                .font(AppFont.subheadline(weight: .semibold))
-                                .foregroundStyle(HermexPaper.money.glow)
-                                .frame(width: 20)
-                                .accessibilityHidden(true)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(verbatim: flag.title)
-                                    .font(AppFont.subheadline(weight: .medium))
-                                    .foregroundStyle(Color.hxTextPrimary)
-                                Text(verbatim: hidden ? MoneySpendingCopy.masked(flag.detail) : flag.detail)
-                                    .font(AppFont.caption())
-                                    .foregroundStyle(Color.hxTextSecondary)
-                                    .multilineTextAlignment(.leading)
-                            }
-                            Spacer(minLength: 6)
-                            Image(systemName: "bubble.left")
-                                .font(AppFont.caption(weight: .semibold))
-                                .foregroundStyle(Color.accentColor)
-                                .accessibilityHidden(true)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityHint(Text(verbatim: "Asks Atlas about it"))
-                }
+            HXSectionHeader(title: "Worth a look", trailing: "\(flags.count)")
+            MoneyRowsCard(flags) { flag in
+                MoneyAskRow(title: flag.title, detail: flag.detail, symbol: flag.symbol, hidden: hidden) { ask(flag.question) }
             }
-            .hxCard()
         }
     }
 
@@ -308,40 +229,6 @@ struct MoneySpendingView: View {
                             .foregroundStyle(Color.hxTextPrimary)
                             .monospacedDigit()
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
-                    .accessibilityElement(children: .combine)
-                }
-            }
-            .hxCard()
-        }
-    }
-
-    // MARK: In and out
-
-    private func inAndOut(_ spending: MoneySpending) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HXSectionHeader(title: "In and out")
-            Text(verbatim: MoneySpendingCopy.keptLine(spending.completeMonths, hidden: hidden))
-                .font(AppFont.subheadline())
-                .foregroundStyle(Color.hxTextPrimary)
-            VStack(spacing: 0) {
-                ForEach(Array(spending.cashFlow.enumerated()), id: \.element.id) { offset, month in
-                    if offset > 0 { Divider().overlay(Color.hxSeparator).padding(.leading, 12) }
-                    HStack {
-                        Text(verbatim: MoneySpendingCopy.monthRowName(month, spending))
-                            .foregroundStyle(month.partial ? Color.hxTextSecondary : Color.hxTextPrimary)
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 1) {
-                            Text(verbatim: MoneyFormat.signed(month.kept, hidden: hidden))
-                                .foregroundStyle(MoneyView.color(for: month.kept))
-                            Text(verbatim: "in \(MoneyFormat.amount(month.in, hidden: hidden)) · out \(MoneyFormat.amount(month.out, hidden: hidden))")
-                                .font(AppFont.caption())
-                                .foregroundStyle(Color.hxTextSecondary)
-                        }
-                        .monospacedDigit()
-                    }
-                    .font(AppFont.subheadline())
                     .padding(.horizontal, 12)
                     .padding(.vertical, 9)
                     .accessibilityElement(children: .combine)

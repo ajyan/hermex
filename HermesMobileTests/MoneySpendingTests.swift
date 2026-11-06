@@ -24,7 +24,7 @@ final class MoneySpendingTests: XCTestCase {
         XCTAssertEqual(s.payday?.due.count, 4)
         XCTAssertEqual(s.flags.map(\.kind), [.twice, .fee, .fee, .creep, .unusual])
         XCTAssertFalse(s.due.isEmpty)
-        XCTAssertEqual(s.completeMonths.map(\.month), ["2026-07", "2026-08", "2026-09"])
+        XCTAssertEqual(s.cashFlow.filter { !$0.partial }.map(\.month), ["2026-07", "2026-08", "2026-09"])
         XCTAssertEqual(s.weeks.count, 12)
         XCTAssertGreaterThan(s.interest?.total ?? 0, 0)
         XCTAssertEqual(s.account("fx-card")?.label, "Sapphire Card ··1934")
@@ -57,7 +57,7 @@ final class MoneySpendingTests: XCTestCase {
         XCTAssertNil(s.payday, "A payday without a date is dropped")
         XCTAssertEqual(s.flags.map(\.kind), [.other])
         XCTAssertEqual(s.flags.first?.question, "Something")
-        XCTAssertTrue(s.completeMonths.isEmpty)
+        XCTAssertTrue(s.months.isEmpty && s.year == nil)
         XCTAssertTrue(s.due.isEmpty && s.accounts.isEmpty)
     }
 
@@ -92,19 +92,98 @@ final class MoneySpendingTests: XCTestCase {
         XCTAssertEqual(MoneySpendingCopy.weekdayLabel(payday.next), "Fri, Oct 30")
     }
 
-    func testKeptLineAnswersSpendingMoreThanIMake() throws {
+    // MARK: Months and the year
+
+    func testMonthsStepBackToWhereTheLogStarts() throws {
         let s = try fixture()
-        XCTAssertTrue(MoneySpendingCopy.keptLine(s.completeMonths, hidden: false).hasPrefix("You kept $"))
-        XCTAssertTrue(MoneySpendingCopy.keptLine(s.completeMonths, hidden: false).hasSuffix("a month on average, July–September."))
-        let json = #"{"cash_flow": [{"month": "2026-09", "in": 100, "out": 300, "partial": false}]}"#
-        let short = try MoneySpending.decode(Data(json.utf8))
-        XCTAssertEqual(MoneySpendingCopy.keptLine(short.completeMonths, hidden: false), "You spent $200 a month more than came in, September.")
+        XCTAssertEqual(s.months.map(\.month), ["2026-10", "2026-09", "2026-08", "2026-07", "2026-06"])
+        let october = s.months[0], september = s.months[1]
+        XCTAssertTrue(october.current && october.partial)
+        XCTAssertEqual(october.summary.categories, s.month?.categories)
+        XCTAssertEqual(october.summary.usual?.spent, s.month?.usual?.spent)
+        XCTAssertEqual(october.pace?.days, 31)
+        XCTAssertEqual(october.pace?.actual.count, 20)
+        XCTAssertEqual(october.pace?.actual.last ?? 0, october.summary.spent, accuracy: 0.01)
+        XCTAssertEqual(october.stands.map(\.title), ["Subscriptions up $189", "Food & drink up $158", "Noodle Bar Brooklyn charged twice"])
+        XCTAssertEqual(MoneySpendingCopy.untold(s.flags, october).map(\.kind), [.fee, .fee, .creep],
+                       "The duplicate and the renewal are already told above")
+        XCTAssertEqual(september.summary.usual?.from, "2026-07")
+        XCTAssertFalse(september.partial)
+        for month in s.months {
+            XCTAssertEqual(s.transactions(month.txns).count, month.txns.count, month.month)
+            XCTAssertEqual(s.transactions(month.biggest).count, month.biggest.count, month.month)
+        }
     }
 
-    func testPartialMonthsSayWhy() throws {
+    func testAnOlderFileStillShowsThisMonth() throws {
+        let json = #"{"month": {"start": "2026-10-01", "end": "2026-10-20", "spent": 10, "categories": [{"key": "food", "amount": 10, "txns": ["a"]}]}}"#
+        let s = try MoneySpending.decode(Data(json.utf8))
+        XCTAssertEqual(s.monthDetails.map(\.month), ["2026-10"])
+        XCTAssertTrue(s.monthDetails[0].current)
+        XCTAssertEqual(s.monthDetails[0].txns, ["a"])
+        XCTAssertNil(s.monthDetails[0].pace)
+    }
+
+    func testMonthWords() throws {
         let s = try fixture()
-        XCTAssertEqual(s.cashFlow.map { MoneySpendingCopy.monthRowName($0, s) },
-                       ["June from Jun 20", "July", "August", "September", "October so far"])
+        let october = s.months[0], september = s.months[1], june = s.months[4]
+        XCTAssertEqual(MoneySpendingCopy.monthLabel(october.month), "October 2026")
+        XCTAssertEqual(MoneySpendingCopy.monthNote(october, historyStart: s.historyStart), "So far · Oct 1–20")
+        XCTAssertEqual(MoneySpendingCopy.monthNote(september, historyStart: s.historyStart), "Full month")
+        XCTAssertEqual(MoneySpendingCopy.monthNote(june, historyStart: s.historyStart), "From Jun 20")
+        XCTAssertEqual(MoneySpendingCopy.usualLine(october, historyStart: s.historyStart, hidden: false), "$311 more than usual by Oct 20")
+        XCTAssertEqual(MoneySpendingCopy.usualLine(september, historyStart: s.historyStart, hidden: false), "$415 less than usual")
+        XCTAssertEqual(MoneySpendingCopy.usualLine(june, historyStart: s.historyStart, hidden: false), "No usual yet: the log starts Jun 20")
+        XCTAssertNil(MoneySpendingCopy.keptLine(october, hidden: false))
+        XCTAssertEqual(MoneySpendingCopy.keptLine(september, hidden: false), "Kept $1,921 of the $5,734 that came in")
+        XCTAssertEqual(MoneySpendingCopy.against(september), "against Jul–Aug")
+        XCTAssertEqual(MoneySpendingCopy.against(s.months[2]), "against July")
+        XCTAssertEqual(MoneySpendingCopy.paceCaption(september), "Dotted: your usual running total, Jul–Aug. September stayed under it all month.")
+        XCTAssertEqual(MoneySpendingCopy.logCount(september, count: 53), "53 in September")
+        XCTAssertEqual(MoneySpendingCopy.kept(income: 100, spent: 300, hidden: false), "Spent $200 more than the $100 that came in")
+    }
+
+    func testRingSlicesKeepTheirPlaceAndColor() throws {
+        let s = try fixture()
+        let september = s.months[1].summary.categories
+        let slices = MoneySpendingCopy.slices(september)
+        XCTAssertEqual(slices.map(\.key), HermexSeries.order.filter { key in slices.contains { $0.key == key } })
+        XCTAssertEqual(slices.map(\.amount).reduce(0, +), s.months[1].summary.spent, accuracy: 0.02)
+        XCTAssertEqual(slices.last?.name, "Everything else", "Loans and fees fold into the gray slice")
+        let legend = MoneySpendingCopy.legend(slices)
+        XCTAssertLessThanOrEqual(legend.count, 5)
+        XCTAssertEqual(legend.first?.key, "home")
+        XCTAssertEqual(legend.last?.key, "rest")
+        XCTAssertEqual(HermexSeries.key(for: "loans"), "rest")
+        XCTAssertEqual(HermexSeries.key(for: nil), "rest")
+        XCTAssertEqual(MoneySpendingCopy.share(0.4, of: 100), "<1%")
+        XCTAssertEqual(MoneySpendingCopy.share(57.4, of: 100), "57%")
+    }
+
+    func testTheLogGroupsByDayNewestFirst() throws {
+        let s = try fixture()
+        let groups = MoneySpendingCopy.byDay(s.transactions(s.months[0].txns))
+        XCTAssertEqual(groups.first?.day, "2026-10-20")
+        XCTAssertEqual(groups.map(\.day), groups.map(\.day).sorted(by: >))
+        XCTAssertEqual(Set(groups.map(\.day)).count, groups.count)
+        XCTAssertEqual(MoneySpendingCopy.signedCents(-53.75, hidden: false), "$53.75")
+        XCTAssertEqual(MoneySpendingCopy.signedCents(2867.15, hidden: false), "+$2,867.15")
+    }
+
+    func testTheYear() throws {
+        let year = try XCTUnwrap(try fixture().year)
+        XCTAssertEqual(year.spent, 16708.25, accuracy: 0.01)
+        XCTAssertEqual(year.fullMonth ?? 0, 4090.16, accuracy: 0.01)
+        XCTAssertEqual(year.months.map(\.partial), [true, false, false, false, true])
+        XCTAssertEqual(year.best?.month, "2026-09")
+        XCTAssertEqual(year.toughest?.note, "Shopping $527, food & drink $1,064")
+        XCTAssertEqual(year.places.first?.name, "Trader Joe's")
+        XCTAssertEqual(year.stands.count, 4)
+        XCTAssertEqual(MoneySpendingCopy.yearSince(year), "From Jun 20, when your history starts. It fills in as the log grows.")
+        XCTAssertEqual(MoneySpendingCopy.yearMonthTitle("Best month", try XCTUnwrap(year.best)), "Best month: September")
+        XCTAssertEqual(MoneySpendingCopy.sparkSpan(year.months), "Jul → Oct")
+        let subscriptions = try XCTUnwrap(year.categories.first { $0.key == "subscriptions" })
+        XCTAssertEqual(MoneySpendingCopy.sparkline(subscriptions, year.months), [27.48, 27.48, 27.48, 216.48])
     }
 
     func testHiddenFlagDetailsMaskEveryAmount() {
@@ -160,6 +239,14 @@ final class MoneySpendingTests: XCTestCase {
                 MoneySpendingView(viewModel: model, ask: { _ in }).dynamicTypeSize(typeSize).onAppear(perform: appeared)
             }, size: CGSize(width: 402, height: 2700), style: style) { window in
                 try write(window, to: directory.appendingPathComponent("spending-\(name).png"))
+            }
+            for (suffix, span, index) in [("september", MoneySpendingView.Span.month, 1), ("year", .year, 0)] {
+                try await host({ appeared in
+                    MoneySpendingView(viewModel: model, ask: { _ in }, span: span, monthIndex: index)
+                        .dynamicTypeSize(typeSize).onAppear(perform: appeared)
+                }, size: CGSize(width: 402, height: 2700), style: style) { window in
+                    try write(window, to: directory.appendingPathComponent("spending-\(suffix)-\(name).png"))
+                }
             }
             try await host({ appeared in
                 MoneyView(viewModel: model).dynamicTypeSize(typeSize).onAppear(perform: appeared)

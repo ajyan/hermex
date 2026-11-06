@@ -525,6 +525,1503 @@
       "limit": 10000.0
     }
   ],
+  "months": [
+    {
+      "month": "2026-10",
+      "start": "2026-10-01",
+      "end": "2026-10-20",
+      "spent": 3424.11,
+      "income": 5692.3,
+      "usual": {
+        "spent": 3113.48,
+        "months": 3,
+        "from": "2026-07",
+        "to": "2026-09"
+      },
+      "categories": [
+        {
+          "key": "home",
+          "name": "Rent & utilities",
+          "amount": 2324.19,
+          "usual": 2313.11,
+          "count": 3,
+          "txns": [
+            "fx-checking:fx0218",
+            "fx-checking:fx0222",
+            "fx-checking:fx0238"
+          ]
+        },
+        {
+          "key": "food",
+          "name": "Food & drink",
+          "amount": 669.7,
+          "usual": 511.79,
+          "count": 16,
+          "txns": [
+            "fx-cashback:fx0247",
+            "fx-cashback:fx0236",
+            "fx-card:fx0228",
+            "fx-cashback:fx0221",
+            "fx-card:fx0254",
+            "fx-card:fx0229",
+            "fx-card:fx0240",
+            "fx-card:fx0244",
+            "fx-card:fx0243",
+            "fx-card:fx0249",
+            "fx-card:fx0216",
+            "fx-card:fx0253",
+            "fx-card:fx0245",
+            "fx-card:fx0241",
+            "fx-card:fx0226",
+            "fx-card:fx0235"
+          ]
+        },
+        {
+          "key": "subscriptions",
+          "name": "Subscriptions",
+          "amount": 216.48,
+          "usual": 27.48,
+          "count": 3,
+          "txns": [
+            "fx-card:fx0227",
+            "fx-cashback:fx0234",
+            "fx-cashback:fx0242"
+          ]
+        },
+        {
+          "key": "shopping",
+          "name": "Shopping",
+          "amount": 113.31,
+          "usual": 172.81,
+          "count": 1,
+          "txns": [
+            "fx-card:fx0224"
+          ]
+        },
+        {
+          "key": "transport",
+          "name": "Getting around",
+          "amount": 97.31,
+          "usual": 88.29,
+          "count": 13,
+          "txns": [
+            "fx-card:fx0255",
+            "fx-card:fx0230",
+            "fx-checking:fx0217",
+            "fx-checking:fx0220",
+            "fx-checking:fx0223",
+            "fx-checking:fx0225",
+            "fx-checking:fx0231",
+            "fx-checking:fx0233",
+            "fx-checking:fx0237",
+            "fx-checking:fx0239",
+            "fx-checking:fx0248",
+            "fx-checking:fx0251",
+            "fx-checking:fx0256"
+          ]
+        },
+        {
+          "key": "fees",
+          "name": "Fees & interest",
+          "amount": 3.12,
+          "usual": 0.0,
+          "count": 1,
+          "txns": [
+            "fx-card:fx0232"
+          ]
+        }
+      ],
+      "current": true,
+      "partial": true,
+      "pace": {
+        "days": 31,
+        "actual": [
+          2184.73,
+          2187.63,
+          2355.76,
+          2471.97,
+          2480.89,
+          2733.0,
+          2812.47,
+          2818.49,
+          2833.98,
+          2908.59,
+          2908.59,
+          2981.48,
+          2984.38,
+          3048.75,
+          3133.94,
+          3152.15,
+          3271.09,
+          3312.18,
+          3333.11,
+          3424.11
+        ],
+        "usual": [
+          2200.72,
+          2200.72,
+          2301.03,
+          2354.43,
+          2393.13,
+          2449.94,
+          2465.3,
+          2509.42,
+          2545.08,
+          2552.82,
+          2608.83,
+          2781.91,
+          2800.49,
+          2844.77,
+          2896.28,
+          2950.15,
+          2999.19,
+          3052.35,
+          3088.93,
+          3113.48,
+          3472.94,
+          3669.96,
+          3678.21,
+          3685.1,
+          3755.52,
+          3834.94,
+          3868.89,
+          3975.93,
+          4001.15,
+          4047.67,
+          4090.16
+        ]
+      },
+      "stands": [
+        {
+          "kind": "shift",
+          "group": "subscriptions",
+          "title": "Subscriptions up $189",
+          "detail": "Mostly Blink Fitness Annual, a renewal: $189.00 on Oct 6.",
+          "question": "Why was my subscriptions spending up in October?",
+          "txns": [
+            "fx-card:fx0227",
+            "fx-cashback:fx0234",
+            "fx-cashback:fx0242"
+          ]
+        },
+        {
+          "kind": "shift",
+          "group": "food",
+          "title": "Food & drink up $158",
+          "detail": "Trader Joe's $245, Corner Cafe $120.",
+          "question": "Why was my food & drink spending up in October?",
+          "txns": [
+            "fx-cashback:fx0247",
+            "fx-cashback:fx0236",
+            "fx-card:fx0228",
+            "fx-cashback:fx0221",
+            "fx-card:fx0254"
+          ]
+        },
+        {
+          "kind": "twice",
+          "group": "food",
+          "title": "Noodle Bar Brooklyn charged twice",
+          "detail": "$42.80 on Oct 14 and Oct 15 on Sapphire Card 1934",
+          "question": "Was I charged twice at Noodle Bar Brooklyn on Oct 14 and Oct 15?",
+          "txns": [
+            "fx-card:fx0240",
+            "fx-card:fx0244"
+          ]
+        }
+      ],
+      "biggest": [
+        "fx-card:fx0227",
+        "fx-cashback:fx0247",
+        "fx-card:fx0224"
+      ],
+      "txns": [
+        "fx-checking:fx0256",
+        "fx-card:fx0255",
+        "fx-card:fx0254",
+        "fx-card:fx0253",
+        "fx-checking:fx0251",
+        "fx-card:fx0249",
+        "fx-checking:fx0248",
+        "fx-cashback:fx0247",
+        "fx-checking:fx0246",
+        "fx-card:fx0245",
+        "fx-card:fx0244",
+        "fx-card:fx0243",
+        "fx-cashback:fx0242",
+        "fx-card:fx0241",
+        "fx-card:fx0240",
+        "fx-checking:fx0239",
+        "fx-checking:fx0238",
+        "fx-checking:fx0237",
+        "fx-cashback:fx0236",
+        "fx-card:fx0235",
+        "fx-cashback:fx0234",
+        "fx-checking:fx0233",
+        "fx-card:fx0232",
+        "fx-checking:fx0231",
+        "fx-card:fx0230",
+        "fx-card:fx0229",
+        "fx-card:fx0228",
+        "fx-card:fx0227",
+        "fx-card:fx0226",
+        "fx-checking:fx0225",
+        "fx-card:fx0224",
+        "fx-checking:fx0223",
+        "fx-checking:fx0222",
+        "fx-cashback:fx0221",
+        "fx-checking:fx0220",
+        "fx-checking:fx0219",
+        "fx-checking:fx0218",
+        "fx-checking:fx0217",
+        "fx-card:fx0216"
+      ]
+    },
+    {
+      "month": "2026-09",
+      "start": "2026-09-01",
+      "end": "2026-09-30",
+      "spent": 3813.43,
+      "income": 5734.3,
+      "usual": {
+        "spent": 4228.52,
+        "months": 2,
+        "from": "2026-07",
+        "to": "2026-08"
+      },
+      "categories": [
+        {
+          "key": "home",
+          "name": "Rent & utilities",
+          "amount": 2402.84,
+          "usual": 2395.74,
+          "count": 4,
+          "txns": [
+            "fx-checking:fx0158",
+            "fx-checking:fx0159",
+            "fx-card:fx0198",
+            "fx-checking:fx0176"
+          ]
+        },
+        {
+          "key": "food",
+          "name": "Food & drink",
+          "amount": 590.1,
+          "usual": 997.34,
+          "count": 14,
+          "txns": [
+            "fx-cashback:fx0192",
+            "fx-cashback:fx0174",
+            "fx-cashback:fx0204",
+            "fx-cashback:fx0162",
+            "fx-card:fx0164",
+            "fx-card:fx0179",
+            "fx-card:fx0168",
+            "fx-card:fx0203",
+            "fx-card:fx0157",
+            "fx-card:fx0207",
+            "fx-card:fx0182",
+            "fx-card:fx0173",
+            "fx-card:fx0177",
+            "fx-card:fx0190"
+          ]
+        },
+        {
+          "key": "loans",
+          "name": "Loans",
+          "amount": 310.0,
+          "usual": 310.0,
+          "count": 1,
+          "txns": [
+            "fx-checking:fx0196"
+          ]
+        },
+        {
+          "key": "shopping",
+          "name": "Shopping",
+          "amount": 302.52,
+          "usual": 334.41,
+          "count": 5,
+          "txns": [
+            "fx-card:fx0209",
+            "fx-cashback:fx0212",
+            "fx-card:fx0195",
+            "fx-cashback:fx0185",
+            "fx-cashback:fx0191"
+          ]
+        },
+        {
+          "key": "transport",
+          "name": "Getting around",
+          "amount": 108.99,
+          "usual": 108.4,
+          "count": 21,
+          "txns": [
+            "fx-card:fx0170",
+            "fx-card:fx0165",
+            "fx-checking:fx0161",
+            "fx-checking:fx0163",
+            "fx-checking:fx0166",
+            "fx-checking:fx0167",
+            "fx-checking:fx0169",
+            "fx-checking:fx0172",
+            "fx-checking:fx0175",
+            "fx-checking:fx0178",
+            "fx-checking:fx0181",
+            "fx-checking:fx0183",
+            "fx-checking:fx0184",
+            "fx-checking:fx0188",
+            "fx-checking:fx0193",
+            "fx-checking:fx0194",
+            "fx-checking:fx0197",
+            "fx-checking:fx0199",
+            "fx-checking:fx0200",
+            "fx-checking:fx0206",
+            "fx-checking:fx0214"
+          ]
+        },
+        {
+          "key": "fees",
+          "name": "Fees & interest",
+          "amount": 53.5,
+          "usual": 37.16,
+          "count": 2,
+          "txns": [
+            "fx-card:fx0208",
+            "fx-checking:fx0213"
+          ]
+        },
+        {
+          "key": "subscriptions",
+          "name": "Subscriptions",
+          "amount": 27.48,
+          "usual": 27.48,
+          "count": 2,
+          "txns": [
+            "fx-cashback:fx0171",
+            "fx-cashback:fx0180"
+          ]
+        },
+        {
+          "key": "health",
+          "name": "Health & insurance",
+          "amount": 18.0,
+          "usual": 18.0,
+          "count": 1,
+          "txns": [
+            "fx-checking:fx0205"
+          ]
+        }
+      ],
+      "current": false,
+      "partial": false,
+      "pace": {
+        "days": 30,
+        "actual": [
+          2175.24,
+          2175.24,
+          2273.09,
+          2275.99,
+          2342.31,
+          2433.26,
+          2436.16,
+          2475.07,
+          2519.32,
+          2519.32,
+          2522.22,
+          2680.64,
+          2693.41,
+          2765.94,
+          2786.55,
+          2789.45,
+          2789.45,
+          2813.15,
+          2897.98,
+          2900.88,
+          3293.15,
+          3381.05,
+          3381.05,
+          3383.95,
+          3383.95,
+          3502.7,
+          3505.6,
+          3718.55,
+          3718.55,
+          3813.43
+        ],
+        "usual": [
+          2213.46,
+          2213.46,
+          2314.99,
+          2393.65,
+          2418.54,
+          2458.28,
+          2479.88,
+          2526.59,
+          2557.97,
+          2569.56,
+          2652.14,
+          2832.55,
+          2854.03,
+          2884.19,
+          2951.14,
+          3030.51,
+          3104.06,
+          3171.94,
+          3184.4,
+          3219.78,
+          3562.84,
+          3814.42,
+          3826.8,
+          3835.67,
+          3941.3,
+          4001.06,
+          4050.54,
+          4104.62,
+          4142.45,
+          4164.78
+        ]
+      },
+      "stands": [
+        {
+          "kind": "shift",
+          "group": "food",
+          "title": "Food & drink down $407",
+          "detail": "Your lightest food & drink month in a while: $590, against about $997.",
+          "question": "Why was my food & drink spending down in September?",
+          "txns": [
+            "fx-cashback:fx0192",
+            "fx-cashback:fx0174",
+            "fx-cashback:fx0204",
+            "fx-cashback:fx0162",
+            "fx-card:fx0164"
+          ]
+        },
+        {
+          "kind": "fee",
+          "group": "fees",
+          "title": "Monthly Service Fee",
+          "detail": "$12.00 on Sep 30 on Everyday Checking 4821",
+          "question": "What was the $12.00 Monthly Service Fee charge on Sep 30, and can I avoid it?",
+          "txns": [
+            "fx-checking:fx0213"
+          ]
+        },
+        {
+          "kind": "kept",
+          "group": null,
+          "title": "You kept $662 more than in August",
+          "detail": "September: $5,734 in, $3,813 spent. August: $5,734 in, $4,475 spent.",
+          "question": "Why did I keep more in September than in August?",
+          "txns": []
+        }
+      ],
+      "biggest": [
+        "fx-card:fx0209",
+        "fx-cashback:fx0192",
+        "fx-cashback:fx0212"
+      ],
+      "txns": [
+        "fx-savings:fx0215",
+        "fx-checking:fx0214",
+        "fx-checking:fx0213",
+        "fx-cashback:fx0212",
+        "fx-card:fx0209",
+        "fx-card:fx0208",
+        "fx-card:fx0207",
+        "fx-checking:fx0206",
+        "fx-checking:fx0205",
+        "fx-cashback:fx0204",
+        "fx-card:fx0203",
+        "fx-checking:fx0200",
+        "fx-checking:fx0199",
+        "fx-card:fx0198",
+        "fx-checking:fx0197",
+        "fx-checking:fx0196",
+        "fx-card:fx0195",
+        "fx-checking:fx0194",
+        "fx-checking:fx0193",
+        "fx-cashback:fx0192",
+        "fx-cashback:fx0191",
+        "fx-card:fx0190",
+        "fx-checking:fx0188",
+        "fx-checking:fx0187",
+        "fx-cashback:fx0185",
+        "fx-checking:fx0184",
+        "fx-checking:fx0183",
+        "fx-card:fx0182",
+        "fx-checking:fx0181",
+        "fx-cashback:fx0180",
+        "fx-card:fx0179",
+        "fx-checking:fx0178",
+        "fx-card:fx0177",
+        "fx-checking:fx0176",
+        "fx-checking:fx0175",
+        "fx-cashback:fx0174",
+        "fx-card:fx0173",
+        "fx-checking:fx0172",
+        "fx-cashback:fx0171",
+        "fx-card:fx0170",
+        "fx-checking:fx0169",
+        "fx-card:fx0168",
+        "fx-checking:fx0167",
+        "fx-checking:fx0166",
+        "fx-card:fx0165",
+        "fx-card:fx0164",
+        "fx-checking:fx0163",
+        "fx-cashback:fx0162",
+        "fx-checking:fx0161",
+        "fx-checking:fx0160",
+        "fx-checking:fx0159",
+        "fx-checking:fx0158",
+        "fx-card:fx0157"
+      ]
+    },
+    {
+      "month": "2026-08",
+      "start": "2026-08-01",
+      "end": "2026-08-31",
+      "spent": 4475.12,
+      "income": 5734.3,
+      "usual": {
+        "spent": 3981.93,
+        "months": 1,
+        "from": "2026-07",
+        "to": "2026-07"
+      },
+      "categories": [
+        {
+          "key": "home",
+          "name": "Rent & utilities",
+          "amount": 2398.09,
+          "usual": 2393.39,
+          "count": 4,
+          "txns": [
+            "fx-checking:fx0090",
+            "fx-checking:fx0091",
+            "fx-card:fx0132",
+            "fx-checking:fx0111"
+          ]
+        },
+        {
+          "key": "food",
+          "name": "Food & drink",
+          "amount": 1064.44,
+          "usual": 930.24,
+          "count": 22,
+          "txns": [
+            "fx-cashback:fx0088",
+            "fx-cashback:fx0115",
+            "fx-cashback:fx0151",
+            "fx-cashback:fx0133",
+            "fx-cashback:fx0101",
+            "fx-card:fx0120",
+            "fx-card:fx0155",
+            "fx-card:fx0127",
+            "fx-card:fx0130",
+            "fx-card:fx0142",
+            "fx-card:fx0096",
+            "fx-card:fx0138",
+            "fx-card:fx0145",
+            "fx-card:fx0107",
+            "fx-card:fx0152",
+            "fx-card:fx0125",
+            "fx-card:fx0105",
+            "fx-card:fx0119",
+            "fx-card:fx0124",
+            "fx-card:fx0093",
+            "fx-card:fx0136",
+            "fx-card:fx0147"
+          ]
+        },
+        {
+          "key": "shopping",
+          "name": "Shopping",
+          "amount": 526.68,
+          "usual": 142.14,
+          "count": 7,
+          "txns": [
+            "fx-card:fx0131",
+            "fx-card:fx0117",
+            "fx-cashback:fx0109",
+            "fx-card:fx0108",
+            "fx-cashback:fx0118",
+            "fx-card:fx0097",
+            "fx-card:fx0112"
+          ]
+        },
+        {
+          "key": "loans",
+          "name": "Loans",
+          "amount": 310.0,
+          "usual": 310.0,
+          "count": 1,
+          "txns": [
+            "fx-checking:fx0129"
+          ]
+        },
+        {
+          "key": "transport",
+          "name": "Getting around",
+          "amount": 92.31,
+          "usual": 124.48,
+          "count": 22,
+          "txns": [
+            "fx-card:fx0094",
+            "fx-checking:fx0089",
+            "fx-checking:fx0092",
+            "fx-checking:fx0095",
+            "fx-checking:fx0098",
+            "fx-checking:fx0100",
+            "fx-checking:fx0103",
+            "fx-checking:fx0104",
+            "fx-checking:fx0106",
+            "fx-checking:fx0110",
+            "fx-checking:fx0113",
+            "fx-checking:fx0116",
+            "fx-checking:fx0122",
+            "fx-checking:fx0126",
+            "fx-checking:fx0134",
+            "fx-checking:fx0135",
+            "fx-checking:fx0137",
+            "fx-checking:fx0140",
+            "fx-checking:fx0144",
+            "fx-checking:fx0146",
+            "fx-checking:fx0153",
+            "fx-checking:fx0156"
+          ]
+        },
+        {
+          "key": "fees",
+          "name": "Fees & interest",
+          "amount": 38.12,
+          "usual": 36.2,
+          "count": 1,
+          "txns": [
+            "fx-card:fx0148"
+          ]
+        },
+        {
+          "key": "subscriptions",
+          "name": "Subscriptions",
+          "amount": 27.48,
+          "usual": 27.48,
+          "count": 2,
+          "txns": [
+            "fx-cashback:fx0102",
+            "fx-cashback:fx0114"
+          ]
+        },
+        {
+          "key": "health",
+          "name": "Health & insurance",
+          "amount": 18.0,
+          "usual": 18.0,
+          "count": 1,
+          "txns": [
+            "fx-checking:fx0143"
+          ]
+        }
+      ],
+      "current": false,
+      "partial": false,
+      "pace": {
+        "days": 31,
+        "actual": [
+          2240.61,
+          2240.61,
+          2336.61,
+          2383.95,
+          2430.82,
+          2478.42,
+          2481.32,
+          2548.2,
+          2566.59,
+          2569.49,
+          2607.57,
+          2862.47,
+          2905.43,
+          2917.42,
+          2997.67,
+          3153.49,
+          3187.6,
+          3254.37,
+          3276.38,
+          3317.98,
+          3691.18,
+          4058.26,
+          4061.16,
+          4076.01,
+          4124.16,
+          4204.0,
+          4249.82,
+          4293.89,
+          4366.66,
+          4408.42,
+          4475.12
+        ],
+        "usual": [
+          2186.31,
+          2186.31,
+          2293.38,
+          2403.36,
+          2406.26,
+          2438.15,
+          2478.43,
+          2504.98,
+          2549.34,
+          2569.64,
+          2696.7,
+          2802.63,
+          2802.63,
+          2850.96,
+          2904.62,
+          2907.52,
+          3020.52,
+          3089.52,
+          3092.42,
+          3121.59,
+          3434.49,
+          3570.58,
+          3592.43,
+          3595.33,
+          3758.45,
+          3798.12,
+          3851.26,
+          3915.35,
+          3918.25,
+          3921.15,
+          3981.93
+        ]
+      },
+      "stands": [
+        {
+          "kind": "shift",
+          "group": "shopping",
+          "title": "Shopping up $385",
+          "detail": "Uniqlo USA $399, Amazon Mktpl $128.",
+          "question": "Why was my shopping spending up in August?",
+          "txns": [
+            "fx-card:fx0131",
+            "fx-card:fx0117",
+            "fx-cashback:fx0109",
+            "fx-card:fx0108",
+            "fx-cashback:fx0118"
+          ]
+        },
+        {
+          "kind": "shift",
+          "group": "transport",
+          "title": "Getting around down $32",
+          "detail": "$92, against about $124.",
+          "question": "Why was my getting around spending down in August?",
+          "txns": [
+            "fx-card:fx0094",
+            "fx-checking:fx0089",
+            "fx-checking:fx0092",
+            "fx-checking:fx0095",
+            "fx-checking:fx0098"
+          ]
+        },
+        {
+          "kind": "kept",
+          "group": null,
+          "title": "You kept $493 less than in July",
+          "detail": "August: $5,734 in, $4,475 spent. July: $5,734 in, $3,982 spent.",
+          "question": "Why did I keep less in August than in July?",
+          "txns": []
+        }
+      ],
+      "biggest": [
+        "fx-card:fx0131",
+        "fx-card:fx0117",
+        "fx-cashback:fx0088"
+      ],
+      "txns": [
+        "fx-checking:fx0156",
+        "fx-card:fx0155",
+        "fx-savings:fx0154",
+        "fx-checking:fx0153",
+        "fx-card:fx0152",
+        "fx-cashback:fx0151",
+        "fx-card:fx0148",
+        "fx-card:fx0147",
+        "fx-checking:fx0146",
+        "fx-card:fx0145",
+        "fx-checking:fx0144",
+        "fx-checking:fx0143",
+        "fx-card:fx0142",
+        "fx-checking:fx0140",
+        "fx-card:fx0138",
+        "fx-checking:fx0137",
+        "fx-card:fx0136",
+        "fx-checking:fx0135",
+        "fx-checking:fx0134",
+        "fx-cashback:fx0133",
+        "fx-card:fx0132",
+        "fx-card:fx0131",
+        "fx-card:fx0130",
+        "fx-checking:fx0129",
+        "fx-checking:fx0128",
+        "fx-card:fx0127",
+        "fx-checking:fx0126",
+        "fx-card:fx0125",
+        "fx-card:fx0124",
+        "fx-checking:fx0122",
+        "fx-card:fx0120",
+        "fx-card:fx0119",
+        "fx-cashback:fx0118",
+        "fx-card:fx0117",
+        "fx-checking:fx0116",
+        "fx-cashback:fx0115",
+        "fx-cashback:fx0114",
+        "fx-checking:fx0113",
+        "fx-card:fx0112",
+        "fx-checking:fx0111",
+        "fx-checking:fx0110",
+        "fx-cashback:fx0109",
+        "fx-card:fx0108",
+        "fx-card:fx0107",
+        "fx-checking:fx0106",
+        "fx-card:fx0105",
+        "fx-checking:fx0104",
+        "fx-checking:fx0103",
+        "fx-cashback:fx0102",
+        "fx-cashback:fx0101",
+        "fx-checking:fx0100",
+        "fx-checking:fx0099",
+        "fx-checking:fx0098",
+        "fx-card:fx0097",
+        "fx-card:fx0096",
+        "fx-checking:fx0095",
+        "fx-card:fx0094",
+        "fx-card:fx0093",
+        "fx-checking:fx0092",
+        "fx-checking:fx0091",
+        "fx-checking:fx0090",
+        "fx-checking:fx0089",
+        "fx-cashback:fx0088"
+      ]
+    },
+    {
+      "month": "2026-07",
+      "start": "2026-07-01",
+      "end": "2026-07-31",
+      "spent": 3981.93,
+      "income": 5734.3,
+      "usual": null,
+      "categories": [
+        {
+          "key": "home",
+          "name": "Rent & utilities",
+          "amount": 2393.39,
+          "usual": null,
+          "count": 4,
+          "txns": [
+            "fx-checking:fx0027",
+            "fx-checking:fx0029",
+            "fx-card:fx0065",
+            "fx-checking:fx0048"
+          ]
+        },
+        {
+          "key": "food",
+          "name": "Food & drink",
+          "amount": 930.24,
+          "usual": null,
+          "count": 21,
+          "txns": [
+            "fx-cashback:fx0071",
+            "fx-cashback:fx0030",
+            "fx-cashback:fx0045",
+            "fx-cashback:fx0057",
+            "fx-card:fx0086",
+            "fx-card:fx0044",
+            "fx-card:fx0051",
+            "fx-card:fx0064",
+            "fx-card:fx0070",
+            "fx-card:fx0077",
+            "fx-card:fx0035",
+            "fx-card:fx0025",
+            "fx-card:fx0053",
+            "fx-card:fx0079",
+            "fx-card:fx0060",
+            "fx-card:fx0037",
+            "fx-card:fx0066",
+            "fx-card:fx0074",
+            "fx-card:fx0028",
+            "fx-card:fx0041",
+            "fx-card:fx0055"
+          ]
+        },
+        {
+          "key": "loans",
+          "name": "Loans",
+          "amount": 310.0,
+          "usual": null,
+          "count": 1,
+          "txns": [
+            "fx-checking:fx0062"
+          ]
+        },
+        {
+          "key": "shopping",
+          "name": "Shopping",
+          "amount": 142.14,
+          "usual": null,
+          "count": 3,
+          "txns": [
+            "fx-card:fx0054",
+            "fx-cashback:fx0033",
+            "fx-cashback:fx0039"
+          ]
+        },
+        {
+          "key": "transport",
+          "name": "Getting around",
+          "amount": 124.48,
+          "usual": null,
+          "count": 21,
+          "txns": [
+            "fx-card:fx0049",
+            "fx-card:fx0046",
+            "fx-checking:fx0026",
+            "fx-checking:fx0031",
+            "fx-checking:fx0032",
+            "fx-checking:fx0034",
+            "fx-checking:fx0036",
+            "fx-checking:fx0038",
+            "fx-checking:fx0043",
+            "fx-checking:fx0047",
+            "fx-checking:fx0052",
+            "fx-checking:fx0059",
+            "fx-checking:fx0061",
+            "fx-checking:fx0063",
+            "fx-checking:fx0068",
+            "fx-checking:fx0072",
+            "fx-checking:fx0076",
+            "fx-checking:fx0078",
+            "fx-checking:fx0083",
+            "fx-checking:fx0084",
+            "fx-checking:fx0087"
+          ]
+        },
+        {
+          "key": "fees",
+          "name": "Fees & interest",
+          "amount": 36.2,
+          "usual": null,
+          "count": 1,
+          "txns": [
+            "fx-card:fx0080"
+          ]
+        },
+        {
+          "key": "subscriptions",
+          "name": "Subscriptions",
+          "amount": 27.48,
+          "usual": null,
+          "count": 2,
+          "txns": [
+            "fx-cashback:fx0040",
+            "fx-cashback:fx0050"
+          ]
+        },
+        {
+          "key": "health",
+          "name": "Health & insurance",
+          "amount": 18.0,
+          "usual": null,
+          "count": 1,
+          "txns": [
+            "fx-checking:fx0075"
+          ]
+        }
+      ],
+      "current": false,
+      "partial": false,
+      "pace": {
+        "days": 31,
+        "actual": [
+          2186.31,
+          2186.31,
+          2293.38,
+          2403.36,
+          2406.26,
+          2438.15,
+          2478.43,
+          2504.98,
+          2549.34,
+          2569.64,
+          2696.7,
+          2802.63,
+          2802.63,
+          2850.96,
+          2904.62,
+          2907.52,
+          3020.52,
+          3089.52,
+          3092.42,
+          3121.59,
+          3434.49,
+          3570.58,
+          3592.43,
+          3595.33,
+          3758.45,
+          3798.12,
+          3851.26,
+          3915.35,
+          3918.25,
+          3921.15,
+          3981.93
+        ],
+        "usual": null
+      },
+      "stands": [],
+      "biggest": [
+        "fx-cashback:fx0071",
+        "fx-cashback:fx0030",
+        "fx-card:fx0054"
+      ],
+      "txns": [
+        "fx-checking:fx0087",
+        "fx-card:fx0086",
+        "fx-savings:fx0085",
+        "fx-checking:fx0084",
+        "fx-checking:fx0083",
+        "fx-card:fx0080",
+        "fx-card:fx0079",
+        "fx-checking:fx0078",
+        "fx-card:fx0077",
+        "fx-checking:fx0076",
+        "fx-checking:fx0075",
+        "fx-card:fx0074",
+        "fx-checking:fx0072",
+        "fx-cashback:fx0071",
+        "fx-card:fx0070",
+        "fx-checking:fx0068",
+        "fx-checking:fx0067",
+        "fx-card:fx0066",
+        "fx-card:fx0065",
+        "fx-card:fx0064",
+        "fx-checking:fx0063",
+        "fx-checking:fx0062",
+        "fx-checking:fx0061",
+        "fx-card:fx0060",
+        "fx-checking:fx0059",
+        "fx-cashback:fx0057",
+        "fx-card:fx0055",
+        "fx-card:fx0054",
+        "fx-card:fx0053",
+        "fx-checking:fx0052",
+        "fx-card:fx0051",
+        "fx-cashback:fx0050",
+        "fx-card:fx0049",
+        "fx-checking:fx0048",
+        "fx-checking:fx0047",
+        "fx-card:fx0046",
+        "fx-cashback:fx0045",
+        "fx-card:fx0044",
+        "fx-checking:fx0043",
+        "fx-checking:fx0042",
+        "fx-card:fx0041",
+        "fx-cashback:fx0040",
+        "fx-cashback:fx0039",
+        "fx-checking:fx0038",
+        "fx-card:fx0037",
+        "fx-checking:fx0036",
+        "fx-card:fx0035",
+        "fx-checking:fx0034",
+        "fx-cashback:fx0033",
+        "fx-checking:fx0032",
+        "fx-checking:fx0031",
+        "fx-cashback:fx0030",
+        "fx-checking:fx0029",
+        "fx-card:fx0028",
+        "fx-checking:fx0027",
+        "fx-checking:fx0026",
+        "fx-card:fx0025"
+      ]
+    },
+    {
+      "month": "2026-06",
+      "start": "2026-06-01",
+      "end": "2026-06-30",
+      "spent": 1013.66,
+      "income": 2888.15,
+      "usual": null,
+      "categories": [
+        {
+          "key": "food",
+          "name": "Food & drink",
+          "amount": 384.5,
+          "usual": null,
+          "count": 7,
+          "txns": [
+            "fx-cashback:fx0000",
+            "fx-cashback:fx0015",
+            "fx-card:fx0022",
+            "fx-card:fx0009",
+            "fx-card:fx0002",
+            "fx-card:fx0013",
+            "fx-card:fx0007"
+          ]
+        },
+        {
+          "key": "loans",
+          "name": "Loans",
+          "amount": 310.0,
+          "usual": null,
+          "count": 1,
+          "txns": [
+            "fx-checking:fx0003"
+          ]
+        },
+        {
+          "key": "shopping",
+          "name": "Shopping",
+          "amount": 126.57,
+          "usual": null,
+          "count": 1,
+          "txns": [
+            "fx-card:fx0008"
+          ]
+        },
+        {
+          "key": "home",
+          "name": "Rent & utilities",
+          "amount": 85.0,
+          "usual": null,
+          "count": 1,
+          "txns": [
+            "fx-card:fx0004"
+          ]
+        },
+        {
+          "key": "transport",
+          "name": "Getting around",
+          "amount": 55.84,
+          "usual": null,
+          "count": 9,
+          "txns": [
+            "fx-card:fx0014",
+            "fx-checking:fx0001",
+            "fx-checking:fx0005",
+            "fx-checking:fx0006",
+            "fx-checking:fx0012",
+            "fx-checking:fx0016",
+            "fx-checking:fx0019",
+            "fx-checking:fx0021",
+            "fx-checking:fx0023"
+          ]
+        },
+        {
+          "key": "fees",
+          "name": "Fees & interest",
+          "amount": 33.75,
+          "usual": null,
+          "count": 1,
+          "txns": [
+            "fx-card:fx0017"
+          ]
+        },
+        {
+          "key": "health",
+          "name": "Health & insurance",
+          "amount": 18.0,
+          "usual": null,
+          "count": 1,
+          "txns": [
+            "fx-checking:fx0011"
+          ]
+        }
+      ],
+      "current": false,
+      "partial": true,
+      "pace": {
+        "days": 30,
+        "actual": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          107.35,
+          462.96,
+          550.86,
+          553.76,
+          691.39,
+          691.39,
+          761.66,
+          918.08,
+          954.73,
+          957.63,
+          1013.66
+        ],
+        "usual": null
+      },
+      "stands": [],
+      "biggest": [
+        "fx-card:fx0008",
+        "fx-cashback:fx0000",
+        "fx-cashback:fx0015"
+      ],
+      "txns": [
+        "fx-savings:fx0024",
+        "fx-checking:fx0023",
+        "fx-card:fx0022",
+        "fx-checking:fx0021",
+        "fx-checking:fx0019",
+        "fx-card:fx0017",
+        "fx-checking:fx0016",
+        "fx-cashback:fx0015",
+        "fx-card:fx0014",
+        "fx-card:fx0013",
+        "fx-checking:fx0012",
+        "fx-checking:fx0011",
+        "fx-checking:fx0010",
+        "fx-card:fx0009",
+        "fx-card:fx0008",
+        "fx-card:fx0007",
+        "fx-checking:fx0006",
+        "fx-checking:fx0005",
+        "fx-card:fx0004",
+        "fx-checking:fx0003",
+        "fx-card:fx0002",
+        "fx-checking:fx0001",
+        "fx-cashback:fx0000"
+      ]
+    }
+  ],
+  "year": {
+    "year": 2026,
+    "since": "2026-06-20",
+    "spent": 16708.25,
+    "income": 25783.35,
+    "full_month": 4090.16,
+    "months": [
+      {
+        "month": "2026-06",
+        "in": 2888.15,
+        "out": 1013.66,
+        "partial": true
+      },
+      {
+        "month": "2026-07",
+        "in": 5734.3,
+        "out": 3981.93,
+        "partial": false
+      },
+      {
+        "month": "2026-08",
+        "in": 5734.3,
+        "out": 4475.12,
+        "partial": false
+      },
+      {
+        "month": "2026-09",
+        "in": 5734.3,
+        "out": 3813.43,
+        "partial": false
+      },
+      {
+        "month": "2026-10",
+        "in": 5692.3,
+        "out": 3424.11,
+        "partial": true
+      }
+    ],
+    "categories": [
+      {
+        "key": "home",
+        "name": "Rent & utilities",
+        "total": 9603.51,
+        "average": 2398.11,
+        "months": [
+          85.0,
+          2393.39,
+          2398.09,
+          2402.84,
+          2324.19
+        ]
+      },
+      {
+        "key": "food",
+        "name": "Food & drink",
+        "total": 3638.98,
+        "average": 861.59,
+        "months": [
+          384.5,
+          930.24,
+          1064.44,
+          590.1,
+          669.7
+        ]
+      },
+      {
+        "key": "loans",
+        "name": "Loans",
+        "total": 1240.0,
+        "average": 310.0,
+        "months": [
+          310.0,
+          310.0,
+          310.0,
+          310.0,
+          0.0
+        ]
+      },
+      {
+        "key": "shopping",
+        "name": "Shopping",
+        "total": 1211.22,
+        "average": 323.78,
+        "months": [
+          126.57,
+          142.14,
+          526.68,
+          302.52,
+          113.31
+        ]
+      },
+      {
+        "key": "transport",
+        "name": "Getting around",
+        "total": 478.93,
+        "average": 108.59,
+        "months": [
+          55.84,
+          124.48,
+          92.31,
+          108.99,
+          97.31
+        ]
+      },
+      {
+        "key": "subscriptions",
+        "name": "Subscriptions",
+        "total": 298.92,
+        "average": 27.48,
+        "months": [
+          0.0,
+          27.48,
+          27.48,
+          27.48,
+          216.48
+        ]
+      },
+      {
+        "key": "fees",
+        "name": "Fees & interest",
+        "total": 164.69,
+        "average": 42.61,
+        "months": [
+          33.75,
+          36.2,
+          38.12,
+          53.5,
+          3.12
+        ]
+      },
+      {
+        "key": "health",
+        "name": "Health & insurance",
+        "total": 72.0,
+        "average": 18.0,
+        "months": [
+          18.0,
+          18.0,
+          18.0,
+          18.0,
+          0.0
+        ]
+      }
+    ],
+    "best": {
+      "month": "2026-09",
+      "kept": 1920.87,
+      "spent": 3813.43,
+      "income": 5734.3,
+      "note": "Food & drink fell to $590"
+    },
+    "toughest": {
+      "month": "2026-08",
+      "kept": 1259.18,
+      "spent": 4475.12,
+      "income": 5734.3,
+      "note": "Shopping $527, food & drink $1,064"
+    },
+    "places": [
+      {
+        "name": "Trader Joe's",
+        "group": "food",
+        "visits": 18,
+        "total": 1479.62
+      },
+      {
+        "name": "Uniqlo USA",
+        "group": "shopping",
+        "visits": 10,
+        "total": 949.52
+      },
+      {
+        "name": "Corner Cafe",
+        "group": "food",
+        "visits": 16,
+        "total": 587.98
+      },
+      {
+        "name": "Pizza Place Bklyn",
+        "group": "food",
+        "visits": 11,
+        "total": 494.32
+      }
+    ],
+    "stands": [
+      {
+        "kind": "biggest",
+        "group": "shopping",
+        "title": "August was your biggest month: $4,475",
+        "detail": "Shopping $527 and food & drink $1,064, both above your average.",
+        "question": "Why was August my biggest spending month this year?"
+      },
+      {
+        "kind": "swing",
+        "group": "food",
+        "title": "Food & drink swings the most",
+        "detail": "From $590 in September to $1,064 in August.",
+        "question": "Why does my food & drink spending swing so much month to month?"
+      },
+      {
+        "kind": "jump",
+        "group": "subscriptions",
+        "title": "Subscriptions jumped in October",
+        "detail": "$216 so far, against about $27 a month.",
+        "question": "Why did my subscriptions spending jump in October?"
+      },
+      {
+        "kind": "share",
+        "group": "home",
+        "title": "Rent & utilities is 57% of everything",
+        "detail": "$9,604 since Jun 20.",
+        "question": "Is 57% of my spending on rent & utilities a lot?"
+      }
+    ]
+  },
   "transactions": [
     {
       "id": "fx-checking:fx0256",
@@ -878,6 +2375,24 @@
       "account": "fx-card"
     },
     {
+      "id": "fx-savings:fx0215",
+      "day": "2026-09-30",
+      "name": "Interest",
+      "description": "INTEREST PAYMENT",
+      "amount": 42.0,
+      "group": "fees",
+      "account": "fx-savings"
+    },
+    {
+      "id": "fx-checking:fx0214",
+      "day": "2026-09-30",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
       "id": "fx-checking:fx0213",
       "day": "2026-09-30",
       "name": "Monthly Service Fee",
@@ -885,6 +2400,24 @@
       "amount": -12.0,
       "group": "fees",
       "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0212",
+      "day": "2026-09-30",
+      "name": "Amazon Mktpl",
+      "description": "AMAZON MKTPL",
+      "amount": -79.98,
+      "group": "shopping",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-card:fx0209",
+      "day": "2026-09-28",
+      "name": "Uniqlo USA",
+      "description": "UNIQLO USA",
+      "amount": -147.36,
+      "group": "shopping",
+      "account": "fx-card"
     },
     {
       "id": "fx-card:fx0208",
@@ -896,6 +2429,402 @@
       "account": "fx-card"
     },
     {
+      "id": "fx-card:fx0207",
+      "day": "2026-09-28",
+      "name": "Bagel Bakery",
+      "description": "BAGEL BAKERY",
+      "amount": -24.09,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0206",
+      "day": "2026-09-27",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0205",
+      "day": "2026-09-26",
+      "name": "Lemonade Insurance",
+      "description": "LEMONADE INSURANCE",
+      "amount": -18.0,
+      "group": "health",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0204",
+      "day": "2026-09-26",
+      "name": "Trader Joe's",
+      "description": "TRADER JOE'S #552",
+      "amount": -70.82,
+      "group": "food",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-card:fx0203",
+      "day": "2026-09-26",
+      "name": "Pizza Place Bklyn",
+      "description": "PIZZA PLACE BKLYN",
+      "amount": -29.93,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0200",
+      "day": "2026-09-24",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0199",
+      "day": "2026-09-22",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0198",
+      "day": "2026-09-22",
+      "name": "Verizon Wireless",
+      "description": "VERIZON WIRELESS",
+      "amount": -85.0,
+      "group": "home",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0197",
+      "day": "2026-09-21",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0196",
+      "day": "2026-09-21",
+      "name": "Dept Education Student",
+      "description": "DEPT EDUCATION STUDENT LN",
+      "amount": -310.0,
+      "group": "loans",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0195",
+      "day": "2026-09-21",
+      "name": "Uniqlo USA",
+      "description": "UNIQLO USA",
+      "amount": -79.37,
+      "group": "shopping",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0194",
+      "day": "2026-09-20",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0193",
+      "day": "2026-09-19",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0192",
+      "day": "2026-09-19",
+      "name": "Trader Joe's",
+      "description": "TRADER JOE'S #552",
+      "amount": -98.24,
+      "group": "food",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-cashback:fx0191",
+      "day": "2026-09-19",
+      "name": "Amazon Mktpl Refund",
+      "description": "AMAZON MKTPL REFUND",
+      "amount": 24.99,
+      "group": "shopping",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-card:fx0190",
+      "day": "2026-09-19",
+      "name": "Sushi Counter",
+      "description": "SUSHI COUNTER",
+      "amount": -8.68,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0188",
+      "day": "2026-09-18",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0187",
+      "day": "2026-09-18",
+      "name": "Acme Corp Payroll",
+      "description": "ACME CORP PAYROLL",
+      "amount": 2846.15,
+      "group": "income",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0185",
+      "day": "2026-09-18",
+      "name": "Amazon Mktpl",
+      "description": "AMAZON MKTPL",
+      "amount": -20.8,
+      "group": "shopping",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-checking:fx0184",
+      "day": "2026-09-16",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0183",
+      "day": "2026-09-15",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0182",
+      "day": "2026-09-15",
+      "name": "Bagel Bakery",
+      "description": "BAGEL BAKERY",
+      "amount": -17.71,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0181",
+      "day": "2026-09-14",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0180",
+      "day": "2026-09-14",
+      "name": "Spotify USA",
+      "description": "SPOTIFY USA",
+      "amount": -11.99,
+      "group": "subscriptions",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-card:fx0179",
+      "day": "2026-09-14",
+      "name": "Pizza Place Bklyn",
+      "description": "PIZZA PLACE BKLYN",
+      "amount": -57.64,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0178",
+      "day": "2026-09-13",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0177",
+      "day": "2026-09-13",
+      "name": "Taco Spot",
+      "description": "TACO SPOT",
+      "amount": -9.87,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0176",
+      "day": "2026-09-12",
+      "name": "Spectrum Internet",
+      "description": "SPECTRUM INTERNET",
+      "amount": -69.99,
+      "group": "home",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0175",
+      "day": "2026-09-12",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0174",
+      "day": "2026-09-12",
+      "name": "Trader Joe's",
+      "description": "TRADER JOE'S #552",
+      "amount": -71.35,
+      "group": "food",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-card:fx0173",
+      "day": "2026-09-12",
+      "name": "Sushi Counter",
+      "description": "SUSHI COUNTER",
+      "amount": -14.18,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0172",
+      "day": "2026-09-11",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0171",
+      "day": "2026-09-09",
+      "name": "Netflix",
+      "description": "NETFLIX.COM",
+      "amount": -15.49,
+      "group": "subscriptions",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-card:fx0170",
+      "day": "2026-09-09",
+      "name": "Uber Trip",
+      "description": "UBER TRIP",
+      "amount": -28.76,
+      "group": "transport",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0169",
+      "day": "2026-09-08",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0168",
+      "day": "2026-09-08",
+      "name": "Bagel Bakery",
+      "description": "BAGEL BAKERY",
+      "amount": -36.01,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0167",
+      "day": "2026-09-07",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0166",
+      "day": "2026-09-06",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0165",
+      "day": "2026-09-06",
+      "name": "Uber Trip",
+      "description": "UBER TRIP",
+      "amount": -25.13,
+      "group": "transport",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0164",
+      "day": "2026-09-06",
+      "name": "Sushi Counter",
+      "description": "SUSHI COUNTER",
+      "amount": -62.92,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0163",
+      "day": "2026-09-05",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0162",
+      "day": "2026-09-05",
+      "name": "Trader Joe's",
+      "description": "TRADER JOE'S #552",
+      "amount": -63.42,
+      "group": "food",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-checking:fx0161",
+      "day": "2026-09-04",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0160",
+      "day": "2026-09-04",
+      "name": "Acme Corp Payroll",
+      "description": "ACME CORP PAYROLL",
+      "amount": 2846.15,
+      "group": "income",
+      "account": "fx-checking"
+    },
+    {
       "id": "fx-checking:fx0159",
       "day": "2026-09-03",
       "name": "Con Edison",
@@ -903,6 +2832,78 @@
       "amount": -97.85,
       "group": "home",
       "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0158",
+      "day": "2026-09-01",
+      "name": "Rent Property Mgmt",
+      "description": "RENT PAYMENT PROPERTY MGMT",
+      "amount": -2150.0,
+      "group": "home",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0157",
+      "day": "2026-09-01",
+      "name": "Corner Cafe",
+      "description": "CORNER CAFE",
+      "amount": -25.24,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0156",
+      "day": "2026-08-31",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0155",
+      "day": "2026-08-31",
+      "name": "Bagel Bakery",
+      "description": "BAGEL BAKERY",
+      "amount": -63.8,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-savings:fx0154",
+      "day": "2026-08-30",
+      "name": "Interest",
+      "description": "INTEREST PAYMENT",
+      "amount": 42.0,
+      "group": "fees",
+      "account": "fx-savings"
+    },
+    {
+      "id": "fx-checking:fx0153",
+      "day": "2026-08-30",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0152",
+      "day": "2026-08-30",
+      "name": "Corner Cafe",
+      "description": "CORNER CAFE",
+      "amount": -38.86,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-cashback:fx0151",
+      "day": "2026-08-29",
+      "name": "Trader Joe's",
+      "description": "TRADER JOE'S #552",
+      "amount": -72.77,
+      "group": "food",
+      "account": "fx-cashback"
     },
     {
       "id": "fx-card:fx0148",
@@ -914,12 +2915,552 @@
       "account": "fx-card"
     },
     {
+      "id": "fx-card:fx0147",
+      "day": "2026-08-28",
+      "name": "Corner Cafe",
+      "description": "CORNER CAFE",
+      "amount": -5.95,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0146",
+      "day": "2026-08-27",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0145",
+      "day": "2026-08-27",
+      "name": "Taco Spot",
+      "description": "TACO SPOT",
+      "amount": -42.92,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0144",
+      "day": "2026-08-26",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0143",
+      "day": "2026-08-26",
+      "name": "Lemonade Insurance",
+      "description": "LEMONADE INSURANCE",
+      "amount": -18.0,
+      "group": "health",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0142",
+      "day": "2026-08-26",
+      "name": "Taco Spot",
+      "description": "TACO SPOT",
+      "amount": -58.94,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0140",
+      "day": "2026-08-25",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0138",
+      "day": "2026-08-25",
+      "name": "Corner Cafe",
+      "description": "CORNER CAFE",
+      "amount": -45.25,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0137",
+      "day": "2026-08-24",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0136",
+      "day": "2026-08-24",
+      "name": "Sushi Counter",
+      "description": "SUSHI COUNTER",
+      "amount": -11.95,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0135",
+      "day": "2026-08-23",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0134",
+      "day": "2026-08-22",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0133",
+      "day": "2026-08-22",
+      "name": "Trader Joe's",
+      "description": "TRADER JOE'S #552",
+      "amount": -70.22,
+      "group": "food",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-card:fx0132",
+      "day": "2026-08-22",
+      "name": "Verizon Wireless",
+      "description": "VERIZON WIRELESS",
+      "amount": -85.0,
+      "group": "home",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0131",
+      "day": "2026-08-22",
+      "name": "Uniqlo USA",
+      "description": "UNIQLO USA",
+      "amount": -146.2,
+      "group": "shopping",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0130",
+      "day": "2026-08-22",
+      "name": "Pizza Place Bklyn",
+      "description": "PIZZA PLACE BKLYN",
+      "amount": -62.76,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0129",
+      "day": "2026-08-21",
+      "name": "Dept Education Student",
+      "description": "DEPT EDUCATION STUDENT LN",
+      "amount": -310.0,
+      "group": "loans",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0128",
+      "day": "2026-08-21",
+      "name": "Acme Corp Payroll",
+      "description": "ACME CORP PAYROLL",
+      "amount": 2846.15,
+      "group": "income",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0127",
+      "day": "2026-08-21",
+      "name": "Corner Cafe",
+      "description": "CORNER CAFE",
+      "amount": -63.2,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0126",
+      "day": "2026-08-20",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0125",
+      "day": "2026-08-20",
+      "name": "Corner Cafe",
+      "description": "CORNER CAFE",
+      "amount": -38.7,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0124",
+      "day": "2026-08-19",
+      "name": "Sushi Counter",
+      "description": "SUSHI COUNTER",
+      "amount": -22.01,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0122",
+      "day": "2026-08-18",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0120",
+      "day": "2026-08-18",
+      "name": "Sushi Counter",
+      "description": "SUSHI COUNTER",
+      "amount": -63.87,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0119",
+      "day": "2026-08-17",
+      "name": "Corner Cafe",
+      "description": "CORNER CAFE",
+      "amount": -34.11,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-cashback:fx0118",
+      "day": "2026-08-16",
+      "name": "Amazon Mktpl",
+      "description": "AMAZON MKTPL",
+      "amount": -57.55,
+      "group": "shopping",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-card:fx0117",
+      "day": "2026-08-16",
+      "name": "Uniqlo USA",
+      "description": "UNIQLO USA",
+      "amount": -98.27,
+      "group": "shopping",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0116",
+      "day": "2026-08-15",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0115",
+      "day": "2026-08-15",
+      "name": "Trader Joe's",
+      "description": "TRADER JOE'S #552",
+      "amount": -77.35,
+      "group": "food",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-cashback:fx0114",
+      "day": "2026-08-14",
+      "name": "Spotify USA",
+      "description": "SPOTIFY USA",
+      "amount": -11.99,
+      "group": "subscriptions",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-checking:fx0113",
+      "day": "2026-08-13",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0112",
+      "day": "2026-08-13",
+      "name": "Uniqlo USA",
+      "description": "UNIQLO USA",
+      "amount": -40.06,
+      "group": "shopping",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0111",
+      "day": "2026-08-12",
+      "name": "Spectrum Internet",
+      "description": "SPECTRUM INTERNET",
+      "amount": -69.99,
+      "group": "home",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0110",
+      "day": "2026-08-12",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0109",
+      "day": "2026-08-12",
+      "name": "Amazon Mktpl",
+      "description": "AMAZON MKTPL",
+      "amount": -70.5,
+      "group": "shopping",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-card:fx0108",
+      "day": "2026-08-12",
+      "name": "Uniqlo USA",
+      "description": "UNIQLO USA",
+      "amount": -69.4,
+      "group": "shopping",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0107",
+      "day": "2026-08-12",
+      "name": "Corner Cafe",
+      "description": "CORNER CAFE",
+      "amount": -42.11,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0106",
+      "day": "2026-08-11",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0105",
+      "day": "2026-08-11",
+      "name": "Bagel Bakery",
+      "description": "BAGEL BAKERY",
+      "amount": -35.18,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0104",
+      "day": "2026-08-10",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0103",
+      "day": "2026-08-09",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0102",
+      "day": "2026-08-09",
+      "name": "Netflix",
+      "description": "NETFLIX.COM",
+      "amount": -15.49,
+      "group": "subscriptions",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-cashback:fx0101",
+      "day": "2026-08-08",
+      "name": "Trader Joe's",
+      "description": "TRADER JOE'S #552",
+      "amount": -66.88,
+      "group": "food",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-checking:fx0100",
+      "day": "2026-08-07",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0099",
+      "day": "2026-08-07",
+      "name": "Acme Corp Payroll",
+      "description": "ACME CORP PAYROLL",
+      "amount": 2846.15,
+      "group": "income",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0098",
+      "day": "2026-08-06",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0097",
+      "day": "2026-08-06",
+      "name": "Uniqlo USA",
+      "description": "UNIQLO USA",
+      "amount": -44.7,
+      "group": "shopping",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0096",
+      "day": "2026-08-05",
+      "name": "Pizza Place Bklyn",
+      "description": "PIZZA PLACE BKLYN",
+      "amount": -46.87,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0095",
+      "day": "2026-08-04",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0094",
+      "day": "2026-08-04",
+      "name": "Uber Trip",
+      "description": "UBER TRIP",
+      "amount": -31.41,
+      "group": "transport",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0093",
+      "day": "2026-08-04",
+      "name": "Taco Spot",
+      "description": "TACO SPOT",
+      "amount": -13.03,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0092",
+      "day": "2026-08-03",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
       "id": "fx-checking:fx0091",
       "day": "2026-08-03",
       "name": "Con Edison",
       "description": "CON EDISON BILL PAY",
       "amount": -93.1,
       "group": "home",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0090",
+      "day": "2026-08-01",
+      "name": "Rent Property Mgmt",
+      "description": "RENT PAYMENT PROPERTY MGMT",
+      "amount": -2150.0,
+      "group": "home",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0089",
+      "day": "2026-08-01",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0088",
+      "day": "2026-08-01",
+      "name": "Trader Joe's",
+      "description": "TRADER JOE'S #552",
+      "amount": -87.71,
+      "group": "food",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-checking:fx0087",
+      "day": "2026-07-31",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0086",
+      "day": "2026-07-31",
+      "name": "Pizza Place Bklyn",
+      "description": "PIZZA PLACE BKLYN",
+      "amount": -57.88,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-savings:fx0085",
+      "day": "2026-07-30",
+      "name": "Interest",
+      "description": "INTEREST PAYMENT",
+      "amount": 42.0,
+      "group": "fees",
+      "account": "fx-savings"
+    },
+    {
+      "id": "fx-checking:fx0084",
+      "day": "2026-07-30",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0083",
+      "day": "2026-07-29",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
       "account": "fx-checking"
     },
     {
@@ -932,12 +3473,507 @@
       "account": "fx-card"
     },
     {
+      "id": "fx-card:fx0079",
+      "day": "2026-07-28",
+      "name": "Bagel Bakery",
+      "description": "BAGEL BAKERY",
+      "amount": -27.89,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0078",
+      "day": "2026-07-27",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0077",
+      "day": "2026-07-27",
+      "name": "Corner Cafe",
+      "description": "CORNER CAFE",
+      "amount": -50.24,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0076",
+      "day": "2026-07-26",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0075",
+      "day": "2026-07-26",
+      "name": "Lemonade Insurance",
+      "description": "LEMONADE INSURANCE",
+      "amount": -18.0,
+      "group": "health",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0074",
+      "day": "2026-07-26",
+      "name": "Bagel Bakery",
+      "description": "BAGEL BAKERY",
+      "amount": -18.77,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0072",
+      "day": "2026-07-25",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0071",
+      "day": "2026-07-25",
+      "name": "Trader Joe's",
+      "description": "TRADER JOE'S #552",
+      "amount": -109.56,
+      "group": "food",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-card:fx0070",
+      "day": "2026-07-25",
+      "name": "Sushi Counter",
+      "description": "SUSHI COUNTER",
+      "amount": -50.66,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0068",
+      "day": "2026-07-24",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0067",
+      "day": "2026-07-24",
+      "name": "Acme Corp Payroll",
+      "description": "ACME CORP PAYROLL",
+      "amount": 2846.15,
+      "group": "income",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0066",
+      "day": "2026-07-23",
+      "name": "Taco Spot",
+      "description": "TACO SPOT",
+      "amount": -21.85,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0065",
+      "day": "2026-07-22",
+      "name": "Verizon Wireless",
+      "description": "VERIZON WIRELESS",
+      "amount": -85.0,
+      "group": "home",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0064",
+      "day": "2026-07-22",
+      "name": "Pizza Place Bklyn",
+      "description": "PIZZA PLACE BKLYN",
+      "amount": -51.09,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0063",
+      "day": "2026-07-21",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0062",
+      "day": "2026-07-21",
+      "name": "Dept Education Student",
+      "description": "DEPT EDUCATION STUDENT LN",
+      "amount": -310.0,
+      "group": "loans",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0061",
+      "day": "2026-07-20",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0060",
+      "day": "2026-07-20",
+      "name": "Pizza Place Bklyn",
+      "description": "PIZZA PLACE BKLYN",
+      "amount": -26.27,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0059",
+      "day": "2026-07-19",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0057",
+      "day": "2026-07-18",
+      "name": "Trader Joe's",
+      "description": "TRADER JOE'S #552",
+      "amount": -61.74,
+      "group": "food",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-card:fx0055",
+      "day": "2026-07-18",
+      "name": "Bagel Bakery",
+      "description": "BAGEL BAKERY",
+      "amount": -7.26,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0054",
+      "day": "2026-07-17",
+      "name": "Uniqlo USA",
+      "description": "UNIQLO USA",
+      "amount": -84.28,
+      "group": "shopping",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0053",
+      "day": "2026-07-17",
+      "name": "Sushi Counter",
+      "description": "SUSHI COUNTER",
+      "amount": -28.72,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0052",
+      "day": "2026-07-16",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0051",
+      "day": "2026-07-15",
+      "name": "Pizza Place Bklyn",
+      "description": "PIZZA PLACE BKLYN",
+      "amount": -53.66,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-cashback:fx0050",
+      "day": "2026-07-14",
+      "name": "Spotify USA",
+      "description": "SPOTIFY USA",
+      "amount": -11.99,
+      "group": "subscriptions",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-card:fx0049",
+      "day": "2026-07-14",
+      "name": "Uber Trip",
+      "description": "UBER TRIP",
+      "amount": -36.34,
+      "group": "transport",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0048",
+      "day": "2026-07-12",
+      "name": "Spectrum Internet",
+      "description": "SPECTRUM INTERNET",
+      "amount": -69.99,
+      "group": "home",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0047",
+      "day": "2026-07-12",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0046",
+      "day": "2026-07-12",
+      "name": "Uber Trip",
+      "description": "UBER TRIP",
+      "amount": -33.04,
+      "group": "transport",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-cashback:fx0045",
+      "day": "2026-07-11",
+      "name": "Trader Joe's",
+      "description": "TRADER JOE'S #552",
+      "amount": -70.76,
+      "group": "food",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-card:fx0044",
+      "day": "2026-07-11",
+      "name": "Bagel Bakery",
+      "description": "BAGEL BAKERY",
+      "amount": -56.3,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0043",
+      "day": "2026-07-10",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0042",
+      "day": "2026-07-10",
+      "name": "Acme Corp Payroll",
+      "description": "ACME CORP PAYROLL",
+      "amount": 2846.15,
+      "group": "income",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0041",
+      "day": "2026-07-10",
+      "name": "Sushi Counter",
+      "description": "SUSHI COUNTER",
+      "amount": -17.4,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-cashback:fx0040",
+      "day": "2026-07-09",
+      "name": "Netflix",
+      "description": "NETFLIX.COM",
+      "amount": -15.49,
+      "group": "subscriptions",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-cashback:fx0039",
+      "day": "2026-07-09",
+      "name": "Amazon Mktpl",
+      "description": "AMAZON MKTPL",
+      "amount": -28.87,
+      "group": "shopping",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-checking:fx0038",
+      "day": "2026-07-08",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0037",
+      "day": "2026-07-08",
+      "name": "Corner Cafe",
+      "description": "CORNER CAFE",
+      "amount": -23.65,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0036",
+      "day": "2026-07-07",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0035",
+      "day": "2026-07-07",
+      "name": "Corner Cafe",
+      "description": "CORNER CAFE",
+      "amount": -37.38,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0034",
+      "day": "2026-07-06",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0033",
+      "day": "2026-07-06",
+      "name": "Amazon Mktpl",
+      "description": "AMAZON MKTPL",
+      "amount": -28.99,
+      "group": "shopping",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-checking:fx0032",
+      "day": "2026-07-05",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0031",
+      "day": "2026-07-04",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0030",
+      "day": "2026-07-04",
+      "name": "Trader Joe's",
+      "description": "TRADER JOE'S #552",
+      "amount": -107.08,
+      "group": "food",
+      "account": "fx-cashback"
+    },
+    {
       "id": "fx-checking:fx0029",
       "day": "2026-07-03",
       "name": "Con Edison",
       "description": "CON EDISON BILL PAY",
       "amount": -88.4,
       "group": "home",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0028",
+      "day": "2026-07-03",
+      "name": "Sushi Counter",
+      "description": "SUSHI COUNTER",
+      "amount": -18.67,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0027",
+      "day": "2026-07-01",
+      "name": "Rent Property Mgmt",
+      "description": "RENT PAYMENT PROPERTY MGMT",
+      "amount": -2150.0,
+      "group": "home",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0026",
+      "day": "2026-07-01",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0025",
+      "day": "2026-07-01",
+      "name": "Taco Spot",
+      "description": "TACO SPOT",
+      "amount": -33.41,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-savings:fx0024",
+      "day": "2026-06-30",
+      "name": "Interest",
+      "description": "INTEREST PAYMENT",
+      "amount": 42.0,
+      "group": "fees",
+      "account": "fx-savings"
+    },
+    {
+      "id": "fx-checking:fx0023",
+      "day": "2026-06-30",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0022",
+      "day": "2026-06-30",
+      "name": "Pizza Place Bklyn",
+      "description": "PIZZA PLACE BKLYN",
+      "amount": -53.13,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0021",
+      "day": "2026-06-29",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0019",
+      "day": "2026-06-28",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
       "account": "fx-checking"
     },
     {
@@ -948,6 +3984,159 @@
       "amount": -33.75,
       "group": "fees",
       "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0016",
+      "day": "2026-06-27",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0015",
+      "day": "2026-06-27",
+      "name": "Trader Joe's",
+      "description": "TRADER JOE'S #552",
+      "amount": -102.71,
+      "group": "food",
+      "account": "fx-cashback"
+    },
+    {
+      "id": "fx-card:fx0014",
+      "day": "2026-06-27",
+      "name": "Uber Trip",
+      "description": "UBER TRIP",
+      "amount": -32.64,
+      "group": "transport",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0013",
+      "day": "2026-06-27",
+      "name": "Corner Cafe",
+      "description": "CORNER CAFE",
+      "amount": -18.17,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0012",
+      "day": "2026-06-26",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0011",
+      "day": "2026-06-26",
+      "name": "Lemonade Insurance",
+      "description": "LEMONADE INSURANCE",
+      "amount": -18.0,
+      "group": "health",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0010",
+      "day": "2026-06-26",
+      "name": "Acme Corp Payroll",
+      "description": "ACME CORP PAYROLL",
+      "amount": 2846.15,
+      "group": "income",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0009",
+      "day": "2026-06-26",
+      "name": "Taco Spot",
+      "description": "TACO SPOT",
+      "amount": -49.37,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0008",
+      "day": "2026-06-24",
+      "name": "Uniqlo USA",
+      "description": "UNIQLO USA",
+      "amount": -126.57,
+      "group": "shopping",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-card:fx0007",
+      "day": "2026-06-24",
+      "name": "Taco Spot",
+      "description": "TACO SPOT",
+      "amount": -11.06,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0006",
+      "day": "2026-06-23",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-checking:fx0005",
+      "day": "2026-06-22",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0004",
+      "day": "2026-06-22",
+      "name": "Verizon Wireless",
+      "description": "VERIZON WIRELESS",
+      "amount": -85.0,
+      "group": "home",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0003",
+      "day": "2026-06-21",
+      "name": "Dept Education Student",
+      "description": "DEPT EDUCATION STUDENT LN",
+      "amount": -310.0,
+      "group": "loans",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-card:fx0002",
+      "day": "2026-06-21",
+      "name": "Corner Cafe",
+      "description": "CORNER CAFE",
+      "amount": -45.61,
+      "group": "food",
+      "account": "fx-card"
+    },
+    {
+      "id": "fx-checking:fx0001",
+      "day": "2026-06-20",
+      "name": "MTA NYCT Paygo",
+      "description": "MTA*NYCT PAYGO",
+      "amount": -2.9,
+      "group": "transport",
+      "account": "fx-checking"
+    },
+    {
+      "id": "fx-cashback:fx0000",
+      "day": "2026-06-20",
+      "name": "Trader Joe's",
+      "description": "TRADER JOE'S #552",
+      "amount": -104.45,
+      "group": "food",
+      "account": "fx-cashback"
     }
   ]
 }
