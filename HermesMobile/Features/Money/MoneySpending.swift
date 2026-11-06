@@ -2,7 +2,8 @@ import Foundation
 
 /// `finance/data/money/spending.json`, written in the vault by `finance/sync/money_spending.py`
 /// in the same run as the snapshot: this month by category against the usual, payday, what's
-/// due, what looks off, money in and out, and interest. Every field is optional on the wire.
+/// due, what looks off, money in and out, interest, each month back to twelve and the year so far
+/// (`MoneySpendingHistory.swift`). Every field is optional on the wire.
 struct MoneySpending: Decodable, Equatable {
     var asOf: Date?
     var historyStart: String?
@@ -14,10 +15,16 @@ struct MoneySpending: Decodable, Equatable {
     var weeks: [Week] = []
     var interest: Interest?
     var accounts: [Account] = []
-    var transactions: [Transaction] = []
+    var transactions: [Transaction] = [] {
+        didSet { byID = Self.index(transactions) }
+    }
+    /// Each month the log covers, newest first. Empty in a file from before months were written.
+    var months: [MonthDetail] = []
+    var year: Year?
+    private var byID: [String: Transaction] = [:]
 
     enum CodingKeys: String, CodingKey {
-        case asOf, historyStart, month, payday, due, flags, cashFlow, weeks, interest, accounts, transactions
+        case asOf, historyStart, month, payday, due, flags, cashFlow, weeks, interest, accounts, transactions, months, year
     }
 
     init(from decoder: Decoder) throws {
@@ -33,6 +40,13 @@ struct MoneySpending: Decodable, Equatable {
         interest = try? c.decodeIfPresent(Interest.self, forKey: .interest)
         accounts = c.lossyArray(Account.self, .accounts)
         transactions = c.lossyArray(Transaction.self, .transactions)
+        byID = Self.index(transactions)
+        months = c.lossyArray(MonthDetail.self, .months)
+        year = try? c.decodeIfPresent(Year.self, forKey: .year)
+    }
+
+    private static func index(_ rows: [Transaction]) -> [String: Transaction] {
+        Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     static func decode(_ data: Data) throws -> MoneySpending {
@@ -43,12 +57,14 @@ struct MoneySpending: Decodable, Equatable {
 
     /// The transactions behind a number, newest first, in the order the ids are listed.
     func transactions(_ ids: [String]) -> [Transaction] {
-        let byID = Dictionary(transactions.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        return ids.compactMap { byID[$0] }
+        ids.compactMap { byID[$0] }
     }
 
-    /// Complete months only: what "am I spending more than I make" averages.
-    var completeMonths: [CashFlowMonth] { cashFlow.filter { !$0.partial } }
+    /// The months to step through: `months`, or this month alone from an older file.
+    var monthDetails: [MonthDetail] {
+        if !months.isEmpty { return months }
+        return month.map { [MonthDetail(current: $0)] } ?? []
+    }
 
     struct Month: Decodable, Equatable {
         var start = ""
@@ -74,6 +90,9 @@ struct MoneySpending: Decodable, Equatable {
     struct Usual: Decodable, Equatable {
         var spent: Double
         var months: Int
+        /// The whole earlier months a finished month is compared with ("2026-07" to "2026-09").
+        var from: String?
+        var to: String?
     }
 
     struct Category: Decodable, Equatable, Identifiable {
@@ -249,8 +268,10 @@ struct MoneySpending: Decodable, Equatable {
         var name: String
         var amount: Double
         var account: String?
+        /// The spending group ("food"), which picks the row's color.
+        var group: String?
 
-        enum CodingKeys: String, CodingKey { case id, day, name, amount, account }
+        enum CodingKeys: String, CodingKey { case id, day, name, amount, account, group }
 
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -259,6 +280,7 @@ struct MoneySpending: Decodable, Equatable {
             name = (try? c.decodeIfPresent(String.self, forKey: .name)) ?? ""
             amount = (try? c.decodeIfPresent(Double.self, forKey: .amount)) ?? 0
             account = try? c.decodeIfPresent(String.self, forKey: .account)
+            group = try? c.decodeIfPresent(String.self, forKey: .group)
         }
     }
 }
@@ -344,14 +366,6 @@ enum MoneySpendingCopy {
             .map { $0.formatted(Date.FormatStyle(timeZone: utc).month(.wide)) } ?? month
     }
 
-    /// "October so far" for this month, "June from Jun 20" for the month the log starts in.
-    static func monthRowName(_ month: MoneySpending.CashFlowMonth, _ spending: MoneySpending) -> String {
-        let name = monthName(month.month)
-        guard month.partial else { return name }
-        if spending.month?.start.hasPrefix(month.month) == true { return name + " so far" }
-        return spending.historyStart.map { "\(name) from \(MoneyPoint.label(day: $0))" } ?? name
-    }
-
     /// "Fri, Oct 30".
     static func weekdayLabel(_ day: String) -> String {
         MoneyPoint.dayFormatter.date(from: day)
@@ -399,17 +413,6 @@ enum MoneySpendingCopy {
         let account = spending.account(payday.account)?.label
         let bills = count == 0 ? "Left until payday" : "Left after \(count == 1 ? "1 bill" : "\(count) bills")"
         return account.map { "\(bills) in \($0)" } ?? bills
-    }
-
-    /// "Am I spending more than I make?": the complete months' average, in one sentence.
-    static func keptLine(_ months: [MoneySpending.CashFlowMonth], hidden: Bool) -> String {
-        guard let first = months.first, let last = months.last else { return "" }
-        let kept = months.map(\.kept).reduce(0, +) / Double(months.count)
-        let span = months.count == 1 ? monthName(first.month) : "\(monthName(first.month))–\(monthName(last.month))"
-        let size = MoneyFormat.amount(abs(kept), hidden: hidden)
-        return kept >= 0
-            ? "You kept \(size) a month on average, \(span)."
-            : "You spent \(size) a month more than came in, \(span)."
     }
 
     static func weeksValue(_ weeks: [MoneySpending.Week], hidden: Bool) -> String {

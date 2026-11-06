@@ -67,6 +67,10 @@
 		C0FFEE50000000000000000D /* MoneySparkline.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE50000000000000000C /* MoneySparkline.swift */; };
 		C0FFEE5000000000000000A1 /* MoneySpending.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE5000000000000000A0 /* MoneySpending.swift */; };
 		C0FFEE5000000000000000A3 /* MoneySpendingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE5000000000000000A2 /* MoneySpendingView.swift */; };
+		C0FFEE5000000000000000A7 /* MoneySpendingHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE5000000000000000A6 /* MoneySpendingHistory.swift */; };
+		C0FFEE5000000000000000A9 /* MoneySpendingMonth.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE5000000000000000A8 /* MoneySpendingMonth.swift */; };
+		C0FFEE5000000000000000AB /* MoneySpendingYear.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE5000000000000000AA /* MoneySpendingYear.swift */; };
+		C0FFEE5000000000000000AD /* MoneySpendingCharts.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE5000000000000000AC /* MoneySpendingCharts.swift */; };
 		C0FFEE5000000000000000A5 /* MoneySpendingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE5000000000000000A4 /* MoneySpendingTests.swift */; };
 		C0FFEE50000000000000000F /* MoneyModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE50000000000000000E /* MoneyModelsTests.swift */; };
 		C0FFEE500000000000000011 /* MoneyViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE500000000000000010 /* MoneyViewModelTests.swift */; };
@@ -998,6 +1002,10 @@
 		C0FFEE50000000000000000C /* MoneySparkline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneySparkline.swift; sourceTree = "<group>"; };
 		C0FFEE5000000000000000A0 /* MoneySpending.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneySpending.swift; sourceTree = "<group>"; };
 		C0FFEE5000000000000000A2 /* MoneySpendingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneySpendingView.swift; sourceTree = "<group>"; };
+		C0FFEE5000000000000000A6 /* MoneySpendingHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneySpendingHistory.swift; sourceTree = "<group>"; };
+		C0FFEE5000000000000000A8 /* MoneySpendingMonth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneySpendingMonth.swift; sourceTree = "<group>"; };
+		C0FFEE5000000000000000AA /* MoneySpendingYear.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneySpendingYear.swift; sourceTree = "<group>"; };
+		C0FFEE5000000000000000AC /* MoneySpendingCharts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneySpendingCharts.swift; sourceTree = "<group>"; };
 		C0FFEE5000000000000000A4 /* MoneySpendingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneySpendingTests.swift; sourceTree = "<group>"; };
 		C0FFEE50000000000000000E /* MoneyModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyModelsTests.swift; sourceTree = "<group>"; };
 		C0FFEE500000000000000010 /* MoneyViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyViewModelTests.swift; sourceTree = "<group>"; };
@@ -1871,6 +1879,10 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C0FFEE50000000000000000C /* MoneySparkline.swift */,
 				C0FFEE5000000000000000A0 /* MoneySpending.swift */,
 				C0FFEE5000000000000000A2 /* MoneySpendingView.swift */,
+				C0FFEE5000000000000000A6 /* MoneySpendingHistory.swift */,
+				C0FFEE5000000000000000A8 /* MoneySpendingMonth.swift */,
+				C0FFEE5000000000000000AA /* MoneySpendingYear.swift */,
+				C0FFEE5000000000000000AC /* MoneySpendingCharts.swift */,
 			);
 			path = Money;
 			sourceTree = "<group>";
@@ -3340,6 +3352,10 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C0FFEE50000000000000000D /* MoneySparkline.swift in Sources */,
 				C0FFEE5000000000000000A1 /* MoneySpending.swift in Sources */,
 				C0FFEE5000000000000000A3 /* MoneySpendingView.swift in Sources */,
+				C0FFEE5000000000000000A7 /* MoneySpendingHistory.swift in Sources */,
+				C0FFEE5000000000000000A9 /* MoneySpendingMonth.swift in Sources */,
+				C0FFEE5000000000000000AB /* MoneySpendingYear.swift in Sources */,
+				C0FFEE5000000000000000AD /* MoneySpendingCharts.swift in Sources */,
 				456FFBA86135A0D6C5707B5E /* DeckCalendarView.swift in Sources */,
 				5DFA5B4E21C6F51D34489C02 /* DeckSleepNumbers.swift in Sources */,
 				6558EDEF58658253C946EE42 /* SleepView.swift in Sources */,

@@ -167,3 +167,35 @@ struct HermexPaper: Equatable {
 
     static let all: [HermexPaper] = [.opener, .quote, .book, .wiki, .reading, .notes, .video, .past, .advisor, .plain, .mandarin, .ledger, .dusk, .kitchen, .orchid]
 }
+
+/// Spending's category colors on Money's charts: the share ring, the legend and row dots, the
+/// biggest charges and every transaction. Data colors, not objects, so they sit apart from the
+/// papers and never use blue (a slice must not read as a control). Each category keeps its color
+/// in every month and view; the six named ones are checked for colorblind separation in light
+/// and dark, in this order around the ring, and everything else is gray.
+enum HermexSeries {
+    /// The ring's fixed order, `rest` last.
+    static let order = ["home", "food", "shopping", "transport", "subscriptions", "health", "rest"]
+
+    private static let values: [String: (light: UInt32, dark: UInt32)] = [
+        "home": (0xEB6834, 0xD95926),
+        "food": (0x1BAF7A, 0x199E70),
+        "shopping": (0xEDA100, 0xC98500),
+        "transport": (0xE87BA4, 0xD55181),
+        "subscriptions": (0x008300, 0x008300),
+        "health": (0x6250D6, 0x9085E9),
+        "rest": (0x8B919C, 0x6E7681),
+    ]
+
+    private static let colors: [String: Color] = values.mapValues { pair in
+        let light = HermexPalette.uiColor(pair.light << 8 | 0xFF), dark = HermexPalette.uiColor(pair.dark << 8 | 0xFF)
+        return Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? dark : light })
+    }
+
+    /// The series a spending group draws in: its own, or `rest`.
+    static func key(for group: String?) -> String {
+        group.flatMap { values[$0] == nil ? nil : $0 } ?? "rest"
+    }
+
+    static func color(for group: String?) -> Color { colors[key(for: group)]! }
+}
