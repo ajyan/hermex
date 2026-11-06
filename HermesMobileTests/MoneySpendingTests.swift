@@ -312,6 +312,13 @@ final class MoneySpendingTests: XCTestCase {
                        ["", "Aug 31", "", "Sep 14", "", "Sep 28", "", "Oct 12"])
     }
 
+    func testTheTrendScaleUsesRoundSteps() {
+        XCTAssertEqual(MoneyWeekTrendChart.ticks(top: 566), [0, 250, 500])
+        XCTAssertEqual(MoneyWeekTrendChart.ticks(top: 400), [0, 200, 400])
+        XCTAssertEqual(MoneyWeekTrendChart.ticks(top: 1200), [0, 500, 1000])
+        XCTAssertEqual(MoneyWeekTrendChart.ticks(top: 60), [0, 25, 50])
+    }
+
     func testTheDeckNamesTheMoneyCardsWeek() throws {
         let deck = try DailyDeck.decode(#"""
         {"version": 4, "date": "2026-10-18", "kind": "weekly", "cards": [

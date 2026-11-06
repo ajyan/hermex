@@ -168,7 +168,7 @@ enum MoneyWeekCopy {
     /// Under the chart: what the line is, and the dotted usual week.
     static func trendCaption(usual: Double?, hidden: Bool) -> String {
         let dotted = usual.map { " The dotted line is a usual week, \(MoneyFormat.amount($0, hidden: hidden))." } ?? ""
-        return "Day-to-day spending each week; the filled point is this one.\(dotted) Bills and one-time charges are left out."
+        return "Day-to-day spending each week, in dollars; the filled point is this one.\(dotted) Bills and one-time charges are left out."
     }
 
     /// "Sep 7" under every other week, ending on this one.
@@ -183,10 +183,24 @@ struct MoneyWeekTrendChart: View {
     let usual: Double?
     let hidden: Bool
 
+    /// The scale's lines: $0 and two round steps up to the top, so the line reads as dollars.
+    static func ticks(top: Double) -> [Double] {
+        let raw = top / 2.5
+        let magnitude = pow(10, floor(log10(max(raw, 1))))
+        let step = [1, 2, 2.5, 5, 10].map { $0 * magnitude }.first { $0 >= raw } ?? 10 * magnitude
+        return (0...3).map { Double($0) * step }.filter { $0 <= top }
+    }
+
     var body: some View {
-        let top = max(trend.map(\.spent).max() ?? 0, usual ?? 0, 1) * 1.15
+        let top = max(trend.map(\.spent).max() ?? 0, usual ?? 0, 1) * 1.2
         let last = trend.count - 1
+        let ticks = Self.ticks(top: top)
         Chart {
+            ForEach(ticks, id: \.self) { tick in
+                RuleMark(y: .value("Scale", tick))
+                    .foregroundStyle(HermexPaper.money.glow.opacity(tick == 0 ? 0.25 : 0.1))
+                    .lineStyle(StrokeStyle(lineWidth: 0.5))
+            }
             if let usual {
                 RuleMark(y: .value("Usual", usual))
                     .foregroundStyle(Color.hxTextSecondary)
@@ -208,9 +222,10 @@ struct MoneyWeekTrendChart: View {
         .chartXScale(domain: -0.3...(Double(max(trend.count, 2) - 1) + 0.3))
         .chartYScale(domain: 0...top)
         .chartXAxis(.hidden)
-        .chartPlotStyle { $0.padding(.bottom, 22) }
+        .chartYAxis(.hidden)
+        .chartPlotStyle { $0.padding(.bottom, 22).padding(.leading, hidden ? 0 : 46).padding(.top, 16) }
         .chartOverlay { proxy in
-            // Week labels drawn on their points: the axis's own labels sit half a step to the right.
+            // Labels drawn on their marks: the axes' own labels sit half a step off on these values.
             GeometryReader { geometry in
                 if let plot = proxy.plotFrame.map({ geometry[$0] }) {
                     ForEach(Array(trend.indices), id: \.self) { index in
@@ -223,14 +238,48 @@ struct MoneyWeekTrendChart: View {
                                 .position(x: plot.minX + x, y: plot.maxY + 14)
                         }
                     }
+                    if !hidden {
+                        let usualY = usual.flatMap { proxy.position(forY: $0) }
+                        ForEach(ticks, id: \.self) { tick in
+                            if let y = proxy.position(forY: tick), usualY.map({ abs($0 - y) > 18 }) ?? true {
+                                gutter(MoneyFormat.amount(tick, hidden: false), y: plot.minY + y, plot: plot)
+                                    .foregroundStyle(Color.hxTextSecondary)
+                            }
+                        }
+                        if let usual, let y = usualY {
+                            gutter(MoneyFormat.amount(usual, hidden: false), y: plot.minY + y, plot: plot)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color.hxTextSecondary)
+                        }
+                        if trend.indices.contains(last), let x = proxy.position(forX: last),
+                           let y = proxy.position(forY: trend[last].spent) {
+                            Text(verbatim: MoneyFormat.amount(trend[last].spent, hidden: false))
+                                .font(AppFont.caption(weight: .semibold))
+                                .foregroundStyle(Color.hxTextPrimary)
+                                .fixedSize()
+                                // Above the point, or below it when the dotted usual line runs just above.
+                                .position(x: plot.minX + x - 8,
+                                          y: plot.minY + y + (trend[last].spent < (usual ?? 0) ? 16 : -16))
+                        }
+                    }
                 }
             }
             .accessibilityHidden(true)
         }
-        .chartYAxis(.hidden)
-        .frame(height: 140)
+        .frame(height: 160)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: accessibilityText))
+    }
+
+    /// A dollar label in the gutter left of the plot, level with its line.
+    private func gutter(_ text: String, y: CGFloat, plot: CGRect) -> some View {
+        Text(verbatim: text)
+            .font(AppFont.caption2())
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .frame(width: 42, alignment: .trailing)
+            .position(x: plot.minX - 25, y: y)
     }
 
     private var accessibilityText: String {
