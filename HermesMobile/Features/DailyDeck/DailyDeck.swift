@@ -384,8 +384,6 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         /// The headline's tag lines, each with its kind of mark (wire `tags`, `{icon, text}`); a sleep card's
         /// `tags` decode into `tags` instead.
         let headlineTags: [DeckTag]
-        /// The headline's pick for today, with yesterday's own words behind it when there are some.
-        let todayOne: DeckTodayOne?
         /// An idea card's one-sentence gist, its verbatim quotes, its labelled parts, and the week's question it serves.
         let gist: String?
         let quotes: [DeckPiece.Quote]
@@ -393,6 +391,10 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         let weekQuestion: String?
         /// A check-in's or letter's thread: yesterday's words it picks up from.
         let thread: DeckThread?
+        /// An idea card's link to something he wrote before: an answer he filed or an open question (wire `linked`).
+        let linked: DeckThread?
+        /// The idea a writing card's prompt builds on (wire `from_idea`), for its "From today's idea" chip.
+        let fromIdea: DeckFromIdea?
         /// A year-ago card's day, "Tue, Oct 28, 2025".
         let dateLabel: String?
 
@@ -404,7 +406,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case piece, learned, variant, date, options, returns, front, fronts, frontReason, weekRows, yesterdayOne
             case todayAction = "today"
             case moments, spares, ended, text, ifThen, name, fact, changes, intention
-            case act, todayOne, gist, quotes, parts, weekQuestion, thread, dateLabel, month
+            case act, gist, quotes, parts, weekQuestion, thread, linked, fromIdea, dateLabel, month
             case valueID = "value"
             case itemKind = "kind"
         }
@@ -505,13 +507,14 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             yesterdayOne = try? c.decodeIfPresent(DeckYesterdayOne.self, forKey: .yesterdayOne)
             act = (try? c.decodeIfPresent(String.self, forKey: .act)).flatMap { $0.isEmpty ? nil : $0 }
             headlineTags = ((try? c.decodeIfPresent([Lossy<DeckTag>].self, forKey: .tags)) ?? []).compactMap(\.value)
-            todayOne = try? c.decodeIfPresent(DeckTodayOne.self, forKey: .todayOne)
             gist = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .gist))
             quotes = ((try? c.decodeIfPresent([Lossy<DeckPiece.Quote>].self, forKey: .quotes)) ?? []).compactMap(\.value)
                 .filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             parts = ((try? c.decodeIfPresent([Lossy<DeckPart>].self, forKey: .parts)) ?? []).compactMap(\.value)
             weekQuestion = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .weekQuestion))
             thread = (try? c.decodeIfPresent(DeckThread.self, forKey: .thread)).flatMap { $0.quote.isEmpty ? nil : $0 }
+            linked = (try? c.decodeIfPresent(DeckThread.self, forKey: .linked)).flatMap { $0.quote.isEmpty ? nil : $0 }
+            fromIdea = (try? c.decodeIfPresent(DeckFromIdea.self, forKey: .fromIdea)).flatMap { $0.title.isEmpty ? nil : $0 }
             dateLabel = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .dateLabel))
             let ref = try? c.decodeIfPresent(Ref.self, forKey: .ref)
             link = ref?.link.flatMap { $0.isEmpty ? nil : $0 }
@@ -544,13 +547,11 @@ struct DeckTag: Decodable, Equatable, Hashable {
     }
 }
 
-/// The headline's one thing for today, its front, and yesterday's words that led to it.
-struct DeckTodayOne: Decodable, Equatable {
-    let label: String
-    let front: String?
-    let quote: String?
-    /// Who said the quote and when ("You, to Brené Brown, Thu"); older decks have none.
-    var at: String?
+/// The idea a writing card builds on: its card's id, its title, and its kind ("book", "wiki").
+struct DeckFromIdea: Decodable, Equatable {
+    let id: String?
+    let title: String
+    let kind: String?
 }
 
 /// One labelled part of an idea ("The loop", "text in, text out; your code runs the tools.").
@@ -1096,9 +1097,10 @@ struct DeckAct {
     let divider: DeckCard?
     var pages: [DeckPage]
 
-    /// A deck by job's acts, in the order they ship, with their names on the opener.
+    /// A deck by job's acts, in the order they ship, with their names on the opener. The body cards (sleep, a goal's
+    /// check) ship right after Today's and are listed with them (2026-11-06).
     static let order: [(id: String, name: String)] = [
-        ("today", "Today"), ("ideas", "Ideas"), ("writing", "Writing"), ("body", "Body"), ("people", "People"),
+        ("today", "Today"), ("ideas", "Ideas"), ("writing", "Writing"), ("people", "People"),
     ]
 
     /// Whether these pages come from a deck by job: any card names its act.
@@ -1111,7 +1113,7 @@ struct DeckAct {
         var ids = order.map(\.id)
         for page in pages {
             if case .card(let card) = page, card.type == .headline || card.type == .close { continue }
-            let act = page.act ?? "today"
+            let act = page.act == "body" ? "today" : page.act ?? "today"
             if let index = ids.firstIndex(of: act) {
                 groups[index].pages.append(page)
             } else {

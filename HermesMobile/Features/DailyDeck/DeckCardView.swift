@@ -283,7 +283,7 @@ struct DeckCardView: View {
     /// Whether the card names its kind in its first line rather than in the corner.
     private var showsKindLabel: Bool {
         switch card.type {
-        case .close: DeckAct.isByJob(viewModel.visiblePages) && !card.weekRows.isEmpty
+        case .close: DeckAct.isByJob(viewModel.visiblePages)
         case .prompt, .reflect, .item, .unknown: isJobCard
         case .training, .weekMoney: true
         default: false
@@ -355,6 +355,13 @@ struct DeckCardView: View {
         .padding(.top, 24)
     }
 
+    /// "From today's idea · <title>" in the idea card's own paper, on a writing card whose prompt builds on it.
+    private func fromIdeaChip(_ idea: DeckFromIdea) -> some View {
+        let source = viewModel.cards.first { $0.id == idea.id }.map { DeckPalette.of($0) }
+        return HXChip(paper: source?.colors ?? .notes, symbol: source?.symbol ?? "lightbulb",
+                      label: "From today's idea · \(idea.title)", lines: 2)
+    }
+
     /// An act card's body: an idea's source, gist, quotes and parts; a check-in's or letter's thread, then
     /// the message that leads into its question (under its speaker when that isn't the card's voice); a
     /// year-ago entry's later words; anything else its attribution and detail.
@@ -363,6 +370,9 @@ struct DeckCardView: View {
         if card.act == "ideas" {
             DeckIdeaBody(card: card, palette: palette)
         } else if card.thread != nil || card.type == .prompt {
+            if let idea = card.fromIdea {
+                fromIdeaChip(idea).padding(.top, 14)
+            }
             if let thread = card.thread {
                 DeckThreadView(thread: thread, palette: palette).padding(.top, 18)
             }
@@ -603,9 +613,10 @@ struct DeckCardView: View {
     /// The day's title, a line about yesterday (on a weekly review, the week and its highlights),
     /// and the cards ahead, so you know what you're about to get.
     /// "Learned: …" with Undo (a retired question approach only informs, with none), which files the rule's id so tomorrow's deck drops it ("Undone" takes it back).
-    private func learnedRow(_ rule: DeckLearned) -> some View {
+    /// Under the close's "What Atlas learned" a learned rule drops its "Learned:" (`underHeading`).
+    private func learnedRow(_ rule: DeckLearned, underHeading: Bool = false) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(verbatim: rule.line).font(AppFont.footnote())
+            Text(verbatim: underHeading && rule.isLearned ? rule.text : rule.line).font(AppFont.footnote())
             if rule.offersUndo {
                 let undone = viewModel.signals.undo.contains(rule.id)
                 Button {
@@ -626,8 +637,8 @@ struct DeckCardView: View {
         if DeckAct.isByJob(pages) { jobOpener(pages) } else { frontOpener }
     }
 
-    /// A deck by job's opener: the day's tag lines, the date, yesterday's one, today's one, then each
-    /// act's cards ("Ideas · 2 cards"). No recap and no front rows; the close shows where you stand.
+    /// A deck by job's opener: the day's tag lines, the date, then each act's cards ("Ideas · 2 cards"). What Atlas
+    /// learned shows on the close (2026-11-06: "the initial card is really cluttered at the top").
     @ViewBuilder
     private func jobOpener(_ pages: [DeckPage]) -> some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -638,9 +649,6 @@ struct DeckCardView: View {
             } else {
                 DeckTagLines(tags: card.headlineTags)
             }
-            ForEach(card.learned) { rule in
-                learnedRow(rule)
-            }
         }
         .foregroundStyle(palette.ink)
         .padding(.trailing, 24)
@@ -649,12 +657,6 @@ struct DeckCardView: View {
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, 14)
             .accessibilityAddTraits(.isHeader)
-        if let one = card.yesterdayOne {
-            DeckYesterdayLine(card: card, one: one, palette: palette, viewModel: viewModel).padding(.top, 18)
-        }
-        if let one = card.todayOne {
-            DeckTodayOnePanel(one: one, palette: palette).padding(.top, 18)
-        }
         ForEach(Array(Self.acts(pages).enumerated()), id: \.offset) { index, group in
             act(group.name, group.pages).padding(.top, index == 0 ? 22 : 16)
         }
@@ -901,24 +903,34 @@ struct DeckCardView: View {
         if showsKindLabel { jobClose } else { plainClose }
     }
 
-    /// A deck by job's close: where you stand this week as one grid, today's one thing, then filing.
+    /// A deck by job's close: what Atlas learned from his notes, each with Undo, then filing (2026-11-06: the week's
+    /// grid and today's one left the close; the rules left the opener).
     @ViewBuilder
     private var jobClose: some View {
         let day = DailyDeckPaths.date(day: viewModel.date)?.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+        let learned = viewModel.cards.first { $0.type == .headline }?.learned ?? []
         DeckKindLabel(symbol: palette.symbol, text: day.map { "Close · \($0)" } ?? "Close", ink: palette.ink)
-        Text(verbatim: "Where you stand this week")
+        Text(verbatim: "What Atlas learned")
             .font(AppFont.display(style: .title2, weight: .bold))
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, 14)
             .accessibilityAddTraits(.isHeader)
-        DeckWeekGrid(rows: card.weekRows, palette: palette, deckDate: viewModel.date).padding(.top, 18)
-        Text(verbatim: "Tap a ringed + to log yesterday or add one.")
-            .font(AppFont.footnote())
-            .foregroundStyle(palette.ink.opacity(0.75))
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.top, 12)
-        if !card.options.isEmpty {
-            DeckTodaysOne(card: card, palette: palette, viewModel: viewModel).padding(.top, 24)
+        VStack(alignment: .leading, spacing: 10) {
+            if learned.isEmpty {
+                Text(verbatim: "Nothing new since yesterday.").font(AppFont.body())
+            }
+            ForEach(learned) { rule in
+                learnedRow(rule, underHeading: true)
+            }
+        }
+        .foregroundStyle(Color.hxTextPrimary)
+        .padding(.top, 12)
+        if learned.contains(where: \.offersUndo) {
+            Text(verbatim: "Undo drops the rule from tomorrow's deck.")
+                .font(AppFont.footnote())
+                .foregroundStyle(palette.ink.opacity(0.75))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 10)
         }
         if let variantCard = viewModel.variantCard {
             DeckVariantPick(card: variantCard, viewModel: viewModel, palette: palette)

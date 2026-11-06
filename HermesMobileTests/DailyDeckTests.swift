@@ -691,13 +691,15 @@ final class DailyDeckTests: XCTestCase {
        "gist":"An agent is a simple loop.","body":"An agent is a simple loop.","reason":"fits the week",
        "quotes":[{"text":"Over 10 steps, 95% per step works out to about 60%.","at":"Marina Wyss"},{"text":"  "},{"at":"x"}],
        "parts":[{"label":"The loop","text":"text in, text out"},{"label":"Evals","text":"20–50 real failed tasks"},{"label":"x"}],
-       "question":"Is she right that evals matter more?"},
+       "question":"Is she right that evals matter more?",
+       "linked":{"label":"You wrote, Oct 27","quote":"Evals are the job.","at":"You, on a check-in"}},
       {"id":"week-0-2","type":"reflect","kind":"video","act":"ideas","title":"Code is cheap now","question":"Q?"},
       {"id":"advisor","type":"prompt","act":"writing","voice":"Roger Federer","context":"Old message.",
        "question":"Which story will you get match-ready today?",
        "thread":{"label":"Picking up from yesterday","quote":"I haven’t put all my efforts in yet.","at":"You, to David Goggins, Tue"}},
       {"id":"letter","type":"prompt","kind":"letter","act":"writing","lines":["80 days to go","Due Jan 16"],
-       "question":"Tell her about your dad.","thread":{"label":"Yesterday's letter","quote":"…her father’s work ethic."}},
+       "question":"Tell her about your dad.","thread":{"label":"Yesterday's letter","quote":"…her father’s work ethic."},
+       "from_idea":{"id":"week-0-1","title":"Make the loop you have trustworthy","kind":"video"}},
       {"id":"year-ago","type":"reflect","kind":"on_this_day","act":"writing","title":"Feeling better after a good night.",
        "body":"Flying to Denver on Thursday.","date_label":"Tue, Oct 28, 2025","question":"What did that rhythm protect?"},
       {"id":"sleep","type":"sleep","act":"body"},
@@ -713,7 +715,7 @@ final class DailyDeckTests: XCTestCase {
          {"label":"Applications","kind":"pips","target":5,"front":"ai","front_name":"Landing the AI role"}]}]}
     """#
 
-    func testLetterCarriesTheAdvisorsCommentAndTodayOneSaysWhoSaidIt() throws {
+    func testLetterCarriesTheAdvisorsComment() throws {
         let deck = try DailyDeck.decode(#"""
         {"date":"2026-10-31","kind":"morning","cards":[
           {"id":"open","type":"headline","title":"Sat, Oct 31",
@@ -725,7 +727,6 @@ final class DailyDeckTests: XCTestCase {
           {"id":"advisor","type":"prompt","act":"writing","voice":"Brené Brown","context":"A story is vulnerable.","context_from":""}]}
         """#)
         let cards = Dictionary(uniqueKeysWithValues: deck.cards.map { ($0.id, $0) })
-        XCTAssertEqual(cards["open"]?.todayOne?.at, "You, to Brené Brown, Fri")
         XCTAssertEqual(cards["letter"]?.contextFrom, "Brené Brown")
         XCTAssertNil(cards["letter"]?.thread)
         XCTAssertNil(cards["advisor"]?.contextFrom, "a blank speaker is no speaker")
@@ -739,8 +740,6 @@ final class DailyDeckTests: XCTestCase {
                                                        "She’s due Jan 16 · 80 days", "Something new"], "a tag without text drops alone")
         XCTAssertEqual(open.headlineTags.map(\.symbol), ["bubble.left", "flag", "figure.and.child.holdinghands", "smallcircle.filled.circle"])
         XCTAssertTrue(open.tags.isEmpty, "the headline's tags are not a sleep card's")
-        XCTAssertEqual(open.todayOne, DeckTodayOne(label: "Draft one interview story", front: "ai",
-                                                   quote: "…rather than at least getting my own stories right."))
         XCTAssertNil(open.act)
 
         let idea = try XCTUnwrap(cards["week-0-1"])
@@ -751,6 +750,12 @@ final class DailyDeckTests: XCTestCase {
                        "a blank or textless quote drops")
         XCTAssertEqual(idea.parts.map(\.label), ["The loop", "Evals"], "a part without text drops")
         XCTAssertEqual(DeckPalette.of(idea).name, "Video")
+        XCTAssertEqual(idea.linked, DeckThread(label: "You wrote, Oct 27", quote: "Evals are the job.", at: "You, on a check-in"))
+        XCTAssertNil(cards["week-0-2"]?.linked)
+        XCTAssertEqual(cards["letter"]?.fromIdea,
+                       DeckFromIdea(id: "week-0-1", title: "Make the loop you have trustworthy", kind: "video"))
+        XCTAssertNil(cards["advisor"]?.fromIdea)
+        XCTAssertEqual(DeckPalette.of(try XCTUnwrap(cards["ask"])).colors, HermexPaper.prep, "the job search wears Prep's paper")
 
         let advisor = try XCTUnwrap(cards["advisor"])
         XCTAssertEqual(advisor.thread, DeckThread(label: "Picking up from yesterday", quote: "I haven’t put all my efforts in yet.",
@@ -768,9 +773,9 @@ final class DailyDeckTests: XCTestCase {
         let pages = DeckPage.pages(for: deck.cards)
         XCTAssertTrue(DeckAct.isByJob(pages))
         let acts = DeckCardView.acts(pages)
-        XCTAssertEqual(acts.map(\.name), ["Today", "Ideas", "Writing", "Body", "People"])
+        XCTAssertEqual(acts.map(\.name), ["Today", "Ideas", "Writing", "People"], "the body cards list under Today")
         XCTAssertEqual(acts.map { $0.pages.map(\.id) },
-                       [["ask"], ["week-0-1", "week-0-2"], ["advisor", "letter", "year-ago"], ["sleep"], ["followups-f1"]])
+                       [["ask", "sleep"], ["week-0-1", "week-0-2"], ["advisor", "letter", "year-ago"], ["followups-f1"]])
         XCTAssertTrue(acts.allSatisfy { $0.divider == nil }, "a deck by job has no front groups")
         XCTAssertEqual(DeckAheadRow.title(pages.first { $0.id == "year-ago" }!), "Tue, Oct 28, 2025", "a year-ago row names its day")
 
@@ -781,8 +786,8 @@ final class DailyDeckTests: XCTestCase {
           {"id":"n","type":"reflect"},{"id":"close","type":"close"}]}
         """#)
         let shuffledActs = DeckCardView.acts(DeckPage.pages(for: shuffled.cards))
-        XCTAssertEqual(shuffledActs.map(\.name), ["Today", "Ideas", "Body", "Later"])
-        XCTAssertEqual(shuffledActs.map { $0.pages.map(\.id) }, [["n"], ["i"], ["s"], ["x"]])
+        XCTAssertEqual(shuffledActs.map(\.name), ["Today", "Ideas", "Later"])
+        XCTAssertEqual(shuffledActs.map { $0.pages.map(\.id) }, [["s", "n"], ["i"], ["x"]])
         XCTAssertFalse(DeckAct.isByJob(DeckPage.pages(for: try DailyDeck.decode(Self.deckJSON).cards)), "an older deck isn't by job")
     }
 
