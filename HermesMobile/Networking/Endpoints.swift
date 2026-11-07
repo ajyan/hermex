@@ -277,8 +277,6 @@ enum Endpoint {
     /// POST `{date, text, question?}` for instant feedback, POST `{date, hanzi, got}` for a recall.
     case mandarinAnswer
     case mandarinRecall
-    /// Make it yours: POST `{date, hanzi, text}`, his own sentences from a cue's example, checked.
-    case mandarinVersions
 
     var path: String {
         switch self {
@@ -692,8 +690,6 @@ enum Endpoint {
             return "/api/mandarin/answer"
         case .mandarinRecall:
             return "/api/mandarin/recall"
-        case .mandarinVersions:
-            return "/api/mandarin/versions"
         }
     }
 
