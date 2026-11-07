@@ -173,8 +173,37 @@ struct BodyHomeView: View {
                     VStack(spacing: 10) { startButtons(next, others: others) }
                 }
                 .padding(.top, 4)
+            } else {
+                let days = BodyHomeCopy.otherDays(
+                    than: "", sessions: home.sessions, today: BodyHomeCopy.localDay(.now))
+                if !days.isEmpty { liftAnyway(days, phase: home.phase) }
             }
         }
+    }
+
+    /// With nothing scheduled: one button per day still open today. Before Re-entry the server
+    /// prescribes a picked day at Re-entry weights.
+    private func liftAnyway(_ days: [String], phase: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(verbatim: ["before", "recover"].contains(phase) ? "Lift anyway, at Re-entry weights" : "Lift anyway")
+                .font(AppFont.caption(weight: .semibold))
+                .foregroundStyle(paper.glow)
+            HStack(spacing: 10) {
+                ForEach(days, id: \.self) { day in
+                    NavigationLink(value: ShellPushDestination.bodyWorkout(day)) {
+                        Text(verbatim: day.capitalized)
+                            .font(AppFont.subheadline(weight: .semibold))
+                            .foregroundStyle(paper.glow)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(paper.wash, in: Capsule())
+                            .overlay(Capsule().strokeBorder(paper.edge, lineWidth: 0.5))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(verbatim: "Start \(day.capitalized)"))
+                }
+            }
+        }
+        .padding(.top, 4)
     }
 
     /// With no next workout: when lifting starts, or the Recover week's line.
