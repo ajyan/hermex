@@ -100,6 +100,23 @@ final class WorkoutFinishTests: XCTestCase {
         return (WorkoutFinishViewModel(workout: workout, client: client), workout)
     }
 
+    func testCheckStartsFromWhatHurtMidWorkout() async throws {
+        let client = FakeFinishClient()
+        let workout = try await workout(client)
+        workout.open(exercise: 6) // DB bench
+        let nine = try XCTUnwrap(Calendar.current.date(from: DateComponents(year: 2026, month: 12, day: 2, hour: 9, minute: 2)))
+        workout.logHurt(.back, now: nine)
+        workout.open(exercise: 8)
+        workout.logHurt(.other, now: nine.addingTimeInterval(600))
+
+        let vm = WorkoutFinishViewModel(workout: workout, client: client)
+        XCTAssertEqual(vm.back, .pain)
+        XCTAssertEqual(vm.shoulders, .fine)
+        XCTAssertEqual(vm.painLift, "db-bench", "the last back or shoulder hurt names the lift")
+        XCTAssertNil(vm.painScore, "the score is still his to give")
+        XCTAssertEqual(vm.note, "Back hurt during DB bench, 9:02. Something hurt during Lateral raise, 9:12")
+    }
+
     // MARK: WorkoutViewModel.finish
 
     func testFinishSendsCheckAndReturnsProposals() async throws {

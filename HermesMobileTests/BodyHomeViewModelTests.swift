@@ -261,6 +261,8 @@ final class BodyHomeCopyTests: XCTestCase {
         let sessions = [try summary("push", "2026-11-30"), try summary("pull", "2026-11-29")]
         XCTAssertEqual(BodyHomeCopy.otherDays(than: "legs", sessions: sessions, today: "2026-11-30"), ["pull"])
         XCTAssertEqual(BodyHomeCopy.otherDays(than: "legs", sessions: sessions, today: "2026-12-01"), ["push", "pull"])
+        XCTAssertEqual(BodyHomeCopy.doneToday(sessions, today: "2026-11-30"), "Push done")
+        XCTAssertNil(BodyHomeCopy.doneToday(sessions, today: "2026-12-02"))
         // With nothing up next (Recover week), every day not finished today can still be lifted.
         XCTAssertEqual(BodyHomeCopy.otherDays(than: "", sessions: sessions, today: "2026-11-30"), ["legs", "pull"])
         let both = sessions + [try summary("pull", "2026-11-30")]

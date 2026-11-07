@@ -165,7 +165,8 @@ struct WorkoutView: View {
                     .equatable()
                     .workoutCardRow(.middle)
             }
-            WorkoutCardFooter(group: index...index, canRemove: lift.workSets.count > 1, viewModel: viewModel)
+            WorkoutCardFooter(group: index...index, canRemove: lift.workSets.count > 1,
+                              hurts: hurtLines(index...index, in: exercises), viewModel: viewModel)
                 .equatable()
                 .workoutCardRow(.bottom)
         } else {
@@ -187,7 +188,8 @@ struct WorkoutView: View {
             .id(exercises[group.lowerBound].id)
         ForEach(WorkoutViewModel.pairedRows(exercises, group: group)) { ref in
             let lift = exercises[ref.exercise]
-            WorkoutSetRow(lift: lift, exercise: ref.exercise, index: ref.set, viewModel: viewModel, pairName: lift.name)
+            WorkoutSetRow(lift: lift, exercise: ref.exercise, index: ref.set, viewModel: viewModel,
+                          pairLetter: WorkoutCopy.pairLetter(ref.exercise - group.lowerBound))
                 .equatable()
                 .workoutCardRow(.middle)
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -205,9 +207,21 @@ struct WorkoutView: View {
                 .equatable()
                 .workoutCardRow(.middle)
         }
-        WorkoutCardFooter(group: group, canRemove: lifts.contains { $0.workSets.count > 1 }, viewModel: viewModel)
+        WorkoutCardFooter(group: group, canRemove: lifts.contains { $0.workSets.count > 1 },
+                          hurts: hurtLines(group, in: exercises), viewModel: viewModel)
             .equatable()
             .workoutCardRow(.bottom)
+    }
+
+    /// The hurts logged on the open card's lifts, by their place in the session's list, for Undo.
+    private func hurtLines(_ group: ClosedRange<Int>, in exercises: [BodyExercise]) -> [WorkoutHurtLine] {
+        let ids = Set(exercises[group].map(\.id))
+        let names = Dictionary(exercises.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
+        return (viewModel.session?.hurts ?? []).enumerated().compactMap { index, hurt in
+            guard ids.contains(hurt.lift) else { return nil }
+            let name = group.count > 1 ? names[hurt.lift] : nil
+            return WorkoutHurtLine(index: index, text: WorkoutFinishCopy.hurtLine(hurt, liftName: name))
+        }
     }
 
     // MARK: Banners
@@ -435,14 +449,22 @@ struct WorkoutEffortRow: View, Equatable {
     }
 }
 
-/// The open card's foot: + Add set and − Remove set (a round, for a superset), and how to change a set.
+/// A hurt logged on the open card, as its foot shows it.
+struct WorkoutHurtLine: Equatable {
+    let index: Int
+    let text: String
+}
+
+/// The open card's foot: + Add set and − Remove set (a round, for a superset), Something hurt with
+/// what was logged here, and how to change a set.
 struct WorkoutCardFooter: View, Equatable {
     let group: ClosedRange<Int>
     let canRemove: Bool
+    let hurts: [WorkoutHurtLine]
     let viewModel: WorkoutViewModel
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.group == rhs.group && lhs.canRemove == rhs.canRemove
+        lhs.group == rhs.group && lhs.canRemove == rhs.canRemove && lhs.hurts == rhs.hurts
     }
 
     private var unit: String { group.count > 1 ? "round" : "set" }
@@ -457,6 +479,33 @@ struct WorkoutCardFooter: View, Equatable {
                     .accessibilityLabel(Text(verbatim: "Remove the last \(unit)"))
             }
             .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
+            ForEach(hurts, id: \.index) { hurt in
+                HStack(spacing: 10) {
+                    Image(systemName: "bandage.fill")
+                        .foregroundStyle(HermexPaper.training.glow)
+                        .accessibilityHidden(true)
+                    Text(verbatim: hurt.text)
+                        .foregroundStyle(Color.hxTextPrimary)
+                    Spacer(minLength: 8)
+                    Button { viewModel.removeHurt(at: hurt.index) } label: { Text(verbatim: "Undo") }
+                        .buttonStyle(.borderless)
+                        .tint(.accentColor)
+                        .frame(minHeight: 44)
+                        .accessibilityLabel(Text(verbatim: "Undo \(hurt.text)"))
+                }
+                .font(AppFont.subheadline())
+            }
+            Menu {
+                Button { viewModel.logHurt(.back) } label: { Text(verbatim: "Back") }
+                Button { viewModel.logHurt(.shoulders) } label: { Text(verbatim: "Shoulders") }
+                Button { viewModel.logHurt(.other) } label: { Text(verbatim: "Something else") }
+            } label: {
+                Label { Text(verbatim: "Something hurt") } icon: { Image(systemName: "bandage") }
+                    .font(AppFont.subheadline(weight: .semibold))
+                    .frame(minHeight: 44)
+            }
+            .tint(.accentColor)
+            .accessibilityHint(Text(verbatim: "Notes where and when, for the check at the end"))
             Text(verbatim: "Tap a number to change it · swipe a set to delete it")
                 .font(AppFont.caption())
                 .foregroundStyle(Color.hxTextSecondary)

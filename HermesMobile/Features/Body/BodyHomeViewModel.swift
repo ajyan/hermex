@@ -82,7 +82,8 @@ final class BodyHomeViewModel {
 
 extension BodyHome {
     init(phase: String, phaseLabel: String, starts: String?, next: BodyNext?, week: BodyWeek, sleep: BodyHomeSleep?,
-         lifts: [BodyHomeLift], sessions: [BodySessionSummary], proposals: [BodyProposal], gaps: [String]) {
+         lifts: [BodyHomeLift], sessions: [BodySessionSummary], proposals: [BodyProposal], changes: [BodyChange] = [],
+         gaps: [String]) {
         self.phase = phase
         self.phaseLabel = phaseLabel
         self.starts = starts
@@ -92,13 +93,14 @@ extension BodyHome {
         self.lifts = lifts
         self.sessions = sessions
         self.proposals = proposals
+        self.changes = changes
         self.gaps = gaps
     }
 
     /// This home with `proposals` swapped in.
     func with(proposals: [BodyProposal]) -> BodyHome {
         BodyHome(phase: phase, phaseLabel: phaseLabel, starts: starts, next: next, week: week, sleep: sleep,
-                 lifts: lifts, sessions: sessions, proposals: proposals, gaps: gaps)
+                 lifts: lifts, sessions: sessions, proposals: proposals, changes: changes, gaps: gaps)
     }
 }
 
@@ -180,6 +182,13 @@ enum BodyHomeCopy {
     static func otherDays(than day: String, sessions: [BodySessionSummary] = [], today: String = "") -> [String] {
         let finishedToday = Set(sessions.filter { $0.date == today }.map(\.day))
         return ["push", "legs", "pull"].filter { $0 != day && !finishedToday.contains($0) }
+    }
+
+    /// "Push done · 32 min" for the newest workout finished `today`, or nil.
+    static func doneToday(_ sessions: [BodySessionSummary], today: String) -> String? {
+        guard let session = sessions.first(where: { $0.date == today }) else { return nil }
+        let label = session.label.isEmpty ? session.day.capitalized : session.label
+        return ["\(label) done", session.minutes.map { "\($0) min" }].compactMap { $0 }.joined(separator: " · ")
     }
 
     /// The phone's calendar day as the server writes dates, "2026-11-30".

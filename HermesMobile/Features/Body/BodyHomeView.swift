@@ -132,14 +132,22 @@ struct BodyHomeView: View {
     // MARK: Up next
 
     private func upNext(_ home: BodyHome) -> some View {
-        HXCard(.glow(paper), title: home.next?.label ?? idleLine(home),
+        let doneToday = BodyHomeCopy.doneToday(home.sessions, today: BodyHomeCopy.localDay(.now))
+        return HXCard(.glow(paper), title: home.next?.label ?? doneToday ?? idleLine(home),
                titleStyle: home.next == nil ? .title3 : .title, spacing: 12) {
             if home.next != nil {
-                Text(verbatim: "Up next")
+                Text(verbatim: doneToday.map { "\($0) · Up next" } ?? "Up next")
                     .font(AppFont.caption(weight: .semibold))
                     .foregroundStyle(paper.glow)
             }
         } content: {
+            if home.next == nil, doneToday != nil {
+                Text(verbatim: idleLine(home, liftedToday: true))
+                    .font(AppFont.subheadline())
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            changes(home.changes)
             if let next = home.next {
                 VStack(spacing: 7) {
                     ForEach(Array(next.preview.enumerated()), id: \.offset) { _, row in
@@ -206,10 +214,30 @@ struct BodyHomeView: View {
         .padding(.top, 4)
     }
 
+    /// Accepted weight changes waiting for their lift: "Incline bench: 95 lb next time".
+    @ViewBuilder
+    private func changes(_ changes: [BodyChange]) -> some View {
+        if !changes.isEmpty {
+            VStack(alignment: .leading, spacing: 5) {
+                ForEach(changes, id: \.lift) { change in
+                    Label {
+                        Text(verbatim: "\(change.name): \(change.weightLabel) next time")
+                            .foregroundStyle(Color.hxTextPrimary)
+                    } icon: {
+                        Image(systemName: "arrow.turn.down.right").foregroundStyle(paper.glow)
+                    }
+                    .font(AppFont.subheadline())
+                }
+            }
+        }
+    }
+
     /// With no next workout: when lifting starts, or the Recover week's line.
-    private func idleLine(_ home: BodyHome) -> String {
-        if let starts = home.starts { return "Starts \(starts)" }
-        if home.phase == "recover" { return "Recover week: no lifting yet. Walk, stretch, and sleep." }
+    private func idleLine(_ home: BodyHome, liftedToday: Bool = false) -> String {
+        if let starts = home.starts { return liftedToday ? "The plan starts \(starts)." : "Starts \(starts)" }
+        if home.phase == "recover" {
+            return liftedToday ? "Recover week: walk, stretch, and sleep." : "Recover week: no lifting yet. Walk, stretch, and sleep."
+        }
         return "Nothing is scheduled."
     }
 

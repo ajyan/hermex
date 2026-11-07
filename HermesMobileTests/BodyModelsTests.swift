@@ -25,6 +25,8 @@ final class BodyModelsTests: APIClientTestCase {
         let home = try decode(BodyHome.self, "home.json")
         XCTAssertEqual(home.phase, "build")
         XCTAssertEqual(home.phaseLabel, "Build · 6 weeks to January")
+        XCTAssertEqual(home.changes.map(\.name), ["Strict press", ""], "a malformed change decodes empty")
+        XCTAssertEqual(home.changes.first?.weightLabel, "70 lb")
         XCTAssertNil(home.starts)
         XCTAssertEqual(home.next?.day, "push")
         XCTAssertEqual(home.next?.preview.map(\.weightLabel), ["150 lb", "75 lb", "42.5s"])

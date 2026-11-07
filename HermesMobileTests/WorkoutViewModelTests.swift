@@ -322,6 +322,19 @@ final class WorkoutViewModelTests: XCTestCase {
         XCTAssertEqual([dips, dips + 1].map { exercise(vm, $0).workSets.count }, [3, 3])
     }
 
+    func testSomethingHurtLogsTheOpenLiftAndUndoes() async throws {
+        let (vm, client) = try await pushVM()
+        vm.open(exercise: dbBench)
+        let nine = try XCTUnwrap(Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 7, hour: 9, minute: 2)))
+        vm.logHurt(.back, now: nine)
+        XCTAssertEqual(session(vm)?.hurts, [BodyHurt(lift: "db-bench", part: .back, at: "2026-11-07T09:02:00")])
+        await vm.idle()
+        XCTAssertEqual(client.saved.last?.hurts.count, 1, "a hurt saves with the session")
+        vm.removeHurt(at: 0)
+        XCTAssertEqual(session(vm)?.hurts, [])
+        XCTAssertEqual(WorkoutCopy.pairLetter(0) + WorkoutCopy.pairLetter(1), "AB")
+    }
+
     func testRemoveNeverDropsBelowOneWorkSet() async throws {
         let (vm, _) = try await pushVM()
         for _ in 0..<5 { vm.removeSet(exercise: press) }
@@ -590,7 +603,7 @@ final class WorkoutViewModelTests: XCTestCase {
         XCTAssertEqual(incline.sets.indices.map { WorkoutCopy.tag(incline, set: $0) }, ["W", "W", "1", "2", "3", "4"])
         XCTAssertEqual(WorkoutCopy.lastTime(incline, workIndex: WorkoutCopy.workIndex(incline, set: 0)), "—")
         XCTAssertEqual(WorkoutCopy.lastTime(incline, workIndex: WorkoutCopy.workIndex(incline, set: 2)), "145 × 8")
-        XCTAssertEqual(WorkoutCopy.lastTime(dips, workIndex: 0), "BW × 12")
+        XCTAssertEqual(WorkoutCopy.lastTime(dips, workIndex: 0), "12", "BW isn't repeated: it can't change")
         XCTAssertEqual(WorkoutCopy.lastTime(curlUp, workIndex: 0), "10 s")
         XCTAssertEqual(WorkoutCopy.sleepTitle(try XCTUnwrap(try pushPrescription().offers.sleep)), "Rough night: 5h 12m, rated 2")
         XCTAssertEqual(WorkoutCopy.phaseLabel("reentry", deload: false), "Re-entry")
