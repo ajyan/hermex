@@ -378,5 +378,15 @@
       "decided_at": null
     }
   ],
-  "gaps": []
+  "gaps": [],
+  "changes": [
+    {
+      "lift": "strict-press",
+      "name": "Strict press",
+      "weight_label": "70 lb"
+    },
+    {
+      "lift": 42
+    }
+  ]
 }

@@ -302,6 +302,38 @@ struct BodyCheck: Codable, Hashable, Sendable {
     }
 }
 
+/// Where something hurt mid-workout.
+enum BodyPart: String, Hashable, Sendable, Codable, CaseIterable {
+    case back, shoulders, other
+
+    init(from decoder: Decoder) throws {
+        self = BodyPart(rawValue: (try? decoder.singleValueContainer().decode(String.self)) ?? "") ?? .other
+    }
+}
+
+/// "Something hurt", tapped during the workout: the lift that was open, where, and when
+/// (`2026-11-07T09:02:00`, the phone's local time). The finish check starts from the last one.
+struct BodyHurt: Codable, Hashable, Sendable {
+    var lift: String
+    var part: BodyPart
+    var at: String
+
+    private enum CodingKeys: String, CodingKey { case lift, part, at }
+
+    init(lift: String, part: BodyPart, at: String) {
+        self.lift = lift
+        self.part = part
+        self.at = at
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        lift = c.string(.lift)
+        part = c.optional(BodyPart.self, .part) ?? .other
+        at = c.string(.at)
+    }
+}
+
 /// Baki's note after a finished workout, written by the model a little after the save.
 struct BodyCoachNote: Codable, Hashable, Sendable {
     var headline: String
@@ -335,10 +367,12 @@ struct BodySession: Codable, Hashable, Sendable, Identifiable {
     var check: BodyCheck?
     var coachNote: BodyCoachNote?
     var note: String?
+    /// Every "Something hurt" tapped during the workout, oldest first.
+    var hurts: [BodyHurt] = []
 
     private enum CodingKeys: String, CodingKey {
         case id, day, phase, started, finished, deload, exercises, trimmed,
-             movedHinge = "moved_hinge", check, coachNote = "coach_note", note
+             movedHinge = "moved_hinge", check, coachNote = "coach_note", note, hurts
     }
 
     init(id: String, day: String, phase: String? = nil, started: String? = nil, finished: String? = nil,
@@ -375,6 +409,7 @@ struct BodySession: Codable, Hashable, Sendable, Identifiable {
         check = c.optional(BodyCheck.self, .check)
         coachNote = c.optional(BodyCoachNote.self, .coachNote)
         note = c.optional(String.self, .note)
+        hurts = c.lossy(BodyHurt.self, .hurts)
     }
 
     var isFinished: Bool { finished != nil }
@@ -675,11 +710,13 @@ struct BodyHome: Decodable, Hashable, Sendable {
     let lifts: [BodyHomeLift]
     let sessions: [BodySessionSummary]
     let proposals: [BodyProposal]
+    /// Accepted weight changes still waiting for their lift's next session.
+    let changes: [BodyChange]
     /// Rotation days with no finished session in 10 or more days.
     let gaps: [String]
 
     private enum CodingKeys: String, CodingKey {
-        case phase, phaseLabel = "phase_label", starts, next, week, sleep, lifts, sessions, proposals, gaps
+        case phase, phaseLabel = "phase_label", starts, next, week, sleep, lifts, sessions, proposals, changes, gaps
     }
 
     init(from decoder: Decoder) throws {
@@ -693,7 +730,24 @@ struct BodyHome: Decodable, Hashable, Sendable {
         lifts = c.lossy(BodyHomeLift.self, .lifts)
         sessions = c.lossy(BodySessionSummary.self, .sessions)
         proposals = c.lossy(BodyProposal.self, .proposals)
+        changes = c.lossy(BodyChange.self, .changes)
         gaps = c.strings(.gaps)
+    }
+}
+
+/// An accepted proposal's new weight, shown on home until the lift is next done: "Incline bench: 95 lb".
+struct BodyChange: Decodable, Hashable, Sendable {
+    let lift: String
+    let name: String
+    let weightLabel: String
+
+    private enum CodingKeys: String, CodingKey { case lift, name, weightLabel = "weight_label" }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        lift = c.string(.lift)
+        name = c.string(.name)
+        weightLabel = c.string(.weightLabel)
     }
 }
 

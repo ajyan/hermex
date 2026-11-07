@@ -240,6 +240,29 @@ final class WorkoutViewModel {
             ?? Self.firstUnfinished(in: exercises, after: -1) ?? e
     }
 
+    // MARK: Something hurt
+
+    /// Records that something hurt while the open lift was up, so the finish check starts from it.
+    func logHurt(_ part: BodyPart, now: Date = .now) {
+        guard let lift = lift(current) else { return }
+        let hurt = BodyHurt(lift: lift.id, part: part, at: Self.localStamp(now))
+        mutate { $0.hurts.append(hurt) }
+    }
+
+    /// Takes back one logged hurt (a mis-tap).
+    func removeHurt(at index: Int) {
+        guard session?.hurts.indices.contains(index) == true else { return }
+        mutate { _ = $0.hurts.remove(at: index) }
+    }
+
+    /// The phone's local time as the server writes stamps, "2026-11-07T09:02:00".
+    static func localStamp(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        return f.string(from: date)
+    }
+
     // MARK: Offers
 
     /// "Drop a set": the last work set of every main, superset and optional lift that has more than

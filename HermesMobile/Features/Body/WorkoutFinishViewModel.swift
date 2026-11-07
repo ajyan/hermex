@@ -47,6 +47,19 @@ final class WorkoutFinishViewModel {
         self.onAPIError = onAPIError
         self.noteDelays = noteDelays
         self.sleep = sleep
+        prefillFromHurts()
+    }
+
+    /// Starts the check from what he logged mid-workout: the last back or shoulder hurt marks that
+    /// part as Pain on its lift, and every hurt goes into the note ("Back hurt during DB bench, 9:02").
+    private func prefillFromHurts() {
+        guard let session = workout.session, !session.hurts.isEmpty else { return }
+        let names = Dictionary(session.exercises.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
+        if let last = session.hurts.last(where: { $0.part != .other }) {
+            if last.part == .back { back = .pain } else { shoulders = .pain }
+            if painLifts.contains(where: { $0.id == last.lift }) { painLift = last.lift }
+        }
+        note = session.hurts.map { WorkoutFinishCopy.hurtLine($0, liftName: names[$0.lift]) }.joined(separator: ". ")
     }
 
     var day: String { workout.session?.day ?? workout.day ?? "" }
@@ -161,6 +174,27 @@ final class WorkoutFinishViewModel {
 /// The words the finish screen composes.
 enum WorkoutFinishCopy {
     static func title(day: String) -> String { "\(day.capitalized) done" }
+
+    /// "Back hurt during DB bench, 9:02"; "Something hurt" for a part that isn't back or shoulders.
+    static func hurtLine(_ hurt: BodyHurt, liftName: String?) -> String {
+        let what = switch hurt.part {
+        case .back: "Back hurt"
+        case .shoulders: "Shoulders hurt"
+        case .other: "Something hurt"
+        }
+        let during = liftName.map { " during \($0)" } ?? ""
+        return what + during + (clock(hurt.at).map { ", \($0)" } ?? "")
+    }
+
+    /// "9:02" from a local stamp, or nil when it doesn't parse.
+    static func clock(_ stamp: String) -> String? {
+        let parts = stamp.split(separator: "T")
+        guard parts.count == 2 else { return nil }
+        let hm = parts[1].split(separator: ":")
+        guard hm.count >= 2, let h = Int(hm[0]), let m = Int(hm[1]) else { return nil }
+        let hour = h % 12 == 0 ? 12 : h % 12
+        return String(format: "%d:%02d", hour, m)
+    }
 
     /// "Baki · after Push".
     static func kicker(day: String) -> String { "Baki · after \(day.capitalized)" }

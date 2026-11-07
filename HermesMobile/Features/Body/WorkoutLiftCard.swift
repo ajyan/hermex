@@ -58,7 +58,7 @@ enum WorkoutCopy {
         guard !reps.isEmpty else { return scheme(lift) }
         let weights = Set(lift.last.compactMap(\.weight))
         var last = reps.map(String.init).joined(separator: " ")
-        if weights.count == 1, let weight = shortWeight(unit: lift.unit, weight: weights.first) {
+        if isWeighted(lift), weights.count == 1, let weight = shortWeight(unit: lift.unit, weight: weights.first) {
             last = "\(weight) × \(last)"
         }
         return "\(scheme(lift)) · last time \(last)"
@@ -71,7 +71,8 @@ enum WorkoutCopy {
         let measure = BodyMeasure(lift)
         let weight = shortWeight(unit: lift.unit, weight: last.weight)
         let count = measure.count(last).map { self.count($0, measure) }
-        let parts: [String?] = measure == .reps ? [weight, count] : [isWeighted(lift) ? weight : nil, count]
+        // Only a weight he can change is worth repeating; "BW", "Band" and "Cable" would just echo the plan.
+        let parts: [String?] = [isWeighted(lift) ? weight : nil, count]
         let text = parts.compactMap { $0 }.joined(separator: measure == .reps ? " × " : " · ")
         return text.isEmpty ? "—" : text
     }
@@ -115,6 +116,11 @@ enum WorkoutCopy {
         case .optional: "Optional"
         case .finisher: "Finisher"
         }
+    }
+
+    /// A superset lift's letter by its place in the pair: "A", "B", "C".
+    static func pairLetter(_ offset: Int) -> String {
+        String(UnicodeScalar(UInt8(65 + min(max(offset, 0), 25))))
     }
 
     /// "W" for a warm-up set, else the work set's number.
@@ -314,19 +320,26 @@ struct WorkoutPairHeader: View, Equatable {
                     .font(AppFont.display(style: .title2, weight: .bold))
                     .foregroundStyle(paper.glow)
                     .accessibilityAddTraits(.isHeader)
-                ForEach(lifts) { lift in
-                    Text(verbatim: "\(lift.name): \(WorkoutCopy.targetLine(lift))")
-                        .font(AppFont.subheadline())
-                        .foregroundStyle(Color.hxTextPrimary)
+                ForEach(Array(lifts.enumerated()), id: \.element.id) { offset, lift in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(verbatim: WorkoutCopy.pairLetter(offset))
+                            .font(AppFont.subheadline(weight: .bold))
+                            .foregroundStyle(paper.glow)
+                            .frame(width: columns.tag, alignment: .leading)
+                        Text(verbatim: "\(lift.name) · \(WorkoutCopy.targetLine(lift))")
+                            .font(AppFont.subheadline())
+                            .foregroundStyle(Color.hxTextPrimary)
+                    }
+                    .accessibilityElement(children: .combine)
                 }
-                Text(verbatim: "Alternate them: one set of each, then the next round.")
+                Text(verbatim: "A1, then B1, then the next round.")
                     .font(AppFont.footnote())
                     .foregroundStyle(Color.hxTextSecondary)
             }
             .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: WorkoutLayout.columnSpacing) {
                 Text(verbatim: "Set").frame(width: columns.tag, alignment: .leading)
-                Text(verbatim: "Lift · last time").frame(maxWidth: .infinity, alignment: .leading)
+                Text(verbatim: "Last time").frame(maxWidth: .infinity, alignment: .leading)
                 Text(verbatim: lifts.lazy.map(WorkoutCopy.weightHeader).first { !$0.isEmpty } ?? "")
                     .frame(width: columns.weight)
                 Text(verbatim: WorkoutCopy.countHeader(lifts.first.map(BodyMeasure.init) ?? .reps))
@@ -345,16 +358,16 @@ struct WorkoutPairHeader: View, Equatable {
 
 /// One set: its tag, last time, the weight and count pills, and the 44 pt check. The row is
 /// identified by the set's `uid`, so deleting a set takes its row (and any open editor) with it.
-/// In a superset card `pairName` names the lift above its last time.
+/// In a superset card `pairLetter` prefixes the set's number with its lift's letter ("A1", "B1").
 struct WorkoutSetRow: View, Equatable {
     let lift: BodyExercise
     let exercise: Int
     let index: Int
     let viewModel: WorkoutViewModel
-    var pairName: String? = nil
+    var pairLetter: String? = nil
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.exercise == rhs.exercise && lhs.index == rhs.index && lhs.row == rhs.row && lhs.pairName == rhs.pairName
+        lhs.exercise == rhs.exercise && lhs.index == rhs.index && lhs.row == rhs.row && lhs.pairLetter == rhs.pairLetter
             && lhs.tag == rhs.tag && lhs.lastTime == rhs.lastTime && lhs.lift.unit == rhs.lift.unit
             && lhs.lift.target == rhs.lift.target && lhs.startingWeight == rhs.startingWeight
     }
@@ -365,12 +378,18 @@ struct WorkoutSetRow: View, Equatable {
 
     private var paper: HermexPaper { .training }
     private var row: BodySet { lift.sets[index] }
-    private var tag: String { WorkoutCopy.tag(lift, set: index) }
+    private var tag: String {
+        let tag = WorkoutCopy.tag(lift, set: index)
+        return tag == "W" ? tag : (pairLetter ?? "") + tag
+    }
     private var lastTime: String { WorkoutCopy.lastTime(lift, workIndex: WorkoutCopy.workIndex(lift, set: index)) }
     private var startingWeight: Double? { WorkoutCopy.startingWeight(lift, set: index) }
     private var measure: BodyMeasure { BodyMeasure(lift) }
     private var isWarm: Bool { row.kind == .warm }
-    private var setName: String { isWarm ? "Warm-up set" : "Set \(tag)" }
+    private var setName: String {
+        if isWarm { return "Warm-up set" }
+        return pairLetter == nil ? "Set \(tag)" : "\(lift.name) set \(WorkoutCopy.tag(lift, set: index))"
+    }
 
     var body: some View {
         HStack(spacing: WorkoutLayout.columnSpacing) {
@@ -379,28 +398,16 @@ struct WorkoutSetRow: View, Equatable {
                     .font(AppFont.subheadline(weight: .bold))
                     .foregroundStyle(isWarm ? Color.hxTextSecondary : paper.glow)
                     .frame(width: columns.tag, alignment: .leading)
-                VStack(alignment: .leading, spacing: 1) {
-                    if let pairName {
-                        Text(verbatim: pairName)
-                            .font(AppFont.subheadline(weight: .semibold))
-                            .foregroundStyle(Color.hxTextPrimary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
-                    // Under a lift's name, a lift with no history shows nothing rather than "—".
-                    if pairName == nil || lastTime != "—" {
-                        Text(verbatim: lastTime)
-                            .font(pairName == nil ? AppFont.subheadline() : AppFont.caption())
-                            .monospacedDigit()
-                            .foregroundStyle(Color.hxTextSecondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
-                }
+                Text(verbatim: lastTime)
+                    .font(AppFont.subheadline())
+                    .monospacedDigit()
+                    .foregroundStyle(Color.hxTextSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(Text(verbatim: [pairName, "\(setName), last time \(lastTime)"].compactMap { $0 }.joined(separator: ", ")))
+            .accessibilityLabel(Text(verbatim: "\(setName), last time \(lastTime)"))
             if WorkoutCopy.isWeighted(lift) { weightPill } else { weightLabel }
             countPill
             check
@@ -414,9 +421,15 @@ struct WorkoutSetRow: View, Equatable {
             .map { lift.unit == "lb_each" ? String($0.dropLast()) : $0 } ?? "—"
     }
 
-    /// Bodyweight, band and cable lifts have nothing to change: the label in the pill's place.
+    /// Bodyweight, band and cable lifts have nothing to change: plain text where the pill would be, so
+    /// it doesn't look tappable.
     private var weightLabel: some View {
-        pill(weightText, secondary: true, width: columns.weight)
+        Text(verbatim: weightText)
+            .font(AppFont.subheadline())
+            .foregroundStyle(Color.hxTextSecondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .frame(width: columns.weight)
             .accessibilityLabel(Text(verbatim: "\(setName), \(BodyFormat.weightLabel(unit: lift.unit, weight: nil))"))
     }
 
