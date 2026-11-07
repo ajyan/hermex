@@ -106,7 +106,7 @@ struct WorkoutView: View {
                 if viewModel.hingeBanner != .hidden { hingeBanner.workoutPlainRow() }
                 ForEach(Array(session.exercises.enumerated()), id: \.element.id) { index, lift in
                     let startsSection = index == 0 || session.exercises[index - 1].section != lift.section
-                    liftRows(lift, index: index, startsSection: startsSection)
+                    liftRows(lift, index: index, startsSection: startsSection, in: session.exercises)
                 }
                 finishButton.workoutPlainRow()
             }
@@ -122,7 +122,7 @@ struct WorkoutView: View {
 
     private func scrollToOpenLift(_ proxy: ScrollViewProxy, animated: Bool) {
         guard let exercises = viewModel.session?.exercises, exercises.indices.contains(viewModel.current) else { return }
-        let id = exercises[viewModel.current].id
+        let id = exercises[WorkoutViewModel.group(of: viewModel.current, in: exercises).lowerBound].id
         if animated {
             withAnimation(HXMotion.scroll(reduceMotion: reduceMotion)) { proxy.scrollTo(id, anchor: .top) }
         } else {
@@ -131,13 +131,17 @@ struct WorkoutView: View {
     }
 
     @ViewBuilder
-    private func liftRows(_ lift: BodyExercise, index: Int, startsSection: Bool) -> some View {
+    private func liftRows(_ lift: BodyExercise, index: Int, startsSection: Bool, in exercises: [BodyExercise]) -> some View {
+        let group = WorkoutViewModel.group(of: index, in: exercises)
         if startsSection {
             HXSectionHeader(title: WorkoutCopy.sectionTitle(lift.section))
                 .padding(.top, 8)
                 .workoutPlainRow()
         }
-        if index == viewModel.current {
+        if group.count > 1, group.contains(viewModel.current) {
+            // An open superset is one card, drawn once by its first lift.
+            if index == group.lowerBound { pairedCard(group, in: exercises) }
+        } else if index == viewModel.current {
             WorkoutCardHeader(lift: lift)
                 .equatable()
                 .workoutCardRow(.top)
@@ -161,7 +165,7 @@ struct WorkoutView: View {
                     .equatable()
                     .workoutCardRow(.middle)
             }
-            WorkoutCardFooter(exercise: index, canRemove: lift.workSets.count > 1, viewModel: viewModel)
+            WorkoutCardFooter(group: index...index, canRemove: lift.workSets.count > 1, viewModel: viewModel)
                 .equatable()
                 .workoutCardRow(.bottom)
         } else {
@@ -170,6 +174,40 @@ struct WorkoutView: View {
                 .workoutPlainRow()
                 .id(lift.id)
         }
+    }
+
+    /// An open superset: one card with the lifts' sets interleaved round by round, so each pair
+    /// logs back to back.
+    @ViewBuilder
+    private func pairedCard(_ group: ClosedRange<Int>, in exercises: [BodyExercise]) -> some View {
+        let lifts = Array(exercises[group])
+        WorkoutPairHeader(lifts: lifts)
+            .equatable()
+            .workoutCardRow(.top)
+            .id(exercises[group.lowerBound].id)
+        ForEach(WorkoutViewModel.pairedRows(exercises, group: group)) { ref in
+            let lift = exercises[ref.exercise]
+            WorkoutSetRow(lift: lift, exercise: ref.exercise, index: ref.set, viewModel: viewModel, pairName: lift.name)
+                .equatable()
+                .workoutCardRow(.middle)
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    if WorkoutViewModel.canDelete(set: ref.set, of: lift) {
+                        Button(role: .destructive) {
+                            viewModel.deleteSet(exercise: ref.exercise, set: ref.set)
+                        } label: {
+                            Label { Text(verbatim: "Delete") } icon: { Image(systemName: "trash") }
+                        }
+                    }
+                }
+        }
+        if let e = viewModel.effortPrompt, group.contains(e) {
+            WorkoutEffortRow(answer: exercises[e].repsLeft, viewModel: viewModel)
+                .equatable()
+                .workoutCardRow(.middle)
+        }
+        WorkoutCardFooter(group: group, canRemove: lifts.contains { $0.workSets.count > 1 }, viewModel: viewModel)
+            .equatable()
+            .workoutCardRow(.bottom)
     }
 
     // MARK: Banners
@@ -397,24 +435,26 @@ struct WorkoutEffortRow: View, Equatable {
     }
 }
 
-/// The open card's foot: + Add set and − Remove set, and how to change a set.
+/// The open card's foot: + Add set and − Remove set (a round, for a superset), and how to change a set.
 struct WorkoutCardFooter: View, Equatable {
-    let exercise: Int
+    let group: ClosedRange<Int>
     let canRemove: Bool
     let viewModel: WorkoutViewModel
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.exercise == rhs.exercise && lhs.canRemove == rhs.canRemove
+        lhs.group == rhs.group && lhs.canRemove == rhs.canRemove
     }
+
+    private var unit: String { group.count > 1 ? "round" : "set" }
 
     var body: some View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
-                Button { viewModel.addSet(exercise: exercise) } label: { Text(verbatim: "+ Add set") }
-                    .accessibilityLabel(Text(verbatim: "Add a set"))
-                Button { viewModel.removeSet(exercise: exercise) } label: { Text(verbatim: "− Remove set") }
+                Button { viewModel.addRound(group) } label: { Text(verbatim: "+ Add \(unit)") }
+                    .accessibilityLabel(Text(verbatim: "Add a \(unit)"))
+                Button { viewModel.removeRound(group) } label: { Text(verbatim: "− Remove \(unit)") }
                     .disabled(!canRemove)
-                    .accessibilityLabel(Text(verbatim: "Remove the last set"))
+                    .accessibilityLabel(Text(verbatim: "Remove the last \(unit)"))
             }
             .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
             Text(verbatim: "Tap a number to change it · swipe a set to delete it")

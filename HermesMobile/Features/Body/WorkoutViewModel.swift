@@ -128,24 +128,32 @@ final class WorkoutViewModel {
             sleepBanner = .hidden
         }
         if completed {
-            if lift.big { effortPrompt = e } else { advance(from: e) }
+            didComplete(e)
         } else if effortPrompt == e, !Self.isComplete(self.lift(e) ?? lift) {
             effortPrompt = nil
         }
     }
 
-    /// Sets one set's weight, committed from the weight editor; the lift's later unticked work sets
-    /// follow a new weight, but never a cleared one.
+    /// A lift just had its last work set ticked or its last open set removed: a big lift asks how
+    /// many reps were left, anything else opens the next lift.
+    private func didComplete(_ e: Int) {
+        guard let lift = lift(e) else { return }
+        if lift.big { effortPrompt = e } else { advance(from: e) }
+    }
+
+    /// Sets one set's weight, committed from the weight editor. Later work sets that still had the
+    /// set's old weight follow a new one, ticked or not, so fixing the first set after the fact fixes
+    /// the rest; a set given its own weight keeps it, and a cleared weight never carries forward.
     func setWeight(_ weight: Double?, exercise e: Int, set s: Int) {
         guard let lift = lift(e), lift.sets.indices.contains(s) else { return }
         let value = weight.map { max(0, $0) }
         mutate { session in
-            let kind = session.exercises[e].sets[s].kind
+            let old = session.exercises[e].sets[s]
             session.exercises[e].sets[s].weight = value
-            guard kind == .work, value != nil else { return }
+            guard old.kind == .work, value != nil else { return }
             for j in session.exercises[e].sets.indices where j > s {
                 let later = session.exercises[e].sets[j]
-                if later.kind == .work, !later.done { session.exercises[e].sets[j].weight = value }
+                if later.kind == .work, later.weight == old.weight { session.exercises[e].sets[j].weight = value }
             }
         }
     }
@@ -179,11 +187,27 @@ final class WorkoutViewModel {
         deleteSet(exercise: e, set: last)
     }
 
-    /// Deletes one set: any warm-up set, or a work set when another remains.
+    /// Deletes one set: any warm-up set, or a work set when another remains. Deleting the last open
+    /// set completes the lift the same as ticking it would.
     func deleteSet(exercise e: Int, set s: Int) {
         guard let lift = lift(e), Self.canDelete(set: s, of: lift) else { return }
         mutate { $0.exercises[e].sets.remove(at: s) }
-        if effortPrompt == e, let after = self.lift(e), !Self.isComplete(after) { effortPrompt = nil }
+        guard let after = self.lift(e) else { return }
+        if !Self.isComplete(lift), Self.isComplete(after) {
+            didComplete(e)
+        } else if effortPrompt == e, !Self.isComplete(after) {
+            effortPrompt = nil
+        }
+    }
+
+    /// Adds a set to every lift in `group` (a superset's round).
+    func addRound(_ group: ClosedRange<Int>) {
+        for e in group { addSet(exercise: e) }
+    }
+
+    /// Removes the last work set from every lift in `group` that has more than one.
+    func removeRound(_ group: ClosedRange<Int>) {
+        for e in group { removeSet(exercise: e) }
     }
 
     static func canDelete(set s: Int, of lift: BodyExercise) -> Bool {
@@ -206,9 +230,14 @@ final class WorkoutViewModel {
         advance(from: e)
     }
 
+    /// Opens the next lift: an unfinished partner in the same superset first, then the next unfinished
+    /// lift after it, wrapping to the start.
     private func advance(from e: Int) {
         guard let exercises = session?.exercises else { return }
-        current = Self.firstUnfinished(in: exercises, after: e) ?? Self.firstUnfinished(in: exercises, after: -1) ?? e
+        let group = Self.group(of: e, in: exercises)
+        current = group.first { !Self.isComplete(exercises[$0]) }
+            ?? Self.firstUnfinished(in: exercises, after: group.upperBound)
+            ?? Self.firstUnfinished(in: exercises, after: -1) ?? e
     }
 
     // MARK: Offers
@@ -426,9 +455,43 @@ final class WorkoutViewModel {
         return !work.isEmpty && work.allSatisfy(\.done)
     }
 
+    /// The lifts done together with `e`: its run of superset lifts, or just `e`.
+    static func group(of e: Int, in exercises: [BodyExercise]) -> ClosedRange<Int> {
+        guard exercises.indices.contains(e), exercises[e].section == .superset else { return e...e }
+        var lo = e, hi = e
+        while lo > 0, exercises[lo - 1].section == .superset { lo -= 1 }
+        while hi < exercises.count - 1, exercises[hi + 1].section == .superset { hi += 1 }
+        return lo...hi
+    }
+
+    /// A superset's set rows, round by round: each lift's warm-up sets first, then work set 1 of each
+    /// lift, then set 2, so the lifts log back to back.
+    static func pairedRows(_ exercises: [BodyExercise], group: ClosedRange<Int>) -> [WorkoutSetRef] {
+        var warm: [WorkoutSetRef] = []
+        var rounds: [[WorkoutSetRef]] = []
+        for e in group {
+            var round = 0
+            for (s, set) in exercises[e].sets.enumerated() {
+                let ref = WorkoutSetRef(exercise: e, set: s, id: set.uid)
+                if set.kind == .warm { warm.append(ref); continue }
+                if rounds.count <= round { rounds.append([]) }
+                rounds[round].append(ref)
+                round += 1
+            }
+        }
+        return warm + rounds.flatMap { $0 }
+    }
+
     private static func firstUnfinished(in exercises: [BodyExercise], after e: Int) -> Int? {
         exercises.indices.first { $0 > e && !isComplete(exercises[$0]) }
     }
+}
+
+/// One set row in a superset card: where the set lives, identified by the set's `uid`.
+struct WorkoutSetRef: Identifiable, Equatable {
+    let exercise: Int
+    let set: Int
+    let id: UUID
 }
 
 private extension APIError {
