@@ -296,16 +296,65 @@ struct WorkoutCardHeader: View, Equatable {
     }
 }
 
+/// An open superset's top: the lifts' names, each one's target and last time, and the column labels.
+struct WorkoutPairHeader: View, Equatable {
+    let lifts: [BodyExercise]
+    private var columns = WorkoutColumns()
+
+    init(lifts: [BodyExercise]) { self.lifts = lifts }
+
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.lifts == rhs.lifts }
+
+    private var paper: HermexPaper { .training }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(verbatim: lifts.map(\.name).joined(separator: " + "))
+                    .font(AppFont.display(style: .title2, weight: .bold))
+                    .foregroundStyle(paper.glow)
+                    .accessibilityAddTraits(.isHeader)
+                ForEach(lifts) { lift in
+                    Text(verbatim: "\(lift.name): \(WorkoutCopy.targetLine(lift))")
+                        .font(AppFont.subheadline())
+                        .foregroundStyle(Color.hxTextPrimary)
+                }
+                Text(verbatim: "Alternate them: one set of each, then the next round.")
+                    .font(AppFont.footnote())
+                    .foregroundStyle(Color.hxTextSecondary)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: WorkoutLayout.columnSpacing) {
+                Text(verbatim: "Set").frame(width: columns.tag, alignment: .leading)
+                Text(verbatim: "Lift · last time").frame(maxWidth: .infinity, alignment: .leading)
+                Text(verbatim: lifts.lazy.map(WorkoutCopy.weightHeader).first { !$0.isEmpty } ?? "")
+                    .frame(width: columns.weight)
+                Text(verbatim: WorkoutCopy.countHeader(lifts.first.map(BodyMeasure.init) ?? .reps))
+                    .frame(width: columns.count)
+                Color.clear.frame(width: columns.check, height: 1)
+            }
+            .font(AppFont.caption2(weight: .bold))
+            .foregroundStyle(paper.glow)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .accessibilityHidden(true)
+        }
+        .padding(.bottom, 4)
+    }
+}
+
 /// One set: its tag, last time, the weight and count pills, and the 44 pt check. The row is
 /// identified by the set's `uid`, so deleting a set takes its row (and any open editor) with it.
+/// In a superset card `pairName` names the lift above its last time.
 struct WorkoutSetRow: View, Equatable {
     let lift: BodyExercise
     let exercise: Int
     let index: Int
     let viewModel: WorkoutViewModel
+    var pairName: String? = nil
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.exercise == rhs.exercise && lhs.index == rhs.index && lhs.row == rhs.row
+        lhs.exercise == rhs.exercise && lhs.index == rhs.index && lhs.row == rhs.row && lhs.pairName == rhs.pairName
             && lhs.tag == rhs.tag && lhs.lastTime == rhs.lastTime && lhs.lift.unit == rhs.lift.unit
             && lhs.lift.target == rhs.lift.target && lhs.startingWeight == rhs.startingWeight
     }
@@ -330,16 +379,28 @@ struct WorkoutSetRow: View, Equatable {
                     .font(AppFont.subheadline(weight: .bold))
                     .foregroundStyle(isWarm ? Color.hxTextSecondary : paper.glow)
                     .frame(width: columns.tag, alignment: .leading)
-                Text(verbatim: lastTime)
-                    .font(AppFont.subheadline())
-                    .monospacedDigit()
-                    .foregroundStyle(Color.hxTextSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 1) {
+                    if let pairName {
+                        Text(verbatim: pairName)
+                            .font(AppFont.subheadline(weight: .semibold))
+                            .foregroundStyle(Color.hxTextPrimary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                    // Under a lift's name, a lift with no history shows nothing rather than "—".
+                    if pairName == nil || lastTime != "—" {
+                        Text(verbatim: lastTime)
+                            .font(pairName == nil ? AppFont.subheadline() : AppFont.caption())
+                            .monospacedDigit()
+                            .foregroundStyle(Color.hxTextSecondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(Text(verbatim: "\(setName), last time \(lastTime)"))
+            .accessibilityLabel(Text(verbatim: [pairName, "\(setName), last time \(lastTime)"].compactMap { $0 }.joined(separator: ", ")))
             if WorkoutCopy.isWeighted(lift) { weightPill } else { weightLabel }
             countPill
             check

@@ -268,6 +268,60 @@ final class WorkoutViewModelTests: XCTestCase {
         XCTAssertNil(exercise(vm, curlUp).sets[0].reps)
     }
 
+    func testRemovingTheLastOpenSetAsksRepsLeft() async throws {
+        let (vm, _) = try await pushVM()
+        vm.open(exercise: incline)
+        for s in 2...4 { vm.toggle(exercise: incline, set: s) } // three of four work sets
+        XCTAssertNil(vm.effortPrompt)
+        vm.removeSet(exercise: incline)
+        XCTAssertEqual(vm.effortPrompt, incline, "dropping the set he skipped finishes the lift, so it asks")
+        vm.setRepsLeft(2)
+        XCTAssertEqual(exercise(vm, incline).repsLeft, 2)
+        XCTAssertEqual(vm.current, press)
+
+        // An accessory finished by a swipe-delete opens the next lift.
+        vm.open(exercise: dbBench)
+        vm.toggle(exercise: dbBench, set: 0)
+        vm.toggle(exercise: dbBench, set: 1)
+        vm.deleteSet(exercise: dbBench, set: 2)
+        XCTAssertNil(vm.effortPrompt)
+        XCTAssertEqual(vm.current, dips)
+    }
+
+    func testFixingAWeightAfterTickingCarriesToLaterSets() async throws {
+        let (vm, _) = try await pushVM()
+        tickAllWork(vm, incline)
+        vm.setWeight(140, exercise: incline, set: 5) // the last set alone was lighter
+        vm.setWeight(155, exercise: incline, set: 2) // then he fixes the first work set
+        let sets = exercise(vm, incline).sets
+        XCTAssertEqual(sets[2...4].map(\.weight), [155, 155, 155], "ticked sets with the old weight follow")
+        XCTAssertEqual(sets[5].weight, 140, "a set given its own weight keeps it")
+        XCTAssertEqual(sets[0].weight, 90, "warm-up sets keep theirs")
+    }
+
+    func testSupersetLogsBackToBack() async throws {
+        let (vm, _) = try await pushVM()
+        let exercises = session(vm)!.exercises
+        XCTAssertEqual(WorkoutViewModel.group(of: dips, in: exercises), dips...(dips + 1))
+        XCTAssertEqual(WorkoutViewModel.group(of: dips + 1, in: exercises), dips...(dips + 1))
+        XCTAssertEqual(WorkoutViewModel.group(of: press, in: exercises), press...press)
+        let rows = WorkoutViewModel.pairedRows(exercises, group: dips...(dips + 1))
+        XCTAssertEqual(rows.map(\.exercise), [dips, dips + 1, dips, dips + 1, dips, dips + 1])
+        XCTAssertEqual(rows.map(\.set), [0, 0, 1, 1, 2, 2])
+
+        // Finishing the second lift first opens its partner, not the lift after the superset.
+        vm.open(exercise: dips + 1)
+        tickAllWork(vm, dips + 1)
+        XCTAssertEqual(vm.current, dips)
+        tickAllWork(vm, dips)
+        XCTAssertEqual(vm.current, dips + 2)
+
+        vm.addRound(dips...(dips + 1))
+        XCTAssertEqual([dips, dips + 1].map { exercise(vm, $0).workSets.count }, [4, 4])
+        vm.removeRound(dips...(dips + 1))
+        XCTAssertEqual([dips, dips + 1].map { exercise(vm, $0).workSets.count }, [3, 3])
+    }
+
     func testRemoveNeverDropsBelowOneWorkSet() async throws {
         let (vm, _) = try await pushVM()
         for _ in 0..<5 { vm.removeSet(exercise: press) }
