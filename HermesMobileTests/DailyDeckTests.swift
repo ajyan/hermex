@@ -2735,14 +2735,6 @@ private final class FakeMandarinClient: MandarinPracticeClient, @unchecked Senda
         if recallFails { throw URLError(.notConnectedToInternet) }
         return try JSONDecoder().decode(MandarinRecallResponse.self, from: Data(#"{"ok":true,"progress":{"phrases":9}}"#.utf8))
     }
-
-    var checks: [MandarinVersionsRequest] = []
-    var versionsResult: Result<MandarinVersionsResponse, Error> = .success(MandarinVersionsResponse(versions: []))
-
-    func versions(_ request: MandarinVersionsRequest) async throws -> MandarinVersionsResponse {
-        checks.append(request)
-        return try versionsResult.get()
-    }
 }
 
 @MainActor
@@ -2819,125 +2811,63 @@ final class MandarinPracticeTests: XCTestCase {
         XCTAssertFalse(try self.card().mandarinTellsAStory, "cards before cues keep the plain question")
     }
 
-    private static let cuesJSON = """
-    {"date": "2026-10-31", "kind": "morning", "cards": [
-      {"id": "mandarin", "type": "prompt", "kind": "mandarin", "question": "你最近怎么样？",
-       "phrases": [{"hanzi": "然后", "en": "and then", "kind": "transition", "example": "我先吃饭，然后去跑步。",
-                    "example_pinyin": "Wǒ xiān chī fàn, rán hòu qù pǎo bù.", "example_en": "I eat, then go running."},
-                   {"hanzi": "有点累", "en": "a bit tired", "kind": "feeling", "example": "今天有点累。"},
-                   {"hanzi": "还不错", "en": "Not bad"}]}
-    ]}
-    """
-
-    private static var snakeDecoder: JSONDecoder {
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return decoder
+    func testTheWarmUpAsksTheCuesThenYesterdaysFixesThenTheRecallEachOnce() throws {
+        let items = MandarinWarmUp.items(for: try card())
+        XCTAssertEqual(items.map(\.hanzi), ["还不错", "早一点休息", "宝宝一月份出生。", "紧张"],
+                       "a cue without English can't be asked from it")
+        XCTAssertEqual(items.map(\.source), [.cue, .fix, .recall, .recall])
+        XCTAssertEqual(items[1].en, "rest earlier")
+        XCTAssertEqual(items[1].said, "休息早一点")
+        XCTAssertEqual(items.map(\.listNote), ["Today's phrase", "From yesterday", "From your phrasebook", "From your phrasebook"])
+        let twice = try self.card("""
+        {"date": "d", "kind": "morning", "cards": [{"id": "m", "type": "prompt", "kind": "mandarin", "question": "你好吗？",
+          "phrases": [{"hanzi": "其实", "en": "actually", "note": "Tells the real story."}],
+          "recall": [{"hanzi": "其实", "en": "actually"}]}]}
+        """)
+        XCTAssertEqual(MandarinWarmUp.items(for: twice).map(\.listNote), ["Tells the real story."], "a phrase is asked once")
     }
 
-    func testMakeItYoursComesBeforeTalkForCuesWithAnExample() async throws {
-        let client = FakeMandarinClient()
-        client.versionsResult = .success(try Self.snakeDecoder.decode(MandarinVersionsResponse.self, from: Data("""
-        {"versions": [{"said": "我先上班，然后去跑步。"},
-                      {"said": "我先跑步了五公里", "natural": "我先跑了五公里", "natural_pinyin": "Wǒ xiān pǎo le wǔ gōng lǐ",
-                       "why": "Distance goes after the verb."}, {"bad": 1}],
-         "used": false}
-        """.utf8)))
-        let practice = practice(try card(Self.cuesJSON), client: client)
-        XCTAssertEqual(practice.steps, [.yours, .talk])
-        XCTAssertEqual(practice.step, .yours)
-        XCTAssertEqual(practice.yoursCues.map(\.hanzi), ["然后", "有点累"], "a cue without an example has nothing to make yours")
-        let cue = try XCTUnwrap(practice.currentCue)
-        let checkedOK = await practice.checkVersions(of: cue, "  我先上班，然后去跑步。我先跑步了五公里  ")
-        XCTAssertTrue(checkedOK)
-        XCTAssertEqual(client.checks.first?.text, "我先上班，然后去跑步。我先跑步了五公里")
-        XCTAssertEqual(client.checks.first?.hanzi, "然后")
-        let checked = try XCTUnwrap(practice.record.versions["然后"])
-        XCTAssertEqual(checked.versions.map(\.natural), [nil, "我先跑了五公里"], "an unreadable version is dropped")
-        XCTAssertFalse(checked.used)
-        XCTAssertEqual(practice.currentCue, cue, "checking doesn't move on; Next does")
-        practice.nextCue()
-        XCTAssertEqual(practice.currentCue?.hanzi, "有点累")
-        practice.nextCue()
-        XCTAssertTrue(practice.isDone(.yours))
-        XCTAssertEqual(practice.step, .talk)
-        let resumed = self.practice(try card(Self.cuesJSON), client: client)
-        XCTAssertEqual(resumed.record.versions["然后"], checked, "the checked versions come back with the day")
-        XCTAssertEqual(resumed.step, .talk)
-    }
-
-    func testEachCheckAddsUpAndTwoCleanVersionsMakeTheCueYours() async throws {
-        let client = FakeMandarinClient()
-        let practice = practice(try card(Self.cuesJSON), client: client)
-        let cue = try XCTUnwrap(practice.currentCue)
-        client.versionsResult = .success(MandarinVersionsResponse(versions: [.init(said: "我先上班，然后去跑步。")], used: true))
-        _ = await practice.checkVersions(of: cue, "我先上班，然后去跑步。")
-        XCTAssertEqual(practice.record.versions["然后"]?.isClean, false, "one version isn't two")
-        client.versionsResult = .success(MandarinVersionsResponse(versions: [.init(said: "我先做饭，然后看书。")], used: true))
-        _ = await practice.checkVersions(of: cue, "我先做饭，然后看书。")
-        let checked = try XCTUnwrap(practice.record.versions["然后"])
-        XCTAssertEqual(checked.versions.map(\.said), ["我先上班，然后去跑步。", "我先做饭，然后看书。"], "one more adds to the first")
-        XCTAssertTrue(checked.isClean)
-        XCTAssertFalse(MandarinVersionsResponse(versions: [.init(said: "a"), .init(said: "b")], used: false).isClean,
-                       "versions without the cue don't make it his")
-        XCTAssertFalse(MandarinVersionsResponse(versions: [.init(said: "a"), .init(said: "b", natural: "c")]).isClean,
-                       "a version that needs a fix stays on screen")
-    }
-
-    func testAnEmptyOrFailedCheckKeepsNothingAndSaysTryAgain() async throws {
-        let client = FakeMandarinClient()
-        let practice = practice(try card(Self.cuesJSON), client: client)
-        let cue = try XCTUnwrap(practice.currentCue)
-        let empty = await practice.checkVersions(of: cue, "然后我去跑步")
-        XCTAssertFalse(empty)
-        XCTAssertNil(practice.record.versions["然后"])
-        XCTAssertNotNil(practice.versionsError)
-        client.versionsResult = .failure(URLError(.notConnectedToInternet))
-        let failed = await practice.checkVersions(of: cue, "然后我去跑步")
-        let blank = await practice.checkVersions(of: cue, "   ")
-        XCTAssertFalse(failed || blank)
-        XCTAssertEqual(client.checks.count, 2, "nothing said, nothing sent")
-        XCTAssertEqual(practice.currentCue, cue)
-    }
-
-    func testStepsStartAtTheFixAndMoveOnAsEachIsDone() async throws {
+    func testTheCardOpensOnTheWarmUpListAndMovesToTheAnswerWhenEveryPhraseIsAnswered() async throws {
         let client = FakeMandarinClient()
         let practice = practice(try card(), client: client)
-        XCTAssertEqual(practice.steps, [.fix, .recall, .talk])
-        XCTAssertEqual(practice.step, .fix)
-        XCTAssertEqual(practice.currentFix?.said, "休息早一点")
-        practice.nextFix()
-        XCTAssertEqual(practice.step, .recall)
-        await practice.recall(try XCTUnwrap(practice.currentRecall), got: true)
-        XCTAssertEqual(practice.currentRecall?.hanzi, "紧张")
+        XCTAssertEqual(practice.steps, [.warmUp, .answer, .again])
+        XCTAssertEqual(practice.step, .warmUp)
+        XCTAssertNil(practice.currentWarmUp, "the list shows until he starts")
+        practice.startWarmUp()
+        XCTAssertEqual(practice.currentWarmUp?.hanzi, "还不错")
+        await practice.warm(try XCTUnwrap(practice.currentWarmUp), got: true)
+        await practice.warm(try XCTUnwrap(practice.currentWarmUp), got: false)
+        XCTAssertTrue(client.recalls.isEmpty, "a cue and a fix stay on the phone")
+        await practice.warm(try XCTUnwrap(practice.currentWarmUp), got: true)
         XCTAssertEqual(practice.progress?.phrases, 9, "a recall brings the server's progress back")
-        await practice.recall(try XCTUnwrap(practice.currentRecall), got: false)
-        XCTAssertEqual(practice.step, .talk)
+        XCTAssertEqual(practice.step, .warmUp)
+        await practice.warm(try XCTUnwrap(practice.currentWarmUp), got: false)
+        XCTAssertEqual(practice.step, .answer)
+        XCTAssertTrue(practice.isDone(.warmUp))
+        XCTAssertEqual(client.recalls.map(\.hanzi), ["宝宝一月份出生。", "紧张"])
         XCTAssertEqual(client.recalls.map(\.got), [true, false])
+        XCTAssertEqual(practice.record.warmed, ["还不错": true, "早一点休息": false])
         XCTAssertEqual(practice.record.recalled, ["宝宝一月份出生。": true, "紧张": false])
     }
 
-    func testARecallPhraseSentenceIsCheckedWithoutRecallingIt() async throws {
-        let client = FakeMandarinClient()
-        client.versionsResult = .success(MandarinVersionsResponse(versions: [.init(said: "我有点紧张。")]))
-        let practice = practice(try card(), client: client)
-        practice.nextFix()
-        let phrase = try XCTUnwrap(practice.currentRecall)
-        let checked = await practice.checkVersions(of: phrase, "我有点紧张。")
-        XCTAssertTrue(checked)
-        XCTAssertEqual(client.checks.map(\.hanzi), [phrase.hanzi])
-        XCTAssertEqual(practice.record.versions[phrase.hanzi]?.versions.map(\.said), ["我有点紧张。"])
-        XCTAssertEqual(practice.currentRecall, phrase, "the sentence is practice; Got it or Again moves on")
-        XCTAssertTrue(client.recalls.isEmpty)
+    func testSaidCountsThePhraseWhateverTheDictationAddedAroundIt() {
+        XCTAssertTrue(MandarinWarmUp.said("其实 我觉得", "其实"))
+        XCTAssertTrue(MandarinWarmUp.said("你身体好吗", "你身体好吗？"))
+        XCTAssertFalse(MandarinWarmUp.said("我觉得", "其实"))
+        XCTAssertFalse(MandarinWarmUp.said("好", "？"))
     }
 
     func testAFailedRecallStaysOnThePhrase() async throws {
         let client = FakeMandarinClient()
         client.recallFails = true
         let practice = practice(try card(), client: client)
-        let phrase = try XCTUnwrap(practice.currentRecall)
-        await practice.recall(phrase, got: true)
-        XCTAssertEqual(practice.currentRecall, phrase, "nothing counts until the server has it")
+        practice.startWarmUp()
+        await practice.warm(try XCTUnwrap(practice.currentWarmUp), got: true)
+        await practice.warm(try XCTUnwrap(practice.currentWarmUp), got: true)
+        let phrase = try XCTUnwrap(practice.currentWarmUp)
+        XCTAssertEqual(phrase.source, .recall)
+        await practice.warm(phrase, got: true)
+        XCTAssertEqual(practice.currentWarmUp, phrase, "nothing counts until the server has it")
         XCTAssertNotNil(practice.recallError)
     }
 
@@ -2952,7 +2882,8 @@ final class MandarinPracticeTests: XCTestCase {
         XCTAssertEqual(practice.result, feedback)
         XCTAssertEqual(practice.answering, .idle)
         XCTAssertEqual(practice.progress?.phrases, 38)
-        XCTAssertTrue(practice.isDone(.talk))
+        XCTAssertTrue(practice.isDone(.answer))
+        XCTAssertEqual(practice.step, .again, "the feedback opens Tell it again")
         await practice.submit("我最近面试了三家公司，有一点anxious，可是还不错", question: nil)
         XCTAssertEqual(client.answers.count, 1, "the same answer isn't sent twice")
         await practice.submit("我最近面试了三家公司。", question: "你好吗？")
@@ -2970,6 +2901,7 @@ final class MandarinPracticeTests: XCTestCase {
         await practice.retry()
         XCTAssertEqual(practice.answering, .idle)
         XCTAssertNil(practice.result?.feedback, "no feedback yet: tomorrow's card brings it")
+        XCTAssertEqual(practice.step, .warmUp, "an answer without feedback doesn't move the card")
         await practice.retry()
         XCTAssertEqual(client.answers.count, 3, "an answer without feedback can be sent again")
     }
@@ -3030,20 +2962,30 @@ final class MandarinPracticeTests: XCTestCase {
     func testThePracticeResumesForTheSameServerAndDayOnly() async throws {
         let card = try card()
         let first = practice(card, client: FakeMandarinClient())
-        first.nextFix()
-        await first.recall(try XCTUnwrap(first.currentRecall), got: true)
+        first.startWarmUp()
+        for _ in 0..<3 { await first.warm(try XCTUnwrap(first.currentWarmUp), got: true) }
         let again = practice(card, client: FakeMandarinClient())
-        XCTAssertEqual(again.step, .recall)
-        XCTAssertEqual(again.currentRecall?.hanzi, "紧张")
+        XCTAssertEqual(again.step, .warmUp)
+        XCTAssertEqual(again.currentWarmUp?.hanzi, "紧张")
         let other = MandarinPractice(card: card, date: "2026-10-25", server: URL(string: "https://other.example")!,
                                      client: nil, store: MandarinPracticeStore(defaults: defaults))
-        XCTAssertEqual(other.step, .fix, "another server starts fresh")
+        XCTAssertEqual(other.step, .warmUp, "another server starts fresh")
+        XCTAssertNil(other.currentWarmUp)
     }
 
-    func testACardWithoutYesterdayOrRecallStartsAtTalk() throws {
+    func testACardWithNothingToWarmUpOnStartsAtTheAnswer() throws {
         let card = try card(#"{"date":"d","kind":"morning","cards":[{"id":"m","type":"prompt","kind":"mandarin","question":"你好吗？"}]}"#)
         let practice = practice(card, client: nil)
-        XCTAssertEqual(practice.steps, [.talk])
-        XCTAssertEqual(practice.step, .talk)
+        XCTAssertEqual(practice.steps, [.answer, .again])
+        XCTAssertEqual(practice.step, .answer)
+    }
+
+    func testTheSceneNamesTheCardInTheOpenersList() throws {
+        let card = try card(#"{"date":"d","kind":"morning","cards":[{"id":"m","type":"prompt","kind":"mandarin","title":"His mother is talking to him about the move.","scene":"Mom asks about the move","question":"你好吗？"}]}"#)
+        XCTAssertEqual(card.scene, "Mom asks about the move")
+        XCTAssertEqual(DeckAheadRow.title(.card(card)), "Mom asks about the move")
+        let older = try self.card(#"{"date":"d","kind":"morning","cards":[{"id":"m","type":"prompt","kind":"mandarin","title":"Mom calls","scene":"","question":"你好吗？"}]}"#)
+        XCTAssertNil(older.scene)
+        XCTAssertEqual(DeckAheadRow.title(.card(older)), "Mom calls", "a card before scenes keeps its title")
     }
 }

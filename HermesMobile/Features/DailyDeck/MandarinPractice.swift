@@ -5,7 +5,6 @@ import Observation
 protocol MandarinPracticeClient: Sendable {
     func answer(_ request: MandarinAnswerRequest) async throws -> MandarinAnswerResponse
     func recall(_ request: MandarinRecallRequest) async throws -> MandarinRecallResponse
-    func versions(_ request: MandarinVersionsRequest) async throws -> MandarinVersionsResponse
 }
 
 struct APIClientMandarinAdapter: MandarinPracticeClient {
@@ -18,21 +17,15 @@ struct APIClientMandarinAdapter: MandarinPracticeClient {
     func recall(_ request: MandarinRecallRequest) async throws -> MandarinRecallResponse {
         try await apiClient.recallMandarin(request)
     }
-
-    func versions(_ request: MandarinVersionsRequest) async throws -> MandarinVersionsResponse {
-        try await apiClient.checkMandarinVersions(request)
-    }
 }
 
-/// What he has done on a day's Mandarin card: fixes stepped through, phrases recalled (Got it is
-/// true), cues made his own (and their checked versions), the answer the feedback is for, and his second
-/// telling with its own. Kept per server and day, so the card resumes.
+/// What he has done on a day's Mandarin card: whether the warm-up started, each warm-up phrase he
+/// answered (Got it is true; a recall phrase's answer is in `recalled`, which the server has too), the
+/// answer the feedback is for, and his second telling with its own. Kept per server and day, so the card resumes.
 struct MandarinPracticeRecord: Codable, Equatable {
-    var fixesSeen = 0
+    var warmStarted = false
+    var warmed: [String: Bool] = [:]
     var recalled: [String: Bool] = [:]
-    /// Make it yours, by cue: the checked versions, and the cues he has moved past.
-    var versions: [String: MandarinVersionsResponse] = [:]
-    var madeYours: Set<String> = []
     var answeredText: String?
     var result: MandarinAnswerResponse?
     var againText: String?
@@ -42,14 +35,65 @@ struct MandarinPracticeRecord: Codable, Equatable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        fixesSeen = (try? c.decodeIfPresent(Int.self, forKey: .fixesSeen)) ?? 0
+        warmStarted = (try? c.decodeIfPresent(Bool.self, forKey: .warmStarted)) ?? false
+        warmed = (try? c.decodeIfPresent([String: Bool].self, forKey: .warmed)) ?? [:]
         recalled = (try? c.decodeIfPresent([String: Bool].self, forKey: .recalled)) ?? [:]
-        versions = (try? c.decodeIfPresent([String: MandarinVersionsResponse].self, forKey: .versions)) ?? [:]
-        madeYours = (try? c.decodeIfPresent(Set<String>.self, forKey: .madeYours)) ?? []
         answeredText = try? c.decodeIfPresent(String.self, forKey: .answeredText)
         result = try? c.decodeIfPresent(MandarinAnswerResponse.self, forKey: .result)
         againText = try? c.decodeIfPresent(String.self, forKey: .againText)
         againResult = try? c.decodeIfPresent(MandarinAnswerResponse.self, forKey: .againResult)
+    }
+}
+
+/// One phrase to warm up on before answering: today's cue (with its example), a fix from yesterday's
+/// feedback, or a due phrasebook phrase that fits the question. Each is asked from its English.
+struct MandarinWarmUp: Identifiable, Equatable {
+    enum Source: Equatable { case cue, fix, recall }
+
+    let source: Source
+    let en: String
+    let hanzi: String
+    let pinyin: String?
+    /// A line under it in the list and the card: the cue's note, the fix's why.
+    let note: String?
+    let example: String?
+    let examplePinyin: String?
+    let exampleEn: String?
+    /// For a fix: what he said yesterday.
+    let said: String?
+    /// For a recall phrase: the phrasebook row Got it or Again moves.
+    let phrase: DeckPhrase?
+
+    var id: String { hanzi }
+
+    /// The list's second line: what the phrase is for, or where it comes from.
+    var listNote: String {
+        switch source {
+        case .cue: note ?? phrase?.kindLabel ?? "Today's phrase"
+        case .fix: "From yesterday"
+        case .recall: "From your phrasebook"
+        }
+    }
+
+    /// Today's cues, then yesterday's fixes, then the recall phrases, each phrase once.
+    static func items(for card: DeckCard) -> [MandarinWarmUp] {
+        let cues = card.phrases.compactMap { p -> MandarinWarmUp? in
+            guard let en = p.en else { return nil }
+            return MandarinWarmUp(source: .cue, en: en, hanzi: p.hanzi, pinyin: p.pinyin, note: p.note,
+                                  example: p.example, examplePinyin: p.examplePinyin, exampleEn: p.exampleEn,
+                                  said: nil, phrase: p)
+        }
+        let fixes = (card.yesterday?.fixes ?? []).map { f in
+            MandarinWarmUp(source: .fix, en: f.en ?? f.said, hanzi: f.natural, pinyin: f.naturalPinyin, note: f.why,
+                           example: nil, examplePinyin: nil, exampleEn: nil, said: f.said, phrase: nil)
+        }
+        let recall = card.recall.compactMap { p -> MandarinWarmUp? in
+            guard let en = p.en else { return nil }
+            return MandarinWarmUp(source: .recall, en: en, hanzi: p.hanzi, pinyin: p.pinyin, note: nil,
+                                  example: nil, examplePinyin: nil, exampleEn: nil, said: nil, phrase: p)
+        }
+        var seen = Set<String>()
+        return (cues + fixes + recall).filter { seen.insert($0.hanzi).inserted }
     }
 }
 
@@ -73,14 +117,14 @@ struct MandarinPracticeStore {
     }
 }
 
-/// One day's Mandarin card: fix yesterday's slips, recall due phrases (Got it / Again), make each cue
-/// yours (say its example, then two versions about his week, checked), talk (answer the question,
-/// cues on hand), the takeaways that come back seconds after answering, and telling it again without them.
-/// Recalls and answers count only once the server has them; a failure leaves the step where it was.
+/// One day's Mandarin card as one conversation: the family member's question first, a warm-up on the
+/// phrases for that answer (say each from its English, see it, Got it or Again), the answer (checked once
+/// he has seen what the dictation heard), and the feedback with telling it again. Recalls and answers count
+/// only once the server has them; a failure leaves the card where it was.
 @MainActor
 @Observable
 final class MandarinPractice {
-    enum Step: String, CaseIterable { case fix, recall, yours, talk }
+    enum Step: String, CaseIterable { case warmUp, answer, again }
 
     enum Answering: Equatable {
         case idle
@@ -90,14 +134,12 @@ final class MandarinPractice {
 
     let card: DeckCard
     let date: String
+    let warmUp: [MandarinWarmUp]
     var step: Step
     private(set) var record: MandarinPracticeRecord
     private(set) var answering: Answering = .idle
     private(set) var isSavingRecall = false
     private(set) var recallError: String?
-    /// The cue whose versions are being checked, and the last check's error.
-    private(set) var checkingCue: String?
-    private(set) var versionsError: String?
     /// The latest progress the server reported: after an answer or a recall, else the deck's.
     private(set) var progress: DeckMandarinProgress?
 
@@ -113,34 +155,28 @@ final class MandarinPractice {
         self.server = server
         self.client = client
         self.store = store
+        warmUp = MandarinWarmUp.items(for: card)
         let record = store.record(for: server, date: date) ?? MandarinPracticeRecord()
         self.record = record
         progress = record.result?.progress ?? card.progress
-        step = .talk
+        step = .answer
         step = firstOpenStep
     }
 
-    /// The steps this card has: a fix only after an answer with feedback, a recall only with phrases due.
-    var steps: [Step] {
-        Step.allCases.filter { step in
-            switch step {
-            case .fix: card.yesterday != nil
-            case .recall: !card.recall.isEmpty
-            case .yours: !yoursCues.isEmpty
-            case .talk: true
-            }
-        }
+    /// The steps this card has: a warm-up only with phrases to warm up on.
+    var steps: [Step] { Step.allCases.filter { $0 != .warmUp || !warmUp.isEmpty } }
+
+    /// The warm-up phrase on screen: the first he hasn't answered. Nil before the warm-up starts
+    /// (the card shows the list) and once every phrase is answered.
+    var currentWarmUp: MandarinWarmUp? {
+        guard record.warmStarted else { return nil }
+        return warmUp.first { answer(for: $0) == nil }
     }
 
-    var fixes: [DeckMandarinFeedback.Fix] { card.yesterday?.fixes ?? [] }
-
-    /// The fix on screen; nil once they've all been seen (or yesterday had none).
-    var currentFix: DeckMandarinFeedback.Fix? {
-        fixes.indices.contains(record.fixesSeen) ? fixes[record.fixesSeen] : nil
+    /// Got it (true) or Again (false), once answered.
+    func answer(for item: MandarinWarmUp) -> Bool? {
+        item.source == .recall ? record.recalled[item.hanzi] : record.warmed[item.hanzi]
     }
-
-    /// The phrase to recall now: the first one not answered yet.
-    var currentRecall: DeckPhrase? { card.recall.first { record.recalled[$0.hanzi] == nil } }
 
     var result: MandarinAnswerResponse? { record.result }
     var againText: String? { record.againText }
@@ -152,86 +188,46 @@ final class MandarinPractice {
         return (record.result?.used ?? []) + again.filter { !(record.result?.used ?? []).contains($0) }
     }
 
-    /// The cues with an example sentence to make his own.
-    var yoursCues: [DeckPhrase] { card.phrases.filter { $0.example != nil } }
-
-    /// The cue to make his own now: the first he hasn't moved past.
-    var currentCue: DeckPhrase? { yoursCues.first { !record.madeYours.contains($0.hanzi) } }
-
     func isDone(_ step: Step) -> Bool {
         switch step {
-        case .fix: record.fixesSeen >= max(fixes.count, 1)
-        case .recall: currentRecall == nil
-        case .yours: currentCue == nil
-        case .talk: record.result != nil
+        case .warmUp: warmUp.allSatisfy { answer(for: $0) != nil }
+        case .answer: record.result?.feedback != nil
+        case .again: record.againText != nil
         }
     }
 
-    /// Moves past the fix on screen (or yesterday's natural version when there were no fixes).
-    func nextFix() {
-        record.fixesSeen += 1
+    func startWarmUp() {
+        record.warmStarted = true
         save()
-        if isDone(.fix) { step = firstOpenStep }
+        if isDone(.warmUp) { step = .answer }
     }
 
-    func recall(_ phrase: DeckPhrase, got: Bool) async {
+    /// Got it or Again on a warm-up phrase. A recall phrase's answer goes to the server's phrasebook
+    /// first and stays on screen if it can't; a cue's or a fix's is kept on the phone.
+    func warm(_ item: MandarinWarmUp, got: Bool) async {
         guard !isSavingRecall else { return }
-        isSavingRecall = true
         recallError = nil
-        defer { isSavingRecall = false }
-        if let client {
-            do {
-                let response = try await client.recall(MandarinRecallRequest(date: date, hanzi: phrase.hanzi, got: got))
-                progress = response.progress ?? progress
-            } catch {
-                recallError = "Couldn't save that. Try again."
-                return
+        if item.source == .recall {
+            isSavingRecall = true
+            defer { isSavingRecall = false }
+            if let client {
+                do {
+                    let response = try await client.recall(MandarinRecallRequest(date: date, hanzi: item.hanzi, got: got))
+                    progress = response.progress ?? progress
+                } catch {
+                    recallError = "Couldn't save that. Try again."
+                    return
+                }
             }
+            record.recalled[item.hanzi] = got
+        } else {
+            record.warmed[item.hanzi] = got
         }
-        record.recalled[phrase.hanzi] = got
         save()
-        if isDone(.recall) { step = firstOpenStep }
+        if isDone(.warmUp) { step = .answer }
     }
 
-    /// Checks his sentences with a phrase (a cue's versions of its example, or a recall phrase used in a
-    /// sentence), added to the ones already checked so "one more"
-    /// builds toward two. An empty check (the model couldn't) is an error to retry, never kept. Returns whether
-    /// they were checked, so the caller keeps his words when not.
-    @discardableResult
-    func checkVersions(of cue: DeckPhrase, _ text: String) async -> Bool {
-        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let client, !text.isEmpty, checkingCue == nil else { return false }
-        checkingCue = cue.hanzi
-        versionsError = nil
-        defer { checkingCue = nil }
-        do {
-            let response = try await client.versions(MandarinVersionsRequest(date: date, hanzi: cue.hanzi, text: text))
-            guard !response.versions.isEmpty else {
-                versionsError = "Couldn't check them. Try again."
-                return false
-            }
-            let earlier = record.versions[cue.hanzi]
-            record.versions[cue.hanzi] = MandarinVersionsResponse(versions: (earlier?.versions ?? []) + response.versions,
-                                                                 used: earlier?.used == true || response.used)
-            save()
-            return true
-        } catch {
-            versionsError = "Couldn't reach the server. Try again."
-            return false
-        }
-    }
-
-    /// Moves past the cue on screen, checked or skipped.
-    func nextCue() {
-        guard let cue = currentCue else { return }
-        record.madeYours.insert(cue.hanzi)
-        versionsError = nil
-        save()
-        if isDone(.yours) { step = firstOpenStep }
-    }
-
-    /// Sends the answer for feedback unless this exact text already has it. Called when the
-    /// answer sheet closes.
+    /// Sends the answer for feedback unless this exact text already has it; the feedback moves the card on.
     func submit(_ text: String, question: String?) async {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let client, !text.isEmpty, answering != .waiting else { return }
@@ -247,6 +243,7 @@ final class MandarinPractice {
             progress = response.progress ?? progress
             save()
             answering = .idle
+            if response.feedback != nil { step = .again }
         } catch {
             answering = .failed("Couldn't reach the server. Try again.")
         }
@@ -284,12 +281,11 @@ final class MandarinPractice {
         await submit(text, question: lastAttempt?.question)
     }
 
-    private var firstOpenStep: Step { steps.first { !isDone($0) } ?? .talk }
+    /// Where the card opens: the warm-up until it's done, then the answer until it has feedback.
+    private var firstOpenStep: Step {
+        if steps.contains(.warmUp), !isDone(.warmUp) { return .warmUp }
+        return isDone(.answer) ? .again : .answer
+    }
 
     private func save() { store.setRecord(record, for: server, date: date) }
-}
-
-extension MandarinVersionsResponse {
-    /// Two or more versions that use the cue and need no fix: the cue is his, so the card moves on.
-    var isClean: Bool { used && versions.count >= 2 && versions.allSatisfy { $0.natural == nil } }
 }

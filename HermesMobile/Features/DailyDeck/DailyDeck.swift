@@ -304,6 +304,8 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         /// A Mandarin card's question (in `question`, as characters) in pinyin and in English.
         let questionPinyin: String?
         let questionEn: String?
+        /// A Mandarin card's question in a few words, said to him: "Mom asks about the move".
+        let scene: String?
         /// A weekly review's What changed card: the fixes whose status moved this week, newest first.
         let rows: [DeckChangeRow]
         /// The headline's style rules learned or dropped since the last deck (`tools/style_learn.py`).
@@ -401,7 +403,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         private enum CodingKeys: String, CodingKey {
             case id, type, title, body, source, lines, question, context, contextFrom, voice, why, draft, actions, fallback
             case reason, altQuestions, entries, recap, scale, sleep, tags, points, meters, color, goals, ref
-            case phrases, recall, yesterday, pattern, progress, questionPinyin, questionEn, rows, week
+            case phrases, recall, yesterday, pattern, progress, questionPinyin, questionEn, scene, rows, week
             case chapter, weekNumber, range, noteFromPast, headline, bullets, proposals, weekStart
             case piece, learned, variant, date, options, returns, front, fronts, frontReason, weekRows, yesterdayOne
             case todayAction = "today"
@@ -470,6 +472,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             progress = try? c.decodeIfPresent(DeckMandarinProgress.self, forKey: .progress)
             questionPinyin = try? c.decodeIfPresent(String.self, forKey: .questionPinyin)
             questionEn = try? c.decodeIfPresent(String.self, forKey: .questionEn)
+            scene = (try? c.decodeIfPresent(String.self, forKey: .scene)).flatMap { $0.isEmpty ? nil : $0 }
             rows = ((try? c.decodeIfPresent([Lossy<DeckChangeRow>].self, forKey: .rows)) ?? []).compactMap(\.value)
             learned = ((try? c.decodeIfPresent([Lossy<DeckLearned>].self, forKey: .learned)) ?? []).compactMap(\.value)
             variant = try? c.decodeIfPresent(DeckVariant.self, forKey: .variant)
