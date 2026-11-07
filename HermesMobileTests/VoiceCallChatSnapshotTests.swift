@@ -54,6 +54,18 @@ final class VoiceCallChatSnapshotTests: XCTestCase {
         XCTAssertEqual(activity("terminal")?.contains("terminal"), false)
     }
 
+    func testOnlyANamedLookupHasASpokenLine() {
+        func line(_ name: String, _ args: [String: JSONValue]? = nil) -> String? {
+            make([message("user", "[voice] hi", "u1")], tools: [ToolCall(name: name, preview: nil, args: args)])
+                .toolActivity?.spokenLine
+        }
+        XCTAssertEqual(line("terminal", ["command": .string("brain crm show jane-doe")]), "Looking up Jane Doe.")
+        XCTAssertEqual(line("terminal", ["command": .string("brain deep 'the taper'")]), "Checking your notes.")
+        XCTAssertEqual(line("web_search"), "Searching the web.")
+        XCTAssertNil(line("terminal", ["command": .string("ls -la")]))
+        XCTAssertNil(line("delegate_task"))
+    }
+
     func testRunningToolKeepsItsKindForTheChipColor() {
         let snapshot = make([], tools: [ToolCall(name: "web_search", preview: nil, args: nil)])
         XCTAssertEqual(snapshot.toolActivity?.kind, .web)

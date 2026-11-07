@@ -212,6 +212,10 @@ final class VoiceCallController {
     /// Seconds into thinking when the next hold-on line is due, and how many were said this turn.
     @ObservationIgnored private var nextHoldOnAt = VoiceCallTiming.holdOnDelay
     @ObservationIgnored private var holdOnLinesSaid = 0
+    /// The newest lookup this turn in spoken words ("Looking up Jane Doe."), and the last hold-on line said,
+    /// so a wait names what Atlas is doing and says each step once.
+    @ObservationIgnored private var toolLine: String?
+    @ObservationIgnored private var lastHoldOnLine: String?
     /// True once this turn's first reply text was timed; an approval pause doesn't add a second sample.
     @ObservationIgnored private var latencyRecorded = false
     @ObservationIgnored private var runSeenStreaming = false
@@ -485,8 +489,7 @@ final class VoiceCallController {
                 if waited >= nextHoldOnAt {
                     // A long silence on a call reads as a dropped line; say it's still coming.
                     setCue(false)
-                    say(holdOnLinesSaid == 0 ? VoiceCallPhrases.holdOn : VoiceCallPhrases.stillWorking)
-                    holdOnLinesSaid += 1
+                    sayHoldOn(holdOnLinesSaid == 0 ? VoiceCallPhrases.holdOn : VoiceCallPhrases.stillWorking)
                     nextHoldOnAt = waited + VoiceCallTiming.stillWorkingInterval
                 } else if waited >= VoiceCallTiming.thinkingCueDelay, holdOnLinesSaid == 0, !speaker.isSpeaking {
                     // One cue per turn; once a hold-on line has been said, the voice reassures instead.
@@ -931,6 +934,8 @@ final class VoiceCallController {
         runFinished = false
         runFinishedAt = nil
         holdOnLinesSaid = 0
+        toolLine = nil
+        lastHoldOnLine = nil
         sentAt = now()
         speechAfterSendAt = nil
     }
@@ -1008,9 +1013,11 @@ final class VoiceCallController {
         isStreaming: Bool,
         approval: ApprovalPromptState?,
         isReconnecting: Bool,
-        currentTool: String?
+        currentTool: String?,
+        toolLine: String? = nil
     ) {
         guard !isEnded, state != .idle, state != .connecting else { return }
+        if let toolLine { self.toolLine = toolLine }
         if self.currentTool != currentTool {
             if let currentTool {
                 log("tool: \(currentTool) \(since(sentAt))")
@@ -1083,9 +1090,16 @@ final class VoiceCallController {
         guard state == .thinking, replyActive, !replyStarted, !isHeld, holdOnLinesSaid == 0,
               pendingApproval == nil, let thinkingSince else { return }
         setCue(false)
-        say(VoiceCallPhrases.checking)
-        holdOnLinesSaid = 1
+        sayHoldOn(VoiceCallPhrases.checking)
         nextHoldOnAt = now() - thinkingSince + VoiceCallTiming.stillWorkingInterval
+    }
+
+    /// Says a hold-on line: what the newest lookup is doing if that hasn't been said yet, else `generic`.
+    private func sayHoldOn(_ generic: String) {
+        let line = toolLine.flatMap { $0 == lastHoldOnLine ? nil : $0 } ?? generic
+        say(line)
+        lastHoldOnLine = line
+        holdOnLinesSaid += 1
     }
 
     /// "after 1.23s" since `start`, for the log.
