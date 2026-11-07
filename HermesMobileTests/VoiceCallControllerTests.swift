@@ -233,11 +233,12 @@ final class VoiceCallControllerTests: XCTestCase {
         streaming: Bool = true,
         approval: ApprovalPromptState? = nil,
         reconnecting: Bool = false,
-        tool: String? = nil
+        tool: String? = nil,
+        toolLine: String? = nil
     ) {
         controller.chatDidUpdate(
             streamingText: text, isStreaming: streaming, approval: approval,
-            isReconnecting: reconnecting, currentTool: tool
+            isReconnecting: reconnecting, currentTool: tool, toolLine: toolLine
         )
     }
 
@@ -481,6 +482,27 @@ final class VoiceCallControllerTests: XCTestCase {
         clock += VoiceCallTiming.stillWorkingInterval
         controller.tick()
         XCTAssertEqual(speaker.spoken, [VoiceCallPhrases.checking, VoiceCallPhrases.stillWorking])
+    }
+
+    func testAWaitNamesEachLookupOnceThenSaysStillWorking() async {
+        await controller.start()
+        await say("when did I last see Jane")
+        clock += 2
+        update(tool: "terminal", toolLine: "Looking up Jane Doe.")
+        XCTAssertEqual(speaker.spoken, ["Looking up Jane Doe."])
+
+        // A second step is named on the next hold-on line, not the moment it starts.
+        update(tool: nil)
+        update(tool: "read_file", toolLine: "Checking your notes.")
+        XCTAssertEqual(speaker.spoken, ["Looking up Jane Doe."])
+        clock += VoiceCallTiming.stillWorkingInterval
+        controller.tick()
+        XCTAssertEqual(speaker.spoken, ["Looking up Jane Doe.", "Checking your notes."])
+
+        // Nothing new since: the generic line.
+        clock += VoiceCallTiming.stillWorkingInterval
+        controller.tick()
+        XCTAssertEqual(speaker.spoken, ["Looking up Jane Doe.", "Checking your notes.", VoiceCallPhrases.stillWorking])
     }
 
     func testReplyCutMidSentenceAtRunEndIsCompletedWhenTheFullTextLands() async {

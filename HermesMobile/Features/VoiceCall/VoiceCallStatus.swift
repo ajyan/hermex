@@ -9,6 +9,13 @@ struct VoiceCallToolActivity: Equatable {
     let label: String
     let symbol: String
 
+    /// The label as a hold-on line on a call, or nil for the generic "Working", which says nothing new.
+    var spokenLine: String? {
+        label == Self.workingLabel ? nil : label + "."
+    }
+
+    private static var workingLabel: String { String(localized: "Working") }
+
     static func of(_ call: ToolCall) -> VoiceCallToolActivity {
         let kind = ToolCallSummaryFormatter.kind(forToolNamed: call.name)
         let command = kind == .shell ? shellCommand(in: call.args) : nil
@@ -27,7 +34,7 @@ struct VoiceCallToolActivity: Equatable {
         case .memory:
             return VoiceCallToolActivity(kind: kind, label: String(localized: "Remembering"), symbol: "brain")
         case .shell, .skill, .delegate, .unknown:
-            return VoiceCallToolActivity(kind: kind, label: String(localized: "Working"), symbol: "gearshape")
+            return VoiceCallToolActivity(kind: kind, label: workingLabel, symbol: "gearshape")
         }
     }
 

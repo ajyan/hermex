@@ -245,7 +245,8 @@ struct VoiceCallView: View {
                     isStreaming: snapshot.isStreaming,
                     approval: snapshot.approval,
                     isReconnecting: snapshot.isReconnecting,
-                    currentTool: snapshot.currentTool
+                    currentTool: snapshot.currentTool,
+                    toolLine: snapshot.toolActivity?.spokenLine
                 )
             }
             .onChange(of: chat.liveToolCalls) { _, _ in absorbSources() }
