@@ -76,6 +76,8 @@ struct DeckCardView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Today's morning deck only: earlier cards to rate, offered on the closing card.
     @Environment(LabelQueueViewModel.self) private var labelQueue: LabelQueueViewModel?
+    /// The goal card's model, whose landed check-ins the close's tracker answers with a haptic.
+    @Environment(GoalsHomeViewModel.self) private var goalCheckIns: GoalsHomeViewModel?
     @State private var isWriting = false
     /// The sleep card's numbers, shown before rating when asked for.
     @State private var showsNumbers = false
@@ -945,32 +947,49 @@ struct DeckCardView: View {
         if showsKindLabel { jobClose } else { plainClose }
     }
 
-    /// A deck by job's close: what Atlas learned from his notes, each with Undo, then filing (2026-11-06: the week's
-    /// grid and today's one left the close; the rules left the opener).
+    /// A deck by job's close. With the week's rows it is the habit tracker: "This week" over the grid (the day
+    /// letters, a row per habit, counts as pips), then what Atlas learned from his notes, each with Undo, then
+    /// filing. This brings the week back to the close (it left on 2026-11-06). A close without rows keeps the
+    /// learned lines alone.
     @ViewBuilder
     private var jobClose: some View {
-        let day = DailyDeckPaths.date(day: viewModel.date)?.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
         let learned = viewModel.cards.first { $0.type == .headline }?.learned ?? []
-        DeckKindLabel(symbol: palette.symbol, text: day.map { "Close · \($0)" } ?? "Close", ink: palette.ink)
-        Text(verbatim: "What Atlas learned")
-            .font(AppFont.display(style: .title2, weight: .bold))
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.top, 14)
-            .accessibilityAddTraits(.isHeader)
+        if card.weekRows.isEmpty {
+            let day = DailyDeckPaths.date(day: viewModel.date)?.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+            DeckKindLabel(symbol: palette.symbol, text: day.map { "Close · \($0)" } ?? "Close", ink: palette.ink)
+            Text(verbatim: "What Atlas learned")
+                .font(AppFont.display(style: .title2, weight: .bold))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 14)
+                .accessibilityAddTraits(.isHeader)
+        } else {
+            Text(verbatim: "This week")
+                .font(AppFont.display(style: .title2, weight: .bold))
+                .foregroundStyle(Color.hxTextPrimary)
+                .accessibilityAddTraits(.isHeader)
+            DeckWeekGrid(rows: card.weekRows, deckDate: viewModel.date)
+                .padding(.top, 12)
+                .sensoryFeedback(.success, trigger: goalCheckIns?.landedCheckIns ?? 0)
+            Text(verbatim: "What Atlas learned")
+                .font(AppFont.display(style: .subheadline, weight: .semibold))
+                .foregroundStyle(Color.hxTextPrimary)
+                .padding(.top, 20)
+                .accessibilityAddTraits(.isHeader)
+        }
         VStack(alignment: .leading, spacing: 10) {
             if learned.isEmpty {
-                Text(verbatim: "Nothing new since yesterday.").font(AppFont.body())
+                Text(verbatim: "Nothing new since yesterday.").font(card.weekRows.isEmpty ? AppFont.body() : AppFont.footnote())
             }
             ForEach(learned) { rule in
                 learnedRow(rule, underHeading: true)
             }
         }
         .foregroundStyle(Color.hxTextPrimary)
-        .padding(.top, 12)
+        .padding(.top, card.weekRows.isEmpty ? 12 : 8)
         if learned.contains(where: \.offersUndo) {
             Text(verbatim: "Undo drops the rule from tomorrow's deck.")
                 .font(AppFont.footnote())
-                .foregroundStyle(palette.ink.opacity(0.75))
+                .foregroundStyle(palette.isNeutralCard ? Color.hxTextSecondary : palette.colors.secondaryInk)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
         }
@@ -1056,10 +1075,13 @@ struct DeckCardView: View {
     @ViewBuilder
     private func fileButton(seal: Bool) -> some View {
         let filed = viewModel.isFiled && !viewModel.hasChanges
+        // On a neutral card (a sealed week, the habit tracker) the one filled button is Nous blue.
+        let seal = seal || palette.isNeutralCard
+        let sealsWeek = viewModel.isSealedWeekly
         Button(action: file) {
             HStack {
                 if viewModel.filing == .filing { ProgressView().tint(seal ? Color.hxOnAccent : palette.onInk) }
-                Text(verbatim: seal ? (viewModel.isFiled ? "Seal your edits" : "Seal the week")
+                Text(verbatim: sealsWeek ? (viewModel.isFiled ? "Seal your edits" : "Seal the week")
                      : viewModel.isFiled ? "File Changes" : "File It")
             }
             .font(AppFont.body(weight: .semibold))

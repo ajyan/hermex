@@ -2622,6 +2622,51 @@ final class DeckMessageSMSTests: XCTestCase {
     }
 }
 
+/// The close card as the week's habit tracker.
+final class DeckHabitTrackerTests: XCTestCase {
+    private func close(_ rows: String) throws -> DeckCard {
+        try XCTUnwrap(DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[{"id":"close","type":"close","week_rows":\#(rows)}]}"#).cards.first)
+    }
+
+    func testEachHabitsDotsWearItsOwnPaper() throws {
+        let card = try close(#"""
+        [{"label":"Sleep by 11","kind":"days","front":"living-well"},{"label":"Lifted","kind":"days","front":"living-well"},
+         {"label":"Mandarin","kind":"days","front":"relationships"},{"label":"Letters to her","kind":"days","front":"fatherhood"},
+         {"label":"Prep practice","kind":"days","front":"ai","goal":"g","commitment":"prep"},
+         {"label":"Applications","kind":"pips","front":"ai","target":5,"done":2},
+         {"label":"Call a friend","kind":"days","front":"relationships"},{"label":"Read","kind":"days","paper":"book","front":"ai"},
+         {"label":"Unfiled","kind":"days"}]
+        """#)
+        XCTAssertEqual(card.weekRows.map(\.habitPaper),
+                       [.notes, .video, .mandarin, .advisor, .orchid, .orchid, BrainModuleID.people.paper, .book, .plain],
+                       "sleep, lifting, Mandarin, the letter and the job search each keep their kind's paper; the vault's name wins")
+        XCTAssertFalse(card.weekRows.contains { $0.habitPaper == .opener }, "amber means waiting on you, so no habit wears it")
+    }
+
+    func testTheTrackerIsANeutralCardAndACloseWithoutRowsIsUnchanged() throws {
+        let tracker = DeckPalette.of(try close(#"[{"label":"Lifted","kind":"days"}]"#))
+        XCTAssertTrue(tracker.isNeutralCard, "it sums up the week's habits, so it sits neutral among the glow cards")
+        XCTAssertEqual(tracker.name, "This week")
+        XCTAssertEqual(DeckPalette.of(try close("[]")), .quote)
+    }
+
+    func testOnlyTodaysAndYesterdaysDotsLog() {
+        XCTAssertEqual(DeckRowCheckIn.loggedDay("2026-11-10", today: "2026-11-10", yesterday: "2026-11-09"), .today)
+        XCTAssertEqual(DeckRowCheckIn.loggedDay("2026-11-09", today: "2026-11-10", yesterday: "2026-11-09"), .yesterday)
+        XCTAssertNil(DeckRowCheckIn.loggedDay("2026-11-08", today: "2026-11-10", yesterday: "2026-11-09"))
+        XCTAssertNil(DeckRowCheckIn.loggedDay("2026-11-11", today: "2026-11-10", yesterday: "2026-11-09"), "a day ahead can't be logged")
+    }
+
+    func testDayRowsComeBeforeCountsWhateverTheirOrderOnTheWire() throws {
+        let rows = try close(#"""
+        [{"label":"Outreach","kind":"pips","front":"ai","front_name":"AI"},{"label":"Prep","kind":"days","front":"ai","front_name":"AI"},
+         {"label":"Lifted","kind":"days","front":"living-well","front_name":"Body"}]
+        """#).weekRows
+        XCTAssertEqual(DeckWeekGridLayout.groups(rows, kind: .days).flatMap(\.rows).map(\.label), ["Prep", "Lifted"])
+        XCTAssertEqual(DeckWeekGridLayout.groups(rows, kind: .pips).flatMap(\.rows).map(\.label), ["Outreach"])
+    }
+}
+
 /// Every idea card reads in one layout (`DeckIdea`), whichever of the four shapes its deck wrote it in.
 final class DeckIdeaLayoutTests: XCTestCase {
     private func idea(_ json: String) throws -> DeckIdea {
