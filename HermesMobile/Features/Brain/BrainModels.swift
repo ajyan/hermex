@@ -787,6 +787,8 @@ enum BrainRoute: Hashable, Sendable {
     case searchAll(BrainModuleID, query: String)
     /// Today's review deck, full screen.
     case review
+    /// One page of the shelf for his writing: Letters, My takes or Memories.
+    case shelf(BrainShelfKind)
     /// A screen in the Prep module (the interview tutor).
     case prep(PrepRoute)
 }

@@ -112,6 +112,10 @@ _Avoid_: flashcard, snippet, excerpt
 The Brain's daily deck of Bites, opened from Today on the Brain home: ten cards you swipe through, then a summary with "Ten more" for another batch. Your position is kept per server and day.
 _Avoid_: quiz, rediscover, feed
 
+**Writing shelf**:
+The Brain's three read-only pages of his own words, under Your writing on the Brain home: **Letters** (to his daughter, oldest first, one book), **My takes** (his answers on idea cards, newest first, each under the idea it answered) and **Memories** (his answers to Looking back, oldest first). Each grows when he files an answer from the Daily Brief; nothing is edited here.
+_Avoid_: archive, journal, notes
+
 **Hub**:
 A wiki page where many other wiki pages meet (at least five link to or from it), found from the vault's links rather than curated. A Brain item's parent hub shows as its trail, and the reader's pager steps through the hub's pages. Front matter `up:` (or `parent:`) sets the parent by hand.
 _Avoid_: map of content, MOC, category

@@ -54,7 +54,7 @@ struct BrainAskSuggestion: Identifiable {
 }
 
 /// The Brain's front door: one field that finds pages and asks Atlas, suggested questions, a
-/// Today list (the review, due catch-ups) and every module to browse (DESIGN.md § Components).
+/// Today list (the review, due catch-ups), his writing's shelf and every module to browse (DESIGN.md § Components).
 /// Pushed onto the shell's navigation stack, so it must not own a `NavigationStack`;
 /// every Brain screen is pushed as `ShellPushDestination.brainRoute(_:)`.
 /// Copy is English-only (personal fork).
@@ -64,6 +64,8 @@ struct BrainHomeView: View {
     @State private var searchViewModel: BrainSearchViewModel
     /// Due catch-ups for Today.
     @State private var peopleHome: BrainPeopleHomeViewModel
+    /// The shelf for his writing; its section shows only once a page has answered.
+    @State private var shelf: BrainShelfHomeViewModel
     /// Prep's summary; its Browse row shows only once it loads.
     @State private var prepViewModel: PrepHomeViewModel
     /// Today's Daily Ask (the shell's): while it locks Prep, Prep's row says so.
@@ -82,6 +84,7 @@ struct BrainHomeView: View {
         _viewModel = State(initialValue: BrainHomeViewModel(client: client, cache: cache, onAPIError: onAPIError))
         _searchViewModel = State(initialValue: BrainSearchViewModel(client: client, onAPIError: onAPIError))
         _peopleHome = State(initialValue: BrainPeopleHomeViewModel(client: client, cache: cache))
+        _shelf = State(initialValue: BrainShelfHomeViewModel(client: client, cache: cache))
         _prepViewModel = State(initialValue: PrepHomeViewModel(
             client: APIClientPrepAdapter(apiClient: APIClient(baseURL: server)), onAPIError: onAPIError))
         self.ask = ask
@@ -105,6 +108,7 @@ struct BrainHomeView: View {
             }
             .task { await dailyAsk?.load() }
             .task { await peopleHome.load() }
+            .task { await shelf.refreshIfStale() }
             .onChange(of: scenePhase) { _, phase in
                 // Left open overnight, the review row moves on to the new day's ten.
                 if phase == .active, viewModel.needsNewDay { Task { await viewModel.load() } }
@@ -194,6 +198,9 @@ struct BrainHomeView: View {
                 if !viewModel.home.bites.isEmpty || !dueCatchUps.isEmpty {
                     today
                 }
+                if !shelf.rows.isEmpty {
+                    BrainShelfHomeSection(rows: shelf.rows)
+                }
                 if !viewModel.modules.isEmpty || isShowingPrep {
                     browse
                 }
@@ -210,9 +217,11 @@ struct BrainHomeView: View {
         .refreshable {
             async let prep: Void = prepViewModel.load()
             async let people: Void = peopleHome.load()
+            async let writing: Void = shelf.load()
             await viewModel.load()
             await prep
             await people
+            await writing
         }
     }
 
@@ -285,9 +294,10 @@ struct BrainHomeView: View {
         .accessibilityValue(Text(verbatim: BrainHomeLayout.reviewProgress(index: viewModel.reviewIndex, bites: bites) ?? "Not started"))
     }
 
-    /// Every module, then Interview prep.
+    /// Every module, then Interview prep. Letters is the shelf's book while "Your writing" shows.
     private var browse: some View {
-        let modules = BrainHomeLayout.ordered(viewModel.modules)
+        let modules = BrainShelfLayout.browseModules(BrainHomeLayout.ordered(viewModel.modules),
+                                                     showingShelf: !shelf.rows.isEmpty)
         return VStack(alignment: .leading, spacing: BrainStyle.s) {
             HXSectionHeader(title: "Browse")
                 .padding(.horizontal, 4)
@@ -330,7 +340,7 @@ struct BrainHomeView: View {
 }
 
 /// The Brain home's rows on one neutral card, with hairlines between them.
-private struct BrainHomeCard<Content: View>: View {
+struct BrainHomeCard<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
@@ -341,7 +351,7 @@ private struct BrainHomeCard<Content: View>: View {
 }
 
 /// The hairline between two rows on a `BrainHomeCard`.
-private struct BrainHomeDivider: View {
+struct BrainHomeDivider: View {
     var body: some View {
         Rectangle()
             .fill(Color.hxSeparator)
