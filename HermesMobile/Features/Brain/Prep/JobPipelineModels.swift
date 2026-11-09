@@ -14,8 +14,11 @@ struct JobPipeline: Decodable, Equatable, Sendable {
     let closed: [JobApplicationRow]
     let stages: [JobStage]
     let metrics: JobMetrics?
+    /// This week's applications and outreach: the vault's one count (`job_pipeline.week`), which the Ask, the
+    /// search card, the close card and Prep all show. Nil on a server that predates it.
+    let week: JobWeek?
 
-    private enum CodingKeys: String, CodingKey { case today, upcoming, applications, closed, stages, metrics }
+    private enum CodingKeys: String, CodingKey { case today, upcoming, applications, closed, stages, metrics, week }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -25,11 +28,50 @@ struct JobPipeline: Decodable, Equatable, Sendable {
         closed = Self.lossy(c, .closed)
         stages = Self.lossy(c, .stages)
         metrics = try? c.decodeIfPresent(JobMetrics.self, forKey: .metrics)
+        week = try? c.decodeIfPresent(JobWeek.self, forKey: .week)
     }
 
     private static func lossy<T: Decodable>(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> [T] {
         ((try? c.decodeIfPresent([PrepLossy<T>].self, forKey: key)) ?? nil)?.compactMap(\.value) ?? []
     }
+
+    /// This week's applications against the goal. A server without `week` still sends the same number as
+    /// `metrics.added_week`, with no target.
+    var applicationsWeek: JobCount? {
+        week?.applications ?? metrics.map { JobCount(done: $0.addedWeek, target: nil) }
+    }
+}
+
+/// The week's two counts, Monday to today.
+struct JobWeek: Decodable, Equatable, Sendable {
+    let start: String?
+    let applications: JobCount?
+    let outreach: JobCount?
+
+    private enum CodingKeys: String, CodingKey { case start, applications, outreach }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        start = try? c.decodeIfPresent(String.self, forKey: .start)
+        applications = try? c.decodeIfPresent(JobCount.self, forKey: .applications)
+        outreach = try? c.decodeIfPresent(JobCount.self, forKey: .outreach)
+    }
+}
+
+/// A count shown as pips: `done` of `target`. With no target every pip is filled.
+struct JobCount: Decodable, Equatable, Sendable {
+    let done: Int
+    let target: Int?
+
+    /// More pips than this read as a count beside them.
+    static let maxPips = 10
+
+    /// How many pips to draw.
+    var total: Int { max(target ?? done, done) }
+    var shown: Int { min(total, Self.maxPips) }
+    var overflows: Bool { total > Self.maxPips }
+    /// What VoiceOver reads after the label: "2 of 5", or "3" with no target.
+    var spoken: String { target == nil ? "\(done)" : "\(done) of \(total)" }
 }
 
 /// The stages an open application moves through, Applied to Offer.
@@ -80,10 +122,14 @@ struct JobApplicationRow: Decodable, Equatable, Identifiable, Sendable {
     /// Its place among the open stages (0 is Applied); nil once closed.
     let step: Int?
     let next: JobInterview?
+    /// What happens next, in plain words ("First round Thu", "Waiting to hear back"); nil once closed, and on
+    /// a server that predates it.
+    let nextStep: String?
 
     private enum CodingKeys: String, CodingKey {
         case id, company, role, via, stage, outcome, since, days, open, step, next
         case stageName = "stage_name"
+        case nextStep = "next_step"
     }
 
     /// The company, or the recruiter a lead came through.

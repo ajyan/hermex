@@ -146,6 +146,12 @@ struct DailyAskWeek: Decodable, Equatable, Sendable {
 struct DailyAskCount: Decodable, Equatable, Sendable {
     let done: Int?
     let target: Int?
+
+    /// The count as pips, the same shape the pipeline's week carries; nil when half of it is missing.
+    var count: JobCount? {
+        guard let done, let target else { return nil }
+        return JobCount(done: done, target: target)
+    }
 }
 
 /// The POST body. `asOf` is the server's today from the last load; the server answers 409 when its

@@ -54,6 +54,54 @@ final class JobPipelineModelTests: XCTestCase {
         XCTAssertEqual(p.stages.count, 5)
     }
 
+    /// 2026-11-09: applications read 2 of 5, 2 dots and 1 of 5 on one day. The vault now counts the week once
+    /// (`job_pipeline.week`) and sends it on both routes; the Ask, the search card and Prep must draw the same pips.
+    @MainActor
+    func testEverySurfaceDrawsTheSameWeek() throws {
+        let week: [String: Any] = ["start": "2026-11-02", "applications": ["done": 3, "target": 5],
+                                   "outreach": ["done": 2, "target": 5]]
+        var summary = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(Self.summaryJSON.utf8)) as? [String: Any])
+        summary["week"] = week
+        summary["metrics"] = ["added_week": 3, "booked": 2, "recent": 11, "replies": 4, "quiet": 0, "quiet_names": []]
+        let pipeline = try PrepDecoding.decode(JobPipeline.self, from: JSONSerialization.data(withJSONObject: summary))
+        let ask = try DailyAskModelTests.ask { $0["week"] = week }
+        let onTheAsk = try XCTUnwrap(DailyAskBody.weekCounts(ask))
+
+        let want = (applications: JobCount(done: 3, target: 5), outreach: JobCount(done: 2, target: 5))
+        XCTAssertEqual(pipeline.applicationsWeek, want.applications)   // the search card and Prep's header
+        XCTAssertEqual(pipeline.week?.outreach, want.outreach)
+        XCTAssertEqual(onTheAsk.applications, want.applications)       // the Ask
+        XCTAssertEqual(onTheAsk.outreach, want.outreach)
+        XCTAssertEqual(pipeline.metrics?.addedWeek, want.applications.done)
+        XCTAssertEqual(want.applications.spoken, "3 of 5")
+    }
+
+    func testAnOlderServerStillShowsTheWeeksApplications() throws {
+        let p = try PrepDecoding.decode(JobPipeline.self, from: Data(Self.summaryJSON.utf8))
+        XCTAssertNil(p.week)
+        XCTAssertEqual(p.applicationsWeek, JobCount(done: 2, target: nil))
+        XCTAssertNil(p.applications[0].nextStep)
+    }
+
+    func testCountPips() {
+        XCTAssertEqual(JobCount(done: 2, target: 5).total, 5)
+        XCTAssertEqual(JobCount(done: 7, target: 5).total, 7, "past the target every one still shows")
+        XCTAssertEqual(JobCount(done: 0, target: nil).shown, 0)
+        XCTAssertEqual(JobCount(done: 3, target: nil).spoken, "3")
+        let many = JobCount(done: 4, target: 14)
+        XCTAssertTrue(many.overflows)
+        XCTAssertEqual(many.shown, JobCount.maxPips)
+    }
+
+    func testNextStepDecodes() throws {
+        var summary = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(Self.summaryJSON.utf8)) as? [String: Any])
+        var rows = try XCTUnwrap(summary["applications"] as? [[String: Any]])
+        rows[0]["next_step"] = "Follow up or close it"
+        summary["applications"] = rows
+        let p = try PrepDecoding.decode(JobPipeline.self, from: JSONSerialization.data(withJSONObject: summary))
+        XCTAssertEqual(p.applications.map(\.nextStep), ["Follow up or close it", nil])
+    }
+
     func testDetailCarriesTheOnePagerAndPlan() throws {
         let app = try PrepDecoding.decode(JobApplication.self, from: Data(Self.detailJSON.utf8))
         XCTAssertEqual(app.row.id, "obin-ai-agentic-ai-engineer")

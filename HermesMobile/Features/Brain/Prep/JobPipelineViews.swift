@@ -79,6 +79,59 @@ struct JobNextInterviewCard: View {
     }
 }
 
+/// A count as a row of pips (`DeckDot`s): `done` filled of its target, a faint ring for each one left, and one
+/// faint ring for a count of none. The one way the job search shows a number: the Ask's and the search card's
+/// week, and Prep's Pipeline header. Past `JobCount.maxPips` the count reads beside the pips.
+struct JobCountPips: View {
+    enum Layout {
+        /// The label over its pips (a card's list of counts).
+        case stacked
+        /// The label, then its pips on the same line (a header, the Ask's week).
+        case beside
+    }
+
+    let label: String
+    let count: JobCount
+    /// The card's ink; the Prep glow by default, the paper the job search wears everywhere.
+    var ink: Color = HermexPaper.prep.glow
+    var layout: Layout = .stacked
+    /// Label and pip sizes for a section header's trailing edge.
+    var compact = false
+
+    var body: some View {
+        Group {
+            switch layout {
+            case .stacked:
+                VStack(alignment: .leading, spacing: 4) { title; dots }
+            case .beside:
+                HStack(spacing: 6) { title; dots }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "\(label): \(count.spoken)"))
+    }
+
+    private var title: some View {
+        Text(verbatim: label).font(compact ? AppFont.caption() : AppFont.subheadline())
+    }
+
+    private var dots: some View {
+        let column: CGFloat = compact ? 14 : DeckDots.column
+        let size: CGFloat = compact ? 10 : DeckDots.dot
+        return HStack(spacing: 0) {
+            if count.shown == 0 {
+                DeckDot(state: "missed", ink: ink, column: column, size: size)
+            }
+            ForEach(0..<count.shown, id: \.self) { index in
+                DeckDot(state: index < count.done ? "done" : "missed", ink: ink, column: column, size: size)
+            }
+            if count.overflows {
+                Text(verbatim: count.spoken).font(AppFont.caption()).foregroundStyle(.secondary).padding(.leading, 6)
+            }
+        }
+    }
+}
+
 /// An application's stage as pips, Applied to Offer, filled through its stage; a closed one shows none.
 struct JobStagePips: View {
     let step: Int?

@@ -87,10 +87,11 @@ struct DailyAskBody: View {
         return "Yesterday's Ask was \(previous) — never miss twice."
     }
 
-    static func weekLine(_ ask: DailyAsk) -> String? {
-        guard let a = ask.week?.applications, let o = ask.week?.outreach,
-              let aDone = a.done, let aTarget = a.target, let oDone = o.done, let oTarget = o.target else { return nil }
-        return "Applications \(aDone)/\(aTarget) · Outreach \(oDone)/\(oTarget)"
+    /// The week's applications and outreach as pips. The server counts them the one way the pipeline does
+    /// (`job_pipeline.week`), so these match the search card, the close card and Prep. Nil when either is missing.
+    static func weekCounts(_ ask: DailyAsk) -> (applications: JobCount, outreach: JobCount)? {
+        guard let a = ask.week?.applications?.count, let o = ask.week?.outreach?.count else { return nil }
+        return (a, o)
     }
 }
 
@@ -127,8 +128,12 @@ private struct DailyAskForm: View {
                     ProgressView().accessibilityLabel(Text(verbatim: "Saving"))
                 }
             }
-            if let week = DailyAskBody.weekLine(ask) {
-                Text(verbatim: week).font(AppFont.subheadline()).foregroundStyle(.secondary).padding(.top, 4)
+            if let week = DailyAskBody.weekCounts(ask) {
+                VStack(alignment: .leading, spacing: 6) {
+                    JobCountPips(label: "Applications", count: week.applications, layout: .beside)
+                    JobCountPips(label: "Outreach", count: week.outreach, layout: .beside)
+                }
+                .padding(.top, 8)
             }
             if let outcome = ask.outcome {
                 Text(verbatim: DailyAskBody.doneLine(outcome)).font(AppFont.body()).padding(.top, 16)
