@@ -171,6 +171,7 @@ enum Endpoint {
     case brainHome(batch: Int)
     case brainPeopleHome
     case brainPersonLog
+    case brainPersonFacts
     /// The Prep interview tutor (`api/tutor.py`): today's run, home, a track map, one item, answer submission,
     /// the gap ledger (all gaps and one gap) and flagging a coach-written card.
     case tutorHome
@@ -564,6 +565,8 @@ enum Endpoint {
             return "/api/brain/people/home"
         case .brainPersonLog:
             return "/api/brain/person/log"
+        case .brainPersonFacts:
+            return "/api/brain/person/facts"
         case .tutorHome:
             return "/api/tutor/home"
         case .tutorToday, .tutorRun:
