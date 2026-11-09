@@ -30,7 +30,7 @@ struct DeckFeedbackSheet: View {
                     .lineLimit(1...4)
                     .padding(12)
                     .withDictation($note)
-                    .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
 
                 VStack(spacing: 0) {
                     if !card.altQuestions.isEmpty {
@@ -47,7 +47,7 @@ struct DeckFeedbackSheet: View {
                         isAskingOwn = true
                     }
                 }
-                .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
 
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 8) { verdictButtons }

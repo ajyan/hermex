@@ -33,7 +33,8 @@ extension DeckCard {
     }
 }
 
-/// An act card's first line: its kind's symbol and its kind label, in the card's ink.
+/// An act card's first line: its kind's symbol and its kind label, in the card's supporting ink
+/// (`DeckPalette.secondaryInk`), at full strength.
 struct DeckKindLabel: View {
     let symbol: String
     let text: String
@@ -45,7 +46,7 @@ struct DeckKindLabel: View {
             Text(verbatim: text).fixedSize(horizontal: false, vertical: true)
         }
         .font(AppFont.footnote(weight: .semibold))
-        .foregroundStyle(ink.opacity(0.75))
+        .foregroundStyle(ink)
         .padding(.trailing, 24)
     }
 }
@@ -198,7 +199,7 @@ struct DeckLinkedBlock: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(verbatim: thread.label.flatMap { $0.isEmpty ? nil : $0 } ?? "You wrote")
                 .font(AppFont.footnote(weight: .semibold))
-                .foregroundStyle(palette.colors.secondaryInk)
+                .foregroundStyle(palette.secondaryInk)
             Text(verbatim: DeckIdea.unquoted(thread.quote))
                 .font(AppFont.serif(style: .body))
                 .lineSpacing(3)
@@ -208,7 +209,7 @@ struct DeckLinkedBlock: View {
             if let at = thread.at, !at.isEmpty {
                 Text(verbatim: at)
                     .font(AppFont.footnote())
-                    .foregroundStyle(palette.colors.secondaryInk)
+                    .foregroundStyle(palette.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -253,7 +254,7 @@ struct DeckPartsList: View {
         VStack(alignment: .leading, spacing: 0) {
             Text(verbatim: "The parts")
                 .font(AppFont.footnote(weight: .semibold))
-                .foregroundStyle(palette.ink.opacity(0.75))
+                .foregroundStyle(palette.secondaryInk)
                 .accessibilityAddTraits(.isHeader)
                 .padding(.bottom, 8)
             VStack(alignment: .leading, spacing: 6) {
@@ -294,7 +295,7 @@ struct DeckQuoteRow: View {
                 if let at, !at.isEmpty {
                     Text(verbatim: at)
                         .font(AppFont.footnote(weight: .medium))
-                        .foregroundStyle(palette.ink.opacity(0.75))
+                        .foregroundStyle(palette.secondaryInk)
                 }
             }
         }
@@ -312,7 +313,7 @@ struct DeckThreadView: View {
             if let label = thread.label, !label.isEmpty {
                 Text(verbatim: label)
                     .font(AppFont.footnote(weight: .semibold))
-                    .foregroundStyle(palette.ink.opacity(0.75))
+                    .foregroundStyle(palette.secondaryInk)
             }
             Text(verbatim: DeckCard.quoted(thread.quote))
                 .font(AppFont.serif(style: .body))
@@ -324,7 +325,7 @@ struct DeckThreadView: View {
             if let at = thread.at, !at.isEmpty {
                 Text(verbatim: at)
                     .font(AppFont.footnote())
-                    .foregroundStyle(palette.ink.opacity(0.75))
+                    .foregroundStyle(palette.secondaryInk)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

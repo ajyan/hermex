@@ -209,7 +209,7 @@ struct DeckCardView: View {
         let text = DeckCardText(card)
         if card.itemKind == "quote" {
             Image(systemName: "quote.opening")
-                .font(.system(size: 40, weight: .semibold))
+                .font(AppFont.display(style: .largeTitle, weight: .semibold))
                 .foregroundStyle(palette.ink.opacity(0.22))
                 .padding(.bottom, 10)
                 .accessibilityHidden(true)
@@ -309,7 +309,7 @@ struct DeckCardView: View {
     @ViewBuilder
     private var idea: some View {
         let idea = DeckIdea(card, palette: palette)
-        DeckKindLabel(symbol: palette.symbol, text: idea.kindLine, ink: palette.ink)
+        DeckKindLabel(symbol: palette.symbol, text: idea.kindLine, ink: palette.secondaryInk)
         if let sentence = idea.sentence {
             Text(inlineMarkdown(sentence))
                 .font(AppFont.display(style: .title2, weight: .bold))
@@ -372,7 +372,7 @@ struct DeckCardView: View {
     /// footnote and no `lines` subtitles; a letter's countdown sits in its kind label.
     @ViewBuilder
     private var jobReading: some View {
-        DeckKindLabel(symbol: palette.symbol, text: card.kindLabel(palette, advisor: viewModel.deck?.advisor), ink: palette.ink)
+        DeckKindLabel(symbol: palette.symbol, text: card.kindLabel(palette, advisor: viewModel.deck?.advisor), ink: palette.secondaryInk)
         let text = DeckCardText(card)
         let isYearAgo = card.itemKind == "on_this_day"
         let title = card.asksInTitle ? (viewModel.question(for: card) ?? text.lead)
@@ -448,7 +448,7 @@ struct DeckCardView: View {
                     if let from = card.contextFrom {
                         Text(verbatim: from)
                             .font(AppFont.footnote(weight: .semibold))
-                            .foregroundStyle(palette.ink.opacity(0.75))
+                            .foregroundStyle(palette.secondaryInk)
                     }
                     Text(inlineMarkdown(context))
                         .font(AppFont.body())
@@ -464,7 +464,7 @@ struct DeckCardView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(verbatim: "That day")
                         .font(AppFont.footnote(weight: .semibold))
-                        .foregroundStyle(palette.ink.opacity(0.75))
+                        .foregroundStyle(palette.secondaryInk)
                     Text(inlineMarkdown(later))
                         .font(AppFont.serif(style: .body))
                         .lineSpacing(3)
@@ -478,7 +478,7 @@ struct DeckCardView: View {
             if let attribution = text.attribution {
                 Text(verbatim: attribution)
                     .font(AppFont.subheadline())
-                    .foregroundStyle(palette.ink.opacity(0.75))
+                    .foregroundStyle(palette.secondaryInk)
                     .padding(.top, 6)
             }
             if let detail = text.detail {
@@ -541,7 +541,7 @@ struct DeckCardView: View {
         return VStack(alignment: .leading, spacing: 8) {
             Text(verbatim: "Comes back to you in")
                 .font(AppFont.footnote(weight: .semibold))
-                .foregroundStyle(palette.ink.opacity(0.75))
+                .foregroundStyle(palette.secondaryInk)
             FlowRow(spacing: 6) {
                 ForEach(card.returns) { option in
                     ChoiceButton(title: option.label, isSelected: chosen == option.id) {
@@ -844,7 +844,7 @@ struct DeckCardView: View {
     /// "Yesterday · …" on the opener: the label bold in the ink, the line in body text.
     private func recapLine(_ label: String?, _ text: String) -> some View {
         (Text(verbatim: label.map { "\($0) · " } ?? "").font(AppFont.display(style: .subheadline, weight: .semibold))
-            + Text(verbatim: text).font(AppFont.subheadline()).foregroundStyle(Color.hxTextPrimary.opacity(0.85)))
+            + Text(verbatim: text).font(AppFont.subheadline()).foregroundStyle(Color.hxTextPrimary))
             .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -979,7 +979,7 @@ struct DeckCardView: View {
         let learned = viewModel.cards.first { $0.type == .headline }?.learned ?? []
         if card.weekRows.isEmpty {
             let day = DailyDeckPaths.date(day: viewModel.date)?.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
-            DeckKindLabel(symbol: palette.symbol, text: day.map { "Close · \($0)" } ?? "Close", ink: palette.ink)
+            DeckKindLabel(symbol: palette.symbol, text: day.map { "Close · \($0)" } ?? "Close", ink: palette.secondaryInk)
             Text(verbatim: "What Atlas learned")
                 .font(AppFont.display(style: .title2, weight: .bold))
                 .fixedSize(horizontal: false, vertical: true)
@@ -1012,7 +1012,7 @@ struct DeckCardView: View {
         if learned.contains(where: \.offersUndo) {
             Text(verbatim: "Undo drops the rule from tomorrow's deck.")
                 .font(AppFont.footnote())
-                .foregroundStyle(palette.isNeutralCard ? Color.hxTextSecondary : palette.colors.secondaryInk)
+                .foregroundStyle(palette.secondaryInk)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
         }
@@ -1138,7 +1138,7 @@ private struct PieceArgument: View {
             if !piece.quotes.isEmpty {
                 Text(verbatim: "In its own words")
                     .font(AppFont.footnote(weight: .semibold))
-                    .foregroundStyle(palette.ink.opacity(0.75))
+                    .foregroundStyle(palette.secondaryInk)
                     .accessibilityAddTraits(.isHeader)
                     .padding(.top, piece.steps.isEmpty ? 0 : 22)
                     .padding(.bottom, 8)
@@ -1212,7 +1212,7 @@ private struct MoodChart: View {
                     if let hours = point.sleep {
                         BarMark(x: .value("Day", point.label), y: .value("Value", min(hours, 10)), width: .ratio(0.5))
                             .foregroundStyle(palette.ink.opacity(0.13))
-                            .cornerRadius(4)
+                            .cornerRadius(HXRadius.xs)
                             .accessibilityLabel(Text(verbatim: "\(point.label), sleep"))
                             .accessibilityValue(Text(verbatim: "\(hours.formatted(.number.precision(.fractionLength(0...1)))) hours"))
                     }
@@ -1242,11 +1242,11 @@ private struct MoodChart: View {
             .chartYAxis {
                 AxisMarks(values: [0, 5, 10]) { _ in
                     AxisGridLine().foregroundStyle(palette.ink.opacity(0.12))
-                    AxisValueLabel().foregroundStyle(palette.ink.opacity(0.6))
+                    AxisValueLabel().foregroundStyle(palette.secondaryInk)
                 }
             }
             .chartXAxis {
-                AxisMarks { _ in AxisValueLabel().foregroundStyle(palette.ink.opacity(0.7)) }
+                AxisMarks { _ in AxisValueLabel().foregroundStyle(palette.secondaryInk) }
             }
             .frame(height: 180)
             HStack(spacing: 14) {
@@ -1254,20 +1254,21 @@ private struct MoodChart: View {
                 if hasMood { legend("Mood", line: [4, 4]) }
                 if hasSleep {
                     HStack(spacing: 6) {
-                        RoundedRectangle(cornerRadius: 2).fill(palette.ink.opacity(0.13)).frame(width: 10, height: 12)
+                        // A 10 pt chart key swatch, too small for the radius scale.
+                        RoundedRectangle(cornerRadius: 2).fill(palette.ink.opacity(0.13)).frame(width: 10, height: 12) // design-drift: allow
                         Text(verbatim: "Sleep (h)")
                     }
                 }
             }
             .font(AppFont.footnote(weight: .medium))
-            .foregroundStyle(palette.ink.opacity(0.7))
+            .foregroundStyle(palette.secondaryInk)
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(points.filter { $0.mood != nil && !($0.quote ?? "").isEmpty }, id: \.label) { point in
                     HStack(alignment: .firstTextBaseline, spacing: 10) {
                         Text(verbatim: point.label)
                             .font(AppFont.footnote(weight: .semibold))
-                            .foregroundStyle(palette.ink.opacity(0.7))
+                            .foregroundStyle(palette.secondaryInk)
                             .frame(width: 34, alignment: .leading)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(verbatim: [point.mood.map { "Mood \($0)" }, point.note].compactMap { $0 }
@@ -1275,7 +1276,7 @@ private struct MoodChart: View {
                                 .font(AppFont.subheadline(weight: .medium))
                             Text(verbatim: "“\(point.quote ?? "")”")
                                 .font(AppFont.serif(style: .subheadline))
-                                .foregroundStyle(palette.ink.opacity(0.75))
+                                .foregroundStyle(palette.secondaryInk)
                         }
                         .fixedSize(horizontal: false, vertical: true)
                     }
@@ -1306,7 +1307,7 @@ private struct GoalMeters: View {
                 if let group = meter.group, index == 0 || meters[index - 1].group != group {
                     Text(verbatim: group)
                         .font(AppFont.subheadline(weight: .semibold))
-                        .foregroundStyle(palette.ink.opacity(0.7))
+                        .foregroundStyle(palette.secondaryInk)
                         .padding(.top, index == 0 ? 0 : 6)
                 }
                 VStack(alignment: .leading, spacing: 6) {
@@ -1502,8 +1503,8 @@ private struct FollowUpRow: View {
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
                 .onTapGesture { if preview.editable { isEditingText = true } }
             }
             // Side by side when they fit; stacked at large text sizes.
@@ -1625,8 +1626,8 @@ private struct AnswerBox: View {
         .padding(12)
         .frame(maxWidth: .infinity, minHeight: minHeight, maxHeight: .infinity, alignment: .topLeading)
         .withDictation(textBinding)
-        .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
         .onTapGesture { isFocused = true }
     }
 

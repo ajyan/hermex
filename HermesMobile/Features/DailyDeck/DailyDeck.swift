@@ -1330,10 +1330,11 @@ struct DailyDeckStore {
         defaults.removeObject(forKey: key("session", server))
     }
 
-    /// The session that reads `date`'s deck; one per day, so filing lands in that day's chat.
+    /// The session the Brief reads the vault's files through. The server's file routes need a session, so
+    /// one is kept and reused day after day (whichever day made it) instead of a new empty one each morning;
+    /// `date` is the day asking. A session the server lost is replaced by the caller.
     func session(for server: URL, date: String) -> String? {
-        let stored = defaults.dictionary(forKey: key("session", server)) as? [String: String]
-        return stored?[date]
+        latestSession(for: server)?.id
     }
 
     /// The newest stored day session, if any.
@@ -1391,6 +1392,26 @@ struct DailyDeckStore {
               let all = try? JSONDecoder().decode([String: [String: DeckAnswer]].self, from: data)
         else { return [:] }
         return all
+    }
+
+    /// The deck last read for `server`, kept so today's brief can be reread without the server: the deck file
+    /// as the server sent it and, when it was filed, its answers file. One deck per server.
+    struct SavedDeck: Codable, Equatable {
+        let date: String
+        let kind: String
+        let deck: String
+        var answers: String?
+    }
+
+    func deckCopy(for server: URL, date: String, kind: String) -> SavedDeck? {
+        guard let data = defaults.data(forKey: key("deckCopy", server)),
+              let copy = try? JSONDecoder().decode(SavedDeck.self, from: data), copy.date == date, copy.kind == kind
+        else { return nil }
+        return copy
+    }
+
+    func setDeckCopy(_ copy: SavedDeck, for server: URL) {
+        if let data = try? JSONEncoder().encode(copy) { defaults.set(data, forKey: key("deckCopy", server)) }
     }
 
     func remove(for server: URL) {

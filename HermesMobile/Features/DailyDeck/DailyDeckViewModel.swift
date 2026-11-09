@@ -68,6 +68,8 @@ final class DailyDeckViewModel {
     private(set) var answers: [String: DeckAnswer] = [:]
     private(set) var filing: DailyDeckFilingState = .idle
     private(set) var sessionID: String?
+    /// The deck on screen is this device's saved copy, shown because the server couldn't be reached.
+    private(set) var isOfflineCopy = false
     private(set) var workspace: String?
     /// What was last filed for the deck on screen; nil until it is filed.
     private(set) var filedAnswers: [String: DeckAnswer]?
@@ -342,6 +344,7 @@ final class DailyDeckViewModel {
     /// Finds the brief's folder, then opens the deck for `date` (today on first load).
     func load() async {
         state = .loading
+        isOfflineCopy = false
         do {
             guard let workspace = try await resolveWorkspace() else { return }
             self.workspace = workspace
@@ -355,8 +358,37 @@ final class DailyDeckViewModel {
         } catch is CancellationError {
             // A newer load owns the state.
         } catch {
-            state = .failed(error.localizedDescription)
+            if !openOfflineCopy() { state = .failed(error.localizedDescription) }
         }
+    }
+
+    /// Shows this device's copy of the deck asked for, when it has one (today's morning brief, once it has been
+    /// read): the cards, the filed answers and any unsent ones. Filing still needs the server.
+    private func openOfflineCopy() -> Bool {
+        guard let copy = store.deckCopy(for: server, date: date, kind: kind),
+              let decoded = try? DailyDeck.decode(copy.deck)
+        else { return false }
+        filedAnswers = copy.answers.map(DeckAnswersFile.decodeAnswers)
+        filedSignals = copy.answers.map(DeckAnswersFile.decodeSignals) ?? DeckSignals()
+        filedNote = nil
+        hasWeekRecord = false
+        show(decoded)
+        isOfflineCopy = true
+        return true
+    }
+
+    /// Puts a decoded deck on screen with this device's unsent answers over the filed ones.
+    private func show(_ decoded: DailyDeck) {
+        deck = decoded
+        pages = DeckPage.pages(for: decoded.cards)
+        let draft = store.answers(for: server, date: date, kind: kind)
+        answers = draft.isEmpty ? (filedAnswers ?? [:]) : draft
+        let drafted = store.signals(for: server, date: date, kind: kind)
+        signals = drafted.isEmpty ? filedSignals : drafted
+        index = min(index, max(visiblePages.count - 1, 0))
+        lastDismissal = nil
+        resetIntention()
+        state = .ready
     }
 
     /// Rolls `today` forward when the app comes back on a new day. A screen left on the old
@@ -395,14 +427,17 @@ final class DailyDeckViewModel {
         filedSignals = DeckSignals()
         filedNote = nil
         hasWeekRecord = false
+        isOfflineCopy = false
         guard names.contains(fileName(DailyDeckPaths.deck(date: date, kind: kind))) else {
             state = .noDeck
             return
         }
         let content = try await client.fileContent(sessionID: sessionID, path: DailyDeckPaths.deck(date: date, kind: kind))
         let decoded = try DailyDeck.decode(content)
+        var copy = DailyDeckStore.SavedDeck(date: date, kind: kind, deck: content, answers: nil)
         if names.contains(fileName(DailyDeckPaths.answers(date: date, kind: kind))) {
             let filed = try await client.fileContent(sessionID: sessionID, path: DailyDeckPaths.answers(date: date, kind: kind))
+            copy.answers = filed
             filedAnswers = DeckAnswersFile.decodeAnswers(filed)
             filedSignals = DeckAnswersFile.decodeSignals(filed)
             if kind == "weekly", (decoded.version ?? 0) >= 2 {
@@ -411,16 +446,9 @@ final class DailyDeckViewModel {
                 hasWeekRecord = records?.contains(fileName(WeeksModel.recordPath(date))) ?? false
             }
         }
-        deck = decoded
-        pages = DeckPage.pages(for: decoded.cards)
-        let draft = store.answers(for: server, date: date, kind: kind)
-        answers = draft.isEmpty ? (filedAnswers ?? [:]) : draft
-        let drafted = store.signals(for: server, date: date, kind: kind)
-        signals = drafted.isEmpty ? filedSignals : drafted
-        index = min(index, max(visiblePages.count - 1, 0))
-        lastDismissal = nil
-        resetIntention()
-        state = .ready
+        // Today's brief is the one worth rereading without the server.
+        if date == today, kind == "morning" { store.setDeckCopy(copy, for: server) }
+        show(decoded)
     }
 
     // MARK: Diagrams
@@ -490,9 +518,9 @@ final class DailyDeckViewModel {
         return nil
     }
 
-    /// A session to read `briefs/` through (today's, whichever deck is shown) and the names
-    /// in it (nil when the folder is missing). A session the server lost, or one made under
-    /// another profile, is replaced once.
+    /// A session to read `briefs/` through and the names in it (nil when the folder is missing). The
+    /// server's file routes all need a session, so the stored one is reused day after day; a new one is
+    /// made only when there is none, or the server lost it or made it under another profile (replaced once).
     private func sessionAndBriefs(workspace: String) async throws -> (String, [String]?) {
         if let stored = store.session(for: server, date: today) {
             do {
@@ -503,7 +531,7 @@ final class DailyDeckViewModel {
         }
         let created = try await client.createSession(workspace: workspace)
         store.setSession(created, for: server, date: today)
-        try? await client.renameSession(id: created, title: Self.sessionTitle(for: date, kind: kind))
+        try? await client.renameSession(id: created, title: Self.readingSessionTitle)
         return (created, try await briefNames(sessionID: created))
     }
 
@@ -517,7 +545,11 @@ final class DailyDeckViewModel {
 
     private func fileName(_ path: String) -> String { (path as NSString).lastPathComponent }
 
-    /// "Daily Brief · Oct 5" for the deck's day; reviews say which.
+    /// The reading session's name: it serves every day's brief, so it names no day.
+    static let readingSessionTitle = "Daily Brief"
+
+    /// "Daily Brief · Oct 5" for the deck's day; reviews say which. The chat a brief is filed through on a
+    /// server without a filer.
     static func sessionTitle(for day: String, kind: String = "morning") -> String {
         let name = kind == "weekly" ? "Weekly Review" : kind == "monthly" ? "Monthly Review" : "Daily Brief"
         return "\(name) · \(DailyDeckPaths.label(day))"
