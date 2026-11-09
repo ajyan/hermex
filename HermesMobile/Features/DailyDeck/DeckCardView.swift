@@ -25,7 +25,7 @@ struct DeckPageView: View {
         let words = Group {
             switch page {
             case .card(let card):
-                DeckCardView(card: card, palette: palette, viewModel: viewModel, file: file, feedback: feedback)
+                DeckCardView(card: card, palette: palette, viewModel: viewModel, file: file, feedback: feedback, isOpen: isOpen)
             case .followUps(let cards):
                 FollowUpsPage(cards: cards, viewModel: viewModel, feedback: feedback)
             }
@@ -70,6 +70,8 @@ struct DeckCardView: View {
     let viewModel: DailyDeckViewModel
     let file: () -> Void
     let feedback: (() -> Void)?
+    /// Opened to fill the screen, over the deck: a button that turns the deck's page is left out.
+    var isOpen = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Today's morning deck only: earlier cards to rate, offered on the closing card.
@@ -124,7 +126,7 @@ struct DeckCardView: View {
                 case .weekHeld: WeekHeldCard(card: card, palette: palette, viewModel: viewModel)
                 case .weekPlan: WeekPlanCard(card: card, palette: palette, viewModel: viewModel)
                 case .weekLetter: WeekLetterCard(card: card, palette: palette, viewModel: viewModel)
-                default: if isJobCard { jobReading } else { reading }
+                default: if card.isIdea { idea } else if isJobCard { jobReading } else { reading }
                 }
                 // Reaching the end of the card counts toward the style learner's usage (`DeckSignals`). A short card's
                 // end is in view while it is still the next card under the stack, so it's checked again on arrival.
@@ -274,6 +276,57 @@ struct DeckCardView: View {
         }
     }
 
+    // MARK: Idea cards
+
+    /// An idea card, in the one order every idea card has: its kind line (saying "summary" when it was written
+    /// without the source's text), the idea as a sentence, the source's lines in the serif, the take, what he
+    /// wrote that it links to, the diagram, one question, the answer box, and Next at the foot.
+    @ViewBuilder
+    private var idea: some View {
+        let idea = DeckIdea(card, palette: palette)
+        DeckKindLabel(symbol: palette.symbol, text: idea.kindLine, ink: palette.ink)
+        if let sentence = idea.sentence {
+            Text(inlineMarkdown(sentence))
+                .font(AppFont.display(style: .title2, weight: .bold))
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 14)
+                .textSelection(.enabled)
+                .accessibilityAddTraits(.isHeader)
+        }
+        DeckIdeaBody(idea: idea, palette: palette)
+        diagramButtons
+        if let question = viewModel.question(for: card) {
+            Text(verbatim: question)
+                .font(AppFont.display(style: .headline, weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 24)
+                .id(question)
+                .transition(reduceMotion ? .opacity : AnyTransition(.blurReplace))
+        }
+        let written = viewModel.answer(for: card)?.text
+        Button { isWriting = true } label: {
+            DeckAnswerBoxLabel(text: written, prompt: "Your take", palette: palette)
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 12)
+        .accessibilityLabel(Text(verbatim: written.flatMap { $0.isEmpty ? nil : "Your take: \($0). Edit" } ?? "Write your take"))
+        if !isOpen, viewModel.currentCardID == card.id, viewModel.index < viewModel.visiblePages.count - 1 {
+            Button {
+                withAnimation(reduceMotion ? HXMotion.crossfade : HXMotion.card(reduceMotion: reduceMotion)) { viewModel.index += 1 }
+            } label: {
+                Text(verbatim: "Next")
+                    .font(AppFont.body(weight: .semibold))
+                    .foregroundStyle(palette.onInk)
+                    .frame(maxWidth: .infinity, minHeight: 50)
+                    .background(palette.ink, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 16)
+            .accessibilityHint(Text(verbatim: "Shows the next card"))
+        }
+    }
+
     // MARK: Deck by job
 
     /// A deck by job's card drawn by the card anatomy (`jobReading`): every act card but the Mandarin card,
@@ -284,7 +337,7 @@ struct DeckCardView: View {
     private var showsKindLabel: Bool {
         switch card.type {
         case .close: DeckAct.isByJob(viewModel.visiblePages)
-        case .prompt, .reflect, .item, .unknown: isJobCard
+        case .prompt, .reflect, .item, .unknown: isJobCard || card.isIdea
         case .training, .weekMoney: true
         default: false
         }
@@ -294,20 +347,11 @@ struct DeckCardView: View {
     /// footnote and no `lines` subtitles; a letter's countdown sits in its kind label.
     @ViewBuilder
     private var jobReading: some View {
-        let idea = DeckAct.ideaPosition(of: card, in: viewModel.visiblePages)
-        DeckKindLabel(symbol: palette.symbol, text: card.kindLabel(palette, idea: idea, advisor: viewModel.deck?.advisor),
-                      ink: palette.ink)
-        if idea != nil, let week = card.weekQuestion {
-            Text(verbatim: "This week: \(week)")
-                .font(AppFont.footnote())
-                .foregroundStyle(palette.ink.opacity(0.75))
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 4)
-        }
+        DeckKindLabel(symbol: palette.symbol, text: card.kindLabel(palette, advisor: viewModel.deck?.advisor), ink: palette.ink)
         let text = DeckCardText(card)
         let isYearAgo = card.itemKind == "on_this_day"
         let title = card.asksInTitle ? (viewModel.question(for: card) ?? text.lead)
-            : card.act == "ideas" || isYearAgo ? (card.title ?? text.lead) : text.lead
+            : isYearAgo ? (card.title ?? text.lead) : text.lead
         if let title {
             Text(inlineMarkdown(title))
                 .font(isYearAgo ? AppFont.serif(style: .title2) : AppFont.display(style: .title2, weight: .bold))
@@ -362,14 +406,12 @@ struct DeckCardView: View {
                       label: "From today's idea · \(idea.title)", lines: 2)
     }
 
-    /// An act card's body: an idea's source, gist, quotes and parts; a check-in's or letter's thread, then
-    /// the message that leads into its question (under its speaker when that isn't the card's voice); a
-    /// year-ago entry's later words; anything else its attribution and detail.
+    /// An act card's body: a check-in's or letter's thread, then the message that leads into its question (under
+    /// its speaker when that isn't the card's voice); a year-ago entry's later words; anything else its
+    /// attribution and detail. An idea card has its own layout (`idea`).
     @ViewBuilder
     private func jobBody(_ text: DeckCardText, isYearAgo: Bool) -> some View {
-        if card.act == "ideas" {
-            DeckIdeaBody(card: card, palette: palette)
-        } else if card.thread != nil || card.type == .prompt {
+        if card.thread != nil || card.type == .prompt {
             if let idea = card.fromIdea {
                 fromIdeaChip(idea).padding(.top, 14)
             }

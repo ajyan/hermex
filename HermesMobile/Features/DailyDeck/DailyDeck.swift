@@ -397,6 +397,11 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         let linked: DeckThread?
         /// The idea a writing card's prompt builds on (wire `from_idea`), for its "From today's idea" chip.
         let fromIdea: DeckFromIdea?
+        /// An idea card's take on its source, in a sentence or two; older decks have only the `gist`.
+        let take: String?
+        /// Whether an idea card was written from a summary, with none of the source's own text on hand (wire
+        /// `summary: true`, or `source_text: false`). Nil on decks that don't say; `DeckIdea` works it out.
+        let isFromSummary: Bool?
         /// A year-ago card's day, "Tue, Oct 28, 2025".
         let dateLabel: String?
 
@@ -409,6 +414,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case todayAction = "today"
             case moments, spares, ended, text, ifThen, name, fact, changes, intention
             case act, gist, quotes, parts, weekQuestion, thread, linked, fromIdea, dateLabel, month
+            case take, summary, sourceText
             case valueID = "value"
             case itemKind = "kind"
         }
@@ -518,6 +524,9 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             thread = (try? c.decodeIfPresent(DeckThread.self, forKey: .thread)).flatMap { $0.quote.isEmpty ? nil : $0 }
             linked = (try? c.decodeIfPresent(DeckThread.self, forKey: .linked)).flatMap { $0.quote.isEmpty ? nil : $0 }
             fromIdea = (try? c.decodeIfPresent(DeckFromIdea.self, forKey: .fromIdea)).flatMap { $0.title.isEmpty ? nil : $0 }
+            take = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .take))
+            isFromSummary = (try? c.decodeIfPresent(Bool.self, forKey: .summary))
+                ?? (try? c.decodeIfPresent(Bool.self, forKey: .sourceText)).map { !$0 }
             dateLabel = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .dateLabel))
             let ref = try? c.decodeIfPresent(Ref.self, forKey: .ref)
             link = ref?.link.flatMap { $0.isEmpty ? nil : $0 }

@@ -1,19 +1,16 @@
 import SwiftUI
 
-// The parts of a deck by job's cards (vault 2026-10-27): the opener's tag lines and Today's one, and the
-// card anatomy every act card drawn by `DeckCardView.reading` shares: a kind label, a title, the body,
-// and the one ask.
+// The parts of a deck by job's cards (vault 2026-10-27): the opener's tag lines and Today's one, the
+// card anatomy every act card drawn by `DeckCardView.reading` shares (a kind label, a title, the body,
+// and the one ask), and the one layout every idea card shares (`DeckIdea`).
 
 extension DeckCard {
-    /// An act card's kind label after its symbol: the palette's name, then what this one is ("Video · Idea 1 of 2",
-    /// "Check-in · Roger Federer", "Letter to her · 80 days to go", "Looking back · Stony Brook",
-    /// "A year ago · Tue, Oct 28, 2025").
-    /// `idea` is the card's place among the deck's ideas.
-    func kindLabel(_ palette: DeckPalette, idea: (number: Int, of: Int)? = nil, advisor: String? = nil) -> String {
+    /// An act card's kind label after its symbol: the palette's name, then what this one is
+    /// ("Check-in · Roger Federer", "Letter to her · 80 days to go", "Looking back · Stony Brook",
+    /// "A year ago · Tue, Oct 28, 2025"). An idea card's is `DeckIdea.kindLine`.
+    func kindLabel(_ palette: DeckPalette, advisor: String? = nil) -> String {
         let detail: String?
-        if let idea {
-            detail = "Idea \(idea.number) of \(idea.of)"
-        } else if isLetter {
+        if isLetter {
             detail = self.lines.first
         } else if isPast || isFuture {
             detail = self.title
@@ -33,16 +30,6 @@ extension DeckCard {
     static func quoted(_ text: String) -> String {
         let marks: Set<Character> = ["“", "\"", "‘", "'"]
         return text.first.map(marks.contains) == true ? text : "“\(text)”"
-    }
-}
-
-extension DeckAct {
-    /// Where an idea card sits among the deck's ideas, counted on the pages shown; nil for any other card.
-    static func ideaPosition(of card: DeckCard, in pages: [DeckPage]) -> (number: Int, of: Int)? {
-        guard card.act == "ideas" else { return nil }
-        let ideas = pages.filter { $0.act == "ideas" }.map(\.id)
-        guard let index = ideas.firstIndex(of: card.id) else { return nil }
-        return (index + 1, ideas.count)
     }
 }
 
@@ -82,46 +69,164 @@ struct DeckTagLines: View {
     }
 }
 
-/// An idea card's body: where it's from, its gist, the source's own words, its parts, and what he wrote that it
-/// links to.
+/// An idea card's words in the one layout every idea card shares: the kind line, the idea as a sentence, the
+/// source's own lines, the take, and what he wrote that it links to. Decks have carried ideas in four shapes
+/// (a gist with labelled parts, a book highlight with its context, a long piece's map, quotes with a link);
+/// each maps onto these slots, so an old deck reads like a new one.
+struct DeckIdea: Equatable {
+    /// "Book highlight · Carol Dweck, Mindset"; a card written from a summary says so: "From your notes · summary".
+    let kindLine: String
+    /// The idea in a sentence. Nil when the card has none of its own (an old highlight titled with its book's name).
+    let sentence: String?
+    /// The source's words, verbatim. Empty on a summary card.
+    let quotes: [DeckPiece.Quote]
+    let take: String?
+    let linked: DeckThread?
+    /// Written from a summary: none of the source's own text was on hand, so there are no quotes.
+    let isSummary: Bool
+
+    init(_ card: DeckCard, palette: DeckPalette) {
+        let text = DeckCardText(card)
+        // A saved quote, or a book highlight from before ideas had a gist: `body` is the source's own words.
+        let isVerbatim = card.itemKind == "quote" || (card.itemKind == "book" && card.gist == nil)
+        let source: String?
+        if isVerbatim {
+            sentence = nil
+            source = card.itemKind == "book"
+                ? Self.joined([card.source, card.title == card.source ? nil : card.title], ", ") : text.attribution
+            take = card.take ?? card.context
+        } else if card.act != nil {
+            sentence = card.title ?? card.gist.flatMap { DeckCardText.split($0).0 }
+            source = card.source
+            let gist = card.title == nil ? card.gist.flatMap { DeckCardText.split($0).1 } : card.gist
+            take = card.take ?? gist ?? card.context ?? (card.gist == nil ? card.body : nil)
+        } else {
+            // A deck from before cards named their act: its lead sentence, where it's from, and the rest.
+            sentence = text.lead
+            source = text.attribution
+            take = card.take ?? text.detail
+        }
+        var lines = card.quotes.isEmpty ? (card.piece?.quotes ?? []) : card.quotes
+        if lines.isEmpty, isVerbatim, let body = card.body { lines = [DeckPiece.Quote(text: body, at: nil)] }
+        lines = lines.map { DeckPiece.Quote(text: Self.unquoted($0.text), at: $0.at) }.filter { !$0.text.isEmpty }
+        isSummary = card.isFromSummary ?? lines.isEmpty
+        quotes = isSummary ? [] : lines
+        linked = card.linked
+        // "Your notes" under "From your notes" says the same thing twice.
+        let named = source.flatMap { palette.name.localizedCaseInsensitiveContains($0) ? nil : $0 }
+        kindLine = Self.joined([palette.name, isSummary ? "summary" : nil, named], " · ") ?? palette.name
+    }
+
+    /// `text` without the quote marks around it (the quote row draws its own), or the stray full stop after them.
+    static func unquoted(_ text: String) -> String {
+        let marks: Set<Character> = ["“", "”", "\"", "‘", "’"]
+        var words = Substring(text.trimmingCharacters(in: .whitespacesAndNewlines))
+        if words.hasSuffix("."), let before = words.dropLast().last, marks.contains(before) { words = words.dropLast() }
+        if let first = words.first, let last = words.last, words.count > 1, marks.contains(first), marks.contains(last),
+           !words.dropFirst().dropLast().contains(where: { $0 == "“" || $0 == "\"" }) {
+            words = words.dropFirst().dropLast()
+        }
+        return words.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func joined(_ parts: [String?], _ separator: String) -> String? {
+        let kept = parts.compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        return kept.isEmpty ? nil : kept.joined(separator: separator)
+    }
+}
+
+extension DeckCard {
+    /// A card that brings an idea from something he saved: a deck by job's `ideas` act, and before acts, every
+    /// reflect card but a year-ago entry and a weekly review's own.
+    var isIdea: Bool {
+        if let act = self.act { return act == "ideas" && !isMandarin }
+        return self.type == .reflect && self.itemKind != "on_this_day" && self.chapter == nil && self.month == nil
+    }
+}
+
+/// An idea card's source lines, its take, and what he wrote that it links to, in that order.
 struct DeckIdeaBody: View {
-    let card: DeckCard
+    let idea: DeckIdea
     let palette: DeckPalette
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if let source = card.source {
-                Text(verbatim: source)
-                    .font(AppFont.subheadline())
-                    .foregroundStyle(palette.ink.opacity(0.75))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 6)
+            if !idea.quotes.isEmpty {
+                VStack(alignment: .leading, spacing: 14) {
+                    ForEach(idea.quotes, id: \.self) { quote in
+                        DeckQuoteRow(text: quote.text, at: quote.at, palette: palette)
+                    }
+                }
+                .padding(.top, 18)
             }
-            if let gist = card.gist ?? card.body {
-                Text(inlineMarkdown(gist))
-                    .font(AppFont.body())
+            if let take = idea.take {
+                (Text(verbatim: "The take. ").font(AppFont.body(weight: .semibold)) + Text(inlineMarkdown(take)).font(AppFont.body()))
                     .lineSpacing(3)
                     .foregroundStyle(Color.hxTextPrimary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 18)
                     .textSelection(.enabled)
             }
-            if !card.quotes.isEmpty {
-                VStack(alignment: .leading, spacing: 14) {
-                    ForEach(card.quotes, id: \.self) { quote in
-                        DeckQuoteRow(text: quote.text, at: quote.at, palette: palette)
-                    }
-                }
-                .padding(.top, 20)
-            }
-            if !card.parts.isEmpty {
-                DeckPartsList(parts: card.parts.map { ($0.label, $0.text) }, palette: palette).padding(.top, 22)
-            }
-            if let linked = card.linked {
-                DeckThreadView(thread: linked, palette: palette).padding(.top, 20)
+            if let linked = idea.linked {
+                DeckLinkedBlock(thread: linked, palette: palette).padding(.top, 18)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// "You wrote": his own earlier words an idea links to, on an inset block in the card's wash. A small label, the
+/// words in the saved-words serif, and where he wrote them.
+struct DeckLinkedBlock: View {
+    let thread: DeckThread
+    let palette: DeckPalette
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(verbatim: thread.label.flatMap { $0.isEmpty ? nil : $0 } ?? "You wrote")
+                .font(AppFont.footnote(weight: .semibold))
+                .foregroundStyle(palette.colors.secondaryInk)
+            Text(verbatim: DeckIdea.unquoted(thread.quote))
+                .font(AppFont.serif(style: .body))
+                .lineSpacing(3)
+                .foregroundStyle(Color.hxTextPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+            if let at = thread.at, !at.isEmpty {
+                Text(verbatim: at)
+                    .font(AppFont.footnote())
+                    .foregroundStyle(palette.colors.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// An idea card's answer box: his take once written, else where it goes. The card holds no text field, so the
+/// box opens the writing sheet.
+struct DeckAnswerBoxLabel: View {
+    let text: String?
+    let prompt: String
+    let palette: DeckPalette
+
+    var body: some View {
+        let written = text.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+        Text(verbatim: written ?? prompt)
+            .font(AppFont.body())
+            .foregroundStyle(written == nil ? Color.hxTextSecondary : Color.hxTextPrimary)
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(12)
+            .frame(maxWidth: .infinity, minHeight: 60, alignment: .topLeading)
+            .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous).strokeBorder(palette.colors.edge, lineWidth: 0.5)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
     }
 }
 
