@@ -763,8 +763,17 @@ struct DeckChangeRow: Decodable, Equatable, Identifiable {
     let state: State
     let recurred: Int?
     let undoable: Bool?
+    /// The same card as it was written before the fix and after it, so the fix can be seen to have worked.
+    /// Both or neither: one face alone shows nothing.
+    let proof: Proof?
 
-    private enum CodingKeys: String, CodingKey { case id, said, change, state, recurred, undoable }
+    /// One card written twice: before a fix and after it.
+    struct Proof: Equatable {
+        let before: DeckChangeFace
+        let after: DeckChangeFace
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, said, change, state, recurred, undoable, before, after }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -774,6 +783,42 @@ struct DeckChangeRow: Decodable, Equatable, Identifiable {
         state = State((try? c.decodeIfPresent(String.self, forKey: .state)) ?? "")
         recurred = try? c.decodeIfPresent(Int.self, forKey: .recurred)
         undoable = try? c.decodeIfPresent(Bool.self, forKey: .undoable)
+        let before = (try? c.decodeIfPresent(DeckChangeFace.self, forKey: .before)).flatMap { $0.isEmpty ? nil : $0 }
+        let after = (try? c.decodeIfPresent(DeckChangeFace.self, forKey: .after)).flatMap { $0.isEmpty ? nil : $0 }
+        if let before, let after, before != after { proof = Proof(before: before, after: after) } else { proof = nil }
+    }
+}
+
+/// A card as it read at one moment, on a What changed row: what a reader would notice of it. Decoded from a card
+/// in the deck's own shape, every field optional; a face with no words is dropped.
+struct DeckChangeFace: Decodable, Equatable {
+    /// The card's title, else the first line it led with.
+    let title: String?
+    /// The first of the source's own lines it quoted.
+    let quote: String?
+    /// Its take on the source: `take`, else its gist, context or body.
+    let text: String?
+    let question: String?
+
+    var isEmpty: Bool { title == nil && quote == nil && text == nil && question == nil }
+
+    private enum CodingKeys: String, CodingKey { case title, quotes, take, gist, context, body, question, kind }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        func words(_ key: CodingKeys) -> String? {
+            (try? c.decodeIfPresent(String.self, forKey: key))
+                .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+        }
+        title = words(.title)
+        question = words(.question)
+        let quotes = ((try? c.decodeIfPresent([Lossy<DeckPiece.Quote>].self, forKey: .quotes)) ?? []).compactMap(\.value)
+            .map { DeckIdea.unquoted($0.text) }.filter { !$0.isEmpty }
+        // An old book highlight's body is the source's own words.
+        let isHighlight = words(.kind) == "book" && words(.gist) == nil && quotes.isEmpty
+        quote = quotes.first ?? (isHighlight ? words(.body).map(DeckIdea.unquoted) : nil)
+        let said = words(.take) ?? words(.gist) ?? words(.context) ?? (isHighlight ? nil : words(.body))
+        text = said == title ? nil : said
     }
 }
 

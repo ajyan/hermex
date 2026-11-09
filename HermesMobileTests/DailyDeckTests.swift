@@ -2622,6 +2622,42 @@ final class DeckMessageSMSTests: XCTestCase {
     }
 }
 
+/// What changed shows the same card before and after a fix, when the vault sends both.
+final class DeckChangeProofTests: XCTestCase {
+    private func rows(_ json: String) throws -> [DeckChangeRow] {
+        try XCTUnwrap(DailyDeck.decode(#"{"date":"d","kind":"weekly","cards":[{"id":"c","type":"changes","rows":\#(json)}]}"#).cards.first).rows
+    }
+
+    func testARowCarriesTheCardBeforeAndAfterTheFix() throws {
+        let row = try XCTUnwrap(rows(#"""
+        [{"id":"f","said":"Titles are just the book's name","change":"Idea titles are a full sentence","state":"shipped",
+          "before":{"kind":"book","title":"Mindset","source":"Carol Dweck","body":"“It’s a learning process.”","question":"Old question?"},
+          "after":{"kind":"book","title":"A mistake is data, not a verdict.","quotes":[{"text":"“What can I learn from this?”"},{"text":"second"}],
+                   "take":"Treat the miss as information.","gist":"ignored","question":"New question?","future_field":{"x":1}}}]
+        """#).first)
+        let proof = try XCTUnwrap(row.proof)
+        XCTAssertEqual(proof.before.title, "Mindset")
+        XCTAssertEqual(proof.before.quote, "It’s a learning process.", "an old highlight's body is its quote")
+        XCTAssertNil(proof.before.text)
+        XCTAssertEqual(proof.before.question, "Old question?")
+        XCTAssertEqual(proof.after.title, "A mistake is data, not a verdict.")
+        XCTAssertEqual(proof.after.quote, "What can I learn from this?", "the first line, without its marks")
+        XCTAssertEqual(proof.after.text, "Treat the miss as information.", "the take wins over the gist")
+    }
+
+    func testARowWithoutBothFacesRendersAsBefore() throws {
+        let rows = try rows(#"""
+        [{"id":"a","change":"No proof","state":"held"},
+         {"id":"b","change":"Only after","state":"shipped","after":{"title":"T"}},
+         {"id":"c","change":"Empty faces","state":"shipped","before":{},"after":{"title":"  "}},
+         {"id":"d","change":"Not objects","state":"shipped","before":"text","after":7},
+         {"id":"e","change":"Nothing changed","state":"shipped","before":{"title":"Same"},"after":{"title":"Same"}}]
+        """#)
+        XCTAssertEqual(rows.map(\.id), ["a", "b", "c", "d", "e"], "a malformed proof never costs the row")
+        XCTAssertTrue(rows.allSatisfy { $0.proof == nil })
+    }
+}
+
 /// Brief cards lead to the module they are about, and a chat opened from a module names its way back.
 final class DeckModuleLinkTests: XCTestCase {
     func testAGoalDinnerAndTrainingCardEachOpenTheirModule() throws {
