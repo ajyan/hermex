@@ -65,6 +65,23 @@ struct PendingClarification: Decodable, Equatable, Identifiable {
     let requestedAt: Double?
     let timeoutSeconds: Int?
     let expiresAt: Double?
+    /// One line saying why the question is asked ("It reads like an interview story. It could
+    /// also be a journal note."). Fork-only; sent with `kind: "filing"`.
+    let detail: String?
+    /// The choice the server thinks likelier, as written in `choicesOffered`. Fork-only.
+    let recommended: String?
+
+    /// `kind` of the "where does this belong?" request: a capture that fits two places.
+    static let filingKind = "filing"
+
+    /// The two places of a filing request, likelier first; nil for any other clarification,
+    /// which keeps the ordinary card.
+    var filingPlaces: (recommended: String, other: String)? {
+        let choices = displayChoices
+        guard kind == Self.filingKind, choices.count == 2, choices[0] != choices[1] else { return nil }
+        let pick = recommended?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return pick == choices[1] ? (choices[1], choices[0]) : (choices[0], choices[1])
+    }
 
     var displayChoices: [String] {
         choicesOffered?.compactMap { choice in
@@ -97,7 +114,9 @@ struct PendingClarification: Decodable, Equatable, Identifiable {
         kind: String? = nil,
         requestedAt: Double? = nil,
         timeoutSeconds: Int? = nil,
-        expiresAt: Double? = nil
+        expiresAt: Double? = nil,
+        detail: String? = nil,
+        recommended: String? = nil
     ) {
         self.clarifyId = clarifyId
         self.question = question
@@ -107,6 +126,8 @@ struct PendingClarification: Decodable, Equatable, Identifiable {
         self.requestedAt = requestedAt
         self.timeoutSeconds = timeoutSeconds
         self.expiresAt = expiresAt
+        self.detail = detail
+        self.recommended = recommended
     }
 
     enum CodingKeys: String, CodingKey {
@@ -124,6 +145,8 @@ struct PendingClarification: Decodable, Equatable, Identifiable {
         case timeoutSecondsSnake = "timeout_seconds"
         case expiresAt
         case expiresAtSnake = "expires_at"
+        case detail
+        case recommended
     }
 
     init(from decoder: Decoder) throws {
@@ -141,6 +164,8 @@ struct PendingClarification: Decodable, Equatable, Identifiable {
             ?? container.decodeLossyIntIfPresent(forKey: .timeoutSecondsSnake)
         expiresAt = container.decodeLossyDoubleIfPresent(forKey: .expiresAt)
             ?? container.decodeLossyDoubleIfPresent(forKey: .expiresAtSnake)
+        detail = container.decodeLossyStringIfPresent(forKey: .detail)
+        recommended = container.decodeLossyStringIfPresent(forKey: .recommended)
     }
 
     private static func decodeStringArray(

@@ -3,7 +3,8 @@ import SwiftUI
 
 /// Debug-only: the filing receipt under a reply, with fixture pages and no server, for
 /// screenshots in light and dark.
-/// `xcrun simctl launch <udid> <bundle id> --filing-receipt-lab`
+/// `xcrun simctl launch <udid> <bundle id> --filing-receipt-lab`; add `--filing-ask` for the
+/// "where does this belong?" card under the turns.
 struct FilingReceiptLab: View {
     private static let receipt = FilingReceipt(
         id: "fr_lab000000001",
@@ -34,6 +35,18 @@ struct FilingReceiptLab: View {
                      receipt: Self.storyReceipt)
                 turn("Ran six miles along the water before work.",
                      receipt: FilingReceipt(id: "fr_lab000000003", undone: true, pages: Self.receipt.pages))
+                if ProcessInfo.processInfo.arguments.contains("--filing-ask") {
+                    FilingAskCard(
+                        question: "Where does this belong?",
+                        detail: "It reads like an interview story. It could also be a journal note.",
+                        recommended: "Story bank",
+                        other: "Journal",
+                        isResponding: false,
+                        errorMessage: nil,
+                        onChoose: { _ in },
+                        onFootprintChange: { _ in }
+                    )
+                }
             }
             .padding(16)
         }
