@@ -51,6 +51,8 @@ enum Endpoint {
     case clarifyPending(sessionID: String)
     case clarifyStream(sessionID: String)
     case clarifyRespond
+    /// Undoes one turn's filing receipt (fork-only).
+    case filingUndo
     case btw
     case background
     case backgroundStatus(sessionID: String)
@@ -366,6 +368,8 @@ enum Endpoint {
             return "/api/clarify/stream"
         case .clarifyRespond:
             return "/api/clarify/respond"
+        case .filingUndo:
+            return "/api/filing/undo"
         case .btw:
             return "/api/btw"
         case .background:

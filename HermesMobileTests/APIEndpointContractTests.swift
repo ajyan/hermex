@@ -148,6 +148,7 @@ final class ContractReadinessTests: XCTestCase {
                 query: ["session_id": "session-123"]
             ),
             .init(name: "clarification respond", method: "POST", endpoint: .clarifyRespond, path: "/api/clarify/respond"),
+            .init(name: "filing undo", method: "POST", endpoint: .filingUndo, path: "/api/filing/undo"),
             .init(name: "btw", method: "POST", endpoint: .btw, path: "/api/btw"),
             .init(name: "background", method: "POST", endpoint: .background, path: "/api/background"),
             .init(

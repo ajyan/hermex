@@ -95,6 +95,8 @@ struct HermesMobileApp: App {
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--voice-call-lab") {
                 VoiceCallLab()
+            } else if ProcessInfo.processInfo.arguments.contains("--filing-receipt-lab") {
+                FilingReceiptLab()
             } else {
                 ContentView(authManager: authManager)
                     .preferredColorScheme(AppTheme.storedValue(appThemeRawValue).colorScheme)
