@@ -323,6 +323,13 @@ struct ChatDecisionButtonStyle: ButtonStyle {
 
     let emphasis: Emphasis
 
+    /// A primary's fill and text (DESIGN.md § Buttons): the object's `glow` and `onGlow` on a
+    /// paper, Nous blue on the app's own surfaces.
+    static func primaryColors(on paper: HermexPaper?) -> (fill: Color, text: Color) {
+        guard let paper else { return (.accentColor, .hxOnAccent) }
+        return (paper.glow, paper.onGlow)
+    }
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.isEnabled) private var isEnabled
@@ -355,8 +362,7 @@ struct ChatDecisionButtonStyle: ButtonStyle {
 
         switch emphasis {
         case .primary:
-            if let paper { return paper.onGlow }
-            return colorScheme == .dark ? .black : .white
+            return Self.primaryColors(on: paper).text
         case .secondary:
             if let paper { return paper.glow }
             return .primary
@@ -372,8 +378,7 @@ struct ChatDecisionButtonStyle: ButtonStyle {
 
         switch emphasis {
         case .primary:
-            if let paper { return paper.glow }
-            return colorScheme == .dark ? .white : .black
+            return Self.primaryColors(on: paper).fill
         case .secondary:
             if let paper { return paper.wash.opacity(isPressed ? 1 : 0.8) }
             return colorScheme == .dark ? Color.white.opacity(isPressed ? 0.12 : 0.08) : Color.black.opacity(isPressed ? 0.07 : 0.045)

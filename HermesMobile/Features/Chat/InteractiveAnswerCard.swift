@@ -237,8 +237,7 @@ private struct InteractiveAnswerFullScreen: View {
         NavigationStack {
             InteractiveAnswerWebView(html: html, onMessage: onMessage, onNavigationFailure: {})
                 .background(Color.hxSurface)
-                .navigationTitle(title)
-                .navigationBarTitleDisplayMode(.inline)
+                .hxNavigationTitle(title)
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
                         Button(String(localized: "Done")) { dismiss() }
@@ -260,8 +259,7 @@ private struct InteractiveAnswerCodeSheet: View {
                     .padding()
             }
             .background(Color.hxCanvas)
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(title)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(String(localized: "Done")) { dismiss() }

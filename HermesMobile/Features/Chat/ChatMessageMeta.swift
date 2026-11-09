@@ -76,7 +76,7 @@ struct ChatMessageMetaRow<Accessory: View>: View {
                 if let actionMenu {
                     Menu { actionMenu } label: {
                         Image(systemName: "ellipsis")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 13, weight: .medium)) // design-drift: allow (SF Symbol in a fixed-size control)
                             .frame(width: 28, height: 28)
                             .chatMinimumHitTarget(in: Rectangle())
                     }
@@ -141,7 +141,7 @@ struct ChatCopyButton: View {
             copyCount += 1
         } label: {
             Image(systemName: showsCopied ? "checkmark" : "doc.on.doc")
-                .font(.system(size: glyphSize, weight: glyphWeight))
+                .font(.system(size: glyphSize, weight: glyphWeight)) // design-drift: allow (SF Symbol in a fixed-size control)
                 .frame(width: size, height: size)
                 .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
                 .chatMinimumHitTarget(

@@ -316,7 +316,7 @@ struct ClarifyAnswerLineView: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: "questionmark.bubble")
-                .font(.system(size: 13, weight: .medium))
+                .font(AppFont.footnote(weight: .medium))
                 .foregroundStyle(.secondary)
                 .frame(width: 20)
 

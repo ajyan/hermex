@@ -621,10 +621,10 @@ struct SidebarSubrowSelectionStyle: ViewModifier {
             .padding(.trailing, 10)
             .background {
                 if isSelected {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                         .fill(Color.accentColor.opacity(0.10))
                         .overlay {
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
                                 .stroke(Color.accentColor.opacity(0.20), lineWidth: 1)
                         }
                 }

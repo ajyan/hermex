@@ -114,8 +114,7 @@ struct ChatAttachmentPreviewView: View {
                     unavailableContent(String(localized: "Preview is not available for this attachment."))
                 }
             }
-            .navigationTitle(item.displayName)
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(item.displayName)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") {

@@ -65,7 +65,7 @@ struct MarkerMessageCardView: View {
     private func header(summary: String) -> some View {
         HStack(alignment: usesStackedHeader ? .top : .center, spacing: 8) {
             Image(systemName: iconName)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold)) // design-drift: allow (SF Symbol in a fixed-size control)
                 .foregroundStyle(.secondary)
                 .frame(width: 18, height: 18)
 

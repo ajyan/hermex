@@ -62,7 +62,7 @@ struct ComposerAttachmentPillPreview: View {
 
                 if attachments.count > visibleLimit {
                     Text("+\(attachments.count - visibleLimit)")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(AppFont.caption2(weight: .bold))
                         .foregroundStyle(Color.hxTextSecondary)
                         .frame(width: tileSize, height: tileSize)
                         .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
@@ -153,7 +153,7 @@ private struct ComposerAttachmentThumbnailView: View {
 
             Button(action: onRemove) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.system(size: 11, weight: .bold)) // design-drift: allow (SF Symbol in a fixed-size control)
                     .frame(width: 24, height: 24)
                     .background(Circle().fill(Color.hxCanvas))
                     .foregroundStyle(Color.hxTextPrimary)

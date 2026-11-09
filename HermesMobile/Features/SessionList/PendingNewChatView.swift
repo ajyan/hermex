@@ -208,7 +208,7 @@ struct PendingNewChatView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
     }
 
     private func createSessionIfNeeded() async {
