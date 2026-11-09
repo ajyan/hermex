@@ -1,3 +1,4 @@
+import SwiftUI
 import XCTest
 import Foundation
 import AVFoundation
@@ -793,18 +794,14 @@ final class DailyDeckTests: XCTestCase {
 
     func testJobCardKindLabels() throws {
         let deck = try DailyDeck.decode(Self.jobDeckJSON)
-        let pages = DeckPage.pages(for: deck.cards)
         let cards = Dictionary(uniqueKeysWithValues: deck.cards.map { ($0.id, $0) })
         let label = { (id: String) -> String in
             let card = cards[id]!
-            return card.kindLabel(DeckPalette.of(card), idea: DeckAct.ideaPosition(of: card, in: pages), advisor: deck.advisor)
+            return card.kindLabel(DeckPalette.of(card), advisor: deck.advisor)
         }
-        XCTAssertEqual(label("week-0-1"), "Video · Idea 1 of 2")
-        XCTAssertEqual(label("week-0-2"), "Video · Idea 2 of 2")
         XCTAssertEqual(label("advisor"), "Check-in · Roger Federer")
         XCTAssertEqual(label("letter"), "Letter to her · 80 days to go")
         XCTAssertEqual(label("year-ago"), "A year ago · Tue, Oct 28, 2025")
-        XCTAssertNil(DeckAct.ideaPosition(of: cards["advisor"]!, in: pages))
         XCTAssertEqual(DeckCard.quoted("words"), "“words”")
         XCTAssertEqual(DeckCard.quoted("“words”"), "“words”", "words already in quotes aren't quoted twice")
     }
@@ -2625,6 +2622,107 @@ final class DeckMessageSMSTests: XCTestCase {
     }
 }
 
+/// Every idea card reads in one layout (`DeckIdea`), whichever of the four shapes its deck wrote it in.
+final class DeckIdeaLayoutTests: XCTestCase {
+    private func idea(_ json: String) throws -> DeckIdea {
+        let card = try XCTUnwrap(DailyDeck.decode(#"{"date":"d","kind":"morning","cards":[\#(json)]}"#).cards.first)
+        XCTAssertTrue(card.isIdea)
+        return DeckIdea(card, palette: DeckPalette.of(card))
+    }
+
+    func testAnIdeaWithItsSourcesLinesLeadsWithThemThenTheTakeAndHisWords() throws {
+        let idea = try idea(#"""
+        {"id":"i","type":"reflect","kind":"book","act":"ideas","title":"A habit isn't yours until it runs without exceptions.",
+         "source":"William James, Habit","gist":"Old gist.","take":"Willpower installs a habit; it doesn't run it.",
+         "quotes":[{"text":"“Never suffer an exception to occur.”.","at":"William James, 1890"},{"text":"Make the nervous system our ally."}],
+         "parts":[{"label":"Ignored","text":"parts are not drawn"}],
+         "linked":{"label":"You wrote, Oct 25","quote":"Sleep is my one thing again.","at":"You, on the weekly review"},
+         "question":"Is he right?"}
+        """#)
+        XCTAssertEqual(idea.kindLine, "Book highlight · William James, Habit")
+        XCTAssertEqual(idea.sentence, "A habit isn't yours until it runs without exceptions.")
+        XCTAssertEqual(idea.quotes, [DeckPiece.Quote(text: "Never suffer an exception to occur.", at: "William James, 1890"),
+                                     DeckPiece.Quote(text: "Make the nervous system our ally.", at: nil)],
+                       "the row draws the quote mark, so the words lose theirs and the stray full stop")
+        XCTAssertEqual(idea.take, "Willpower installs a habit; it doesn't run it.", "the take wins over the gist")
+        XCTAssertEqual(idea.linked?.quote, "Sleep is my one thing again.")
+        XCTAssertFalse(idea.isSummary)
+    }
+
+    func testACardWrittenFromASummarySaysSoAndHasNoQuoteSlots() throws {
+        // The gist-and-parts shape: no words from the source, so it is a summary without being told.
+        let derived = try idea(#"""
+        {"id":"i","type":"reflect","kind":"insight","act":"ideas","title":"Write down why your work mattered","source":"Your notes",
+         "gist":"Your contributions fade unless you document them.","body":"Your contributions fade unless you document them.",
+         "quotes":[],"parts":[{"label":"Memory fades","text":"Work disappears."}],"question":"Q?"}
+        """#)
+        XCTAssertTrue(derived.isSummary)
+        XCTAssertEqual(derived.kindLine, "From your notes · summary", "\"Your notes\" isn't said twice")
+        XCTAssertEqual(derived.take, "Your contributions fade unless you document them.")
+        XCTAssertTrue(derived.quotes.isEmpty)
+
+        // The vault's marker wins either way, under either name.
+        let marked = try idea(#"""
+        {"id":"i","type":"reflect","kind":"media","act":"ideas","title":"T","source":"A Life Engineered","summary":true,
+         "quotes":[{"text":"A line that should not show."}]}
+        """#)
+        XCTAssertEqual(marked.kindLine, "From your reading · summary · A Life Engineered")
+        XCTAssertTrue(marked.quotes.isEmpty, "a summary card leaves the quote slots out")
+        XCTAssertTrue(try idea(#"{"id":"i","type":"reflect","kind":"media","act":"ideas","source_text":false,"quotes":[{"text":"x y"}]}"#).isSummary)
+        XCTAssertFalse(try idea(#"{"id":"i","type":"reflect","kind":"media","act":"ideas","summary":false,"title":"T"}"#).isSummary)
+    }
+
+    func testAnOldBookHighlightShowsItsHighlightAsTheQuoteNotTheBooksNameAsTheIdea() throws {
+        let idea = try idea(#"""
+        {"id":"i","type":"reflect","kind":"book","act":"ideas","title":"Mindset","source":"Carol Dweck",
+         "body":"“What can I learn from this?” It’s a learning process.","context":"The quote reframes mistakes as data.","question":"Q?"}
+        """#)
+        XCTAssertNil(idea.sentence, "a book's name is not the idea")
+        XCTAssertEqual(idea.kindLine, "Book highlight · Carol Dweck, Mindset")
+        XCTAssertEqual(idea.quotes.map(\.text), ["“What can I learn from this?” It’s a learning process."],
+                       "marks inside the words stay")
+        XCTAssertEqual(idea.take, "The quote reframes mistakes as data.")
+        XCTAssertFalse(idea.isSummary)
+    }
+
+    func testAPieceCardsQuotesAreItsLinesAndItsStepsAreLeftToTheMap() throws {
+        let idea = try idea(#"""
+        {"id":"i","type":"reflect","kind":"media","act":"ideas","title":"Teams drive real progress","source":"A Life Engineered · 9 min read",
+         "gist":"Solitary effort is a myth.","quotes":[],
+         "piece":{"meta":"9 min read","steps":[{"name":"Reject the Lone Myth","claim":"Teams, not solo effort."}],
+                  "quotes":[{"text":"Coaching is the closest thing we have to time travel."}]}}
+        """#)
+        XCTAssertEqual(idea.quotes.map(\.text), ["Coaching is the closest thing we have to time travel."])
+        XCTAssertEqual(idea.kindLine, "From your reading · A Life Engineered · 9 min read")
+        XCTAssertEqual(idea.take, "Solitary effort is a myth.")
+    }
+
+    func testADeckFromBeforeActsReadsInTheSameLayout() throws {
+        let wiki = try idea(#"""
+        {"id":"w","type":"reflect","kind":"wiki","title":"NYC Marathon","source":"Wiki",
+         "body":"Run the first half slower than feels right. The race starts at mile 20.","context":"From your race plan."}
+        """#)
+        XCTAssertEqual(wiki.sentence, "Run the first half slower than feels right.")
+        XCTAssertEqual(wiki.kindLine, "From your wiki · summary · NYC Marathon · Wiki")
+        XCTAssertEqual(wiki.take, "The race starts at mile 20.\n\nFrom your race plan.")
+
+        let quote = try idea(#"{"id":"q","type":"reflect","kind":"quote","title":"Seneca","source":"Letters","body":"We suffer more in imagination."}"#)
+        XCTAssertNil(quote.sentence)
+        XCTAssertEqual(quote.quotes.map(\.text), ["We suffer more in imagination."])
+        XCTAssertEqual(quote.kindLine, "Quote · Seneca, Letters")
+    }
+
+    func testOnlyIdeasTakeTheIdeaLayout() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"d","kind":"morning","cards":[
+          {"id":"a","type":"reflect","kind":"on_this_day","act":"writing"},{"id":"b","type":"reflect","kind":"on_this_day"},
+          {"id":"c","type":"reflect","kind":"book","chapter":"remember"},{"id":"d","type":"prompt","act":"writing"},
+          {"id":"e","type":"reflect","kind":"video","act":"ideas"},{"id":"f","type":"reflect","kind":"wiki"}]}
+        """#)
+        XCTAssertEqual(deck.cards.filter(\.isIdea).map(\.id), ["e", "f"])
+    }
+}
+
 final class DeckCardSourceTests: XCTestCase {
     private func card(_ json: String) throws -> DeckCard {
         try JSONDecoder().decode(DeckCard.self, from: Data(json.utf8))
@@ -2987,5 +3085,128 @@ final class MandarinPracticeTests: XCTestCase {
         let older = try self.card(#"{"date":"d","kind":"morning","cards":[{"id":"m","type":"prompt","kind":"mandarin","title":"Mom calls","scene":"","question":"你好吗？"}]}"#)
         XCTAssertNil(older.scene)
         XCTAssertEqual(DeckAheadRow.title(.card(older)), "Mom calls", "a card before scenes keeps its title")
+    }
+}
+
+/// Deck cards hosted in a real window on stand-in words, written as PNGs for manual review.
+@MainActor
+final class DeckRenderTests: XCTestCase {
+    /// A morning deck of stand-in cards: an idea in each shape decks have carried, then the cards a review looks at.
+    static let deckJSON = #"""
+    {"version":1,"date":"2026-11-10","kind":"morning","advisor":"Roger Federer","cards":[
+      {"id":"headline","type":"headline","title":"Tue, Nov 10","tags":[{"icon":"advisor","text":"Check-in: Roger Federer"}],
+       "learned":[{"id":"note.1","text":"Idea titles are a full sentence","state":"learned"},
+                  {"id":"note.2","text":"Letter prompts never say what to tell her","state":"learned"}]},
+      {"id":"idea-quotes","type":"reflect","kind":"book","act":"ideas","ref":{"pool":"book:habit"},
+       "title":"A habit isn't yours until it runs without exceptions.","source":"William James, Habit",
+       "gist":"Willpower is for installing a habit, not for running it.",
+       "take":"Willpower is for installing a habit, not for running it. One skipped day costs more than one extra day earns.",
+       "quotes":[{"text":"The great thing, then, in all education, is to make our nervous system our ally instead of our enemy."},
+                 {"text":"Never suffer an exception to occur till the new habit is securely rooted in your life.","at":"William James, 1890"}],
+       "linked":{"label":"You wrote, Oct 25","quote":"Sleep is my one thing again this week.","at":"You, on the weekly review"},
+       "question":"James says one exception undoes many repetitions. Is he right, or is he overstating it?"},
+      {"id":"idea-parts","type":"reflect","kind":"insight","act":"ideas","ref":{"link":"wiki/career","pool":"insight:career_1"},
+       "title":"Make your impact memorable","source":"Your notes","week_question":"What do I want her to learn from watching how I work?",
+       "gist":"Promotion depends on making your impact memorable and showing how your growth helps the team.",
+       "body":"Promotion depends on making your impact memorable and showing how your growth helps the team.","quotes":[],
+       "parts":[{"label":"Impact memory","text":"Make your impact easy to remember."},
+                {"label":"Team growth","text":"Show how your growth helps the whole team."},
+                {"label":"Style over volume","text":"How you work matters more than how much you work."}],
+       "reason":"For this week's question","question":"How do you currently explain why a recent project mattered to the team?"},
+      {"id":"idea-book","type":"reflect","kind":"book","act":"ideas","ref":{"pool":"book:mindset"},"title":"Mindset","source":"Carol Dweck",
+       "body":"“What can I learn from this? What will I do next time when I’m in this situation?” It’s a learning process, not a battle between the bad you and the good you.",
+       "context":"The quote reframes mistakes as data, not moral failures. It turns self-improvement into a loop of observation and action.",
+       "week_question":"What do I want her to learn from watching how I work?",
+       "question":"When you hit a wall, what do you want her to see you do?"},
+      {"id":"idea-piece","type":"reflect","kind":"media","act":"ideas","ref":{"link":"email_ingest/summaries/sample","pool":"email:sample"},
+       "title":"Teams and precise questions drive real progress","source":"A Sample Letter · 9 min read",
+       "gist":"Solitary effort is a myth. Teams and one-on-one guidance speed growth by skipping trial and error.","quotes":[],"parts":[],
+       "piece":{"meta":"9 min read","steps":[{"name":"Reject the lone myth","claim":"Great work relies on teams and patrons."},
+                {"name":"Define problems precisely","claim":"A specific diagnosis lets others give a targeted fix."},
+                {"name":"Find local solutions","claim":"Answers often sit inside your own network."}],
+                "quotes":[{"text":"Coaching is the closest thing we have to time travel."}]},
+       "linked":{"label":"You wrote, Nov 7","quote":"If someone is watching me work, I want them to see that I listen first.","at":"You, on a check-in"},
+       "question":"How does defining a problem precisely change the help you get?"},
+      {"id":"goal","type":"goal","act":"body","goals":["sample-goal"],"color":"wiki","fallback":"Run 3 of 4 this week."},
+      {"id":"dinner","type":"dinner","act":"body","date":"2026-11-09","question":"What was last night's dinner?",
+       "options":[{"id":"hamachi","label":"Hamachi collar"},{"id":"other","label":"Something else"},{"id":"out","label":"Ate out"}]},
+      {"id":"changes","type":"changes","title":"What changed","rows":[
+        {"id":"fix-1","said":"The idea titles are just the book's name","change":"Idea titles are a full sentence","state":"shipped","undoable":true,
+         "before":{"kind":"book","title":"Mindset","source":"Carol Dweck","body":"It’s a learning process, not a battle.","question":"When you hit a wall, what do you want her to see you do?"},
+         "after":{"kind":"book","title":"A mistake is data, not a verdict.","source":"Carol Dweck, Mindset",
+                  "quotes":[{"text":"What can I learn from this? What will I do next time?"}],
+                  "take":"Treat the miss as information and the next attempt as the answer.","question":"Dweck says a miss is only data. Where is she wrong?"}},
+        {"id":"fix-2","said":"Stop telling me what to write to her","change":"Letter prompts never say what to tell her","state":"held"}]},
+      {"id":"close","type":"close","week_rows":[
+        {"label":"Sleep by 11","kind":"days","done":2,"front":"living-well","front_name":"Body","days":[
+          {"date":"2026-11-09","state":"done"},{"date":"2026-11-10","state":"today"},{"date":"2026-11-11","state":"ahead"},
+          {"date":"2026-11-12","state":"ahead"},{"date":"2026-11-13","state":"ahead"},{"date":"2026-11-14","state":"ahead"},{"date":"2026-11-15","state":"ahead"}]},
+        {"label":"Lifted","kind":"days","done":1,"front":"living-well","front_name":"Body","days":[
+          {"date":"2026-11-09","state":"done"},{"date":"2026-11-10","state":"today"},{"date":"2026-11-11","state":"ahead"},
+          {"date":"2026-11-12","state":"ahead"},{"date":"2026-11-13","state":"ahead"},{"date":"2026-11-14","state":"ahead"},{"date":"2026-11-15","state":"ahead"}]},
+        {"label":"Mandarin","kind":"days","done":1,"front":"relationships","front_name":"People","days":[
+          {"date":"2026-11-09","state":"done"},{"date":"2026-11-10","state":"today"},{"date":"2026-11-11","state":"ahead"},
+          {"date":"2026-11-12","state":"ahead"},{"date":"2026-11-13","state":"ahead"},{"date":"2026-11-14","state":"ahead"},{"date":"2026-11-15","state":"ahead"}]},
+        {"label":"Letters to her","kind":"days","done":1,"front":"fatherhood","front_name":"Becoming a dad","days":[
+          {"date":"2026-11-09","state":"done"},{"date":"2026-11-10","state":"today"},{"date":"2026-11-11","state":"ahead"},
+          {"date":"2026-11-12","state":"ahead"},{"date":"2026-11-13","state":"ahead"},{"date":"2026-11-14","state":"ahead"},{"date":"2026-11-15","state":"ahead"}]},
+        {"label":"Prep practice","goal":"sample-goal","commitment":"prep","target":6,"kind":"days","done":0,"front":"ai","front_name":"Landing the AI role","days":[
+          {"date":"2026-11-09","state":"missed"},{"date":"2026-11-10","state":"today"},{"date":"2026-11-11","state":"ahead"},
+          {"date":"2026-11-12","state":"ahead"},{"date":"2026-11-13","state":"ahead"},{"date":"2026-11-14","state":"ahead"},{"date":"2026-11-15","state":"ahead"}]},
+        {"label":"Applications","goal":"sample-goal","commitment":"applications","target":5,"kind":"pips","done":2,"front":"ai","front_name":"Landing the AI role"},
+        {"label":"Outreach","goal":"sample-goal","commitment":"outreach","target":5,"kind":"pips","done":1,"front":"ai","front_name":"Landing the AI role"}]}
+    ]}
+    """#
+
+    /// Writes each named card as `<card>-<light|dark>.png`, only when `DECK_RENDERS` names a folder
+    /// (`TEST_RUNNER_DECK_RENDERS=<folder>`). `DECK_RENDER_CARDS` (comma-separated ids) narrows it. Stand-in words only.
+    func testRenderFixturesForReview() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let folder = environment["DECK_RENDERS"] else {
+            throw XCTSkip("Set TEST_RUNNER_DECK_RENDERS to write review renders")
+        }
+        UIView.setAnimationsEnabled(false)
+        defer { UIView.setAnimationsEnabled(true) }
+        let directory = URL(fileURLWithPath: folder, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let suite = "DeckRenderTests"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = DailyDeckStore(defaults: defaults)
+        let server = URL(string: "https://deck-render-tests.invalid")!
+        store.setWorkspace("/vault", for: server)
+        let morning = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 10, hour: 9))!
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-11-10.morning.json"], deck: Self.deckJSON)
+        let viewModel = DailyDeckViewModel(server: server, client: client, store: store, now: { morning })
+        await viewModel.load()
+        let wanted = environment["DECK_RENDER_CARDS"].map { Set($0.split(separator: ",").map(String.init)) }
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+
+        for (index, page) in viewModel.visiblePages.enumerated() where wanted?.contains(page.id) ?? true {
+            viewModel.index = index
+            for (name, style) in [("light", UIUserInterfaceStyle.light), ("dark", .dark)] {
+                let appeared = expectation(description: "\(page.id) appeared")
+                let window = UIWindow(windowScene: scene)
+                window.frame = CGRect(x: 0, y: 0, width: 402, height: 1040)
+                window.overrideUserInterfaceStyle = style
+                window.rootViewController = UIHostingController(rootView:
+                    DeckPageView(page: page, viewModel: viewModel, file: {})
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.hxCanvas.ignoresSafeArea())
+                        .onAppear { appeared.fulfill() })
+                window.makeKeyAndVisible()
+                await fulfillment(of: [appeared], timeout: 5)
+                window.layoutIfNeeded()
+                let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                    window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+                }
+                try XCTUnwrap(image.pngData()).write(to: directory.appendingPathComponent("\(page.id)-\(name).png"))
+                window.isHidden = true
+                window.rootViewController = nil
+            }
+        }
     }
 }
