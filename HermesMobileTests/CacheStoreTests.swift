@@ -413,6 +413,32 @@ final class CacheStoreTests: XCTestCase {
         XCTAssertEqual(cachedMessages.first?.reasoning, "Cached reasoning.")
     }
 
+    func testFilingReceiptRoundTripsThroughCache() throws {
+        let context = try makeContext()
+        let serverURL = URL(string: "https://example.test")!
+        let cachedAt = Date(timeIntervalSince1970: 1_770_000_000)
+        let message = try JSONDecoder().decode(
+            ChatMessage.self,
+            from: Data(#"""
+            {"role":"assistant","content":"Saved.","messageId":"m1",
+             "_filed":{"id":"fr_1","can_undo":true,"pages":[{"kind":"person","title":"Sam Rivera","module":"people","page_id":"crm/contacts/Sam Rivera.md"}]}}
+            """#.utf8)
+        )
+        let receipt = try XCTUnwrap(message.filed)
+
+        try CacheStore.cacheMessages([message], serverURL: serverURL, sessionID: "abc123", in: context, cachedAt: cachedAt)
+
+        XCTAssertEqual(
+            try CacheStore.cachedMessages(
+                serverURL: serverURL,
+                sessionID: "abc123",
+                in: context,
+                now: cachedAt.addingTimeInterval(60)
+            ).first?.filed,
+            receipt
+        )
+    }
+
     func testAssistantTurnTpsDecodesAndRoundTripsThroughCache() throws {
         let context = try makeContext()
         let serverURL = URL(string: "https://example.test")!

@@ -109,11 +109,14 @@ protocol ChatStreamCoordinatorDelegate: AnyObject {
     @discardableResult
     func streamCoordinatorEnqueuePendingSteerLeftover(_ text: String) -> Bool
     func streamCoordinatorApplyContextSources(_ payload: ContextSourcesStreamEvent)
+    func streamCoordinatorApplyFiled(_ payload: FiledStreamEvent)
 }
 
 extension ChatStreamCoordinatorDelegate {
     /// Only the chat keeps a run's context sources (for the call screen); other delegates skip them.
     func streamCoordinatorApplyContextSources(_ payload: ContextSourcesStreamEvent) {}
+    /// Only the chat shows a turn's filing receipt.
+    func streamCoordinatorApplyFiled(_ payload: FiledStreamEvent) {}
 }
 
 @MainActor
@@ -852,7 +855,7 @@ final class ChatStreamCoordinator {
                 // pre-change handleTransportError path (PR #295 re-gate).
                 finishStream()
                 return
-            case .token, .interimAssistant, .reasoning, .toolStarted, .toolCompleted, .contextSources,
+            case .token, .interimAssistant, .reasoning, .toolStarted, .toolCompleted, .contextSources, .filed,
                  .approvalPending, .clarificationPending, .pendingSteerLeftover:
                 return
             }
@@ -898,6 +901,9 @@ final class ChatStreamCoordinator {
             }
         case .contextSources(let payload):
             delegate?.streamCoordinatorApplyContextSources(payload)
+            markProgress()
+        case .filed(let payload):
+            delegate?.streamCoordinatorApplyFiled(payload)
             markProgress()
         case .title(let payload):
             if delegate?.streamCoordinatorUpdateTitle(payload) == true {

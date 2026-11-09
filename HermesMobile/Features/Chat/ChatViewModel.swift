@@ -382,6 +382,11 @@ final class ChatViewModel {
     /// The notes and people the server gave the agent for the current run (`context_sources`),
     /// read by the call screen. Cleared when a turn is sent.
     private(set) var liveContextSources: [ContextSourcesStreamEvent.Source] = []
+    /// The running turn's filing receipt from the `filed` event, held until `done` settles the
+    /// transcript.
+    private var liveFilingReceipt: FilingReceipt?
+    /// Receipts whose Undo is in flight, by receipt id.
+    private(set) var undoingFilingReceiptIDs: Set<String> = []
     private(set) var liveReasoningText = ""
     private(set) var streamingAssistantMessageID: String? {
         didSet {
@@ -2213,7 +2218,8 @@ final class ChatViewModel {
                 contentParts: loadedAssistant.contentParts ?? snapshotAssistant.contentParts,
                 reasoning: loadedAssistant.reasoning ?? snapshotAssistant.reasoning,
                 attachments: loadedAssistant.attachments ?? snapshotAssistant.attachments,
-                turnTps: loadedAssistant.turnTps ?? snapshotAssistant.turnTps
+                turnTps: loadedAssistant.turnTps ?? snapshotAssistant.turnTps,
+                filed: loadedAssistant.filed ?? snapshotAssistant.filed
             )
             return ActiveStreamMessageMerge(
                 messages: mergedMessages,
@@ -2736,6 +2742,7 @@ final class ChatViewModel {
         liveReasoningText = ""
         liveToolCalls = []
         liveContextSources = []
+        liveFilingReceipt = nil
         reasoningAnchorMessageID = nil
         toolCallAnchorMessageID = nil
         streamCoordinator.prepareForNewResponse()
@@ -4115,6 +4122,41 @@ final class ChatViewModel {
         }
     }
 
+    /// Undoes a turn's filing: the server puts each page back as it was before the turn. The
+    /// receipt changes only once the server says so; a failure leaves it as it was and shows
+    /// the reason in the composer's error banner.
+    func undoFiling(for message: ChatMessage) async {
+        guard let receipt = message.filed, let receiptID = receipt.id, !receipt.undone,
+              !undoingFilingReceiptIDs.contains(receiptID)
+        else { return }
+        guard !isViewingCachedData else {
+            sendErrorMessage = String(localized: "Reconnect to the server to undo a filing.")
+            return
+        }
+        guard let sessionID else {
+            sendErrorMessage = String(localized: "The server did not provide a session ID.")
+            return
+        }
+
+        undoingFilingReceiptIDs.insert(receiptID)
+        defer { undoingFilingReceiptIDs.remove(receiptID) }
+        do {
+            let response = try await client.undoFiling(sessionID: sessionID, receiptID: receiptID)
+            guard response.ok == true else {
+                sendErrorMessage = response.error ?? String(localized: "That filing could not be undone.")
+                return
+            }
+            var undone = response.receipt ?? receipt
+            undone.undone = true
+            undone.canUndo = false
+            if let index = messages.lastIndex(where: { $0.filed?.id == receiptID }) {
+                messages[index] = messages[index].withFiled(undone)
+            }
+        } catch {
+            sendErrorMessage = (error as? APIError)?.serverMessage ?? error.localizedDescription
+        }
+    }
+
     private func undoLastExchangeFromSlashCommand() async -> SlashCommandExecutionResult {
         guard !isViewingCachedData else {
             return .unsupported(friendlyMessage: String(localized: "Reconnect to the server to undo messages."))
@@ -4378,7 +4420,8 @@ final class ChatViewModel {
             contentParts: existing.contentParts,
             reasoning: existing.reasoning,
             attachments: existing.attachments,
-            turnTps: existing.turnTps
+            turnTps: existing.turnTps,
+            filed: existing.filed
         )
         scheduleStreamingScrollTrigger()
     }
@@ -5061,7 +5104,7 @@ final class ChatViewModel {
             activeBtwAnswer = "Error: \(message)"
             updateActiveBtwMessage(isLoading: false)
             finishBtwStream()
-        case .heartbeat, .ignored, .reasoning, .toolStarted, .toolCompleted, .contextSources, .title, .metering, .pendingSteerLeftover:
+        case .heartbeat, .ignored, .reasoning, .toolStarted, .toolCompleted, .contextSources, .filed, .title, .metering, .pendingSteerLeftover:
             break
         }
     }
@@ -5183,7 +5226,8 @@ final class ChatViewModel {
                 contentParts: existing.contentParts,
                 reasoning: existing.reasoning,
                 attachments: existing.attachments,
-                turnTps: existing.turnTps
+                turnTps: existing.turnTps,
+                filed: existing.filed
             )
             scheduleStreamingScrollTrigger()
             return true
@@ -5666,7 +5710,8 @@ final class ChatViewModel {
                 contentParts: existing.contentParts,
                 reasoning: existing.reasoning,
                 attachments: existing.attachments,
-                turnTps: existing.turnTps
+                turnTps: existing.turnTps,
+                filed: existing.filed
             )
             return true
         }
@@ -6458,6 +6503,22 @@ extension ChatViewModel: ChatStreamCoordinatorDelegate {
         liveContextSources = payload.sources
     }
 
+    func streamCoordinatorApplyFiled(_ payload: FiledStreamEvent) {
+        liveFilingReceipt = payload.receipt
+    }
+
+    /// Puts the `filed` event's receipt on the turn's last assistant message when the completed
+    /// transcript didn't already carry it (`done` with no messages, or an older `done`).
+    private func attachLiveFilingReceipt() {
+        guard let receipt = liveFilingReceipt else { return }
+        liveFilingReceipt = nil
+        guard !receipt.pages.isEmpty,
+              let index = messages.lastIndex(where: { $0.role == "assistant" }),
+              messages[index].filed == nil
+        else { return }
+        messages[index] = messages[index].withFiled(receipt)
+    }
+
     @discardableResult
     func streamCoordinatorUpdateTitle(_ payload: TitleStreamEvent) -> Bool {
         updateTitle(payload)
@@ -6474,6 +6535,7 @@ extension ChatViewModel: ChatStreamCoordinatorDelegate {
         if let usage = payload.usage {
             contextWindowSnapshot = usage
         }
+        attachLiveFilingReceipt()
         if let finalTokensPerSecond = payload.usage?.tokensPerSecond,
            finalTokensPerSecond.isFinite,
            finalTokensPerSecond > 0,
@@ -6507,7 +6569,8 @@ extension ChatViewModel: ChatStreamCoordinatorDelegate {
                 contentParts: message.contentParts,
                 reasoning: message.reasoning,
                 attachments: message.attachments,
-                turnTps: finalTokensPerSecond
+                turnTps: finalTokensPerSecond,
+                filed: message.filed
             )
         }
         return hasCompletedTranscript

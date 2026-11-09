@@ -267,6 +267,7 @@
 		1A2B3C4D5E6F7000000000A8 /* Endpoints.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000B8 /* Endpoints.swift */; };
 		1A2B3C4D5E6F7000000000A9 /* JSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000B9 /* JSONValue.swift */; };
 		1A2B3C4D5E6F7000000000AA /* ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000BA /* ChatMessage.swift */; };
+		F11E0000000000000000010A /* FilingReceipt.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E0000000000000000010B /* FilingReceipt.swift */; };
 		1A2B3C4D5E6F7000000000AB /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000BB /* Session.swift */; };
 		1A2B3C4D5E6F7000000000AC /* APIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7000000000BC /* APIClientTests.swift */; };
 		C0FF000000000000000000C1 /* CustomHeaderInjectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FF000000000000000000C2 /* CustomHeaderInjectionTests.swift */; };
@@ -368,8 +369,11 @@
 		A04200000000000000000003 /* ApprovalRequestOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04200000000000000000004 /* ApprovalRequestOverlay.swift */; };
 		C1A042000000000000000001 /* Clarification.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A042000000000000000002 /* Clarification.swift */; };
 		C1A042000000000000000003 /* ClarificationRequestCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A042000000000000000004 /* ClarificationRequestCard.swift */; };
+		F11E0000000000000000030A /* FilingReceiptLab.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E0000000000000000030B /* FilingReceiptLab.swift */; };
+		F11E0000000000000000020A /* FilingReceiptRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E0000000000000000020B /* FilingReceiptRow.swift */; };
 		C1A0420000000000000000A3 /* PendingRequestSurfaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A0420000000000000000A4 /* PendingRequestSurfaces.swift */; };
 		C1A042000000000000000005 /* ClarificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A042000000000000000006 /* ClarificationTests.swift */; };
+		F11E0000000000000000040A /* FilingReceiptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E0000000000000000040B /* FilingReceiptTests.swift */; };
 		A02400000000000000000001 /* Goal.swift in Sources */ = {isa = PBXBuildFile; fileRef = A02400000000000000000002 /* Goal.swift */; };
 		C04600000000000000000001 /* ChatStreamCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04600000000000000000002 /* ChatStreamCoordinator.swift */; };
 		C0A100000000000000000001 /* TurnTrace.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A100000000000000000002 /* TurnTrace.swift */; };
@@ -1186,6 +1190,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		1A2B3C4D5E6F7000000000B8 /* Endpoints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Endpoints.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7000000000B9 /* JSONValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONValue.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7000000000BA /* ChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessage.swift; sourceTree = "<group>"; };
+		F11E0000000000000000010B /* FilingReceipt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilingReceipt.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7000000000BB /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7000000000BC /* APIClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientTests.swift; sourceTree = "<group>"; };
 		C0FF000000000000000000C2 /* CustomHeaderInjectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomHeaderInjectionTests.swift; sourceTree = "<group>"; };
@@ -1287,8 +1292,11 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		A04200000000000000000004 /* ApprovalRequestOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalRequestOverlay.swift; sourceTree = "<group>"; };
 		C1A042000000000000000002 /* Clarification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Clarification.swift; sourceTree = "<group>"; };
 		C1A042000000000000000004 /* ClarificationRequestCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClarificationRequestCard.swift; sourceTree = "<group>"; };
+		F11E0000000000000000030B /* FilingReceiptLab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilingReceiptLab.swift; sourceTree = "<group>"; };
+		F11E0000000000000000020B /* FilingReceiptRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilingReceiptRow.swift; sourceTree = "<group>"; };
 		C1A0420000000000000000A4 /* PendingRequestSurfaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingRequestSurfaces.swift; sourceTree = "<group>"; };
 		C1A042000000000000000006 /* ClarificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClarificationTests.swift; sourceTree = "<group>"; };
+		F11E0000000000000000040B /* FilingReceiptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilingReceiptTests.swift; sourceTree = "<group>"; };
 		A02400000000000000000002 /* Goal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Goal.swift; sourceTree = "<group>"; };
 		C04600000000000000000002 /* ChatStreamCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStreamCoordinator.swift; sourceTree = "<group>"; };
 		C0A100000000000000000002 /* TurnTrace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurnTrace.swift; sourceTree = "<group>"; };
@@ -2275,6 +2283,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C15400000000000000000006 /* KanbanCardDetailStateTests.swift */,
 				C15300000000000000000006 /* KanbanCardEditorStateTests.swift */,
 				C1A042000000000000000006 /* ClarificationTests.swift */,
+				F11E0000000000000000040B /* FilingReceiptTests.swift */,
 				1A2B3C4D5E6F7000000000F4 /* CacheStoreTests.swift */,
 				B1A1C0DE0000000000000704 /* BrainCacheTests.swift */,
 				C04400000000000000000004 /* CacheFallbackPolicyTests.swift */,
@@ -2448,6 +2457,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				1A2B3C4D5E6F7000000000B4 /* ServerInfo.swift */,
 				1A2B3C4D5E6F7000000000BB /* Session.swift */,
 				1A2B3C4D5E6F7000000000BA /* ChatMessage.swift */,
+				F11E0000000000000000010B /* FilingReceipt.swift */,
 				1A2B3C4D5E6F7000000000BD /* Workspace.swift */,
 				C03120000000000000F001 /* GitWorkspace.swift */,
 				1A2B3C4D5E6F7000000000BE /* ServerCatalog.swift */,
@@ -2681,6 +2691,8 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				105050000000000000000002 /* ComposerModelPickerSectionExpansionState.swift */,
 				A04200000000000000000004 /* ApprovalRequestOverlay.swift */,
 				C1A042000000000000000004 /* ClarificationRequestCard.swift */,
+				F11E0000000000000000030B /* FilingReceiptLab.swift */,
+				F11E0000000000000000020B /* FilingReceiptRow.swift */,
 				C1A0420000000000000000A4 /* PendingRequestSurfaces.swift */,
 				1A2B3C4D5E6F7000000000D9 /* MessageBubbleView.swift */,
 				C87100000000000000000002 /* UserBubbleFoldPolicy.swift */,
@@ -3704,6 +3716,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				1A2B3C4D5E6F7000000000A4 /* ServerInfo.swift in Sources */,
 				1A2B3C4D5E6F7000000000AB /* Session.swift in Sources */,
 				1A2B3C4D5E6F7000000000AA /* ChatMessage.swift in Sources */,
+				F11E0000000000000000010A /* FilingReceipt.swift in Sources */,
 				1A2B3C4D5E6F7000000000AD /* Workspace.swift in Sources */,
 				1A2B3C4D5E6F7000000000AE /* ServerCatalog.swift in Sources */,
 				1A2B3C4D5E6F70000000140 /* ModelFavoritesStore.swift in Sources */,
@@ -3877,6 +3890,8 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				A04200000000000000000003 /* ApprovalRequestOverlay.swift in Sources */,
 				C1A042000000000000000001 /* Clarification.swift in Sources */,
 				C1A042000000000000000003 /* ClarificationRequestCard.swift in Sources */,
+				F11E0000000000000000030A /* FilingReceiptLab.swift in Sources */,
+				F11E0000000000000000020A /* FilingReceiptRow.swift in Sources */,
 				C1A0420000000000000000A3 /* PendingRequestSurfaces.swift in Sources */,
 				A02400000000000000000001 /* Goal.swift in Sources */,
 				D600000000000000000002 /* CronRunHistory.swift in Sources */,
@@ -4116,6 +4131,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C15400000000000000000005 /* KanbanCardDetailStateTests.swift in Sources */,
 				C15300000000000000000005 /* KanbanCardEditorStateTests.swift in Sources */,
 				C1A042000000000000000005 /* ClarificationTests.swift in Sources */,
+				F11E0000000000000000040A /* FilingReceiptTests.swift in Sources */,
 				1A2B3C4D5E6F7000000000F2 /* CacheStoreTests.swift in Sources */,
 				B1A1C0DE0000000000000702 /* BrainCacheTests.swift in Sources */,
 				C04400000000000000000003 /* CacheFallbackPolicyTests.swift in Sources */,

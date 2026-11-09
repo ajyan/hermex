@@ -101,6 +101,16 @@ extension APIClient {
         )
     }
 
+    /// Puts the pages a turn filed back as they were before it. The server refuses (409) when
+    /// every page changed again since, and never touches such a page.
+    func undoFiling(sessionID: String, receiptID: String) async throws -> FilingUndoResponse {
+        try await send(
+            endpoint: .filingUndo,
+            method: "POST",
+            body: FilingUndoRequest(sessionId: sessionID, receiptId: receiptID)
+        )
+    }
+
     /// Steers the session's active run and reports what became of the hint.
     /// Never throws: a failed request is a refusal carrying its error.
     func steerChat(sessionID: String, text: String) async -> ChatSteerOutcome {
@@ -207,6 +217,11 @@ private struct ClarificationRespondRequest: Encodable {
     let sessionId: String
     let response: String
     let clarifyId: String?
+}
+
+private struct FilingUndoRequest: Encodable {
+    let sessionId: String
+    let receiptId: String
 }
 
 private struct BtwRequest: Encodable {

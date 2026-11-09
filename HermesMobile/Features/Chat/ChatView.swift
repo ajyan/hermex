@@ -1716,6 +1716,9 @@ struct ChatView: View {
             forkOrigin: forkOrigin,
             onOpenForkParent: openForkParent
         )
+        .environment(\.filingReceiptActions, FilingReceiptActions(undoingIDs: viewModel.undoingFilingReceiptIDs) { message in
+            Task { await viewModel.undoFiling(for: message) }
+        })
         // Off the main body chain, which is at the type-checker's limit.
         .onChange(of: viewModel.latestRunOutcome) {
             handleLatestRunOutcomeChange(viewModel.latestRunOutcome)

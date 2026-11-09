@@ -225,6 +225,11 @@ struct MessageBubbleView: View {
                     .padding(.top, 4)
             }
 
+            if !isStreaming, let receipt = message.filed, !receipt.pages.isEmpty {
+                FilingReceiptRow(message: message, receipt: receipt)
+                    .padding(.top, 4)
+            }
+
             linkPreview(linkPreviewURL)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

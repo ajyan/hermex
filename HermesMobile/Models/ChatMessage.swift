@@ -26,6 +26,9 @@ struct ChatMessage: Decodable, Equatable, Identifiable {
     /// Server-measured wall-clock seconds for the whole turn, set on its final
     /// assistant message (`_turnDuration`). Absent on older transcripts.
     let turnDuration: Double?
+    /// The filing receipt: the vault pages this turn wrote (`_filed` on the turn's last
+    /// assistant message). Absent when the turn filed nothing, and on older servers.
+    let filed: FilingReceipt?
     /// The host's durable `messages.id` for a Bot Chat row (`session.resume`'s
     /// `row_id`), which `message.react` addresses. Set only by
     /// `BotTranscriptProjection`; nil everywhere else.
@@ -47,7 +50,8 @@ struct ChatMessage: Decodable, Equatable, Identifiable {
         displayMetadata: [String: JSONValue]? = nil,
         turnTps: Double? = nil,
         turnDuration: Double? = nil,
-        rowID: Int? = nil
+        rowID: Int? = nil,
+        filed: FilingReceipt? = nil
     ) {
         self.role = role
         self.content = content
@@ -65,6 +69,7 @@ struct ChatMessage: Decodable, Equatable, Identifiable {
         self.turnTps = turnTps
         self.turnDuration = turnDuration
         self.rowID = rowID
+        self.filed = filed
     }
 
     enum CodingKeys: String, CodingKey {
@@ -82,6 +87,7 @@ struct ChatMessage: Decodable, Equatable, Identifiable {
         case displayMetadata
         case turnTps = "_turnTps"
         case turnDuration = "_turnDuration"
+        case filed = "_filed"
         case displayKindSnake = "display_kind"
         case underscoredTimestamp = "_ts"
     }
@@ -110,6 +116,30 @@ struct ChatMessage: Decodable, Equatable, Identifiable {
         turnTps = container.decodeLossyDoubleIfPresent(forKey: .turnTps)
         turnDuration = container.decodeLossyDoubleIfPresent(forKey: .turnDuration)
         rowID = nil
+        filed = try? container.decodeIfPresent(FilingReceipt.self, forKey: .filed)
+    }
+
+    /// This message with its filing receipt replaced; every other field is kept.
+    func withFiled(_ receipt: FilingReceipt?) -> ChatMessage {
+        ChatMessage(
+            role: role,
+            content: content,
+            timestamp: timestamp,
+            messageId: messageId,
+            name: name,
+            toolCallId: toolCallId,
+            toolUseId: toolUseId,
+            toolCalls: toolCalls,
+            contentParts: contentParts,
+            reasoning: reasoning,
+            attachments: attachments,
+            displayKind: displayKind,
+            displayMetadata: displayMetadata,
+            turnTps: turnTps,
+            turnDuration: turnDuration,
+            rowID: rowID,
+            filed: receipt
+        )
     }
 
     // MARK: - Steering hints

@@ -377,7 +377,8 @@ private extension ChatMessage {
             attachments: attachments,
             displayKind: cachedMessage.displayKind,
             turnTps: cachedMessage.turnTps,
-            turnDuration: cachedMessage.turnDuration
+            turnDuration: cachedMessage.turnDuration,
+            filed: cachedMessage.filedData.flatMap { try? JSONDecoder().decode(FilingReceipt.self, from: $0) }
         )
     }
 }
