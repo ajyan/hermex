@@ -377,6 +377,7 @@ private struct BrainShelfNoClient: BrainDataClient {
     func peopleHome() async throws -> BrainPeopleHome { throw CancellationError() }
     func shelf(kind: BrainShelfKind) async throws -> BrainShelf { throw CancellationError() }
     func logPerson(_ request: BrainPersonLogRequest) async throws -> BrainPersonLogResult { throw CancellationError() }
+    func savePersonFacts(_ request: BrainPersonFactsRequest) async throws -> BrainPersonFactsResult { throw CancellationError() }
 }
 
 /// The Brain home's "Your writing" rows: how many entries each page holds. Best effort and
