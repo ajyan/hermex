@@ -12,6 +12,16 @@ enum SettingsScrollAnchor: Hashable {
     case notifications
 }
 
+/// The Tools card's rows, in order: every operator screen, which Settings is now the
+/// one way into. Feedback shows only while the server has the feedback routes.
+enum SettingsToolRow: Hashable, CaseIterable {
+    case projects, tasks, kanban, skills, memory, usage, feedback
+
+    static func visible(hasFeedbackInbox: Bool) -> [SettingsToolRow] {
+        allCases.filter { $0 != .feedback || hasFeedbackInbox }
+    }
+}
+
 struct SettingsView: View {
     @Bindable var authManager: AuthManager
     let server: URL
@@ -115,19 +125,14 @@ struct SettingsView: View {
     @AppStorage(SessionIdentitySettings.displayNameKey) private var identityDisplayName = ""
     @AppStorage(SessionIdentitySettings.initialsKey) private var identityInitials = ""
     @AppStorage(VoiceCallSettings.usesServerVoiceKey) private var usesServerVoiceForCalls = false
-    @AppStorage(SectionVisibilitySettings.tasksKey) private var showsTasksSection = true
-    @AppStorage(SectionVisibilitySettings.kanbanKey) private var showsKanbanSection = true
-    @AppStorage(SectionVisibilitySettings.skillsKey) private var showsSkillsSection = true
-    @AppStorage(SectionVisibilitySettings.memoryKey) private var showsMemorySection = true
-    @AppStorage(SectionVisibilitySettings.insightsKey) private var showsInsightsSection = true
-    @AppStorage(SectionVisibilitySettings.activeProfileKey) private var showsActiveProfileSection = true
-    @AppStorage(SectionVisibilitySettings.projectsKey) private var showsProjectsSection = true
     @AppStorage(SectionVisibilitySettings.chatFilesKey) private var showsChatFilesButton = true
     @AppStorage(SectionVisibilitySettings.chatGitKey) private var showsChatGitControls = true
     @AppStorage(BotModeGate.isEnabledKey) private var isBotModeEnabled = false
     @AppStorage(BotQuickReplyStore.storageKey) private var storedQuickReplies = ""
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    /// Set by the shell; nil on a Hermes server, which has no feedback inbox.
+    @Environment(FeedbackAvailability.self) private var feedbackAvailability: FeedbackAvailability?
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -144,6 +149,7 @@ struct SettingsView: View {
                 }
 
                 if !isHermesServer {
+                    toolsCard
                     agentCard
                 }
 
@@ -418,66 +424,8 @@ struct SettingsView: View {
                     SettingsFootnote(String(localized: "Hides the git menu, branch picker, and commit controls."))
                 }
 
-                // Main Page and Sessions configure only a webui server's home.
+                // Sessions configures only a webui server's chat list.
                 if !isHermesServer {
-                    SettingsCard(title: String(localized: "Main Page")) {
-                        SettingsToggleRow(
-                            title: String(localized: "Tasks"),
-                            systemImage: "calendar.badge.clock",
-                            isOn: $showsTasksSection
-                        )
-
-                        SettingsDivider()
-
-                        SettingsToggleRow(
-                            title: String(localized: "Kanban"),
-                            systemImage: "rectangle.split.3x1",
-                            isOn: $showsKanbanSection
-                        )
-
-                        SettingsDivider()
-
-                        SettingsToggleRow(
-                            title: String(localized: "Skills"),
-                            systemImage: "hammer",
-                            isOn: $showsSkillsSection
-                        )
-
-                        SettingsDivider()
-
-                        SettingsToggleRow(
-                            title: String(localized: "Memory"),
-                            systemImage: "brain",
-                            isOn: $showsMemorySection
-                        )
-
-                        SettingsDivider()
-
-                        SettingsToggleRow(
-                            title: String(localized: "Usage"),
-                            systemImage: "chart.bar",
-                            isOn: $showsInsightsSection
-                        )
-
-                        SettingsDivider()
-
-                        SettingsToggleRow(
-                            title: String(localized: "Active Profile"),
-                            systemImage: "person.crop.circle",
-                            isOn: $showsActiveProfileSection
-                        )
-
-                        SettingsDivider()
-
-                        SettingsToggleRow(
-                            title: String(localized: "Projects"),
-                            systemImage: "folder.badge.gearshape",
-                            isOn: $showsProjectsSection
-                        )
-
-                        SettingsFootnote(String(localized: "Turn off the entries you never use to shorten the top of the session list. Each one is the only way into its screen, so turn it back on here when you need it again."))
-                    }
-
                     SettingsCard(title: String(localized: "Sessions")) {
                         SettingsToggleRow(
                             title: String(localized: "Message Count"),
@@ -918,7 +866,57 @@ struct SettingsView: View {
 
     /// On a Hermes server Settings loads nothing from a webui and hides every row that
     /// configures or reads one (#899).
-    /// The agent's own screens, moved here from the old home screen's sidebar.
+    /// The operator screens, in one group: the three the drawer used to lead with
+    /// (Projects, Tasks, Kanban), the agent's Skills, Memory and Usage, and the Feedback
+    /// inbox while the server has one. The drawer keeps only the second brain's rows.
+    private var toolsCard: some View {
+        SettingsCard(title: String(localized: "Tools")) {
+            let rows = SettingsToolRow.visible(hasFeedbackInbox: feedbackAvailability?.isAvailable == true)
+            ForEach(Array(rows.enumerated()), id: \.element) { index, row in
+                if index > 0 {
+                    SettingsDivider()
+                }
+                toolRow(row)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func toolRow(_ row: SettingsToolRow) -> some View {
+        switch row {
+        case .projects:
+            shellLink(String(localized: "Projects"), systemImage: "folder", destination: .projects)
+        case .tasks:
+            shellLink(String(localized: "Tasks"), systemImage: "calendar.badge.clock", destination: .tasks)
+        case .kanban:
+            shellLink(String(localized: "Kanban"), systemImage: "rectangle.split.3x1", destination: .kanban)
+        case .skills:
+            agentLink(String(localized: "Skills"), systemImage: "hammer", paper: .recall) {
+                SkillsView(server: server, onAPIError: authManager.handleAPIError)
+            }
+        case .memory:
+            agentLink(String(localized: "Memory"), systemImage: "brain", paper: .recall) {
+                MemoryView(server: server, onAPIError: authManager.handleAPIError)
+            }
+        case .usage:
+            agentLink(String(localized: "Usage"), systemImage: "chart.bar") {
+                InsightsView(server: server, onAPIError: authManager.handleAPIError)
+            }
+        case .feedback:
+            shellLink(String(localized: "Feedback"), systemImage: "message", destination: .feedback)
+        }
+    }
+
+    /// A row that pushes one of the shell's own screens, which the shell builds because it
+    /// owns what they need (the session list's model, the feedback client).
+    private func shellLink(_ title: String, systemImage: String, destination: ShellPushDestination) -> some View {
+        NavigationLink(value: destination) {
+            SettingsAccessoryRow(title: title, systemImage: systemImage)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// The rest of the agent's screens.
     private var agentCard: some View {
         SettingsCard(title: String(localized: "Agent")) {
             let rows = visibleAgentRows
@@ -937,16 +935,12 @@ struct SettingsView: View {
     }
 
     private enum AgentRow: Hashable {
-        case skills, memory, usage, activeProfile, bots, archivedSessions, activity
+        case activeProfile, bots, archivedSessions, activity
     }
 
-    /// The Agent card's rows, in order, filtered by the Main Page visibility toggles.
     private var visibleAgentRows: [AgentRow] {
         var rows: [AgentRow] = []
-        if showsSkillsSection { rows.append(.skills) }
-        if showsMemorySection { rows.append(.memory) }
-        if showsInsightsSection { rows.append(.usage) }
-        if showsActiveProfileSection, let profileViewModel, !profileViewModel.isSingleProfileMode {
+        if let profileViewModel, !profileViewModel.isSingleProfileMode {
             rows.append(.activeProfile)
         }
         if isBotModeEnabled { rows.append(.bots) }
@@ -958,18 +952,6 @@ struct SettingsView: View {
     @ViewBuilder
     private func agentRow(_ row: AgentRow) -> some View {
         switch row {
-        case .skills:
-            agentLink(String(localized: "Skills"), systemImage: "hammer", paper: .recall) {
-                SkillsView(server: server, onAPIError: authManager.handleAPIError)
-            }
-        case .memory:
-            agentLink(String(localized: "Memory"), systemImage: "brain", paper: .recall) {
-                MemoryView(server: server, onAPIError: authManager.handleAPIError)
-            }
-        case .usage:
-            agentLink(String(localized: "Usage"), systemImage: "chart.bar") {
-                InsightsView(server: server, onAPIError: authManager.handleAPIError)
-            }
         case .activeProfile:
             if let profileViewModel {
                 agentLink(String(localized: "Active Profile"), systemImage: "person.crop.circle") {

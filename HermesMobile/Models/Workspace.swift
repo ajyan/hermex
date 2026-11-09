@@ -126,6 +126,7 @@ struct WorkspaceEntry: Decodable, Hashable, Identifiable {
         case type
         case size
         case modified
+        case mtimeNs
         case isDirectory
         case isDir
         case targetOutsideWorkspace
@@ -137,10 +138,20 @@ struct WorkspaceEntry: Decodable, Hashable, Identifiable {
         path = try container.decodeIfPresent(String.self, forKey: .path)
         type = try container.decodeIfPresent(String.self, forKey: .type)
         size = try container.decodeIfPresent(Int.self, forKey: .size)
+        // The fork's listing sends `mtime_ns` (nanoseconds, as a string) instead of `modified`.
         modified = try container.decodeIfPresent(Double.self, forKey: .modified)
+            ?? Self.seconds(fromNanoseconds: container, forKey: .mtimeNs)
         isDirectory = try container.decodeIfPresent(Bool.self, forKey: .isDirectory)
             ?? container.decodeIfPresent(Bool.self, forKey: .isDir)
         targetOutsideWorkspace = try container.decodeIfPresent(Bool.self, forKey: .targetOutsideWorkspace)
+    }
+}
+
+private extension WorkspaceEntry {
+    static func seconds(fromNanoseconds container: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys) -> Double? {
+        let nanoseconds = (try? container.decodeIfPresent(String.self, forKey: key)).flatMap { $0 }.flatMap(Double.init)
+            ?? (try? container.decodeIfPresent(Double.self, forKey: key)).flatMap { $0 }
+        return nanoseconds.map { $0 / 1_000_000_000 }
     }
 }
 

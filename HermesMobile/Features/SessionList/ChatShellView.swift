@@ -92,6 +92,8 @@ struct ChatShellView: View {
     @Namespace private var zoomNamespace
     /// Whether this server takes feedback; rechecked on return until yes, gone with the shell on a server switch.
     @State private var feedbackAvailability: FeedbackAvailability
+    /// The drawer rows' trailing notes for this server, refreshed when the drawer opens.
+    @State private var drawerNotes: DrawerNotesModel
     /// Today's Daily Ask, one per server: the Prep gate and the Brain tile read it.
     @State private var dailyAsk: DailyAskModel
     /// The drawer is built on first open and kept alive, so it keeps its scroll position.
@@ -126,13 +128,6 @@ struct ChatShellView: View {
     @AppStorage(SessionRowDisplaySettings.showCronSessionsKey) private var showsCronSessions = true
     @AppStorage(SessionRowDisplaySettings.showSubagentSessionsKey)
     private var showsSubagentSessions = SessionRowDisplaySettings.defaultShowsSubagentSessions
-    @AppStorage(SectionVisibilitySettings.tasksKey) private var showsTasksSection = true
-    @AppStorage(SectionVisibilitySettings.kanbanKey) private var showsKanbanSection = true
-    @AppStorage(SectionVisibilitySettings.skillsKey) private var showsSkillsSection = true
-    @AppStorage(SectionVisibilitySettings.memoryKey) private var showsMemorySection = true
-    @AppStorage(SectionVisibilitySettings.insightsKey) private var showsInsightsSection = true
-    @AppStorage(SectionVisibilitySettings.activeProfileKey) private var showsActiveProfileSection = true
-    @AppStorage(SectionVisibilitySettings.projectsKey) private var showsProjectsSection = true
     // Per-server key (#19): the CLI toggle mirrors the active server's
     // `show_cli_sessions`, so its cached value must not leak across servers.
     // Configured in `init`, where the server URL is known.
@@ -168,6 +163,7 @@ struct ChatShellView: View {
         _pendingBotDestination = pendingBotDestination
         _pendingWebuiPush = pendingWebuiPush
         _viewModel = State(initialValue: SessionListViewModel(server: server))
+        _drawerNotes = State(initialValue: DrawerNotesModel(loader: APIClientDrawerNotesLoader(server: server)))
         _feedbackAvailability = State(initialValue: FeedbackAvailability(
             client: APIClientFeedbackAdapter(apiClient: APIClient(baseURL: server)),
             labels: APIClientLabelsAdapter(apiClient: APIClient(baseURL: server))))
@@ -420,6 +416,7 @@ struct ChatShellView: View {
                 // keyboard typing into the hidden search field.
                 if !isOpen { searchFieldIsFocused = false }
                 if isOpen { showPendingAutoArchiveToast() }
+                if isOpen, !viewModel.isViewingCachedData { drawerNotes.refreshIfStale() }
                 guard ShellNavigationState.drawerOpenRequestsRefresh(wasOpen: wasOpen, isOpen: isOpen) else { return }
                 refreshAfterReturningIfNeeded()
             }
@@ -928,7 +925,7 @@ struct ChatShellView: View {
             filter: $recentsFilter,
             sessions: drawerSessions,
             isSearching: isSearchingSessions,
-            sectionVisibility: sidebarSectionVisibility,
+            notes: drawerNotes.notes,
             selectedSessionID: navigation.selectedSessionID,
             showsMessageCount: showsSessionMessageCount,
             showsWorkspace: showsSessionWorkspace,
@@ -965,21 +962,6 @@ struct ChatShellView: View {
             showsCli: showsCliSessions,
             showsClaudeCode: showsClaudeCodeSessions,
             showsSubagents: showsSubagentSessions
-        )
-    }
-
-    private var sidebarSectionVisibility: SidebarSectionVisibility {
-        SidebarSectionVisibility(
-            bots: isBotModeEnabled,
-            tasks: showsTasksSection,
-            kanban: showsKanbanSection,
-            skills: showsSkillsSection,
-            memory: showsMemorySection,
-            insights: showsInsightsSection,
-            activeProfile: showsActiveProfileSection,
-            projects: showsProjectsSection,
-            brain: true,
-            feedback: feedbackAvailability.isAvailable
         )
     }
 

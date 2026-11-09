@@ -47,44 +47,6 @@ enum SessionRowActionPolicy {
 
 }
 
-/// Which of the session list's optional navigation rows are shown, so a user can
-/// hide the parts of the app they never use (issue #189).
-struct SidebarSectionVisibility: Equatable {
-    /// Follows the Bot Mode (beta) gate rather than a per-row Settings toggle.
-    var bots: Bool
-    var tasks: Bool
-    var kanban: Bool
-    var skills: Bool
-    var memory: Bool
-    var insights: Bool
-    var activeProfile: Bool
-    var projects: Bool
-    /// The second brain's read-only CRM tab (personal fork).
-    var brain: Bool
-    /// The in-app feedback inbox, shown only while the server has the feedback routes (personal fork).
-    var feedback: Bool
-
-    /// Show every row, primarily for previews and tests.
-    static let showAll = SidebarSectionVisibility(
-        bots: true,
-        tasks: true,
-        kanban: true,
-        skills: true,
-        memory: true,
-        insights: true,
-        activeProfile: true,
-        projects: true,
-        brain: true,
-        feedback: true
-    )
-
-    /// The plain links share one List row, so that row is dropped entirely
-    /// once all of them are hidden rather than leaving an empty padded gap.
-    var showsAnyUtilityLink: Bool {
-        bots || tasks || kanban || skills || memory || insights
-    }
-}
-
 struct SessionListRowsSection: View {
     let viewModel: SessionListViewModel
     /// The sidebar's current query, forwarded to rows for match excerpts.
