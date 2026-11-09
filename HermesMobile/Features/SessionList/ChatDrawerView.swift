@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The shell's left drawer: search, navigation rows, the filtered recents, and
+/// The shell's left drawer: search, the second brain's sections, the filtered recents, and
 /// a Settings bar pinned to the bottom. The shell owns all state and actions;
 /// `sessions` arrives already searched, filtered, and sorted.
 struct ChatDrawerView<ServerMenu: View>: View {
@@ -10,7 +10,8 @@ struct ChatDrawerView<ServerMenu: View>: View {
     @Binding var filter: RecentsFilter
     let sessions: [SessionSummary]
     let isSearching: Bool
-    let sectionVisibility: SidebarSectionVisibility
+    /// What each section holds today, by section. A section with nothing to say is absent.
+    let notes: [DrawerSection: String]
     let selectedSessionID: String?
     let showsMessageCount: Bool
     let showsWorkspace: Bool
@@ -127,33 +128,11 @@ struct ChatDrawerView<ServerMenu: View>: View {
         .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
     }
 
-    @ViewBuilder
+    /// The second brain's sections, in `DrawerSection` order. The operator screens
+    /// (Projects, Tasks, Kanban, Feedback) live in Settings' Tools card.
     private var navigationRows: some View {
-        if sectionVisibility.projects {
-            drawerRow(String(localized: "Projects"), systemImage: "folder") { onOpen(.projects) }
-        }
-        if sectionVisibility.tasks {
-            drawerRow(String(localized: "Tasks"), systemImage: "calendar.badge.clock") { onOpen(.tasks) }
-        }
-        if sectionVisibility.kanban {
-            drawerRow(String(localized: "Kanban"), systemImage: "rectangle.split.3x1") { onOpen(.kanban) }
-        }
-        drawerRow("Daily Brief", systemImage: "sun.horizon", paper: .opener) { onOpen(.dailyDeck) }
-        if sectionVisibility.brain {
-            drawerRow("Brain", systemImage: "brain", paper: .knowledge) { onOpen(.brain) }
-            drawerRow("People", systemImage: BrainModuleID.people.symbolName, paper: BrainModuleID.people.paper) {
-                onOpen(.brainRoute(.module(.people)))
-            }
-            drawerRow("Interview prep", systemImage: "target", paper: .prep) {
-                onOpen(.brainRoute(.prep(.home)))
-            }
-        }
-        drawerRow("Goals", systemImage: "flag.checkered", paper: .goals) { onOpen(.goals) }
-        drawerRow("Body", systemImage: "figure.strengthtraining.traditional", paper: .training) { onOpen(.body) }
-        drawerRow("Meals", systemImage: "fork.knife", paper: .meal) { onOpen(.meals) }
-        drawerRow("Money", systemImage: "chart.line.uptrend.xyaxis", paper: .money) { onOpen(.money) }
-        if sectionVisibility.feedback {
-            drawerRow("Feedback", systemImage: "message") { onOpen(.feedback) }
+        ForEach(DrawerSection.allCases, id: \.self) { section in
+            drawerRow(section, note: notes[section]) { onOpen(section.destination) }
         }
     }
 
@@ -174,29 +153,38 @@ struct ChatDrawerView<ServerMenu: View>: View {
         .padding(.bottom, 16)
     }
 
-    /// A section row. A section with its own paper (Brief, Brain, People, Interview prep, Goals, Body,
-    /// Meals, Money) shows its icon in that paper's glow on a faint wash tile; the rest stay neutral so the colored
-    /// ones stand out.
+    /// A section row: its icon in its paper's glow on a faint wash tile, its name, and a
+    /// trailing note of what it holds today when it has one.
     private func drawerRow(
-        _ title: String,
-        systemImage: String,
-        paper: HermexPaper? = nil,
+        _ section: DrawerSection,
+        note: String?,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Image(systemName: systemImage)
+                Image(systemName: section.systemImage)
                     .font(AppFont.body())
-                    .foregroundStyle(paper?.glow ?? Color.hxTextPrimary)
+                    .foregroundStyle(section.paper.glow)
                     .frame(width: 30, height: 30)
-                    .background(paper?.wash ?? .clear, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
+                    .background(section.paper.wash, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
                     .accessibilityHidden(true)
-                Text(title)
-                    .font(.body)
+                Text(section.title)
+                    .font(AppFont.body())
                     .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .fixedSize()
+                if let note {
+                    Spacer(minLength: 8)
+                    Text(note)
+                        .font(AppFont.caption())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .layoutPriority(-1)
+                }
             }
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                .contentShape(Rectangle())
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 20)

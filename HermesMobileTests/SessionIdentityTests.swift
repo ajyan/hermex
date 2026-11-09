@@ -351,13 +351,6 @@ final class SectionVisibilitySettingsTests: XCTestCase {
     private var defaults: UserDefaults!
 
     private let allKeys = [
-        SectionVisibilitySettings.tasksKey,
-        SectionVisibilitySettings.kanbanKey,
-        SectionVisibilitySettings.skillsKey,
-        SectionVisibilitySettings.memoryKey,
-        SectionVisibilitySettings.insightsKey,
-        SectionVisibilitySettings.activeProfileKey,
-        SectionVisibilitySettings.projectsKey,
         SectionVisibilitySettings.chatFilesKey,
         SectionVisibilitySettings.chatGitKey
     ]
@@ -398,58 +391,27 @@ final class SectionVisibilitySettingsTests: XCTestCase {
     }
 
     func testHidingOneSectionLeavesTheOthersVisible() {
-        defaults.set(false, forKey: SectionVisibilitySettings.insightsKey)
+        defaults.set(false, forKey: SectionVisibilitySettings.chatFilesKey)
 
-        XCTAssertFalse(SectionVisibilitySettings.isVisible(SectionVisibilitySettings.insightsKey, in: defaults))
-        for key in allKeys where key != SectionVisibilitySettings.insightsKey {
+        XCTAssertFalse(SectionVisibilitySettings.isVisible(SectionVisibilitySettings.chatFilesKey, in: defaults))
+        for key in allKeys where key != SectionVisibilitySettings.chatFilesKey {
             XCTAssertTrue(SectionVisibilitySettings.isVisible(key, in: defaults), "\(key) should be unaffected")
         }
     }
 }
 
-final class SidebarSectionVisibilityTests: XCTestCase {
-    func testShowAllShowsEverySection() {
-        let visibility = SidebarSectionVisibility.showAll
-
-        XCTAssertTrue(visibility.tasks)
-        XCTAssertTrue(visibility.kanban)
-        XCTAssertTrue(visibility.skills)
-        XCTAssertTrue(visibility.memory)
-        XCTAssertTrue(visibility.insights)
-        XCTAssertTrue(visibility.activeProfile)
-        XCTAssertTrue(visibility.projects)
-        XCTAssertTrue(visibility.feedback)
-        XCTAssertTrue(visibility.showsAnyUtilityLink)
+final class SettingsToolRowTests: XCTestCase {
+    func testToolsListEveryOperatorScreenInOrder() {
+        XCTAssertEqual(
+            SettingsToolRow.visible(hasFeedbackInbox: true),
+            [.projects, .tasks, .kanban, .skills, .memory, .usage, .feedback]
+        )
     }
 
-    func testUtilityLinkRowSurvivesWhileAnySingleLinkIsShown() {
-        var visibility = SidebarSectionVisibility.showAll
-        visibility.tasks = false
-        visibility.kanban = false
-        visibility.skills = false
-        visibility.memory = false
-
-        XCTAssertTrue(visibility.showsAnyUtilityLink)
-    }
-
-    func testUtilityLinkRowDropsOnlyWhenEveryLinkIsHidden() {
-        var visibility = SidebarSectionVisibility.showAll
-        visibility.tasks = false
-        visibility.kanban = false
-        visibility.skills = false
-        visibility.memory = false
-        visibility.insights = false
-
-        XCTAssertTrue(visibility.showsAnyUtilityLink, "the Bots row keeps the row alive while Bot Mode is on")
-        visibility.bots = false
-        XCTAssertFalse(visibility.showsAnyUtilityLink)
-    }
-
-    func testProfileAndProjectRowsDoNotAffectTheUtilityLinkRow() {
-        var visibility = SidebarSectionVisibility.showAll
-        visibility.activeProfile = false
-        visibility.projects = false
-
-        XCTAssertTrue(visibility.showsAnyUtilityLink)
+    func testFeedbackShowsOnlyWhileTheServerHasAnInbox() {
+        XCTAssertEqual(
+            SettingsToolRow.visible(hasFeedbackInbox: false),
+            [.projects, .tasks, .kanban, .skills, .memory, .usage]
+        )
     }
 }
