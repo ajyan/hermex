@@ -23,6 +23,8 @@ final class CachedMessage {
     /// Optional server display hint (e.g. `"steer"`). Added after the initial
     /// schema; SwiftData migrates it as a nullable column on existing stores.
     var displayKind: String?
+    /// The turn's filing receipt as JSON. Added after the initial schema, like `displayKind`.
+    var filedData: Data?
     var cachedAt: Date
     var expiresAt: Date
 
@@ -95,6 +97,7 @@ final class CachedMessage {
             && toolCallsData == blobs.toolCalls
             && contentPartsData == blobs.contentParts
             && attachmentsData == blobs.attachments
+            && filedData == blobs.filed
     }
 
     private func write(_ message: ChatMessage, blobs: Blobs, sortIndex: Int, cachedAt: Date) {
@@ -113,6 +116,7 @@ final class CachedMessage {
         turnDuration = message.turnDuration
         displayKind = message.displayKind
         attachmentsData = blobs.attachments
+        filedData = blobs.filed
         stamp(cachedAt)
     }
 
@@ -134,11 +138,13 @@ private struct Blobs {
     let toolCalls: Data?
     let contentParts: Data?
     let attachments: Data?
+    let filed: Data?
 
     init(_ message: ChatMessage) {
         toolCalls = Self.encode(message.toolCalls)
         contentParts = Self.encode(message.contentParts)
         attachments = Self.encode(message.attachments)
+        filed = message.filed.flatMap { try? Self.encoder.encode($0) }
     }
 
     private static func encode<Element: Encodable>(_ values: [Element]?) -> Data? {

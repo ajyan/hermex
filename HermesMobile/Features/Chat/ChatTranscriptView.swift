@@ -119,6 +119,8 @@ struct ChatTranscriptView: View {
     /// Non-nil draws the "Forked from" row above everything else (#873).
     var forkOrigin: ForkOrigin? = nil
     var onOpenForkParent: () -> Void = {}
+    /// What the call that just ended saved; shown under the last turn until the next message.
+    var callReceipt: CallReceipt? = nil
 
     var body: some View {
         if isLoading && messages.isEmpty {
@@ -390,6 +392,9 @@ struct ChatTranscriptView: View {
             liveResponseBlocks
             workingRow
             turnChangesCard
+            if let callReceipt {
+                CallReceiptCard(receipt: callReceipt)
+            }
             inlineCommitButton
 
             Color.clear

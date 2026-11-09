@@ -315,6 +315,8 @@ struct ChatView: View {
     /// `persistDraftEdit`.
     @State private var draftMessage = ""
     @State private var draftQuotes: [ComposerQuote] = []
+    @State private var callReceipt: CallReceipt?
+    @State private var receiptIDsBeforeCall: Set<String> = []
     @State private var isVoiceCallPresented = false
     @State private var isFileBrowserPresented = false
     @State private var didAutoStartCall = false
@@ -1523,7 +1525,32 @@ struct ChatView: View {
     /// bottom stack as the composer so it rides the keyboard with it.
     private func clarificationInset(maximumExpandedHeight: CGFloat) -> some View {
         ZStack(alignment: .bottom) {
-            if let clarificationPrompt = viewModel.clarificationPrompt {
+            if let clarificationPrompt = viewModel.clarificationPrompt,
+               let places = clarificationPrompt.pending.filingPlaces {
+                FilingAskCard(
+                    question: clarificationPrompt.question,
+                    detail: clarificationPrompt.pending.detail,
+                    recommended: places.recommended,
+                    other: places.other,
+                    isResponding: viewModel.isRespondingToClarification,
+                    errorMessage: viewModel.clarificationErrorMessage,
+                    onChoose: { place in
+                        Task {
+                            let didRespond = await viewModel.respondToClarification(place)
+                            if didRespond {
+                                ChatHaptics.clarificationSubmitted(isEnabled: isHapticsEnabled)
+                            }
+                        }
+                    },
+                    onFootprintChange: { height in
+                        clarificationBarHeight = height
+                    }
+                )
+                .id(clarificationPrompt.id)
+                .padding(.horizontal, 16)
+                .padding(.bottom, composerHeight + 8)
+                .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
+            } else if let clarificationPrompt = viewModel.clarificationPrompt {
                 ClarificationRequestInset(
                     prompt: clarificationPrompt,
                     maximumExpandedHeight: maximumExpandedHeight,
@@ -1714,8 +1741,33 @@ struct ChatView: View {
                 turnDiffPresentation = .turnFiles(turnChangesRecapSummary?.diffFiles ?? [file], initial: file)
             },
             forkOrigin: forkOrigin,
-            onOpenForkParent: openForkParent
+            onOpenForkParent: openForkParent,
+            callReceipt: callReceipt
         )
+        // The receipt after a call: what its turns filed, from hang-up until the next message.
+        .onChange(of: isVoiceCallPresented) { _, isPresented in
+            if isPresented {
+                receiptIDsBeforeCall = CallReceipt.receiptIDs(in: viewModel.messages)
+                callReceipt = nil
+            } else {
+                callReceipt = CallReceipt(messages: viewModel.messages, before: receiptIDsBeforeCall)
+            }
+        }
+        .onChange(of: viewModel.activeStreamID) { _, streamID in
+            guard callReceipt != nil, !isVoiceCallPresented else { return }
+            // A new message ends the receipt; a reply that settles just after hang-up still counts.
+            callReceipt = streamID == nil
+                ? CallReceipt(messages: viewModel.messages, before: receiptIDsBeforeCall)
+                : nil
+        }
+        .onChange(of: viewModel.undoingFilingReceiptIDs) { _, undoing in
+            // A filing undone after the call drops out of its receipt.
+            guard callReceipt != nil, undoing.isEmpty, !isVoiceCallPresented else { return }
+            callReceipt = CallReceipt(messages: viewModel.messages, before: receiptIDsBeforeCall)
+        }
+        .environment(\.filingReceiptActions, FilingReceiptActions(undoingIDs: viewModel.undoingFilingReceiptIDs) { message in
+            Task { await viewModel.undoFiling(for: message) }
+        })
         // Off the main body chain, which is at the type-checker's limit.
         .onChange(of: viewModel.latestRunOutcome) {
             handleLatestRunOutcomeChange(viewModel.latestRunOutcome)

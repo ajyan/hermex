@@ -112,6 +112,9 @@ enum SSEEvent: Equatable {
     /// The notes and people the server put in front of the agent for this run (fork-only,
     /// optional): at most once per run, before its first token or tool call.
     case contextSources(ContextSourcesStreamEvent)
+    /// The vault pages the turn wrote (fork-only, optional): at most once per run, after the
+    /// turn settles and before `done`.
+    case filed(FiledStreamEvent)
     case title(TitleStreamEvent)
     case metering(MeteringStreamEvent)
     case done(DoneStreamEvent)
@@ -242,6 +245,29 @@ struct ContextSourcesStreamEvent: Decodable, Equatable {
     }
 }
 
+/// `filed`: `{"session_id", "receipt": <FilingReceipt>}`. A payload with no readable receipt is
+/// ignored.
+struct FiledStreamEvent: Decodable, Equatable {
+    let sessionID: String?
+    let receipt: FilingReceipt?
+
+    init(sessionID: String? = nil, receipt: FilingReceipt?) {
+        self.sessionID = sessionID
+        self.receipt = receipt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        sessionID = container.decodeLossyStringIfPresent(forKey: .sessionID)
+        receipt = try? container.decodeIfPresent(FilingReceipt.self, forKey: .receipt)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case sessionID = "session_id"
+        case receipt
+    }
+}
+
 struct InterimAssistantStreamEvent: Decodable, Equatable {
     let text: String?
     let alreadyStreamed: Bool?
@@ -343,6 +369,11 @@ struct SSEEventDecoder {
         case "context_sources":
             let payload = decodePayload(ContextSourcesStreamEvent.self, eventType: eventType, from: eventData, decoder: decoder)
             return .contextSources(payload ?? ContextSourcesStreamEvent())
+        case "filed":
+            guard let payload = decodePayload(FiledStreamEvent.self, eventType: eventType, from: eventData, decoder: decoder),
+                  payload.receipt != nil
+            else { return .ignored }
+            return .filed(payload)
         case "title":
             let payload = decodePayload(TitleStreamEvent.self, eventType: eventType, from: eventData, decoder: decoder)
             return .title(payload ?? TitleStreamEvent())
