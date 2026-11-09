@@ -117,8 +117,7 @@ private struct ComposerQuoteDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
             }
-            .navigationTitle("Quoted passage")
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(String(localized: "Quoted passage"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
@@ -1084,7 +1083,7 @@ struct MessageComposerView: View {
             showMediaPicker = true
         } label: {
             Image(systemName: "plus")
-                .font(.system(size: plusIconSize, weight: .medium))
+                .font(.system(size: plusIconSize, weight: .medium)) // design-drift: allow (SF Symbol in a fixed-size control)
                 .foregroundStyle(metaControlColor)
                 .frame(width: circleSize, height: circleSize)
                 // Inside the masked toolbar scroller, like the context ring.

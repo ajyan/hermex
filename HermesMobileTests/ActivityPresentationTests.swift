@@ -1,3 +1,4 @@
+import SwiftUI
 import XCTest
 @testable import HermesMobile
 
@@ -26,6 +27,25 @@ final class ActivityPresentationTests: XCTestCase {
     }
 
     // MARK: - episodeSubtitle
+
+    func testOutcomeColorsAreStatusColorsNeverAccent() {
+        XCTAssertEqual(ActivityPresentation.outcomeStyle(.approved), .hxSuccess)
+        XCTAssertEqual(ActivityPresentation.outcomeStyle(.denied), .hxWarning)
+        XCTAssertEqual(ActivityPresentation.outcomeStyle(.error), .hxDanger)
+        for outcome in [AtlasOutcome.ok, .approved, .denied, .blocked, .error, .unknown] {
+            XCTAssertNotEqual(ActivityPresentation.outcomeStyle(outcome), Color.accentColor)
+        }
+    }
+
+    func testPrimaryButtonIsNousBlueWithoutAPaperAndTheGlowOnOne() {
+        let plain = ChatDecisionButtonStyle.primaryColors(on: nil)
+        XCTAssertEqual(plain.fill, Color.accentColor)
+        XCTAssertEqual(plain.text, .hxOnAccent)
+
+        let request = ChatDecisionButtonStyle.primaryColors(on: .request)
+        XCTAssertEqual(request.fill, HermexPaper.request.glow)
+        XCTAssertEqual(request.text, HermexPaper.request.onGlow)
+    }
 
     func testEpisodeSubtitleSpan() throws {
         let first = try date("2026-10-02T17:12:00Z")

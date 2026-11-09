@@ -2,7 +2,6 @@ import SwiftUI
 
 struct SessionRowView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @ScaledMetric(relativeTo: .caption2) private var pinnedIconSize: CGFloat = 11
     @ScaledMetric(relativeTo: .body) private var verticalPadding: CGFloat = 8
 
     let session: SessionSummary
@@ -243,7 +242,7 @@ struct SessionRowView: View {
 
             if session.pinned == true {
                 Image(systemName: "pin.fill")
-                    .font(.system(size: pinnedIconSize, weight: .semibold))
+                    .font(AppFont.caption2(weight: .semibold))
                     .foregroundStyle(Color.accentColor)
                     .accessibilityHidden(true)
             }

@@ -319,7 +319,7 @@ struct MessageBubbleView: View {
     private func localStatusRow(iconName: String, iconColor: Color) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: iconName)
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 17, weight: .semibold)) // design-drift: allow (SF Symbol in a fixed-size control)
                 .foregroundStyle(iconColor)
                 .frame(width: 28, height: 28)
                 .background(iconColor.opacity(colorScheme == .dark ? 0.18 : 0.12), in: Circle())

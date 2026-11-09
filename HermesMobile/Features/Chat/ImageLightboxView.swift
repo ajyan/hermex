@@ -257,7 +257,7 @@ struct ImageLightboxActionButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold)) // design-drift: allow (SF Symbol in a fixed-size control)
                 .foregroundStyle(.white)
                 .frame(width: 34, height: 34)
                 .background(.ultraThinMaterial, in: Circle())

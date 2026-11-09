@@ -69,8 +69,7 @@ struct ComposerWorkspacePickerSheet: View {
                     }
                 }
             }
-            .navigationTitle("Choose Workspace")
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(String(localized: "Choose Workspace"))
             .toolbar {
                 if managementServer != nil {
                     ToolbarItem(placement: .topBarLeading) {

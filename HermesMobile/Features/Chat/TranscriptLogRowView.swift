@@ -160,7 +160,7 @@ struct TranscriptLogRowView<Icon: View, Accessory: View, Status: View, ExpandedB
                 }
 
                 Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold)) // design-drift: allow (SF Symbol in a fixed-size control)
                     .foregroundStyle(.secondary)
                     .frame(width: 16, height: 16)
 
