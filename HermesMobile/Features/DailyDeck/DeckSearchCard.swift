@@ -1,9 +1,11 @@
 import SwiftUI
 
 /// The Brief's job search card: the coming interviews with their dates (each opening its one-pager), then how
-/// the search is going as pips: applied this week against the goal, interviews booked, replies to the last 30
-/// days' applications, and the ones gone quiet. Read live from `/api/jobs/pipeline` (`JobPipelineModel`); the
-/// brief's `fallback` stands in while loading, on an older deck, or when the server has no pipeline.
+/// the search is going as pips: applications and outreach this week against the goal (the pipeline's one
+/// count, `JobPipeline.week`), interviews booked, replies to the last 30 days' applications, and the ones gone
+/// quiet. Read live from `/api/jobs/pipeline` (`JobPipelineModel`), and again whenever the Ask's week moves, so
+/// the two cards never disagree; the brief's `fallback` stands in while loading, on an older deck, or when the
+/// server has no pipeline.
 struct DeckSearchCard: View {
     let card: DeckCard
     let palette: DeckPalette
@@ -13,9 +15,6 @@ struct DeckSearchCard: View {
     @Environment(JobPipelineModel.self) private var model: JobPipelineModel?
     @Environment(DailyAskModel.self) private var askModel: DailyAskModel?
     @Environment(\.openBrainRoute) private var openBrainRoute
-
-    /// More pips than this read as a count beside them.
-    private static let maxPips = 10
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -30,6 +29,16 @@ struct DeckSearchCard: View {
             guard let model, model.pipeline?.today != deckDate else { return }
             await model.load()
         }
+        // An Ask action (Applied, Sent, Applied elsewhere) changes the week: read the pipeline again.
+        .onChange(of: askWeek) { _, _ in
+            guard let model else { return }
+            Task { await model.load() }
+        }
+    }
+
+    private var askWeek: DailyAskWeek? {
+        guard let askModel, case .loaded(let ask) = askModel.state else { return nil }
+        return ask.week
     }
 
     @ViewBuilder
@@ -44,14 +53,15 @@ struct DeckSearchCard: View {
         if let m = pipeline.metrics {
             heading("How it's going")
             VStack(alignment: .leading, spacing: 12) {
-                if let week = applicationsWeek {
-                    pips("Applied this week", filled: week.done, of: max(week.target, week.done))
-                } else {
-                    pips("Applied this week", filled: m.addedWeek, of: m.addedWeek)
+                if let applied = pipeline.applicationsWeek {
+                    JobCountPips(label: "Applied this week", count: applied, ink: palette.ink)
                 }
-                pips("Interviews booked", filled: m.booked, of: m.booked)
-                pips("Replies, last 30 days", filled: m.replies, of: m.recent)
-                pips("Gone quiet, 14+ days", filled: m.quiet, of: m.quiet)
+                if let outreach = pipeline.week?.outreach {
+                    JobCountPips(label: "Outreach this week", count: outreach, ink: palette.ink)
+                }
+                JobCountPips(label: "Interviews booked", count: JobCount(done: m.booked, target: nil), ink: palette.ink)
+                JobCountPips(label: "Replies, last 30 days", count: JobCount(done: m.replies, target: m.recent), ink: palette.ink)
+                JobCountPips(label: "Gone quiet, 14+ days", count: JobCount(done: m.quiet, target: nil), ink: palette.ink)
             }
             if m.quiet > 0 {
                 Text(verbatim: "Follow up or close: \(m.quietNames.joined(separator: ", ")).")
@@ -60,12 +70,6 @@ struct DeckSearchCard: View {
                     .padding(.top, 12)
             }
         }
-    }
-
-    private var applicationsWeek: (done: Int, target: Int)? {
-        guard let askModel, case .loaded(let ask) = askModel.state, let a = ask.week?.applications,
-              let done = a.done, let target = a.target else { return nil }
-        return (done, target)
     }
 
     private func heading(_ title: String) -> some View {
@@ -95,26 +99,5 @@ struct DeckSearchCard: View {
         .buttonStyle(.plain)
         .disabled(!openBrainRoute.isAvailable)
         .accessibilityHint(Text(verbatim: "Opens the one-pager"))
-    }
-
-    /// A label over a row of pips, `filled` of `of` filled; past `maxPips` the count reads beside them.
-    private func pips(_ label: String, filled: Int, of total: Int) -> some View {
-        let shown = min(max(total, filled), Self.maxPips)
-        return VStack(alignment: .leading, spacing: 4) {
-            Text(verbatim: label).font(AppFont.subheadline())
-            HStack(spacing: 0) {
-                if shown == 0 {
-                    DeckDot(state: "missed", ink: palette.ink)
-                }
-                ForEach(0..<shown, id: \.self) { index in
-                    DeckDot(state: index < filled ? "done" : "missed", ink: palette.ink)
-                }
-                if max(total, filled) > Self.maxPips {
-                    Text(verbatim: "\(filled) of \(total)").font(AppFont.caption()).foregroundStyle(.secondary).padding(.leading, 6)
-                }
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: "\(label): \(filled) of \(total)"))
     }
 }
