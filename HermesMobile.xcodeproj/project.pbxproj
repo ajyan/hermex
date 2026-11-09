@@ -146,6 +146,7 @@
 		A1C0FFEE0000000000000B01 /* VoiceCallAudioLevels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE0000000000000F01 /* VoiceCallAudioLevels.swift */; };
 		CA1100CAB0000000000000B3 /* ServerSpeechSpeaker.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA1100CAB0000000000000F3 /* ServerSpeechSpeaker.swift */; };
 		CA1100CAB0000000000000B2 /* VoiceCallLab.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA1100CAB0000000000000F2 /* VoiceCallLab.swift */; };
+		F11E0000000000000000070A /* CallReceipt.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E0000000000000000070B /* CallReceipt.swift */; };
 		C411D15B0000000000000B01 /* VoiceCallStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = C411D15B0000000000000F01 /* VoiceCallStatus.swift */; };
 		5A7F1E1D000100000000B002 /* VoiceCallStarfield.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A7F1E1D000100000000F002 /* VoiceCallStarfield.swift */; };
 		5A7F1E1D000100000000B003 /* VoiceCallConstellation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A7F1E1D000100000000F003 /* VoiceCallConstellation.swift */; };
@@ -371,6 +372,7 @@
 		F11E0000000000000000020A /* FilingReceiptRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E0000000000000000020B /* FilingReceiptRow.swift */; };
 		C1A0420000000000000000A3 /* PendingRequestSurfaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A0420000000000000000A4 /* PendingRequestSurfaces.swift */; };
 		C1A042000000000000000005 /* ClarificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A042000000000000000006 /* ClarificationTests.swift */; };
+		F11E0000000000000000080A /* CallReceiptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E0000000000000000080B /* CallReceiptTests.swift */; };
 		F11E0000000000000000060A /* FilingAskTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E0000000000000000060B /* FilingAskTests.swift */; };
 		F11E0000000000000000040A /* FilingReceiptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E0000000000000000040B /* FilingReceiptTests.swift */; };
 		A02400000000000000000001 /* Goal.swift in Sources */ = {isa = PBXBuildFile; fileRef = A02400000000000000000002 /* Goal.swift */; };
@@ -1089,6 +1091,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		A1C0FFEE0000000000000F01 /* VoiceCallAudioLevels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallAudioLevels.swift; sourceTree = "<group>"; };
 		CA1100CAB0000000000000F3 /* ServerSpeechSpeaker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSpeechSpeaker.swift; sourceTree = "<group>"; };
 		CA1100CAB0000000000000F2 /* VoiceCallLab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallLab.swift; sourceTree = "<group>"; };
+		F11E0000000000000000070B /* CallReceipt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallReceipt.swift; sourceTree = "<group>"; };
 		C411D15B0000000000000F01 /* VoiceCallStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallStatus.swift; sourceTree = "<group>"; };
 		5A7F1E1D000100000000F002 /* VoiceCallStarfield.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallStarfield.swift; sourceTree = "<group>"; };
 		5A7F1E1D000100000000F003 /* VoiceCallConstellation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallConstellation.swift; sourceTree = "<group>"; };
@@ -1291,6 +1294,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		F11E0000000000000000020B /* FilingReceiptRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilingReceiptRow.swift; sourceTree = "<group>"; };
 		C1A0420000000000000000A4 /* PendingRequestSurfaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingRequestSurfaces.swift; sourceTree = "<group>"; };
 		C1A042000000000000000006 /* ClarificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClarificationTests.swift; sourceTree = "<group>"; };
+		F11E0000000000000000080B /* CallReceiptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallReceiptTests.swift; sourceTree = "<group>"; };
 		F11E0000000000000000060B /* FilingAskTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilingAskTests.swift; sourceTree = "<group>"; };
 		F11E0000000000000000040B /* FilingReceiptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilingReceiptTests.swift; sourceTree = "<group>"; };
 		A02400000000000000000002 /* Goal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Goal.swift; sourceTree = "<group>"; };
@@ -2015,6 +2019,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				A1C0FFEE0000000000000F01 /* VoiceCallAudioLevels.swift */,
 				CA1100CAB0000000000000F3 /* ServerSpeechSpeaker.swift */,
 				CA1100CAB0000000000000F2 /* VoiceCallLab.swift */,
+				F11E0000000000000000070B /* CallReceipt.swift */,
 				C411D15B0000000000000F01 /* VoiceCallStatus.swift */,
 				5A7F1E1D000100000000F002 /* VoiceCallStarfield.swift */,
 				5A7F1E1D000100000000F003 /* VoiceCallConstellation.swift */,
@@ -2275,6 +2280,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C15400000000000000000006 /* KanbanCardDetailStateTests.swift */,
 				C15300000000000000000006 /* KanbanCardEditorStateTests.swift */,
 				C1A042000000000000000006 /* ClarificationTests.swift */,
+				F11E0000000000000000080B /* CallReceiptTests.swift */,
 				F11E0000000000000000060B /* FilingAskTests.swift */,
 				F11E0000000000000000040B /* FilingReceiptTests.swift */,
 				1A2B3C4D5E6F7000000000F4 /* CacheStoreTests.swift */,
@@ -3526,6 +3532,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				A1C0FFEE0000000000000B01 /* VoiceCallAudioLevels.swift in Sources */,
 				CA1100CAB0000000000000B3 /* ServerSpeechSpeaker.swift in Sources */,
 				CA1100CAB0000000000000B2 /* VoiceCallLab.swift in Sources */,
+				F11E0000000000000000070A /* CallReceipt.swift in Sources */,
 				C411D15B0000000000000B01 /* VoiceCallStatus.swift in Sources */,
 				5A7F1E1D000100000000B002 /* VoiceCallStarfield.swift in Sources */,
 				5A7F1E1D000100000000B003 /* VoiceCallConstellation.swift in Sources */,
@@ -4118,6 +4125,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C15400000000000000000005 /* KanbanCardDetailStateTests.swift in Sources */,
 				C15300000000000000000005 /* KanbanCardEditorStateTests.swift in Sources */,
 				C1A042000000000000000005 /* ClarificationTests.swift in Sources */,
+				F11E0000000000000000080A /* CallReceiptTests.swift in Sources */,
 				F11E0000000000000000060A /* FilingAskTests.swift in Sources */,
 				F11E0000000000000000040A /* FilingReceiptTests.swift in Sources */,
 				1A2B3C4D5E6F7000000000F2 /* CacheStoreTests.swift in Sources */,
