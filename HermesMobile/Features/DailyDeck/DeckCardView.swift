@@ -18,7 +18,10 @@ struct DeckPageView: View {
     var isOpen = false
 
     @Environment(\.openBrainRoute) private var openBrainRoute
+    @Environment(\.openShellScreen) private var openShellScreen
     @Environment(DailyAskModel.self) private var askModel: DailyAskModel?
+    /// The Sleep screen, opened from the sleep card's foot button.
+    @State private var showsSleep = false
 
     var body: some View {
         let palette = DeckPalette.of(page, inV2Weekly: viewModel.isSealedWeekly)
@@ -43,13 +46,33 @@ struct DeckPageView: View {
                         .onDisappear { viewModel.screenDisappeared() }
                 }
                 .padding(.vertical, 12)
+                .sheet(isPresented: $showsSleep) {
+                    let deck = viewModel
+                    SleepView(viewModel: SleepViewModel(today: SleepNight.dayFormatter.date(from: deck.date) ?? .now) {
+                        try await deck.sleepHistory()
+                    })
+                }
         }
     }
 
-    /// "Open the page" on an open card whose source is a Brain page; "Open Prep" on today's Ask once it
+    /// The open card's foot button: the module a card is about ("Open the goal", "Open Meals", "Open Body",
+    /// "Open Sleep"), "Open the page" when its source is a Brain page, and "Open Prep" on today's Ask once it
     /// is acted on.
     private var sourceAction: HXCardAction? {
-        guard case .card(let card) = page, openBrainRoute.isAvailable else { return nil }
+        guard case .card(let card) = page else { return nil }
+        if card.type == .sleep {
+            return HXCardAction(title: "Open Sleep") { [viewModel] in
+                viewModel.opened("module", on: card.id)
+                showsSleep = true
+            }
+        }
+        if let module = card.moduleDestination, openShellScreen.isAvailable {
+            return HXCardAction(title: module.title) { [viewModel, openShellScreen] in
+                viewModel.opened("module", on: card.id)
+                openShellScreen(module.screen)
+            }
+        }
+        guard openBrainRoute.isAvailable else { return nil }
         let (open, deck) = (openBrainRoute, viewModel)
         if card.type == .ask, let askModel, askModel.isLive(for: viewModel.date),
            case .loaded(let ask) = askModel.state, let outcome = ask.outcome, DailyAskBody.opensPrep(outcome) {

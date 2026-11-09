@@ -85,6 +85,7 @@ struct ChatShellView: View {
     @State private var brainRouteOpener = OpenBrainRouteAction()
     /// Lets pushed screens (a Week ahead card's Edit in chat) start a new chat with a draft.
     @State private var draftChatOpener = OpenDraftChatAction()
+    @State private var shellScreenOpener = OpenShellScreenAction()
     /// Lets Prep's mock brief open a voice mock: a new interviewer chat already in a call.
     @State private var mockCallOpener = OpenMockCallAction()
     /// Where cards and chips that push a screen meet the screen they zoom into.
@@ -519,7 +520,8 @@ struct ChatShellView: View {
 
     private var mainStack: some View {
         brainRouteOpener.handler = { navigation.path.append(.brainRoute($0)) }
-        draftChatOpener.handler = { selectDestination(PendingNewChatRoute(initialDraft: $0)) }
+        draftChatOpener.handler = { askAtlas($0) }
+        shellScreenOpener.handler = { navigation.push($0) }
         mockCallOpener.handler = { try await openMockCall($0) }
         brainRouteOpener.homeHandler = { navigation.showBrainHome() }
         brainRouteOpener.replaceHandler = { navigation.replaceTop(with: .brainRoute($0)) }
@@ -545,6 +547,7 @@ struct ChatShellView: View {
         // Pushed screens (the Daily Brief's open cards) open Brain pages too.
         .environment(\.openBrainRoute, brainRouteOpener)
         .environment(\.openDraftChat, draftChatOpener)
+        .environment(\.openShellScreen, shellScreenOpener)
         .environment(\.openMockCall, mockCallOpener)
         // A new root also drops screens ChatView pushed outside the typed path.
         .id(navigation.rootRevision)
@@ -602,10 +605,10 @@ struct ChatShellView: View {
             .accessibilityLabel(navigation.isDrawerOpen ? "Close chats" : "Open chats")
         }
 
-        if !navigation.returnPath.isEmpty && navigation.path.isEmpty {
+        if let returnTitle = navigation.returnTitle, navigation.path.isEmpty {
             ToolbarItem(placement: .topBarLeading) {
                 Button { navigation.returnToSavedScreens() } label: {
-                    Label { Text(verbatim: "Back to Prep") } icon: { Image(systemName: "arrow.uturn.backward") }
+                    Label { Text(verbatim: returnTitle) } icon: { Image(systemName: "arrow.uturn.backward") }
                         .labelStyle(.titleAndIcon)
                 }
             }
@@ -655,12 +658,12 @@ struct ChatShellView: View {
                 server: server,
                 modelContext: modelContext,
                 onAPIError: authManager.handleAPIError,
-                ask: { selectDestination(PendingNewChatRoute(initialDraft: $0)) }
+                ask: askAtlas
             )
             .adaptiveSecondaryNavigationTitle()
         case .goals:
             GoalsHomeView(server: server, onAPIError: authManager.handleAPIError,
-                          onNewGoal: { selectDestination(PendingNewChatRoute(initialDraft: GoalsCopy.newGoalDraft)) },
+                          onNewGoal: { askAtlas(GoalsCopy.newGoalDraft) },
                           onOpen: { navigation.push($0) })
             .adaptiveSecondaryNavigationTitle()
         case .goal(let slug):
@@ -689,7 +692,7 @@ struct ChatShellView: View {
                 .id(day ?? "next")
         case .meals:
             MealsHomeView(server: server, onAPIError: authManager.handleAPIError, onOpen: { navigation.push($0) },
-                          ask: { selectDestination(PendingNewChatRoute(initialDraft: $0)) })
+                          ask: askAtlas)
                 .adaptiveSecondaryNavigationTitle()
         case .mealsBook:
             MealsBookView(server: server, onAPIError: authManager.handleAPIError, onOpen: { navigation.push($0) })
@@ -699,7 +702,7 @@ struct ChatShellView: View {
         case .mealsDish(let route):
             MealsDishView(route: route, server: server, onAPIError: authManager.handleAPIError,
                           onOpen: { navigation.push($0) },
-                          ask: { selectDestination(PendingNewChatRoute(initialDraft: $0)) })
+                          ask: askAtlas)
                 .id(route)
         case .feedback:
             FeedbackInboxView(client: feedbackAvailability.client)
@@ -728,8 +731,8 @@ struct ChatShellView: View {
         }
     }
 
-    /// Starts a new chat with these words in the composer, as the Brain home's Ask Atlas does, and
-    /// keeps the Prep screens it came from one tap away ("Back to Prep").
+    /// Starts a new chat with these words in the composer and keeps the screens it came from one tap away
+    /// ("Back to Meals"). Every module's Ask Atlas, Ask Baki and New goal comes through here.
     private func askAtlas(_ words: String) {
         viewModel.invalidateSessionOpening()
         navigation.select(PendingNewChatRoute(initialDraft: words), returningTo: navigation.path)

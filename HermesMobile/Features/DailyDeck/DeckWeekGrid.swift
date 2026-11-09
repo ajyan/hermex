@@ -103,19 +103,14 @@ private struct DeckWeekGridRow: View {
     let deckDate: String
 
     @Environment(GoalsHomeViewModel.self) private var model: GoalsHomeViewModel?
+    @Environment(\.openShellScreen) private var openShellScreen
     /// A row is as tall as a comfortable tap, so today's dot is easy to hit.
     @ScaledMetric(relativeTo: .subheadline) private var rowHeight: CGFloat = 36
 
     var body: some View {
         let checkIn = DeckRowCheckIn(row: row, ink: row.habitPaper.glow, deckDate: deckDate, model: model, hitHeight: rowHeight)
         HStack(spacing: 0) {
-            Text(verbatim: row.label)
-                .font(AppFont.subheadline())
-                .foregroundStyle(Color.hxTextPrimary)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.trailing, 6)
-                .accessibilityHidden(true)
+            label
             switch row.kind {
             case .days: days(checkIn)
             case .pips: pips(checkIn)
@@ -123,6 +118,26 @@ private struct DeckWeekGridRow: View {
         }
         .frame(minHeight: rowHeight)
         .accessibilityElement(children: .contain)
+    }
+
+    /// The habit's name; it opens where the habit is kept (its goal, Body) when it has such a place.
+    @ViewBuilder
+    private var label: some View {
+        let name = Text(verbatim: row.label)
+            .font(AppFont.subheadline())
+            .foregroundStyle(Color.hxTextPrimary)
+            .lineLimit(2)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, minHeight: rowHeight, alignment: .leading)
+            .padding(.trailing, 6)
+        if let screen = row.moduleDestination, openShellScreen.isAvailable {
+            Button { openShellScreen(screen) } label: { name.contentShape(Rectangle()) }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(verbatim: "Open \(row.label)"))
+                .accessibilityHint(Text(verbatim: "Opens \(screen.moduleName)"))
+        } else {
+            name.accessibilityHidden(true)
+        }
     }
 
     private func days(_ checkIn: DeckRowCheckIn) -> some View {
