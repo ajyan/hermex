@@ -70,6 +70,13 @@ struct DailyAskBody: View {
     /// The longest steer the server keeps.
     static let steerLimit = 120
 
+    /// The steer as it would be saved, trimmed; nil when it runs past what the server keeps, so
+    /// Save never cuts words off.
+    static func steerToSave(_ typed: String) -> String? {
+        let note = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+        return note.count <= steerLimit ? note : nil
+    }
+
     static func loggedLine(_ logged: DailyAskElsewhere) -> String {
         guard let via = logged.via, !via.isEmpty else { return "Logged \(logged.company)" }
         return "Logged \(logged.company), via \(via)"
@@ -315,12 +322,24 @@ private struct DailyAskForm: View {
             }
             .padding(.top, 10)
         case .steer:
-            let note = String(steerNote.trimmingCharacters(in: .whitespacesAndNewlines).prefix(DailyAskBody.steerLimit))
+            let note = DailyAskBody.steerToSave(steerNote) ?? ""
+            let count = steerNote.trimmingCharacters(in: .whitespacesAndNewlines).count
+            let tooLong = count > DailyAskBody.steerLimit
             VStack(alignment: .leading, spacing: 8) {
-                field("What to see more of, e.g. AI engineer roles", text: $steerNote)
-                Text(verbatim: "Roles whose titles match move up on the next Ask.")
-                    .font(AppFont.footnote())
-                    .foregroundStyle(.secondary)
+                // A steer is title words, not a note: it lifts roles whose titles hold every word of a phrase.
+                field("Words in the titles you want, e.g. AI engineer, forward deployed", text: $steerNote, minLines: 3)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(verbatim: "Roles with these words in their titles move up on the next Ask. Separate titles with commas.")
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(verbatim: "\(count)/\(DailyAskBody.steerLimit)")
+                        .monospacedDigit()
+                        .foregroundStyle(tooLong ? Color.hxWarning : Color.secondary)
+                        .accessibilityLabel(Text(verbatim: tooLong
+                            ? "\(count - DailyAskBody.steerLimit) characters over the limit"
+                            : "\(DailyAskBody.steerLimit - count) characters left"))
+                }
+                .font(AppFont.footnote())
                 HStack(spacing: 8) {
                     ChoiceButton(title: "Save", isSelected: !note.isEmpty) {
                         guard !note.isEmpty else { return }
@@ -363,12 +382,14 @@ private struct DailyAskForm: View {
         panel = panel == next ? nil : next
     }
 
-    private func field(_ prompt: String, text: Binding<String>) -> some View {
+    /// A box on the card that grows with its words; `minLines` sets how tall it starts.
+    private func field(_ prompt: String, text: Binding<String>, minLines: Int = 1) -> some View {
         TextField(text: text, axis: .vertical) { Text(verbatim: prompt) }
             .font(AppFont.body())
+            .lineLimit(minLines...)
             .padding(10)
             .withDictation(text)
-            .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
     }
 }
 

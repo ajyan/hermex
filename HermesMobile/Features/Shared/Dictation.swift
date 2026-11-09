@@ -6,10 +6,12 @@ import SwiftUI
 // Dictation into a text box, Wispr Flow style: the words appear punctuated as they are heard, and
 // the dictated part is tidied (grammar, fillers, paragraphs) by the server's local model, or the
 // on-device model when the server is slow or away, with "Original" one tap away. Tidying starts
-// while the speaker talks, a passage at a time, so Stop waits only on the last few words. Text
-// typed before the dictation is never rewritten. The keyboard goes away while the mic listens, and
-// typing into the box stops it: the recognizer never writes over a keyboard edit, and the tidy waits
-// for the box's Done (`finish()`) rather than rewriting under the cursor.
+// while the speaker talks, a passage at a time, so Stop waits only on the last few words. While you
+// talk, text typed before the dictation is left alone. The keyboard goes away while the mic listens,
+// and typing into the box stops it: the recognizer never writes over a keyboard edit, and the tidy
+// waits for the box's Done (`finish()`) rather than rewriting under the cursor. A box that says when
+// it `opened` gets one more pass on Done: if its words changed since it opened, typed or spoken, and
+// no tidy has seen them as a whole, the whole box is tidied as if it had all been dictated at once.
 
 /// Rewrites one dictated passage. Tests inject their own; the live one is Apple's on-device model.
 protocol DictationPolishing {
@@ -47,6 +49,12 @@ final class DictationModel {
     @ObservationIgnored private var heldForEdit = false
     /// Set once the field was edited on the keyboard: from then on the recognizer only adds words at the end.
     @ObservationIgnored private var appendsOnly = false
+    /// The box's words as a whole that need no tidy on Done: what it held when it opened, then the
+    /// last text a tidy saw whole. Nil until `opened`, so a box that never says it opened is never
+    /// tidied whole.
+    @ObservationIgnored private var settled: String?
+    /// Whether the running `tidyTask` covers the whole box (the box was empty when dictation began).
+    @ObservationIgnored private var tidyCoversBox = false
     /// `finish()` calls waiting for a server transcription to land.
     @ObservationIgnored private var idleWaiters: [CheckedContinuation<Void, Never>] = []
 
@@ -67,6 +75,14 @@ final class DictationModel {
 
     /// Listening, or tidying what was heard: a box closing now would lose words or their tidy.
     var isBusy: Bool { voiceInput.state != .idle || isTidying }
+
+    /// Call when a box with a Done opens, after its text is loaded: Done then tidies the whole box
+    /// if its words changed since now.
+    func opened(_ text: Binding<String>, server: URL?) {
+        self.text = text
+        self.server = server
+        settled = text.wrappedValue
+    }
 
     /// Starts or stops dictation into `text`.
     func toggle(_ text: Binding<String>) {
@@ -114,7 +130,8 @@ final class DictationModel {
     }
 
     /// Stops listening and waits for the words to land and be tidied: a box's Done calls this before it
-    /// closes, so what it saves is the tidied text.
+    /// closes, so what it saves is the tidied text. After `opened`, a box whose words changed is tidied
+    /// whole, edits and earlier words included; a dictation into an empty box keeps its passage tidy.
     func finish() async {
         switch voiceInput.state {
         case .listening, .serverListening, .requestingPermission: voiceInput.stopKeepingTranscript()
@@ -123,8 +140,15 @@ final class DictationModel {
         if voiceInput.state != .idle {
             await withCheckedContinuation { idleWaiters.append($0) }
         }
+        if settled != nil, let base, !Self.isBlank(base) {
+            // The dictation went after earlier words, so the whole-box tidy below covers it.
+            self.base = nil
+            dropEarly()
+        }
         startTidy()
+        if settled != nil, !tidyCoversBox { tidyTask?.cancel() }
         await tidyTask?.value
+        await tidyWholeBox()
     }
 
     /// Puts back the words as they were heard.
@@ -132,6 +156,8 @@ final class DictationModel {
         guard let lastTidy, let text else { return }
         self.lastTidy = nil
         text.wrappedValue = lastTidy.original
+        // You chose the words as heard: Done keeps them.
+        if settled != nil { settled = lastTidy.original }
     }
 
     /// Stops listening and drops any pending tidy: the answer is being sent or the box is going away.
@@ -189,6 +215,7 @@ final class DictationModel {
     private func startTidy() {
         guard let base else { return }
         self.base = nil
+        tidyCoversBox = Self.isBlank(base)
         tidyTask = Task { await tidy(from: base) }
     }
 
@@ -218,9 +245,33 @@ final class DictationModel {
         dropEarly()
         guard !Task.isCancelled, text.wrappedValue == heard else { return }
         let result = split.kept + passages.filter { !$0.isEmpty }.joined(separator: " ")
+        // The box was empty when dictation began, so this tidy saw all of it.
+        if settled != nil, Self.isBlank(split.kept) { settled = result }
         guard result != heard else { return }
         text.wrappedValue = result
         lastTidy = (heard, result)
+    }
+
+    /// Tidies the whole box once, when its words changed since it opened and no tidy saw them whole.
+    private func tidyWholeBox() async {
+        guard let text, let settled else { return }
+        let whole = text.wrappedValue
+        guard whole != settled else { return }
+        self.settled = whole
+        let trimmed = whole.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard DictationSplice.isWorthTidying(trimmed), let polisher = activePolisher ?? polisher(server) else { return }
+        isTidying = true
+        defer { isTidying = false }
+        guard let tidied = try? await polisher.polish(trimmed),
+              let accepted = DictationSplice.accepted(tidied, for: trimmed),
+              !Task.isCancelled, text.wrappedValue == whole, accepted != whole else { return }
+        text.wrappedValue = accepted
+        self.settled = accepted
+        lastTidy = (whole, accepted)
+    }
+
+    private static func isBlank(_ text: String) -> Bool {
+        text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func dropEarly() {

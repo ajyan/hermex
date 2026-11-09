@@ -180,6 +180,13 @@ final class DailyAskModelTests: XCTestCase {
         XCTAssertEqual(object, ["as_of": "2026-10-19", "action": "steer", "note": ""])
     }
 
+    func testASteerSavesTrimmedAndNeverCutsWordsOff() {
+        XCTAssertEqual(DailyAskBody.steerToSave("  AI engineer, forward deployed \n"), "AI engineer, forward deployed")
+        let full = String(repeating: "a", count: DailyAskBody.steerLimit)
+        XCTAssertEqual(DailyAskBody.steerToSave(full), full)
+        XCTAssertNil(DailyAskBody.steerToSave(full + "b"), "past the server's cap, Save waits for a shorter steer")
+    }
+
     func testDecodesSteerAndElsewhere() throws {
         let ask = try Self.ask {
             $0["steer"] = "AI engineer roles"
