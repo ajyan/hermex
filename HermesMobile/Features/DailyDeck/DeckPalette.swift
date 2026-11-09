@@ -15,6 +15,9 @@ struct DeckPalette: Equatable {
     var edge: Color { isNeutralCard ? .hxSeparator : colors.edge }
     /// Text and marks on the card: the paper's glow.
     var ink: Color { colors.glow }
+    /// Supporting text on the card (a kind line, a small label, where a quote is from), at full strength: the
+    /// paper's `secondaryInk` on a glow card, `hxTextSecondary` on a neutral one. Never the ink faded.
+    var secondaryInk: Color { isNeutralCard ? .hxTextSecondary : colors.secondaryInk }
     /// Text on an `ink`-filled button.
     var onInk: Color { colors.onGlow }
     /// The kind's mark, drawn faintly in the card's corner.
@@ -32,8 +35,6 @@ struct DeckPalette: Equatable {
         self.shortName = shortName
     }
 
-    // Bright paper in both appearances: index cards on a dark desk. Cards draw in light mode
-    // (`DeckPageView`) so system text and controls stay legible on them.
     static let opener = DeckPalette(.opener, symbol: "sun.horizon", name: "Today", shortName: "Today", isNeutralCard: true)
     /// The "This week" divider: the opener's neutral paper, named for what it opens.
     static let section = DeckPalette(.opener, symbol: "calendar", name: "This week", shortName: "This week", isNeutralCard: true)

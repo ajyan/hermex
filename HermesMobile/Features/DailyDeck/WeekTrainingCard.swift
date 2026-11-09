@@ -66,7 +66,7 @@ struct WeekTrainingCard: View {
     var body: some View {
         let proposals = model.visible(card.proposals)
         VStack(alignment: .leading, spacing: 0) {
-            DeckKindLabel(symbol: palette.symbol, text: "Baki · this week", ink: palette.ink)
+            DeckKindLabel(symbol: palette.symbol, text: "Baki · this week", ink: palette.secondaryInk)
             Text(verbatim: card.headline ?? card.title ?? "The week's training")
                 .font(AppFont.display(style: .title2, weight: .semibold))
                 .foregroundStyle(palette.ink)
@@ -89,7 +89,7 @@ struct WeekTrainingCard: View {
             if !proposals.isEmpty {
                 Text(verbatim: "Baki suggests")
                     .font(AppFont.footnote(weight: .semibold))
-                    .foregroundStyle(palette.ink.opacity(0.75))
+                    .foregroundStyle(palette.secondaryInk)
                     .padding(.top, 22)
                     .padding(.bottom, 4)
                     .accessibilityAddTraits(.isHeader)

@@ -332,7 +332,7 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(viewModel.cards.count, 7)
         XCTAssertEqual(client.createdWorkspaces, ["/vault"])
         XCTAssertEqual(client.renamed.first?.0, "new-1")
-        XCTAssertTrue(client.renamed.first?.1.hasPrefix("Daily Brief · ") == true)
+        XCTAssertEqual(client.renamed.first?.1, "Daily Brief", "the reading session serves every day, so it names none")
         XCTAssertEqual(store.workspace(for: server), "/vault")
         XCTAssertEqual(store.session(for: server, date: "2026-10-04"), "new-1")
     }
@@ -2181,6 +2181,68 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertTrue(viewModel.cards.allSatisfy { viewModel.diagram(for: $0) == nil })
     }
 
+    // MARK: - Housekeeping
+
+    @MainActor
+    func testTheBriefReusesOneReadingSessionDayAfterDay() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json", "2026-10-05.morning.json"], deck: Self.deckJSON)
+        let clock = TestDeckClock(morning)
+        let viewModel = DailyDeckViewModel(server: server, client: client, store: store, now: { clock.now })
+        await viewModel.load()
+        XCTAssertEqual(client.createdWorkspaces.count, 1)
+
+        clock.now = morning.addingTimeInterval(24 * 60 * 60)
+        await viewModel.refreshDay()
+        XCTAssertEqual(viewModel.state, .ready)
+        XCTAssertEqual(client.createdWorkspaces.count, 1, "a new day opens no new session: the file routes only need one")
+
+        // A session the server lost is still replaced, once.
+        client.vanished = ["new-1"]
+        await viewModel.load()
+        XCTAssertEqual(client.createdWorkspaces.count, 2)
+        XCTAssertEqual(viewModel.state, .ready)
+    }
+
+    @MainActor
+    func testTodaysBriefOpensFromItsSavedCopyWhenTheServerIsOut() async throws {
+        store.setWorkspace("/vault", for: server)
+        store.setWorkspace("/vault", for: otherServer)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json", "2026-10-03.morning.json"], deck: Self.deckJSON)
+        let online = makeViewModel(client)
+        await online.load()
+        XCTAssertEqual(online.state, .ready)
+        XCTAssertFalse(online.isOfflineCopy)
+        let cards = online.cards.map(\.id)
+
+        client.listingErrors[DailyDeckPaths.directory] = URLError(.notConnectedToInternet)
+        let offline = makeViewModel(client)
+        await offline.load()
+        XCTAssertEqual(offline.state, .ready, "today's brief can be reread without the server")
+        XCTAssertTrue(offline.isOfflineCopy)
+        XCTAssertEqual(offline.cards.map(\.id), cards)
+
+        await offline.show(date: "2026-10-03")
+        guard case .failed = offline.state else { return XCTFail("only today's brief is kept") }
+        XCTAssertFalse(offline.isOfflineCopy)
+
+        let elsewhere = DailyDeckViewModel(server: otherServer, client: client, store: store, now: { [morning] in morning })
+        await elsewhere.load()
+        guard case .failed = elsewhere.state else { return XCTFail("one server's copy never shows under another") }
+
+        client.listingErrors = [:]
+        await offline.show(date: "2026-10-04")
+        XCTAssertFalse(offline.isOfflineCopy, "back online, the server's deck replaces the copy")
+
+        store.remove(for: server)
+        XCTAssertNil(store.deckCopy(for: server, date: "2026-10-04", kind: "morning"), "removing a server removes its copy")
+    }
+
+    func testAHabitsSupportingInkIsNeverTheGlowFaded() {
+        XCTAssertEqual(DeckPalette.book.secondaryInk, HermexPaper.book.secondaryInk)
+        XCTAssertEqual(DeckPalette.opener.secondaryInk, Color.hxTextSecondary, "a neutral card's supporting text is neutral")
+    }
+
     // MARK: - Helpers
 
     @MainActor
@@ -3302,7 +3364,10 @@ final class DeckRenderTests: XCTestCase {
         let server = URL(string: "https://deck-render-tests.invalid")!
         store.setWorkspace("/vault", for: server)
         let morning = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 10, hour: 9))!
-        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-11-10.morning.json"], deck: Self.deckJSON)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: [
+            "2026-11-10.morning.json", "2026-11-09.morning.json", "2026-11-09.morning.answers.json", "2026-11-06.morning.json",
+            "2026-11-05.morning.json", "2026-11-05.morning.answers.json", "2026-11-04.morning.json", "2026-11-04.morning.answers.json",
+        ], deck: Self.deckJSON)
         let viewModel = DailyDeckViewModel(server: server, client: client, store: store, now: { morning })
         await viewModel.load()
         let wanted = environment["DECK_RENDER_CARDS"].map { Set($0.split(separator: ",").map(String.init)) }
@@ -3331,6 +3396,25 @@ final class DeckRenderTests: XCTestCase {
                 window.isHidden = true
                 window.rootViewController = nil
             }
+        }
+        // The journal calendar, whose dots say which days' briefs are filed.
+        guard wanted?.contains("calendar") ?? true else { return }
+        for (name, style) in [("light", UIUserInterfaceStyle.light), ("dark", .dark)] {
+            let appeared = expectation(description: "calendar appeared")
+            let window = UIWindow(windowScene: scene)
+            window.frame = CGRect(x: 0, y: 0, width: 402, height: 640)
+            window.overrideUserInterfaceStyle = style
+            window.rootViewController = UIHostingController(rootView:
+                DeckCalendarView(viewModel: viewModel, weeks: nil, openDeck: { _, _ in }).onAppear { appeared.fulfill() })
+            window.makeKeyAndVisible()
+            await fulfillment(of: [appeared], timeout: 5)
+            window.layoutIfNeeded()
+            let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+            }
+            try XCTUnwrap(image.pngData()).write(to: directory.appendingPathComponent("calendar-\(name).png"))
+            window.isHidden = true
+            window.rootViewController = nil
         }
     }
 }

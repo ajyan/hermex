@@ -129,7 +129,7 @@ struct DeckChangeFaceBlock: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(verbatim: label)
                 .font(AppFont.footnote(weight: .semibold))
-                .foregroundStyle(palette.colors.secondaryInk)
+                .foregroundStyle(palette.secondaryInk)
             if let title = face.title {
                 Text(verbatim: title)
                     .font(AppFont.display(style: .subheadline, weight: .semibold))
