@@ -302,7 +302,7 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertEqual(store.workspace(for: otherServer), "/elsewhere")
     }
 
-    func testStoreKeepsDraftsPerDeckForAWeekAndOneDaysSession() {
+    func testStoreKeepsDraftsPerDeckForAWeekAndOneReadingSession() {
         store.setAnswers(["a": DeckAnswer(card: "a", text: "x")], for: server, date: "2026-10-03", kind: "morning")
         store.setAnswers(["b": DeckAnswer(card: "b", text: "y")], for: server, date: "2026-10-04", kind: "morning")
         XCTAssertEqual(store.answers(for: server, date: "2026-10-03", kind: "morning")["a"]?.text, "x")
@@ -316,7 +316,9 @@ final class DailyDeckTests: XCTestCase {
 
         store.setSession("s3", for: server, date: "2026-10-03")
         store.setSession("s4", for: server, date: "2026-10-04")
-        XCTAssertNil(store.session(for: server, date: "2026-10-03"))
+        XCTAssertEqual(store.session(for: server, date: "2026-10-03"), "s4", "one session is kept, whichever day asks")
+        XCTAssertEqual(store.session(for: server, date: "2026-10-09"), "s4", "and it serves the days after")
+        XCTAssertNil(store.session(for: otherServer, date: "2026-10-04"), "never another server's")
     }
 
     // MARK: - View model
