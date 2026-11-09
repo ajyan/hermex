@@ -1523,7 +1523,32 @@ struct ChatView: View {
     /// bottom stack as the composer so it rides the keyboard with it.
     private func clarificationInset(maximumExpandedHeight: CGFloat) -> some View {
         ZStack(alignment: .bottom) {
-            if let clarificationPrompt = viewModel.clarificationPrompt {
+            if let clarificationPrompt = viewModel.clarificationPrompt,
+               let places = clarificationPrompt.pending.filingPlaces {
+                FilingAskCard(
+                    question: clarificationPrompt.question,
+                    detail: clarificationPrompt.pending.detail,
+                    recommended: places.recommended,
+                    other: places.other,
+                    isResponding: viewModel.isRespondingToClarification,
+                    errorMessage: viewModel.clarificationErrorMessage,
+                    onChoose: { place in
+                        Task {
+                            let didRespond = await viewModel.respondToClarification(place)
+                            if didRespond {
+                                ChatHaptics.clarificationSubmitted(isEnabled: isHapticsEnabled)
+                            }
+                        }
+                    },
+                    onFootprintChange: { height in
+                        clarificationBarHeight = height
+                    }
+                )
+                .id(clarificationPrompt.id)
+                .padding(.horizontal, 16)
+                .padding(.bottom, composerHeight + 8)
+                .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
+            } else if let clarificationPrompt = viewModel.clarificationPrompt {
                 ClarificationRequestInset(
                     prompt: clarificationPrompt,
                     maximumExpandedHeight: maximumExpandedHeight,
