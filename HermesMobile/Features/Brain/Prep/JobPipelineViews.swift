@@ -1,17 +1,25 @@
 import SwiftUI
 
-/// Prep home's "Your search": the next interview pinned with its one-pager, then every open application with its
-/// stage as pips (Applied to Offer), each opening its company page, and Add a company. Hidden until the pipeline
-/// loads, and on a server without one.
-struct PrepSearchSection: View {
+/// Prep home's Pipeline: every open application as a hairline row in one neutral card (the company, then its
+/// stage and next step in plain words), each opening its company page, and Add a company. The week's
+/// applications sit in the header as pips, the same count the Ask and the Brief's search card show. Hidden until
+/// the pipeline loads, and on a server without one.
+struct PrepPipelineSection: View {
     let model: JobPipelineModel
     @State private var adding = false
 
     var body: some View {
         if let pipeline = model.pipeline, !pipeline.applications.isEmpty || !pipeline.upcoming.isEmpty {
             VStack(alignment: .leading, spacing: BrainStyle.s) {
-                BrainSectionHeader(title: "Your search", count: pipeline.applications.count)
-                if let next = pipeline.upcoming.first {
+                HStack(alignment: .firstTextBaseline, spacing: BrainStyle.s) {
+                    BrainSectionHeader(title: "Pipeline")
+                    if let applied = pipeline.applicationsWeek {
+                        JobCountPips(label: "Applications", count: applied, layout: .beside, compact: true)
+                            .foregroundStyle(Color.hxTextSecondary)
+                    }
+                }
+                // A server that sends no pack still pins the next interview above the rows.
+                if pipeline.pack == nil, let next = pipeline.upcoming.first {
                     JobNextInterviewCard(slot: next)
                 }
                 SectionCard {
@@ -19,13 +27,8 @@ struct PrepSearchSection: View {
                         ForEach(Array(pipeline.applications.enumerated()), id: \.element.id) { offset, row in
                             if offset > 0 { PrepRowDivider() }
                             NavigationLink(value: ShellPushDestination.brainRoute(.prep(.application(row.id)))) {
-                                HStack(spacing: BrainStyle.m) {
-                                    BrainRow(leading: { EmptyView() }, title: row.name,
-                                             subtitle: [row.role, JobCopy.stageLine(row)].compactMap { $0 }.joined(separator: " · "),
-                                             subtitleLineLimit: 2)
-                                    JobStagePips(step: row.step, count: pipeline.stages.count)
-                                }
-                                .accessibilityElement(children: .combine)
+                                BrainRow(leading: { EmptyView() }, title: row.name, subtitle: JobCopy.pipelineLine(row),
+                                         subtitleLineLimit: 2)
                             }
                             .buttonStyle(.plain)
                         }
@@ -48,6 +51,114 @@ struct PrepSearchSection: View {
             }
             .sheet(isPresented: $adding) { JobAddSheet(model: model) }
         }
+    }
+}
+
+/// The interview pack, leading Prep's home while an interview is booked: one orchid glow card with who and
+/// when, three hairline rows (the stories picked for it with told pips, the round's mock, the one-pager), and
+/// the screen's one filled button, which starts the first step not done yet.
+struct PrepInterviewPackCard: View {
+    let pack: JobPack
+    /// Starts the company mock call when that is the next step.
+    let mock: PrepMockViewModel
+    @Environment(\.openMockCall) private var openMockCall
+
+    private var paper: HermexPaper { .prep }
+
+    var body: some View {
+        HXCard(.glow(paper), title: JobCopy.packTitle(pack), titleStyle: .title3, spacing: BrainStyle.s, kicker: {
+            Text(verbatim: JobCopy.packKicker(pack))
+                .font(AppFont.footnote(weight: .semibold))
+                .foregroundStyle(paper.glow)
+        }, content: {
+            Text(verbatim: JobCopy.packRound(pack))
+                .font(BrainStyle.rowSubtitle)
+                .foregroundStyle(paper.secondaryInk)
+            VStack(spacing: 0) {
+                link(.application(pack.id), hint: "Opens the prep plan") {
+                    row("Stories to tell", detail: pack.stories.map(\.name).joined(separator: ", ")) {
+                        JobCountPips(label: "Told", count: pack.told, layout: .beside, compact: true, showsLabel: false)
+                    }
+                }
+                if let step = pack.mock {
+                    divider
+                    link(pack.mockRoute, hint: "Opens the mock") {
+                        row(step.title, detail: nil) { trailing(step.done == true ? "Done" : "To do") }
+                    }
+                }
+                divider
+                if pack.onePagerReady {
+                    link(.onePager(pack.id), hint: "Opens the one-pager") {
+                        row("One-pager", detail: nil) { trailing("Ready") }
+                    }
+                } else {
+                    row("One-pager", detail: "Ask Atlas to write one from the posting and your stories.") {
+                        trailing("Not written")
+                    }
+                }
+            }
+        }, footer: {
+            start
+            if let message = mock.errorMessage {
+                Text(verbatim: message)
+                    .font(BrainStyle.meta)
+                    .foregroundStyle(Color.hxDanger)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        })
+    }
+
+    @ViewBuilder
+    private var start: some View {
+        let title = JobCopy.packStart(pack)
+        switch pack.start {
+        case .route(let route):
+            NavigationLink(value: ShellPushDestination.brainRoute(.prep(route))) { PrepPrimaryLabel(title: title) }
+                .buttonStyle(.plain)
+        case .call(let part) where openMockCall.isAvailable:
+            PrepPrimaryButton(title: mock.isStarting ? "Starting…" : title, enabled: !mock.isStarting) {
+                Task { await mock.startCompanyCall(app: pack.id, part: part, open: openMockCall) }
+            }
+        case .call, .plan:
+            NavigationLink(value: ShellPushDestination.brainRoute(.prep(.application(pack.id)))) {
+                PrepPrimaryLabel(title: title)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var divider: some View {
+        Rectangle().fill(paper.edge).frame(height: 0.5).accessibilityHidden(true)
+    }
+
+    private func link<Label: View>(_ route: PrepRoute, hint: String, @ViewBuilder label: () -> Label) -> some View {
+        NavigationLink(value: ShellPushDestination.brainRoute(.prep(route)), label: label)
+            .buttonStyle(.plain)
+            .accessibilityHint(Text(verbatim: hint))
+    }
+
+    private func row<Trailing: View>(_ title: String, detail: String?, @ViewBuilder trailing: () -> Trailing) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: BrainStyle.m) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: title).font(BrainStyle.rowSubtitle).foregroundStyle(Color.hxTextPrimary)
+                if let detail, !detail.isEmpty {
+                    Text(verbatim: detail)
+                        .font(BrainStyle.meta)
+                        .foregroundStyle(paper.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: BrainStyle.s)
+            trailing()
+        }
+        .padding(.vertical, BrainStyle.xs)
+        .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+
+    private func trailing(_ text: String) -> some View {
+        Text(verbatim: text).font(BrainStyle.meta).foregroundStyle(paper.secondaryInk)
     }
 }
 
@@ -97,14 +208,16 @@ struct JobCountPips: View {
     var layout: Layout = .stacked
     /// Label and pip sizes for a section header's trailing edge.
     var compact = false
+    /// Off when the row it sits in already names the count; VoiceOver still reads the label.
+    var showsLabel = true
 
     var body: some View {
         Group {
             switch layout {
             case .stacked:
-                VStack(alignment: .leading, spacing: 4) { title; dots }
+                VStack(alignment: .leading, spacing: 4) { if showsLabel { title }; dots }
             case .beside:
-                HStack(spacing: 6) { title; dots }
+                HStack(spacing: 6) { if showsLabel { title }; dots }
             }
         }
         .accessibilityElement(children: .ignore)

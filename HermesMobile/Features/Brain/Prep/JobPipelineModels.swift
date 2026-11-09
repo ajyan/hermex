@@ -17,8 +17,11 @@ struct JobPipeline: Decodable, Equatable, Sendable {
     /// This week's applications and outreach: the vault's one count (`job_pipeline.week`), which the Ask, the
     /// search card, the close card and Prep all show. Nil on a server that predates it.
     let week: JobWeek?
+    /// The next interview's pack, which Prep's home leads with; nil with no interview booked (in the pipeline
+    /// or on the calendar), and on a server that predates it.
+    let pack: JobPack?
 
-    private enum CodingKeys: String, CodingKey { case today, upcoming, applications, closed, stages, metrics, week }
+    private enum CodingKeys: String, CodingKey { case today, upcoming, applications, closed, stages, metrics, week, pack }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -29,6 +32,7 @@ struct JobPipeline: Decodable, Equatable, Sendable {
         stages = Self.lossy(c, .stages)
         metrics = try? c.decodeIfPresent(JobMetrics.self, forKey: .metrics)
         week = try? c.decodeIfPresent(JobWeek.self, forKey: .week)
+        pack = try? c.decodeIfPresent(JobPack.self, forKey: .pack)
     }
 
     private static func lossy<T: Decodable>(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> [T] {
@@ -72,6 +76,118 @@ struct JobCount: Decodable, Equatable, Sendable {
     var overflows: Bool { total > Self.maxPips }
     /// What VoiceOver reads after the label: "2 of 5", or "3" with no target.
     var spoken: String { target == nil ? "\(done)" : "\(done) of \(total)" }
+}
+
+/// What to practice for the next interview (the vault's `job_pipeline.pack`): who and when, the stories picked
+/// for it, the mock for its round, whether its one-pager is written, and the step today's session starts with.
+struct JobPack: Decodable, Equatable, Sendable {
+    /// The application's pipeline id.
+    let id: String
+    let company: String?
+    let role: String?
+    /// The interview's own name ("First round").
+    let label: String
+    /// The round it prepares for ("Recruiter screen").
+    let round: String?
+    let on: String
+    let time: String?
+    let inDays: Int
+    /// "calendar" when the interview was found on Google Calendar rather than booked in the pipeline.
+    let source: String?
+    /// The length of the daily session its button starts.
+    let minutes: Int
+    let stories: [JobPackStory]
+    /// "onepager" (the stories behind the one-pager's questions) or "bank" (no one-pager: the active stories
+    /// told longest ago).
+    let storiesFrom: String?
+    let mock: JobPackStep?
+    let onePagerReady: Bool
+    /// The first story or mock not done yet; nil once all are.
+    let next: JobPackStep?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, company, role, label, round, on, time, source, minutes, stories, mock, onepager, next
+        case inDays = "in_days"
+        case storiesFrom = "stories_from"
+    }
+
+    private struct OnePager: Decodable { let ready: Bool? }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        on = try c.decode(String.self, forKey: .on)
+        company = try? c.decodeIfPresent(String.self, forKey: .company)
+        role = try? c.decodeIfPresent(String.self, forKey: .role)
+        label = (try? c.decodeIfPresent(String.self, forKey: .label)) ?? "Interview"
+        round = try? c.decodeIfPresent(String.self, forKey: .round)
+        time = try? c.decodeIfPresent(String.self, forKey: .time)
+        inDays = (try? c.decodeIfPresent(Int.self, forKey: .inDays)) ?? 0
+        source = try? c.decodeIfPresent(String.self, forKey: .source)
+        minutes = (try? c.decodeIfPresent(Int.self, forKey: .minutes)) ?? 20
+        stories = ((try? c.decodeIfPresent([PrepLossy<JobPackStory>].self, forKey: .stories)) ?? nil)?.compactMap(\.value) ?? []
+        storiesFrom = try? c.decodeIfPresent(String.self, forKey: .storiesFrom)
+        mock = try? c.decodeIfPresent(JobPackStep.self, forKey: .mock)
+        onePagerReady = ((try? c.decodeIfPresent(OnePager.self, forKey: .onepager)) ?? nil)?.ready ?? false
+        next = try? c.decodeIfPresent(JobPackStep.self, forKey: .next)
+    }
+
+    /// The stories told so far, as pips.
+    var told: JobCount { JobCount(done: stories.filter(\.done).count, target: stories.count) }
+
+    /// What the pack's button does: tell the next story, start the round's mock, or (all done, or a step this
+    /// build doesn't know) open the application's prep plan.
+    var start: JobPackStart {
+        guard let next else { return .plan }
+        switch next.kind {
+        case "story": return .route(.story(next.id))
+        case "ladder": return PrepMockKind(rawValue: next.id).map { .route(.mockLadder($0)) } ?? .plan
+        case "mock": return .call(part: "questions")
+        case "pitch": return .call(part: "pitch")
+        default: return .plan
+        }
+    }
+
+    /// Where the mock row goes: a ladder's brief, or the prep plan, which holds the company mock call.
+    var mockRoute: PrepRoute {
+        if let mock, mock.kind == "ladder", let kind = PrepMockKind(rawValue: mock.id) { return .mockLadder(kind) }
+        return .application(id)
+    }
+}
+
+struct JobPackStory: Decodable, Equatable, Identifiable, Sendable {
+    let id: String
+    /// The short name the one-pager gives it ("Retrieval quality").
+    let name: String
+    let title: String?
+    /// Told in Prep since the application was added.
+    let done: Bool
+
+    private enum CodingKeys: String, CodingKey { case id, name, title, done }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        title = try? c.decodeIfPresent(String.self, forKey: .title)
+        done = (try? c.decodeIfPresent(Bool.self, forKey: .done)) ?? false
+    }
+}
+
+/// A step of the pack: `kind` is story (`id` is the story's), ladder (`id` is the mock ladder's kind), or mock
+/// (the company mock call over the one-pager's questions).
+struct JobPackStep: Decodable, Equatable, Sendable {
+    let id: String
+    let kind: String
+    let title: String
+    let done: Bool?
+}
+
+enum JobPackStart: Equatable {
+    case route(PrepRoute)
+    /// A company mock call: pitch or questions.
+    case call(part: String)
+    case plan
 }
 
 /// The stages an open application moves through, Applied to Offer.
@@ -541,6 +657,40 @@ enum JobCopy {
         guard row.open else { return outcomeLabel(row.outcome) }
         return row.days == 0 ? "\(row.stageName) · today" : "\(row.stageName) · \(row.days) day\(row.days == 1 ? "" : "s")"
     }
+
+    /// A Pipeline row's second line: the next interview ("First round tomorrow"), else the stage and what it
+    /// waits on ("Applied · waiting to hear back"). A server without `next_step` keeps the stage line.
+    static func pipelineLine(_ row: JobApplicationRow) -> String {
+        guard row.open, let step = row.nextStep, !step.isEmpty else { return stageLine(row) }
+        if row.next != nil { return step }
+        return "\(row.stageName) · \(step.prefix(1).lowercased())\(step.dropFirst())"
+    }
+
+    /// "Interview · Tue, Nov 10 · 10:00".
+    static func packKicker(_ pack: JobPack) -> String {
+        (["Interview", day(pack.on)] + [pack.time].compactMap { $0 }).joined(separator: " · ")
+    }
+
+    /// "Agentic AI Engineer, Obin AI".
+    static func packTitle(_ pack: JobPack) -> String {
+        let parts = [pack.role, pack.company].compactMap { $0 }.filter { !$0.isEmpty }
+        return parts.isEmpty ? pack.label : parts.joined(separator: ", ")
+    }
+
+    /// "Recruiter screen · First round · tomorrow".
+    static func packRound(_ pack: JobPack) -> String {
+        var parts = [pack.round].compactMap { $0 }
+        if !parts.contains(pack.label) { parts.append(pack.label) }
+        return (parts + [when(inDays: pack.inDays)]).joined(separator: " · ")
+    }
+
+    /// "Start today's 20 minutes", or the way into the plan once every step is done.
+    static func packStart(_ pack: JobPack) -> String {
+        pack.next == nil ? "Open the prep plan" : "Start today's \(pack.minutes) minutes"
+    }
+
+    /// "Interview tomorrow", under Prep home's title while a pack leads.
+    static func packSubtitle(_ pack: JobPack) -> String { "Interview \(when(inDays: pack.inDays))" }
 
     static let isoFormatter: DateFormatter = {
         let f = DateFormatter()
