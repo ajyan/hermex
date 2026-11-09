@@ -15,6 +15,9 @@ struct DeckPalette: Equatable {
     var edge: Color { isNeutralCard ? .hxSeparator : colors.edge }
     /// Text and marks on the card: the paper's glow.
     var ink: Color { colors.glow }
+    /// Supporting text on the card (a kind line, a small label, where a quote is from), at full strength: the
+    /// paper's `secondaryInk` on a glow card, `hxTextSecondary` on a neutral one. Never the ink faded.
+    var secondaryInk: Color { isNeutralCard ? .hxTextSecondary : colors.secondaryInk }
     /// Text on an `ink`-filled button.
     var onInk: Color { colors.onGlow }
     /// The kind's mark, drawn faintly in the card's corner.
@@ -32,8 +35,6 @@ struct DeckPalette: Equatable {
         self.shortName = shortName
     }
 
-    // Bright paper in both appearances: index cards on a dark desk. Cards draw in light mode
-    // (`DeckPageView`) so system text and controls stay legible on them.
     static let opener = DeckPalette(.opener, symbol: "sun.horizon", name: "Today", shortName: "Today", isNeutralCard: true)
     /// The "This week" divider: the opener's neutral paper, named for what it opens.
     static let section = DeckPalette(.opener, symbol: "calendar", name: "This week", shortName: "This week", isNeutralCard: true)
@@ -57,6 +58,9 @@ struct DeckPalette: Equatable {
         "ai": ("briefcase", "Landing the AI role", "AI role"), "fatherhood": ("heart", "Becoming a dad", "Dad"),
         "living-well": ("figure.run", "Body", "Body"), "relationships": ("person.2", "People", "People"),
     ]
+    /// A deck by job's close, the week's habit tracker: a neutral summary card like the opener, since it sums up
+    /// the week's habits (each row in its own paper) rather than being one kind of thing.
+    static let tracker = DeckPalette(.opener, symbol: "checkmark.seal", name: "This week", shortName: "Close", isNeutralCard: true)
     static let quote = DeckPalette(.quote, symbol: "quote.opening", name: "Quote", shortName: "Quote")
     static let book = DeckPalette(.book, symbol: "book.closed", name: "Book highlight", shortName: "Book")
     static let wiki = DeckPalette(.wiki, symbol: "leaf", name: "From your wiki", shortName: "Wiki")
@@ -140,7 +144,7 @@ struct DeckPalette: Equatable {
         case .headline: return .opener
         case .section: return .section(front: card.frontName)
         case .front: return .front(card.front)
-        case .close: return .quote
+        case .close: return card.weekRows.isEmpty ? .quote : .tracker
         case .prompt where card.chapter != nil: return .week
         case .prompt:
             if card.isPast { return .lookingBack }

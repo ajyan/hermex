@@ -290,24 +290,14 @@ enum ChatTranscriptDisplaySettings {
     }
 }
 
-/// Visibility of the optional navigation entries, so a user can hide the parts of
-/// the app they never use (issue #189): the session-list utility rows and the
-/// chat's Files and Git controls. These buttons are the only way into those
-/// screens, so hiding one takes it out of reach until the toggle goes back on.
-/// Purely a display preference — nothing stops loading or syncing.
+/// Visibility of the chat's optional Files and Git controls, so a user can hide the
+/// ones they never use (issue #189). Purely a display preference: nothing stops
+/// loading or syncing.
 enum SectionVisibilitySettings {
-    static let tasksKey = "sectionVisibility.tasks"
-    static let kanbanKey = "sectionVisibility.kanban"
-    static let skillsKey = "sectionVisibility.skills"
-    static let memoryKey = "sectionVisibility.memory"
-    static let insightsKey = "sectionVisibility.insights"
-    static let activeProfileKey = "sectionVisibility.activeProfile"
-    static let projectsKey = "sectionVisibility.projects"
     static let chatFilesKey = "sectionVisibility.chatFiles"
     static let chatGitKey = "sectionVisibility.chatGit"
 
-    /// Every entry defaults to visible, so an install that predates these toggles
-    /// looks exactly as it did before.
+    /// Both default to visible.
     static func isVisible(_ key: String, in defaults: UserDefaults = .standard) -> Bool {
         defaults.object(forKey: key) as? Bool ?? true
     }

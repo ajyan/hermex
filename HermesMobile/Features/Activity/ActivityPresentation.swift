@@ -3,11 +3,12 @@ import SwiftUI
 /// Display rules for the activity timeline, kept out of the views so they can
 /// be asserted without rendering.
 enum ActivityPresentation {
+    /// Status colors only: accent is for controls, never a state (DESIGN.md).
     static func outcomeStyle(_ outcome: AtlasOutcome) -> Color {
         switch outcome {
         case .blocked, .error: .hxDanger
         case .denied: .hxWarning
-        case .approved: Color.accentColor
+        case .approved: .hxSuccess
         case .ok, .unknown: .hxTextSecondary
         }
     }

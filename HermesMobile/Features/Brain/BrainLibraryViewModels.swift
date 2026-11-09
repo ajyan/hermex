@@ -479,6 +479,29 @@ final class BrainPageViewModel {
         return result
     }
 
+    /// The values the last facts save replaced, while it can still be undone.
+    private(set) var factsUndo: BrainPersonFactsChange?
+
+    /// Saves the facts that changed to this person's page, then reloads it. Throws when the server
+    /// didn't write them (its reason for a value it refused); the sheet keeps his edits.
+    func saveFacts(_ change: BrainPersonFactsChange) async throws {
+        guard !change.isEmpty else { return }
+        let result = try await client.savePersonFacts(BrainPersonFactsRequest(id: id, change: change))
+        factsUndo = result.previous.isEmpty ? nil : result.previous
+        await load()
+    }
+
+    /// Puts back what the last save replaced. Throws when the server didn't; the offer stays so he can retry.
+    func undoFacts() async throws {
+        guard let previous = factsUndo else { return }
+        _ = try await client.savePersonFacts(BrainPersonFactsRequest(id: id, change: previous))
+        factsUndo = nil
+        await load()
+    }
+
+    /// Ends the Undo offer.
+    func dismissFactsUndo() { factsUndo = nil }
+
     /// The page's saved copy is per hub: one opened while paging a hub carries that hub's trail and
     /// pager, which must not show when the same page is opened from search.
     private var cacheID: String { hub.map { "\(id)#hub=\($0)" } ?? id }

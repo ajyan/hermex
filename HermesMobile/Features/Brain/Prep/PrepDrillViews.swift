@@ -541,6 +541,20 @@ struct PrepPrimaryButton: View {
     }
 }
 
+/// `PrepPrimaryButton`'s face on its own, for a primary action that is a `NavigationLink`.
+struct PrepPrimaryLabel: View {
+    let title: String
+
+    var body: some View {
+        Text(verbatim: title)
+            .font(AppFont.body(weight: .semibold))
+            .foregroundStyle(HermexPaper.prep.onGlow)
+            .frame(maxWidth: .infinity, minHeight: 50)
+            .background(HermexPaper.prep.glow, in: Capsule())
+            .contentShape(Capsule())
+    }
+}
+
 /// The wait while Atlas grades an answer: a breathing sparkle and the seconds since submit.
 /// The symbol effect runs in the render server and the counter ticks once a second inside a
 /// `TimelineView` scoped to this label, so nothing else re-renders. Under Reduce Motion the

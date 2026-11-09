@@ -173,6 +173,7 @@ enum Endpoint {
     case brainPersonLog
     /// The shelf for his writing (`kind`: letters, takes or memories), read-only.
     case brainShelf(kind: String)
+    case brainPersonFacts
     /// The Prep interview tutor (`api/tutor.py`): today's run, home, a track map, one item, answer submission,
     /// the gap ledger (all gaps and one gap) and flagging a coach-written card.
     case tutorHome
@@ -568,6 +569,8 @@ enum Endpoint {
             return "/api/brain/person/log"
         case .brainShelf:
             return "/api/brain/shelf"
+        case .brainPersonFacts:
+            return "/api/brain/person/facts"
         case .tutorHome:
             return "/api/tutor/home"
         case .tutorToday, .tutorRun:

@@ -173,7 +173,7 @@ private struct ListenPlaybackBar: View {
                     Circle()
                         .fill(Color.accentColor)
                     Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 13, weight: .bold)) // design-drift: allow (SF Symbol in a fixed-size control)
                         .foregroundStyle(.white)
                 }
                 .frame(width: 34, height: 34)
@@ -241,7 +241,7 @@ private struct ListenPlaybackBar: View {
     private var stopButton: some View {
         Button(action: onStop) {
             Image(systemName: "xmark")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold)) // design-drift: allow (SF Symbol in a fixed-size control)
                 .foregroundStyle(.secondary)
                 .frame(width: 30, height: 30)
                 .contentShape(Circle())

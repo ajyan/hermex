@@ -983,7 +983,7 @@ struct ChatScrollToBottomButton: View {
     var body: some View {
         Button(action: onTap) {
             Image(systemName: "arrow.down")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold)) // design-drift: allow (SF Symbol in a fixed-size control)
                 .frame(width: 32, height: 32)
                 .foregroundStyle(.primary)
                 .adaptiveGlass(

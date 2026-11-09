@@ -2,7 +2,7 @@ import SwiftUI
 
 /// A weekly review's What changed card: each fix from the feedback loop whose status moved this
 /// week, newest first. A row leads with the change, then what the user said (his words, in
-/// serif) and the state as a chip. A shipped row offers Undo, which reverts the fix on the
+/// serif), then, when the vault sends them, the same card before and after the fix, and the state as a chip. A shipped row offers Undo, which reverts the fix on the
 /// vault's main branch after a confirmation; the server's reason shows under the row when it
 /// refuses. Undo goes through the deck's view model so the open card and the stack agree.
 struct DeckChangesCard: View {
@@ -66,6 +66,10 @@ struct DeckChangesCard: View {
                 }
             }
             .accessibilityElement(children: .combine)
+            if let proof = row.proof {
+                DeckChangeFaceBlock(label: "Before", face: proof.before, palette: palette)
+                DeckChangeFaceBlock(label: "After", face: proof.after, palette: palette)
+            }
             HStack(alignment: .center, spacing: 10) {
                 if !stateLabel.isEmpty {
                     HXChip(paper: palette.colors, symbol: Self.symbol(for: state), label: stateLabel)
@@ -111,5 +115,41 @@ struct DeckChangesCard: View {
         case .reverted: "arrow.uturn.backward"
         case .unknown: nil
         }
+    }
+}
+
+/// One face of a fix's proof: the card as it read before or after, on an inset block in the card's wash. Its
+/// title in the display voice, the source's line in the serif, its take and its question.
+struct DeckChangeFaceBlock: View {
+    let label: String
+    let face: DeckChangeFace
+    let palette: DeckPalette
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(verbatim: label)
+                .font(AppFont.footnote(weight: .semibold))
+                .foregroundStyle(palette.secondaryInk)
+            if let title = face.title {
+                Text(verbatim: title)
+                    .font(AppFont.display(style: .subheadline, weight: .semibold))
+                    .foregroundStyle(palette.ink)
+            }
+            if let quote = face.quote {
+                DeckQuoteRow(text: quote, at: nil, palette: palette)
+            }
+            if let text = face.text {
+                Text(verbatim: text).font(AppFont.footnote()).foregroundStyle(Color.hxTextPrimary)
+            }
+            if let question = face.question {
+                Text(verbatim: question).font(AppFont.footnote(weight: .semibold)).foregroundStyle(Color.hxTextPrimary)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(palette.colors.wash, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(verbatim: ([label] + [face.title, face.quote, face.text, face.question].compactMap { $0 }).joined(separator: ". ")))
     }
 }

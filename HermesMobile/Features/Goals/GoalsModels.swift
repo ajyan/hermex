@@ -294,6 +294,9 @@ struct GoalSummary: Decodable, Hashable, Sendable, Identifiable {
     var dailyChecks: [GoalDailyCheck]
     var flags: GoalFlags
     var confirmedStarts: [String]
+    /// The day of the weekly deck that proposed this week while it is still unconfirmed; nil
+    /// once confirmed, on a Sunday, and from servers that don't send it.
+    var weekPending: String?
     /// Why a source such as Prep could not be read, shown instead of a silent zero.
     var sourceErrors: [String]
     /// The last milestone (else the deadline) is due: time to ask "I finished?".
@@ -304,7 +307,7 @@ struct GoalSummary: Decodable, Hashable, Sendable, Identifiable {
     private enum CodingKeys: String, CodingKey {
         case slug, title, status, deadline, identity, week, flags, color, icon
         case confirmedStarts = "confirmed_starts", sourceErrors = "source_errors"
-        case finishDue = "finish_due"
+        case finishDue = "finish_due", weekPending = "week_pending"
         case daysLeft = "days_left", nextMilestone = "next_milestone", dailyChecks = "daily_checks"
     }
 
@@ -323,6 +326,7 @@ struct GoalSummary: Decodable, Hashable, Sendable, Identifiable {
         dailyChecks = c.lossy(GoalDailyCheck.self, .dailyChecks)
         flags = c.optional(GoalFlags.self, .flags) ?? GoalFlags()
         confirmedStarts = c.optional([String].self, .confirmedStarts) ?? []
+        weekPending = c.optional(String.self, .weekPending)
         sourceErrors = c.optional([String].self, .sourceErrors) ?? []
         finishDue = c.bool(.finishDue)
     }

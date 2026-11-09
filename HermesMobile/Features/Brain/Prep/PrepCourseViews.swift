@@ -140,6 +140,9 @@ struct PrepTodayCard: View {
     let run: PrepRunSummary
     let streakDays: Int
     let today: PrepDayCount?
+    /// Off while the interview pack leads home: the run's Start is outlined, so the pack's button stays the
+    /// screen's one filled button.
+    var leads = true
 
     var body: some View {
         let action = PrepCopy.runAction(reps: run.reps, remaining: run.remaining)
@@ -167,7 +170,7 @@ struct PrepTodayCard: View {
             VStack(spacing: BrainStyle.m) {
                 // Once started: how far it got. Before, the size line above already says it.
                 if let today, today.done > 0 { PrepRunProgress(today: today).frame(maxWidth: .infinity, alignment: .leading) }
-                PrepRunButton(action: action, fullWidth: true)
+                PrepRunButton(action: action, fullWidth: true, prominent: leads)
             }
         })
     }

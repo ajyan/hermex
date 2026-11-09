@@ -357,16 +357,18 @@ struct BrainPerson: Codable, Hashable, Sendable {
     let rhythmEnd: String?
     /// Their iMessage number or email (the contact's `imessage:`), for the page's Text button; nil without one.
     let imessage: String?
+    /// The facts this page can edit; nil from a server without `POST /api/brain/person/facts`.
+    let editable: BrainPersonFacts?
 
     private enum CodingKeys: String, CodingKey {
         case encounters, profile, questions, other, journal, lastSeen, nextBirthday, catchup, threads, rhythm, rhythmEnd
-        case imessage
+        case imessage, editable
     }
 
     init(encounters: [BrainEncounter] = [], profile: [BrainProfileSection] = [], questions: [String] = [],
          other: String = "", lastSeen: String? = nil, nextBirthday: String? = nil,
          journal: [BrainJournalMention] = [], catchup: String? = nil, threads: [String] = [], rhythm: [Int] = [],
-         rhythmEnd: String? = nil, imessage: String? = nil) {
+         rhythmEnd: String? = nil, imessage: String? = nil, editable: BrainPersonFacts? = nil) {
         self.encounters = encounters
         self.profile = profile
         self.questions = questions
@@ -379,6 +381,7 @@ struct BrainPerson: Codable, Hashable, Sendable {
         self.rhythm = rhythm
         self.rhythmEnd = rhythmEnd
         self.imessage = imessage
+        self.editable = editable
     }
 
     init(from decoder: Decoder) throws {
@@ -395,6 +398,7 @@ struct BrainPerson: Codable, Hashable, Sendable {
         rhythm = c.lossy(Int.self, .rhythm)
         rhythmEnd = c.optional(String.self, .rhythmEnd)
         imessage = c.optional(String.self, .imessage).flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
+        editable = c.optional(BrainPersonFacts.self, .editable)
     }
 }
 

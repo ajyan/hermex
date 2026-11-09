@@ -397,6 +397,11 @@ struct DeckCard: Decodable, Equatable, Identifiable {
         let linked: DeckThread?
         /// The idea a writing card's prompt builds on (wire `from_idea`), for its "From today's idea" chip.
         let fromIdea: DeckFromIdea?
+        /// An idea card's take on its source, in a sentence or two; older decks have only the `gist`.
+        let take: String?
+        /// Whether an idea card was written from a summary, with none of the source's own text on hand (wire
+        /// `summary: true`, or `source_text: false`). Nil on decks that don't say; `DeckIdea` works it out.
+        let isFromSummary: Bool?
         /// A year-ago card's day, "Tue, Oct 28, 2025".
         let dateLabel: String?
 
@@ -409,6 +414,7 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             case todayAction = "today"
             case moments, spares, ended, text, ifThen, name, fact, changes, intention
             case act, gist, quotes, parts, weekQuestion, thread, linked, fromIdea, dateLabel, month
+            case take, summary, sourceText
             case valueID = "value"
             case itemKind = "kind"
         }
@@ -518,6 +524,9 @@ struct DeckCard: Decodable, Equatable, Identifiable {
             thread = (try? c.decodeIfPresent(DeckThread.self, forKey: .thread)).flatMap { $0.quote.isEmpty ? nil : $0 }
             linked = (try? c.decodeIfPresent(DeckThread.self, forKey: .linked)).flatMap { $0.quote.isEmpty ? nil : $0 }
             fromIdea = (try? c.decodeIfPresent(DeckFromIdea.self, forKey: .fromIdea)).flatMap { $0.title.isEmpty ? nil : $0 }
+            take = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .take))
+            isFromSummary = (try? c.decodeIfPresent(Bool.self, forKey: .summary))
+                ?? (try? c.decodeIfPresent(Bool.self, forKey: .sourceText)).map { !$0 }
             dateLabel = Self.nonEmpty(try? c.decodeIfPresent(String.self, forKey: .dateLabel))
             let ref = try? c.decodeIfPresent(Ref.self, forKey: .ref)
             link = ref?.link.flatMap { $0.isEmpty ? nil : $0 }
@@ -754,8 +763,17 @@ struct DeckChangeRow: Decodable, Equatable, Identifiable {
     let state: State
     let recurred: Int?
     let undoable: Bool?
+    /// The same card as it was written before the fix and after it, so the fix can be seen to have worked.
+    /// Both or neither: one face alone shows nothing.
+    let proof: Proof?
 
-    private enum CodingKeys: String, CodingKey { case id, said, change, state, recurred, undoable }
+    /// One card written twice: before a fix and after it.
+    struct Proof: Equatable {
+        let before: DeckChangeFace
+        let after: DeckChangeFace
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, said, change, state, recurred, undoable, before, after }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -765,6 +783,42 @@ struct DeckChangeRow: Decodable, Equatable, Identifiable {
         state = State((try? c.decodeIfPresent(String.self, forKey: .state)) ?? "")
         recurred = try? c.decodeIfPresent(Int.self, forKey: .recurred)
         undoable = try? c.decodeIfPresent(Bool.self, forKey: .undoable)
+        let before = (try? c.decodeIfPresent(DeckChangeFace.self, forKey: .before)).flatMap { $0.isEmpty ? nil : $0 }
+        let after = (try? c.decodeIfPresent(DeckChangeFace.self, forKey: .after)).flatMap { $0.isEmpty ? nil : $0 }
+        if let before, let after, before != after { proof = Proof(before: before, after: after) } else { proof = nil }
+    }
+}
+
+/// A card as it read at one moment, on a What changed row: what a reader would notice of it. Decoded from a card
+/// in the deck's own shape, every field optional; a face with no words is dropped.
+struct DeckChangeFace: Decodable, Equatable {
+    /// The card's title, else the first line it led with.
+    let title: String?
+    /// The first of the source's own lines it quoted.
+    let quote: String?
+    /// Its take on the source: `take`, else its gist, context or body.
+    let text: String?
+    let question: String?
+
+    var isEmpty: Bool { title == nil && quote == nil && text == nil && question == nil }
+
+    private enum CodingKeys: String, CodingKey { case title, quotes, take, gist, context, body, question, kind }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        func words(_ key: CodingKeys) -> String? {
+            (try? c.decodeIfPresent(String.self, forKey: key))
+                .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+        }
+        title = words(.title)
+        question = words(.question)
+        let quotes = ((try? c.decodeIfPresent([Lossy<DeckPiece.Quote>].self, forKey: .quotes)) ?? []).compactMap(\.value)
+            .map { DeckIdea.unquoted($0.text) }.filter { !$0.isEmpty }
+        // An old book highlight's body is the source's own words.
+        let isHighlight = words(.kind) == "book" && words(.gist) == nil && quotes.isEmpty
+        quote = quotes.first ?? (isHighlight ? words(.body).map(DeckIdea.unquoted) : nil)
+        let said = words(.take) ?? words(.gist) ?? words(.context) ?? (isHighlight ? nil : words(.body))
+        text = said == title ? nil : said
     }
 }
 
@@ -1276,10 +1330,11 @@ struct DailyDeckStore {
         defaults.removeObject(forKey: key("session", server))
     }
 
-    /// The session that reads `date`'s deck; one per day, so filing lands in that day's chat.
+    /// The session the Brief reads the vault's files through. The server's file routes need a session, so
+    /// one is kept and reused day after day (whichever day made it) instead of a new empty one each morning;
+    /// `date` is the day asking. A session the server lost is replaced by the caller.
     func session(for server: URL, date: String) -> String? {
-        let stored = defaults.dictionary(forKey: key("session", server)) as? [String: String]
-        return stored?[date]
+        latestSession(for: server)?.id
     }
 
     /// The newest stored day session, if any.
@@ -1337,6 +1392,26 @@ struct DailyDeckStore {
               let all = try? JSONDecoder().decode([String: [String: DeckAnswer]].self, from: data)
         else { return [:] }
         return all
+    }
+
+    /// The deck last read for `server`, kept so today's brief can be reread without the server: the deck file
+    /// as the server sent it and, when it was filed, its answers file. One deck per server.
+    struct SavedDeck: Codable, Equatable {
+        let date: String
+        let kind: String
+        let deck: String
+        var answers: String?
+    }
+
+    func deckCopy(for server: URL, date: String, kind: String) -> SavedDeck? {
+        guard let data = defaults.data(forKey: key("deckCopy", server)),
+              let copy = try? JSONDecoder().decode(SavedDeck.self, from: data), copy.date == date, copy.kind == kind
+        else { return nil }
+        return copy
+    }
+
+    func setDeckCopy(_ copy: SavedDeck, for server: URL) {
+        if let data = try? JSONEncoder().encode(copy) { defaults.set(data, forKey: key("deckCopy", server)) }
     }
 
     func remove(for server: URL) {

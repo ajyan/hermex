@@ -287,7 +287,7 @@ struct ChatCodeBlock: View {
                     wrapsCodeBlockLines.toggle()
                 } label: {
                     Image(systemName: wrapsCodeBlockLines ? "arrow.turn.down.left" : "arrow.left.and.right")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: 18, weight: .semibold)) // design-drift: allow (SF Symbol in a fixed-size control)
                         .frame(width: 36, height: 36)
                         .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
                 }

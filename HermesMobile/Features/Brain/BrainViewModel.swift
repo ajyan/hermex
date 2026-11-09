@@ -3,7 +3,7 @@ import Foundation
 /// The read-only Brain API on this user's `hermes-webui` fork (`api/brain.py`):
 /// `GET /api/brain/{modules,list,page,search,home,people/home,shelf}`. Stock upstream servers
 /// answer 404, which the screens show as "no Brain on this server".
-/// Only GETs: the Second Brain is edited by the agent, never from the app.
+/// GETs, plus two writes from a person page: a catch-up note and the person's facts.
 protocol BrainDataClient: Sendable {
     func modules() async throws -> [BrainModule]
     func list(module: BrainModuleID, tag: String?, cursor: Int?) async throws -> BrainList
@@ -16,6 +16,8 @@ protocol BrainDataClient: Sendable {
     func shelf(kind: BrainShelfKind) async throws -> BrainShelf
     /// Writes one catch-up note to a contact (`POST /api/brain/person/log`).
     func logPerson(_ request: BrainPersonLogRequest) async throws -> BrainPersonLogResult
+    /// Sets a contact's facts (`POST /api/brain/person/facts`); the answer carries what it replaced.
+    func savePersonFacts(_ request: BrainPersonFactsRequest) async throws -> BrainPersonFactsResult
 }
 
 /// A catch-up logged from a person page: what happened, or the words of a text Messages reported sent.
@@ -86,5 +88,9 @@ struct APIClientBrainAdapter: BrainDataClient {
 
     func logPerson(_ request: BrainPersonLogRequest) async throws -> BrainPersonLogResult {
         try await apiClient.send(endpoint: .brainPersonLog, method: "POST", body: request)
+    }
+
+    func savePersonFacts(_ request: BrainPersonFactsRequest) async throws -> BrainPersonFactsResult {
+        try await apiClient.send(endpoint: .brainPersonFacts, method: "POST", body: request)
     }
 }

@@ -1,8 +1,11 @@
 import SwiftUI
 
-/// Prep's landing screen, ordered by the goal: whether you're interview-ready (the mastery bar as four pips),
-/// your search (the next interview and every application in motion), today's run (its one action), the weak spots (open gaps and missed lessons), practice out loud (the voice
-/// mock ladders, a due one marked, and the story bank), then the course, folded to the unit being taught.
+/// Prep's landing screen. With an interview booked it leads with the interview pack (`PrepInterviewPackCard`:
+/// the stories, the mock and the one-pager for that interview, and the screen's one filled button), then the
+/// Pipeline, then whether you're interview-ready and today's run with an outlined Start. With none booked it
+/// falls back to today's run: interview-ready, today's run (its one action), then the Pipeline. Below either:
+/// the weak spots (open gaps and missed lessons), practice out loud (the voice mock ladders, a due one marked,
+/// and the story bank), then the course, folded to the unit being taught.
 /// Pushed as `.brainRoute(.prep(.home))`; owns no `NavigationStack`.
 struct PrepHomeView: View {
     @State private var viewModel: PrepHomeViewModel
@@ -28,7 +31,7 @@ struct PrepHomeView: View {
 
     var body: some View {
         content
-            .hxNavigationTitle("Interview prep")
+            .hxNavigationTitle("Interview prep", subtitle: searchModel.pipeline?.pack.map(JobCopy.packSubtitle))
             .toolbar { ToolbarItem(placement: .topBarTrailing) { FeedbackMoreMenu() } }
             .feedbackContext(FeedbackContext(feature: "Prep", screen: "Home"))
             .background(Color.hxCanvas.ignoresSafeArea())
@@ -63,15 +66,16 @@ struct PrepHomeView: View {
         case .loaded(let home):
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
-                    if !home.readiness.isEmpty {
-                        PrepReadinessRow(checks: home.readiness,
-                                         countdown: milestone.flatMap { PrepCopy.countdown(title: $0.title, due: $0.due) }) { check in
-                            PrepCopy.readinessRoute(check, runDone: home.run.remaining <= 0 && home.run.reps > 0,
-                                                    dueMock: mockViewModel.mocks?.weeklyDue())
-                        }
+                    if let pack = searchModel.pipeline?.pack {
+                        PrepInterviewPackCard(pack: pack, mock: mockViewModel)
+                        PrepPipelineSection(model: searchModel)
+                        readiness(home)
+                        PrepTodayCard(run: home.run, streakDays: home.streak.days, today: viewModel.course?.today, leads: false)
+                    } else {
+                        readiness(home)
+                        PrepTodayCard(run: home.run, streakDays: home.streak.days, today: viewModel.course?.today)
+                        PrepPipelineSection(model: searchModel)
                     }
-                    PrepSearchSection(model: searchModel)
-                    PrepTodayCard(run: home.run, streakDays: home.streak.days, today: viewModel.course?.today)
                     if viewModel.gaps != nil || viewModel.course != nil {
                         PrepWeakSpotsSection(gaps: viewModel.gaps ?? [], missed: PrepWeakSpotsSection.missed(in: viewModel.course),
                                              claims: home.claims)
@@ -86,6 +90,17 @@ struct PrepHomeView: View {
                 .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
             }
             .refreshable { await load() }
+        }
+    }
+
+    @ViewBuilder
+    private func readiness(_ home: PrepHome) -> some View {
+        if !home.readiness.isEmpty {
+            PrepReadinessRow(checks: home.readiness,
+                             countdown: milestone.flatMap { PrepCopy.countdown(title: $0.title, due: $0.due) }) { check in
+                PrepCopy.readinessRoute(check, runDone: home.run.remaining <= 0 && home.run.reps > 0,
+                                        dueMock: mockViewModel.mocks?.weeklyDue())
+            }
         }
     }
 

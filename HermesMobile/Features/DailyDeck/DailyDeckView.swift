@@ -224,6 +224,7 @@ struct DailyDeckView: View {
         }
         parts.append("\(viewModel.index + 1) of \(viewModel.visiblePages.count)")
         if viewModel.isFiled { parts.append(DeckCopy.filedStatus(seal: viewModel.isSealedWeekly, edited: viewModel.hasChanges)) }
+        if viewModel.isOfflineCopy { parts.append("Offline copy") }
         return parts.joined(separator: " · ")
     }
 

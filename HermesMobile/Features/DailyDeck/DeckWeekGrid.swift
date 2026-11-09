@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The close's week in a deck by job, laid out as one grid: a flexible label column (the count sits under
-/// the label, so the label keeps its room) and seven fixed day columns under the weekday letters. Every
+/// The close's week in a deck by job, laid out as one grid: a flexible label column and seven fixed day
+/// columns under the weekday letters. Every
 /// width but the label's is fixed, so a long label wraps inside its column and can never move a dot out
 /// from under its letter.
 enum DeckWeekGridLayout {
@@ -51,35 +51,36 @@ enum DeckWeekGridLayout {
     }
 }
 
-/// "Where you stand this week" on a deck by job's close: day rows under the weekday letters, grouped by
-/// front, then the counted rows below a hairline. Dots and + check in live as on a front divider.
+/// The close's habit tracker: the weekday letters over one row per habit, every dot in its day's column, then
+/// the counted habits as pips in a section of their own. Each row's dots wear the habit's paper
+/// (`DeckFrontRow.habitPaper`); the labels stay neutral. Today's and yesterday's dots log a goal commitment in
+/// place (`DeckRowCheckIn`), and + adds one to a count. Numbers are dots and pips, never a bar or a bare count.
 struct DeckWeekGrid: View {
     let rows: [DeckFrontRow]
-    let palette: DeckPalette
     let deckDate: String
 
     var body: some View {
-        let days = DeckWeekGridLayout.groups(rows, kind: .days)
-        let counts = DeckWeekGridLayout.groups(rows, kind: .pips)
+        let days = DeckWeekGridLayout.groups(rows, kind: .days).flatMap(\.rows)
+        let counts = DeckWeekGridLayout.groups(rows, kind: .pips).flatMap(\.rows)
         VStack(alignment: .leading, spacing: 0) {
             if !days.isEmpty {
-                weekdays
-                ForEach(days) { group in
-                    groupRows(group, header: group.name)
+                weekdays.padding(.bottom, 2)
+                ForEach(days) { row in
+                    DeckWeekGridRow(row: row, deckDate: deckDate)
                 }
             }
             if !counts.isEmpty {
-                Rectangle().fill(palette.ink.opacity(0.15)).frame(height: 0.5)
-                    .padding(.top, days.isEmpty ? 0 : 14)
+                Rectangle().fill(Color.hxSeparator).frame(height: 0.5)
+                    .padding(.top, days.isEmpty ? 0 : 10)
                     .padding(.bottom, 4)
-                ForEach(counts) { group in
-                    groupRows(group, header: group.name.map { "\($0) · counts" } ?? "Counts")
+                ForEach(counts) { row in
+                    DeckWeekGridRow(row: row, deckDate: deckDate)
                 }
             }
         }
     }
 
-    /// The weekday letters over the day columns, today's bold.
+    /// The weekday letters over the day columns, today's heavy.
     private var weekdays: some View {
         let today = DeckWeekGridLayout.weekdayIndex(of: deckDate)
         return HStack(spacing: 0) {
@@ -87,67 +88,56 @@ struct DeckWeekGrid: View {
             ForEach(Array(DeckDots.weekdays.enumerated()), id: \.offset) { index, letter in
                 Text(verbatim: letter)
                     .font(AppFont.caption2(weight: index == today ? .heavy : .regular))
-                    .foregroundStyle(palette.ink.opacity(index == today ? 1 : 0.75))
+                    .foregroundStyle(index == today ? Color.hxTextPrimary : Color.hxTextSecondary)
                     .frame(width: DeckWeekGridLayout.dayColumn)
             }
         }
         .accessibilityHidden(true)
     }
-
-    private func groupRows(_ group: DeckWeekGridLayout.Group, header: String?) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if let header {
-                Text(verbatim: header)
-                    .font(AppFont.caption2(weight: .heavy))
-                    .textCase(.uppercase)
-                    .foregroundStyle(palette.ink.opacity(0.75))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 8)
-                    .accessibilityAddTraits(.isHeader)
-            }
-            ForEach(group.rows) { row in
-                DeckWeekGridRow(row: row, palette: palette, deckDate: deckDate)
-            }
-        }
-    }
 }
 
-/// One row of the close's grid: its label in the flexible column, its dots (or pips and +) in the fixed
-/// day columns, its count in the count column.
+/// One habit of the close's tracker: its label in the flexible column, then its dots in the fixed day columns,
+/// or its pips (and +) packed against the trailing edge.
 private struct DeckWeekGridRow: View {
     let row: DeckFrontRow
-    let palette: DeckPalette
     let deckDate: String
 
     @Environment(GoalsHomeViewModel.self) private var model: GoalsHomeViewModel?
+    @Environment(\.openShellScreen) private var openShellScreen
+    /// A row is as tall as a comfortable tap, so today's dot is easy to hit.
+    @ScaledMetric(relativeTo: .subheadline) private var rowHeight: CGFloat = 36
 
     var body: some View {
-        let checkIn = DeckRowCheckIn(row: row, ink: palette.ink, deckDate: deckDate, model: model)
+        let checkIn = DeckRowCheckIn(row: row, ink: row.habitPaper.glow, deckDate: deckDate, model: model, hitHeight: rowHeight)
         HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(verbatim: row.label)
-                    .font(AppFont.subheadline(weight: .semibold))
-                    .foregroundStyle(Color.hxTextPrimary)
-                    .lineLimit(2)
-                Text(verbatim: checkIn.shortCountText)
-                    .font(AppFont.caption())
-                    .foregroundStyle(palette.ink.opacity(0.75))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .accessibilityHidden(true)
+            label
+            switch row.kind {
+            case .days: days(checkIn)
+            case .pips: pips(checkIn)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.trailing, 6)
-            Group {
-                switch row.kind {
-                case .days: days(checkIn)
-                case .pips: pips(checkIn)
-                }
-            }
-            .frame(width: DeckWeekGridLayout.dayColumn * CGFloat(DeckWeekGridLayout.dayCount), alignment: .leading)
         }
-        .frame(minHeight: 24)
+        .frame(minHeight: rowHeight)
         .accessibilityElement(children: .contain)
+    }
+
+    /// The habit's name; it opens where the habit is kept (its goal, Body) when it has such a place.
+    @ViewBuilder
+    private var label: some View {
+        let name = Text(verbatim: row.label)
+            .font(AppFont.subheadline())
+            .foregroundStyle(Color.hxTextPrimary)
+            .lineLimit(2)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, minHeight: rowHeight, alignment: .leading)
+            .padding(.trailing, 6)
+        if let screen = row.moduleDestination, openShellScreen.isAvailable {
+            Button { openShellScreen(screen) } label: { name.contentShape(Rectangle()) }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(verbatim: "Open \(row.label)"))
+                .accessibilityHint(Text(verbatim: "Opens \(screen.moduleName)"))
+        } else {
+            name.accessibilityHidden(true)
+        }
     }
 
     private func days(_ checkIn: DeckRowCheckIn) -> some View {
@@ -160,6 +150,7 @@ private struct DeckWeekGridRow: View {
                 }
             }
         }
+        .frame(width: DeckWeekGridLayout.trailingWidth, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: checkIn.spokenWeek))
         .accessibilityActions { checkIn.yesterdayActions }
@@ -171,7 +162,7 @@ private struct DeckWeekGridRow: View {
         let column = DeckWeekGridLayout.pipColumn(pips: count, addsOne: checkIn.live != nil)
         return HStack(spacing: 0) {
             ForEach(0..<count, id: \.self) { index in
-                DeckDot(state: index < done ? "done" : "missed", ink: palette.ink, column: column)
+                DeckDot(state: index < done ? "done" : "missed", ink: row.habitPaper.glow, column: column)
             }
             checkIn.addButton(column: column)
         }

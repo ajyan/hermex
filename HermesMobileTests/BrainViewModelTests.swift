@@ -804,4 +804,11 @@ final class FakeBrainClient: BrainDataClient, @unchecked Sendable {
         lock.withLock { _logged.append(request) }
         return try logResult.get()
     }
+    var factsResult: Result<BrainPersonFactsResult, Error> = .success(BrainPersonFactsResult())
+    private var _savedFacts: [BrainPersonFactsRequest] = []
+    var savedFacts: [BrainPersonFactsRequest] { lock.withLock { _savedFacts } }
+    func savePersonFacts(_ request: BrainPersonFactsRequest) async throws -> BrainPersonFactsResult {
+        lock.withLock { _savedFacts.append(request) }
+        return try factsResult.get()
+    }
 }

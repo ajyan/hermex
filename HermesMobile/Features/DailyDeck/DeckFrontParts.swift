@@ -16,10 +16,36 @@ struct DeckFrontRow: Decodable, Equatable, Identifiable {
     /// In a deck by job's close, the front the row serves ("ai") and its name ("Landing the AI role").
     let front: String?
     let frontName: String?
+    /// The habit's paper by name ("notes"), when the vault says; `habitPaper` works one out otherwise.
+    let paper: String?
 
     var id: String { [goal, commitment, label].compactMap { $0 }.joined(separator: "/") }
 
-    private enum CodingKeys: String, CodingKey { case label, kind, days, done, target, goal, commitment, front, frontName }
+    /// The paper the habit's dots wear on the close's tracker, so color means the kind of habit: the vault's
+    /// when it names one, else Sleep's and Mandarin's own, else its front's (the job search wears Prep's,
+    /// a letter to her the Dad card's, lifting Body's, people the person paper).
+    var habitPaper: HermexPaper {
+        if let named = HermexPaper.named(paper) { return named }
+        let name = label.lowercased()
+        if name.contains("sleep") { return DeckPalette.sleep.colors }
+        if name.contains("mandarin") { return DeckPalette.mandarin.colors }
+        switch front {
+        case "ai": return .prep
+        case "fatherhood": return DeckPalette.letter.colors
+        case "living-well": return .training
+        case "relationships": return BrainModuleID.people.paper
+        default: return .plain
+        }
+    }
+
+    /// Where the habit is kept, opened from its label on the close's tracker: a goal commitment's goal, and Body
+    /// for lifting. Nil for a habit whose card is in this deck (the letter, Mandarin, sleep).
+    var moduleDestination: ShellPushDestination? {
+        if let goal { return .goal(goal) }
+        return front == "living-well" && !label.lowercased().contains("sleep") ? .body : nil
+    }
+
+    private enum CodingKeys: String, CodingKey { case label, kind, days, done, target, goal, commitment, front, frontName, paper }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -32,6 +58,7 @@ struct DeckFrontRow: Decodable, Equatable, Identifiable {
         commitment = (try? c.decodeIfPresent(String.self, forKey: .commitment)).flatMap { $0.isEmpty ? nil : $0 }
         front = (try? c.decodeIfPresent(String.self, forKey: .front)).flatMap { $0.isEmpty ? nil : $0 }
         frontName = (try? c.decodeIfPresent(String.self, forKey: .frontName)).flatMap { $0.isEmpty ? nil : $0 }
+        paper = (try? c.decodeIfPresent(String.self, forKey: .paper)).flatMap { $0.isEmpty ? nil : $0 }
     }
 }
 
@@ -115,8 +142,8 @@ struct DeckFrontRowView: View {
 }
 
 /// A front row's live check-in on today's deck, shared by a divider's row (`DeckFrontRowView`) and the
-/// close's week grid (`DeckWeekGrid`): the row's dots as the server has them now, yesterday's dot as a
-/// check-in (tap for Done, hold for the 2-minute version, Skip or Missed), and + to add one to a count.
+/// close's week grid (`DeckWeekGrid`): the row's dots as the server has them now, today's and yesterday's dots
+/// as check-ins (tap for Done, hold for the 2-minute version, Skip or Missed), and + to add one to a count.
 /// Off today's deck, or without the goal card's model, it shows the deck's own states and checks nothing in.
 @MainActor
 struct DeckRowCheckIn {
@@ -128,10 +155,14 @@ struct DeckRowCheckIn {
     /// The goal commitment as the server has it now, on today's deck; nil otherwise.
     let live: Live?
 
-    init(row: DeckFrontRow, ink: Color, deckDate: String, model: GoalsHomeViewModel?) {
+    /// How tall a check-in dot's tappable area is.
+    var hitHeight: CGFloat = DeckDots.dot
+
+    init(row: DeckFrontRow, ink: Color, deckDate: String, model: GoalsHomeViewModel?, hitHeight: CGFloat = DeckDots.dot) {
         self.row = row
         self.ink = ink
         self.model = model
+        self.hitHeight = hitHeight
         live = Self.live(row: row, deckDate: deckDate, model: model)
     }
 
@@ -172,28 +203,36 @@ struct DeckRowCheckIn {
 
     // MARK: Day dots
 
-    /// One day's dot, in a fixed column; yesterday's checks in when the row is live.
+    /// The day a dot logs, when it can: today or yesterday on a live row; nil for any other dot.
+    nonisolated static func loggedDay(_ date: String, today: String, yesterday: String) -> GoalDay? {
+        date == today ? .today : date == yesterday ? .yesterday : nil
+    }
+
+    /// One day's dot, in a fixed column; today's and yesterday's check in when the row is live.
     @ViewBuilder
     func dot(_ day: DeckDay) -> some View {
         let shown = state(day)
-        if let live, day.date == live.home.yesterday {
+        if let live, let logged = Self.loggedDay(day.date, today: live.home.today, yesterday: live.home.yesterday) {
             let key = GoalsHomeViewModel.key(live.slug, .commitment(live.row.id))
-            GoalCheckInDot(state: shown, ink: ink, explicit: live.row.yesterday,
-                           isPending: model?.pending.contains(key) == true) { checkIn(live, $0) }
+            GoalCheckInDot(state: shown, ink: ink, explicit: logged == .today ? live.row.today : live.row.yesterday,
+                           hitHeight: hitHeight, isPending: model?.pending.contains(key) == true) { checkIn(live, $0, logged) }
         } else {
             DeckDot(state: shown, ink: ink)
         }
     }
 
-    private func checkIn(_ live: Live, _ status: GoalStatus) {
+    private func checkIn(_ live: Live, _ status: GoalStatus, _ day: GoalDay = .yesterday) {
         guard let model else { return }
-        Task { await model.checkIn(slug: live.slug, commitment: live.row.id, status: status, day: .yesterday) }
+        Task { await model.checkIn(slug: live.slug, commitment: live.row.id, status: status, day: day) }
     }
 
     /// The row's VoiceOver action for yesterday's check-in.
     @ViewBuilder
     var yesterdayActions: some View {
         if let live {
+            Button(live.row.today == nil ? "Mark today done" : "Clear today") {
+                checkIn(live, live.row.today == nil ? .done : .clear, .today)
+            }
             Button(live.row.yesterday == nil ? "Mark yesterday done" : "Clear yesterday") {
                 checkIn(live, live.row.yesterday == nil ? .done : .clear)
             }

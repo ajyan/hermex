@@ -1006,7 +1006,7 @@ struct HermexAttachmentMenuRow: View {
         Button(action: action) {
             HStack(spacing: 14) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 19, weight: .medium))
+                    .font(.system(size: 19, weight: .medium)) // design-drift: allow (SF Symbol in a fixed-size control)
                     .foregroundStyle(.primary)
                     .frame(width: 42, height: 42)
                     .background(.primary.opacity(0.08), in: Circle())

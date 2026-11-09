@@ -32,7 +32,7 @@ struct WeekMoneyCard: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 DeckKindLabel(symbol: palette.symbol, text: "Money · " + (week.map(MoneyWeekCopy.range) ?? "this week"),
-                              ink: palette.ink)
+                              ink: palette.secondaryInk)
                 Spacer(minLength: 0)
                 if week != nil {
                     Button { revealed.toggle() } label: {
@@ -154,7 +154,7 @@ struct WeekMoneyCard: View {
     private func section(_ title: String) -> some View {
         Text(verbatim: title)
             .font(AppFont.footnote(weight: .semibold))
-            .foregroundStyle(palette.ink.opacity(0.75))
+            .foregroundStyle(palette.secondaryInk)
             .padding(.top, 22)
             .padding(.bottom, 4)
             .accessibilityAddTraits(.isHeader)

@@ -259,7 +259,7 @@ private extension TranscriptLinkPreviewView {
                 .clipped()
         } else {
             Image(systemName: "link")
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: 18, weight: .semibold)) // design-drift: allow (SF Symbol in a fixed-size control)
                 .foregroundStyle(Color.accentColor)
                 .frame(width: 84, height: 84)
                 .background(Color.accentColor.opacity(0.12))

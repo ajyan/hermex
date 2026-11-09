@@ -195,8 +195,7 @@ struct SelectableTextPresentationView: View {
             SelectableTextView(text: selection.text)
                 .accessibilityIdentifier("selectable-response-text")
                 .background(Color.hxCanvas)
-                .navigationTitle("Select Text")
-                .navigationBarTitleDisplayMode(.inline)
+                .hxNavigationTitle(String(localized: "Select Text"))
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Done") {
@@ -251,8 +250,7 @@ struct EditMessageSheet: View {
                     .scrollContentBackground(.hidden)
                     .background(Color.hxCanvas)
             }
-            .navigationTitle("Edit Message")
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(String(localized: "Edit Message"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

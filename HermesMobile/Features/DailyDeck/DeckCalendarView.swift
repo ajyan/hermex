@@ -177,18 +177,19 @@ struct DeckCalendarView: View {
             VStack(spacing: 3) {
                 Text(verbatim: "\(day)")
                     .font(AppFont.body(weight: isToday ? .semibold : nil))
-                    .foregroundStyle(hasEntry ? Color.primary : Color.secondary.opacity(0.5))
+                    .foregroundStyle(hasEntry ? Color.hxTextPrimary : Color.hxTextSecondary)
+                // Filed is an outcome, so the dot is the done color; Nous blue is for controls.
                 Circle()
-                    .strokeBorder(Color.accentColor, lineWidth: hasDeck ? 1.2 : 0)
-                    .background(Circle().fill(viewModel.filedDates.contains(key) ? Color.accentColor : .clear))
+                    .strokeBorder(viewModel.filedDates.contains(key) ? Color.hxSuccess : Color.hxTextSecondary, lineWidth: hasDeck ? 1.2 : 0)
+                    .background(Circle().fill(viewModel.filedDates.contains(key) ? Color.hxSuccess : .clear))
                     .frame(width: 6, height: 6)
                     .opacity(hasDeck ? 1 : 0)
             }
             .frame(maxWidth: .infinity, minHeight: 48)
-            .background(hasEntry ? Color.hxSurface : Color.clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(hasEntry ? Color.hxSurface : Color.clear, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
             .overlay {
                 if isToday {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.accentColor, lineWidth: 1.5)
+                    RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous).strokeBorder(Color.accentColor, lineWidth: 1.5)
                 }
             }
         }
@@ -305,8 +306,8 @@ struct DeckCalendarView: View {
 
     private var legend: some View {
         HStack(spacing: 16) {
-            Label { Text(verbatim: "Brief filed") } icon: { Circle().fill(Color.accentColor).frame(width: 6, height: 6) }
-            Label { Text(verbatim: "Brief not filed") } icon: { Circle().strokeBorder(Color.accentColor, lineWidth: 1.2).frame(width: 6, height: 6) }
+            Label { Text(verbatim: "Brief filed") } icon: { Circle().fill(Color.hxSuccess).frame(width: 6, height: 6) }
+            Label { Text(verbatim: "Brief not filed") } icon: { Circle().strokeBorder(Color.hxTextSecondary, lineWidth: 1.2).frame(width: 6, height: 6) }
         }
         .font(AppFont.caption())
         .foregroundStyle(.secondary)

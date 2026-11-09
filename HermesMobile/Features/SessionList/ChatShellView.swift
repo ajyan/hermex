@@ -85,12 +85,15 @@ struct ChatShellView: View {
     @State private var brainRouteOpener = OpenBrainRouteAction()
     /// Lets pushed screens (a Week ahead card's Edit in chat) start a new chat with a draft.
     @State private var draftChatOpener = OpenDraftChatAction()
+    @State private var shellScreenOpener = OpenShellScreenAction()
     /// Lets Prep's mock brief open a voice mock: a new interviewer chat already in a call.
     @State private var mockCallOpener = OpenMockCallAction()
     /// Where cards and chips that push a screen meet the screen they zoom into.
     @Namespace private var zoomNamespace
     /// Whether this server takes feedback; rechecked on return until yes, gone with the shell on a server switch.
     @State private var feedbackAvailability: FeedbackAvailability
+    /// The drawer rows' trailing notes for this server, refreshed when the drawer opens.
+    @State private var drawerNotes: DrawerNotesModel
     /// Today's Daily Ask, one per server: the Prep gate and the Brain tile read it.
     @State private var dailyAsk: DailyAskModel
     /// The drawer is built on first open and kept alive, so it keeps its scroll position.
@@ -125,13 +128,6 @@ struct ChatShellView: View {
     @AppStorage(SessionRowDisplaySettings.showCronSessionsKey) private var showsCronSessions = true
     @AppStorage(SessionRowDisplaySettings.showSubagentSessionsKey)
     private var showsSubagentSessions = SessionRowDisplaySettings.defaultShowsSubagentSessions
-    @AppStorage(SectionVisibilitySettings.tasksKey) private var showsTasksSection = true
-    @AppStorage(SectionVisibilitySettings.kanbanKey) private var showsKanbanSection = true
-    @AppStorage(SectionVisibilitySettings.skillsKey) private var showsSkillsSection = true
-    @AppStorage(SectionVisibilitySettings.memoryKey) private var showsMemorySection = true
-    @AppStorage(SectionVisibilitySettings.insightsKey) private var showsInsightsSection = true
-    @AppStorage(SectionVisibilitySettings.activeProfileKey) private var showsActiveProfileSection = true
-    @AppStorage(SectionVisibilitySettings.projectsKey) private var showsProjectsSection = true
     // Per-server key (#19): the CLI toggle mirrors the active server's
     // `show_cli_sessions`, so its cached value must not leak across servers.
     // Configured in `init`, where the server URL is known.
@@ -167,6 +163,7 @@ struct ChatShellView: View {
         _pendingBotDestination = pendingBotDestination
         _pendingWebuiPush = pendingWebuiPush
         _viewModel = State(initialValue: SessionListViewModel(server: server))
+        _drawerNotes = State(initialValue: DrawerNotesModel(loader: APIClientDrawerNotesLoader(server: server)))
         _feedbackAvailability = State(initialValue: FeedbackAvailability(
             client: APIClientFeedbackAdapter(apiClient: APIClient(baseURL: server)),
             labels: APIClientLabelsAdapter(apiClient: APIClient(baseURL: server))))
@@ -419,6 +416,7 @@ struct ChatShellView: View {
                 // keyboard typing into the hidden search field.
                 if !isOpen { searchFieldIsFocused = false }
                 if isOpen { showPendingAutoArchiveToast() }
+                if isOpen, !viewModel.isViewingCachedData { drawerNotes.refreshIfStale() }
                 guard ShellNavigationState.drawerOpenRequestsRefresh(wasOpen: wasOpen, isOpen: isOpen) else { return }
                 refreshAfterReturningIfNeeded()
             }
@@ -519,7 +517,8 @@ struct ChatShellView: View {
 
     private var mainStack: some View {
         brainRouteOpener.handler = { navigation.path.append(.brainRoute($0)) }
-        draftChatOpener.handler = { selectDestination(PendingNewChatRoute(initialDraft: $0)) }
+        draftChatOpener.handler = { askAtlas($0) }
+        shellScreenOpener.handler = { navigation.push($0) }
         mockCallOpener.handler = { try await openMockCall($0) }
         brainRouteOpener.homeHandler = { navigation.showBrainHome() }
         brainRouteOpener.replaceHandler = { navigation.replaceTop(with: .brainRoute($0)) }
@@ -545,6 +544,7 @@ struct ChatShellView: View {
         // Pushed screens (the Daily Brief's open cards) open Brain pages too.
         .environment(\.openBrainRoute, brainRouteOpener)
         .environment(\.openDraftChat, draftChatOpener)
+        .environment(\.openShellScreen, shellScreenOpener)
         .environment(\.openMockCall, mockCallOpener)
         // A new root also drops screens ChatView pushed outside the typed path.
         .id(navigation.rootRevision)
@@ -602,10 +602,10 @@ struct ChatShellView: View {
             .accessibilityLabel(navigation.isDrawerOpen ? "Close chats" : "Open chats")
         }
 
-        if !navigation.returnPath.isEmpty && navigation.path.isEmpty {
+        if let returnTitle = navigation.returnTitle, navigation.path.isEmpty {
             ToolbarItem(placement: .topBarLeading) {
                 Button { navigation.returnToSavedScreens() } label: {
-                    Label { Text(verbatim: "Back to Prep") } icon: { Image(systemName: "arrow.uturn.backward") }
+                    Label { Text(verbatim: returnTitle) } icon: { Image(systemName: "arrow.uturn.backward") }
                         .labelStyle(.titleAndIcon)
                 }
             }
@@ -655,12 +655,12 @@ struct ChatShellView: View {
                 server: server,
                 modelContext: modelContext,
                 onAPIError: authManager.handleAPIError,
-                ask: { selectDestination(PendingNewChatRoute(initialDraft: $0)) }
+                ask: askAtlas
             )
             .adaptiveSecondaryNavigationTitle()
         case .goals:
             GoalsHomeView(server: server, onAPIError: authManager.handleAPIError,
-                          onNewGoal: { selectDestination(PendingNewChatRoute(initialDraft: GoalsCopy.newGoalDraft)) },
+                          onNewGoal: { askAtlas(GoalsCopy.newGoalDraft) },
                           onOpen: { navigation.push($0) })
             .adaptiveSecondaryNavigationTitle()
         case .goal(let slug):
@@ -689,7 +689,7 @@ struct ChatShellView: View {
                 .id(day ?? "next")
         case .meals:
             MealsHomeView(server: server, onAPIError: authManager.handleAPIError, onOpen: { navigation.push($0) },
-                          ask: { selectDestination(PendingNewChatRoute(initialDraft: $0)) })
+                          ask: askAtlas)
                 .adaptiveSecondaryNavigationTitle()
         case .mealsBook:
             MealsBookView(server: server, onAPIError: authManager.handleAPIError, onOpen: { navigation.push($0) })
@@ -699,7 +699,7 @@ struct ChatShellView: View {
         case .mealsDish(let route):
             MealsDishView(route: route, server: server, onAPIError: authManager.handleAPIError,
                           onOpen: { navigation.push($0) },
-                          ask: { selectDestination(PendingNewChatRoute(initialDraft: $0)) })
+                          ask: askAtlas)
                 .id(route)
         case .feedback:
             FeedbackInboxView(client: feedbackAvailability.client)
@@ -728,8 +728,8 @@ struct ChatShellView: View {
         }
     }
 
-    /// Starts a new chat with these words in the composer, as the Brain home's Ask Atlas does, and
-    /// keeps the Prep screens it came from one tap away ("Back to Prep").
+    /// Starts a new chat with these words in the composer and keeps the screens it came from one tap away
+    /// ("Back to Meals"). Every module's Ask Atlas, Ask Baki and New goal comes through here.
     private func askAtlas(_ words: String) {
         viewModel.invalidateSessionOpening()
         navigation.select(PendingNewChatRoute(initialDraft: words), returningTo: navigation.path)
@@ -927,7 +927,7 @@ struct ChatShellView: View {
             filter: $recentsFilter,
             sessions: drawerSessions,
             isSearching: isSearchingSessions,
-            sectionVisibility: sidebarSectionVisibility,
+            notes: drawerNotes.notes,
             selectedSessionID: navigation.selectedSessionID,
             showsMessageCount: showsSessionMessageCount,
             showsWorkspace: showsSessionWorkspace,
@@ -964,21 +964,6 @@ struct ChatShellView: View {
             showsCli: showsCliSessions,
             showsClaudeCode: showsClaudeCodeSessions,
             showsSubagents: showsSubagentSessions
-        )
-    }
-
-    private var sidebarSectionVisibility: SidebarSectionVisibility {
-        SidebarSectionVisibility(
-            bots: isBotModeEnabled,
-            tasks: showsTasksSection,
-            kanban: showsKanbanSection,
-            skills: showsSkillsSection,
-            memory: showsMemorySection,
-            insights: showsInsightsSection,
-            activeProfile: showsActiveProfileSection,
-            projects: showsProjectsSection,
-            brain: true,
-            feedback: feedbackAvailability.isAvailable
         )
     }
 

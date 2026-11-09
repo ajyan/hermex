@@ -123,8 +123,12 @@ struct BrainReaderView: View {
     @State private var texting: DeckMessage?
     /// A text Messages reported sent that couldn't be logged: its words, for Try again.
     @State private var unloggedText: String?
-    /// Bumped by each logged catch-up; plays the success haptic.
+    /// Bumped by each logged catch-up or saved facts edit; plays the success haptic.
     @State private var loggedCount = 0
+    /// A person page's Edit facts sheet, and the state of the Undo its save offers.
+    @State private var showsFacts = false
+    @State private var isUndoingFacts = false
+    @State private var factsUndoFailure: String?
     @Environment(\.openDraftChat) private var openDraftChat
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -169,9 +173,25 @@ struct BrainReaderView: View {
                         .padding(.horizontal, BrainStyle.l)
                         .padding(.bottom, BrainStyle.s)
                 } else if let page = viewModel.page, let person = page.person {
-                    personActions(page: page, person: person)
-                        .padding(.horizontal, BrainStyle.l)
-                        .padding(.bottom, BrainStyle.s)
+                    VStack(spacing: BrainStyle.s) {
+                        if viewModel.factsUndo != nil {
+                            BrainPersonFactsUndoBar(isWorking: isUndoingFacts, failure: factsUndoFailure,
+                                                    undo: { Task { await undoFacts() } },
+                                                    dismiss: { factsUndoFailure = nil; viewModel.dismissFactsUndo() })
+                        }
+                        personActions(page: page, person: person)
+                    }
+                    .padding(.horizontal, BrainStyle.l)
+                    .padding(.bottom, BrainStyle.s)
+                }
+            }
+            .sheet(isPresented: $showsFacts) {
+                if let facts = viewModel.page?.person?.editable {
+                    BrainPersonFactsSheet(name: viewModel.page?.item.title ?? "them", facts: facts) { change in
+                        factsUndoFailure = nil
+                        try await viewModel.saveFacts(change)
+                        loggedCount += 1
+                    }
                 }
             }
             .sheet(isPresented: $showsLog) {
@@ -239,6 +259,17 @@ struct BrainReaderView: View {
             },
             onLog: { showsLog = true },
             onAsk: { openDraftChat("About \(name) (\(page.item.id)): ") })
+    }
+
+    private func undoFacts() async {
+        isUndoingFacts = true
+        do {
+            try await viewModel.undoFacts()
+            factsUndoFailure = nil
+        } catch {
+            factsUndoFailure = error.localizedDescription
+        }
+        isUndoingFacts = false
     }
 
     private func logText(_ words: String) async {
@@ -325,7 +356,9 @@ struct BrainReaderView: View {
                 push: push,
                 rating: labelsAvailable && labels.isLoaded(feature: ratingKey.feature, item: ratingKey.item)
                     ? BrainPageRating(labels: labels, key: ratingKey) : nil,
-                focusIdea: viewModel.module == opened.module && viewModel.id == opened.id ? focusIdea : nil
+                focusIdea: viewModel.module == opened.module && viewModel.id == opened.id ? focusIdea : nil,
+                // Facts are edited on the live page only: a saved copy can't be written to.
+                onEditFacts: page.person?.editable != nil && !viewModel.isShowingCachedCopy ? { showsFacts = true } : nil
             )
             .refreshable { await viewModel.load() }
         }
@@ -347,6 +380,8 @@ struct BrainReaderContent: View {
     var rating: BrainPageRating?
     /// The key idea a bite opened this page at; nil on any other page.
     var focusIdea: Int?
+    /// Opens a person page's Edit facts sheet; nil where the facts can't be edited.
+    var onEditFacts: (() -> Void)?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Built once per page: the line under the title.
     private let meta: String
@@ -373,7 +408,8 @@ struct BrainReaderContent: View {
 
     init(page: BrainPage, person: BrainPersonPage?, isShowingCachedCopy: Bool, isMissing: Bool = false,
          push: @escaping (BrainRoute) -> Void, rating: BrainPageRating? = nil,
-         focusIdea: Int? = nil) {
+         focusIdea: Int? = nil, onEditFacts: (() -> Void)? = nil) {
+        self.onEditFacts = onEditFacts
         self.page = page
         self.isShowingCachedCopy = isShowingCachedCopy
         self.isMissing = isMissing
@@ -424,6 +460,9 @@ struct BrainReaderContent: View {
                         }
                         if !person.layout.chips.isEmpty {
                             BrainProfileChips(person: person)
+                        }
+                        if let onEditFacts {
+                            BrainPersonEditFactsButton(action: onEditFacts)
                         }
                     } else if page.item.module == .people {
                         BrainPersonCardView(item: page.item, facts: page.facts)

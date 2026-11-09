@@ -204,6 +204,33 @@ struct ShellNavigationState: Equatable {
     }
 }
 
+extension ShellPushDestination {
+    /// The module this screen belongs to, as the chat's way back names it ("Back to Meals").
+    var moduleName: String {
+        switch self {
+        case .projects, .project: "Projects"
+        case .tasks: "Tasks"
+        case .kanban: "Kanban"
+        case .dailyDeck: "the Brief"
+        case .brain: "Brain"
+        case .brainRoute(.prep): "Prep"
+        case .brainRoute: "Brain"
+        case .goals, .goal, .finishedGoal, .finishedGoals: "Goals"
+        case .money: "Money"
+        case .feedback: "Feedback"
+        case .body, .bodyLift, .bodyPlan, .bodyWorkout: "Body"
+        case .meals, .mealsBook, .mealsDish, .mealsSeason: "Meals"
+        case .settings: "Settings"
+        }
+    }
+}
+
+extension ShellNavigationState {
+    /// The chat's way back to the screens it was opened over, named for the screen on top of them
+    /// ("Back to the Brief"); nil when there are none.
+    var returnTitle: String? { returnPath.last.map { "Back to \($0.moduleName)" } }
+}
+
 /// Keeps the shell's chat streaming while a screen is pushed over it, so a reply
 /// still arrives (and alerts) while the user is in the Deck, the Brain or Goals.
 /// The shell keeps `isCovered` in step with its push path; a covered chat that

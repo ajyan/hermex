@@ -56,7 +56,7 @@ struct InlineAudioPlayerView: View {
                 ZStack {
                     Circle().fill(Color.accentColor)
                     Image(systemName: "play.fill")
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(size: 15, weight: .bold)) // design-drift: allow (SF Symbol in a fixed-size control)
                         .foregroundStyle(.white)
                 }
                 .frame(width: 40, height: 40)
@@ -79,7 +79,7 @@ struct InlineAudioPlayerView: View {
                 ZStack {
                     Circle().fill(Color.accentColor)
                     Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(size: 15, weight: .bold)) // design-drift: allow (SF Symbol in a fixed-size control)
                         .foregroundStyle(.white)
                 }
                 .frame(width: 40, height: 40)
@@ -95,7 +95,7 @@ struct InlineAudioPlayerView: View {
             ZStack {
                 Circle().fill(Color(.systemFill))
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold)) // design-drift: allow (SF Symbol in a fixed-size control)
                     .foregroundStyle(.secondary)
             }
             .frame(width: 40, height: 40)

@@ -93,7 +93,7 @@ final class DailyAskModelTests: XCTestCase {
         let ask = try Self.ask { $0["week"] = ["applications": ["done": 1], "outreach": ["target": 5]] }
         XCTAssertEqual(ask.week?.applications?.done, 1)
         XCTAssertNil(ask.week?.applications?.target)
-        XCTAssertNil(DailyAskBody.weekLine(ask), "half a count is no line")
+        XCTAssertNil(DailyAskBody.weekCounts(ask), "half a count shows no pips")
     }
 
     func testLockedOnlyWhenLoadedAndLocked() async throws {
@@ -346,8 +346,10 @@ final class DailyAskModelTests: XCTestCase {
     }
 
     func testWeekLine() throws {
-        XCTAssertEqual(DailyAskBody.weekLine(try Self.ask()), "Applications 1/2 · Outreach 0/5")
-        XCTAssertNil(DailyAskBody.weekLine(try Self.ask { $0.removeValue(forKey: "week") }))
+        let week = try XCTUnwrap(DailyAskBody.weekCounts(try Self.ask()))
+        XCTAssertEqual(week.applications, JobCount(done: 1, target: 2))
+        XCTAssertEqual(week.outreach, JobCount(done: 0, target: 5))
+        XCTAssertNil(DailyAskBody.weekCounts(try Self.ask { $0.removeValue(forKey: "week") }))
     }
 
     func testGateFollowsModel() async throws {

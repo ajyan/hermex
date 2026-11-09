@@ -141,7 +141,7 @@ struct ClarificationRequestBar: View {
 
             Button(action: onStop) {
                 Image(systemName: "stop.fill")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold)) // design-drift: allow (SF Symbol in a fixed-size control)
                     .frame(width: stopButtonSize, height: stopButtonSize)
                     .background(Color.hxDanger.opacity(0.12))
                     .foregroundStyle(.hxDanger)
@@ -235,7 +235,7 @@ struct ClarificationRequestCard: View {
     private var collapseButton: some View {
         Button(action: onCollapse) {
             Image(systemName: "chevron.down")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold)) // design-drift: allow (SF Symbol in a fixed-size control)
                 .frame(width: collapseButtonSize, height: collapseButtonSize)
                 .background(.primary.opacity(0.08))
                 .foregroundStyle(.secondary)

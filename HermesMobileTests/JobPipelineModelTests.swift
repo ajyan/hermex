@@ -54,6 +54,126 @@ final class JobPipelineModelTests: XCTestCase {
         XCTAssertEqual(p.stages.count, 5)
     }
 
+    /// 2026-11-09: applications read 2 of 5, 2 dots and 1 of 5 on one day. The vault now counts the week once
+    /// (`job_pipeline.week`) and sends it on both routes; the Ask, the search card and Prep must draw the same pips.
+    @MainActor
+    func testEverySurfaceDrawsTheSameWeek() throws {
+        let week: [String: Any] = ["start": "2026-11-02", "applications": ["done": 3, "target": 5],
+                                   "outreach": ["done": 2, "target": 5]]
+        var summary = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(Self.summaryJSON.utf8)) as? [String: Any])
+        summary["week"] = week
+        summary["metrics"] = ["added_week": 3, "booked": 2, "recent": 11, "replies": 4, "quiet": 0, "quiet_names": []]
+        let pipeline = try PrepDecoding.decode(JobPipeline.self, from: JSONSerialization.data(withJSONObject: summary))
+        let ask = try DailyAskModelTests.ask { $0["week"] = week }
+        let onTheAsk = try XCTUnwrap(DailyAskBody.weekCounts(ask))
+
+        let want = (applications: JobCount(done: 3, target: 5), outreach: JobCount(done: 2, target: 5))
+        XCTAssertEqual(pipeline.applicationsWeek, want.applications)   // the search card and Prep's header
+        XCTAssertEqual(pipeline.week?.outreach, want.outreach)
+        XCTAssertEqual(onTheAsk.applications, want.applications)       // the Ask
+        XCTAssertEqual(onTheAsk.outreach, want.outreach)
+        XCTAssertEqual(pipeline.metrics?.addedWeek, want.applications.done)
+        XCTAssertEqual(want.applications.spoken, "3 of 5")
+    }
+
+    func testAnOlderServerStillShowsTheWeeksApplications() throws {
+        let p = try PrepDecoding.decode(JobPipeline.self, from: Data(Self.summaryJSON.utf8))
+        XCTAssertNil(p.week)
+        XCTAssertEqual(p.applicationsWeek, JobCount(done: 2, target: nil))
+        XCTAssertNil(p.applications[0].nextStep)
+    }
+
+    func testCountPips() {
+        XCTAssertEqual(JobCount(done: 2, target: 5).total, 5)
+        XCTAssertEqual(JobCount(done: 7, target: 5).total, 7, "past the target every one still shows")
+        XCTAssertEqual(JobCount(done: 0, target: nil).shown, 0)
+        XCTAssertEqual(JobCount(done: 3, target: nil).spoken, "3")
+        let many = JobCount(done: 4, target: 14)
+        XCTAssertTrue(many.overflows)
+        XCTAssertEqual(many.shown, JobCount.maxPips)
+    }
+
+    func testNextStepDecodes() throws {
+        var summary = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(Self.summaryJSON.utf8)) as? [String: Any])
+        var rows = try XCTUnwrap(summary["applications"] as? [[String: Any]])
+        rows[0]["next_step"] = "Follow up or close it"
+        summary["applications"] = rows
+        let p = try PrepDecoding.decode(JobPipeline.self, from: JSONSerialization.data(withJSONObject: summary))
+        XCTAssertEqual(p.applications.map(\.nextStep), ["Follow up or close it", nil])
+    }
+
+    static let packJSON = #"""
+    {"id": "obin-ai-agentic-ai-engineer", "company": "Obin AI", "role": "Agentic AI Engineer", "label": "First round",
+     "round": "Recruiter screen", "on": "2026-11-10", "time": "10:00", "in_days": 1, "source": "pipeline", "minutes": 20,
+     "stories": [{"id": "s10", "name": "600-agent reliability loop", "title": "Building the reliability loop", "done": true},
+                 {"id": "s9", "name": "Retrieval quality", "title": "Owning retrieval quality", "done": false},
+                 {"name": "no id"}],
+     "stories_from": "onepager",
+     "mock": {"id": "mock", "kind": "mock", "title": "Mock Obin AI call", "done": false},
+     "onepager": {"ready": true, "updated": "2026-11-02"},
+     "next": {"id": "s9", "kind": "story", "title": "Owning retrieval quality"}, "future_field": 1}
+    """#
+
+    private func pack(_ edit: (inout [String: Any]) -> Void = { _ in }) throws -> JobPack {
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(Self.packJSON.utf8)) as? [String: Any])
+        edit(&json)
+        return try PrepDecoding.decode(JobPack.self, from: JSONSerialization.data(withJSONObject: json))
+    }
+
+    func testThePipelineCarriesTheInterviewPack() throws {
+        var summary = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(Self.summaryJSON.utf8)) as? [String: Any])
+        XCTAssertNil(try PrepDecoding.decode(JobPipeline.self, from: Data(Self.summaryJSON.utf8)).pack,
+                     "no interview, or an older server: home falls back to today's run")
+        summary["pack"] = try JSONSerialization.jsonObject(with: Data(Self.packJSON.utf8))
+        let pack = try XCTUnwrap(PrepDecoding.decode(JobPipeline.self, from: JSONSerialization.data(withJSONObject: summary)).pack)
+        XCTAssertEqual(pack.stories.map(\.id), ["s10", "s9"])  // the malformed story is dropped
+        XCTAssertEqual(pack.told, JobCount(done: 1, target: 2))
+        XCTAssertTrue(pack.onePagerReady)
+        XCTAssertEqual(JobCopy.packTitle(pack), "Agentic AI Engineer, Obin AI")
+        XCTAssertEqual(JobCopy.packRound(pack), "Recruiter screen · First round · tomorrow")
+        XCTAssertEqual(JobCopy.packStart(pack), "Start today's 20 minutes")
+        XCTAssertEqual(JobCopy.packSubtitle(pack), "Interview tomorrow")
+        XCTAssertTrue(JobCopy.packKicker(pack).hasPrefix("Interview · "))
+        XCTAssertTrue(JobCopy.packKicker(pack).hasSuffix(" · 10:00"))
+    }
+
+    func testThePackStartsTheFirstStepNotDone() throws {
+        XCTAssertEqual(try pack().start, .route(.story("s9")))
+        XCTAssertEqual(try pack { $0["next"] = ["id": "mock", "kind": "mock", "title": "Mock Obin AI call"] }.start,
+                       .call(part: "questions"))
+        XCTAssertEqual(try pack { $0["next"] = ["id": "design", "kind": "ladder", "title": "System design mock"] }.start,
+                       .route(.mockLadder(.design)))
+        XCTAssertEqual(try pack { $0["next"] = ["id": "x", "kind": "new", "title": "?"] }.start, .plan)
+        let done = try pack { $0.removeValue(forKey: "next") }
+        XCTAssertEqual(done.start, .plan)
+        XCTAssertEqual(JobCopy.packStart(done), "Open the prep plan")
+    }
+
+    func testThePackToleratesASparsePayload() throws {
+        let sparse = try PrepDecoding.decode(JobPack.self, from: Data(#"{"id": "ramp", "on": "2026-11-12"}"#.utf8))
+        XCTAssertEqual(sparse.label, "Interview")
+        XCTAssertEqual(sparse.minutes, 20)
+        XCTAssertFalse(sparse.onePagerReady)
+        XCTAssertEqual(sparse.mockRoute, .application("ramp"))
+        XCTAssertEqual(JobCopy.packTitle(sparse), "Interview")
+        let ladder = try pack { $0["mock"] = ["id": "behavioral", "kind": "ladder", "title": "Behavioral mock", "done": false] }
+        XCTAssertEqual(ladder.mockRoute, .mockLadder(.behavioral))
+    }
+
+    func testPipelineRowsSayTheStageAndTheNextStep() throws {
+        var summary = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(Self.summaryJSON.utf8)) as? [String: Any])
+        var rows = try XCTUnwrap(summary["applications"] as? [[String: Any]])
+        rows[0]["next_step"] = "Follow up or close it"
+        rows[1]["next_step"] = "First round tomorrow"
+        rows[1]["next"] = ["key": "first-round", "label": "First round", "on": "2026-11-03", "time": NSNull()]
+        summary["applications"] = rows
+        let p = try PrepDecoding.decode(JobPipeline.self, from: JSONSerialization.data(withJSONObject: summary))
+        XCTAssertEqual(p.applications.map(JobCopy.pipelineLine),
+                       ["Recruiter screen · follow up or close it", "First round tomorrow"])
+        let old = try PrepDecoding.decode(JobPipeline.self, from: Data(Self.summaryJSON.utf8))
+        XCTAssertEqual(JobCopy.pipelineLine(old.applications[0]), "Recruiter screen · 14 days", "an older server keeps the stage line")
+    }
+
     func testDetailCarriesTheOnePagerAndPlan() throws {
         let app = try PrepDecoding.decode(JobApplication.self, from: Data(Self.detailJSON.utf8))
         XCTAssertEqual(app.row.id, "obin-ai-agentic-ai-engineer")

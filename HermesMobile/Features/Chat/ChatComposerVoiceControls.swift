@@ -68,7 +68,7 @@ struct ComposerVoiceControlButton: View {
 
     private var label: some View {
         Image(systemName: symbolName)
-            .font(.system(size: 18, weight: .regular))
+            .font(.system(size: 18, weight: .regular)) // design-drift: allow (SF Symbol in a fixed-size control)
             .frame(width: 44, height: 44)
             .foregroundStyle(isListening || isRecordingVoiceNote ? Color.hxDanger : color)
             .scaleEffect(reduceMotion ? 1 : (isRecordingVoiceNote ? 1.3 : 1))

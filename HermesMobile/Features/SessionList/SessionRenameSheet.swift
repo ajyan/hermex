@@ -30,8 +30,7 @@ struct SessionRenameSheet: View {
                         .disabled(isSaving)
                 }
             }
-            .navigationTitle("Rename Session")
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(String(localized: "Rename Session"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)

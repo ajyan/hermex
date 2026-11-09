@@ -23,8 +23,7 @@ struct ArchiveReviewSheet: View {
                     Text("Summarize & Archive asks Atlas to save a digest to your second brain first. Your choices teach Atlas which chats you keep.")
                 }
             }
-            .navigationTitle(Text("Review Before Archiving"))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(String(localized: "Review Before Archiving"))
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
