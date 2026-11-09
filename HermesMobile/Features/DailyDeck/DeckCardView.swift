@@ -1257,9 +1257,11 @@ private struct ReflectionSheet: View {
     @Environment(\.dismiss) private var dismiss
     @FocusState private var isFocused: Bool
     @State private var text = ""
-    /// The mic, which Done waits on so the tidied words are what's saved.
+    /// The mic, which Done waits on so the tidied words are what's saved. Done also tidies the whole
+    /// answer once its words changed since the sheet opened, typed or spoken.
     @State private var dictation = DictationModel()
     @State private var isClosing = false
+    @Environment(\.dictationServer) private var server
 
     var body: some View {
         NavigationStack {
@@ -1306,6 +1308,7 @@ private struct ReflectionSheet: View {
         .interactiveDismissDisabled(dictation.isBusy)
         .onAppear {
             text = viewModel.answer(for: card)?.text ?? ""
+            dictation.opened($text, server: server)
             isFocused = true
         }
         .onChange(of: text) { _, new in viewModel.setText(new, for: card) }

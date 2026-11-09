@@ -245,6 +245,137 @@ final class DictationEarlyTidyTests: XCTestCase {
     }
 }
 
+/// Done in a box that said when it opened: changed words are tidied whole, as if all dictated.
+@MainActor
+final class DictationDoneTidyTests: XCTestCase {
+    private final class Box { var text = "" }
+
+    /// Tidies by capitalizing every word, and records each text it was given.
+    private final class Recorder: DictationPolishing {
+        var passages: [String] = []
+        func polish(_ text: String) async throws -> String {
+            await MainActor.run { passages.append(text) }
+            return text.capitalized
+        }
+    }
+
+    private func opened(_ box: Box, _ recorder: Recorder) -> (DictationModel, Binding<String>) {
+        let dictation = DictationModel(
+            voiceInput: ComposerVoiceInputController(mayRecord: { false }),
+            polisher: { _ in recorder }
+        )
+        let text = Binding(get: { box.text }, set: { box.text = $0 })
+        dictation.opened(text, server: nil)
+        return (dictation, text)
+    }
+
+    func testATypedFixAfterTheTidyTidiesTheWholeBoxOnDone() async {
+        let box = Box()
+        let recorder = Recorder()
+        let (dictation, text) = opened(box, recorder)
+        dictation.begin(text)
+        dictation.heard("we should ship it on friday")
+        dictation.voiceStateChanged()
+        await dictation.tidy()
+        XCTAssertEqual(box.text, "We Should Ship It On Friday")
+
+        box.text = "We Should Ship It On friday or monday"
+        dictation.textChanged(box.text)
+        await dictation.finish()
+
+        XCTAssertEqual(recorder.passages, ["we should ship it on friday", "We Should Ship It On friday or monday"])
+        XCTAssertEqual(box.text, "We Should Ship It On Friday Or Monday")
+        XCTAssertFalse(dictation.isBusy)
+    }
+
+    func testTypingIntoASavedAnswerWithoutTheMicTidiesItOnDone() async {
+        let box = Box()
+        box.text = "my parents didn't talk about money"
+        let recorder = Recorder()
+        let (dictation, _) = opened(box, recorder)
+
+        box.text = "my parents didn't really talk about money"
+        dictation.textChanged(box.text)
+        await dictation.finish()
+
+        XCTAssertEqual(recorder.passages, ["my parents didn't really talk about money"])
+        XCTAssertEqual(box.text, "My Parents Didn't Really Talk About Money")
+    }
+
+    func testAnUnchangedAnswerIsLeftAloneOnDone() async {
+        let box = Box()
+        box.text = "my parents didn't talk about money"
+        let recorder = Recorder()
+        let (dictation, _) = opened(box, recorder)
+
+        await dictation.finish()
+
+        XCTAssertEqual(recorder.passages, [])
+        XCTAssertEqual(box.text, "my parents didn't talk about money")
+    }
+
+    func testDictatingOntoASavedAnswerTidiesTheWholeBoxOnce() async {
+        let box = Box()
+        box.text = "my parents didn't talk about money"
+        let recorder = Recorder()
+        let (dictation, text) = opened(box, recorder)
+        dictation.begin(text)
+        dictation.heard("my parents didn't talk about money and that shaped me")
+
+        await dictation.finish()
+
+        XCTAssertEqual(recorder.passages, ["my parents didn't talk about money and that shaped me"],
+                       "the whole box, not just the new words, and only once")
+        XCTAssertEqual(box.text, "My Parents Didn't Talk About Money And That Shaped Me")
+    }
+
+    func testAnEditToTheEarlierWordsWhileListeningTidiesTheWholeBox() async {
+        let box = Box()
+        box.text = "my parents didnt talk"
+        let recorder = Recorder()
+        let (dictation, text) = opened(box, recorder)
+        dictation.begin(text)
+        dictation.heard("my parents didnt talk about money at all")
+
+        box.text = "my parents didn't talk about money at all"
+        dictation.textChanged(box.text)
+        await dictation.finish()
+
+        XCTAssertEqual(recorder.passages, ["my parents didn't talk about money at all"])
+        XCTAssertEqual(box.text, "My Parents Didn't Talk About Money At All")
+    }
+
+    func testAnUntouchedDictationIntoAnEmptyBoxIsTidiedOnce() async {
+        let box = Box()
+        let recorder = Recorder()
+        let (dictation, text) = opened(box, recorder)
+        dictation.begin(text)
+        dictation.heard("we should ship it on friday")
+
+        dictation.voiceStateChanged()
+        await dictation.finish()
+
+        XCTAssertEqual(recorder.passages, ["we should ship it on friday"])
+        XCTAssertEqual(box.text, "We Should Ship It On Friday")
+    }
+
+    func testOriginalBeforeDoneKeepsTheWordsAsHeard() async {
+        let box = Box()
+        let recorder = Recorder()
+        let (dictation, text) = opened(box, recorder)
+        dictation.begin(text)
+        dictation.heard("we should ship it on friday")
+        await dictation.tidy()
+
+        dictation.undoTidy()
+        dictation.textChanged(box.text)
+        await dictation.finish()
+
+        XCTAssertEqual(recorder.passages, ["we should ship it on friday"])
+        XCTAssertEqual(box.text, "we should ship it on friday")
+    }
+}
+
 @MainActor
 final class LocalModelDictationPolisherTests: XCTestCase {
     private struct Fixed: DictationPolishing {

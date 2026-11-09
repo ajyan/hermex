@@ -264,9 +264,11 @@ struct WeekEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
     @FocusState private var isFocused: Bool
     @State private var text = ""
-    /// The mic, which Done waits on so the tidied words are what's saved.
+    /// The mic, which Done waits on so the tidied words are what's saved. Done also tidies the whole
+    /// answer once its words changed since the sheet opened, typed or spoken.
     @State private var dictation = DictationModel()
     @State private var isClosing = false
+    @Environment(\.dictationServer) private var server
 
     var body: some View {
         NavigationStack {
@@ -322,6 +324,7 @@ struct WeekEditorSheet: View {
         .interactiveDismissDisabled(dictation.isBusy)
         .onAppear {
             text = initial
+            dictation.opened($text, server: server)
             isFocused = true
         }
         .onChange(of: text) { old, new in
