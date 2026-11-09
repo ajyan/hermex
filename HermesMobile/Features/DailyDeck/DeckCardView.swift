@@ -209,7 +209,7 @@ struct DeckCardView: View {
         let text = DeckCardText(card)
         if card.itemKind == "quote" {
             Image(systemName: "quote.opening")
-                .font(.system(size: 40, weight: .semibold))
+                .font(AppFont.display(style: .largeTitle, weight: .semibold))
                 .foregroundStyle(palette.ink.opacity(0.22))
                 .padding(.bottom, 10)
                 .accessibilityHidden(true)
