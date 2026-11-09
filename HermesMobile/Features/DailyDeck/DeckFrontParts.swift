@@ -38,6 +38,13 @@ struct DeckFrontRow: Decodable, Equatable, Identifiable {
         }
     }
 
+    /// Where the habit is kept, opened from its label on the close's tracker: a goal commitment's goal, and Body
+    /// for lifting. Nil for a habit whose card is in this deck (the letter, Mandarin, sleep).
+    var moduleDestination: ShellPushDestination? {
+        if let goal { return .goal(goal) }
+        return front == "living-well" && !label.lowercased().contains("sleep") ? .body : nil
+    }
+
     private enum CodingKeys: String, CodingKey { case label, kind, days, done, target, goal, commitment, front, frontName, paper }
 
     init(from decoder: Decoder) throws {

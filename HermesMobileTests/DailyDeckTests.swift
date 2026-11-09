@@ -2622,6 +2622,49 @@ final class DeckMessageSMSTests: XCTestCase {
     }
 }
 
+/// Brief cards lead to the module they are about, and a chat opened from a module names its way back.
+final class DeckModuleLinkTests: XCTestCase {
+    func testAGoalDinnerAndTrainingCardEachOpenTheirModule() throws {
+        let deck = try DailyDeck.decode(#"""
+        {"date":"d","kind":"morning","cards":[
+          {"id":"g1","type":"goal","goals":["marathon"]},{"id":"g2","type":"goal","goals":["marathon","land-ai-role"]},
+          {"id":"dinner","type":"dinner"},{"id":"training","type":"training"},{"id":"idea","type":"reflect","act":"ideas"},
+          {"id":"close","type":"close","week_rows":[
+            {"label":"Prep practice","kind":"days","goal":"land-ai-role","commitment":"prep","front":"ai"},
+            {"label":"Lifted","kind":"days","front":"living-well"},{"label":"Sleep by 11","kind":"days","front":"living-well"},
+            {"label":"Mandarin","kind":"days","front":"relationships"}]}]}
+        """#)
+        let cards = Dictionary(uniqueKeysWithValues: deck.cards.map { ($0.id, $0) })
+        XCTAssertEqual(cards["g1"]?.moduleDestination?.screen, .goal("marathon"))
+        XCTAssertEqual(cards["g1"]?.moduleDestination?.title, "Open the goal")
+        XCTAssertEqual(cards["g2"]?.moduleDestination?.screen, .goals, "a card with several goals opens Goals")
+        XCTAssertEqual(cards["dinner"]?.moduleDestination?.screen, .meals)
+        XCTAssertEqual(cards["training"]?.moduleDestination?.screen, .body)
+        XCTAssertNil(cards["idea"]?.moduleDestination, "an idea opens its source's page, not a module")
+        XCTAssertEqual(cards["close"]?.weekRows.map(\.moduleDestination), [.goal("land-ai-role"), .body, nil, nil],
+                       "a habit whose card is in the deck has nowhere else to open")
+    }
+
+    func testTheWayBackNamesTheScreenTheChatWasOpenedOver() {
+        var state = ShellNavigationState()
+        XCTAssertNil(state.returnTitle)
+        let cases: [([ShellPushDestination], String)] = [
+            ([.dailyDeck], "Back to the Brief"), ([.money], "Back to Money"), ([.brain], "Back to Brain"),
+            ([.brain, .brainRoute(.prep(.home))], "Back to Prep"), ([.brainRoute(.module(.people))], "Back to Brain"),
+            ([.goals, .goal("marathon")], "Back to Goals"), ([.meals, .mealsBook], "Back to Meals"),
+            ([.body, .bodyWorkout(nil)], "Back to Body"),
+        ]
+        for (screens, title) in cases {
+            state.select(PendingNewChatRoute(initialDraft: "hi"), returningTo: screens)
+            XCTAssertEqual(state.returnTitle, title)
+        }
+        state.returnToSavedScreens()
+        XCTAssertNil(state.returnTitle, "once back, there is nothing to go back to")
+        state.select(PendingNewChatRoute())
+        XCTAssertNil(state.returnTitle, "a plain new chat keeps no way back")
+    }
+}
+
 /// The close card as the week's habit tracker.
 final class DeckHabitTrackerTests: XCTestCase {
     private func close(_ rows: String) throws -> DeckCard {

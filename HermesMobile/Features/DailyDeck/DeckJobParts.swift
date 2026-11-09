@@ -136,6 +136,19 @@ struct DeckIdea: Equatable {
 }
 
 extension DeckCard {
+    /// The module a card is about, as its open card's foot button: a goal card opens its goal (Goals when it
+    /// holds several), the dinner card Meals, the training card Body. Nil for a card with no module of its own.
+    var moduleDestination: (title: String, screen: ShellPushDestination)? {
+        switch self.type {
+        case .goal:
+            if self.goals.count == 1, let slug = self.goals.first { return ("Open the goal", .goal(slug)) }
+            return ("Open Goals", .goals)
+        case .dinner: return ("Open Meals", .meals)
+        case .training: return ("Open Body", .body)
+        default: return nil
+        }
+    }
+
     /// A card that brings an idea from something he saved: a deck by job's `ideas` act, and before acts, every
     /// reflect card but a year-ago entry and a weekly review's own.
     var isIdea: Bool {
