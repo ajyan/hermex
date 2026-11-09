@@ -4,7 +4,7 @@ import SwiftUI
 /// Debug-only: the filing receipt under a reply, with fixture pages and no server, for
 /// screenshots in light and dark.
 /// `xcrun simctl launch <udid> <bundle id> --filing-receipt-lab`; add `--filing-ask` for the
-/// "where does this belong?" card under the turns.
+/// "where does this belong?" card under the turns, `--call-receipt` for the receipt after a call.
 struct FilingReceiptLab: View {
     private static let receipt = FilingReceipt(
         id: "fr_lab000000001",
@@ -35,6 +35,10 @@ struct FilingReceiptLab: View {
                      receipt: Self.storyReceipt)
                 turn("Ran six miles along the water before work.",
                      receipt: FilingReceipt(id: "fr_lab000000003", undone: true, pages: Self.receipt.pages))
+                if ProcessInfo.processInfo.arguments.contains("--call-receipt") {
+                    CallReceiptCard(receipt: CallReceipt(pages: Self.receipt.pages))
+                    CallReceiptCard(receipt: CallReceipt(pages: []))
+                }
                 if ProcessInfo.processInfo.arguments.contains("--filing-ask") {
                     FilingAskCard(
                         question: "Where does this belong?",

@@ -26,7 +26,6 @@ struct FilingReceiptRow: View {
     let message: ChatMessage
     let receipt: FilingReceipt
 
-    @Environment(\.openBrainRoute) private var openBrainRoute
     @Environment(\.filingReceiptActions) private var actions
 
     private var isUndoing: Bool {
@@ -45,7 +44,7 @@ struct FilingReceiptRow: View {
         } else {
             FlowRow(spacing: 6) {
                 ForEach(Array(receipt.pages.enumerated()), id: \.offset) { _, page in
-                    chip(for: page)
+                    FiledPageChip(page: page)
                 }
                 if showsUndo {
                     undoButton
@@ -53,27 +52,6 @@ struct FilingReceiptRow: View {
             }
             .accessibilityElement(children: .contain)
             .accessibilityLabel(Text("Saved to"))
-        }
-    }
-
-    @ViewBuilder
-    private func chip(for page: FiledPage) -> some View {
-        let chip = HXChip(paper: page.kind.paper, symbol: page.kind.symbol, label: page.label)
-        if let route = page.route, openBrainRoute.isAvailable {
-            Button {
-                openBrainRoute(route)
-            } label: {
-                // A taller hit area than the chip draws, like the Brain citation chips.
-                chip
-                    .zoomSource(for: ShellPushDestination.brainRoute(route))
-                    .contentShape(.interaction, Capsule().inset(by: -7))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Text(verbatim: "\(page.label), \(page.kind.name)"))
-            .accessibilityHint(Text("Opens the page"))
-        } else {
-            chip
-                .accessibilityLabel(Text(verbatim: "\(page.label), \(page.kind.name)"))
         }
     }
 
@@ -98,5 +76,33 @@ struct FilingReceiptRow: View {
         .disabled(isUndoing)
         .accessibilityLabel(Text("Undo filing"))
         .accessibilityHint(Text("Puts these pages back as they were"))
+    }
+}
+
+/// One filed page as a chip in its page's paper. It opens the page when the page has a Brain
+/// screen and a shell is listening; otherwise it only names the page.
+struct FiledPageChip: View {
+    let page: FiledPage
+
+    @Environment(\.openBrainRoute) private var openBrainRoute
+
+    var body: some View {
+        let chip = HXChip(paper: page.kind.paper, symbol: page.kind.symbol, label: page.label)
+        if let route = page.route, openBrainRoute.isAvailable {
+            Button {
+                openBrainRoute(route)
+            } label: {
+                // A taller hit area than the chip draws, like the Brain citation chips.
+                chip
+                    .zoomSource(for: ShellPushDestination.brainRoute(route))
+                    .contentShape(.interaction, Capsule().inset(by: -7))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(verbatim: "\(page.label), \(page.kind.name)"))
+            .accessibilityHint(Text("Opens the page"))
+        } else {
+            chip
+                .accessibilityLabel(Text(verbatim: "\(page.label), \(page.kind.name)"))
+        }
     }
 }
