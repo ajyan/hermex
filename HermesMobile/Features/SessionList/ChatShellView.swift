@@ -807,6 +807,8 @@ struct ChatShellView: View {
                 onAPIError: authManager.handleAPIError,
                 push: { navigation.path.append(.brainRoute($0)) }
             )
+        case .shelf(let kind):
+            BrainShelfView(kind: kind, server: server, modelContext: modelContext, onAPIError: authManager.handleAPIError)
         case .searchAll(let module, let query):
             BrainSearchView(module: module, query: query, server: server, onAPIError: authManager.handleAPIError)
                 .adaptiveSecondaryNavigationTitle()

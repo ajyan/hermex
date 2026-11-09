@@ -1,7 +1,7 @@
 import Foundation
 
 /// The read-only Brain API on this user's `hermes-webui` fork (`api/brain.py`):
-/// `GET /api/brain/{modules,list,page,search,home,people/home}`. Stock upstream servers
+/// `GET /api/brain/{modules,list,page,search,home,people/home,shelf}`. Stock upstream servers
 /// answer 404, which the screens show as "no Brain on this server".
 /// Only GETs: the Second Brain is edited by the agent, never from the app.
 protocol BrainDataClient: Sendable {
@@ -12,6 +12,8 @@ protocol BrainDataClient: Sendable {
     func search(query: String, module: BrainModuleID?) async throws -> BrainSearchResult
     func home(batch: Int) async throws -> BrainHome
     func peopleHome() async throws -> BrainPeopleHome
+    /// One page of the shelf for his writing (`GET /api/brain/shelf?kind=`).
+    func shelf(kind: BrainShelfKind) async throws -> BrainShelf
     /// Writes one catch-up note to a contact (`POST /api/brain/person/log`).
     func logPerson(_ request: BrainPersonLogRequest) async throws -> BrainPersonLogResult
 }
@@ -76,6 +78,10 @@ struct APIClientBrainAdapter: BrainDataClient {
 
     func peopleHome() async throws -> BrainPeopleHome {
         try await apiClient.send(endpoint: .brainPeopleHome, method: "GET")
+    }
+
+    func shelf(kind: BrainShelfKind) async throws -> BrainShelf {
+        try await apiClient.send(endpoint: .brainShelf(kind: kind.rawValue), method: "GET")
     }
 
     func logPerson(_ request: BrainPersonLogRequest) async throws -> BrainPersonLogResult {

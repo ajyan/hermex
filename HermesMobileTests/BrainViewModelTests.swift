@@ -786,6 +786,17 @@ final class FakeBrainClient: BrainDataClient, @unchecked Sendable {
     func peopleHome() async throws -> BrainPeopleHome {
         try peopleHomeResult.get()
     }
+    /// One answer per shelf page; a page without one answers an empty shelf.
+    var shelfResults: [BrainShelfKind: Result<BrainShelf, Error>] = [:]
+    private var _shelfCalls: [BrainShelfKind] = []
+    var shelfCalls: [BrainShelfKind] { lock.withLock { _shelfCalls } }
+    func shelf(kind: BrainShelfKind) async throws -> BrainShelf {
+        let result = lock.withLock {
+            _shelfCalls.append(kind)
+            return shelfResults[kind]
+        }
+        return try (result ?? .success(BrainShelf(kind: kind.rawValue))).get()
+    }
     var logResult: Result<BrainPersonLogResult, Error> = .success(BrainPersonLogResult())
     private var _logged: [BrainPersonLogRequest] = []
     var logged: [BrainPersonLogRequest] { lock.withLock { _logged } }

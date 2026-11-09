@@ -88,7 +88,7 @@ struct VoiceCallSourcesSheet: View {
         case .module(let module):
             BrainModuleListView(module: module, server: server, modelContext: modelContext,
                                 onAPIError: onAPIError, push: { path.append($0) })
-        case .bite, .searchAll, .review, .prep:
+        case .bite, .searchAll, .review, .shelf, .prep:
             // A page's links and tags reach only the routes above.
             EmptyView()
         }

@@ -171,6 +171,8 @@ enum Endpoint {
     case brainHome(batch: Int)
     case brainPeopleHome
     case brainPersonLog
+    /// The shelf for his writing (`kind`: letters, takes or memories), read-only.
+    case brainShelf(kind: String)
     /// The Prep interview tutor (`api/tutor.py`): today's run, home, a track map, one item, answer submission,
     /// the gap ledger (all gaps and one gap) and flagging a coach-written card.
     case tutorHome
@@ -564,6 +566,8 @@ enum Endpoint {
             return "/api/brain/people/home"
         case .brainPersonLog:
             return "/api/brain/person/log"
+        case .brainShelf:
+            return "/api/brain/shelf"
         case .tutorHome:
             return "/api/tutor/home"
         case .tutorToday, .tutorRun:
@@ -900,6 +904,8 @@ enum Endpoint {
             var items = [URLQueryItem(name: "q", value: query)]
             if let module { items.append(URLQueryItem(name: "module", value: module)) }
             return items
+        case let .brainShelf(kind):
+            return [URLQueryItem(name: "kind", value: kind)]
         case let .brainHome(batch):
             return batch > 0 ? [URLQueryItem(name: "batch", value: String(batch))] : []
         case let .tutorGap(id), let .tutorLesson(id), let .tutorStory(id):
