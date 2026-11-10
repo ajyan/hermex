@@ -548,7 +548,7 @@ final class ChatViewModel {
         sessionID.map { PushPresence.Viewer(server: server, sessionID: $0) }
     }
     let client: APIClient
-    private let streamCoordinator: ChatStreamCoordinator
+    let streamCoordinator: ChatStreamCoordinator
     private let drafts: ChatDraftStore
     private let pendingActionCoordinator: ChatPendingActionCoordinator
     private let attachmentCoordinator: ChatAttachmentCoordinator

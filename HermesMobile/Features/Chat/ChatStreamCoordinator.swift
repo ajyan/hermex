@@ -252,7 +252,7 @@ final class ChatStreamCoordinator {
         setLiveTokensPerSecondIfChanged(nil)
         hasInMemorySnapshotForActiveStream = false
         invalidateReconnectTask()
-        turnTrace = nil
+        abandonTurnTrace()
     }
 
     /// Called when the first non-empty text of the turn is applied to the transcript.
@@ -308,6 +308,7 @@ final class ChatStreamCoordinator {
     ) {
         if let newTrace {
             sendHeldVoiceUpload()
+            abandonTurnTrace()
             turnTrace = newTrace
         } else {
             turnTrace?.reconnects += 1
@@ -368,6 +369,7 @@ final class ChatStreamCoordinator {
     }
 
     func prepareForSessionLoad() -> ChatStreamLoadPreparation {
+        retryPendingTurnUploads()
         setLiveTokensPerSecondIfChanged(nil)
         let activeStreamIDBeforeLoad = activeStreamID
         if activeStreamIDBeforeLoad != nil, !hasCompletedCurrentResponse {
@@ -459,6 +461,7 @@ final class ChatStreamCoordinator {
     }
 
     func reconnectIfNeeded(modelContext: ModelContext? = nil) async {
+        retryPendingTurnUploads()
         guard let activeStreamID, isConnectionSuspended else { return }
         if var reconnectTask {
             if reconnectTask.modelContext == nil, let modelContext {
@@ -1221,6 +1224,15 @@ final class ChatStreamCoordinator {
         }
     }
 
+    /// A turn still holding its trace when the next response is prepared never reached an end the app saw
+    /// (the user moved on, or the stream was lost for good). It uploads as cancelled and detached, so the
+    /// server gets the turn's root and its timings read as time away rather than latency.
+    private func abandonTurnTrace() {
+        guard turnTrace != nil else { return }
+        turnTrace?.detached = true
+        uploadTurnTrace(outcome: .cancelled)
+    }
+
     /// Sends the voice turn's held upload with the call's timings of it, and clears them for the next turn.
     private func sendHeldVoiceUpload() {
         defer {
@@ -1233,6 +1245,13 @@ final class ChatStreamCoordinator {
         upload.speechEndToAudibleMs = voiceAudibleMS
         upload.bargeInMs = voiceBargeInMS
         sendUpload(upload)
+    }
+
+    /// A chat opening or returning to the foreground sends the turn uploads this server never received.
+    private func retryPendingTurnUploads() {
+        guard TurnTraceUploader.isEnabled else { return }
+        let client = client
+        Task(priority: .utility) { await TurnTraceUploader.retryPending(client: client) }
     }
 
     private func sendUpload(_ upload: TurnTraceUpload) {
