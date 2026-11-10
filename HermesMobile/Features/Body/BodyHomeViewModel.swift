@@ -15,6 +15,9 @@ final class BodyHomeViewModel {
     private(set) var decideError: String?
     /// Proposal ids with a decision in flight; further taps on them are ignored.
     private(set) var deciding: Set<String> = []
+    /// Baki's note on the newest finished workout, for his card. Nil until it loads, and when he
+    /// hasn't written one.
+    private(set) var latestNote: BodyLatestNote?
 
     @ObservationIgnored private let client: BodyDataClient
     @ObservationIgnored private let onAPIError: (Error) -> Void
@@ -33,6 +36,7 @@ final class BodyHomeViewModel {
             let home = try await client.home()
             guard token == generation, !Task.isCancelled else { return }
             state = .loaded(home)
+            await loadLatestNote(home.sessions.first, token: token)
         } catch {
             guard token == generation, !bodyIsCancellation(error) else { return }
             onAPIError(error)
@@ -40,6 +44,16 @@ final class BodyHomeViewModel {
             if case .loaded = state, !notFound { return }
             state = notFound ? .unavailable : .failed(error.localizedDescription)
         }
+    }
+
+    /// Reads the newest session for Baki's note. Home doesn't carry it, and a note is written a
+    /// little after its workout, so a session with none yet is read again on the next load. A
+    /// failed read leaves the card as it was.
+    private func loadLatestNote(_ newest: BodySessionSummary?, token: Int) async {
+        guard let newest else { latestNote = nil; return }
+        if latestNote?.session.id == newest.id { return }
+        guard let session = try? await client.session(id: newest.id), token == generation, !Task.isCancelled else { return }
+        latestNote = session.coachNote.map { BodyLatestNote(session: newest, note: $0) }
     }
 
     /// Accepts or skips a proposal. It leaves the list at once and comes back where it was if the
@@ -135,6 +149,12 @@ enum BodyHomeCopy {
         return display.string(from: date)
     }
 
+    /// Baki's card on Body home: "Baki · after Pull, Mon, Nov 9"; just "Baki" with no note to date.
+    static func bakiKicker(_ latest: BodyLatestNote?) -> String {
+        guard let latest else { return "Baki" }
+        return "Baki · after \(latest.session.label), \(sessionDate(latest.session.date))"
+    }
+
     /// "Fri, Nov 27 · 52 min · one set dropped".
     static func sessionSubtitle(_ session: BodySessionSummary) -> String {
         var parts = [sessionDate(session.date)]
@@ -164,18 +184,22 @@ enum BodyHomeCopy {
     static func liftGroups(_ lifts: [BodyHomeLift]) -> [BodyLiftGroup] {
         var groups: [BodyLiftGroup] = []
         for lift in lifts {
-            let key = lift.muscle.flatMap { $0.isEmpty ? nil : $0 } ?? lift.day
-            if let index = groups.firstIndex(where: { $0.id == key }) {
+            let muscle = lift.muscle.flatMap { $0.isEmpty ? nil : $0 }
+            // A day and a body part can share a name ("legs"), so the id says which it is.
+            let id = muscle.map { "muscle:\($0)" } ?? "day:\(lift.day)"
+            let title = muscle ?? lift.day
+            if let index = groups.firstIndex(where: { $0.id == id }) {
                 groups[index].lifts.append(lift)
             } else {
-                groups.append(BodyLiftGroup(id: key, title: key.isEmpty ? "Other" : key.capitalized, lifts: [lift]))
+                groups.append(BodyLiftGroup(id: id, title: title.isEmpty ? "Other" : title.capitalized, lifts: [lift]))
             }
         }
         // A stable sort: tagged body parts first in their fixed order, the rest as the server sent them.
+        func rank(_ group: BodyLiftGroup) -> Int {
+            muscleOrder.firstIndex { "muscle:\($0)" == group.id } ?? muscleOrder.count
+        }
         return groups.enumerated().sorted { a, b in
-            let x = muscleOrder.firstIndex(of: a.element.id) ?? muscleOrder.count
-            let y = muscleOrder.firstIndex(of: b.element.id) ?? muscleOrder.count
-            return x == y ? a.offset < b.offset : x < y
+            rank(a.element) == rank(b.element) ? a.offset < b.offset : rank(a.element) < rank(b.element)
         }.map(\.element)
     }
 
@@ -240,6 +264,12 @@ enum BodyHomeCopy {
         f.setLocalizedDateFormatFromTemplate("EEEMMMd")
         return f
     }()
+}
+
+/// Baki's note with the workout it is about.
+struct BodyLatestNote: Equatable {
+    let session: BodySessionSummary
+    let note: BodyCoachNote
 }
 
 /// One section of Body home's Lifts card.

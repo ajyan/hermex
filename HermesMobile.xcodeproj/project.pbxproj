@@ -50,6 +50,7 @@
 		B0D70000000000000000001B /* WorkoutFinishViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D70000000000000000001A /* WorkoutFinishViewModel.swift */; };
 		B0D700000000000000000027 /* WorkoutFinishTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000026 /* WorkoutFinishTests.swift */; };
 		B0D70000000000000000001D /* LiftProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D70000000000000000001C /* LiftProgressView.swift */; };
+		B0D7000000000000000000E2 /* BodySessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D7000000000000000000E1 /* BodySessionView.swift */; };
 		B0D70000000000000000001F /* LiftProgressViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D70000000000000000001E /* LiftProgressViewModel.swift */; };
 		B0D700000000000000000021 /* PlanEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000020 /* PlanEditView.swift */; };
 		B0D700000000000000000023 /* PlanEditViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D700000000000000000022 /* PlanEditViewModel.swift */; };
@@ -1003,6 +1004,7 @@
 		B0D70000000000000000001A /* WorkoutFinishViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutFinishViewModel.swift; sourceTree = "<group>"; };
 		B0D700000000000000000026 /* WorkoutFinishTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutFinishTests.swift; sourceTree = "<group>"; };
 		B0D70000000000000000001C /* LiftProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiftProgressView.swift; sourceTree = "<group>"; };
+		B0D7000000000000000000E1 /* BodySessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodySessionView.swift; sourceTree = "<group>"; };
 		B0D70000000000000000001E /* LiftProgressViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiftProgressViewModel.swift; sourceTree = "<group>"; };
 		B0D700000000000000000020 /* PlanEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanEditView.swift; sourceTree = "<group>"; };
 		B0D700000000000000000022 /* PlanEditViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanEditViewModel.swift; sourceTree = "<group>"; };
@@ -1961,6 +1963,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				B0D700000000000000000020 /* PlanEditView.swift */,
 				B0D70000000000000000001E /* LiftProgressViewModel.swift */,
 				B0D70000000000000000001C /* LiftProgressView.swift */,
+				B0D7000000000000000000E1 /* BodySessionView.swift */,
 				B0D70000000000000000001A /* WorkoutFinishViewModel.swift */,
 				B0D700000000000000000018 /* WorkoutFinishView.swift */,
 				B0D700000000000000000015 /* WorkoutLiftCard.swift */,
@@ -3504,6 +3507,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				B0D700000000000000000021 /* PlanEditView.swift in Sources */,
 				B0D70000000000000000001F /* LiftProgressViewModel.swift in Sources */,
 				B0D70000000000000000001D /* LiftProgressView.swift in Sources */,
+				B0D7000000000000000000E2 /* BodySessionView.swift in Sources */,
 				B0D70000000000000000001B /* WorkoutFinishViewModel.swift in Sources */,
 				B0D700000000000000000019 /* WorkoutFinishView.swift in Sources */,
 				B0D700000000000000000014 /* WorkoutLiftCard.swift in Sources */,

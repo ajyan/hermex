@@ -80,6 +80,75 @@ extension View {
     /// Lifts a `ChatDecisionButtonStyle` label to a 44 pt button. The style adds 9 pt above and below
     /// its label and a 40 pt floor, so a 26 pt label is 44 pt tall in all.
     func bodyTapHeight() -> some View { frame(minHeight: 26) }
+
+    /// The same, at 50 pt: a screen's or card's one full-width action (DESIGN.md § Buttons).
+    func bodyPrimaryHeight() -> some View { frame(minHeight: 32) }
+}
+
+/// Baki's note as he wrote it: the headline in the training glow, then his paragraphs. It sits on
+/// his wash card on Body home, the finish screen and a past session.
+struct BakiNoteText: View {
+    let note: BodyCoachNote
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if !note.headline.isEmpty {
+                Text(verbatim: note.headline)
+                    .font(AppFont.display(style: .headline, weight: .semibold))
+                    .foregroundStyle(HermexPaper.training.glow)
+                    .accessibilityAddTraits(.isHeader)
+            }
+            ForEach(Array(note.body.enumerated()), id: \.offset) { _, paragraph in
+                Text(verbatim: paragraph)
+                    .font(AppFont.body())
+                    .foregroundStyle(Color.hxTextPrimary)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// The last row of Baki's card: opens a new chat with `draft` in the composer. Draws nothing when
+/// no chat can open.
+struct BakiAskRow: View {
+    var title = "Ask Baki"
+    var draft = BodyAskBaki.draft
+    @Environment(\.openDraftChat) private var openDraftChat
+
+    var body: some View {
+        if openDraftChat.isAvailable {
+            Button { openDraftChat(draft) } label: {
+                HStack(spacing: 8) {
+                    Text(verbatim: title)
+                        .font(AppFont.body())
+                        .foregroundStyle(HermexPaper.training.glow)
+                    Spacer(minLength: 8)
+                    BodyChevron()
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(Text(verbatim: "Starts a chat with Baki"))
+        }
+    }
+}
+
+/// The hairline between the parts of Baki's card.
+struct BakiRule: View {
+    var body: some View {
+        Rectangle().fill(HermexPaper.training.edge).frame(height: 0.5).accessibilityHidden(true)
+    }
+}
+
+/// The trailing mark on every Body row that opens another screen.
+struct BodyChevron: View {
+    var body: some View {
+        Image(systemName: "chevron.right")
+            .font(AppFont.caption(weight: .semibold))
+            .foregroundStyle(Color.hxTextSecondary)
+            .accessibilityHidden(true)
+    }
 }
 
 /// What "Ask Baki" starts a chat with: the composer is filled in, never sent.
@@ -89,6 +158,9 @@ enum BodyAskBaki {
 
     /// An opener about one proposal: `Baki, about "Strict press: 70 lb for 3 × 8": `.
     static func draft(about title: String) -> String { "Baki, about \"\(title)\": " }
+
+    /// An opener about one workout: `Baki, about Pull on Mon, Nov 9: `.
+    static func draft(aboutSession label: String, date: String) -> String { "Baki, about \(label) on \(date): " }
 }
 
 /// Baki's pending proposals as cards, one after another. Use and Not now go to `decide`; Ask opens

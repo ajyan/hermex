@@ -35,6 +35,8 @@ enum ShellPushDestination: Hashable {
     case bodyLift(String)
     /// The training plan editor.
     case bodyPlan
+    /// A finished workout with Baki's note, by session id.
+    case bodySession(String)
     /// A workout: the given day (push, legs, pull), or the next in the rotation when nil.
     case bodyWorkout(String?)
     /// Meals: tonight and the week, from the drawer or the Tonight widget.
@@ -224,7 +226,7 @@ extension ShellPushDestination {
         case .goals, .goal, .finishedGoal, .finishedGoals: "Goals"
         case .money: "Money"
         case .feedback: "Feedback"
-        case .body, .bodyLift, .bodyPlan, .bodyWorkout: "Body"
+        case .body, .bodyLift, .bodyPlan, .bodySession, .bodyWorkout: "Body"
         case .meals, .mealsBook, .mealsDish, .mealsSeason: "Meals"
         case .settings: "Settings"
         }
@@ -337,7 +339,7 @@ extension ShellPushDestination {
         switch self {
         case .brain, .brainRoute: true
         case .projects, .project, .tasks, .kanban, .dailyDeck, .goals, .goal, .finishedGoal, .finishedGoals, .money,
-             .feedback, .body, .bodyLift, .bodyPlan, .bodyWorkout, .meals, .mealsBook, .mealsDish, .mealsSeason, .settings: false
+             .feedback, .body, .bodyLift, .bodyPlan, .bodySession, .bodyWorkout, .meals, .mealsBook, .mealsDish, .mealsSeason, .settings: false
         }
     }
 
@@ -353,7 +355,7 @@ extension ShellPushDestination {
              .brainRoute(.prep(.story(_))), .brainRoute(.prep(.gapRun(_))), .brainRoute(.prep(.lessonRun(_))): false
         case .brainRoute: true
         case .projects, .project, .tasks, .kanban, .dailyDeck, .brain, .goals, .finishedGoals, .money, .feedback,
-             .body, .bodyLift, .bodyPlan, .bodyWorkout, .meals, .mealsBook, .mealsDish, .mealsSeason, .settings: false
+             .body, .bodyLift, .bodyPlan, .bodySession, .bodyWorkout, .meals, .mealsBook, .mealsDish, .mealsSeason, .settings: false
         }
     }
 }
