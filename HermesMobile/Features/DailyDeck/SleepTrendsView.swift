@@ -118,7 +118,7 @@ private struct SleepTrendChart: View {
     let selected: SleepPoint?
     @Binding var selection: Date?
 
-    private let paper = HermexPaper.notes
+    private let paper = HermexPaper.training
 
     var body: some View {
         Chart {

@@ -149,7 +149,7 @@ private struct SleepNightCard: View {
     let showLastNight: () -> Void
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    private let paper = HermexPaper.notes
+    private let paper = HermexPaper.training
 
     var body: some View {
         HXCard(.glow(paper), spacing: 14, kicker: {

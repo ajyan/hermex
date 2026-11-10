@@ -1027,7 +1027,7 @@ final class DailyDeckTests: XCTestCase {
         let journal = try palette("journal")
         XCTAssertEqual(journal, DeckPalette.journal)
         XCTAssertEqual(journal.name, "Your journal", "a week's journal entry is not the year-ago card")
-        XCTAssertEqual(journal.colors, HermexPaper.past)
+        XCTAssertEqual(journal.colors, HermexPaper.knowledge)
         let yearAgo = try palette("on_this_day")
         XCTAssertEqual(yearAgo.name, "A year ago")
         XCTAssertEqual(yearAgo.colors, journal.colors, "same journal paper")
@@ -2241,7 +2241,7 @@ final class DailyDeckTests: XCTestCase {
     }
 
     func testAHabitsSupportingInkIsNeverTheGlowFaded() {
-        XCTAssertEqual(DeckPalette.book.secondaryInk, HermexPaper.book.secondaryInk)
+        XCTAssertEqual(DeckPalette.book.secondaryInk, HermexPaper.knowledge.secondaryInk)
         XCTAssertEqual(DeckPalette.opener.secondaryInk, Color.hxTextSecondary, "a neutral card's supporting text is neutral")
     }
 
@@ -2781,7 +2781,7 @@ final class DeckHabitTrackerTests: XCTestCase {
          {"label":"Unfiled","kind":"days"}]
         """#)
         XCTAssertEqual(card.weekRows.map(\.habitPaper),
-                       [.notes, .video, .mandarin, .advisor, .orchid, .orchid, BrainModuleID.people.paper, .book, .plain],
+                       [.video, .video, .mandarin, .advisor, .orchid, .orchid, BrainModuleID.people.paper, .book, .plain],
                        "sleep, lifting, Mandarin, the letter and the job search each keep their kind's paper; the vault's name wins")
         XCTAssertFalse(card.weekRows.contains { $0.habitPaper == .opener }, "amber means waiting on you, so no habit wears it")
     }

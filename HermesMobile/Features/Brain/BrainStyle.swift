@@ -209,11 +209,9 @@ extension BrainModuleID {
     /// its source's Daily Brief paper. Chat citations stay `.knowledge`.
     var paper: HermexPaper {
         switch self {
-        case .wiki: .wiki
+        case .wiki: .knowledge
         case .people: .advisor
-        case .journal: .past
-        case .articles: .reading
-        case .highlights: .book
+        case .journal, .articles, .highlights: .knowledge
         // Letters to his daughter wear the Daily Deck's Dad card paper.
         case .letters: .advisor
         }

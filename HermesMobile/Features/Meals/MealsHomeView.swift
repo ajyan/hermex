@@ -256,7 +256,7 @@ struct MealsHomeView: View {
 
     /// What he ate this week a year ago; each opens its recipe.
     private func yearAgo(_ picks: [MealsSeasonPick]) -> some View {
-        let past = HermexPaper.past
+        let past = HermexPaper.meal
         return VStack(alignment: .leading, spacing: 8) {
             HXSectionHeader(title: "A year ago this week")
             FlowRow(spacing: 8) {

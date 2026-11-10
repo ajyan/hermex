@@ -501,7 +501,7 @@ private struct MealsPlanFillStep: View {
     }
 
     private var lastYear: some View {
-        let past = HermexPaper.past
+        let past = HermexPaper.meal
         return HXCard(.glow(past), spacing: 8) {
             Text(verbatim: "This time last year")
                 .font(AppFont.caption(weight: .semibold))

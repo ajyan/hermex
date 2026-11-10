@@ -260,7 +260,7 @@ struct BrainHomeView: View {
             BrainHomeCard {
                 if bites > 0 {
                     link(.review) {
-                        reviewRow(bites: bites, paper: viewModel.home.bites.first?.paper ?? .reading)
+                        reviewRow(bites: bites, paper: viewModel.home.bites.first?.paper ?? .knowledge)
                     }
                 }
                 ForEach(dueCatchUps) { row in

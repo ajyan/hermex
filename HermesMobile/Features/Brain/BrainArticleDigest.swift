@@ -182,7 +182,7 @@ struct BrainArticleDigestView: View {
     @State private var showsFullGist = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(digest: BrainArticleDigest, focusIdea: Int? = nil, paper: HermexPaper = .reading) {
+    init(digest: BrainArticleDigest, focusIdea: Int? = nil, paper: HermexPaper = .knowledge) {
         self.digest = digest
         self.focusIdea = focusIdea
         self.paper = paper

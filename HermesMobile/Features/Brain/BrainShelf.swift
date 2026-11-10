@@ -26,8 +26,7 @@ enum BrainShelfKind: String, CaseIterable, Codable, Hashable, Sendable {
     var paper: HermexPaper {
         switch self {
         case .letters: BrainModuleID.letters.paper
-        case .takes: .notes
-        case .memories: .past
+        case .takes, .memories: .knowledge
         }
     }
 
