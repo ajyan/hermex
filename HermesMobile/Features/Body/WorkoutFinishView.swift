@@ -43,8 +43,8 @@ struct WorkoutFinishView: View {
     // MARK: The check
 
     private var checkCard: some View {
-        HXCard(.neutral, spacing: 18) {
-            question("How hard was it?") {
+        HXCard(.glow(paper), title: "How did it go?", spacing: 18) {
+            question("Effort") {
                 choices($viewModel.effort, [(.easy, "Easy"), (.solid, "Solid"), (.grinder, "Grinder")])
             }
             question("Lower back") {
@@ -63,6 +63,7 @@ struct WorkoutFinishView: View {
             }
             saveButton
         }
+        .environment(\.hxPaper, paper)
         .disabled(viewModel.phase == .saving)
     }
 
@@ -88,7 +89,6 @@ struct WorkoutFinishView: View {
                     .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
-        .environment(\.hxPaper, paper)
     }
 
     /// Pain asks how bad it was (0 to 10) and on which lift.
@@ -146,7 +146,7 @@ struct WorkoutFinishView: View {
     private var noteField: some View {
         VStack(alignment: .leading, spacing: 8) {
             (Text(verbatim: "Anything else? ").font(AppFont.subheadline(weight: .semibold)).foregroundStyle(Color.hxTextPrimary)
-                + Text(verbatim: "optional").font(AppFont.subheadline()).foregroundStyle(Color.hxTextSecondary))
+                + Text(verbatim: "optional").font(AppFont.subheadline()).foregroundStyle(paper.secondaryInk))
                 .accessibilityAddTraits(.isHeader)
             TextField(text: $viewModel.note, axis: .vertical) { Text(verbatim: "How it felt, what to watch") }
                 .lineLimit(1...4)
@@ -162,20 +162,14 @@ struct WorkoutFinishView: View {
         Button { Task { await viewModel.save() } } label: {
             Group {
                 if viewModel.phase == .saving {
-                    ProgressView()
+                    ProgressView().tint(paper.onGlow)
                 } else {
                     Text(verbatim: "Save workout")
                 }
             }
-            .font(AppFont.display(style: .headline, weight: .semibold))
-            // A disabled prominent button dims its fill, so the label drops the on-glow color to stay readable.
-            .foregroundStyle(viewModel.canSave ? paper.onGlow : Color.hxTextSecondary)
-            .frame(maxWidth: .infinity)
+            .bodyPrimaryHeight()
         }
-        .buttonStyle(.borderedProminent)
-        .buttonBorderShape(.capsule)
-        .controlSize(.large)
-        .tint(paper.glow)
+        .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
         .disabled(!viewModel.canSave)
     }
 
@@ -199,21 +193,14 @@ struct WorkoutFinishView: View {
     }
 
     private func coachCard(_ note: BodyCoachNote) -> some View {
-        HXCard(.glow(paper), title: note.headline, titleStyle: .title3, spacing: 10) {
+        HXCard(.wash(paper), spacing: 10) {
             BodyCoachKicker(text: WorkoutFinishCopy.kicker(day: viewModel.day))
         } content: {
-            ForEach(Array(note.body.enumerated()), id: \.offset) { _, paragraph in
-                Text(verbatim: paragraph)
-                    .font(AppFont.body())
-                    .foregroundStyle(Color.hxTextPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            BakiNoteText(note: note)
         } footer: {
             if openDraftChat.isAvailable {
-                Button { openDraftChat(BodyAskBaki.draft) } label: { Text(verbatim: "Ask Baki").bodyTapHeight() }
-                    .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
-                    .environment(\.hxPaper, paper)
-                    .padding(.top, 4)
+                BakiRule()
+                BakiAskRow(title: "Ask Baki about this workout")
             }
         }
     }
@@ -221,7 +208,7 @@ struct WorkoutFinishView: View {
     /// Baki's card while the note is being written: the same card the note lands in, with a
     /// breathing sparkle and the note's shape. Once the scheduled reads run out it says so instead.
     private var waitingCard: some View {
-        HXCard(.glow(paper), spacing: 12) {
+        HXCard(.wash(paper), spacing: 12) {
             BodyCoachKicker(text: WorkoutFinishCopy.kicker(day: viewModel.day))
         } content: {
             if viewModel.noteWaitEnded {
@@ -252,28 +239,20 @@ struct WorkoutFinishView: View {
         }
     }
 
-    /// The way out once the workout is saved: back to Body home.
+    /// The way out once the workout is saved: back to Body home. It sits on the canvas, so it is Nous blue.
     private var doneButton: some View {
-        Button(action: onDone) {
-            Text(verbatim: "Done")
-                .font(AppFont.display(style: .headline, weight: .semibold))
-                .foregroundStyle(paper.onGlow)
-                .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.borderedProminent)
-        .buttonBorderShape(.capsule)
-        .controlSize(.large)
-        .tint(paper.glow)
+        Button(action: onDone) { Text(verbatim: "Done").bodyPrimaryHeight() }
+            .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
     }
 }
 
-/// An input's fill on a neutral card: the canvas with a hairline, like the board's text fields.
+/// An input's fill on the check's glow card: the training wash with its edge.
 private struct FinishFieldBackground: ViewModifier {
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
         content
-            .background(Color.hxCanvas, in: shape)
-            .overlay(shape.strokeBorder(Color.hxSeparator, lineWidth: 0.5))
+            .background(HermexPaper.training.wash, in: shape)
+            .overlay(shape.strokeBorder(HermexPaper.training.edge, lineWidth: 0.5))
     }
 }
 

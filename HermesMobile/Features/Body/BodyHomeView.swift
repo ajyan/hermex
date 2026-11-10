@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Body's landing screen: the next workout, the week, last night's sleep, every lift, and recent
-/// sessions. Pushed from the drawer as `.body`; workouts, lifts, and the plan push from here.
+/// Body's landing screen: the next workout, Baki's card, the week, every lift, recent sessions,
+/// and last night's sleep. Pushed from the drawer as `.body`; workouts, lifts, and the plan push from here.
 struct BodyHomeView: View {
     @State private var viewModel: BodyHomeViewModel
     @State private var showsSleep = false
@@ -66,13 +66,12 @@ struct BodyHomeView: View {
         case .loaded(let home):
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.l) {
-                    proposalSlot(home.proposals)
                     upNext(home)
+                    bakiCard(home.proposals)
                     thisWeek(home)
-                    if let sleep = home.sleep { sleepRow(sleep) }
                     if !home.lifts.isEmpty { lifts(home.lifts) }
                     if !home.sessions.isEmpty { sessions(home.sessions) }
-                    askBaki
+                    if let sleep = home.sleep { sleepRow(sleep) }
                 }
                 .padding(BrainStyle.l)
                 .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
@@ -81,52 +80,72 @@ struct BodyHomeView: View {
         }
     }
 
-    // MARK: Proposals
+    // MARK: Baki
 
-    /// Baki's pending proposals sit above Up next.
-    private func proposalSlot(_ proposals: [BodyProposal]) -> some View {
-        BodyProposalCards(proposals: proposals, deciding: viewModel.deciding, error: viewModel.decideError) { proposal, accept in
-            Task { await viewModel.decide(proposal, accept: accept) }
+    /// Baki's one place on Body home: his note on the newest workout, each change waiting for a
+    /// yes or no, and the way to ask him something.
+    private func bakiCard(_ proposals: [BodyProposal]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HXSectionHeader(title: "Baki")
+            HXCard(.wash(paper), spacing: 10) {
+                BodyCoachKicker(text: BodyHomeCopy.bakiKicker(viewModel.latestNote))
+            } content: {
+                if let latest = viewModel.latestNote {
+                    BakiNoteText(note: latest.note)
+                } else if proposals.isEmpty {
+                    Text(verbatim: "Ask about a lift, your plan, or how you feel. His note on each workout lands here.")
+                        .font(AppFont.subheadline())
+                        .foregroundStyle(paper.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                ForEach(proposals) { proposal in
+                    BakiRule()
+                    proposalRows(proposal)
+                }
+                if let error = viewModel.decideError {
+                    Text(verbatim: error)
+                        .font(AppFont.footnote())
+                        .foregroundStyle(Color.hxDanger)
+                }
+            } footer: {
+                if openDraftChat.isAvailable {
+                    BakiRule()
+                    BakiAskRow()
+                }
+            }
         }
     }
 
-    // MARK: Ask Baki
-
-    /// Opens a new chat with "Baki, " in the composer; hidden when no chat can open.
-    @ViewBuilder
-    private var askBaki: some View {
-        if openDraftChat.isAvailable {
-            Button { openDraftChat(BodyAskBaki.draft) } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "person.fill")
-                        .font(AppFont.subheadline(weight: .semibold))
-                        .foregroundStyle(paper.glow)
-                        .frame(width: 30, height: 30)
-                        .background(paper.wash, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(verbatim: "Ask Baki")
-                            .font(AppFont.subheadline(weight: .semibold))
-                            .foregroundStyle(Color.hxTextPrimary)
-                        Text(verbatim: "About a lift, your plan, or how you feel")
-                            .font(AppFont.caption())
-                            .foregroundStyle(Color.hxTextSecondary)
-                    }
-                    Spacer(minLength: 8)
-                    Image(systemName: "chevron.right")
-                        .font(AppFont.caption())
-                        .foregroundStyle(Color.hxTextSecondary)
-                        .accessibilityHidden(true)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 11)
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                .contentShape(Rectangle())
+    /// One change to approve, inside Baki's card: what changes, why, and Accept or Skip.
+    private func proposalRows(_ proposal: BodyProposal) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(verbatim: "A change to approve")
+                .font(AppFont.caption(weight: .semibold))
+                .foregroundStyle(paper.glow)
+            Text(verbatim: proposal.title)
+                .font(AppFont.body(weight: .semibold))
+                .foregroundStyle(Color.hxTextPrimary)
+            ForEach(Array(proposal.why.enumerated()), id: \.offset) { _, reason in
+                Text(verbatim: reason)
+                    .font(AppFont.footnote())
+                    .foregroundStyle(paper.secondaryInk)
             }
-            .buttonStyle(.plain)
-            .hxCard()
-            .accessibilityHint(Text(verbatim: "Starts a chat with Baki"))
+            HStack(spacing: 8) {
+                Button { Task { await viewModel.decide(proposal, accept: true) } } label: {
+                    Text(verbatim: "Accept").bodyTapHeight()
+                }
+                .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
+                .accessibilityLabel(Text(verbatim: "Accept: \(proposal.title)"))
+                Button { Task { await viewModel.decide(proposal, accept: false) } } label: {
+                    Text(verbatim: "Skip").bodyTapHeight()
+                }
+                .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
+                .accessibilityLabel(Text(verbatim: "Skip: \(proposal.title)"))
+            }
+            .disabled(viewModel.deciding.contains(proposal.id))
+            .padding(.top, 4)
         }
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     // MARK: Up next
@@ -175,11 +194,9 @@ struct BodyHomeView: View {
                 let others = BodyHomeCopy.otherDays(
                     than: next.day, sessions: home.sessions, today: BodyHomeCopy.localDay(.now))
                 // Side by side when they fit; stacked at large text sizes.
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 10) { startButtons(next, others: others) }
-                    VStack(spacing: 10) { startButtons(next, others: others) }
-                }
-                .padding(.top, 4)
+                VStack(spacing: 4) { startButtons(next, others: others) }
+                    .environment(\.hxPaper, paper)
+                    .padding(.top, 4)
             } else {
                 let days = BodyHomeCopy.otherDays(
                     than: "", sessions: home.sessions, today: BodyHomeCopy.localDay(.now))
@@ -198,18 +215,14 @@ struct BodyHomeView: View {
             HStack(spacing: 10) {
                 ForEach(days, id: \.self) { day in
                     NavigationLink(value: ShellPushDestination.bodyWorkout(day)) {
-                        Text(verbatim: day.capitalized)
-                            .font(AppFont.subheadline(weight: .semibold))
-                            .foregroundStyle(paper.glow)
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .background(paper.wash, in: Capsule())
-                            .overlay(Capsule().strokeBorder(paper.edge, lineWidth: 0.5))
+                        Text(verbatim: day.capitalized).bodyTapHeight()
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
                     .accessibilityLabel(Text(verbatim: "Start \(day.capitalized)"))
                 }
             }
         }
+        .environment(\.hxPaper, paper)
         .padding(.top, 4)
     }
 
@@ -226,15 +239,9 @@ struct BodyHomeView: View {
     @ViewBuilder
     private func startButtons(_ next: BodyNext, others: [String]) -> some View {
         NavigationLink(value: ShellPushDestination.bodyWorkout(nil)) {
-            Text(verbatim: "Start \(next.label)")
-                .font(AppFont.display(style: .headline, weight: .semibold))
-                .foregroundStyle(paper.onGlow)
-                .frame(maxWidth: .infinity)
+            Text(verbatim: "Start \(next.label)").bodyPrimaryHeight()
         }
-        .buttonStyle(.borderedProminent)
-        .buttonBorderShape(.capsule)
-        .controlSize(.large)
-        .tint(paper.glow)
+        .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
         if !others.isEmpty { otherDayMenu(others) }
     }
 
@@ -244,13 +251,10 @@ struct BodyHomeView: View {
                 Button(other.capitalized) { onOpen(.bodyWorkout(other)) }
             }
         } label: {
-            Text(verbatim: "Other day")
-                .font(AppFont.subheadline(weight: .semibold))
+            Text(verbatim: "Lift a different day")
+                .font(AppFont.subheadline())
                 .foregroundStyle(paper.glow)
-                .padding(.horizontal, 18)
-                .frame(minHeight: 44)
-                .background(paper.wash, in: Capsule())
-                .overlay(Capsule().strokeBorder(paper.edge, lineWidth: 0.5))
+                .frame(maxWidth: .infinity, minHeight: 44)
         }
         .accessibilityHint(Text(verbatim: "Do a different day"))
     }
@@ -361,11 +365,10 @@ struct BodyHomeView: View {
                     Text(verbatim: lift.upFromLabel.map { "↑ from \($0)" } ?? "↑ up").foregroundStyle(paper.glow)
                 } else if let goal = lift.goalReps, !goal.isEmpty {
                     Text(verbatim: BodyHomeCopy.goalLabel(goal)).foregroundStyle(Color.hxTextSecondary)
-                } else {
-                    Text(verbatim: "Hold").foregroundStyle(Color.hxTextSecondary)
                 }
             }
             .font(AppFont.caption())
+            BodyChevron()
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
@@ -402,6 +405,7 @@ struct BodyHomeView: View {
             VStack(spacing: 0) {
                 ForEach(Array(sessions.prefix(5).enumerated()), id: \.element.id) { offset, session in
                     if offset > 0 { Divider().padding(.leading, 14) }
+                    NavigationLink(value: ShellPushDestination.bodySession(session.id)) {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(verbatim: session.label)
@@ -419,11 +423,16 @@ struct BodyHomeView: View {
                                 .multilineTextAlignment(.trailing)
                                 .lineLimit(2)
                         }
+                        BodyChevron()
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 11)
                     .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                     .accessibilityElement(children: .combine)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(Text(verbatim: "Opens this workout and Baki's note"))
                 }
             }
             .hxCard()

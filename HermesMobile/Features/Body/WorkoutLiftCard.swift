@@ -51,17 +51,21 @@ enum WorkoutCopy {
             .compactMap { $0 }.joined(separator: " · ")
     }
 
-    /// The open lift's line: "4 × 6–8 · last time 145 × 8 8 8 8".
-    static func targetLine(_ lift: BodyExercise) -> String {
-        guard BodyMeasure(lift) == .reps else { return scheme(lift) }
-        let reps = lift.last.compactMap(\.reps)
-        guard !reps.isEmpty else { return scheme(lift) }
-        let weights = Set(lift.last.compactMap(\.weight))
-        var last = reps.map(String.init).joined(separator: " ")
-        if isWeighted(lift), weights.count == 1, let weight = shortWeight(unit: lift.unit, weight: weights.first) {
-            last = "\(weight) × \(last)"
-        }
-        return "\(scheme(lift)) · last time \(last)"
+    /// The lifts still to finish; the warm-up counts as lifts too.
+    @MainActor static func liftsLeft(_ exercises: [BodyExercise]) -> Int {
+        exercises.filter { !WorkoutViewModel.isComplete($0) }.count
+    }
+
+    /// The header's count: "2 of 7 lifts"; nil for an empty workout.
+    @MainActor static func progress(_ exercises: [BodyExercise]) -> String? {
+        guard !exercises.isEmpty else { return nil }
+        return "\(exercises.count - liftsLeft(exercises)) of \(exercises.count) lifts"
+    }
+
+    /// The bottom button: "Finish Push" once every lift is done, "Finish early · 3 lifts left" before.
+    static func finishLabel(left: Int, day: String) -> String {
+        guard left > 0 else { return day.isEmpty ? "Finish workout" : "Finish \(day.capitalized)" }
+        return "Finish early · \(left) \(left == 1 ? "lift" : "lifts") left"
     }
 
     /// A set's last time: "145 × 8", "BW × 12", "10 s", "50 · 40 yd"; "—" when there's none.
@@ -263,7 +267,7 @@ struct WorkoutCardHeader: View, Equatable {
                     .font(AppFont.display(style: .title2, weight: .bold))
                     .foregroundStyle(paper.glow)
                     .accessibilityAddTraits(.isHeader)
-                Text(verbatim: WorkoutCopy.targetLine(lift))
+                Text(verbatim: WorkoutCopy.scheme(lift))
                     .font(AppFont.subheadline())
                     .foregroundStyle(Color.hxTextPrimary)
                 if let note = WorkoutCopy.upNote(lift) {
@@ -313,7 +317,7 @@ struct WorkoutPairHeader: View, Equatable {
                     .foregroundStyle(paper.glow)
                     .accessibilityAddTraits(.isHeader)
                 ForEach(lifts) { lift in
-                    (Text(verbatim: lift.name).fontWeight(.semibold) + Text(verbatim: " · \(WorkoutCopy.targetLine(lift))"))
+                    (Text(verbatim: lift.name).fontWeight(.semibold) + Text(verbatim: " · \(WorkoutCopy.scheme(lift))"))
                         .font(AppFont.subheadline())
                         .foregroundStyle(Color.hxTextPrimary)
                 }

@@ -36,7 +36,16 @@ private final class FakeBodyClient: BodyDataClient, @unchecked Sendable {
     func prescription(day: String?) async throws -> BodyPrescription { throw URLError(.unsupportedURL) }
     func save(_ session: BodySession) async throws -> BodySession { throw URLError(.unsupportedURL) }
     func finish(id: String, check: BodyCheck) async throws -> BodyFinishResult { throw URLError(.unsupportedURL) }
-    func session(id: String) async throws -> BodySession { throw URLError(.unsupportedURL) }
+    /// What `session(id:)` answers, by id; an id with none throws.
+    var sessionsByID: [String: BodySession] = [:]
+    private(set) var sessionReads = 0
+
+    func session(id: String) async throws -> BodySession {
+        lock.withLock { sessionReads += 1 }
+        guard let session = sessionsByID[id] else { throw URLError(.unsupportedURL) }
+        return session
+    }
+
     func sessions(before: String?) async throws -> [BodySessionSummary] { throw URLError(.unsupportedURL) }
     func lift(id: String) async throws -> BodyLift { throw URLError(.unsupportedURL) }
     func plan() async throws -> BodyPlan { throw URLError(.unsupportedURL) }
@@ -71,6 +80,27 @@ final class BodyHomeViewModelTests: XCTestCase {
         XCTAssertEqual(loaded.phaseLabel, "Build · 6 weeks to January")
         XCTAssertEqual(loaded.next?.day, "push")
         XCTAssertEqual(loaded.proposals.map(\.id), ["p1", "p2"])
+    }
+
+    func testBakisCardShowsTheNewestWorkoutsNote() async throws {
+        let client = FakeBodyClient()
+        let home = try home()
+        let newest = try XCTUnwrap(home.sessions.first)
+        client.homeResults = [.success(home)]
+        let vm = BodyHomeViewModel(client: client)
+        await vm.load()
+        XCTAssertNil(vm.latestNote, "a session whose read fails leaves the card without a note")
+        XCTAssertEqual(BodyHomeCopy.bakiKicker(vm.latestNote), "Baki")
+
+        // The note is written a little after the workout: the next load reads the session again.
+        let json = #"{"id":"\#(newest.id)","day":"\#(newest.day)","exercises":[],"coach_note":{"headline":"Good work","body":["Keep the weight."]}}"#
+        client.sessionsByID[newest.id] = try PrepDecoding.decode(BodySession.self, from: Data(json.utf8))
+        await vm.load()
+        XCTAssertEqual(vm.latestNote?.note.headline, "Good work")
+        XCTAssertTrue(BodyHomeCopy.bakiKicker(vm.latestNote).hasPrefix("Baki · after \(newest.label), "))
+
+        await vm.load()
+        XCTAssertEqual(client.sessionReads, 2, "a note already in hand isn't read again")
     }
 
     func testNotFoundIsUnavailable() async {
@@ -209,6 +239,29 @@ final class BodyHomeCopyTests: XCTestCase {
         let session = try PrepDecoding.decode(BodySessionSummary.self, from: Data(
             #"{"id":"a","day":"pull","label":"Pull","date":"2026-11-28","minutes":46,"trimmed":true}"#.utf8))
         XCTAssertTrue(BodyHomeCopy.sessionSubtitle(session).hasSuffix("46 min · one set dropped"))
+    }
+
+    func testAPastWorkoutsLinesAndChips() throws {
+        func lift(_ unit: String, _ sets: String, target: String = #"{"reps":[6,8]}"#) throws -> BodyExercise {
+            try PrepDecoding.decode(BodyExercise.self, from: Data(
+                #"{"id":"x","name":"X","section":"main","unit":"\#(unit)","target":\#(target),"sets":[\#(sets)]}"#.utf8))
+        }
+        let bench = try lift("lb", #"{"kind":"warm","weight":45,"reps":8,"done":true},{"kind":"work","weight":115,"reps":8,"done":true},{"kind":"work","weight":115,"reps":7,"done":true},{"kind":"work","weight":115,"reps":6,"done":false}"#)
+        XCTAssertEqual(BodySessionCopy.setsLine(bench), "115 × 8 7", "only the work sets he ticked")
+        let pullUps = try lift("bw", #"{"kind":"work","reps":5,"done":true},{"kind":"work","reps":4,"done":true}"#)
+        XCTAssertEqual(BodySessionCopy.setsLine(pullUps), "BW × 5 4")
+        let mixed = try lift("lb", #"{"kind":"work","weight":60,"reps":8,"done":true},{"kind":"work","weight":55,"reps":8,"done":true}"#)
+        XCTAssertEqual(BodySessionCopy.setsLine(mixed), "8 8", "two weights don't fit one line")
+        let skipped = try lift("lb", #"{"kind":"work","weight":60,"reps":8,"done":false}"#)
+        XCTAssertEqual(BodySessionCopy.setsLine(skipped), "Skipped")
+        let hold = try lift("bw", #"{"kind":"work","hold_s":45,"done":true}"#, target: #"{"hold_s":45}"#)
+        XCTAssertEqual(BodySessionCopy.setsLine(hold), "1 set")
+
+        XCTAssertEqual(BodySessionCopy.title(id: "2026-11-09-pull"), "Pull")
+        XCTAssertEqual(BodySessionCopy.title(id: "x"), "Workout")
+        XCTAssertEqual(BodySessionCopy.checkChips(BodyCheck(effort: .grinder, back: .fine, shoulders: .pain, pain: BodyPain(score: 4, lift: "x"))),
+                       ["Grinder", "Lower back fine", "Shoulder blades pain", "Pain 4 of 10"])
+        XCTAssertEqual(BodyAskBaki.draft(aboutSession: "Pull", date: "Mon, Nov 9"), "Baki, about Pull on Mon, Nov 9: ")
     }
 
     func testDoneDaysReadAsWeekdayNames() {

@@ -684,6 +684,9 @@ struct ChatShellView: View {
                 .id(id)
         case .bodyPlan:
             PlanEditView(server: server, onAPIError: authManager.handleAPIError)
+        case .bodySession(let id):
+            BodySessionView(id: id, server: server, onAPIError: authManager.handleAPIError)
+                .id(id)
         case .bodyWorkout(let day):
             WorkoutView(day: day, server: server, onAPIError: authManager.handleAPIError,
                         onDone: { navigation.closeWorkout() })

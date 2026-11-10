@@ -63,7 +63,8 @@ struct WorkoutView: View {
         if viewModel.saveStatus == .failed { return "Not saved" }
         if viewModel.saveStatus == .finished { return "Already finished" }
         guard let session = viewModel.session else { return nil }
-        return WorkoutCopy.phaseLabel(session.phase, deload: session.deload)
+        return [WorkoutCopy.progress(session.exercises), WorkoutCopy.phaseLabel(session.phase, deload: session.deload)]
+            .compactMap { $0 }.joined(separator: " · ")
     }
 
     @ViewBuilder
@@ -111,7 +112,7 @@ struct WorkoutView: View {
                     let startsSection = index == 0 || session.exercises[index - 1].section != lift.section
                     liftRows(lift, index: index, startsSection: startsSection, in: session.exercises)
                 }
-                finishButton.workoutPlainRow()
+                finishButton(left: WorkoutCopy.liftsLeft(session.exercises), day: session.day).workoutPlainRow()
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
@@ -176,8 +177,7 @@ struct WorkoutView: View {
                     .equatable()
                     .workoutCardRow(.middle)
             }
-            WorkoutCardFooter(group: index...index, canRemove: lift.workSets.count > 1,
-                              hurts: hurtLines(index...index, in: exercises), viewModel: viewModel)
+            WorkoutCardFooter(group: index...index, hurts: hurtLines(index...index, in: exercises), viewModel: viewModel)
                 .equatable()
                 .workoutCardRow(.bottom)
         } else {
@@ -217,8 +217,7 @@ struct WorkoutView: View {
                 .equatable()
                 .workoutCardRow(.middle)
         }
-        WorkoutCardFooter(group: group, canRemove: lifts.contains { $0.workSets.count > 1 },
-                          hurts: hurtLines(group, in: exercises), viewModel: viewModel)
+        WorkoutCardFooter(group: group, hurts: hurtLines(group, in: exercises), viewModel: viewModel)
             .equatable()
             .workoutCardRow(.bottom)
     }
@@ -344,20 +343,16 @@ struct WorkoutView: View {
 
     // MARK: Finish
 
-    private var finishButton: some View {
+    /// The screen's one action, on the canvas, so Nous blue: filled once every lift is done, and a
+    /// quieter "Finish early" that counts what is left until then.
+    private func finishButton(left: Int, day: String) -> some View {
         Button {
             viewModel.saveNow()
             showsFinish = true
         } label: {
-            Text(verbatim: "Finish workout")
-                .font(AppFont.display(style: .headline, weight: .semibold))
-                .foregroundStyle(paper.onGlow)
-                .frame(maxWidth: .infinity)
+            Text(verbatim: WorkoutCopy.finishLabel(left: left, day: day)).bodyPrimaryHeight()
         }
-        .buttonStyle(.borderedProminent)
-        .buttonBorderShape(.capsule)
-        .controlSize(.large)
-        .tint(paper.glow)
+        .buttonStyle(ChatDecisionButtonStyle(emphasis: left == 0 ? .primary : .secondary))
         .padding(.top, 12)
         .padding(.bottom, 24)
     }
@@ -431,9 +426,9 @@ struct WorkoutEffortRow: View, Equatable {
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(verbatim: "How many more could you have done?")
-                .font(AppFont.display(style: .headline, weight: .semibold))
+                .font(AppFont.subheadline(weight: .semibold))
                 .foregroundStyle(Color.hxTextPrimary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {
@@ -446,16 +441,8 @@ struct WorkoutEffortRow: View, Equatable {
                     .accessibilityAddTraits(answer == choice.value ? .isSelected : [])
                 }
             }
-            Text(verbatim: "Only on the last set of big lifts. Tap and the next lift opens.")
-                .font(AppFont.footnote())
-                .foregroundStyle(Color.hxTextSecondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(14)
-        .background(Color.hxCanvas, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous)
-            .strokeBorder(HermexPaper.training.edge, lineWidth: 0.5))
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
     }
 }
 
@@ -465,30 +452,22 @@ struct WorkoutHurtLine: Equatable {
     let text: String
 }
 
-/// The open card's foot: + Add set and − Remove set (a round, for a superset), Something hurt with
-/// what was logged here, and how to change a set.
+/// The open card's foot: what hurt here so far, then one row of two buttons, Add a set (a round, for
+/// a superset) and Something hurt. A set is removed by swiping its row.
 struct WorkoutCardFooter: View, Equatable {
     let group: ClosedRange<Int>
-    let canRemove: Bool
     let hurts: [WorkoutHurtLine]
     let viewModel: WorkoutViewModel
+    @State private var asksWhere = false
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.group == rhs.group && lhs.canRemove == rhs.canRemove && lhs.hurts == rhs.hurts
+        lhs.group == rhs.group && lhs.hurts == rhs.hurts
     }
 
     private var unit: String { group.count > 1 ? "round" : "set" }
 
     var body: some View {
         VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                Button { viewModel.addRound(group) } label: { Text(verbatim: "+ Add \(unit)") }
-                    .accessibilityLabel(Text(verbatim: "Add a \(unit)"))
-                Button { viewModel.removeRound(group) } label: { Text(verbatim: "− Remove \(unit)") }
-                    .disabled(!canRemove)
-                    .accessibilityLabel(Text(verbatim: "Remove the last \(unit)"))
-            }
-            .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
             ForEach(hurts, id: \.index) { hurt in
                 HStack(spacing: 10) {
                     Image(systemName: "bandage.fill")
@@ -505,22 +484,19 @@ struct WorkoutCardFooter: View, Equatable {
                 }
                 .font(AppFont.subheadline())
             }
-            Menu {
-                Button { viewModel.logHurt(.back) } label: { Text(verbatim: "Back") }
-                Button { viewModel.logHurt(.shoulders) } label: { Text(verbatim: "Shoulders") }
-                Button { viewModel.logHurt(.other) } label: { Text(verbatim: "Something else") }
-            } label: {
-                Label { Text(verbatim: "Something hurt") } icon: { Image(systemName: "bandage") }
-                    .font(AppFont.subheadline(weight: .semibold))
-                    .frame(minHeight: 44)
+            HStack(spacing: 8) {
+                Button { viewModel.addRound(group) } label: { Text(verbatim: "Add a \(unit)").bodyTapHeight() }
+                    .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
+                    .accessibilityHint(Text(verbatim: "Swipe a set to remove it"))
+                Button { asksWhere = true } label: { Text(verbatim: "Something hurt").bodyTapHeight() }
+                    .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
+                    .accessibilityHint(Text(verbatim: "Notes where and when, for the check at the end"))
             }
-            .tint(.accentColor)
-            .accessibilityHint(Text(verbatim: "Notes where and when, for the check at the end"))
-            Text(verbatim: "Tap a number to change it · swipe a set to delete it")
-                .font(AppFont.caption())
-                .foregroundStyle(Color.hxTextSecondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
+        }
+        .confirmationDialog(Text(verbatim: "Where did it hurt?"), isPresented: $asksWhere, titleVisibility: .visible) {
+            Button { viewModel.logHurt(.back) } label: { Text(verbatim: "Back") }
+            Button { viewModel.logHurt(.shoulders) } label: { Text(verbatim: "Shoulders") }
+            Button { viewModel.logHurt(.other) } label: { Text(verbatim: "Something else") }
         }
         .padding(.top, 6)
     }
