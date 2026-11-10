@@ -247,6 +247,33 @@ final class BodyHomeCopyTests: XCTestCase {
         XCTAssertEqual(BodyHomeCopy.liftSummary(pull), "Pull-ups, BW. Last time 1 of 4 sets at goal")
     }
 
+    func testLiftsGroupUnderTheirDay() throws {
+        let lifts = try [("i", "push"), ("s", "legs"), ("p", "push"), ("x", "")].map { id, day in
+            try lift(#"{"id":"\#(id)","name":"\#(id)","day":"\#(day)","weight_label":"BW"}"#)
+        }
+        let groups = BodyHomeCopy.liftGroups(lifts)
+        XCTAssertEqual(groups.map(\.title), ["Push", "Legs", "Other"], "days in the server's order")
+        XCTAssertEqual(groups.map { $0.lifts.map(\.id) }, [["i", "p"], ["s"], ["x"]])
+    }
+
+    func testLiftsGroupUnderTheirBodyPart() throws {
+        let lifts = try [("row", "pull", "back"), ("press", "push", "shoulders"), ("bench", "push", "chest"),
+                         ("pulldown", "pull", "back"), ("carry", "pull", "")].map { id, day, muscle in
+            try lift(#"{"id":"\#(id)","name":"\#(id)","day":"\#(day)","muscle":"\#(muscle)","weight_label":"BW"}"#)
+        }
+        let groups = BodyHomeCopy.liftGroups(lifts)
+        XCTAssertEqual(groups.map(\.title), ["Chest", "Shoulders", "Back", "Pull"],
+                       "body parts in their fixed order, then an untagged lift under its day")
+        XCTAssertEqual(groups.map { $0.lifts.map(\.id) }, [["bench"], ["press"], ["row", "pulldown"], ["carry"]])
+    }
+
+    func testSavingThePlanKeepsALiftsBodyPart() throws {
+        let json = #"{"id":"db-row","name":"Row","muscle":"back","section":"main","sets":3,"reps":[10,10],"load":{"unit":"lb"}}"#
+        let exercise = try PrepDecoding.decode(BodyPlanExercise.self, from: Data(json.utf8))
+        let saved = try JSONSerialization.jsonObject(with: JSONEncoder().encode(exercise)) as? [String: Any]
+        XCTAssertEqual(saved?["muscle"] as? String, "back")
+    }
+
     func testGoalLabelAndOtherDays() {
         XCTAssertEqual(BodyHomeCopy.goalLabel([8, 7, 6, 6]), "Goal 8·7·6·6")
         XCTAssertEqual(BodyHomeCopy.otherDays(than: "legs"), ["push", "pull"])

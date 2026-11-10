@@ -325,6 +325,7 @@ final class WorkoutFinishTests: XCTestCase {
         await vm.save()
         await vm.awaitNote()
         XCTAssertEqual(vm.coachNote?.headline, "The jump held.")
+        XCTAssertFalse(vm.noteWaitEnded)
         XCTAssertEqual(client.log.filter { $0.hasPrefix("session:") }.count, 2, "no third read once the note is in")
         XCTAssertEqual(sleeps.waits, [.seconds(10), .seconds(20)], "reads at 10 s and 30 s after the save")
     }
@@ -339,6 +340,7 @@ final class WorkoutFinishTests: XCTestCase {
         await vm.save()
         await vm.awaitNote()
         XCTAssertNil(vm.coachNote)
+        XCTAssertTrue(vm.noteWaitEnded, "the card stops looking busy once the reads run out")
         XCTAssertEqual(client.log.filter { $0.hasPrefix("session:") }.count, 3)
         XCTAssertEqual(sleeps.waits, [.seconds(10), .seconds(20), .seconds(60)])
     }

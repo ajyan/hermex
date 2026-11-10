@@ -159,6 +159,29 @@ enum BodyHomeCopy {
 
     /// What a lift row says for VoiceOver, since its dots are drawn: "Incline bench, 150 lb, up from
     /// 145 lb. Last time 4 of 4 sets hit the top of the range."
+    /// The lifts under the body part they train ("Chest", "Back", ...), body parts in `muscleOrder`
+    /// and lifts in the server's order. A lift the plan has not tagged files under its day.
+    static func liftGroups(_ lifts: [BodyHomeLift]) -> [BodyLiftGroup] {
+        var groups: [BodyLiftGroup] = []
+        for lift in lifts {
+            let key = lift.muscle.flatMap { $0.isEmpty ? nil : $0 } ?? lift.day
+            if let index = groups.firstIndex(where: { $0.id == key }) {
+                groups[index].lifts.append(lift)
+            } else {
+                groups.append(BodyLiftGroup(id: key, title: key.isEmpty ? "Other" : key.capitalized, lifts: [lift]))
+            }
+        }
+        // A stable sort: tagged body parts first in their fixed order, the rest as the server sent them.
+        return groups.enumerated().sorted { a, b in
+            let x = muscleOrder.firstIndex(of: a.element.id) ?? muscleOrder.count
+            let y = muscleOrder.firstIndex(of: b.element.id) ?? muscleOrder.count
+            return x == y ? a.offset < b.offset : x < y
+        }.map(\.element)
+    }
+
+    /// The vault's `MUSCLES`, in the order Body home lists them.
+    static let muscleOrder = ["chest", "shoulders", "back", "arms", "legs", "core"]
+
     static func liftSummary(_ lift: BodyHomeLift) -> String {
         var parts = [lift.name, lift.weightLabel]
         if lift.up { parts.append(lift.upFromLabel.map { "up from \($0)" } ?? "going up") }
@@ -217,4 +240,11 @@ enum BodyHomeCopy {
         f.setLocalizedDateFormatFromTemplate("EEEMMMd")
         return f
     }()
+}
+
+/// One section of Body home's Lifts card.
+struct BodyLiftGroup: Identifiable, Equatable {
+    let id: String
+    let title: String
+    var lifts: [BodyHomeLift]
 }

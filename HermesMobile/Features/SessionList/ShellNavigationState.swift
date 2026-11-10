@@ -131,6 +131,12 @@ struct ShellNavigationState: Equatable {
         path.append(destination)
     }
 
+    /// Leaves a finished workout: pops it and anything pushed over it, back to the screen it started from.
+    mutating func closeWorkout() {
+        guard let index = path.lastIndex(where: { if case .bodyWorkout = $0 { true } else { false } }) else { return }
+        path.removeSubrange(index...)
+    }
+
     /// Replaces whatever is pushed with `destination` alone.
     mutating func showOnly(_ destination: ShellPushDestination) {
         path = [destination]

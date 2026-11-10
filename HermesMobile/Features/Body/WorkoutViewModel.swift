@@ -141,33 +141,47 @@ final class WorkoutViewModel {
         if lift.big { effortPrompt = e } else { advance(from: e) }
     }
 
-    /// Sets one set's weight, committed from the weight editor. Later work sets that still had the
-    /// set's old weight follow a new one, ticked or not, so fixing the first set after the fact fixes
-    /// the rest; a set given its own weight keeps it, and a cleared weight never carries forward.
+    /// Sets one set's weight. Later work sets he hasn't ticked yet that still had the set's old
+    /// weight follow the new one; a ticked set, a set given its own weight, and the warm-up sets
+    /// keep theirs, and a cleared weight never carries forward.
     func setWeight(_ weight: Double?, exercise e: Int, set s: Int) {
         guard let lift = lift(e), lift.sets.indices.contains(s) else { return }
         let value = weight.map { max(0, $0) }
         mutate { session in
-            let old = session.exercises[e].sets[s]
+            let old = session.exercises[e].sets[s].weight
             session.exercises[e].sets[s].weight = value
-            guard old.kind == .work, value != nil else { return }
-            for j in session.exercises[e].sets.indices where j > s {
-                let later = session.exercises[e].sets[j]
-                if later.kind == .work, later.weight == old.weight { session.exercises[e].sets[j].weight = value }
+            Self.carryForward(in: &session.exercises[e], from: s, changed: value != nil) { set in
+                if set.weight == old { set.weight = value }
             }
         }
     }
 
-    /// Sets the count one set logs: reps, or seconds for a hold, or yards for a carry.
+    /// Sets the count one set logs: reps, or seconds for a hold, or yards for a carry. It carries
+    /// to the later sets by the same rule as a weight.
     func setReps(_ count: Int?, exercise e: Int, set s: Int) {
         guard let lift = lift(e), lift.sets.indices.contains(s) else { return }
         let value = count.map { max(0, $0) }
+        let path: WritableKeyPath<BodySet, Int?> = switch BodyMeasure(lift) {
+        case .reps: \.reps
+        case .hold: \.holdS
+        case .distance: \.distanceYd
+        }
         mutate { session in
-            switch BodyMeasure(lift) {
-            case .reps: session.exercises[e].sets[s].reps = value
-            case .hold: session.exercises[e].sets[s].holdS = value
-            case .distance: session.exercises[e].sets[s].distanceYd = value
+            let old = session.exercises[e].sets[s][keyPath: path]
+            session.exercises[e].sets[s][keyPath: path] = value
+            Self.carryForward(in: &session.exercises[e], from: s, changed: value != nil) { set in
+                if set[keyPath: path] == old { set[keyPath: path] = value }
             }
+        }
+    }
+
+    /// The one rule for an edit carrying down a lift: from a work set, `apply` runs on each later
+    /// work set that isn't ticked, and changes the ones that still had the old number.
+    private static func carryForward(in lift: inout BodyExercise, from s: Int, changed: Bool,
+                                     apply: (inout BodySet) -> Void) {
+        guard changed, lift.sets[s].kind == .work else { return }
+        for j in lift.sets.indices where j > s && lift.sets[j].kind == .work && !lift.sets[j].done {
+            apply(&lift.sets[j])
         }
     }
 

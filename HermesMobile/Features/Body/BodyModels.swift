@@ -663,6 +663,8 @@ struct BodyHomeLift: Decodable, Hashable, Sendable, Identifiable {
     let id: String
     let name: String
     let day: String
+    /// The body part the plan tags this lift with (`chest`, `back`, ...); nil on a plan without tags.
+    let muscle: String?
     let weightLabel: String
     let up: Bool
     let dots: [Bool]
@@ -673,7 +675,7 @@ struct BodyHomeLift: Decodable, Hashable, Sendable, Identifiable {
     let unit: String?
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, day, weightLabel = "weight_label", up, dots, goalReps = "goal_reps", upFrom = "up_from", unit
+        case id, name, day, muscle, weightLabel = "weight_label", up, dots, goalReps = "goal_reps", upFrom = "up_from", unit
     }
 
     init(from decoder: Decoder) throws {
@@ -681,6 +683,7 @@ struct BodyHomeLift: Decodable, Hashable, Sendable, Identifiable {
         id = c.string(.id)
         name = c.string(.name)
         day = c.string(.day)
+        muscle = c.optional(String.self, .muscle)
         weightLabel = c.string(.weightLabel)
         up = c.bool(.up)
         dots = (try? c.decodeIfPresent([Bool].self, forKey: .dots)) ?? []
@@ -877,6 +880,8 @@ struct BodyPlanLoad: Codable, Hashable, Sendable {
 struct BodyPlanExercise: Codable, Hashable, Sendable, Identifiable {
     let id: String
     var name: String
+    /// The body part Body home files this lift under; kept so saving the plan does not drop it.
+    var muscle: String?
     var section: BodySection
     var sets: Int
     var reps: [Int]?
@@ -893,7 +898,7 @@ struct BodyPlanExercise: Codable, Hashable, Sendable, Identifiable {
     var load: BodyPlanLoad
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, section, sets, reps, holdS = "hold_s", distanceYd = "distance_yd", big, newborn, hinge,
+        case id, name, muscle, section, sets, reps, holdS = "hold_s", distanceYd = "distance_yd", big, newborn, hinge,
              perSide = "per_side", rampSets = "ramp_sets", goalReps = "goal_reps", alternates,
              alternateWeekly = "alternate_weekly", load
     }
@@ -902,6 +907,7 @@ struct BodyPlanExercise: Codable, Hashable, Sendable, Identifiable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = c.string(.id)
         name = c.string(.name)
+        muscle = c.optional(String.self, .muscle)
         section = c.optional(BodySection.self, .section) ?? .main
         sets = c.int(.sets)
         reps = c.optional([Int].self, .reps)
@@ -923,6 +929,7 @@ struct BodyPlanExercise: Codable, Hashable, Sendable, Identifiable {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(id, forKey: .id)
         try c.encode(name, forKey: .name)
+        try c.encodeIfPresent(muscle, forKey: .muscle)
         try c.encode(section, forKey: .section)
         try c.encode(sets, forKey: .sets)
         try c.encodeIfPresent(reps, forKey: .reps)

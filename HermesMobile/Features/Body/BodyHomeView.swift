@@ -147,7 +147,6 @@ struct BodyHomeView: View {
                     .foregroundStyle(Color.hxTextPrimary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            changes(home.changes)
             if let next = home.next {
                 VStack(spacing: 7) {
                     ForEach(Array(next.preview.enumerated()), id: \.offset) { _, row in
@@ -212,24 +211,6 @@ struct BodyHomeView: View {
             }
         }
         .padding(.top, 4)
-    }
-
-    /// Accepted weight changes waiting for their lift: "Incline bench: 95 lb next time".
-    @ViewBuilder
-    private func changes(_ changes: [BodyChange]) -> some View {
-        if !changes.isEmpty {
-            VStack(alignment: .leading, spacing: 5) {
-                ForEach(changes, id: \.lift) { change in
-                    Label {
-                        Text(verbatim: "\(change.name): \(change.weightLabel) next time")
-                            .foregroundStyle(Color.hxTextPrimary)
-                    } icon: {
-                        Image(systemName: "arrow.turn.down.right").foregroundStyle(paper.glow)
-                    }
-                    .font(AppFont.subheadline())
-                }
-            }
-        }
     }
 
     /// With no next workout: when lifting starts, or the Recover week's line.
@@ -340,13 +321,23 @@ struct BodyHomeView: View {
     private func lifts(_ lifts: [BodyHomeLift]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HXSectionHeader(title: "Lifts")
-            VStack(spacing: 0) {
-                ForEach(Array(lifts.enumerated()), id: \.element.id) { offset, lift in
-                    if offset > 0 { Divider().padding(.leading, 14) }
-                    NavigationLink(value: ShellPushDestination.bodyLift(lift.id)) {
-                        liftRow(lift)
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(BodyHomeCopy.liftGroups(lifts).enumerated()), id: \.element.id) { groupOffset, group in
+                    if groupOffset > 0 { Divider() }
+                    Text(verbatim: group.title)
+                        .font(AppFont.caption(weight: .semibold))
+                        .foregroundStyle(paper.glow)
+                        .padding(.horizontal, 14)
+                        .padding(.top, 12)
+                        .padding(.bottom, 2)
+                        .accessibilityAddTraits(.isHeader)
+                    ForEach(Array(group.lifts.enumerated()), id: \.element.id) { offset, lift in
+                        if offset > 0 { Divider().padding(.leading, 14) }
+                        NavigationLink(value: ShellPushDestination.bodyLift(lift.id)) {
+                            liftRow(lift)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .hxCard()

@@ -257,7 +257,13 @@ final class WorkoutViewModelTests: XCTestCase {
 
         vm.setReps(7, exercise: incline, set: 3)
         XCTAssertEqual(exercise(vm, incline).sets[3].reps, 7)
-        XCTAssertEqual(exercise(vm, incline).sets[4].reps, 8, "reps change one set only")
+        XCTAssertEqual(exercise(vm, incline).sets[2].reps, 8, "a done set keeps its reps")
+        XCTAssertEqual(exercise(vm, incline).sets[4].reps, 7, "a set whose weight was cleared still follows reps")
+        vm.setReps(6, exercise: incline, set: 3)
+        XCTAssertEqual(exercise(vm, incline).sets[3...5].map(\.reps), [6, 6, 6], "later open sets follow a reps change, like a weight")
+        vm.setReps(5, exercise: incline, set: 5)
+        vm.setReps(8, exercise: incline, set: 3)
+        XCTAssertEqual(exercise(vm, incline).sets[3...5].map(\.reps), [8, 8, 5], "a set given its own reps keeps them")
 
         vm.setReps(35, exercise: carry, set: 0) // a carry logs yards
         XCTAssertEqual(exercise(vm, carry).sets[0].distanceYd, 35)
@@ -288,14 +294,14 @@ final class WorkoutViewModelTests: XCTestCase {
         XCTAssertEqual(vm.current, dips)
     }
 
-    func testFixingAWeightAfterTickingCarriesToLaterSets() async throws {
+    func testAnEditNeverChangesATickedSet() async throws {
         let (vm, _) = try await pushVM()
-        tickAllWork(vm, incline)
-        vm.setWeight(140, exercise: incline, set: 5) // the last set alone was lighter
-        vm.setWeight(155, exercise: incline, set: 2) // then he fixes the first work set
+        for s in 2...3 { vm.toggle(exercise: incline, set: s) }
+        vm.setWeight(155, exercise: incline, set: 2) // he fixes the first work set after ticking two
+        vm.setReps(7, exercise: incline, set: 2)
         let sets = exercise(vm, incline).sets
-        XCTAssertEqual(sets[2...4].map(\.weight), [155, 155, 155], "ticked sets with the old weight follow")
-        XCTAssertEqual(sets[5].weight, 140, "a set given its own weight keeps it")
+        XCTAssertEqual(sets[2...5].map(\.weight), [155, 150, 155, 155], "the ticked set keeps what was logged; open ones follow")
+        XCTAssertEqual(sets[2...5].map(\.reps), [7, 8, 7, 7])
         XCTAssertEqual(sets[0].weight, 90, "warm-up sets keep theirs")
     }
 
@@ -332,7 +338,6 @@ final class WorkoutViewModelTests: XCTestCase {
         XCTAssertEqual(client.saved.last?.hurts.count, 1, "a hurt saves with the session")
         vm.removeHurt(at: 0)
         XCTAssertEqual(session(vm)?.hurts, [])
-        XCTAssertEqual(WorkoutCopy.pairLetter(0) + WorkoutCopy.pairLetter(1), "AB")
     }
 
     func testRemoveNeverDropsBelowOneWorkSet() async throws {
@@ -567,21 +572,13 @@ final class WorkoutViewModelTests: XCTestCase {
         XCTAssertFalse(before.contains(added), "an added set is a new row")
     }
 
-    func testWeightEditorStartsFromLastTime() throws {
-        let json = #"""
-        {"id":"lat-pulldown","name":"Lat pulldown","section":"main","unit":"lb","target":{"reps":[10,12]},
-         "last":[{"weight":90,"reps":12},{"weight":95,"reps":10}],
-         "sets":[{"kind":"work","weight":null,"reps":12},{"kind":"work","weight":null,"reps":12},{"kind":"work","weight":null,"reps":12}]}
-        """#
-        let lift = try PrepDecoding.decode(BodyExercise.self, from: Data(json.utf8))
-        XCTAssertEqual(WorkoutCopy.startingWeight(lift, set: 0), 90)
-        XCTAssertEqual(WorkoutCopy.startingWeight(lift, set: 1), 95)
-        XCTAssertEqual(WorkoutCopy.startingWeight(lift, set: 2), 95, "past last time's sets, its heaviest")
-        let fresh = try PrepDecoding.decode(BodyExercise.self, from: Data(
-            #"{"id":"x","unit":"lb","sets":[{"kind":"work","weight":null}]}"#.utf8))
-        XCTAssertNil(WorkoutCopy.startingWeight(fresh, set: 0))
-        let prescribed = try pushPrescription().exercises[incline]
-        XCTAssertEqual(WorkoutCopy.startingWeight(prescribed, set: 3), 150, "a set with a weight starts from it")
+    func testTypedNumbers() {
+        XCTAssertEqual(WorkoutCopy.typedNumber("137.5"), 137.5)
+        XCTAssertEqual(WorkoutCopy.typedNumber(" 137,5 "), 137.5, "a comma keyboard")
+        XCTAssertEqual(WorkoutCopy.typedNumber("8"), 8)
+        XCTAssertNil(WorkoutCopy.typedNumber(""), "an empty box keeps the old number")
+        XCTAssertNil(WorkoutCopy.typedNumber("."))
+        XCTAssertNil(WorkoutCopy.typedNumber("-5"))
     }
 
     // MARK: Copy
