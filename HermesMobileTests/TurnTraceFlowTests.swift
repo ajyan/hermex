@@ -9,15 +9,24 @@ final class TurnTraceFlowTests: APIClientTestCase {
     override func setUp() {
         super.setUp()
         MainActor.assumeIsolated {
+            savedQueueDirectory = TurnTraceUploader.directory
+            TurnTraceUploader.directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("TurnTraceFlowTests-\(UUID().uuidString)", isDirectory: true)
             TurnTraceUploader.reset()
             TurnTraceUploader.isEnabled = true
         }
     }
 
     override func tearDown() {
-        MainActor.assumeIsolated { TurnTraceUploader.isEnabled = false }
+        MainActor.assumeIsolated {
+            TurnTraceUploader.isEnabled = false
+            try? FileManager.default.removeItem(at: TurnTraceUploader.directory)
+            if let savedQueueDirectory { TurnTraceUploader.directory = savedQueueDirectory }
+        }
         super.tearDown()
     }
+
+    private var savedQueueDirectory: URL?
 
     // MARK: - chat/start header
 
@@ -218,7 +227,7 @@ final class TurnTraceFlowTests: APIClientTestCase {
     @MainActor
     func testNon404FailureDoesNotBlockLaterUploads() async throws {
         let recorder = RequestRecorder()
-        let client = makeClient { request in
+        let client = makeQueueClient { request in
             recorder.recordRaw(request)
             return apiTestJSONResponse(#"{"error": "boom"}"#, for: request, status: 500)
         }
@@ -230,7 +239,184 @@ final class TurnTraceFlowTests: APIClientTestCase {
         XCTAssertEqual(recorder.rawRequestCount, 2)
     }
 
+    // MARK: - Pending queue
+
+    /// An upload the server couldn't take stays on disk and goes out, once, with the next retry.
+    @MainActor
+    func testFailedUploadIsKeptAndRetried() async throws {
+        let recorder = RequestRecorder()
+        let serverIsUp = LockedFlag()
+        let client = makeQueueClient { request in
+            guard serverIsUp.value else { throw URLError(.notConnectedToInternet) }
+            recorder.recordUpload(apiTestBodyData(from: request))
+            return apiTestJSONResponse("", for: request, status: 204)
+        }
+        let upload = makeUpload()
+
+        await TurnTraceUploader.send(upload, client: client)
+        XCTAssertTrue(recorder.uploads.isEmpty)
+
+        serverIsUp.value = true
+        await TurnTraceUploader.retryPending(client: client)
+        XCTAssertEqual(recorder.uploads.map { $0["traceparent"] as? String }, [upload.traceparent])
+
+        await TurnTraceUploader.retryPending(client: client)
+        XCTAssertEqual(recorder.uploads.count, 1, "a delivered upload leaves the queue")
+    }
+
+    /// The next turn that uploads carries the earlier, unsent ones with it, oldest first.
+    @MainActor
+    func testSuccessfulUploadDrainsEarlierFailures() async throws {
+        let recorder = RequestRecorder()
+        let serverIsUp = LockedFlag()
+        let client = makeQueueClient { request in
+            guard serverIsUp.value else {
+                return apiTestJSONResponse(#"{"error": "boom"}"#, for: request, status: 503)
+            }
+            recorder.recordUpload(apiTestBodyData(from: request))
+            return apiTestJSONResponse("", for: request, status: 204)
+        }
+        let first = makeUpload()
+        let second = makeUpload()
+
+        await TurnTraceUploader.send(first, client: client)
+        serverIsUp.value = true
+        await TurnTraceUploader.send(second, client: client)
+
+        XCTAssertEqual(
+            recorder.uploads.map { $0["traceparent"] as? String },
+            [first.traceparent, second.traceparent]
+        )
+    }
+
+    @MainActor
+    func testPendingUploadsNeverReachAnotherServer() async throws {
+        let recorder = RequestRecorder()
+        let serverIsUp = LockedFlag()
+        let client = makeQueueClient { request in
+            guard serverIsUp.value else { throw URLError(.notConnectedToInternet) }
+            recorder.recordHost(request.url?.host)
+            return apiTestJSONResponse("", for: request, status: 204)
+        }
+        let otherServer = APIClient(baseURL: URL(string: "https://other.test")!, session: clientSession())
+
+        await TurnTraceUploader.send(makeUpload(), client: client)
+        serverIsUp.value = true
+        await TurnTraceUploader.retryPending(client: otherServer)
+        await TurnTraceUploader.send(makeUpload(), client: otherServer)
+        XCTAssertEqual(recorder.hosts, ["other.test"], "server A's turn stays queued for server A")
+
+        await TurnTraceUploader.retryPending(client: client)
+        XCTAssertEqual(recorder.hosts, ["other.test", "queue.test"])
+    }
+
+    @MainActor
+    func testQueueKeepsTheNewestAndDropsExpired() async throws {
+        let recorder = RequestRecorder()
+        let serverIsUp = LockedFlag()
+        let client = makeQueueClient { request in
+            guard serverIsUp.value else { throw URLError(.notConnectedToInternet) }
+            recorder.recordUpload(apiTestBodyData(from: request))
+            return apiTestJSONResponse("", for: request, status: 204)
+        }
+        let old = Date(timeIntervalSince1970: 1_800_000_000)
+        let stale = makeUpload()
+        await TurnTraceUploader.send(stale, client: client, now: old)
+
+        let now = old.addingTimeInterval(TurnTraceUploader.maxAge + 1)
+        var sent: [TurnTraceUpload] = []
+        for _ in 0..<(TurnTraceUploader.maxPending + 2) {
+            let upload = makeUpload()
+            sent.append(upload)
+            await TurnTraceUploader.send(upload, client: client, now: now)
+        }
+
+        serverIsUp.value = true
+        await TurnTraceUploader.retryPending(client: client, now: now)
+        XCTAssertEqual(
+            recorder.uploads.map { $0["traceparent"] as? String },
+            sent.suffix(TurnTraceUploader.maxPending).map(\.traceparent)
+        )
+    }
+
+    /// A body the server refuses outright is not retried forever.
+    @MainActor
+    func testRejectedUploadLeavesTheQueue() async throws {
+        let recorder = RequestRecorder()
+        let client = makeQueueClient { request in
+            recorder.recordRaw(request)
+            return apiTestJSONResponse(#"{"error": "invalid traceparent"}"#, for: request, status: 400)
+        }
+
+        await TurnTraceUploader.send(makeUpload(), client: client)
+        await TurnTraceUploader.retryPending(client: client)
+
+        XCTAssertEqual(recorder.rawRequestCount, 1)
+    }
+
+    /// A turn whose end the app never saw still uploads when the next one starts, marked as left.
+    @MainActor
+    func testTurnWithoutAnEndUploadsWhenTheNextOneStarts() async throws {
+        let recorder = RequestRecorder()
+        let uploaded = expectation(description: "abandoned turn uploaded")
+        recorder.onUpload = { uploaded.fulfill() }
+        let streamClient = ScriptedSSEStreamingClient(connectionScripts: [[
+            .init(.token("Hi"), lastEventID: "stream-123:1")
+        ]])
+        let viewModel = try makeViewModel(streamClient: streamClient, recorder: recorder)
+
+        let didStart = await viewModel.sendMessage("Say hi")
+        XCTAssertTrue(didStart)
+        let firstTraceparent = recorder.chatStartTraceparent
+        streamClient.playArmedConnectionScript()
+        viewModel.streamCoordinator.prepareForNewResponse()
+        await fulfillment(of: [uploaded], timeout: 5)
+
+        XCTAssertEqual(recorder.uploads.count, 1)
+        let body = try XCTUnwrap(recorder.uploads.first)
+        XCTAssertEqual(body["traceparent"] as? String, firstTraceparent)
+        XCTAssertEqual(body["outcome"] as? String, "cancelled")
+        XCTAssertEqual(body["detached"] as? Bool, true)
+    }
+
+    /// What goes to disk and over the wire is ids, flags and timings: nothing the user or the agent wrote.
+    @MainActor
+    func testUploadCarriesNoMessageText() async throws {
+        let recorder = RequestRecorder()
+        let uploaded = expectation(description: "turn uploaded")
+        recorder.onUpload = { uploaded.fulfill() }
+        let streamClient = ScriptedSSEStreamingClient(connectionScripts: [[
+            .init(.token("SECRET-REPLY"), lastEventID: "stream-123:1"),
+            .init(.done(DoneStreamEvent())),
+            .init(.streamEnd)
+        ]])
+        let viewModel = try makeViewModel(streamClient: streamClient, recorder: recorder)
+
+        let didStart = await viewModel.sendMessage("SECRET-PROMPT")
+        XCTAssertTrue(didStart)
+        streamClient.playArmedConnectionScript()
+        await fulfillment(of: [uploaded], timeout: 5)
+
+        let body = try XCTUnwrap(recorder.uploads.first)
+        XCTAssertEqual(
+            Set(body.keys),
+            ["traceparent", "start_unix_nano", "connection", "outcome", "reconnects", "backgrounded", "detached", "marks_ms"]
+        )
+        let text = String(data: try JSONSerialization.data(withJSONObject: body), encoding: .utf8) ?? ""
+        XCTAssertFalse(text.contains("SECRET"))
+        XCTAssertFalse(text.contains("session-abc"))
+    }
+
     // MARK: - Helpers
+
+    /// A server of its own for the tests that call the uploader directly: a view model left over from an
+    /// earlier test retries `example.test`'s queue when it wakes, and must find nothing of theirs there.
+    private func makeQueueClient(
+        handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)
+    ) -> APIClient {
+        MockURLProtocol.requestHandler = handler
+        return APIClient(baseURL: URL(string: "https://queue.test")!, session: clientSession())
+    }
 
     private func clientSession() -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
@@ -314,6 +500,10 @@ private final class RequestRecorder: @unchecked Sendable {
         set { lock.withLock { _chatStartTraceparent = newValue } }
     }
 
+    private var _hosts: [String] = []
+    var hosts: [String] { lock.withLock { _hosts } }
+    func recordHost(_ host: String?) { lock.withLock { _hosts.append(host ?? "") } }
+
     var uploads: [[String: Any]] { lock.withLock { _uploads } }
     var rawRequestCount: Int { lock.withLock { _rawRequestCount } }
 
@@ -333,5 +523,14 @@ private final class RequestRecorder: @unchecked Sendable {
             return _onUpload
         }
         callback?()
+    }
+}
+
+private final class LockedFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _value = false
+    var value: Bool {
+        get { lock.withLock { _value } }
+        set { lock.withLock { _value = newValue } }
     }
 }

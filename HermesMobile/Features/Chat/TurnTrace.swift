@@ -4,7 +4,7 @@ import Foundation
 /// holds it while the response streams, and `upload(outcome:endedAt:)` turns it into the body POSTed to
 /// `/api/telemetry/turn`. Metadata only: no message text, titles, paths or URLs are recorded.
 struct TurnTrace: Sendable {
-    enum Connection: String, Encodable, Sendable {
+    enum Connection: String, Codable, Sendable {
         case localhost, tailscale, tunnel
 
         /// `localhost`, `127.0.0.1` and `::1` are local; `*.ts.net` and IPv4 in 100.64.0.0/10 are Tailscale;
@@ -23,7 +23,7 @@ struct TurnTrace: Sendable {
         }
     }
 
-    enum Outcome: String, Encodable, Sendable { case done, error, cancelled }
+    enum Outcome: String, Codable, Sendable { case done, error, cancelled }
 
     /// 32 lowercase hex characters.
     let traceID: String
@@ -113,9 +113,10 @@ struct TurnTrace: Sendable {
 }
 
 /// Body of `POST /api/telemetry/turn`. Encoded with `.convertToSnakeCase` (`start_unix_nano`, `marks_ms`,
-/// `first_token`). `Marks` values are milliseconds since the turn started.
-struct TurnTraceUpload: Encodable, Equatable, Sendable {
-    struct Marks: Encodable, Equatable, Sendable {
+/// `first_token`). `Marks` values are milliseconds since the turn started. Decodable so `TurnTraceUploader`
+/// can keep an unsent upload on disk.
+struct TurnTraceUpload: Codable, Equatable, Sendable {
+    struct Marks: Codable, Equatable, Sendable {
         var headers: Int?
         var firstToken: Int?
         var rendered: Int?
