@@ -304,9 +304,8 @@ final class BrainShelfTests: XCTestCase {
     func testEachPageWearsItsBriefCardsPaper() {
         XCTAssertEqual(BrainShelfKind.letters.paper, BrainModuleID.letters.paper)
         XCTAssertEqual(BrainShelfKind.letters.paper, DeckPalette.letter.colors)
-        XCTAssertEqual(BrainShelfKind.takes.paper, .notes)
-        XCTAssertEqual(BrainShelfKind.memories.paper, DeckPalette.lookingBack.colors)
-        XCTAssertEqual(BrainShelfKind.memories.paper, .past)
+        XCTAssertEqual(BrainShelfKind.takes.paper, .knowledge)
+        XCTAssertEqual(BrainShelfKind.memories.paper, .knowledge)
         XCTAssertEqual(BrainShelfKind.letters.countLabel(1), "1 letter")
         XCTAssertEqual(BrainShelfKind.memories.countLabel(4), "4 memories")
     }

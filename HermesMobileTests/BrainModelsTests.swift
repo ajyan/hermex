@@ -415,10 +415,10 @@ final class BrainModelsTests: XCTestCase {
         XCTAssertEqual(BrainBiteCopy.open(bite(.idea, .highlights, id: "highlights/video.md")), "Open the note")
         XCTAssertEqual(BrainBiteCopy.open(bite(.quote, .wiki, id: "wiki/a.md")), "Open the note")
 
-        XCTAssertEqual(bite(.idea).paper, .reading)
-        XCTAssertEqual(bite(.takeaway).paper, .reading)
-        XCTAssertEqual(bite(.quote).paper, .quote)
-        XCTAssertEqual(bite(.highlight).paper, .book)
+        XCTAssertEqual(bite(.idea).paper, .knowledge)
+        XCTAssertEqual(bite(.takeaway).paper, .knowledge)
+        XCTAssertEqual(bite(.quote).paper, .knowledge)
+        XCTAssertEqual(bite(.highlight).paper, .knowledge)
 
         XCTAssertEqual([.idea, .takeaway, .quote, .highlight].map { BrainBiteCopy.kind(bite($0)) },
                        ["Idea", "Takeaway", "Quote", "Highlight"])

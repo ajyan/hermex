@@ -61,19 +61,19 @@ struct DeckPalette: Equatable {
     /// A deck by job's close, the week's habit tracker: a neutral summary card like the opener, since it sums up
     /// the week's habits (each row in its own paper) rather than being one kind of thing.
     static let tracker = DeckPalette(.opener, symbol: "checkmark.seal", name: "This week", shortName: "Close", isNeutralCard: true)
-    static let quote = DeckPalette(.quote, symbol: "quote.opening", name: "Quote", shortName: "Quote")
-    static let book = DeckPalette(.book, symbol: "book.closed", name: "Book highlight", shortName: "Book")
-    static let wiki = DeckPalette(.wiki, symbol: "leaf", name: "From your wiki", shortName: "Wiki")
-    static let reading = DeckPalette(.reading, symbol: "newspaper", name: "From your reading", shortName: "Reading")
-    static let notes = DeckPalette(.notes, symbol: "lightbulb", name: "From your notes", shortName: "Notes")
-    static let video = DeckPalette(.video, symbol: "play.rectangle", name: "Video", shortName: "Video")
-    static let past = DeckPalette(.past, symbol: "clock.arrow.circlepath", name: "A year ago", shortName: "A year ago")
+    static let quote = DeckPalette(.knowledge, symbol: "quote.opening", name: "Quote", shortName: "Quote")
+    static let book = DeckPalette(.knowledge, symbol: "book.closed", name: "Book highlight", shortName: "Book")
+    static let wiki = DeckPalette(.knowledge, symbol: "leaf", name: "From your wiki", shortName: "Wiki")
+    static let reading = DeckPalette(.knowledge, symbol: "newspaper", name: "From your reading", shortName: "Reading")
+    static let notes = DeckPalette(.knowledge, symbol: "lightbulb", name: "From your notes", shortName: "Notes")
+    static let video = DeckPalette(.knowledge, symbol: "play.rectangle", name: "Video", shortName: "Video")
+    static let past = DeckPalette(.knowledge, symbol: "clock.arrow.circlepath", name: "A year ago", shortName: "A year ago")
     /// A past journal entry picked for the week's question: the journal's paper, named for the journal.
-    static let journal = DeckPalette(.past, symbol: "book.pages", name: "Your journal", shortName: "Journal")
+    static let journal = DeckPalette(.knowledge, symbol: "book.pages", name: "Your journal", shortName: "Journal")
     /// Baki's Sunday training card, on the Body paper.
     static let money = DeckPalette(.money, symbol: "cart", name: "Money", shortName: "Money")
     static let training = DeckPalette(.training, symbol: "figure.strengthtraining.traditional", name: "Training", shortName: "Training")
-    static let sleep = DeckPalette(.notes, symbol: "moon.zzz", name: "Sleep", shortName: "Sleep")
+    static let sleep = DeckPalette(.training, symbol: "moon.zzz", name: "Sleep", shortName: "Sleep")
     static let advisor = DeckPalette(.advisor, symbol: "bubble.left", name: "Check-in", shortName: "Check-in")
     /// The Dad card is the Dad advisor's, so it wears the advisor paper with its own mark.
     static let letter = DeckPalette(.advisor, symbol: "heart", name: "Letter to her", shortName: "Letter")
@@ -83,7 +83,7 @@ struct DeckPalette: Equatable {
     static let dinner = DeckPalette(.meal, symbol: "fork.knife", name: "Last night's dinner", shortName: "Dinner")
     /// Atlas's questions from last night's review: Atlas's own system cards (like What changed) wear the plain paper.
     static let dream = DeckPalette(.plain, symbol: "moon.stars", name: "Atlas asks", shortName: "Atlas")
-    static let plain = DeckPalette(.plain, symbol: "tray", name: "From your library", shortName: "Library")
+    static let plain = DeckPalette(.knowledge, symbol: "tray", name: "From your library", shortName: "Library")
     /// A reflect card about a person (a week source from the CRM), in the person paper the Brain's
     /// People pages wear.
     static let people = DeckPalette(BrainModuleID.people.paper, symbol: "person.2", name: "From your people", shortName: "People")

@@ -38,7 +38,7 @@ final class DesignSystemTests: XCTestCase {
     func testDeckOpenerIsASummaryCardAndOtherKindsGlow() {
         guard case .summary = DeckPalette.opener.cardRole else { return XCTFail("the opener summarizes the day") }
         guard case .glow(let paper) = DeckPalette.quote.cardRole else { return XCTFail("a quote is one kind of thing") }
-        XCTAssertEqual(paper, .quote)
+        XCTAssertEqual(paper, .knowledge)
     }
 
     func testLiveChipsKeepTheNewestCallsAndCountTheRest() {

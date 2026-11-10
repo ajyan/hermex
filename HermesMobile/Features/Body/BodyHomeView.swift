@@ -283,9 +283,9 @@ struct BodyHomeView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "moon.fill")
                         .font(AppFont.subheadline(weight: .semibold))
-                        .foregroundStyle(HermexPaper.notes.glow)
+                        .foregroundStyle(HermexPaper.training.glow)
                         .frame(width: 30, height: 30)
-                        .background(HermexPaper.notes.wash, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
+                        .background(HermexPaper.training.wash, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(verbatim: BodyHomeCopy.sleepTitle(hours: sleep.hours))

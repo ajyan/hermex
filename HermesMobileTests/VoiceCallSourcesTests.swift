@@ -91,12 +91,12 @@ final class VoiceCallSourcesTests: XCTestCase {
     }
 
     func testKindsWearTheirBrainPapers() {
-        XCTAssertEqual(VoiceCallSourceKind.journal.paper, .past)
+        XCTAssertEqual(VoiceCallSourceKind.journal.paper, .knowledge)
         XCTAssertEqual(VoiceCallSourceKind.wiki.paper, .wiki)
         XCTAssertEqual(VoiceCallSourceKind.person.paper, .advisor)
         XCTAssertEqual(VoiceCallSourceKind.note.paper, .notes)
-        XCTAssertEqual(VoiceCallSourceKind.article.paper, .reading)
-        XCTAssertEqual(VoiceCallSourceKind.book.paper, .book)
+        XCTAssertEqual(VoiceCallSourceKind.article.paper, .knowledge)
+        XCTAssertEqual(VoiceCallSourceKind.book.paper, .knowledge)
     }
 
     func testMergeDedupesAndCapsWithTheFirstWinning() {

@@ -464,9 +464,9 @@ final class BrainConnectionsTests: XCTestCase {
     func testEachKindWearsItsBriefPaper() {
         XCTAssertEqual(BrainModuleID.wiki.paper, .wiki)
         XCTAssertEqual(BrainModuleID.people.paper, .advisor)
-        XCTAssertEqual(BrainModuleID.journal.paper, .past)
-        XCTAssertEqual(BrainModuleID.articles.paper, .reading)
-        XCTAssertEqual(BrainModuleID.highlights.paper, .book)
+        XCTAssertEqual(BrainModuleID.journal.paper, .knowledge)
+        XCTAssertEqual(BrainModuleID.articles.paper, .knowledge)
+        XCTAssertEqual(BrainModuleID.highlights.paper, .knowledge)
         XCTAssertEqual(BrainModuleID.people.kindName, "Person")
     }
 }

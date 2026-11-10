@@ -125,7 +125,7 @@ struct HermexPaper: Equatable {
         self.ink = Color(uiColor: color(ink))
         glow = dynamic(light: color(glowLight), dark: color(glowDark))
         wash = Color(uiColor: color(hue, alpha: 0x29))
-        let darkCard = warm ? Self.mix(hue, over: 0x161B22, 0.12) : Self.mix(hue, over: 0x0D1117, 0.2)
+        let darkCard = Self.mix(hue, over: 0x161B22, warm ? 0.12 : 0.14)
         card = dynamic(light: color(Self.mix(hue, over: 0xF8FAFF, 0.2)), dark: color(darkCard))
         edge = dynamic(light: color(glowLight, alpha: 0x4D), dark: color(glowDark, alpha: 0x47))
         onGlow = dynamic(light: color(0xFFFFFF), dark: color(ink))
