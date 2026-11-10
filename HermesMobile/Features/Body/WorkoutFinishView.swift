@@ -7,6 +7,7 @@ struct WorkoutFinishView: View {
     @State private var viewModel: WorkoutFinishViewModel
     private let onDone: () -> Void
     @Environment(\.openDraftChat) private var openDraftChat
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(workout: WorkoutViewModel, client: BodyDataClient, onAPIError: @escaping (Error) -> Void = { _ in },
          onDone: @escaping () -> Void) {
@@ -182,22 +183,19 @@ struct WorkoutFinishView: View {
 
     @ViewBuilder
     private var saved: some View {
-        if let note = viewModel.coachNote {
-            coachCard(note)
-        } else {
-            Text(verbatim: "The coach's note will be here shortly.")
-                .font(AppFont.subheadline())
-                .foregroundStyle(Color.hxTextSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(HXCard<EmptyView, EmptyView, EmptyView>.padding)
-                .hxCard()
+        Group {
+            if let note = viewModel.coachNote {
+                coachCard(note)
+            } else {
+                waitingCard
+            }
         }
+        .animation(HXMotion.swap(reduceMotion: reduceMotion), value: viewModel.coachNote)
         // What the rules raised from this workout; undecided ones wait on Body home.
         BodyProposalCards(proposals: viewModel.proposals, deciding: viewModel.deciding, error: viewModel.decideError) { proposal, accept in
             Task { await viewModel.decide(proposal, accept: accept) }
         }
-        if viewModel.coachNote == nil { doneButton }
+        doneButton
     }
 
     private func coachCard(_ note: BodyCoachNote) -> some View {
@@ -211,23 +209,61 @@ struct WorkoutFinishView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         } footer: {
-            HStack(spacing: 8) {
-                if openDraftChat.isAvailable {
-                    Button { openDraftChat(BodyAskBaki.draft) } label: { Text(verbatim: "Ask Baki") }
-                        .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
-                }
-                Button(action: onDone) { Text(verbatim: "Done") }
+            if openDraftChat.isAvailable {
+                Button { openDraftChat(BodyAskBaki.draft) } label: { Text(verbatim: "Ask Baki").bodyTapHeight() }
                     .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
+                    .environment(\.hxPaper, paper)
+                    .padding(.top, 4)
             }
-            .environment(\.hxPaper, paper)
-            .padding(.top, 4)
         }
     }
 
+    /// Baki's card while the note is being written: the same card the note lands in, with a
+    /// breathing sparkle and the note's shape. Once the scheduled reads run out it says so instead.
+    private var waitingCard: some View {
+        HXCard(.glow(paper), spacing: 12) {
+            BodyCoachKicker(text: WorkoutFinishCopy.kicker(day: viewModel.day))
+        } content: {
+            if viewModel.noteWaitEnded {
+                Text(verbatim: "Baki's note is taking longer than usual. Pull down to check again.")
+                    .font(AppFont.subheadline())
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .symbolEffect(.breathe, isActive: !reduceMotion)
+                        .accessibilityHidden(true)
+                    Text(verbatim: "Baki is reading your sets")
+                }
+                .font(AppFont.display(style: .title3, weight: .semibold))
+                .foregroundStyle(paper.glow)
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach([0, 28, 120] as [CGFloat], id: \.self) { short in
+                        Capsule().fill(paper.wash)
+                            .frame(height: 10)
+                            .padding(.trailing, short)
+                    }
+                }
+                .accessibilityHidden(true)
+            }
+        } footer: {
+            EmptyView()
+        }
+    }
+
+    /// The way out once the workout is saved: back to Body home.
     private var doneButton: some View {
-        Button(action: onDone) { Text(verbatim: "Done") }
-            .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
-            .environment(\.hxPaper, paper)
+        Button(action: onDone) {
+            Text(verbatim: "Done")
+                .font(AppFont.display(style: .headline, weight: .semibold))
+                .foregroundStyle(paper.onGlow)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .buttonBorderShape(.capsule)
+        .controlSize(.large)
+        .tint(paper.glow)
     }
 }
 

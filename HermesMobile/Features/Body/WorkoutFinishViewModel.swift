@@ -23,6 +23,8 @@ final class WorkoutFinishViewModel {
     private(set) var saveError: String?
     /// Baki's note, once the server has written it.
     private(set) var coachNote: BodyCoachNote?
+    /// The scheduled reads for Baki's note ran out without one; pull to refresh still reads again.
+    private(set) var noteWaitEnded = false
     /// New proposals the rules raised when the workout finished, until decided.
     private(set) var proposals: [BodyProposal] = []
     private(set) var decideError: String?
@@ -135,6 +137,7 @@ final class WorkoutFinishViewModel {
             guard !Task.isCancelled else { return }
             await refreshNote()
         }
+        if coachNote == nil { noteWaitEnded = true }
     }
 
     /// Reads the finished session again for Baki's note, which the server writes a little after the

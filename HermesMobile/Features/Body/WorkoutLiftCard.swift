@@ -118,11 +118,6 @@ enum WorkoutCopy {
         }
     }
 
-    /// A superset lift's letter by its place in the pair: "A", "B", "C".
-    static func pairLetter(_ offset: Int) -> String {
-        String(UnicodeScalar(UInt8(65 + min(max(offset, 0), 25))))
-    }
-
     /// "W" for a warm-up set, else the work set's number.
     static func tag(_ lift: BodyExercise, set s: Int) -> String {
         guard lift.sets.indices.contains(s), lift.sets[s].kind == .work else { return "W" }
@@ -158,15 +153,12 @@ enum WorkoutCopy {
         return "Move \(rdl ? "RDLs" : ListFormatter.localizedString(byJoining: names)) to the end?"
     }
 
-    /// Where the weight editor starts: the set's weight, else last time's weight for this set, else
-    /// last time's heaviest. Nil when the lift has never had one.
-    static func startingWeight(_ lift: BodyExercise, set s: Int) -> Double? {
-        guard lift.sets.indices.contains(s) else { return nil }
-        if let weight = lift.sets[s].weight { return weight }
-        if let i = workIndex(lift, set: s), lift.last.indices.contains(i), let weight = lift.last[i].weight {
-            return weight
-        }
-        return lift.last.compactMap(\.weight).max()
+    /// A number typed into a set's box: "137.5", or "137,5" from a comma keyboard; nil when the box
+    /// is empty or doesn't read as a number at or above zero.
+    static func typedNumber(_ text: String) -> Double? {
+        let trimmed = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
+        guard let value = Double(trimmed), value.isFinite, value >= 0 else { return nil }
+        return value
     }
 
     /// The phase subtitle: "Build", "Re-entry · Deload".
@@ -320,26 +312,19 @@ struct WorkoutPairHeader: View, Equatable {
                     .font(AppFont.display(style: .title2, weight: .bold))
                     .foregroundStyle(paper.glow)
                     .accessibilityAddTraits(.isHeader)
-                ForEach(Array(lifts.enumerated()), id: \.element.id) { offset, lift in
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(verbatim: WorkoutCopy.pairLetter(offset))
-                            .font(AppFont.subheadline(weight: .bold))
-                            .foregroundStyle(paper.glow)
-                            .frame(width: columns.tag, alignment: .leading)
-                        Text(verbatim: "\(lift.name) · \(WorkoutCopy.targetLine(lift))")
-                            .font(AppFont.subheadline())
-                            .foregroundStyle(Color.hxTextPrimary)
-                    }
-                    .accessibilityElement(children: .combine)
+                ForEach(lifts) { lift in
+                    (Text(verbatim: lift.name).fontWeight(.semibold) + Text(verbatim: " · \(WorkoutCopy.targetLine(lift))"))
+                        .font(AppFont.subheadline())
+                        .foregroundStyle(Color.hxTextPrimary)
                 }
-                Text(verbatim: "A1, then B1, then the next round.")
+                Text(verbatim: "One set of each, then the next round.")
                     .font(AppFont.footnote())
                     .foregroundStyle(Color.hxTextSecondary)
             }
             .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: WorkoutLayout.columnSpacing) {
                 Text(verbatim: "Set").frame(width: columns.tag, alignment: .leading)
-                Text(verbatim: "Last time").frame(maxWidth: .infinity, alignment: .leading)
+                Text(verbatim: "Lift · last time").frame(maxWidth: .infinity, alignment: .leading)
                 Text(verbatim: lifts.lazy.map(WorkoutCopy.weightHeader).first { !$0.isEmpty } ?? "")
                     .frame(width: columns.weight)
                 Text(verbatim: WorkoutCopy.countHeader(lifts.first.map(BodyMeasure.init) ?? .reps))
@@ -356,39 +341,47 @@ struct WorkoutPairHeader: View, Equatable {
     }
 }
 
-/// One set: its tag, last time, the weight and count pills, and the 44 pt check. The row is
-/// identified by the set's `uid`, so deleting a set takes its row (and any open editor) with it.
-/// In a superset card `pairLetter` prefixes the set's number with its lift's letter ("A1", "B1").
+/// One set: its tag, last time, the weight and count boxes, and the 44 pt check. The row is
+/// identified by the set's `uid`, so deleting a set takes its row with it. A box is a number he
+/// types straight into: tapping it empties it over the old number, and the new one commits when
+/// he leaves the box or ticks the set; leaving it empty keeps the old number. In a superset card
+/// `named` puts the lift's name over its last time, so the interleaved rows say whose they are.
 struct WorkoutSetRow: View, Equatable {
     let lift: BodyExercise
     let exercise: Int
     let index: Int
     let viewModel: WorkoutViewModel
-    var pairLetter: String? = nil
+    var named = false
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.exercise == rhs.exercise && lhs.index == rhs.index && lhs.row == rhs.row && lhs.pairLetter == rhs.pairLetter
+        lhs.exercise == rhs.exercise && lhs.index == rhs.index && lhs.row == rhs.row && lhs.named == rhs.named
             && lhs.tag == rhs.tag && lhs.lastTime == rhs.lastTime && lhs.lift.unit == rhs.lift.unit
-            && lhs.lift.target == rhs.lift.target && lhs.startingWeight == rhs.startingWeight
+            && lhs.lift.target == rhs.lift.target && lhs.lift.name == rhs.lift.name
     }
 
-    private enum Field { case weight, count }
-    @State private var editing: Field?
+    private enum Field: Hashable { case weight, count }
+    @FocusState private var focus: Field?
+    /// What he has typed into the focused box so far.
+    @State private var draft = ""
     private var columns = WorkoutColumns()
+
+    init(lift: BodyExercise, exercise: Int, index: Int, viewModel: WorkoutViewModel, named: Bool = false) {
+        self.lift = lift
+        self.exercise = exercise
+        self.index = index
+        self.viewModel = viewModel
+        self.named = named
+    }
 
     private var paper: HermexPaper { .training }
     private var row: BodySet { lift.sets[index] }
-    private var tag: String {
-        let tag = WorkoutCopy.tag(lift, set: index)
-        return tag == "W" ? tag : (pairLetter ?? "") + tag
-    }
+    private var tag: String { WorkoutCopy.tag(lift, set: index) }
     private var lastTime: String { WorkoutCopy.lastTime(lift, workIndex: WorkoutCopy.workIndex(lift, set: index)) }
-    private var startingWeight: Double? { WorkoutCopy.startingWeight(lift, set: index) }
     private var measure: BodyMeasure { BodyMeasure(lift) }
     private var isWarm: Bool { row.kind == .warm }
     private var setName: String {
-        if isWarm { return "Warm-up set" }
-        return pairLetter == nil ? "Set \(tag)" : "\(lift.name) set \(WorkoutCopy.tag(lift, set: index))"
+        if isWarm { return named ? "\(lift.name) warm-up set" : "Warm-up set" }
+        return named ? "\(lift.name) set \(tag)" : "Set \(tag)"
     }
 
     var body: some View {
@@ -398,22 +391,33 @@ struct WorkoutSetRow: View, Equatable {
                     .font(AppFont.subheadline(weight: .bold))
                     .foregroundStyle(isWarm ? Color.hxTextSecondary : paper.glow)
                     .frame(width: columns.tag, alignment: .leading)
-                Text(verbatim: lastTime)
-                    .font(AppFont.subheadline())
-                    .monospacedDigit()
-                    .foregroundStyle(Color.hxTextSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                VStack(alignment: .leading, spacing: 1) {
+                    if named {
+                        Text(verbatim: lift.name)
+                            .font(AppFont.caption(weight: .semibold))
+                            .foregroundStyle(Color.hxTextPrimary)
+                    }
+                    Text(verbatim: lastTime)
+                        .font(named ? AppFont.caption() : AppFont.subheadline())
+                        .monospacedDigit()
+                        .foregroundStyle(Color.hxTextSecondary)
+                }
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text(verbatim: "\(setName), last time \(lastTime)"))
-            if WorkoutCopy.isWeighted(lift) { weightPill } else { weightLabel }
-            countPill
+            if WorkoutCopy.isWeighted(lift) { weightBox } else { weightLabel }
+            countBox
             check
         }
         .frame(minHeight: 48)
         .opacity(row.done ? 0.75 : 1)
+        .onChange(of: focus) { old, _ in
+            if let old { commit(old) }
+            draft = ""
+        }
     }
 
     private var weightText: String {
@@ -421,7 +425,11 @@ struct WorkoutSetRow: View, Equatable {
             .map { lift.unit == "lb_each" ? String($0.dropLast()) : $0 } ?? "—"
     }
 
-    /// Bodyweight, band and cable lifts have nothing to change: plain text where the pill would be, so
+    private var countText: String {
+        WorkoutCopy.count(measure.count(row), measure).replacingOccurrences(of: " ", with: "\u{00A0}")
+    }
+
+    /// Bodyweight, band and cable lifts have nothing to change: plain text where the box would be, so
     /// it doesn't look tappable.
     private var weightLabel: some View {
         Text(verbatim: weightText)
@@ -433,45 +441,23 @@ struct WorkoutSetRow: View, Equatable {
             .accessibilityLabel(Text(verbatim: "\(setName), \(BodyFormat.weightLabel(unit: lift.unit, weight: nil))"))
     }
 
-    private var weightPill: some View {
-        Button { editing = .weight } label: {
-            pill(weightText, secondary: false, width: columns.weight)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(verbatim:
-            "\(setName) weight, \(row.weight.map { "\(BodyFormat.number($0)) pounds" } ?? "not set")"))
-        .accessibilityHint(Text(verbatim: "Changes the weight"))
-        .popover(isPresented: binding(.weight)) {
-            WorkoutNumberEditor(
-                title: lift.unit == "lb_each" ? "Pounds a dumbbell" : "Pounds",
-                step: lift.unit == "lb_each" ? 2.5 : 5, isInteger: false,
-                current: row.weight, start: startingWeight
-            ) { viewModel.setWeight($0, exercise: exercise, set: index) }
-            .presentationCompactAdaptation(.popover)
-        }
+    private var weightBox: some View {
+        numberBox(.weight, shown: weightText, width: columns.weight,
+                  label: "\(setName) weight, pounds\(lift.unit == "lb_each" ? " a dumbbell" : "")")
     }
 
-    private var countPill: some View {
-        Button { editing = .count } label: {
-            pill(WorkoutCopy.count(measure.count(row), measure).replacingOccurrences(of: " ", with: "\u{00A0}"),
-                 secondary: false, width: columns.count)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(verbatim: "\(setName) \(WorkoutCopy.countHeader(measure).lowercased()), "
-            + WorkoutCopy.count(measure.count(row), measure)))
-        .accessibilityHint(Text(verbatim: "Changes the count"))
-        .popover(isPresented: binding(.count)) {
-            let count = measure.count(row).map(Double.init)
-            WorkoutNumberEditor(
-                title: measure == .reps ? "Reps" : measure == .hold ? "Seconds" : "Yards",
-                step: measure == .reps ? 1 : 5, isInteger: true, current: count, start: count
-            ) { viewModel.setReps($0.map { Int($0.rounded()) }, exercise: exercise, set: index) }
-            .presentationCompactAdaptation(.popover)
-        }
+    private var countBox: some View {
+        numberBox(.count, shown: countText, width: columns.count,
+                  label: "\(setName) \(WorkoutCopy.countHeader(measure).lowercased())")
     }
 
     private var check: some View {
-        Button { viewModel.toggle(exercise: exercise, set: index) } label: {
+        Button {
+            // A number still being typed belongs to this set: land it before the tick.
+            if let focus { commit(focus) }
+            focus = nil
+            viewModel.toggle(exercise: exercise, set: index)
+        } label: {
             Image(systemName: "checkmark")
                 .font(AppFont.headline(weight: .bold))
                 .foregroundStyle(row.done ? paper.onGlow : Color.hxTextSecondary)
@@ -487,88 +473,49 @@ struct WorkoutSetRow: View, Equatable {
         .accessibilityLabel(Text(verbatim: row.done ? "\(setName) done" : "Mark \(setName.lowercased()) done"))
     }
 
-    /// A 44 pt tall number box, as wide as its column.
-    private func pill(_ text: String, secondary: Bool, width: CGFloat) -> some View {
-        Text(verbatim: text)
-            .font(AppFont.body(weight: .semibold))
-            .monospacedDigit()
-            .lineLimit(1)
-            .minimumScaleFactor(0.5)
-            .foregroundStyle(secondary ? Color.hxTextSecondary : Color.hxTextPrimary)
-            .padding(.horizontal, 4)
-            .frame(width: width)
-            .frame(minHeight: 44)
-            .background(Color.hxCanvas, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
-                .strokeBorder(Color.hxSeparator, lineWidth: 0.5))
-    }
-
-    private func binding(_ field: Field) -> Binding<Bool> {
-        Binding(get: { editing == field }, set: { if !$0, editing == field { editing = nil } else if $0 { editing = field } })
-    }
-}
-
-/// The small editor a pill opens: steppers either side of a number he can also type. It starts
-/// from `start` (for an empty weight, last time's) and commits once, when it closes, and only if
-/// the number changed from `current`; a field that doesn't parse commits nothing.
-struct WorkoutNumberEditor: View {
-    let title: String
-    let step: Double
-    let isInteger: Bool
-    let current: Double?
-    let commit: (Double?) -> Void
-    @State private var text: String
-
-    init(title: String, step: Double, isInteger: Bool, current: Double?, start: Double?,
-         commit: @escaping (Double?) -> Void) {
-        self.title = title
-        self.step = step
-        self.isInteger = isInteger
-        self.current = current
-        self.commit = commit
-        _text = State(initialValue: start.map(BodyFormat.number) ?? "")
-    }
-
-    var body: some View {
-        VStack(spacing: 10) {
-            Text(verbatim: title)
-                .font(AppFont.caption(weight: .semibold))
-                .foregroundStyle(Color.hxTextSecondary)
-            HStack(spacing: 12) {
-                stepButton(-step)
-                TextField(text: $text, prompt: Text(verbatim: "—")) { Text(verbatim: title) }
-                    .keyboardType(isInteger ? .numberPad : .decimalPad)
-                    .multilineTextAlignment(.center)
-                    .font(AppFont.display(style: .title2, weight: .semibold))
-                    .monospacedDigit()
-                    .frame(width: 84)
-                stepButton(step)
+    /// A 44 pt tall number box, as wide as its column, typed into in place. The set's number shows
+    /// until he types, dimmed while the box has focus; the focused box wears the Nous-blue edge.
+    private func numberBox(_ field: Field, shown: String, width: CGFloat, label: String) -> some View {
+        let isFocused = focus == field
+        let shape = RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
+        let text = Binding(get: { focus == field ? draft : "" }, set: { if focus == field { draft = $0 } })
+        return ZStack {
+            if !isFocused || draft.isEmpty {
+                Text(verbatim: shown)
+                    .foregroundStyle(isFocused ? Color.hxTextSecondary : Color.hxTextPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
             }
+            TextField(text: text) { Text(verbatim: label) }
+                .keyboardType(field == .weight ? .decimalPad : .numberPad)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(Color.hxTextPrimary)
+                .focused($focus, equals: field)
+                .accessibilityLabel(Text(verbatim: label))
+                .accessibilityValue(Text(verbatim: shown))
         }
-        .padding(16)
-        .onDisappear(perform: commitIfChanged)
+        .font(AppFont.body(weight: .semibold))
+        .monospacedDigit()
+        .padding(.horizontal, 4)
+        .frame(width: width)
+        .frame(minHeight: 44)
+        .background(Color.hxCanvas, in: shape)
+        .overlay(shape.strokeBorder(isFocused ? Color.accentColor : Color.hxSeparator, lineWidth: isFocused ? 1.5 : 0.5))
+        .contentShape(Rectangle())
+        .onTapGesture { focus = field }
     }
 
-    private func commitIfChanged() {
-        let trimmed = text.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty {
-            if current != nil { commit(nil) }
-        } else if let value = Double(trimmed), value != current {
-            commit(value)
+    /// Lands what was typed into `field`. An empty or unreadable box changes nothing.
+    private func commit(_ field: Field) {
+        guard let value = WorkoutCopy.typedNumber(draft) else { return }
+        switch field {
+        case .weight:
+            if value != row.weight { viewModel.setWeight(value, exercise: exercise, set: index) }
+        case .count:
+            let count = Int(value.rounded())
+            if count != measure.count(row) { viewModel.setReps(count, exercise: exercise, set: index) }
         }
-    }
-
-    private func stepButton(_ delta: Double) -> some View {
-        Button {
-            let value = max(0, (Double(text) ?? 0) + delta)
-            text = BodyFormat.number(isInteger ? value.rounded() : value)
-        } label: {
-            Image(systemName: delta < 0 ? "minus" : "plus")
-                .font(AppFont.headline(weight: .semibold))
-                .frame(width: 44, height: 44)
-        }
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.circle)
-        .accessibilityLabel(Text(verbatim: "\(delta < 0 ? "Less" : "More") by \(BodyFormat.number(abs(delta)))"))
     }
 }

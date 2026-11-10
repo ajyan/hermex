@@ -9,14 +9,16 @@ struct WorkoutView: View {
     @State private var showsFinish = false
     private let client: BodyDataClient
     private let onAPIError: (Error) -> Void
-    @Environment(\.dismiss) private var dismiss
+    /// Leaves the finished workout for the screen it started from.
+    private let onDone: () -> Void
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(day: String?, server: URL, onAPIError: @escaping (Error) -> Void) {
+    init(day: String?, server: URL, onAPIError: @escaping (Error) -> Void, onDone: @escaping () -> Void) {
         let client = APIClientBodyAdapter(apiClient: APIClient(baseURL: server))
         self.client = client
         self.onAPIError = onAPIError
+        self.onDone = onDone
         _viewModel = State(initialValue: WorkoutViewModel(client: client, day: day, onAPIError: onAPIError))
     }
 
@@ -36,8 +38,9 @@ struct WorkoutView: View {
                 }
             }
             .navigationDestination(isPresented: $showsFinish) {
-                // Done leaves the workout too: it is closed, and Body home is where he lands.
-                WorkoutFinishView(workout: viewModel, client: client, onAPIError: onAPIError) { dismiss() }
+                // Done leaves the workout too: it is closed, and Body home is where he lands. The
+                // workout's own `dismiss` can't do it, since it only pops the finish screen on top.
+                WorkoutFinishView(workout: viewModel, client: client, onAPIError: onAPIError, onDone: onDone)
             }
     }
 
@@ -113,6 +116,14 @@ struct WorkoutView: View {
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .environment(\.defaultMinListRowHeight, 0)
+            .scrollDismissesKeyboard(.interactively)
+            .toolbar {
+                // The number pads have no return key: Done lands the number and puts the keyboard away.
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button { HXKeyboard.dismiss() } label: { Text(verbatim: "Done").fontWeight(.semibold) }
+                }
+            }
             // A resumed workout opens on its first unfinished lift, which may be far down.
             // A fresh one starts at the top, where the offers are.
             .onAppear { if viewModel.current > 0 { scrollToOpenLift(proxy, animated: false) } }
@@ -188,8 +199,7 @@ struct WorkoutView: View {
             .id(exercises[group.lowerBound].id)
         ForEach(WorkoutViewModel.pairedRows(exercises, group: group)) { ref in
             let lift = exercises[ref.exercise]
-            WorkoutSetRow(lift: lift, exercise: ref.exercise, index: ref.set, viewModel: viewModel,
-                          pairLetter: WorkoutCopy.pairLetter(ref.exercise - group.lowerBound))
+            WorkoutSetRow(lift: lift, exercise: ref.exercise, index: ref.set, viewModel: viewModel, named: true)
                 .equatable()
                 .workoutCardRow(.middle)
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {

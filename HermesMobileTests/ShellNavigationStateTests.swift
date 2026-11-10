@@ -173,6 +173,17 @@ final class ShellNavigationStateTests: XCTestCase {
         XCTAssertEqual(state.root, .session(SessionSummary(sessionId: "s1")))
     }
 
+    func testCloseWorkoutPopsBackToBodyHome() {
+        var state = ShellNavigationState()
+        state.push(.body)
+        state.push(.bodyWorkout("push"))
+        state.closeWorkout()
+        XCTAssertEqual(state.path, [.body], "Done on the finish screen lands on Body home")
+
+        state.closeWorkout()
+        XCTAssertEqual(state.path, [.body], "with no workout open it changes nothing")
+    }
+
     func testShowOnlyReplacesPath() {
         var state = ShellNavigationState()
         state.push(.projects)

@@ -163,9 +163,10 @@ extension BodyPlanExercise {
 
     init(id: String, name: String, section: BodySection, sets: Int, reps: [Int]?, holdS: Int?, distanceYd: Int?,
          big: Bool, newborn: Bool, hinge: Bool, perSide: Bool, rampSets: Int?, goalReps: [Int]?,
-         alternates: [String]?, alternateWeekly: String?, load: BodyPlanLoad) {
+         alternates: [String]?, alternateWeekly: String?, load: BodyPlanLoad, muscle: String? = nil) {
         self.id = id
         self.name = name
+        self.muscle = muscle
         self.section = section
         self.sets = sets
         self.reps = reps
@@ -186,7 +187,7 @@ extension BodyPlanExercise {
         BodyPlanExercise(
             id: id, name: name, section: section, sets: sets, reps: reps, holdS: holdS, distanceYd: distanceYd,
             big: big, newborn: newborn, hinge: hinge, perSide: perSide, rampSets: rampSets, goalReps: goalReps,
-            alternates: alternates, alternateWeekly: alternateWeekly, load: load)
+            alternates: alternates, alternateWeekly: alternateWeekly, load: load, muscle: muscle)
     }
 }
 
