@@ -17,12 +17,12 @@ struct PrepStoryMicButton: View {
     @State private var dictation = DictationModel()
     @Environment(\.dictationServer) private var server
 
-    private var isListening: Bool { dictation.voiceInput.isListening }
+    private var isListening: Bool { dictation.isListening }
 
     var body: some View {
         VStack(alignment: .leading, spacing: BrainStyle.xs) {
             Button {
-                if dictation.voiceInput.state == .idle { onStart() }
+                if dictation.phase == .idle { onStart() }
                 dictation.server = server
                 dictation.toggle($text)
             } label: {
@@ -43,14 +43,14 @@ struct PrepStoryMicButton: View {
                 .contentShape(Capsule())
             }
             .buttonStyle(.plain)
-            .disabled(isSubmitting || dictation.isTidying || dictation.voiceInput.isRequestingPermission)
+            .disabled(isSubmitting || dictation.isTidying || dictation.phase == .finishing)
             .accessibilityLabel(Text(verbatim: dictation.isTidying ? "Tidying your words"
                 : isListening ? "Stop dictation" : "Tap to talk"))
             .accessibilityHint(Text(verbatim: isListening ? "" : DictationCopy.micHint))
             if dictation.canUndoTidy {
                 DictationOriginalButton(dictation: dictation)
             }
-            if let message = dictation.voiceInput.errorMessage {
+            if let message = dictation.errorMessage {
                 Text(verbatim: message)
                     .font(BrainStyle.meta)
                     .foregroundStyle(Color.hxTextSecondary)

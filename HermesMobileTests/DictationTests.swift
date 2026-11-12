@@ -3,23 +3,6 @@ import XCTest
 @testable import HermesMobile
 
 final class DictationSpliceTests: XCTestCase {
-    func testSplitTakesEverythingWhenTheBoxWasEmpty() throws {
-        let split = try XCTUnwrap(DictationSplice.split(base: "", draft: "um so this is it"))
-        XCTAssertEqual(split.kept, "")
-        XCTAssertEqual(split.dictated, "um so this is it")
-    }
-
-    func testSplitKeepsTypedTextAndTheJoiningSpace() throws {
-        let split = try XCTUnwrap(DictationSplice.split(base: "Typed first.  ", draft: "Typed first. then i said this"))
-        XCTAssertEqual(split.kept, "Typed first. ")
-        XCTAssertEqual(split.dictated, "then i said this")
-    }
-
-    func testSplitIsNilWhenTheEarlierTextChangedOrNothingWasHeard() {
-        XCTAssertNil(DictationSplice.split(base: "Typed first.", draft: "Typed second. words"))
-        XCTAssertNil(DictationSplice.split(base: "Typed first.", draft: "Typed first."))
-    }
-
     func testShortPassagesAreNotWorthTidying() {
         XCTAssertFalse(DictationSplice.isWorthTidying("yes I agree"))
         XCTAssertTrue(DictationSplice.isWorthTidying("yes I agree with that"))
@@ -40,339 +23,246 @@ final class DictationSpliceTests: XCTestCase {
     }
 }
 
+/// A mic the test speaks through.
+@MainActor
+final class FakeDictationListener: DictationListening {
+    let engineName = "fake"
+    var onEvent: ((DictationListenerEvent) -> Void)?
+    var audio: Data? = Data([1, 2, 3])
+    /// Words that settle only when the mic stops.
+    var settlesOnStop: String?
+    private(set) var skips = 0
+    private(set) var isRunning = false
+
+    func start(vocabulary: @escaping () async -> [String]) async throws { isRunning = true }
+
+    func stop() async {
+        isRunning = false
+        if let settlesOnStop { onEvent?(.settled(settlesOnStop)) }
+    }
+
+    func cancel() { isRunning = false }
+    func takeAudio(throughNow: Bool) -> Data? { audio }
+    func skipLiveWords() { skips += 1 }
+
+    func say(_ words: String) { onEvent?(.volatile(words)) }
+    func settle(_ words: String) { onEvent?(.settled(words)) }
+}
+
+@MainActor
+final class FakeDictationCursor: DictationCursor {
+    var offset: Int?
+    private(set) var placed: Int?
+
+    func position(in text: String) -> Int? { offset }
+
+    func place(_ offset: Int, in text: String) {
+        placed = offset
+        self.offset = offset
+    }
+}
+
+/// Rewrites by upper-casing unless told otherwise, and keeps what it was asked.
+final class DictationRecorder: DictationPolishing, @unchecked Sendable {
+    var passages: [DictationPassage] = []
+    var outcomes: [DictationOutcome] = []
+    var rewrite: (DictationPassage) -> String? = { $0.heard.uppercased() }
+    var onOutcome: (() -> Void)?
+
+    func polish(_ passage: DictationPassage) async throws -> DictationPolish {
+        passages.append(passage)
+        guard let text = rewrite(passage) else { throw CancellationError() }
+        return DictationPolish(text: text, id: "r\(passages.count)")
+    }
+
+    func report(_ outcome: DictationOutcome) async {
+        outcomes.append(outcome)
+        onOutcome?()
+    }
+}
+
 @MainActor
 final class DictationModelTests: XCTestCase {
     private final class Box { var text = "" }
 
-    private struct FakePolisher: DictationPolishing {
-        var result: Result<String, Error>
-        var duringPolish: @MainActor () -> Void = {}
+    private let box = Box()
+    private let listener = FakeDictationListener()
+    private let cursor = FakeDictationCursor()
+    private let recorder = DictationRecorder()
 
-        func polish(_ text: String) async throws -> String {
-            await duringPolish()
-            return try result.get()
-        }
+    private var binding: Binding<String> {
+        Binding(get: { [box] in box.text }, set: { [box] in box.text = $0 })
     }
 
-    private struct PolishFailed: Error {}
-
-    private func binding(_ box: Box) -> Binding<String> {
-        Binding(get: { box.text }, set: { box.text = $0 })
+    private func model(polisher: (any DictationPolishing)? = nil, hasPolisher: Bool = true) -> DictationModel {
+        let polisher: (any DictationPolishing)? = hasPolisher ? (polisher ?? recorder) : nil
+        let listener = listener, cursor = cursor
+        return DictationModel(services: DictationServices(
+            polisher: { _ in polisher }, vocabulary: { _ in [] }, listener: { listener },
+            fallbackListener: nil, cursor: cursor, mayRecord: { true }))
     }
 
-    private func model(_ polisher: FakePolisher?) -> DictationModel {
-        DictationModel(
-            voiceInput: ComposerVoiceInputController(mayRecord: { false }),
-            polisher: { _ in polisher }
-        )
+    /// The keyboard changed the box: what the view's `onChange` does.
+    private func type(_ text: String, into dictation: DictationModel) {
+        box.text = text
+        dictation.textChanged(text)
     }
 
-    func testTidyRewritesOnlyTheDictatedWordsAndOriginalPutsThemBack() async {
-        let box = Box()
-        box.text = "Note:"
-        let dictation = model(FakePolisher(result: .success("I think we should ship it.")))
-        dictation.begin(binding(box))
-        box.text = "Note: um so i think we should ship it"
+    func testSpeechIsRewrittenOnStopAndOriginalPutsItBack() async {
+        box.text = "Typed first."
+        let dictation = model()
+        await dictation.toggle(binding)?.value
+        XCTAssertTrue(dictation.isListening)
+        listener.say("um we should")
+        XCTAssertEqual(box.text, "Typed first. um we should")
+        listener.settle("um we should ship it")
+        await dictation.toggle(binding)?.value
 
-        await dictation.tidy()
-
-        XCTAssertEqual(box.text, "Note: I think we should ship it.")
+        XCTAssertEqual(box.text, "Typed first. UM WE SHOULD SHIP IT")
+        XCTAssertEqual(recorder.passages.map(\.heard), ["um we should ship it"])
+        XCTAssertEqual(recorder.passages.first?.before, "Typed first. ")
+        XCTAssertNotNil(recorder.passages.first?.audio)
         XCTAssertTrue(dictation.canUndoTidy)
-        dictation.undoTidy()
-        XCTAssertEqual(box.text, "Note: um so i think we should ship it")
-        XCTAssertFalse(dictation.canUndoTidy)
-    }
-
-    func testAnEditWhileTidyingKeepsTheEdit() async {
-        let box = Box()
-        let dictation = model(FakePolisher(result: .success("We should ship it on Friday."),
-                                           duringPolish: { box.text = "we should ship it on Friday!!" }))
-        dictation.begin(binding(box))
-        box.text = "we should ship it on friday"
-
-        await dictation.tidy()
-
-        XCTAssertEqual(box.text, "we should ship it on Friday!!")
-        XCTAssertFalse(dictation.canUndoTidy)
-    }
-
-    func testAnEditAfterTidyingDropsOriginal() async {
-        let box = Box()
-        let dictation = model(FakePolisher(result: .success("We should ship it on Friday.")))
-        dictation.begin(binding(box))
-        box.text = "we should ship it on friday"
-        await dictation.tidy()
-
-        dictation.textChanged(box.text)
-        XCTAssertTrue(dictation.canUndoTidy)
-        box.text += " Or Monday."
-        dictation.textChanged(box.text)
-        XCTAssertFalse(dictation.canUndoTidy)
-    }
-
-    func testAFailedOrMissingModelKeepsTheWordsAsHeard() async {
-        for polisher in [FakePolisher(result: .failure(PolishFailed())), nil] {
-            let box = Box()
-            let dictation = model(polisher)
-            dictation.begin(binding(box))
-            box.text = "we should ship it on friday"
-
-            await dictation.tidy()
-
-            XCTAssertEqual(box.text, "we should ship it on friday")
-            XCTAssertFalse(dictation.canUndoTidy)
-            XCTAssertFalse(dictation.isTidying)
-        }
-    }
-
-    func testAKeyboardEditIsNeverOverwrittenByTheRecognizer() {
-        let box = Box()
-        let dictation = model(nil)
-        dictation.begin(binding(box))
-        dictation.heard("um so i think")
-        XCTAssertEqual(box.text, "um so i think")
-
-        box.text = "So I think"
-        dictation.textChanged(box.text)
-        dictation.heard("um so i think we should")
-        XCTAssertEqual(box.text, "So I think we should", "only the new words go on the end")
-
-        dictation.heard("um so I think we should ship")
-        XCTAssertEqual(box.text, "So I think we should", "a revised draft that no longer extends the last one is dropped")
-    }
-
-    func testFinishTidiesWhatWasDictatedOnce() async {
-        let box = Box()
-        var polishes = 0
-        let dictation = model(FakePolisher(result: .success("I think we should ship it."),
-                                           duringPolish: { polishes += 1 }))
-        dictation.begin(binding(box))
-        dictation.heard("um so i think we should ship it")
-
-        dictation.voiceStateChanged()
-        await dictation.finish()
-
-        XCTAssertEqual(box.text, "I think we should ship it.")
-        XCTAssertEqual(polishes, 1, "the recognizer going idle and Done both ask, and the tidy runs once")
         XCTAssertFalse(dictation.isBusy)
+
+        dictation.undoTidy()
+        XCTAssertEqual(box.text, "Typed first. um we should ship it")
+        XCTAssertFalse(dictation.canUndoTidy)
     }
 
-    func testCancelDropsThePendingTidy() async {
-        let box = Box()
-        let dictation = model(FakePolisher(result: .success("We should ship it on Friday.")))
-        dictation.begin(binding(box))
-        box.text = "we should ship it on friday"
+    func testSpeechLandsAtTheCursorAndTheCursorFollowsIt() async {
+        box.text = "Start end"
+        cursor.offset = 5
+        let dictation = model()
+        await dictation.toggle(binding)?.value
+        listener.say("in the middle")
+        XCTAssertEqual(box.text, "Start in the middle end")
+        XCTAssertEqual(cursor.placed, 19)
+        listener.say("in the very middle")
+        XCTAssertEqual(box.text, "Start in the very middle end")
+    }
 
+    func testFixingAWordWhileListeningKeepsTheFixAndSpeechGoesOn() async {
+        let dictation = model()
+        await dictation.toggle(binding)?.value
+        listener.say("I met Alice today")
+        type("I met Alex today", into: dictation)
+        XCTAssertTrue(dictation.isListening, "typing doesn't stop the mic")
+        XCTAssertEqual(listener.skips, 1)
+        listener.say("at lunch")
+        XCTAssertEqual(box.text, "I met Alex today at lunch")
+        listener.settlesOnStop = "at lunch time"
+        await dictation.toggle(binding)?.value
+
+        XCTAssertEqual(box.text, "I MET ALEX TODAY AT LUNCH TIME")
+        let edited = recorder.passages.first { $0.heard == "I met Alex today" }
+        XCTAssertNotNil(edited)
+        XCTAssertNil(edited?.audio, "an edited passage is rewritten from the edit, not the audio")
+    }
+
+    func testTypingElsewhereMovesSpeechToTheCursor() async {
+        let dictation = model()
+        await dictation.toggle(binding)?.value
+        listener.say("first thought")
+        type("first thought.\n", into: dictation)
+        listener.say("second thought")
+        XCTAssertEqual(box.text, "first thought.\nsecond thought")
+    }
+
+    func testLongSpeechIsSentInPassagesWhileTalking() async {
+        let dictation = model()
+        await dictation.toggle(binding)?.value
+        let early = Array(repeating: "word", count: DictationModel.earlyPassageWords).joined(separator: " ")
+        listener.settle(early)
+        listener.settle("and the rest of it")
+        await dictation.toggle(binding)?.value
+
+        XCTAssertEqual(recorder.passages.map(\.heard), [early, "and the rest of it"])
+        XCTAssertEqual(recorder.passages.map(\.sequence), [0, 1])
+        XCTAssertEqual(recorder.passages.last?.before, early + " ")
+        XCTAssertEqual(box.text, early.uppercased() + " AND THE REST OF IT")
+    }
+
+    func testAFailedOrMissingRewriterKeepsTheWordsAsHeard() async {
+        recorder.rewrite = { _ in nil }
+        let failing = model()
+        await failing.toggle(binding)?.value
+        listener.settle("we should ship it today")
+        await failing.toggle(binding)?.value
+        XCTAssertEqual(box.text, "we should ship it today")
+        XCTAssertFalse(failing.canUndoTidy)
+
+        box.text = ""
+        let missing = model(hasPolisher: false)
+        await missing.toggle(binding)?.value
+        listener.settle("we should ship it today")
+        await missing.toggle(binding)?.value
+        XCTAssertEqual(box.text, "we should ship it today")
+    }
+
+    func testAnEditAfterTheTidyDropsOriginalAndIsReportedAsTheOutcome() async {
+        let reported = expectation(description: "outcome reported")
+        recorder.onOutcome = { reported.fulfill() }
+        recorder.rewrite = { _ in "We should ship it Friday." }
+        let dictation = model()
+        await dictation.toggle(binding)?.value
+        listener.settle("we should ship it friday")
+        await dictation.toggle(binding)?.value
+        XCTAssertEqual(box.text, "We should ship it Friday.")
+
+        type("We should ship it Monday.", into: dictation)
+        XCTAssertFalse(dictation.canUndoTidy)
         dictation.cancel()
-        await dictation.tidy()
-
-        XCTAssertEqual(box.text, "we should ship it on friday")
-    }
-}
-
-@MainActor
-final class DictationEarlyTidyTests: XCTestCase {
-    private final class Box { var text = "" }
-
-    /// Tidies by capitalizing every word, and records each passage it was given.
-    private final class Recorder: DictationPolishing {
-        var passages: [String] = []
-        func polish(_ text: String) async throws -> String {
-            await MainActor.run { passages.append(text) }
-            return text.capitalized
-        }
+        await fulfillment(of: [reported])
+        XCTAssertEqual(recorder.outcomes.first?.final, "We should ship it Monday.")
+        XCTAssertEqual(recorder.outcomes.first?.ids, ["r1"])
+        XCTAssertEqual(recorder.outcomes.first?.undone, false)
     }
 
-    private func words(_ count: Int, _ word: String) -> String {
-        Array(repeating: word, count: count).joined(separator: " ")
-    }
-
-    private func start(_ box: Box, _ recorder: Recorder) -> DictationModel {
-        let dictation = DictationModel(
-            voiceInput: ComposerVoiceInputController(mayRecord: { false }),
-            polisher: { _ in recorder }
-        )
-        dictation.begin(Binding(get: { box.text }, set: { box.text = $0 }))
-        return dictation
-    }
-
-    func testFinishedPassagesAreTidiedWhileTalkingAndStopTidiesOnlyTheRest() async {
-        let box = Box()
-        box.text = "Earlier."
-        let recorder = Recorder()
-        let dictation = start(box, recorder)
-        let first = words(25, "one")
-        let second = words(6, "two")
-
-        dictation.committedChanged(first)
-        box.text = "Earlier. \(first) \(second)"
-        await dictation.tidy()
-
-        // The last words can reach the model before the early passage; only the assembly order matters.
-        XCTAssertEqual(recorder.passages.sorted(), [first, second].sorted())
-        XCTAssertEqual(box.text, "Earlier. \(first.capitalized) \(second.capitalized)")
-        dictation.undoTidy()
-        XCTAssertEqual(box.text, "Earlier. \(first) \(second)")
-    }
-
-    func testShortFinishedSegmentsWaitUntilTheyAddUp() async {
-        let box = Box()
-        let recorder = Recorder()
-        let dictation = start(box, recorder)
-        let a = words(10, "a"), b = words(20, "b")
-
-        dictation.committedChanged(a)
-        dictation.committedChanged("\(a) \(b)")
-        box.text = "\(a) \(b) end"
-        await dictation.tidy()
-
-        XCTAssertEqual(recorder.passages, ["\(a) \(b)"])
-        XCTAssertEqual(box.text, "\(a) \(b)".capitalized + " end")
-    }
-
-    func testAnEditOverTheEarlyWordsTidiesTheWholeDictationOnce() async {
-        let box = Box()
-        let recorder = Recorder()
-        let dictation = start(box, recorder)
-        let first = words(25, "one")
-
-        dictation.committedChanged(first)
-        box.text = "changed \(first) more words here"
-        await dictation.tidy()
-
-        XCTAssertTrue(recorder.passages.contains("changed \(first) more words here"))
-        XCTAssertEqual(box.text, "changed \(first) more words here".capitalized)
-    }
-}
-
-/// Done in a box that said when it opened: changed words are tidied whole, as if all dictated.
-@MainActor
-final class DictationDoneTidyTests: XCTestCase {
-    private final class Box { var text = "" }
-
-    /// Tidies by capitalizing every word, and records each text it was given.
-    private final class Recorder: DictationPolishing {
-        var passages: [String] = []
-        func polish(_ text: String) async throws -> String {
-            await MainActor.run { passages.append(text) }
-            return text.capitalized
-        }
-    }
-
-    private func opened(_ box: Box, _ recorder: Recorder) -> (DictationModel, Binding<String>) {
-        let dictation = DictationModel(
-            voiceInput: ComposerVoiceInputController(mayRecord: { false }),
-            polisher: { _ in recorder }
-        )
-        let text = Binding(get: { box.text }, set: { box.text = $0 })
-        dictation.opened(text, server: nil)
-        return (dictation, text)
-    }
-
-    func testATypedFixAfterTheTidyTidiesTheWholeBoxOnDone() async {
-        let box = Box()
-        let recorder = Recorder()
-        let (dictation, text) = opened(box, recorder)
-        dictation.begin(text)
-        dictation.heard("we should ship it on friday")
-        dictation.voiceStateChanged()
-        await dictation.tidy()
-        XCTAssertEqual(box.text, "We Should Ship It On Friday")
-
-        box.text = "We Should Ship It On friday or monday"
-        dictation.textChanged(box.text)
-        await dictation.finish()
-
-        XCTAssertEqual(recorder.passages, ["we should ship it on friday", "We Should Ship It On friday or monday"])
-        XCTAssertEqual(box.text, "We Should Ship It On Friday Or Monday")
+    func testCancelWhileListeningKeepsTheWordsAndRewritesNothing() async {
+        let dictation = model()
+        await dictation.toggle(binding)?.value
+        listener.say("half a thought")
+        dictation.cancel()
+        XCTAssertEqual(box.text, "half a thought")
         XCTAssertFalse(dictation.isBusy)
+        XCTAssertFalse(listener.isRunning)
+        XCTAssertTrue(recorder.passages.isEmpty)
     }
 
-    func testTypingIntoASavedAnswerWithoutTheMicTidiesItOnDone() async {
-        let box = Box()
-        box.text = "my parents didn't talk about money"
-        let recorder = Recorder()
-        let (dictation, _) = opened(box, recorder)
-
-        box.text = "my parents didn't really talk about money"
-        dictation.textChanged(box.text)
+    func testDoneWaitsForTheRewrite() async {
+        let dictation = model()
+        dictation.opened(binding, server: nil)
+        await dictation.toggle(binding)?.value
+        listener.settle("we should ship it today")
         await dictation.finish()
-
-        XCTAssertEqual(recorder.passages, ["my parents didn't really talk about money"])
-        XCTAssertEqual(box.text, "My Parents Didn't Really Talk About Money")
+        XCTAssertEqual(box.text, "WE SHOULD SHIP IT TODAY")
+        XCTAssertEqual(recorder.passages.count, 1, "untouched speech into an empty box is tidied once")
     }
 
-    func testAnUnchangedAnswerIsLeftAloneOnDone() async {
-        let box = Box()
-        box.text = "my parents didn't talk about money"
-        let recorder = Recorder()
-        let (dictation, _) = opened(box, recorder)
-
+    func testDoneTidiesTheWholeBoxOnlyWhenItWasTypedInto() async {
+        box.text = "an older saved answer here"
+        let dictation = model()
+        dictation.opened(binding, server: nil)
         await dictation.finish()
+        XCTAssertTrue(recorder.passages.isEmpty, "an unchanged answer is left alone")
 
-        XCTAssertEqual(recorder.passages, [])
-        XCTAssertEqual(box.text, "my parents didn't talk about money")
+        type("an older saved answer here plus typing", into: dictation)
+        await dictation.finish()
+        XCTAssertEqual(recorder.passages.map(\.heard), ["an older saved answer here plus typing"])
+        XCTAssertEqual(box.text, "AN OLDER SAVED ANSWER HERE PLUS TYPING")
+        XCTAssertTrue(dictation.canUndoTidy)
     }
 
-    func testDictatingOntoASavedAnswerTidiesTheWholeBoxOnce() async {
-        let box = Box()
-        box.text = "my parents didn't talk about money"
-        let recorder = Recorder()
-        let (dictation, text) = opened(box, recorder)
-        dictation.begin(text)
-        dictation.heard("my parents didn't talk about money and that shaped me")
-
+    func testDictatingOntoASavedAnswerRewritesOnlyTheSpeech() async {
+        box.text = "Saved words."
+        let dictation = model()
+        dictation.opened(binding, server: nil)
+        await dictation.toggle(binding)?.value
+        listener.settle("and some new speech here")
         await dictation.finish()
-
-        XCTAssertEqual(recorder.passages, ["my parents didn't talk about money and that shaped me"],
-                       "the whole box, not just the new words, and only once")
-        XCTAssertEqual(box.text, "My Parents Didn't Talk About Money And That Shaped Me")
-    }
-
-    func testAnEditToTheEarlierWordsWhileListeningTidiesTheWholeBox() async {
-        let box = Box()
-        box.text = "my parents didnt talk"
-        let recorder = Recorder()
-        let (dictation, text) = opened(box, recorder)
-        dictation.begin(text)
-        dictation.heard("my parents didnt talk about money at all")
-
-        box.text = "my parents didn't talk about money at all"
-        dictation.textChanged(box.text)
-        await dictation.finish()
-
-        XCTAssertEqual(recorder.passages, ["my parents didn't talk about money at all"])
-        XCTAssertEqual(box.text, "My Parents Didn't Talk About Money At All")
-    }
-
-    func testAnUntouchedDictationIntoAnEmptyBoxIsTidiedOnce() async {
-        let box = Box()
-        let recorder = Recorder()
-        let (dictation, text) = opened(box, recorder)
-        dictation.begin(text)
-        dictation.heard("we should ship it on friday")
-
-        dictation.voiceStateChanged()
-        await dictation.finish()
-
-        XCTAssertEqual(recorder.passages, ["we should ship it on friday"])
-        XCTAssertEqual(box.text, "We Should Ship It On Friday")
-    }
-
-    func testOriginalBeforeDoneKeepsTheWordsAsHeard() async {
-        let box = Box()
-        let recorder = Recorder()
-        let (dictation, text) = opened(box, recorder)
-        dictation.begin(text)
-        dictation.heard("we should ship it on friday")
-        await dictation.tidy()
-
-        dictation.undoTidy()
-        dictation.textChanged(box.text)
-        await dictation.finish()
-
-        XCTAssertEqual(recorder.passages, ["we should ship it on friday"])
-        XCTAssertEqual(box.text, "we should ship it on friday")
+        XCTAssertEqual(box.text, "Saved words. AND SOME NEW SPEECH HERE")
+        XCTAssertEqual(recorder.passages.count, 1)
     }
 }
 
@@ -380,36 +270,36 @@ final class DictationDoneTidyTests: XCTestCase {
 final class LocalModelDictationPolisherTests: XCTestCase {
     private struct Fixed: DictationPolishing {
         let text: String
-        func polish(_ text: String) async throws -> String { self.text }
+        func polish(_ passage: DictationPassage) async throws -> DictationPolish { DictationPolish(text: text) }
     }
 
     private struct Down: Error {}
 
     func testTheLocalModelAnswerWins() async throws {
-        let polisher = LocalModelDictationPolisher(fallback: Fixed(text: "on device")) { _, _ in "local model" }
-        let tidied = try await polisher.polish("we should ship it")
+        let polisher = LocalModelDictationPolisher(fallback: Fixed(text: "on device")) { _, _ in DictationPolish(text: "local model", id: "r1") }
+        let tidied = try await polisher.polish(DictationPassage(heard: "we should ship it today")).text
         XCTAssertEqual(tidied, "local model")
     }
 
     func testAFailedServerFallsBackToTheDevice() async throws {
         let polisher = LocalModelDictationPolisher(fallback: Fixed(text: "on device")) { _, _ in throw Down() }
-        let tidied = try await polisher.polish("we should ship it")
+        let tidied = try await polisher.polish(DictationPassage(heard: "we should ship it today")).text
         XCTAssertEqual(tidied, "on device")
     }
 
     func testAMissedDeadlineFallsBackToTheDevice() async throws {
         let polisher = LocalModelDictationPolisher(fallback: Fixed(text: "on device"), deadline: { _ in 0 }) { _, _ in
             try await Task.sleep(for: .seconds(60))
-            return "too late"
+            return DictationPolish(text: "too late")
         }
-        let tidied = try await polisher.polish("we should ship it")
+        let tidied = try await polisher.polish(DictationPassage(heard: "we should ship it today")).text
         XCTAssertEqual(tidied, "on device")
     }
 
     func testWithoutADeviceModelTheServerErrorSurfaces() async {
         let polisher = LocalModelDictationPolisher(fallback: nil) { _, _ in throw Down() }
         do {
-            _ = try await polisher.polish("we should ship it")
+            _ = try await polisher.polish(DictationPassage(heard: "we should ship it today")).text
             XCTFail("expected the server error")
         } catch {
             XCTAssertTrue(error is Down)
@@ -417,10 +307,13 @@ final class LocalModelDictationPolisherTests: XCTestCase {
     }
 
     func testTheDeadlineGrowsWithThePassageUpToACap() {
-        XCTAssertEqual(DictationPolisher.serverDeadline(for: "one two three"), 4.15, accuracy: 0.001)
+        XCTAssertEqual(DictationPolisher.serverDeadline(for: DictationPassage(heard: "one two three")), 4.15, accuracy: 0.001)
+        XCTAssertEqual(
+            DictationPolisher.serverDeadline(for: DictationPassage(heard: "one two three", audio: Data([0]))),
+            7.15, accuracy: 0.001)
         let long = Array(repeating: "word", count: 300).joined(separator: " ")
-        XCTAssertEqual(DictationPolisher.serverDeadline(for: long), 19, accuracy: 0.001)
+        XCTAssertEqual(DictationPolisher.serverDeadline(for: DictationPassage(heard: long)), 19, accuracy: 0.001)
         let huge = Array(repeating: "word", count: 2_000).joined(separator: " ")
-        XCTAssertEqual(DictationPolisher.serverDeadline(for: huge), 45)
+        XCTAssertEqual(DictationPolisher.serverDeadline(for: DictationPassage(heard: huge)), 45)
     }
 }
