@@ -88,6 +88,7 @@ struct ResponseSelectionEnvironment: Equatable {
     let reduceTransparency: Bool
     let tableEdgeFadeColor: Color?
     let workspaceRoot: String?
+    let serverOrigin: URL?
     let interactiveAnswersEnabled: Bool
     let chatDisclosureToggled: ChatDisclosureToggleAction
     let interactiveAnswerAsk: InteractiveAnswerAskAction
@@ -104,6 +105,7 @@ struct ResponseSelectionEnvironment: Equatable {
         reduceTransparency = environment.accessibilityReduceTransparency
         tableEdgeFadeColor = environment.markdownTableEdgeFadeColor
         workspaceRoot = environment.chatWorkspaceRoot
+        serverOrigin = environment.transcriptServerOrigin
         interactiveAnswersEnabled = environment.interactiveAnswersEnabled
         chatDisclosureToggled = environment.chatDisclosureToggled
         interactiveAnswerAsk = environment.interactiveAnswerAsk
@@ -121,6 +123,7 @@ struct ResponseSelectionEnvironment: Equatable {
             lhs.reduceTransparency == rhs.reduceTransparency &&
             lhs.tableEdgeFadeColor == rhs.tableEdgeFadeColor &&
             lhs.workspaceRoot == rhs.workspaceRoot &&
+            lhs.serverOrigin == rhs.serverOrigin &&
             lhs.interactiveAnswersEnabled == rhs.interactiveAnswersEnabled &&
             lhs.chatDisclosureToggled === rhs.chatDisclosureToggled &&
             lhs.interactiveAnswerAsk === rhs.interactiveAnswerAsk
