@@ -35,7 +35,7 @@ to `CacheStore`. Two consequences:
 | State | Server kinds | Where it lives | How it's scoped |
 | --- | --- | --- | --- |
 | Push notification preferences | webui (Hermes: #706) | Server-scoped shared Keychain pairing (`PushPairing.preferences`) | Replies, subagent mute, and previews apply to this device for that server. Every relay registration sends its confirmed choices, including after token rotation. Settings → Interaction → Notifications separates these from the global local-alert and Live Activity excerpt preferences. |
-| Auth cookies | webui | `HTTPCookieStorage` (shared jar) | Cleared/queried per active server URL (#16). Same-host/different-port servers still share the jar — documented #16 limitation. |
+| Auth cookies | webui | `WebUICookieJar`: one in-memory jar for every webui server, mirrored to one Keychain item (`webui_cookies`, this device only) | Cleared/queried per active server URL (#16); a clear is mirrored, so sign-out and server removal drop the saved copy too. Never in `HTTPCookieStorage.shared`, which persists to backed-up `Library/Cookies`; the first launch after the move migrates and empties it. Same-host/different-port servers still share the jar — documented #16 limitation. |
 | Custom request headers | webui | Keychain, per-server-scoped keys (#16) | `CustomHeaderStore` is hydrated for the active server; SSE + requests source headers from the active store. |
 | Display name / initials / **Header Logo Color** | both | `ServerAccount` in the Keychain registry blob (`Models/ServerAccount.swift`) | Per-server. The **active** server's identity is mirrored into the global `@AppStorage` keys (`SessionIdentitySettings.*`, `HeaderLogoColor.storageKey`) by `ServerRegistry.mirrorIdentityToDefaults`, on activate / set-active / identity-edit / remove — **never on first insert**, so first-run/single-server behavior is unchanged. Consumers (session-list avatar, header logo tint, New Chat / Send primary-action tint) read the mirrored global keys and therefore follow the active server automatically. |
 | Offline session/message cache | webui | SwiftData (`CachedSession`, `CachedMessage`) | Keyed by `serverURLString` (the active server URL's `absoluteString`) on the unique `cacheKey` and on every read/write predicate. See below. |
@@ -121,8 +121,8 @@ per-server:
 `APIClient`'s HTTP sessions (`APIClient.sharedSession` and
 `sharedPublicMediaSession`) are also process-wide and outlive server switches,
 so a newly opened chat reuses warm connections (#688). They hold nothing
-server-specific: connections pool per host, auth cookies live in the shared jar
-(scoped as in the table above), custom headers are applied per request, and the
+server-specific: connections pool per host, auth cookies live in `WebUICookieJar`
+(scoped as in the table above; the event streams use it too), custom headers are applied per request, and the
 #277 cross-origin redirect guard is a per-task delegate bound to each client's
 server. Never invalidate these sessions or give them a session delegate.
 `CrossOriginRedirectHeaderTests` covers the sharing and the per-task guard.

@@ -76,20 +76,8 @@ final class SSEClient: SSEStreamingClient {
             handler.onError(error: error)
             return .shutdown
         }
-        // Custom headers merged underneath the built-ins so the built-ins win on
-        // collision; an empty list leaves the built-in three unchanged (#255).
-        config.headers = customHeaderProvider().merged(under: [
-            "Accept": "text/event-stream",
-            "Cache-Control": "no-cache, no-transform",
-            "Accept-Encoding": "identity"
-        ])
-
-        let configuration = baseConfiguration.copy() as? URLSessionConfiguration ?? .default
-        configuration.httpCookieStorage = .shared
-        configuration.httpCookieAcceptPolicy = .always
-        configuration.httpShouldSetCookies = true
-        configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        config.urlSessionConfiguration = configuration
+        config.headers = StreamSession.headers(for: url, custom: customHeaderProvider())
+        config.urlSessionConfiguration = StreamSession.configuration(from: baseConfiguration)
 
         let source = EventSource(config: config)
         eventSource = source
@@ -101,6 +89,74 @@ final class SSEClient: SSEStreamingClient {
         eventSource?.stop()
         eventSource = nil
     }
+}
+
+/// The request headers and session configuration every webui event stream
+/// (`SSEClient`, `SessionEventStreamClient`, `KanbanEventStreamClient`) opens with.
+enum StreamSession {
+    /// The user's custom headers merged underneath the built-ins, so the built-ins win
+    /// on collision (#255), plus the `StreamRedirectGuard` origin marker.
+    static func headers(for url: URL, custom: [CustomHeader]) -> [String: String] {
+        var builtIns = [
+            "Accept": "text/event-stream",
+            "Cache-Control": "no-cache, no-transform",
+            "Accept-Encoding": "identity"
+        ]
+        if let origin = StreamRedirectGuard.origin(of: url) {
+            builtIns[StreamRedirectGuard.originHeader] = origin
+        }
+        return custom.merged(under: builtIns)
+    }
+
+    /// A copy of `base` that sends `WebUICookieJar`'s cookies, like `APIClient`, and
+    /// refuses cross-origin redirects (`StreamRedirectGuard`) ahead of `base`'s own
+    /// protocol classes.
+    static func configuration(from base: URLSessionConfiguration) -> URLSessionConfiguration {
+        let configuration = base.copy() as? URLSessionConfiguration ?? .default
+        configuration.httpCookieStorage = WebUICookieJar.shared.storage
+        configuration.httpCookieAcceptPolicy = .always
+        configuration.httpShouldSetCookies = true
+        configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        configuration.protocolClasses = [StreamRedirectGuard.self] + (configuration.protocolClasses ?? [])
+        return configuration
+    }
+}
+
+/// Fails a stream request that a redirect points at another origin, so the user's
+/// custom headers (which may hold a proxy secret) never follow it off the server.
+/// `APIClient` does this with a `URLSessionTaskDelegate` (`CrossOriginHeaderStripper`),
+/// but LDSwiftEventSource owns its session's delegate and offers no redirect hook, so
+/// streams get a protocol class instead. The stream request carries its own origin in
+/// `originHeader`, and URLSession copies every header onto a redirect, so a redirected
+/// request whose URL is off that origin is claimed here and fails with
+/// `URLError(.badServerResponse)` before anything is sent. Same-origin requests and
+/// requests without the marker pass through untouched.
+final class StreamRedirectGuard: URLProtocol {
+    /// Names the origin the stream was opened for. It only ever reaches that origin.
+    static let originHeader = "X-Hermex-Stream-Origin"
+
+    static func origin(of url: URL) -> String? {
+        guard let scheme = url.scheme, let host = url.host else { return nil }
+        var parts = URLComponents()
+        parts.scheme = scheme
+        parts.host = host
+        parts.port = url.port
+        return parts.url?.absoluteString
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        guard let marker = request.value(forHTTPHeaderField: originHeader),
+              let origin = URL(string: marker), let url = request.url else { return false }
+        return !APIClient.isSameOrigin(url, as: origin)
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+    }
+
+    override func stopLoading() {}
 }
 
 enum SSEEvent: Equatable {

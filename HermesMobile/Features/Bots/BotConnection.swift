@@ -28,12 +28,14 @@ struct BotConnection: Codable, Equatable, Identifiable {
         return value
     }
 
-    /// Called with the live `install_id` before any password is sent. Throws
-    /// `.differentHost` only when both ids are known and differ; a record without one,
-    /// or a host that omits it this time, connects as before (trust on first use). The
-    /// id is public, so this catches an address that now reaches another host, not an impostor.
+    /// Called with the live `install_id` before any password is sent. A record without
+    /// one connects as before (trust on first use). A record with one throws
+    /// `.differentHost` when the host reports another id or omits it, so a host that
+    /// can't prove it is the saved install never receives the saved password. The id is
+    /// public, so this catches an address that now reaches another host or a careless
+    /// impostor, not one that copied the id.
     func requireSameInstall(_ live: String?) throws {
-        if let installID, let live, installID != live { throw BotFailure.differentHost }
+        if let installID, installID != live { throw BotFailure.differentHost }
     }
 
     /// First path segments a browser, config file or curl command adds to the dashboard's
@@ -45,8 +47,9 @@ struct BotConnection: Codable, Equatable, Identifiable {
     /// reduced to its root: `ws`/`wss` become `http`/`https`, the query and fragment are
     /// dropped, and a path starting with a `dashboardPaths` segment is cleared. Any other
     /// path throws `BotAddressError.path`; credentials, other schemes and bad hosts or
-    /// ports throw `.invalid`. A missing scheme becomes HTTPS, or HTTP for private and
-    /// local hosts. The form's preview and dev auto-login parse through here too.
+    /// ports throw `.invalid`. A missing scheme becomes HTTPS, or HTTP for a loopback
+    /// host, so the saved password never crosses a network in the clear unless the user
+    /// typed `http://`. The form's preview and dev auto-login parse through here too.
     static func address(_ text: String) throws -> URL {
         var value = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty, !value.contains(where: \.isWhitespace) else { throw BotAddressError.invalid }
@@ -87,25 +90,13 @@ struct BotConnection: Codable, Equatable, Identifiable {
 
     /// Infer a scheme only for an omitted one, never as a retry after TLS fails.
     private static func defaultsToHTTP(_ host: String) -> Bool {
-        if let address = IPv4Address(host) { return privateIPv4(Array(address.rawValue)) }
+        if let address = IPv4Address(host) { return address.rawValue.first == 127 }
         if let address = IPv6Address(host) {
             let bytes = Array(address.rawValue)
-            if bytes.prefix(12) == Array(repeating: UInt8(0), count: 10) + [255, 255] {
-                return privateIPv4(Array(bytes.suffix(4)))
-            }
+            if bytes.prefix(12) == Array(repeating: UInt8(0), count: 10) + [255, 255] { return bytes[12] == 127 }
             return bytes == Array(repeating: UInt8(0), count: 15) + [1]
-                || bytes[0] & 0xfe == 0xfc || (bytes[0] == 0xfe && bytes[1] & 0xc0 == 0x80)
         }
-        return host == "localhost" || host.hasSuffix(".localhost") || host.hasSuffix(".local")
-            || (!host.contains(".") && !host.contains(":"))
-    }
-
-    private static func privateIPv4(_ octets: [UInt8]) -> Bool {
-        octets[0] == 10 || octets[0] == 127
-            || (octets[0] == 172 && (16...31).contains(octets[1]))
-            || (octets[0] == 192 && octets[1] == 168)
-            || (octets[0] == 169 && octets[1] == 254)
-            || (octets[0] == 100 && (64...127).contains(octets[1]))
+        return host == "localhost" || host.hasSuffix(".localhost")
     }
 }
 
