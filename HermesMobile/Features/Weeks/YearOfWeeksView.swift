@@ -54,14 +54,8 @@ struct YearOfWeeksView: View {
                 header(reviewed: tiles.filter { if case .reviewed = $0.state { true } else { false } }.count, total: tiles.count)
                 if let loadError = model.loadError {
                     // The tiles show the last good read; a later one failed.
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(verbatim: loadError)
-                            .foregroundStyle(Color.hxTextSecondary)
-                        Button { Task { await load() } } label: { Text(verbatim: "Try again") }
-                            .disabled(isLoading)
-                    }
-                    .font(AppFont.footnote())
-                    .padding(.top, 8)
+                    HXFailedView(title: loadError, style: .inline) { Task { await load() } }
+                        .padding(.top, 8)
                 }
                 LazyVGrid(columns: columns, spacing: 4) {
                     ForEach(tiles, id: \.weekEnding) { tile in

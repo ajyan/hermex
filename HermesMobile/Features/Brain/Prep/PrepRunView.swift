@@ -203,7 +203,7 @@ struct PrepRunView: View {
         case .unavailable:
             PrepUnavailableView()
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load today's run", message: message) {
+            HXFailedView(title: "Couldn't load today's run", message: message) {
                 Task { await viewModel.load() }
             }
         case .rep(let rep, _):

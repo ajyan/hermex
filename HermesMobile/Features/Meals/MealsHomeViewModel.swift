@@ -90,6 +90,14 @@ final class MealsHomeViewModel {
         }
     }
 
+    /// Takes back a night logged by mistake (tonight's Not eaten, or a day's menu): nothing stays
+    /// logged for `day`, and the planned meal goes back to waiting for Eating it.
+    func unlog(_ day: String) async {
+        guard case .loaded(let home) = state, home.days.contains(where: { $0.day == day && $0.logged != nil })
+        else { return }
+        await write({ try await self.client.log(.notEaten(day: day, today: home.day)) })
+    }
+
     /// Opens the rating sheet for a night already logged (tonight's Rate button).
     func rateTonight() {
         guard case .loaded(let home) = state, let tonight = home.tonight else { return }

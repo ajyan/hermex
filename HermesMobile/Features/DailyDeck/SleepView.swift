@@ -117,8 +117,9 @@ struct SleepView: View {
             ContentUnavailableView("No sleep history yet", systemImage: "moon.zzz",
                                    description: Text(verbatim: "It appears after the morning Garmin pull runs."))
         case .failed(let message):
-            ContentUnavailableView("Couldn't load sleep", systemImage: "exclamationmark.triangle",
-                                   description: Text(verbatim: message))
+            HXFailedView(title: "Couldn't load sleep", message: message) {
+                Task { await viewModel.load() }
+            }
         case .ready:
             if let night = viewModel.night {
                 SleepNightCard(night: night, stages: viewModel.stages, usual: viewModel.usual,

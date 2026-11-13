@@ -93,11 +93,9 @@ private struct PlanNextButton: View {
             Group {
                 if busy { ProgressView().tint(Color.hxOnAccent) } else { Text(verbatim: title) }
             }
-            .font(AppFont.headline(weight: .semibold))
-            .frame(maxWidth: .infinity, minHeight: 50)
+            .bodyPrimaryHeight()
         }
-        .buttonStyle(.borderedProminent)
-        .buttonBorderShape(.capsule)
+        .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
         .disabled(busy || disabled)
         .padding(.horizontal, BrainStyle.l)
         .padding(.bottom, 8)
@@ -150,7 +148,7 @@ private struct PlanLoadState<Value: Equatable, Content: View>: View {
                 Text(verbatim: "This server doesn't serve the weekend planner. It needs the Meals API from your hermes-webui fork.")
             }
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load this step", message: message) { Task { await retry() } }
+            HXFailedView(title: "Couldn't load this step", message: message) { Task { await retry() } }
         case .loaded(let value):
             content(value)
         }
@@ -260,7 +258,8 @@ private struct MealsPlanReviewStep: View {
                         Text(verbatim: MealsCopy.weekday(day.day))
                             .font(AppFont.caption2())
                             .foregroundStyle(Color.hxTextSecondary)
-                        MealsReviewDot(state: day.state, paper: paper)
+                        DeckDot(state: MealsCopy.reviewDot(day.state), ink: paper.glow,
+                                column: 22, size: 22)
                     }
                     .frame(maxWidth: .infinity)
                     .accessibilityElement(children: .ignore)
@@ -307,35 +306,20 @@ private struct MealsPlanReviewStep: View {
     }
 }
 
-/// A day on the review's dots card: a filled check when logged, a heavy ring when it needs a look,
-/// a minus when skipped, a faint ring when still ahead, a faint dash with nothing planned.
-private struct MealsReviewDot: View {
-    let state: String
-    let paper: HermexPaper
-
-    var body: some View {
-        ZStack {
-            switch state {
-            case "logged":
-                Circle().fill(paper.glow)
-                Image(systemName: "checkmark").font(AppFont.caption2(weight: .bold)).foregroundStyle(paper.onGlow)
-            case "open":
-                Circle().strokeBorder(paper.glow, lineWidth: 2)
-            case "skipped", "out":
-                Circle().strokeBorder(Color.hxSeparator, lineWidth: 1.5)
-                Image(systemName: state == "out" ? "fork.knife" : "minus")
-                    .font(AppFont.caption2(weight: .bold)).foregroundStyle(Color.hxTextSecondary)
-            case "ahead":
-                Circle().strokeBorder(Color.hxSeparator, lineWidth: 1.5)
-            default:
-                Capsule().fill(Color.hxSeparator).frame(width: 10, height: 2)
-            }
-        }
-        .frame(width: 24, height: 24)
-    }
-}
-
 extension MealsCopy {
+    /// A review day's `DeckDot`, as Meals' week and season draw days: done when logged or eaten out,
+    /// ringed when it needs a look, half-filled when skipped, dashed ahead, a small mark with nothing
+    /// planned.
+    static func reviewDot(_ state: String) -> String {
+        switch state {
+        case "logged", "out": "done"
+        case "open": "today"
+        case "skipped": "skip"
+        case "ahead": "ahead"
+        default: "off"
+        }
+    }
+
     static func reviewLabel(_ state: String) -> String {
         switch state {
         case "logged": "logged"

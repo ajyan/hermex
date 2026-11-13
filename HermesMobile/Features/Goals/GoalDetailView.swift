@@ -69,7 +69,7 @@ struct GoalDetailView: View {
                 Text(verbatim: "It may have been closed or renamed.")
             }
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load this goal", message: message) {
+            HXFailedView(title: "Couldn't load this goal", message: message) {
                 Task { await viewModel.load() }
             }
         case .loaded(let detail):

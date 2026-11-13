@@ -59,12 +59,8 @@ struct MoneyView: View {
         switch viewModel.state {
         case .idle, .loading:
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-        case .needsWorkspace:
-            ContentUnavailableView {
-                Label { Text(verbatim: "Choose your vault") } icon: { Image(systemName: "folder") }
-            } description: {
-                Text(verbatim: "Open Daily Brief once to choose your vault.")
-            }
+        case .needsWorkspace(let paths):
+            workspacePicker(paths)
         case .noSnapshot:
             ContentUnavailableView {
                 Label { Text(verbatim: "No money snapshot yet") } icon: { Image(systemName: "chart.line.uptrend.xyaxis") }
@@ -74,24 +70,44 @@ struct MoneyView: View {
                 Button { Task { await viewModel.load() } } label: { Text(verbatim: "Check Again") }
             }
         case .failed(let message):
-            ContentUnavailableView {
-                Label { Text(verbatim: "Couldn't load Money") } icon: { Image(systemName: "exclamationmark.triangle") }
-            } description: {
-                Text(verbatim: message)
-            } actions: {
-                Button { Task { await viewModel.load() } } label: { Text(verbatim: "Try Again") }
+            HXFailedView(title: "Couldn't load Money", message: message) {
+                Task { await viewModel.load() }
             }
         case .ready:
             if let snapshot = viewModel.snapshot { ready(snapshot) }
         }
     }
 
+    /// The Daily Brief's own question, asked here so Money is never a dead end. The choice is shared.
+    private func workspacePicker(_ paths: [String]) -> some View {
+        List {
+            Section {
+                ForEach(paths, id: \.self) { path in
+                    Button { Task { await viewModel.chooseWorkspace(path) } } label: {
+                        Text(verbatim: path).font(AppFont.body()).foregroundStyle(Color.hxTextPrimary)
+                    }
+                }
+            } header: {
+                Text(verbatim: "Which workspace is your vault?")
+            } footer: {
+                Text(verbatim: "The Daily Brief reads from the same one.")
+            }
+        }
+    }
+
     private func ready(_ snapshot: MoneySnapshot) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                headline
+                if let refreshError = viewModel.refreshError {
+                    HXFailedView(title: "Couldn't refresh", message: refreshError, style: .inline) {
+                        Task { await viewModel.load() }
+                    }
                     .padding(.horizontal, 16)
-                MoneyChart(points: viewModel.points, scrubbed: viewModel.scrubbed, color: trendColor) { viewModel.scrub(to: $0) }
+                    .padding(.bottom, 8)
+                }
+                MoneyHeadline(viewModel: viewModel)
+                    .padding(.horizontal, 16)
+                MoneyScrubChart(viewModel: viewModel)
                     .frame(height: 190)
                     .padding(.top, 12)
                 rangePicker
@@ -106,6 +122,19 @@ struct MoneyView: View {
                     spendingCard(spending, month)
                         .padding(.horizontal, 16)
                         .padding(.top, 12)
+                    if viewModel.spendingError != nil {
+                        Text(verbatim: "Couldn't refresh spending; showing the last read.")
+                            .font(AppFont.caption())
+                            .foregroundStyle(Color.hxTextSecondary)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 6)
+                    }
+                } else if let spendingError = viewModel.spendingError {
+                    HXFailedView(title: "Couldn't load spending", message: spendingError, style: .inline) {
+                        Task { await viewModel.load() }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
                 }
                 if snapshot.holdingsMissing {
                     Text(verbatim: "Add finance/sync/holdings.yaml in your vault to split out the market.")
@@ -121,49 +150,11 @@ struct MoneyView: View {
             .padding(.vertical, 12)
             .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
         }
-        .scrollDisabled(viewModel.scrubbed != nil)
+        .scrollDisabled(viewModel.isScrubbing)
         .refreshable { await viewModel.load() }
     }
 
-    // MARK: Headline
-
-    private var trendColor: Color { MoneyView.color(for: MoneyChange.between(viewModel.points).amount) }
-
-    private var headline: some View {
-        let change = viewModel.change
-        return VStack(alignment: .leading, spacing: 2) {
-            Text(verbatim: "Net worth")
-                .font(AppFont.footnote())
-                .foregroundStyle(Color.hxTextSecondary)
-            // Not a button: a tap on the number is the first thing someone shown the phone does.
-            Text(verbatim: MoneyFormat.amount(viewModel.displayedValue, hidden: viewModel.isHidden))
-                .font(AppFont.display(style: .largeTitle, weight: .semibold))
-                .monospacedDigit()
-                .foregroundStyle(Color.hxTextPrimary)
-                .contentTransition(.numericText())
-                .accessibilityLabel(Text(verbatim: viewModel.isHidden ? "Net worth, amount hidden" : "Net worth, \(MoneyFormat.amount(viewModel.displayedValue, hidden: false))"))
-            HStack(spacing: 6) {
-                Text(verbatim: "\(MoneyFormat.signed(change.amount, hidden: viewModel.isHidden)) (\(MoneyFormat.percent(change.percent)))")
-                    .foregroundStyle(MoneyView.color(for: change.amount))
-                    .monospacedDigit()
-                Text(verbatim: scrubLabel)
-                    .foregroundStyle(Color.hxTextSecondary)
-            }
-            .font(AppFont.subheadline(weight: .medium))
-            if let warning = viewModel.trustWarning {
-                Label { Text(verbatim: warning) } icon: { Image(systemName: "exclamationmark.triangle.fill") }
-                    .font(AppFont.footnote(weight: .medium))
-                    .foregroundStyle(Color.hxWarning)
-                    .padding(.top, 6)
-            }
-        }
-    }
-
-    private var scrubLabel: String {
-        guard let point = viewModel.scrubbed else { return viewModel.range.label }
-        let day = MoneyPoint.label(point.date, withYear: true)
-        return point.e ? "\(day) · estimated" : day
-    }
+    // MARK: Range
 
     /// The system segmented control, like the Sleep screen's span: a control, so it wears the
     /// tint, never the gain or loss color.
@@ -377,5 +368,58 @@ struct MoneySplitBar: View {
         }
         .frame(height: 6)
         .accessibilityHidden(true)
+    }
+}
+
+/// Net worth, the range's change and the trust warning. It reads the scrubbed day, so a drag on
+/// the chart redraws this and the chart, never the rest of Money.
+private struct MoneyHeadline: View {
+    let viewModel: MoneyViewModel
+
+    var body: some View {
+        let change = viewModel.change
+        VStack(alignment: .leading, spacing: 2) {
+            Text(verbatim: "Net worth")
+                .font(AppFont.footnote())
+                .foregroundStyle(Color.hxTextSecondary)
+            // Not a button: a tap on the number is the first thing someone shown the phone does.
+            Text(verbatim: MoneyFormat.amount(viewModel.displayedValue, hidden: viewModel.isHidden))
+                .font(AppFont.display(style: .largeTitle, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(Color.hxTextPrimary)
+                .contentTransition(.numericText())
+                .accessibilityLabel(Text(verbatim: viewModel.isHidden ? "Net worth, amount hidden" : "Net worth, \(MoneyFormat.amount(viewModel.displayedValue, hidden: false))"))
+            HStack(spacing: 6) {
+                Text(verbatim: "\(MoneyFormat.signed(change.amount, hidden: viewModel.isHidden)) (\(MoneyFormat.percent(change.percent)))")
+                    .foregroundStyle(MoneyView.color(for: change.amount))
+                    .monospacedDigit()
+                Text(verbatim: scrubLabel)
+                    .foregroundStyle(Color.hxTextSecondary)
+            }
+            .font(AppFont.subheadline(weight: .medium))
+            if let warning = viewModel.trustWarning {
+                Label { Text(verbatim: warning) } icon: { Image(systemName: "exclamationmark.triangle.fill") }
+                    .font(AppFont.footnote(weight: .medium))
+                    .foregroundStyle(Color.hxWarning)
+                    .padding(.top, 6)
+            }
+        }
+    }
+
+    private var scrubLabel: String {
+        guard let point = viewModel.scrubbed else { return viewModel.range.label }
+        let day = MoneyPoint.label(point.date, withYear: true)
+        return point.e ? "\(day) · estimated" : day
+    }
+}
+
+/// The range's chart in its gain or loss color; dragging scrubs the headline.
+private struct MoneyScrubChart: View {
+    let viewModel: MoneyViewModel
+
+    var body: some View {
+        let points = viewModel.points
+        MoneyChart(points: points, scrubbed: viewModel.scrubbed,
+                   color: MoneyView.color(for: MoneyChange.between(points).amount)) { viewModel.scrub(to: $0) }
     }
 }
