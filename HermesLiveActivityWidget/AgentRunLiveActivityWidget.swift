@@ -155,7 +155,6 @@ private struct AgentRunLockScreenView: View {
                 Text(isBot ? "Atlas · \(String(localized: "Bot"))" : "Atlas")
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(AgentRunLiveActivityTheme.secondaryText)
-                    .textCase(.uppercase)
 
                 Text(context.presentedState.sessionTitle)
                     .font(.headline.weight(.semibold))

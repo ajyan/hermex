@@ -69,7 +69,7 @@ struct CronJobEditorSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Task") {
+                Section {
                     TextField("Name", text: $draft.name)
 
                     TextField("Prompt", text: $draft.prompt, axis: .vertical)
@@ -78,9 +78,12 @@ struct CronJobEditorSheet: View {
                     TextField("Schedule", text: $draft.schedule)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                } header: {
+                    HXSectionHeader(title: String(localized: "Task"))
+                        .textCase(nil)
                 }
 
-                Section("Delivery") {
+                Section {
                     if let deliverPickerOptions {
                         Picker("Deliver", selection: $draft.deliver) {
                             ForEach(deliverPickerOptions) { option in
@@ -101,6 +104,9 @@ struct CronJobEditorSheet: View {
                     }
 
                     Toggle("Toast Notifications", isOn: $draft.toastNotifications)
+                } header: {
+                    HXSectionHeader(title: String(localized: "Delivery"))
+                        .textCase(nil)
                 }
 
                 Section {
@@ -125,7 +131,8 @@ struct CronJobEditorSheet: View {
                         onRetry: { Task { await configuration.loadProfiles() } }
                     )
                 } header: {
-                    Text("Configuration")
+                    HXSectionHeader(title: String(localized: "Configuration"))
+                        .textCase(nil)
                 } footer: {
                     // States what upstream already does rather than
                     // reimplementing it: `_selected_profile_snapshot_updates`

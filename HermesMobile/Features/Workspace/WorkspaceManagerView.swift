@@ -249,7 +249,7 @@ private struct WorkspaceAddSheet: View {
                 }
 
                 if !filteredSuggestions.isEmpty {
-                    Section("Suggestions") {
+                    Section {
                         ForEach(filteredSuggestions, id: \.self) { suggestion in
                             Button {
                                 path = suggestion
@@ -269,6 +269,9 @@ private struct WorkspaceAddSheet: View {
                             }
                             .buttonStyle(.plain)
                         }
+                    } header: {
+                        HXSectionHeader(title: String(localized: "Suggestions"))
+                            .textCase(nil)
                     }
                 }
             }
