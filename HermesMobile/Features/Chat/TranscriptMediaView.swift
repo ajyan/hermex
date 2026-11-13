@@ -1,5 +1,6 @@
 import AVFoundation
 import AVKit
+import MarkdownUI
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
@@ -589,6 +590,45 @@ private struct TranscriptMediaVideoTile: View {
                     .foregroundStyle(Color.hxTextSecondary)
             }
             .padding(.horizontal, 14)
+        }
+    }
+}
+
+/// MarkdownUI's image loaders held to `TranscriptRemoteFetchPolicy`, for the images the
+/// transcript parser leaves in the text (a reference-style `![x][r]`). A block image off
+/// the server's origin shows the tap-to-load chip; an inline one shows a photo symbol.
+struct TranscriptGatedImageProvider: ImageProvider {
+    let serverOrigin: URL?
+
+    func makeImage(url: URL?) -> some View {
+        TranscriptGatedMarkdownImage(url: url, serverOrigin: serverOrigin)
+    }
+}
+
+struct TranscriptGatedInlineImageProvider: InlineImageProvider {
+    var serverOrigin: URL?
+
+    func image(with url: URL, label: String) async throws -> Image {
+        guard TranscriptRemoteFetchPolicy.loadsAutomatically(url, serverOrigin: serverOrigin) else {
+            return Image(systemName: "photo")
+        }
+        return try await DefaultInlineImageProvider.default.image(with: url, label: label)
+    }
+}
+
+private struct TranscriptGatedMarkdownImage: View {
+    let url: URL?
+    let serverOrigin: URL?
+
+    @State private var isFetchApproved = false
+
+    var body: some View {
+        if let url, !isFetchApproved, !TranscriptRemoteFetchPolicy.loadsAutomatically(url, serverOrigin: serverOrigin) {
+            TranscriptRemoteMediaPlaceholder(reference: TranscriptMediaReference(rawReference: url.absoluteString)) {
+                isFetchApproved = true
+            }
+        } else {
+            DefaultImageProvider.default.makeImage(url: url)
         }
     }
 }

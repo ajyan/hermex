@@ -1815,7 +1815,6 @@ struct ChatView: View {
         .transcriptLinks(perform: handleTranscriptLink)
         .interactiveAnswerAsk(perform: fillDraftFromInteractiveAnswer)
         .environment(\.chatWorkspaceRoot, session.workspace)
-        .environment(\.transcriptServerOrigin, server)
         .task(id: transcriptSkillReferenceCount) {
             await loadSkillSuggestionsForTranscriptChipsIfNeeded()
         }

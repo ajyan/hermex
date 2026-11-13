@@ -198,6 +198,7 @@ private struct ChatMarkdownView: View {
     let content: String
     let colorScheme: ColorScheme
     let isStreaming: Bool
+    @Environment(\.transcriptServerOrigin) private var serverOrigin
 
     var body: some View {
         // Parsed here rather than inside `Markdown(_: String)` so the parse alone is timed.
@@ -214,6 +215,8 @@ private struct ChatMarkdownView: View {
                 BackgroundColor(nil)
             }
             .markdownCodeSyntaxHighlighter(.plainText)
+            .markdownImageProvider(TranscriptGatedImageProvider(serverOrigin: serverOrigin))
+            .markdownInlineImageProvider(TranscriptGatedInlineImageProvider(serverOrigin: serverOrigin))
     }
 }
 
