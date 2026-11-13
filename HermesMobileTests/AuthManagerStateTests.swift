@@ -994,11 +994,10 @@ final class AuthManagerStateTests: XCTestCase {
 
     func testASavedPasswordLeavesTheFormWhenTheAddressChanges() async throws {
         defer { HermesHostFixture.reset() }
-        // The second row changes only the scheme the dashboard is reached at: the webui path
-        // reads both texts as https://hermes.local:9119, the Hermes parser does not.
+        // The second row changes only the scheme the dashboard is reached at.
         let rows: [(saved: String, typed: String, edited: String, mode: OnboardingViewModel.ConnectionMode, rowsLeft: [String])] = [
             ("https://hermes.example", "hermes.example", "other.example", .privateNetwork, []),
-            ("http://hermes.local:9119", "hermes.local:9119", "https://hermes.local:9119", .cloudflareTunnel,
+            ("https://hermes.local:9119", "hermes.local:9119", "http://hermes.local:9119", .cloudflareTunnel,
              ["CF-Access-Client-Id", "CF-Access-Client-Secret"])
         ]
         for row in rows {

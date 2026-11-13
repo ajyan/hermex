@@ -10,8 +10,10 @@ record stores it the first time the host reports one (trust on first use; the in
 backfills older records). A sign-in whose live id differs from the stored one
 fails with `.differentHost` before the login POST, in `HermesConnection.signIn()`,
 which every Bot surface and push provisioning goes through, so they all refuse
-without sending the password. A missing stored or live id skips the check, and an
-omitted id never clears a stored one. In the connection form, a new address or
+without sending the password. A record without a stored id skips the check; a
+record with one also fails with `.differentHost` when the host omits the live id,
+so a host that can't prove the saved install never gets the password. An omitted
+id never clears a stored one. In the connection form, a new address or
 username keeps the UUID when the host reports the stored `install_id`; otherwise a
 different endpoint or username gets a new UUID. Password/name edits retain the
 identity. After `.differentHost`, "Connect to this host instead" saves a new UUID
@@ -231,9 +233,10 @@ still with Reduce Motion. Setup help copies a generic prompt for the user's
 agent; copying sends nothing and includes no credentials or configured address.
 The prompt discovers the existing backend and asks before changing setup.
 The same connection form serves Bots, Settings and push setup. A schemeless
-address defaults to HTTPS, except recognizable private/local IPs (including
-Tailscale ranges), local names and single-label hosts use HTTP. Explicit schemes
-and ports are preserved; TLS failures never trigger an HTTP downgrade. A pasted
+address defaults to HTTPS; only loopback (`localhost`, `127/8`, `::1`) defaults to
+HTTP, so the saved password never crosses a network in the clear unless the user
+typed `http://`. Explicit schemes and ports are preserved; TLS failures never
+trigger an HTTP downgrade. Saved records keep the full URL they were saved with. A pasted
 link is reduced to its root: `ws`/`wss` become `http`/`https`, the query and
 fragment are dropped, and a path starting with `login`, `auth`, `api`, `chat` or
 `sessions` is removed; any other path (a proxy prefix) and credentials are refused.

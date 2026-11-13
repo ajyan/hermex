@@ -846,31 +846,35 @@ import XCTest
         client.close()
     }
 
-    func testAHostReportingAnotherInstallIDIsRefusedBeforeThePasswordIsSent() async {
+    func testAHostReportingAnotherOrNoInstallIDIsRefusedBeforeThePasswordIsSent() async {
         let saved = String(repeating: "a", count: 32), other = String(repeating: "b", count: 32)
-        var paths: [String] = []
-        BotHTTPFixture.handler = { request in
-            paths.append(request.url!.path)
-            return (200, .object(["auth_required": .bool(true), "auth_providers": .array([.string("basic")]),
-                                  "install_id": .string(other)]))
+        // A host that omits the id can't prove it is the saved install, so it is refused too.
+        for live in [other, nil] as [String?] {
+            var paths: [String] = []
+            BotHTTPFixture.handler = { request in
+                paths.append(request.url!.path)
+                var status: [String: BotJSON] = ["auth_required": .bool(true), "auth_providers": .array([.string("basic")])]
+                if let live { status["install_id"] = .string(live) }
+                return (200, .object(status))
+            }
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.protocolClasses = [BotHTTPFixture.self]
+            var record = connection(); record.installID = saved
+            let client = BotClient(connection: record, configuration: configuration) { _ in
+                XCTFail("Must not open a socket")
+                return BotScriptedSocket()
+            }
+            do { try await client.connect(); XCTFail("Expected a different host for \(live ?? "nil")") }
+            catch { XCTAssertEqual(error as? BotFailure, .differentHost) }
+            XCTAssertEqual(paths, ["/api/status"], "No login request reaches the other host")
+            client.close()
         }
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [BotHTTPFixture.self]
-        var record = connection(); record.installID = saved
-        let client = BotClient(connection: record, configuration: configuration) { _ in
-            XCTFail("Must not open a socket")
-            return BotScriptedSocket()
-        }
-        do { try await client.connect(); XCTFail("Expected a different host") }
-        catch { XCTAssertEqual(error as? BotFailure, .differentHost) }
-        XCTAssertEqual(paths, ["/api/status"], "No login request reaches the other host")
-        client.close()
     }
 
-    func testAMatchingOrMissingInstallIDConnectsAndReportsTheLiveOne() async throws {
+    func testAMatchingInstallIDOrALegacyRecordConnectsAndReportsTheLiveOne() async throws {
         let known = String(repeating: "a", count: 32), fresh = String(repeating: "c", count: 32)
-        // (stored, live): the same host, a host omitting it after a read error, and a legacy record.
-        for (stored, live) in [(known, known), (known, nil), (nil, fresh)] as [(String?, String?)] {
+        // (stored, live): the same host, and a legacy record or a host that never reported one.
+        for (stored, live) in [(known, known), (nil, fresh), (nil, nil)] as [(String?, String?)] {
             BotHTTPFixture.handler = { request in
                 switch request.url!.path {
                 case "/api/status":
