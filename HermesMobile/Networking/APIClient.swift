@@ -278,7 +278,8 @@ actor APIClient {
         endpoint: Endpoint,
         body: Data,
         contentType: String,
-        requireSuccess: Bool = true
+        requireSuccess: Bool = true,
+        timeout: TimeInterval? = nil
     ) async throws -> (Data, HTTPURLResponse) {
         var request = URLRequest(url: endpoint.url(relativeTo: baseURL))
         request.httpMethod = "POST"
@@ -286,6 +287,7 @@ actor APIClient {
         customHeaderProvider().apply(to: &request)
         request.setValue(contentType, forHTTPHeaderField: "Content-Type")
         request.httpBody = body
+        if let timeout { request.timeoutInterval = timeout }
         return try await sendPreparedRequest(request, requireSuccess: requireSuccess)
     }
 

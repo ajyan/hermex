@@ -27,3 +27,24 @@ struct DictationTidyResponse: Decodable {
 struct DictationTidyRequest: Encodable {
     let text: String
 }
+
+/// `POST /api/dictation/polish`: `{ok, id, text, transcript, used}`, or `{error}` when the local model is away.
+struct DictationPolishResponse: Decodable {
+    let ok: Bool?
+    let id: String?
+    let text: String?
+    let error: String?
+}
+
+/// `POST /api/dictation/outcome`: what one mic session's words read when the box was saved or closed.
+struct DictationOutcomeRequest: Encodable {
+    let session: String
+    let final: String
+    let undone: Bool
+    let waitMs: Int
+    let ids: [String]
+}
+
+struct DictationOutcomeResponse: Decodable {
+    let ok: Bool?
+}

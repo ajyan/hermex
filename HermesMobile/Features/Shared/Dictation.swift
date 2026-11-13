@@ -3,151 +3,197 @@ import FoundationModels
 import Observation
 import SwiftUI
 
-// Dictation into a text box, Wispr Flow style: the words appear punctuated as they are heard, and
-// the dictated part is tidied (grammar, fillers, paragraphs) by the server's local model, or the
-// on-device model when the server is slow or away, with "Original" one tap away. Tidying starts
-// while the speaker talks, a passage at a time, so Stop waits only on the last few words. While you
-// talk, text typed before the dictation is left alone. The keyboard goes away while the mic listens,
-// and typing into the box stops it: the recognizer never writes over a keyboard edit, and the tidy
-// waits for the box's Done (`finish()`) rather than rewriting under the cursor. A box that says when
-// it `opened` gets one more pass on Done: if its words changed since it opened, typed or spoken, and
-// no tidy has seen them as a whole, the whole box is tidied as if it had all been dictated at once.
+// Dictation into a text box, Wispr Flow style. The words appear at the cursor as they are heard, by
+// the phone's recognizer primed with the server's names and words. Each finished passage goes to the
+// server with its audio: a larger model on the Mac transcribes it again, the local model rewrites it
+// as clean text (grammar, fillers, punctuation, self-corrections), and the result replaces the passage
+// when the mic stops, with "Original" one tap away. Passages are sent while the speaker talks, so Stop
+// waits only on the last one. With the server away, the phone's own model tidies the words as heard.
+//
+// The keyboard stays as it was and the mic stays on while you type. Fixing a word inside what you
+// just dictated leaves speech going on at the end of it; typing or tapping anywhere else moves speech
+// to the cursor. A passage you edited is rewritten from your edit, never from the audio. A box that
+// says when it `opened` gets one more pass on Done: if you typed into it since it opened and no tidy
+// has seen the typing, the whole box is tidied as if it had all been dictated at once.
 
-/// Rewrites one dictated passage. Tests inject their own; the live one is Apple's on-device model.
-protocol DictationPolishing {
-    func polish(_ text: String) async throws -> String
+/// One finished passage of speech on its way to the rewriter.
+struct DictationPassage: Equatable {
+    /// The words as the phone heard them, or as the user corrected them.
+    var heard: String
+    /// The text just before the passage in the box, as context only.
+    var before = ""
+    /// The passage's audio as a WAV file, when the recognizer kept it and the words are untouched.
+    var audio: Data?
+    /// One mic session, and the passage's place in it, for the server's log.
+    var session = ""
+    var sequence = 0
+    var engine = ""
 }
 
-/// One mic's state: the recognizer, the tidy as it talks and after Stop, and the way back to the raw words.
+struct DictationPolish: Equatable {
+    var text: String
+    /// The server's log record for this passage; nil from the on-device model.
+    var id: String?
+}
+
+/// How one mic session ended up, for the server's log: what the dictated words read once the box was
+/// saved or closed, after any fixes.
+struct DictationOutcome: Equatable {
+    var session: String
+    var final: String
+    var undone: Bool
+    var waitMilliseconds: Int
+    var ids: [String]
+}
+
+/// Rewrites dictated passages. Tests inject their own; the live one is the server's local model,
+/// then Apple's on-device model.
+protocol DictationPolishing {
+    func polish(_ passage: DictationPassage) async throws -> DictationPolish
+    func report(_ outcome: DictationOutcome) async
+}
+
+extension DictationPolishing {
+    func report(_ outcome: DictationOutcome) async {}
+}
+
+/// What a mic needs from the phone and the server; tests replace the parts.
+@MainActor
+struct DictationServices {
+    var polisher: (URL?) -> (any DictationPolishing)? = DictationPolisher.live
+    var vocabulary: (URL?) async -> [String] = DictationVocabulary.terms
+    var listener: @MainActor () -> any DictationListening = DictationListenerFactory.live
+    /// Tried once when `listener` can't start.
+    var fallbackListener: (@MainActor () -> any DictationListening)? = { LegacyDictationListener() }
+    var cursor: any DictationCursor = FocusedFieldCursor()
+    var mayRecord: @MainActor () -> Bool = {
+        ComposerVoiceInputStartPolicy.canStart(
+            appIsActive: UIApplication.shared.applicationState == .active,
+            appIsLocked: AppLock.shared.isLocked)
+    }
+}
+
+/// One mic's state: the recognizer, the passages on their way to the rewriter, and the way back to
+/// the words as heard.
 @MainActor
 @Observable
 final class DictationModel {
-    let voiceInput: ComposerVoiceInputController
+    enum Phase: Equatable {
+        case idle
+        /// Asking permission and starting the recognizer.
+        case starting
+        case listening
+        /// The mic is off and the last words are settling.
+        case finishing
+    }
+
+    private(set) var phase = Phase.idle
     private(set) var isTidying = false
-    /// The draft before and after the last tidy; set while "Original" can still put it back.
+    private(set) var errorMessage: String?
+    /// The box before and after the last tidy; set while "Original" can still put it back.
     private(set) var lastTidy: (original: String, tidied: String)?
 
-    /// Looked up on Start rather than at init: SwiftUI builds a mic's initial state on every render.
-    @ObservationIgnored private let polisher: (URL?) -> (any DictationPolishing)?
-    @ObservationIgnored private var activePolisher: (any DictationPolishing)?
-    /// The active server, whose local model tidies first; nil tidies on-device only.
+    /// The active server, whose models transcribe and tidy first; nil tidies on-device only.
     @ObservationIgnored var server: URL?
+    @ObservationIgnored private let services: DictationServices
+    @ObservationIgnored private var activePolisher: (any DictationPolishing)?
+    @ObservationIgnored private var listener: (any DictationListening)?
     @ObservationIgnored private var text: Binding<String>?
-    /// The draft when dictation began; nil when nothing is waiting to be tidied.
-    @ObservationIgnored private var base: String?
-    @ObservationIgnored private var tidyTask: Task<Void, Never>?
-    /// The finished segments already handed to the model while talking, and their tidied passages in order.
-    @ObservationIgnored private var sentEarly = ""
-    @ObservationIgnored private var tidiedEarly: [String] = []
-    /// Tidies the early passages one after another, so they finish in the order they were spoken.
-    @ObservationIgnored private var earlyChain: Task<Void, Never>?
-    /// The field as dictation last wrote it, and the recognizer's draft it wrote: a field that differs
-    /// was edited on the keyboard.
-    @ObservationIgnored private var lastWritten = ""
-    @ObservationIgnored private var lastHeard = ""
-    /// Set when typing stopped the mic: the tidy waits for `finish()`.
-    @ObservationIgnored private var heldForEdit = false
-    /// Set once the field was edited on the keyboard: from then on the recognizer only adds words at the end.
-    @ObservationIgnored private var appendsOnly = false
+    /// The box as dictation knows it; nil when nothing was dictated since the last whole-box tidy.
+    @ObservationIgnored private(set) var document: DictationDocument?
+    @ObservationIgnored private var documentBeforeTidy: DictationDocument?
+    /// The recognizer's words not yet cut into a passage: final ones, then the ones still changing.
+    @ObservationIgnored private var settled = ""
+    @ObservationIgnored private var volatile = ""
+    /// Each passage sent to the rewriter: the words it was sent with and the rewrite on its way.
+    @ObservationIgnored private var sent: [Int: (heard: String, task: Task<DictationPolish?, Never>)] = [:]
+    /// The last send, so passages are rewritten in the order they were spoken.
+    @ObservationIgnored private var chain: Task<DictationPolish?, Never>?
+    @ObservationIgnored private var session = ""
+    @ObservationIgnored private var sequence = 0
+    @ObservationIgnored private var engineName = ""
+    /// For the server's log: its records for this session, whether "Original" was tapped, the wait on Stop.
+    @ObservationIgnored private var recordIDs: [String] = []
+    @ObservationIgnored private var undone = false
+    @ObservationIgnored private var waitMilliseconds = 0
     /// The box's words as a whole that need no tidy on Done: what it held when it opened, then the
-    /// last text a tidy saw whole. Nil until `opened`, so a box that never says it opened is never
-    /// tidied whole.
-    @ObservationIgnored private var settled: String?
-    /// Whether the running `tidyTask` covers the whole box (the box was empty when dictation began).
-    @ObservationIgnored private var tidyCoversBox = false
-    /// `finish()` calls waiting for a server transcription to land.
-    @ObservationIgnored private var idleWaiters: [CheckedContinuation<Void, Never>] = []
+    /// last text a tidy left. Nil until `opened`, so a box that never says it opened is never tidied whole.
+    @ObservationIgnored private var seenWhole: String?
+    /// Whether the keyboard changed the box since `seenWhole`.
+    @ObservationIgnored private var typed = false
+    @ObservationIgnored private var work: Task<Void, Never>?
 
-    /// Words a finished stretch of speech needs before it is tidied early: enough context for a good rewrite.
+    /// One mic listens at a time: starting another stops this one, keeping its words.
+    private static weak var active: DictationModel?
+
+    /// Settled words a passage needs before it is sent while the speaker talks: enough for a good rewrite.
     static let earlyPassageWords = 25
 
-    init(
-        voiceInput: ComposerVoiceInputController? = nil,
-        polisher: @escaping (URL?) -> (any DictationPolishing)? = DictationPolisher.live
-    ) {
-        self.voiceInput = voiceInput ?? ComposerVoiceInputController(punctuates: true)
-        self.polisher = polisher
-        // Driven by the recognizer rather than the view, so a box that closes mid-dictation still tidies.
-        self.voiceInput.onStateChange = { [weak self] in self?.voiceStateChanged() }
+    init(services: DictationServices? = nil) {
+        self.services = services ?? DictationServices()
     }
 
     var canUndoTidy: Bool { lastTidy != nil }
+    var isListening: Bool { phase == .listening }
+    var isStarting: Bool { phase == .starting }
 
     /// Listening, or tidying what was heard: a box closing now would lose words or their tidy.
-    var isBusy: Bool { voiceInput.state != .idle || isTidying }
+    var isBusy: Bool { phase != .idle || isTidying }
 
     /// Call when a box with a Done opens, after its text is loaded: Done then tidies the whole box
-    /// if its words changed since now.
+    /// if it was typed into since now.
     func opened(_ text: Binding<String>, server: URL?) {
         self.text = text
         self.server = server
-        settled = text.wrappedValue
+        seenWhole = text.wrappedValue
+        typed = false
     }
 
-    /// Starts or stops dictation into `text`.
-    func toggle(_ text: Binding<String>) {
-        if voiceInput.state == .idle {
-            begin(text)
+    /// Starts or stops dictation into `text`. The returned task ends when the mic is listening, or
+    /// when the stopped words are tidied.
+    @discardableResult
+    func toggle(_ text: Binding<String>) -> Task<Void, Never>? {
+        switch phase {
+        case .idle:
+            work = Task { await start(text) }
+        case .starting:
+            cancel()
+        case .listening:
+            work = Task { await stop() }
+        case .finishing:
+            break
         }
-        voiceInput.scheduleToggle(currentDraft: text.wrappedValue) { [weak self] in self?.heard($0) }
+        return work
     }
 
-    /// A draft from the recognizer: written whole while the field is as dictation left it. After a
-    /// keyboard edit only its new words go on the end (a server transcript landing after the edit).
-    func heard(_ draft: String) {
-        guard let text else { return }
-        let current = text.wrappedValue
-        var next = draft
-        if current != lastWritten { appendsOnly = true }
-        if appendsOnly {
-            guard draft.hasPrefix(lastHeard) else { return }
-            let added = draft.dropFirst(lastHeard.count).trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !added.isEmpty else { return }
-            next = current.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? added : current + " " + added
-        }
-        lastHeard = draft
-        lastWritten = next
-        text.wrappedValue = next
-    }
-
-    /// Called on every recognizer state change: a return to idle tidies what was dictated.
-    func voiceStateChanged() {
-        guard voiceInput.state == .idle else { return }
-        if !heldForEdit { startTidy() }
-        let waiters = idleWaiters
-        idleWaiters = []
-        waiters.forEach { $0.resume() }
-    }
-
-    /// Call on every change to the field: typing while the mic listens stops it and keeps every word;
-    /// an edit after a tidy keeps the edit and drops "Original".
+    /// Call on every change to the box: a keyboard edit moves the passages with it, and one after a
+    /// tidy drops "Original".
     func textChanged(_ newText: String) {
-        if newText != lastWritten, voiceInput.state == .listening || voiceInput.state == .serverListening {
-            heldForEdit = true
-            voiceInput.stopKeepingTranscript()
+        if let document, newText != document.text {
+            if phase == .listening || phase == .finishing {
+                sync()
+            } else {
+                self.document?.adopt(newText)
+                typed = true
+            }
+        } else if document == nil, let seenWhole, newText != seenWhole {
+            typed = true
         }
-        if let lastTidy, newText != lastTidy.tidied { self.lastTidy = nil }
+        if let lastTidy, newText != lastTidy.tidied {
+            self.lastTidy = nil
+            documentBeforeTidy = nil
+        }
     }
 
-    /// Stops listening and waits for the words to land and be tidied: a box's Done calls this before it
-    /// closes, so what it saves is the tidied text. After `opened`, a box whose words changed is tidied
-    /// whole, edits and earlier words included; a dictation into an empty box keeps its passage tidy.
+    /// Stops listening and waits for the words to land and be tidied: a box's Done calls this before
+    /// it closes, so what it saves is the tidied text.
     func finish() async {
-        switch voiceInput.state {
-        case .listening, .serverListening, .requestingPermission: voiceInput.stopKeepingTranscript()
-        case .idle, .transcribing: break
+        switch phase {
+        case .listening: await stop()
+        case .starting: cancel()
+        case .idle, .finishing: await work?.value
         }
-        if voiceInput.state != .idle {
-            await withCheckedContinuation { idleWaiters.append($0) }
-        }
-        if settled != nil, let base, !Self.isBlank(base) {
-            // The dictation went after earlier words, so the whole-box tidy below covers it.
-            self.base = nil
-            dropEarly()
-        }
-        startTidy()
-        if settled != nil, !tidyCoversBox { tidyTask?.cancel() }
-        await tidyTask?.value
+        reportOutcome()
         await tidyWholeBox()
     }
 
@@ -155,130 +201,279 @@ final class DictationModel {
     func undoTidy() {
         guard let lastTidy, let text else { return }
         self.lastTidy = nil
+        if let documentBeforeTidy { document = documentBeforeTidy }
+        documentBeforeTidy = nil
+        undone = true
         text.wrappedValue = lastTidy.original
         // You chose the words as heard: Done keeps them.
-        if settled != nil { settled = lastTidy.original }
+        if seenWhole != nil {
+            seenWhole = lastTidy.original
+            typed = false
+        }
     }
 
     /// Stops listening and drops any pending tidy: the answer is being sent or the box is going away.
     func cancel() {
-        base = nil
-        heldForEdit = false
-        tidyTask?.cancel()
-        tidyTask = nil
-        dropEarly()
+        listener?.cancel()
+        listener = nil
+        work?.cancel()
+        work = nil
+        dropSent()
+        phase = .idle
         isTidying = false
-        voiceInput.stopBeforeSubmittingDraft()
+        reportOutcome()
+        document = nil
     }
 
-    /// Begins dictating into `text`, putting the keyboard away: you're talking, not typing.
-    func begin(_ text: Binding<String>) {
-        tidyTask?.cancel()
-        dropEarly()
-        isTidying = false
+    /// The app left the foreground: the mic stops and the words heard so far are tidied.
+    func suspend() {
+        switch phase {
+        case .listening: work = Task { await stop() }
+        case .starting: cancel()
+        case .idle, .finishing: break
+        }
+    }
+
+    // MARK: - Listening
+
+    private func start(_ text: Binding<String>) async {
+        guard phase == .idle, services.mayRecord() else { return }
+        if let other = Self.active, other !== self { other.suspend() }
+        Self.active = self
+        reportOutcome()
+        dropSent()
         lastTidy = nil
-        heldForEdit = false
-        appendsOnly = false
+        documentBeforeTidy = nil
+        errorMessage = nil
+        undone = false
+        recordIDs = []
         self.text = text
-        base = text.wrappedValue
-        lastWritten = text.wrappedValue
-        lastHeard = text.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        activePolisher = polisher(server)
-        voiceInput.onCommittedTranscript = { [weak self] in self?.committedChanged($0) }
-        HXKeyboard.dismiss()
+        let current = text.wrappedValue
+        document = DictationDocument(text: current, cursor: services.cursor.position(in: current))
+        settled = ""
+        volatile = ""
+        session = UUID().uuidString
+        sequence = 0
+        activePolisher = services.polisher(server)
+        phase = .starting
+
+        let vocabulary = services.vocabulary
+        let server = server
+        var candidates = [services.listener]
+        if let fallback = services.fallbackListener { candidates.append(fallback) }
+        var failure: Error?
+        for make in candidates {
+            let listener = make()
+            self.listener = listener
+            engineName = listener.engineName
+            listener.onEvent = { [weak self, weak listener] event in
+                guard let self, let listener, self.listener === listener else { return }
+                self.handle(event)
+            }
+            do {
+                try await listener.start { await vocabulary(server) }
+                // Cancelled while starting: the mic must not stay open.
+                guard self.listener === listener, phase == .starting else {
+                    listener.cancel()
+                    return
+                }
+                phase = .listening
+                return
+            } catch {
+                failure = error
+                guard self.listener === listener, phase == .starting else { return }
+                if case DictationListenerError.permissionDenied = error { break }
+            }
+        }
+        listener = nil
+        phase = .idle
+        errorMessage = failure?.localizedDescription
     }
 
-    /// Call with every finished-segment transcript while listening: once enough new words have
-    /// settled, they are tidied now rather than after Stop.
-    func committedChanged(_ committed: String) {
-        guard base != nil, let polisher = activePolisher, committed.hasPrefix(sentEarly) else { return }
-        let passage = committed.dropFirst(sentEarly.count).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard DictationSplice.wordCount(passage) >= Self.earlyPassageWords else { return }
-        sentEarly = committed
-        let previous = earlyChain
-        earlyChain = Task { [weak self] in
-            await previous?.value
-            guard !Task.isCancelled else { return }
-            let tidied = try? await polisher.polish(passage)
-            guard let self, !Task.isCancelled else { return }
-            self.tidiedEarly.append(tidied.flatMap { DictationSplice.accepted($0, for: passage) } ?? passage)
+    private func handle(_ event: DictationListenerEvent) {
+        switch event {
+        case .volatile(let words):
+            volatile = words
+            write()
+        case .settled(let words):
+            settled = settled.isEmpty ? words : settled + " " + words
+            volatile = ""
+            write()
+            if DictationSplice.wordCount(settled) >= Self.earlyPassageWords, let piece = document?.cut() {
+                settled = ""
+                send(piece, throughNow: false)
+            }
+        case .ended(let error):
+            errorMessage = error
+            if phase == .listening { work = Task { await stop() } }
         }
     }
 
-    /// Tidies what was dictated since `begin`, if it hasn't been handed to the tidy already.
-    func tidy() async {
-        startTidy()
-        await tidyTask?.value
+    /// Writes the live words into the box, keeping the cursor where the user has it: one at the end
+    /// of the live words stays at their end.
+    private func write() {
+        sync()
+        guard let old = document, let edit = document?.hear(settled: settled, volatile: volatile),
+              let new = document else { return }
+        let follows: (Int) -> Int = { $0 == old.caret || $0 == old.open.upperBound ? new.caret : edit.moved($0) }
+        put(new.text, over: old.text, edit: edit, cursor: follows)
     }
 
-    /// Hands what was dictated to the tidy, once: the recognizer going idle and `finish()` can both ask.
-    private func startTidy() {
-        guard let base else { return }
-        self.base = nil
-        tidyCoversBox = Self.isBlank(base)
-        tidyTask = Task { await tidy(from: base) }
-    }
-
-    private func tidy(from base: String) async {
-        guard let text else { return }
-        let heard = text.wrappedValue
-        guard let polisher = activePolisher, let split = DictationSplice.split(base: base, draft: heard) else {
-            dropEarly()
-            return
+    /// Changes the box from `before` to `written`: in the focused field first, so its cursor and
+    /// keyboard follow, then in the binding.
+    private func put(
+        _ written: String, over before: String, edit: DictationDocument.Edit, cursor: ((Int) -> Int)? = nil
+    ) {
+        if let at = services.cursor.position(in: before) {
+            services.cursor.write(edit, from: before, to: written, cursor: (cursor ?? edit.moved)(at))
         }
-        // The early passages count only if the dictation still starts with them (no edit in between).
-        let early = !sentEarly.isEmpty && split.dictated.hasPrefix(sentEarly) ? sentEarly : ""
-        if early.isEmpty { dropEarly() }
-        let rest = String(split.dictated.dropFirst(early.count)).trimmingCharacters(in: .whitespacesAndNewlines)
-        let tidiesRest = DictationSplice.isWorthTidying(rest)
-        guard !early.isEmpty || tidiesRest else { return }
+        text?.wrappedValue = written
+    }
 
+    /// Takes in what the keyboard did since dictation last wrote: an edit to the live words makes
+    /// them the user's, and a cursor outside the dictated stretch moves speech there.
+    private func sync() {
+        guard let text, let known = document?.text else { return }
+        let current = text.wrappedValue
+        var editEnd: Int?
+        if current != known, let adopted = document?.adopt(current) {
+            editEnd = adopted.editEnd
+            typed = true
+            if case .sealed = adopted.live { liveWordsTaken() }
+        }
+        guard let cursor = services.cursor.position(in: current) ?? editEnd,
+              document?.isInStretch(cursor) == false else { return }
+        let piece = document?.move(to: cursor)
+        if let piece { send(piece, throughNow: true) }
+        liveWordsTaken()
+    }
+
+    /// The live words left the recognizer's hands: it starts the next ones clean.
+    private func liveWordsTaken() {
+        settled = ""
+        volatile = ""
+        listener?.skipLiveWords()
+        _ = listener?.takeAudio(throughNow: true)
+    }
+
+    private func stop() async {
+        guard phase == .listening else { return }
+        let began = Date()
+        phase = .finishing
+        await listener?.stop()
+        guard phase == .finishing else { return }
+        write()
+        if let piece = document?.seal() { send(piece, throughNow: true) }
+        settled = ""
+        volatile = ""
+        listener = nil
+        phase = .idle
+        await applyRewrites()
+        waitMilliseconds = Int(Date().timeIntervalSince(began) * 1_000)
+    }
+
+    // MARK: - Rewriting
+
+    /// Sends one finished passage, with its audio, to the rewriter; the rewrite waits for Stop.
+    private func send(_ piece: DictationDocument.Piece, throughNow: Bool) {
+        let audio = listener?.takeAudio(throughNow: throughNow)
+        guard let polisher = activePolisher, let document, let heard = document.text(of: piece.id),
+              audio != nil || DictationSplice.isWorthTidying(heard) else { return }
+        let passage = DictationPassage(
+            heard: heard, before: document.context(before: piece.id), audio: audio,
+            session: session, sequence: sequence, engine: engineName)
+        sequence += 1
+        let previous = chain
+        let task = Task<DictationPolish?, Never> {
+            _ = await previous?.value
+            guard !Task.isCancelled else { return nil }
+            return try? await polisher.polish(passage)
+        }
+        chain = task
+        sent[piece.id] = (heard, task)
+    }
+
+    /// Swaps every passage for its rewrite, in one change "Original" can undo. A passage edited
+    /// since it was sent is rewritten again from the edit.
+    private func applyRewrites() async {
+        guard let polisher = activePolisher, let pieces = document?.pieces, !pieces.isEmpty else { return }
         isTidying = true
         defer { isTidying = false }
-        var tidiedRest = rest
-        if tidiesRest, let tidied = try? await polisher.polish(rest),
-           let accepted = DictationSplice.accepted(tidied, for: rest) {
-            tidiedRest = accepted
+        var rewrites: [(id: Int, expected: String, text: String)] = []
+        for piece in pieces {
+            var polish: DictationPolish?
+            var expected = ""
+            if let sent = sent[piece.id] {
+                polish = await sent.task.value
+                expected = sent.heard
+                if let id = polish?.id { recordIDs.append(id) }
+            }
+            guard !Task.isCancelled, let now = document?.text(of: piece.id) else { return }
+            if polish == nil || now != expected {
+                // Never sent, or edited since: rewrite the words as they stand, without the audio.
+                guard DictationSplice.isWorthTidying(now), let document else { continue }
+                expected = now
+                polish = try? await polisher.polish(DictationPassage(
+                    heard: now, before: document.context(before: piece.id),
+                    session: session, sequence: sequence, engine: engineName))
+                sequence += 1
+                if let id = polish?.id { recordIDs.append(id) }
+            }
+            if let polish, let accepted = DictationSplice.accepted(polish.text, for: expected) {
+                rewrites.append((piece.id, expected, accepted))
+            }
         }
-        await earlyChain?.value
-        let passages = (early.isEmpty ? [] : tidiedEarly) + [tidiedRest]
-        dropEarly()
-        guard !Task.isCancelled, text.wrappedValue == heard else { return }
-        let result = split.kept + passages.filter { !$0.isEmpty }.joined(separator: " ")
-        // The box was empty when dictation began, so this tidy saw all of it.
-        if settled != nil, Self.isBlank(split.kept) { settled = result }
-        guard result != heard else { return }
-        text.wrappedValue = result
-        lastTidy = (heard, result)
+        dropSent()
+        guard !Task.isCancelled, text != nil, phase == .idle else { return }
+        sync()
+        guard let before = document else { return }
+        var after = before
+        for rewrite in rewrites { after.rewrite(rewrite.id, expecting: rewrite.expected, with: rewrite.text) }
+        guard after.text != before.text else { return }
+        document = after
+        documentBeforeTidy = before
+        put(after.text, over: before.text, edit: .between(before.text, after.text))
+        lastTidy = (before.text, after.text)
+        // Nothing was typed, so the box is the saved words plus tidied speech: Done leaves it alone.
+        if seenWhole != nil, !typed { seenWhole = after.text }
     }
 
-    /// Tidies the whole box once, when its words changed since it opened and no tidy saw them whole.
+    /// Tidies the whole box once on Done, when it was typed into since it opened.
     private func tidyWholeBox() async {
-        guard let text, let settled else { return }
+        guard let text, let seenWhole else { return }
         let whole = text.wrappedValue
-        guard whole != settled else { return }
-        self.settled = whole
+        guard whole != seenWhole else { return }
+        self.seenWhole = whole
+        typed = false
         let trimmed = whole.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard DictationSplice.isWorthTidying(trimmed), let polisher = activePolisher ?? polisher(server) else { return }
+        guard DictationSplice.isWorthTidying(trimmed), let polisher = activePolisher ?? services.polisher(server) else { return }
         isTidying = true
         defer { isTidying = false }
-        guard let tidied = try? await polisher.polish(trimmed),
-              let accepted = DictationSplice.accepted(tidied, for: trimmed),
+        guard let polish = try? await polisher.polish(DictationPassage(heard: trimmed)),
+              let accepted = DictationSplice.accepted(polish.text, for: trimmed),
               !Task.isCancelled, text.wrappedValue == whole, accepted != whole else { return }
+        // The passages no longer sit where the document has them.
+        document = nil
+        documentBeforeTidy = nil
         text.wrappedValue = accepted
-        self.settled = accepted
+        self.seenWhole = accepted
         lastTidy = (whole, accepted)
     }
 
-    private static func isBlank(_ text: String) -> Bool {
-        text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    /// Tells the server how this session's words ended up, once.
+    private func reportOutcome() {
+        guard !recordIDs.isEmpty, let polisher = activePolisher, let document else { return }
+        let outcome = DictationOutcome(
+            session: session, final: document.dictated, undone: undone,
+            waitMilliseconds: waitMilliseconds, ids: recordIDs)
+        recordIDs = []
+        Task { await polisher.report(outcome) }
     }
 
-    private func dropEarly() {
-        earlyChain?.cancel()
-        earlyChain = nil
-        sentEarly = ""
-        tidiedEarly = []
+    private func dropSent() {
+        sent.values.forEach { $0.task.cancel() }
+        sent = [:]
+        chain = nil
     }
 }
 
@@ -287,21 +482,8 @@ extension EnvironmentValues {
     @Entry var dictationServer: URL?
 }
 
-/// Finds the dictated words in a draft and decides whether a rewrite of them is safe to use.
+/// Decides whether a passage is worth a rewrite and whether the rewrite is safe to use.
 enum DictationSplice {
-    /// `kept` is the draft as it was before dictation plus the joining space; `dictated` is what was
-    /// heard after it. Nil when the earlier text changed during dictation, so nothing is rewritten.
-    static func split(base: String, draft: String) -> (kept: String, dictated: String)? {
-        // The recognizer trims the earlier text and joins with one space (`ComposerVoiceDraftComposer`).
-        let earlier = base.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard draft.hasPrefix(earlier) else { return nil }
-        let rest = draft.dropFirst(earlier.count)
-        let dictated = rest.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !dictated.isEmpty else { return nil }
-        let joiner = rest.prefix(while: \.isWhitespace)
-        return (earlier + joiner, dictated)
-    }
-
     /// A few words are already right once punctuated; a very long passage overflows the model.
     static func isWorthTidying(_ dictated: String) -> Bool {
         let words = wordCount(dictated)
@@ -326,16 +508,33 @@ enum DictationSplice {
     }
 }
 
-/// The server's local model first, then Apple's on-device model; nil when neither is there, and
+/// The names and words the recognizer should expect, from the server's vault, kept for a few minutes
+/// so a mic tap doesn't wait on a fetch.
+@MainActor
+enum DictationVocabulary {
+    private static var cached: [URL: (terms: [String], at: Date)] = [:]
+    static let lifetime: TimeInterval = 600
+
+    static func terms(server: URL?) async -> [String] {
+        guard let server else { return [] }
+        if let hit = cached[server], Date().timeIntervalSince(hit.at) < lifetime { return hit.terms }
+        let terms = await APIClient(baseURL: server).dictationVocabulary()
+        if !terms.isEmpty { cached[server] = (terms, Date()) }
+        return terms
+    }
+}
+
+/// The server's models first, then Apple's on-device model; nil when neither is there, and
 /// dictation stays as heard.
 enum DictationPolisher {
     static func live(server: URL?) -> (any DictationPolishing)? {
         let onDevice = onDevice()
         guard let server else { return onDevice }
         let client = APIClient(baseURL: server)
-        return LocalModelDictationPolisher(fallback: onDevice) { text, timeout in
-            try await client.tidyDictation(text, timeout: timeout)
-        }
+        return LocalModelDictationPolisher(
+            fallback: onDevice,
+            polish: { passage, timeout in try await client.polishDictation(passage, timeout: timeout) },
+            report: { outcome in await client.reportDictation(outcome) })
     }
 
     static func onDevice() -> (any DictationPolishing)? {
@@ -343,11 +542,11 @@ enum DictationPolisher {
         return FoundationDictationPolisher()
     }
 
-    /// How long the local model gets before the phone tidies instead: 4 s, plus time to write a
-    /// long passage (it writes about 37 tokens a second), up to 45 s.
-    static func serverDeadline(for text: String) -> TimeInterval {
-        let words = text.split(whereSeparator: { $0.isWhitespace }).count
-        return min(45, 4 + 0.05 * Double(words))
+    /// How long the server gets before the phone tidies instead: 4 s, plus time to transcribe the
+    /// audio and to write a long passage (the model writes about 37 tokens a second), up to 45 s.
+    static func serverDeadline(for passage: DictationPassage) -> TimeInterval {
+        let words = passage.heard.split(whereSeparator: { $0.isWhitespace }).count
+        return min(45, 4 + 0.05 * Double(words) + (passage.audio == nil ? 0 : 3))
     }
 
     static let instructions = """
@@ -369,19 +568,21 @@ enum DictationPolisher {
         """
 }
 
-/// Tidies on the server's local model, falling back to `fallback` when it fails or misses its deadline.
+/// Rewrites on the server, falling back to `fallback` (the words as heard, no audio) when the
+/// server fails or misses its deadline.
 struct LocalModelDictationPolisher: DictationPolishing {
     let fallback: (any DictationPolishing)?
-    var deadline: (String) -> TimeInterval = DictationPolisher.serverDeadline
-    let tidy: @Sendable (String, TimeInterval) async throws -> String
+    var deadline: (DictationPassage) -> TimeInterval = DictationPolisher.serverDeadline
+    let polish: @Sendable (DictationPassage, TimeInterval) async throws -> DictationPolish
+    var report: @Sendable (DictationOutcome) async -> Void = { _ in }
 
     private struct DeadlinePassed: Error {}
 
-    func polish(_ text: String) async throws -> String {
-        let seconds = deadline(text)
+    func polish(_ passage: DictationPassage) async throws -> DictationPolish {
+        let seconds = deadline(passage)
         do {
-            return try await withThrowingTaskGroup(of: String.self) { group in
-                group.addTask { try await tidy(text, seconds + 1) }
+            return try await withThrowingTaskGroup(of: DictationPolish.self) { group in
+                group.addTask { try await polish(passage, seconds + 1) }
                 group.addTask {
                     try await Task.sleep(for: .seconds(seconds))
                     throw DeadlinePassed()
@@ -392,20 +593,24 @@ struct LocalModelDictationPolisher: DictationPolishing {
             }
         } catch {
             try Task.checkCancellation()
-            guard let fallback else { throw error }
-            return try await fallback.polish(text)
+            guard let fallback, DictationSplice.isWorthTidying(passage.heard) else { throw error }
+            return try await fallback.polish(passage)
         }
+    }
+
+    func report(_ outcome: DictationOutcome) async {
+        await report(outcome)
     }
 }
 
 @available(iOS 26.0, *)
 private struct FoundationDictationPolisher: DictationPolishing {
-    func polish(_ text: String) async throws -> String {
+    func polish(_ passage: DictationPassage) async throws -> DictationPolish {
         let session = LanguageModelSession(instructions: DictationPolisher.instructions)
         let response = try await session.respond(
-            to: "Dictated: \(text)\nCleaned:",
+            to: "Dictated: \(passage.heard)\nCleaned:",
             options: GenerationOptions(temperature: 0.2)
         )
-        return response.content
+        return DictationPolish(text: response.content)
     }
 }

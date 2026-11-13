@@ -213,6 +213,8 @@
 		C0DE512E0000000000000202 /* InsightsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE512E0000000000000201 /* InsightsModels.swift */; };
 		C0DE512E0000000000000204 /* SectionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE512E0000000000000203 /* SectionCard.swift */; };
 		D1C7A7000000000000000002 /* Dictation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C7A7000000000000000001 /* Dictation.swift */; };
+		D1C7A700000000000000000A /* DictationListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C7A7000000000000000009 /* DictationListener.swift */; };
+		D1C7A7000000000000000008 /* DictationDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C7A7000000000000000007 /* DictationDocument.swift */; };
 		D1C7A7000000000000000004 /* DictationMicButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C7A7000000000000000003 /* DictationMicButton.swift */; };
 		C08650000000000000000002 /* ActionToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = C08650000000000000000001 /* ActionToast.swift */; };
 		C13730000000000000000002 /* DelayedStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = C13730000000000000000001 /* DelayedStatus.swift */; };
@@ -695,6 +697,7 @@
 		5927FF7204918E46CCE7387C /* SlashAutocompleteRanking.swift in Sources */ = {isa = PBXBuildFile; fileRef = A82A2A58F08883E396B94B1C /* SlashAutocompleteRanking.swift */; };
 		A710739233F64F4FA4C2B700 /* ComposerVoiceInputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A710739233F64F4FA4C2B710 /* ComposerVoiceInputController.swift */; };
 		D1C7A7000000000000000006 /* DictationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C7A7000000000000000005 /* DictationTests.swift */; };
+		D1C7A700000000000000000C /* DictationDocumentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C7A700000000000000000B /* DictationDocumentTests.swift */; };
 		A710739233F64F4FA4C2B701 /* ComposerVoiceDraftComposerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A710739233F64F4FA4C2B711 /* ComposerVoiceDraftComposerTests.swift */; };
 		B53F3F24A5C24D9E8E54A810 /* SlashCommandExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D1CE5F12B9E4D4D9E5A01C1 /* SlashCommandExecutor.swift */; };
 		C0CAM000000000000000B001 /* CameraPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0CAM000000000000000B002 /* CameraPickerView.swift */; };
@@ -1577,6 +1580,8 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		C0DE512E0000000000000201 /* InsightsModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InsightsModels.swift; sourceTree = "<group>"; };
 		C0DE512E0000000000000203 /* SectionCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SectionCard.swift; sourceTree = "<group>"; };
 		D1C7A7000000000000000001 /* Dictation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dictation.swift; sourceTree = "<group>"; };
+		D1C7A7000000000000000009 /* DictationListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationListener.swift; sourceTree = "<group>"; };
+		D1C7A7000000000000000007 /* DictationDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationDocument.swift; sourceTree = "<group>"; };
 		D1C7A7000000000000000003 /* DictationMicButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationMicButton.swift; sourceTree = "<group>"; };
 		C08650000000000000000001 /* ActionToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionToast.swift; sourceTree = "<group>"; };
 		C13730000000000000000001 /* DelayedStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DelayedStatus.swift; sourceTree = "<group>"; };
@@ -1594,6 +1599,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		26AB000000000000000000F4 /* ProvidersViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProvidersViewModelTests.swift; sourceTree = "<group>"; };
 		A710739233F64F4FA4C2B710 /* ComposerVoiceInputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerVoiceInputController.swift; sourceTree = "<group>"; };
 		D1C7A7000000000000000005 /* DictationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationTests.swift; sourceTree = "<group>"; };
+		D1C7A700000000000000000B /* DictationDocumentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationDocumentTests.swift; sourceTree = "<group>"; };
 		A710739233F64F4FA4C2B711 /* ComposerVoiceDraftComposerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerVoiceDraftComposerTests.swift; sourceTree = "<group>"; };
 		B5A100000000000000000010 /* SharedDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedDraftStore.swift; sourceTree = "<group>"; };
 		B5A100000000000000000011 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
@@ -2366,6 +2372,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				6809B8F1391248A4AA77C453 /* SlashCommandExecutorTests.swift */,
 				A710739233F64F4FA4C2B711 /* ComposerVoiceDraftComposerTests.swift */,
 				D1C7A7000000000000000005 /* DictationTests.swift */,
+				D1C7A700000000000000000B /* DictationDocumentTests.swift */,
 				C5A0D8F5502048B6B9258B00 /* InsightsViewModelTests.swift */,
 				C0415A0000000000000004 /* ProviderLimitCardTests.swift */,
 				C0415A0000000000000003 /* APIClientProviderQuotaTests.swift */,
@@ -2634,6 +2641,8 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C08650000000000000000001 /* ActionToast.swift */,
 				D1C7A7000000000000000003 /* DictationMicButton.swift */,
 				D1C7A7000000000000000001 /* Dictation.swift */,
+				D1C7A7000000000000000009 /* DictationListener.swift */,
+				D1C7A7000000000000000007 /* DictationDocument.swift */,
 				C13730000000000000000001 /* DelayedStatus.swift */,
 				879A00000000000000000001 /* QuickLookFilePreview.swift */,
 			);
@@ -3962,6 +3971,8 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C08650000000000000000002 /* ActionToast.swift in Sources */,
 				D1C7A7000000000000000004 /* DictationMicButton.swift in Sources */,
 				D1C7A7000000000000000002 /* Dictation.swift in Sources */,
+				D1C7A700000000000000000A /* DictationListener.swift in Sources */,
+				D1C7A7000000000000000008 /* DictationDocument.swift in Sources */,
 				C13730000000000000000002 /* DelayedStatus.swift in Sources */,
 				879A00000000000000000002 /* QuickLookFilePreview.swift in Sources */,
 				C0DE512E00000000000002206 /* UsageChartData.swift in Sources */,
@@ -4225,6 +4236,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				0D82B28493C6401D98DA9C0E /* SlashCommandExecutorTests.swift in Sources */,
 				A710739233F64F4FA4C2B701 /* ComposerVoiceDraftComposerTests.swift in Sources */,
 				D1C7A7000000000000000006 /* DictationTests.swift in Sources */,
+				D1C7A700000000000000000C /* DictationDocumentTests.swift in Sources */,
 				C5A0D8F5502048B6B9258B01 /* InsightsViewModelTests.swift in Sources */,
 				C0415B0000000000000004 /* ProviderLimitCardTests.swift in Sources */,
 				C0415B0000000000000003 /* APIClientProviderQuotaTests.swift in Sources */,

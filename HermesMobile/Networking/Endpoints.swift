@@ -163,6 +163,12 @@ enum Endpoint {
     case voiceVocabulary
     /// One dictated passage tidied on the local model (fork route `api/dictation_tidy.py`).
     case dictationTidy
+    /// One dictated passage, with its audio, transcribed again and rewritten (fork route `api/dictation_polish.py`).
+    case dictationPolish
+    /// How a dictation's words ended up, for the server's quality log.
+    case dictationOutcome
+    /// Names and words the dictation recognizer should expect; unlike `voiceVocabulary` it marks no call live.
+    case dictationVocabulary
     case tts
     /// The Brain module library (`api/brain_catalog.py`): module counts, item lists, one page (optionally
     /// placed in a given hub), search, the home's daily deck of bites, and the People screen's sections.
@@ -555,6 +561,12 @@ enum Endpoint {
             return "/api/voice/vocabulary"
         case .dictationTidy:
             return "/api/dictation/tidy"
+        case .dictationPolish:
+            return "/api/dictation/polish"
+        case .dictationOutcome:
+            return "/api/dictation/outcome"
+        case .dictationVocabulary:
+            return "/api/dictation/vocabulary"
         case .tts:
             return "/api/tts"
         case .brainModules:

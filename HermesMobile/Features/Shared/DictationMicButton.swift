@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// A text box's mic: tap to talk into `text`, tap again to stop, and the dictated words are tidied.
+/// A text box's mic: tap to talk into `text` at the cursor, tap again to stop, and the dictated words
+/// are tidied. The keyboard stays up and typing doesn't stop it.
 /// After a tidy, "Original" beside the mic puts back the words as heard. It wears the tint: Nous blue,
 /// or a card's ink on a Daily Brief card. Place it in the box's trailing corner.
 struct DictationMicButton: View {
@@ -14,7 +15,6 @@ struct DictationMicButton: View {
 
     var body: some View {
         let dictation = model ?? ownModel
-        let voiceInput = dictation.voiceInput
         HStack(spacing: 4) {
             if dictation.canUndoTidy {
                 DictationOriginalButton(dictation: dictation)
@@ -24,10 +24,10 @@ struct DictationMicButton: View {
                 dictation.toggle($text)
             } label: {
                 Group {
-                    if dictation.isTidying {
+                    if dictation.isTidying || dictation.isStarting || dictation.phase == .finishing {
                         ProgressView().controlSize(.small)
                     } else {
-                        Image(systemName: voiceInput.isListening ? "stop.circle.fill" : "mic.fill")
+                        Image(systemName: dictation.isListening ? "stop.circle.fill" : "mic.fill")
                             .font(AppFont.body(weight: .semibold))
                     }
                 }
@@ -36,12 +36,12 @@ struct DictationMicButton: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .disabled(isSubmitting || dictation.isTidying || voiceInput.isRequestingPermission)
+            .disabled(isSubmitting || dictation.isTidying || dictation.phase == .finishing)
             .accessibilityLabel(Text(verbatim: DictationCopy.micLabel(dictation)))
-            .accessibilityHint(Text(verbatim: voiceInput.isListening ? "" : DictationCopy.micHint))
+            .accessibilityHint(Text(verbatim: dictation.isListening ? "" : DictationCopy.micHint))
         }
         .dictationLifecycle(dictation, text: text, isSubmitting: isSubmitting)
-        .onChange(of: voiceInput.errorMessage) { _, message in shownError = message }
+        .onChange(of: dictation.errorMessage) { _, message in shownError = message }
         .alert(Text(verbatim: "Dictation"), isPresented: Binding(
             get: { shownError != nil }, set: { if !$0 { shownError = nil } }
         )) {
@@ -79,12 +79,13 @@ struct DictationOriginalButton: View {
 }
 
 enum DictationCopy {
-    static let micHint = "Tidies your words when you stop"
+    static let micHint = "Writes at the cursor and tidies your words when you stop"
 
     @MainActor
     static func micLabel(_ dictation: DictationModel) -> String {
-        if dictation.isTidying { return "Tidying your words" }
-        return dictation.voiceInput.isListening ? "Stop dictation" : "Dictate"
+        if dictation.isTidying || dictation.phase == .finishing { return "Tidying your words" }
+        if dictation.isStarting { return "Starting dictation" }
+        return dictation.isListening ? "Stop dictation" : "Dictate"
     }
 }
 
@@ -98,7 +99,7 @@ extension View {
         }
     }
 
-    /// Wires a mic's dictation to its box: stop on a keyboard edit, drop "Original" on an edit, stop on
+    /// Wires a mic's dictation to its box: follow keyboard edits, drop "Original" on an edit, stop on
     /// send, background, or the box going away. The model tidies on stop by itself.
     func dictationLifecycle(_ dictation: DictationModel, text: String, isSubmitting: Bool) -> some View {
         modifier(DictationLifecycle(dictation: dictation, text: text, isSubmitting: isSubmitting))
@@ -118,7 +119,7 @@ private struct DictationLifecycle: ViewModifier {
                 if submitting { dictation.cancel() }
             }
             .onChange(of: scenePhase) { _, phase in
-                if phase == .active { dictation.voiceInput.resume() } else { dictation.voiceInput.suspend() }
+                if phase != .active { dictation.suspend() }
             }
             .onDisappear { dictation.cancel() }
     }

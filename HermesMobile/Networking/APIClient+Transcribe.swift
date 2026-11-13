@@ -37,15 +37,49 @@ extension APIClient {
         return try decode(TranscribeResponse.self, from: responseData)
     }
 
-    /// One dictated passage rewritten as clean text by the server's local model.
-    /// Throws when the server is unreachable, lacks the route, or returns no text.
-    func tidyDictation(_ text: String, timeout: TimeInterval) async throws -> String {
-        let response: DictationTidyResponse = try await send(
-            endpoint: .dictationTidy, method: "POST", body: DictationTidyRequest(text: text), timeout: timeout)
-        guard let tidied = response.text, !tidied.isEmpty else {
+    /// One dictated passage transcribed again from its audio and rewritten as clean text by the
+    /// server's models. Throws when the server is unreachable, lacks the route, or returns no text.
+    func polishDictation(_ passage: DictationPassage, timeout: TimeInterval) async throws -> DictationPolish {
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var body = Data()
+        let fields = [
+            ("heard", passage.heard), ("before", passage.before), ("session", passage.session),
+            ("seq", String(passage.sequence)), ("engine", passage.engine), ("locale", Locale.current.identifier),
+        ]
+        for (name, value) in fields where !value.isEmpty {
+            body.appendMultipart(textField: name, value: value, boundary: boundary)
+        }
+        if let audio = passage.audio {
+            body.appendMultipart(fileField: "audio", filename: "passage.wav", data: audio, boundary: boundary)
+        }
+        body.appendMultipartClosingBoundary(boundary)
+        let (data, _) = try await sendMultipart(
+            endpoint: .dictationPolish, body: body,
+            contentType: "multipart/form-data; boundary=\(boundary)", timeout: timeout)
+        let response = try decode(DictationPolishResponse.self, from: data)
+        guard let text = response.text, !text.isEmpty else {
             throw APIError.http(statusCode: 502, body: response.error)
         }
-        return tidied
+        return DictationPolish(text: text, id: response.id)
+    }
+
+    /// Tells the server's quality log how a dictation ended up. Best effort: a failure is dropped.
+    func reportDictation(_ outcome: DictationOutcome) async {
+        let request = DictationOutcomeRequest(
+            session: outcome.session, final: outcome.final, undone: outcome.undone,
+            waitMs: outcome.waitMilliseconds, ids: outcome.ids)
+        let _: DictationOutcomeResponse? = try? await send(endpoint: .dictationOutcome, method: "POST", body: request)
+    }
+
+    /// The names and words the dictation recognizer should expect, from the server's vault.
+    /// Empty on any failure, including a server without the route.
+    func dictationVocabulary() async -> [String] {
+        do {
+            let response: VoiceVocabularyResponse = try await send(endpoint: .dictationVocabulary, method: "GET")
+            return (response.terms ?? []).filter { !$0.isEmpty }
+        } catch {
+            return []
+        }
     }
 
     /// The names and words a voice call's recognizer should expect, from the server's vault.
