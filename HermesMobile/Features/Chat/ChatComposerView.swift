@@ -47,6 +47,7 @@ private struct ComposerStatusView: View {
                         .font(AppFont.caption(weight: .bold))
                         .foregroundStyle(textColor)
                         .frame(width: 22, height: 22)
+                        .chatMinimumHitTarget(horizontalPadding: 11, verticalPadding: 11, in: Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Dismiss attachment error")

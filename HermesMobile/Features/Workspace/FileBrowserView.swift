@@ -149,13 +149,15 @@ struct FileBrowserView: View {
                     Image(systemName: "xmark.circle.fill")
                         .font(AppFont.caption())
                         .foregroundStyle(.secondary)
+                        .chatMinimumHitTarget(horizontalPadding: 14, verticalPadding: 14, in: Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Clear file search")
             }
         }
         .padding(.horizontal, 12)
-        .frame(height: 40)
+        .padding(.vertical, 6)
+        .frame(minHeight: 40)
         .background(Color(.tertiarySystemFill).opacity(0.5), in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
         .padding(.horizontal)
         .padding(.vertical, 10)

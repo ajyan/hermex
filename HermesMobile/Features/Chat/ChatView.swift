@@ -177,6 +177,7 @@ private struct ListenPlaybackBar: View {
                         .foregroundStyle(.white)
                 }
                 .frame(width: 34, height: 34)
+                .chatMinimumHitTarget(horizontalPadding: 5, verticalPadding: 5, in: Circle())
             }
             .buttonStyle(.chatTactile(.icon))
             .disabled(!isReady)
@@ -232,6 +233,7 @@ private struct ListenPlaybackBar: View {
                 .frame(minWidth: 36, minHeight: 30)
                 .padding(.horizontal, 6)
                 .background(Color(.secondarySystemBackground), in: Capsule())
+                .chatMinimumHitTarget(horizontalPadding: 0, verticalPadding: 7, in: Capsule())
         }
         .disabled(!isReady)
         .accessibilityLabel(String(localized: "Playback speed"))
@@ -245,6 +247,7 @@ private struct ListenPlaybackBar: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 30, height: 30)
                 .contentShape(Circle())
+                .chatMinimumHitTarget(horizontalPadding: 7, verticalPadding: 7, in: Circle())
         }
         .buttonStyle(.chatTactile(.icon))
         .accessibilityLabel(String(localized: "Stop audio"))

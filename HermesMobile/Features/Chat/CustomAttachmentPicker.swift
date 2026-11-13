@@ -668,10 +668,11 @@ struct HermexAttachmentPickerView: View {
 
             if model.hasLimitedAccess {
                 Button("Manage Access", action: openSettings)
-                    .font(.caption.weight(.semibold))
+                    .font(AppFont.caption(weight: .semibold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 12)
-                    .frame(height: 36)
+                    .padding(.vertical, 8)
+                    .frame(minHeight: 36)
                     .background(.black.opacity(0.54), in: Capsule())
                     .padding(14)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
