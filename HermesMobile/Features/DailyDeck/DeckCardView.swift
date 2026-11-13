@@ -736,7 +736,7 @@ struct DeckCardView: View {
                     Text(verbatim: line).font(AppFont.footnote())
                 }
             } else {
-                DeckTagLines(tags: card.headlineTags)
+                DeckTagLines(tags: card.openerTags)
             }
         }
         .foregroundStyle(palette.ink)
@@ -746,6 +746,9 @@ struct DeckCardView: View {
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, 14)
             .accessibilityAddTraits(.isHeader)
+        if let calendar = card.calendar {
+            DeckOpenerCalendar(calendar: calendar, today: viewModel.date, paper: palette.colors).padding(.top, 16)
+        }
         ForEach(Array(Self.acts(pages).enumerated()), id: \.offset) { index, group in
             act(group.name, group.pages).padding(.top, index == 0 ? 22 : 16)
         }
