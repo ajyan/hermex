@@ -37,20 +37,45 @@ extension View {
     /// Offers Undo on the filing receipts below this view, routed to `handler`, without
     /// invalidating them when the caller rebuilds the closure.
     func filingReceiptActions(undoingIDs: Set<String>, perform handler: @escaping (ChatMessage) -> Void) -> some View {
-        modifier(FilingReceiptActionsModifier(undoingIDs: undoingIDs, handler: handler))
+        modifier(FilingReceiptActionsModifier(undoingIDs: undoingIDs))
+            .modifier(FilingReceiptUndoHandlerModifier(handler: handler))
     }
 }
 
 /// Holds the one Undo action in its own state, not the caller's, so a handler that
-/// captures the calling view can't keep it alive.
-private struct FilingReceiptActionsModifier: ViewModifier {
-    let undoingIDs: Set<String>
+/// captures the calling view can't keep it alive, and refreshes its handler on every
+/// pass. It publishes only that reference, never the receipts' value.
+private struct FilingReceiptUndoHandlerModifier: ViewModifier {
     let handler: (ChatMessage) -> Void
     @State private var undo = FilingReceiptUndoAction()
 
     func body(content: Content) -> some View {
         undo.handler = handler
-        return content.environment(\.filingReceiptActions, FilingReceiptActions(undoingIDs: undoingIDs, undo: undo))
+        return content.environment(\.filingReceiptUndoAction, undo)
+    }
+}
+
+/// Publishes `filingReceiptActions`. Its inputs compare by value, so caller passes that
+/// leave `undoingIDs` alone skip its body and the value is not written again: re-written
+/// on every pass, iOS 26 can treat it as changed and re-run every reader below, as with
+/// `transcriptLinks` (ChatTranscriptEnvironmentStabilityTests).
+private struct FilingReceiptActionsModifier: ViewModifier {
+    let undoingIDs: Set<String>
+    @Environment(\.filingReceiptUndoAction) private var undo
+
+    func body(content: Content) -> some View {
+        content.environment(\.filingReceiptActions, FilingReceiptActions(undoingIDs: undoingIDs, undo: undo))
+    }
+}
+
+private struct FilingReceiptUndoActionKey: EnvironmentKey {
+    static let defaultValue: FilingReceiptUndoAction? = nil
+}
+
+private extension EnvironmentValues {
+    var filingReceiptUndoAction: FilingReceiptUndoAction? {
+        get { self[FilingReceiptUndoActionKey.self] }
+        set { self[FilingReceiptUndoActionKey.self] = newValue }
     }
 }
 
