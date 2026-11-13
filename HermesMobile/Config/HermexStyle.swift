@@ -323,6 +323,21 @@ extension View {
             }
         }
     }
+
+    /// Keeps an editor sheet from losing work. With unsaved changes a swipe down
+    /// is blocked, and Cancel sets `isConfirmingDiscard` to ask before
+    /// `onDiscard` closes the sheet.
+    func hxDiscardChangesGuard(
+        hasChanges: Bool,
+        isConfirmingDiscard: Binding<Bool>,
+        onDiscard: @escaping () -> Void
+    ) -> some View {
+        interactiveDismissDisabled(hasChanges)
+            .confirmationDialog("Discard changes?", isPresented: isConfirmingDiscard, titleVisibility: .visible) {
+                Button("Discard changes", role: .destructive, action: onDiscard)
+                Button("Keep editing", role: .cancel) {}
+            }
+    }
 }
 
 /// Saved notes and course text carry *emphasis* and **bold**; show it rather than the asterisks.

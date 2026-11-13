@@ -67,6 +67,9 @@ final class KanbanCardEditorState: Identifiable {
     private var activeAttemptID: UUID?
     private var statusAtOpen = "triage"
     private var remotePrerequisiteID: String?
+    /// The editable fields as the editor opened (or last reloaded), for
+    /// `hasUnsavedChanges`.
+    private var openingFields: [String?] = []
 
     private enum MutationIntent {
         case create(KanbanCreateCardRequest)
@@ -99,6 +102,18 @@ final class KanbanCardEditorState: Identifiable {
         if let card {
             populate(from: card, prerequisiteID: prerequisiteID)
         }
+        openingFields = editableFields
+    }
+
+    /// True once any field differs from what the editor opened with, so Cancel
+    /// and swipe-down ask before throwing the draft away.
+    var hasUnsavedChanges: Bool {
+        editableFields != openingFields
+    }
+
+    private var editableFields: [String?] {
+        [title, body, status, priorityText, assignee, tenant, workspaceKind,
+         workspacePath, skillsText, maximumRuntimeText, prerequisiteID]
     }
 
     var isEditing: Bool {
@@ -228,6 +243,7 @@ final class KanbanCardEditorState: Identifiable {
     func reloadServerVersion() {
         guard let remoteCard else { return }
         populate(from: remoteCard, prerequisiteID: remotePrerequisiteID)
+        openingFields = editableFields
         baselineCard = remoteCard
         self.remoteCard = nil
         remotePrerequisiteID = nil

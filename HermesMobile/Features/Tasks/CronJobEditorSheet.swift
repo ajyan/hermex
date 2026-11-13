@@ -18,7 +18,11 @@ struct CronJobEditorSheet: View {
     @State private var isPresentingModelPicker = false
     @State private var isPresentingProfilePicker = false
     @State private var isPresentingSkillsPicker = false
+    @State private var isConfirmingDiscard = false
     @Environment(\.dismiss) private var dismiss
+    /// The draft as the sheet opened, so Cancel and swipe-down know whether
+    /// there is work to lose.
+    private let initialDraft: CronJobEditorDraft
 
     /// Server-provided deliver targets. A plain `let` so a re-init while the
     /// sheet is presented (options finishing their async load) swaps in the
@@ -57,6 +61,7 @@ struct CronJobEditorSheet: View {
         self.onSave = onSave
         self.serverDeliveryOptions = deliveryOptions
         self.initialDeliver = draft.deliver
+        self.initialDraft = draft
         _draft = State(initialValue: draft)
         _configuration = State(initialValue: CronJobEditorConfigurationLoader(server: server))
     }
@@ -196,7 +201,11 @@ struct CronJobEditorSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        dismiss()
+                        if draft != initialDraft {
+                            isConfirmingDiscard = true
+                        } else {
+                            dismiss()
+                        }
                     }
                     .disabled(isSaving)
                 }
@@ -218,6 +227,11 @@ struct CronJobEditorSheet: View {
                     .disabled(isSaving || draft.validationMessage != nil)
                 }
             }
+            .hxDiscardChangesGuard(
+                hasChanges: isSaving || draft != initialDraft,
+                isConfirmingDiscard: $isConfirmingDiscard,
+                onDiscard: { dismiss() }
+            )
         }
         .adaptiveFormPresentation()
     }

@@ -10,6 +10,7 @@ struct KanbanCardEditorView: View {
     @State private var showsReadyWarning = false
     @State private var showsReloadConfirmation = false
     @State private var hasConfirmedReadyUnassigned = false
+    @State private var isConfirmingDiscard = false
 
     private enum Field: Hashable {
         case title, body, tenant, priority, workspacePath, skills, maximumRuntime, prerequisite
@@ -32,11 +33,15 @@ struct KanbanCardEditorView: View {
             .background(Color.hxCanvas)
             .hxNavigationTitle(state.isEditing ? String(localized: "Edit Card") : String(localized: "New Card"))
             .toolbar { editorToolbar }
-            .interactiveDismissDisabled(state.submission.isInFlight)
+            .hxDiscardChangesGuard(
+                hasChanges: state.submission.isInFlight || state.hasUnsavedChanges,
+                isConfirmingDiscard: $isConfirmingDiscard,
+                onDiscard: { dismiss() }
+            )
             .onChange(of: state.submission) { _, submission in
                 handle(submission)
             }
-            .alert("Create Ready, Unassigned Card?", isPresented: $showsReadyWarning) {
+            .alert("Create a Ready, unassigned Card?", isPresented: $showsReadyWarning) {
                 Button("Cancel", role: .cancel) {}
                 Button("Create") {
                     hasConfirmedReadyUnassigned = true
@@ -229,8 +234,14 @@ struct KanbanCardEditorView: View {
     @ToolbarContentBuilder
     private var editorToolbar: some ToolbarContent {
         ToolbarItem(placement: .cancellationAction) {
-            Button("Cancel") { dismiss() }
-                .disabled(state.submission.isInFlight)
+            Button("Cancel") {
+                if state.hasUnsavedChanges {
+                    isConfirmingDiscard = true
+                } else {
+                    dismiss()
+                }
+            }
+            .disabled(state.submission.isInFlight)
         }
         ToolbarItem(placement: .confirmationAction) {
             Button {
