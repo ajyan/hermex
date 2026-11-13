@@ -8,6 +8,9 @@ struct PendingNewChatView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppHaptics.isEnabledKey) private var isHapticsEnabled = true
+    @AppStorage(PrimaryActionTintSettings.isEnabledKey) private var tintsPrimaryActions = false
+    @AppStorage(HeaderLogoColor.storageKey) private var themeHex = HeaderLogoColor.defaultHex
+    @Environment(\.colorScheme) private var colorScheme
 
     let server: URL
     let viewModel: SessionListViewModel
@@ -156,36 +159,57 @@ struct PendingNewChatView: View {
             .padding(.horizontal)
             .padding(.bottom, 12)
         }
-        .navigationTitle("New Chat")
-        .navigationBarTitleDisplayMode(.inline)
+        .hxNavigationTitle(String(localized: "New chat"))
     }
 
+    /// Drawn like the real composer's collapsed pill while the server session is
+    /// created. Send is live only after creation failed, where it retries and keeps
+    /// the draft for the real composer.
     private var pendingComposer: some View {
-        HStack(alignment: .bottom, spacing: 10) {
+        let canRetry = creationErrorMessage != nil && !viewModel.isCreatingSession
+        let appearance = ChatComposerActionAppearance(
+            isStop: false,
+            isDisabled: !canRetry,
+            colorScheme: colorScheme,
+            tintsPrimaryActions: tintsPrimaryActions,
+            themeHex: themeHex
+        )
+        return HStack(alignment: .center, spacing: 4) {
             TextField("Message Atlas", text: persistedDraftBinding, axis: .vertical)
                 .textFieldStyle(.plain)
                 .lineLimit(1...5)
                 .focused($composerIsFocused)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 13)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .strokeBorder(Color(.separator).opacity(0.18), lineWidth: 0.5)
-                }
+                .padding(.leading, 16)
+                .padding(.vertical, 12)
                 .submitLabel(.send)
+                .onSubmit {
+                    if canRetry { Task { await retryCreateSession() } }
+                }
 
-            Button {} label: {
-                Image(systemName: "arrow.up")
-                    .font(.headline.weight(.bold))
-                    .foregroundStyle(Color(.secondaryLabel))
-                    .frame(width: 44, height: 44)
-                    .background(Color(.tertiarySystemFill), in: Circle())
+            Button {
+                Task { await retryCreateSession() }
+            } label: {
+                Group {
+                    if viewModel.isCreatingSession {
+                        ProgressView()
+                            .tint(appearance.foreground)
+                    } else {
+                        Image(systemName: "arrow.up")
+                            .font(.headline.weight(.bold))
+                    }
+                }
+                .foregroundStyle(appearance.foreground)
+                .frame(width: ChatComposerMetrics.actionSize, height: ChatComposerMetrics.actionSize)
+                .background(appearance.background, in: Circle())
             }
             .buttonStyle(.plain)
-            .disabled(true)
-            .accessibilityLabel("Send")
+            .disabled(!canRetry)
+            .accessibilityLabel(canRetry ? Text("Retry") : Text("Send"))
+            .accessibilityHint(canRetry ? Text("Starts the chat again and keeps your message") : Text(""))
         }
+        .padding(.trailing, ChatComposerMetrics.pillInset)
+        .padding(.vertical, ChatComposerMetrics.pillInset)
+        .modifier(ChatComposerSurfaceStyle(isExpanded: false))
     }
 
     private func pendingErrorBanner(_ message: String) -> some View {
@@ -195,7 +219,7 @@ struct PendingNewChatView: View {
 
             Text(message)
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.hxTextSecondary)
                 .lineLimit(2)
 
             Spacer(minLength: 0)
@@ -208,7 +232,7 @@ struct PendingNewChatView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
+        .hxCard(cornerRadius: HXRadius.md)
     }
 
     private func createSessionIfNeeded() async {

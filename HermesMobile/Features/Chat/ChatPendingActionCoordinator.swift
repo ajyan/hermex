@@ -192,6 +192,28 @@ final class ChatPendingActionCoordinator {
         }
     }
 
+    /// Turns approval bypass back off for the current session. The pill keeps
+    /// showing until the server confirms; a failure surfaces as the chat's error.
+    @discardableResult
+    func disableApprovalBypassForCurrentSession() async -> Bool {
+        guard isSessionApprovalBypassEnabled,
+              let sessionID = delegate?.pendingActionSessionID
+        else { return false }
+
+        delegate?.pendingActionCoordinatorWillSubmitAction()
+        do {
+            let response = try await client.setSessionYolo(sessionID: sessionID, enabled: false)
+            guard delegate?.pendingActionSessionID == sessionID else { return false }
+            isSessionApprovalBypassEnabled = response.yoloEnabled ?? false
+            guard !isSessionApprovalBypassEnabled else { return false }
+            renderApprovalPromptForCurrentSession()
+            return true
+        } catch {
+            delegate?.pendingActionCoordinatorDidFailAction(error)
+            return false
+        }
+    }
+
     func startMonitoring() {
         startApprovalMonitoring()
         startClarificationMonitoring()

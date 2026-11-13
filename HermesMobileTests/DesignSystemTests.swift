@@ -12,13 +12,13 @@ final class DesignSystemTests: XCTestCase {
     }
 
     func testToolKindsWearTheirObjectPaper() {
-        XCTAssertEqual(HermexPaper.forTool(.read), .file)
-        XCTAssertEqual(HermexPaper.forTool(.write), .file)
-        XCTAssertEqual(HermexPaper.forTool(.list), .file)
-        XCTAssertEqual(HermexPaper.forTool(.search), .file, "grep and find search files, not the Brain")
-        XCTAssertEqual(HermexPaper.forTool(.web), .web)
-        XCTAssertEqual(HermexPaper.forTool(.memory), .recall)
-        XCTAssertEqual(HermexPaper.forTool(.skill), .recall)
+        XCTAssertEqual(HermexPaper.forTool(.read), .tool)
+        XCTAssertEqual(HermexPaper.forTool(.write), .tool)
+        XCTAssertEqual(HermexPaper.forTool(.list), .tool)
+        XCTAssertEqual(HermexPaper.forTool(.search), .tool, "every tool step is Atlas's machinery: one paper")
+        XCTAssertEqual(HermexPaper.forTool(.web), .tool)
+        XCTAssertEqual(HermexPaper.forTool(.memory), .tool)
+        XCTAssertEqual(HermexPaper.forTool(.skill), .tool)
         XCTAssertEqual(HermexPaper.forTool(.shell), .tool)
         XCTAssertEqual(HermexPaper.forTool(.unknown), .tool)
         XCTAssertEqual(HermexPaper.request, .opener, "requests share the Brief's opener paper")
@@ -74,7 +74,7 @@ final class DesignSystemTests: XCTestCase {
         let counts = ToolActivityPresentation.kindCounts(all)
         XCTAssertEqual(counts.map(\.label), ["3 commands", "2 searches", "1 web lookup"])
         XCTAssertEqual(counts.map(\.failures), [1, 0, 0])
-        XCTAssertEqual(counts.map(\.paper), [.tool, .file, .web])
+        XCTAssertEqual(counts.map(\.paper), [.tool, .tool, .tool])
     }
 
     func testBrainCitationsAreDistinctLinkedPagesInOrder() {

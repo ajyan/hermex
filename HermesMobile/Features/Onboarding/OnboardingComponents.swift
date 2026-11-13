@@ -80,7 +80,7 @@ struct OnboardingCommandPill: View {
                     ChatHaptics.copied(isEnabled: isHapticsEnabled)
                 } label: {
                     Image(systemName: didCopy ? "checkmark" : "doc.on.doc")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold)) // design-drift: allow (SF Symbol in a fixed-size control)
                         .foregroundStyle(didCopy ? Color.hxSuccess : .white.opacity(0.76))
                         .frame(width: 28, height: 28)
                         .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous))
@@ -198,7 +198,7 @@ struct OnboardingStepHeader: View {
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: icon)
-                .font(.system(size: 30, weight: .light))
+                .font(.system(size: 30, weight: .light)) // design-drift: allow (SF Symbol sized to the 80 pt tile)
                 .foregroundStyle(.white)
                 .frame(width: 80, height: 80)
                 .background(

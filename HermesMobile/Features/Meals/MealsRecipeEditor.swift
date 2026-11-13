@@ -83,8 +83,7 @@ struct MealsRecipeEditor: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-            .navigationTitle(Text(verbatim: recipe.hasRecipe ? "Edit recipe" : "Write the recipe"))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(recipe.hasRecipe ? "Edit recipe" : "Write the recipe")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button { dismiss() } label: { Text(verbatim: "Cancel") }

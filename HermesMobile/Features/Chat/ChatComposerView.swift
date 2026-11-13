@@ -47,6 +47,7 @@ private struct ComposerStatusView: View {
                         .font(AppFont.caption(weight: .bold))
                         .foregroundStyle(textColor)
                         .frame(width: 22, height: 22)
+                        .chatMinimumHitTarget(horizontalPadding: 11, verticalPadding: 11, in: Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Dismiss attachment error")
@@ -771,7 +772,7 @@ struct MessageComposerView: View {
             }
         }
         .alert(
-            "Composer Option",
+            "Composer option",
             isPresented: Binding(
                 get: { noticeMessage != nil },
                 set: { isPresented in
@@ -1114,6 +1115,7 @@ struct MessageComposerView: View {
                 isLoading: gitViewModel.isLoadingBranches,
                 isSwitching: gitViewModel.isSwitchingBranch,
                 isDisabled: isReadOnly || isWaitingForStream,
+                errorMessage: gitViewModel.branchesError?.localizedDescription,
                 onSelect: onSelectGitBranch,
                 onCreate: onCreateGitBranch,
                 onRefresh: onRefreshGitBranches,

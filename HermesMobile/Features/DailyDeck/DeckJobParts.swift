@@ -162,6 +162,8 @@ extension DeckCard {
 struct DeckIdeaBody: View {
     let idea: DeckIdea
     let palette: DeckPalette
+    /// The take's emphasis; the card's `markdown`, which parses it once.
+    var markdown: (String) -> AttributedString = inlineMarkdown
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -174,7 +176,7 @@ struct DeckIdeaBody: View {
                 .padding(.top, 18)
             }
             if let take = idea.take {
-                (Text(verbatim: "The take. ").font(AppFont.body(weight: .semibold)) + Text(inlineMarkdown(take)).font(AppFont.body()))
+                (Text(verbatim: "The take. ").font(AppFont.body(weight: .semibold)) + Text(markdown(take)).font(AppFont.body()))
                     .lineSpacing(3)
                     .foregroundStyle(Color.hxTextPrimary)
                     .fixedSize(horizontal: false, vertical: true)

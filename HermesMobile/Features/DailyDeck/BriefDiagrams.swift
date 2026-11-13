@@ -108,8 +108,7 @@ struct DiagramSheet: View {
                     .frame(maxWidth: .infinity)
             }
             .background(Color.hxCanvas.ignoresSafeArea())
-            .navigationTitle(Text(verbatim: title))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(title)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button { dismiss() } label: { Text(verbatim: "Done") }

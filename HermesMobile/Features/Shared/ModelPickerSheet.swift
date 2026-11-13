@@ -268,7 +268,7 @@ struct ModelPickerSheet: View {
                 .padding(.horizontal, 12)
                 .frame(maxWidth: .infinity, minHeight: PickerRowMetrics.minHeight, alignment: .leading)
                 .background(
-                    customOption == nil ? Color.clear : Color.primary,
+                    customOption == nil ? Color.clear : Color.accentColor.opacity(0.12),
                     in: RoundedRectangle(cornerRadius: PickerRowMetrics.cornerRadius, style: .continuous)
                 )
                 .disabled(customOption == nil || isSelectionDisabled)
@@ -284,7 +284,7 @@ struct ModelPickerSheet: View {
     }
 
     private var customEntryForeground: Color {
-        customOption == nil ? Color(.tertiaryLabel) : Color(.systemBackground)
+        customOption == nil ? Color(.tertiaryLabel) : Color.accentColor
     }
 
     /// Trailing star shared by model rows and the custom entry. Monochrome:
@@ -310,7 +310,7 @@ struct ModelPickerSheet: View {
 
     private func starColor(isFavorite: Bool, isInverted: Bool, isEnabled: Bool) -> Color {
         guard isEnabled else { return Color(.tertiaryLabel) }
-        if isInverted { return Color(.systemBackground) }
+        if isInverted { return Color.accentColor }
         return isFavorite ? Color.primary : Color(.tertiaryLabel)
     }
 
@@ -478,7 +478,7 @@ struct ModelPickerSheet: View {
                     if inFlight {
                         ProgressView()
                             .controlSize(.small)
-                            .tint(selected ? Color(.systemBackground) : Color.primary)
+                            .tint(selected ? Color.accentColor : Color.primary)
                     } else if selected {
                         Image(systemName: "checkmark")
                             .font(AppFont.body(weight: .semibold))
@@ -788,20 +788,20 @@ private struct CustomModelFieldStyle: ViewModifier {
 /// here, and the profile rows in `DefaultProfilePickerView`.
 enum PickerRowMetrics {
     static let minHeight: CGFloat = 48
-    static let cornerRadius: CGFloat = 12
+    static let cornerRadius: CGFloat = HXRadius.sm
 }
 
 extension View {
     /// The selected-row treatment shared by the model rows and the profile
-    /// rows: a filled `Color.primary` pill with the inverted foreground that
-    /// fill needs. The caller owns the row's frame, because the pill can wrap
+    /// rows: Nous blue text on a Nous blue wash, since a pick is a control
+    /// state. The caller owns the row's frame, because the pill can wrap
     /// content that sits outside the row's own button — the model rows'
     /// favorite star does.
     func pickerSelectionPill(isSelected: Bool) -> some View {
-        foregroundStyle(isSelected ? Color(.systemBackground) : Color.primary)
+        foregroundStyle(isSelected ? Color.accentColor : Color.primary)
             .padding(.horizontal, 12)
             .background(
-                isSelected ? Color.primary : Color.clear,
+                isSelected ? Color.accentColor.opacity(0.12) : Color.clear,
                 in: RoundedRectangle(cornerRadius: PickerRowMetrics.cornerRadius, style: .continuous)
             )
     }

@@ -5,10 +5,10 @@ struct OnboardingFeaturesPage: View {
 
     private let features: [(icon: String, color: Color, title: String, subtitle: String)] = [
         ("bubble.left.and.bubble.right.fill", Color.accentColor, String(localized: "Chat with Atlas from iPhone"), String(localized: "Drive conversations from anywhere on your tailnet.")),
-        ("list.bullet.rectangle.portrait.fill", .green, String(localized: "Manage sessions, tasks, and files remotely"), String(localized: "Browse workspaces and stay on top of agent work.")),
-        ("mic.fill", .purple, String(localized: "Voice input and mobile-friendly composer controls"), String(localized: "Compose naturally with touch-first controls.")),
-        ("checkmark.shield.fill", .cyan, String(localized: "Review approvals and clarifications inline"), String(localized: "Respond to agent prompts without switching apps.")),
-        ("server.rack", .orange, String(localized: "Self-hosted: your machine, your tailnet"), String(localized: "Your Hermes Web UI stays on hardware you control."))
+        ("list.bullet.rectangle.portrait.fill", HermexPaper.file.glow, String(localized: "Manage sessions, tasks, and files remotely"), String(localized: "Browse workspaces and stay on top of agent work.")),
+        ("mic.fill", Color.accentColor, String(localized: "Voice input and mobile-friendly composer controls"), String(localized: "Compose naturally with touch-first controls.")),
+        ("checkmark.shield.fill", HermexPaper.request.glow, String(localized: "Review approvals and clarifications inline"), String(localized: "Respond to agent prompts without switching apps.")),
+        ("server.rack", HermexPaper.tool.glow, String(localized: "Self-hosted: your machine, your tailnet"), String(localized: "Your Hermes Web UI stays on hardware you control."))
     ]
 
     var body: some View {
@@ -54,7 +54,7 @@ struct OnboardingFeatureRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold)) // design-drift: allow (SF Symbol sized to the 40 pt tile)
                 .foregroundStyle(color)
                 .frame(width: 40, height: 40)
                 .background(

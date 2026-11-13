@@ -59,7 +59,7 @@ struct OnboardingWelcomePage: View {
                                     lineWidth: 1
                                 )
                         )
-                        .shadow(color: Color.accentColor.opacity(0.35), radius: 24, y: 10)
+                        .hxShadow(.float)
                 }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Atlas")

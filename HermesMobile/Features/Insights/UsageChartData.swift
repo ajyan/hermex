@@ -112,18 +112,21 @@ enum UsageChartSegment: String, Identifiable, CaseIterable {
         }
     }
 
+    /// Data colors from the chart set (`HermexSeries`), not system hues: no blue,
+    /// so a bar never reads as a control, and the stacked token layers take the
+    /// set's first three, whose neighbors passed the colorblind check.
     var color: Color {
         switch self {
         case .input:
-            .blue
+            HermexSeries.color(for: "home")
         case .output:
-            .orange
+            HermexSeries.color(for: "food")
         case .cacheRead:
-            .teal
+            HermexSeries.color(for: "shopping")
         case .cost:
-            .indigo
+            HermexSeries.color(for: "health")
         case .sessions:
-            .purple
+            HermexSeries.color(for: "transport")
         }
     }
 }

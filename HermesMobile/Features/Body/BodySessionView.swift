@@ -33,7 +33,7 @@ struct BodySessionView: View {
                 Text(verbatim: "This server doesn't have that workout any more.")
             }
         case .failed(let message):
-            PrepFailedView(title: "Couldn't load this workout", message: message) {
+            HXFailedView(title: "Couldn't load this workout", message: message) {
                 Task { await viewModel.load() }
             }
         case .loaded(let session):

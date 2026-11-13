@@ -124,6 +124,9 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     /// inline copies overflowed the iPhone's 1 MB main-thread stack on opening the deck.
     private final class Storage {
         let fields: Fields
+        /// The card's text with its emphasis, parsed once per text (`markdown(_:)`).
+        var markdown: [String: AttributedString] = [:]
+        let lock = NSLock()
         init(_ fields: Fields) { self.fields = fields }
     }
 
@@ -132,6 +135,17 @@ struct DeckCard: Decodable, Equatable, Identifiable {
     init(from decoder: Decoder) throws { storage = Storage(try Fields(from: decoder)) }
 
     var id: String { storage.fields.id }
+
+    /// `inlineMarkdown(text)`, parsed the first time this card shows it and kept with the card, so a card
+    /// redrawn during a swipe never parses Markdown again.
+    func markdown(_ text: String) -> AttributedString {
+        storage.lock.withLock {
+            if let parsed = storage.markdown[text] { return parsed }
+            let parsed = inlineMarkdown(text)
+            storage.markdown[text] = parsed
+            return parsed
+        }
+    }
 
     subscript<T>(dynamicMember keyPath: KeyPath<Fields, T>) -> T { storage.fields[keyPath: keyPath] }
 

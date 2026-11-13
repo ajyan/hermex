@@ -387,10 +387,18 @@ enum MoneyDates {
     }()
 
     static func timestamp(_ s: String) -> Date? {
+        whole.date(from: s) ?? fractional.date(from: s)
+    }
+
+    private static let whole: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime]
-        if let date = f.date(from: s) { return date }
+        return f
+    }()
+
+    private static let fractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f.date(from: s)
-    }
+        return f
+    }()
 }
