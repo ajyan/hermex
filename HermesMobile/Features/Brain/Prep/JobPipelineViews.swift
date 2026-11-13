@@ -2,14 +2,15 @@ import SwiftUI
 
 /// Prep home's Pipeline: every open application as a hairline row in one neutral card (the company, then its
 /// stage and next step in plain words), each opening its company page, and Add a company. The week's
-/// applications sit in the header as pips, the same count the Ask and the Brief's search card show. Hidden until
-/// the pipeline loads, and on a server without one.
+/// applications sit in the header as pips, the same count the Ask and the Brief's search card show. An empty
+/// pipeline says so over Add, so the first company can be added. Hidden until the pipeline loads and on a server
+/// without one (404); a failed load shows one retry line instead.
 struct PrepPipelineSection: View {
     let model: JobPipelineModel
     @State private var adding = false
 
     var body: some View {
-        if let pipeline = model.pipeline, !pipeline.applications.isEmpty || !pipeline.upcoming.isEmpty {
+        if let pipeline = model.pipeline {
             VStack(alignment: .leading, spacing: BrainStyle.s) {
                 HStack(alignment: .firstTextBaseline, spacing: BrainStyle.s) {
                     BrainSectionHeader(title: "Pipeline")
@@ -24,6 +25,13 @@ struct PrepPipelineSection: View {
                 }
                 SectionCard {
                     VStack(spacing: 0) {
+                        if pipeline.applications.isEmpty {
+                            Text(verbatim: "No applications yet. Add the first company you're talking to.")
+                                .font(BrainStyle.rowSubtitle)
+                                .foregroundStyle(Color.hxTextSecondary)
+                                .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                         ForEach(Array(pipeline.applications.enumerated()), id: \.element.id) { offset, row in
                             if offset > 0 { PrepRowDivider() }
                             NavigationLink(value: ShellPushDestination.brainRoute(.prep(.application(row.id)))) {
@@ -50,6 +58,16 @@ struct PrepPipelineSection: View {
                 }
             }
             .sheet(isPresented: $adding) { JobAddSheet(model: model) }
+        } else if model.loadFailed {
+            Button { Task { await model.load() } } label: {
+                Label { Text(verbatim: "Couldn't load your pipeline · Try again") } icon: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .font(BrainStyle.rowSubtitle)
+                .foregroundStyle(Color.accentColor)
+                .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
+            }
+            .buttonStyle(.plain)
         }
     }
 }
