@@ -53,7 +53,7 @@ private struct AtlasMealsWidgetView: View {
     let entry: AtlasMealsEntry
     @Environment(\.widgetFamily) private var family
 
-    private var paper: HermexPaper { .kitchen }
+    private var paper: HermexPaper { .reading }
 
     var body: some View {
         Group {
