@@ -19,6 +19,17 @@ struct DictationDocument: Equatable {
         let removed: Int
         let inserted: Int
 
+        /// The one stretch that differs between two texts.
+        static func between(_ old: String, _ new: String) -> Edit {
+            let old = Array(old), new = Array(new)
+            var prefix = 0
+            while prefix < min(old.count, new.count), old[prefix] == new[prefix] { prefix += 1 }
+            var suffix = 0
+            while suffix < min(old.count, new.count) - prefix,
+                  old[old.count - 1 - suffix] == new[new.count - 1 - suffix] { suffix += 1 }
+            return Edit(at: prefix, removed: old.count - prefix - suffix, inserted: new.count - prefix - suffix)
+        }
+
         /// Where a cursor at `cursor` sits after this edit: one at or past the changed words moves with them.
         func moved(_ cursor: Int) -> Int {
             if cursor < at { return cursor }
@@ -49,6 +60,10 @@ struct DictationDocument: Equatable {
 
     /// Whether the live words hold anything yet.
     var hasLiveWords: Bool { !words.isEmpty }
+
+    /// Where typing goes on from: the end of the live words, before any space that parts them from
+    /// the text after.
+    var caret: Int { words.upperBound }
 
     /// The live words as they stand in the text.
     var liveWords: String { slice(words) }
@@ -115,15 +130,10 @@ struct DictationDocument: Equatable {
     /// the field can't say) and what happened to the live words.
     @discardableResult
     mutating func adopt(_ newText: String) -> (editEnd: Int, live: Adoption) {
-        let old = Array(text), new = Array(newText)
-        var prefix = 0
-        while prefix < min(old.count, new.count), old[prefix] == new[prefix] { prefix += 1 }
-        var suffix = 0
-        while suffix < min(old.count, new.count) - prefix,
-              old[old.count - 1 - suffix] == new[new.count - 1 - suffix] { suffix += 1 }
-        let changed = prefix..<(old.count - suffix)
-        let delta = new.count - old.count
-        let editEnd = new.count - suffix
+        let edit = Edit.between(text, newText)
+        let changed = edit.at..<(edit.at + edit.removed)
+        let delta = edit.inserted - edit.removed
+        let editEnd = edit.at + edit.inserted
         text = newText
 
         func shifted(_ range: Range<Int>) -> Range<Int> {
@@ -138,6 +148,10 @@ struct DictationDocument: Equatable {
                 || (changed.isEmpty && range.lowerBound < changed.lowerBound && changed.lowerBound < range.upperBound)
         }
 
+        // Typing right after the live words: the space that parted them from the rest is his text now.
+        if !words.isEmpty, changed.lowerBound >= words.upperBound, changed.lowerBound <= open.upperBound {
+            open = open.lowerBound..<words.upperBound
+        }
         pieces = pieces.map { Piece(id: $0.id, range: shifted($0.range)) }
         if stretchStart > changed.lowerBound || (stretchStart == changed.lowerBound && changed.isEmpty && open.isEmpty) {
             stretchStart = max(changed.lowerBound, stretchStart + delta)

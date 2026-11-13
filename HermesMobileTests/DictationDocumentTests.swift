@@ -59,6 +59,19 @@ final class DictationDocumentTests: XCTestCase {
         XCTAssertEqual(document.text, "hello there! and more")
     }
 
+    func testTypingAtTheCaretBeforeTheJoiningSpaceIsKept() {
+        var document = DictationDocument(text: "Start end", cursor: 6)
+        document.hear(settled: "", volatile: "middle")
+        XCTAssertEqual(document.text, "Start middle end")
+        XCTAssertEqual(document.caret, 12)
+        let adopted = document.adopt("Start middle! end")
+        XCTAssertEqual(adopted.live, .unchanged)
+        XCTAssertFalse(document.isInStretch(adopted.editEnd))
+        document.move(to: adopted.editEnd)
+        document.hear(settled: "", volatile: "more")
+        XCTAssertEqual(document.text, "Start middle! more end")
+    }
+
     func testAnEditBeforeAPassageMovesItAndOneInsideGrowsIt() throws {
         var document = DictationDocument(text: "")
         document.hear(settled: "we ship friday", volatile: "")

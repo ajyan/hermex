@@ -309,14 +309,25 @@ final class DictationModel {
         }
     }
 
-    /// Writes the live words into the box, keeping the cursor where the user has it.
+    /// Writes the live words into the box, keeping the cursor where the user has it: one at the end
+    /// of the live words stays at their end.
     private func write() {
         sync()
-        guard let text, document != nil else { return }
-        let cursor = services.cursor.position(in: document?.text ?? "")
-        guard let edit = document?.hear(settled: settled, volatile: volatile), let written = document?.text else { return }
-        text.wrappedValue = written
-        if let cursor { services.cursor.place(edit.moved(cursor), in: written) }
+        guard let old = document, let edit = document?.hear(settled: settled, volatile: volatile),
+              let new = document else { return }
+        let follows: (Int) -> Int = { $0 == old.caret || $0 == old.open.upperBound ? new.caret : edit.moved($0) }
+        put(new.text, over: old.text, edit: edit, cursor: follows)
+    }
+
+    /// Changes the box from `before` to `written`: in the focused field first, so its cursor and
+    /// keyboard follow, then in the binding.
+    private func put(
+        _ written: String, over before: String, edit: DictationDocument.Edit, cursor: ((Int) -> Int)? = nil
+    ) {
+        if let at = services.cursor.position(in: before) {
+            services.cursor.write(edit, from: before, to: written, cursor: (cursor ?? edit.moved)(at))
+        }
+        text?.wrappedValue = written
     }
 
     /// Takes in what the keyboard did since dictation last wrote: an edit to the live words makes
@@ -413,17 +424,15 @@ final class DictationModel {
             }
         }
         dropSent()
-        guard !Task.isCancelled, let text, phase == .idle else { return }
+        guard !Task.isCancelled, text != nil, phase == .idle else { return }
         sync()
         guard let before = document else { return }
         var after = before
         for rewrite in rewrites { after.rewrite(rewrite.id, expecting: rewrite.expected, with: rewrite.text) }
         guard after.text != before.text else { return }
-        let cursor = services.cursor.position(in: before.text)
         document = after
         documentBeforeTidy = before
-        text.wrappedValue = after.text
-        if let cursor { services.cursor.place(min(cursor, after.text.count), in: after.text) }
+        put(after.text, over: before.text, edit: .between(before.text, after.text))
         lastTidy = (before.text, after.text)
         // Nothing was typed, so the box is the saved words plus tidied speech: Done leaves it alone.
         if seenWhole != nil, !typed { seenWhole = after.text }

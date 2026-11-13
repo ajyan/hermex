@@ -56,9 +56,9 @@ final class FakeDictationCursor: DictationCursor {
 
     func position(in text: String) -> Int? { offset }
 
-    func place(_ offset: Int, in text: String) {
-        placed = offset
-        self.offset = offset
+    func write(_ edit: DictationDocument.Edit, from old: String, to new: String, cursor: Int) {
+        placed = cursor
+        offset = cursor
     }
 }
 
@@ -138,6 +138,7 @@ final class DictationModelTests: XCTestCase {
         listener.say("in the middle")
         XCTAssertEqual(box.text, "Start in the middle end")
         XCTAssertEqual(cursor.placed, 19)
+        XCTAssertEqual(cursor.placed, 19, "the cursor sits at the end of the words, before the joining space")
         listener.say("in the very middle")
         XCTAssertEqual(box.text, "Start in the very middle end")
     }

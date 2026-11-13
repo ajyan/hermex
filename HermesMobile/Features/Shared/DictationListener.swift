@@ -501,16 +501,20 @@ final class LegacyDictationListener: DictationListening {
     }
 }
 
-/// Where the cursor is in the box being dictated into, so speech lands there and typing isn't disturbed.
+/// The focused field behind the box being dictated into: where its cursor is, so speech lands there,
+/// and a way to change its words without disturbing the keyboard.
 @MainActor
 protocol DictationCursor {
     /// The cursor's character offset when the focused field holds exactly `text`; nil otherwise.
     func position(in text: String) -> Int?
-    /// Puts the cursor at `offset` once the focused field shows `text`.
-    func place(_ offset: Int, in text: String)
+    /// Makes `edit` in the focused field when it holds `old`, turning it into `new`, and leaves the
+    /// cursor at `cursor`. The caller still writes `new` to the box's binding.
+    func write(_ edit: DictationDocument.Edit, from old: String, to new: String, cursor: Int)
 }
 
-/// The focused UIKit text input behind a SwiftUI field.
+/// The focused UIKit text input behind a SwiftUI field. Dictation edits it through `UITextInput`, as
+/// the keyboard does: a field whose text is only replaced through its binding loses its cursor and
+/// leaves the keyboard's autocorrection holding the old words.
 struct FocusedFieldCursor: DictationCursor {
     func position(in text: String) -> Int? {
         guard let input = Self.focusedInput(showing: text), let range = input.selectedTextRange else { return nil }
@@ -519,16 +523,21 @@ struct FocusedFieldCursor: DictationCursor {
         return text.distance(from: text.startIndex, to: index)
     }
 
-    func place(_ offset: Int, in text: String) {
-        // SwiftUI moves the cursor to the end when it writes new text into the field, on its next
-        // update: put it back after that.
-        DispatchQueue.main.async {
-            guard let input = Self.focusedInput(showing: text) else { return }
-            let index = text.index(text.startIndex, offsetBy: min(max(offset, 0), text.count))
-            let utf16 = index.utf16Offset(in: text)
-            guard let position = input.position(from: input.beginningOfDocument, offset: utf16) else { return }
-            input.selectedTextRange = input.textRange(from: position, to: position)
-        }
+    func write(_ edit: DictationDocument.Edit, from old: String, to new: String, cursor: Int) {
+        guard let input = Self.focusedInput(showing: old),
+              let start = Self.position(edit.at, in: old, of: input),
+              let end = Self.position(edit.at + edit.removed, in: old, of: input),
+              let range = input.textRange(from: start, to: end) else { return }
+        let from = new.index(new.startIndex, offsetBy: edit.at)
+        let replacement = String(new[from..<new.index(from, offsetBy: edit.inserted)])
+        input.replace(range, withText: replacement)
+        guard let caret = Self.position(cursor, in: new, of: input) else { return }
+        input.selectedTextRange = input.textRange(from: caret, to: caret)
+    }
+
+    private static func position(_ offset: Int, in text: String, of input: UITextInput) -> UITextPosition? {
+        let index = text.index(text.startIndex, offsetBy: min(max(offset, 0), text.count))
+        return input.position(from: input.beginningOfDocument, offset: index.utf16Offset(in: text))
     }
 
     private static func focusedInput(showing text: String) -> UITextInput? {
