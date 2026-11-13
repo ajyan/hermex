@@ -230,7 +230,7 @@ import SwiftUI
             }
         }
         .background(Color.hxCanvas.ignoresSafeArea())
-        .hxNavigationTitle(model.profile.name)
+        .navigationTitle(model.profile.name)
         .toolbar {
             // The bot's face and name sit in one pill beside Back, and that pill is the
             // way into its profile. iOS 26 draws the toolbar glass; older systems get a material.
