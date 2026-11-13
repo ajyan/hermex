@@ -74,18 +74,8 @@ final class SessionEventStreamClient: SessionEventStreaming {
             Task { @MainActor in finish(end) }
             return .shutdown
         }
-        config.headers = customHeaderProvider().merged(under: [
-            "Accept": "text/event-stream",
-            "Cache-Control": "no-cache, no-transform",
-            "Accept-Encoding": "identity"
-        ])
-
-        let configuration = baseConfiguration.copy() as? URLSessionConfiguration ?? .default
-        configuration.httpCookieStorage = .shared
-        configuration.httpCookieAcceptPolicy = .always
-        configuration.httpShouldSetCookies = true
-        configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        config.urlSessionConfiguration = configuration
+        config.headers = StreamSession.headers(for: url, custom: customHeaderProvider())
+        config.urlSessionConfiguration = StreamSession.configuration(from: baseConfiguration)
 
         let source = EventSource(config: config)
         eventSource = source

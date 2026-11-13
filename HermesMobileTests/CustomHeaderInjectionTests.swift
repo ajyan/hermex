@@ -655,6 +655,49 @@ final class RedirectingMockURLProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
+@MainActor
+final class StreamRedirectGuardTests: XCTestCase {
+    override func tearDown() {
+        RedirectingMockURLProtocol.reset()
+        super.tearDown()
+    }
+
+    /// Opens an `SSEClient` stream whose first hop redirects to `target` and waits for
+    /// the stream to end, either refused or closed after the second hop.
+    private func streamRedirected(to target: URL) async throws {
+        RedirectingMockURLProtocol.redirect = .init(fromPath: "/api/chat/stream", to: target)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [RedirectingMockURLProtocol.self]
+        let client = SSEClient(urlSessionConfiguration: configuration, reconnectsAfterServerClose: false,
+                               customHeaderProvider: { [CustomHeader(name: "X-Api-Key", value: "k1")] })
+        let ended = expectation(description: "stream ended")
+        ended.assertForOverFulfill = false
+        client.start(url: try XCTUnwrap(URL(string: "https://example.test/api/chat/stream?stream_id=s1"))) { event in
+            if case .transportError = event { ended.fulfill() }
+        }
+        await fulfillment(of: [ended], timeout: 2)
+        client.stop()
+    }
+
+    func testAStreamRedirectedToAnotherOriginIsRefusedBeforeItsHeadersLeave() async throws {
+        try await streamRedirected(to: try XCTUnwrap(URL(string: "https://third-party.example/leak")))
+        XCTAssertNil(RedirectingMockURLProtocol.secondHopRequest, "No request reaches the other origin")
+    }
+
+    func testASameOriginStreamRedirectIsFollowedWithItsHeaders() async throws {
+        try await streamRedirected(to: try XCTUnwrap(URL(string: "https://example.test/proxy/api/chat/stream")))
+        let secondHop = try XCTUnwrap(RedirectingMockURLProtocol.secondHopRequest)
+        XCTAssertEqual(secondHop.value(forHTTPHeaderField: "X-Api-Key"), "k1")
+    }
+
+    func testTheStreamConfigurationPutsTheGuardFirstAndMarksTheOrigin() {
+        let configuration = StreamSession.configuration(from: .ephemeral)
+        XCTAssertTrue(configuration.protocolClasses?.first == StreamRedirectGuard.self)
+        let headers = StreamSession.headers(for: URL(string: "https://example.test:8443/api/kanban/events?x=1")!, custom: [])
+        XCTAssertEqual(headers[StreamRedirectGuard.originHeader], "https://example.test:8443")
+    }
+}
+
 final class CrossOriginRedirectHeaderTests: XCTestCase {
     private let baseURL = URL(string: "https://example.test")!
 
