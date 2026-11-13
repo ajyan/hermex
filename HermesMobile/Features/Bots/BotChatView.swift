@@ -257,8 +257,8 @@ import SwiftUI
                         Image(systemName: "person.2")
                             .overlay(alignment: .topTrailing) {
                                 Text("\(min(model.delegatedWork.activeCount, 99))")
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundStyle(.black)
+                                    .font(AppFont.caption2(weight: .bold))
+                                    .foregroundStyle(Color.hxOnAccent)
                                     .frame(minWidth: 15, minHeight: 15)
                                     .background(Color.hxSuccess, in: Capsule())
                                     .offset(x: 7, y: -7)

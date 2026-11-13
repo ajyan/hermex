@@ -13,7 +13,7 @@ import UIKit
                     Section {
                         Label(error, systemImage: "exclamationmark.triangle")
                             .font(AppFont.footnote())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.hxTextSecondary)
                     }
                 }
 
@@ -100,7 +100,7 @@ import UIKit
                 Spacer(minLength: 8)
                 Text(worker.status.localizedUppercase)
                     .font(AppFont.caption2(weight: .bold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.hxTextSecondary)
             }
 
             HStack(spacing: 6) {
@@ -114,13 +114,13 @@ import UIKit
                 }
             }
             .font(AppFont.caption())
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.hxTextSecondary)
             .lineLimit(1)
 
             if work.loadingTail == worker.identity {
                 Text("Loading tail…")
                     .font(AppFont.caption())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.hxTextSecondary)
             } else if let tail = work.tail, tail.worker == worker.identity {
                 tailView(tail)
             }
@@ -141,7 +141,7 @@ import UIKit
                 if work.interruptedWorker == worker.identity {
                     Label("Interrupt sent", systemImage: "stop.circle")
                         .font(AppFont.caption(weight: .semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.hxTextSecondary)
                 } else {
                     Button("Interrupt", role: .destructive) {
                         interruptAction = work.prepareInterrupt(worker)
@@ -169,7 +169,7 @@ import UIKit
                 if tail.truncated {
                     Label("Showing the latest 16 KB", systemImage: "scissors")
                         .font(AppFont.caption2())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.hxTextSecondary)
                 }
             }
             .padding(10)
@@ -177,7 +177,7 @@ import UIKit
         } else {
             Text("Live output is no longer available for this worker.")
                 .font(AppFont.caption())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.hxTextSecondary)
         }
     }
 }
@@ -204,7 +204,7 @@ struct BotDelegationCompletionCard: View {
                             .foregroundStyle(.primary)
                         Text(summary)
                             .font(AppFont.caption())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.hxTextSecondary)
                             .monospacedDigit()
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -302,7 +302,7 @@ struct BotDelegationResultsSheet: View {
                     if let delegationID = completion.delegationID {
                         Text(delegationID)
                             .font(AppFont.mono(style: .caption))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.hxTextSecondary)
                             .textSelection(.enabled)
                     }
 

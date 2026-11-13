@@ -84,7 +84,7 @@ struct BotsInboxHome {
         let toasted = list
             .overlay(alignment: .bottom) {
                 if let toast {
-                    Text(toast).font(.callout).padding()
+                    Text(toast).font(AppFont.subheadline()).padding()
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
                         .padding().accessibilityAddTraits(.updatesFrequently)
                 }
@@ -103,7 +103,7 @@ struct BotsInboxHome {
         List {
             if inbox.connection != nil {
                 if let message = inbox.errorMessage ?? inbox.routeAdvice {
-                    Text(message).font(.callout)
+                    Text(message).font(AppFont.subheadline())
                     // Reconnecting would only send the refused password again (#884).
                     if inbox.needsSignIn {
                         Button("Update sign-in", action: updateSignIn)
@@ -123,7 +123,7 @@ struct BotsInboxHome {
                     Text("No bots yet. Tap + to create one.")
                 }
                 if let notice = inbox.notice {
-                    Text(notice).font(.callout).foregroundStyle(.secondary).listRowSeparator(.hidden)
+                    Text(notice).font(AppFont.subheadline()).foregroundStyle(Color.hxTextSecondary).listRowSeparator(.hidden)
                 }
                 let pinned = inbox.pinned
                 if !pinned.isEmpty {
@@ -162,7 +162,7 @@ struct BotsInboxHome {
                     Button(inbox.showsHidden ? "Hide hidden" : "Show hidden (\(inbox.hiddenCount))") {
                         inbox.showsHidden.toggle()
                     }
-                    .font(AppFont.subheadline()).foregroundStyle(.secondary)
+                    .font(AppFont.subheadline()).foregroundStyle(Color.hxTextSecondary)
                     .listRowSeparator(.hidden)
                 }
             } else {
@@ -675,7 +675,7 @@ private struct BotHeroTile: View {
             BotAvatarView(profile: profile, avatar: avatar, size: 84)
             VStack(spacing: 4) {
                 HStack(spacing: 6) {
-                    Text(profile.name).font(AppFont.body()).foregroundStyle(.secondary).lineLimit(1)
+                    Text(profile.name).font(AppFont.body()).foregroundStyle(Color.hxTextSecondary).lineLimit(1)
                     if unread { BotUnreadDot() }
                 }
                 if let status {
@@ -698,7 +698,7 @@ private struct BotRoomHeroTile: View {
     var body: some View {
         VStack(spacing: 14) {
             BotRoomAvatars(room: room, roster: roster, avatars: avatars, size: 60).frame(height: 84)
-            Text(room.name).font(AppFont.body()).foregroundStyle(.secondary).lineLimit(1)
+            Text(room.name).font(AppFont.body()).foregroundStyle(Color.hxTextSecondary).lineLimit(1)
         }
         .frame(maxWidth: 132)
         .accessibilityElement(children: .combine)
@@ -743,7 +743,7 @@ private struct BotInboxRow: View {
                     }
                 }
                 HStack(spacing: 8) {
-                    Text(subline).font(AppFont.body()).foregroundStyle(.secondary).lineLimit(1)
+                    Text(subline).font(AppFont.body()).foregroundStyle(Color.hxTextSecondary).lineLimit(1)
                     Spacer(minLength: 0)
                     if unread { BotUnreadDot() }
                 }
@@ -755,7 +755,7 @@ private struct BotInboxRow: View {
     @ViewBuilder private var nameAndChip: some View {
         Text(profile.name).font(AppFont.headline()).foregroundStyle(Color.hxTextPrimary).lineLimit(1)
         if let chip {
-            Text(chip).font(AppFont.footnote()).foregroundStyle(.secondary).lineLimit(1)
+            Text(chip).font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary).lineLimit(1)
                 .padding(.horizontal, 8).padding(.vertical, 3)
                 .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous))
                 .layoutPriority(-1)
@@ -769,7 +769,7 @@ private struct BotInboxRow: View {
             BotLiveStatusLabel(status: status, font: .subheadline.weight(.semibold))
                 .fixedSize(horizontal: !dynamicTypeSize.isAccessibilitySize, vertical: false)
         } else if let date = profile.lastActive {
-            Text(BotInboxDateLabel.text(for: date)).font(AppFont.subheadline()).foregroundStyle(.secondary)
+            Text(BotInboxDateLabel.text(for: date)).font(AppFont.subheadline()).foregroundStyle(Color.hxTextSecondary)
         }
     }
 }

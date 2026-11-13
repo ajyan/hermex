@@ -82,15 +82,15 @@ struct BotTurnOutcomeRow: View {
                     if let detail {
                         // Raw provider text is often a JSON blob: capped, and selectable to copy.
                         Text(detail)
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                            .font(AppFont.mono(style: .caption))
+                            .foregroundStyle(Color.hxTextSecondary)
                             .lineLimit(4)
                             .textSelection(.enabled)
                     }
                     if let resetsAt, resetsAt > Date() {
                         Label(Self.resetLine(resetsAt), systemImage: "clock")
                             .font(AppFont.caption())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.hxTextSecondary)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
