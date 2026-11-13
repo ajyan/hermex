@@ -204,27 +204,32 @@ extension EnvironmentValues {
 /// Routes link taps through one `OpenURLAction` that outlives body passes, for
 /// the same reason as `ChatDisclosureToggleAction`. The screen's `handler` sees
 /// each link first and returns nil for links it does not own; of those, web
-/// pages open in the in-app browser and the rest go to the system.
+/// pages open in the in-app browser, mail and phone links go to the system, and
+/// any other scheme asks first (`ExternalLinkPolicy`).
 final class TranscriptLinkRouter {
     enum Decision {
         case host(OpenURLAction.Result)
         case inAppBrowser
         case system
+        case confirmBeforeOpening
     }
 
     var handler: (URL) -> OpenURLAction.Result? = { _ in nil }
     var openInAppBrowser: (URL) -> Void = { url in
         MainActor.assumeIsolated { SafariView.present(url) }
     }
+    /// Shows the confirmation for a link another app (or Atlas itself) would open.
+    var confirmOpening: (URL) -> Void = { _ in }
 
     private(set) lazy var openURL = OpenURLAction { [weak self] url in
-        self?.route(url) ?? .systemAction
+        self?.route(url) ?? .discarded
     }
 
     /// What a tap on `url` does, given the screen handler's result for it.
     static func decision(for url: URL, hostResult: OpenURLAction.Result?) -> Decision {
         if let hostResult { return .host(hostResult) }
-        return InAppBrowserPolicy.opensInApp(url) ? .inAppBrowser : .system
+        if InAppBrowserPolicy.opensInApp(url) { return .inAppBrowser }
+        return ExternalLinkPolicy.opensWithoutAsking(url) ? .system : .confirmBeforeOpening
     }
 
     private func route(_ url: URL) -> OpenURLAction.Result {
@@ -236,6 +241,80 @@ final class TranscriptLinkRouter {
             return .handled
         case .system:
             return .systemAction
+        case .confirmBeforeOpening:
+            confirmOpening(url)
+            return .handled
+        }
+    }
+}
+
+/// Which links a tap may hand to another app at once. A reply is untrusted text, and a
+/// link can name any scheme some installed app registered, Atlas's own included (which
+/// can start a call or switch servers), so anything but web, mail and phone links asks
+/// first, showing the whole address and who opens it.
+enum ExternalLinkPolicy {
+    static func opensWithoutAsking(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased() else { return false }
+        return ["http", "https", "mailto", "tel"].contains(scheme)
+    }
+
+    /// The confirmation's title.
+    static func title(for url: URL) -> String {
+        isAtlasLink(url) ? String(localized: "Open this Atlas link?") : String(localized: "Open this link in another app?")
+    }
+
+    /// Who opens it, then the whole address.
+    static func message(for url: URL) -> String {
+        "\(opener(for: url))\n\n\(url.absoluteString)"
+    }
+
+    static func opener(for url: URL) -> String {
+        if isAtlasLink(url) {
+            return String(localized: "Atlas opens it, and it can start a chat or a call or switch servers.")
+        }
+        let scheme = url.scheme?.lowercased() ?? ""
+        if let app = knownApps[scheme] {
+            return String(localized: "\(app) opens it.")
+        }
+        return scheme.isEmpty
+            ? String(localized: "Another app on this iPhone opens it.")
+            : String(localized: "Whichever app on this iPhone handles \u{201C}\(scheme):\u{201D} links opens it.")
+    }
+
+    private static func isAtlasLink(_ url: URL) -> Bool {
+        url.scheme?.lowercased() == HermesDeepLink.scheme.lowercased()
+    }
+
+    private static let knownApps: [String: String] = [
+        "sms": "Messages",
+        "facetime": "FaceTime",
+        "facetime-audio": "FaceTime",
+        "maps": "Maps",
+        "shortcuts": "Shortcuts",
+        "music": "Music",
+        "itms-apps": "App Store",
+        "itms-appss": "App Store",
+        "app-settings": "Settings",
+        "calshow": "Calendar",
+        "x-apple-reminderkit": "Reminders",
+        "message": "Mail",
+    ]
+}
+
+extension View {
+    /// Asks before opening `link` in another app; Cancel drops it. Pair with a link
+    /// handler that sets `link` instead of opening a scheme `ExternalLinkPolicy` doesn't trust.
+    func confirmsExternalLink(_ link: Binding<URL?>) -> some View {
+        confirmationDialog(
+            link.wrappedValue.map(ExternalLinkPolicy.title(for:)) ?? "",
+            isPresented: Binding(get: { link.wrappedValue != nil }, set: { if !$0 { link.wrappedValue = nil } }),
+            titleVisibility: .visible,
+            presenting: link.wrappedValue
+        ) { url in
+            Button("Open") { UIApplication.shared.open(url) }
+            Button("Cancel", role: .cancel) {}
+        } message: { url in
+            Text(verbatim: ExternalLinkPolicy.message(for: url))
         }
     }
 }
@@ -281,11 +360,21 @@ private struct ChatDisclosureToggledModifier: ViewModifier {
 private struct TranscriptLinkHandlerModifier: ViewModifier {
     let handler: (URL) -> OpenURLAction.Result?
     @State private var router = TranscriptLinkRouter()
+    @State private var prompt = ExternalLinkPrompt()
 
     func body(content: Content) -> some View {
         router.handler = handler
-        return content.environment(\.transcriptLinkRouter, router)
+        // Weak, so the router (in this modifier's state) never holds that state in turn.
+        router.confirmOpening = { [weak prompt] url in prompt?.url = url }
+        return content
+            .environment(\.transcriptLinkRouter, router)
+            .confirmsExternalLink(Binding(get: { prompt.url }, set: { prompt.url = $0 }))
     }
+}
+
+/// The link waiting on the router's confirmation, if any.
+@Observable private final class ExternalLinkPrompt {
+    var url: URL?
 }
 
 /// Publishes the enclosing router's `openURL`. It takes no inputs and its one

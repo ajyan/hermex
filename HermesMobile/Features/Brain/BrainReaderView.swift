@@ -405,6 +405,8 @@ struct BrainReaderContent: View {
     private static let hubPagesAnchor = "hub-pages"
     /// The page's diagram sheet, while open.
     @State private var showsDiagram = false
+    /// A link in the page another app would open, waiting on the confirmation.
+    @State private var pendingExternalLink: URL?
 
     init(page: BrainPage, person: BrainPersonPage?, isShowingCachedCopy: Bool, isMissing: Bool = false,
          push: @escaping (BrainRoute) -> Void, rating: BrainPageRating? = nil,
@@ -444,6 +446,7 @@ struct BrainReaderContent: View {
                         proxy.scrollTo(BrainArticleDigestView.ideaAnchor(focusIdea), anchor: .top)
                     }
                 }
+                .confirmsExternalLink($pendingExternalLink)
         }
     }
 
@@ -559,7 +562,7 @@ struct BrainReaderContent: View {
     }
 
     /// Opens a page's `brain://` links in the reader, drops ones the app can't resolve, and
-    /// hands any other URL to the system.
+    /// hands any other URL to the system, asking first for a scheme `ExternalLinkPolicy` doesn't trust.
     private var brainLinks: OpenURLAction {
         OpenURLAction { url in
             switch BrainReaderLayout.linkAction(for: url) {
@@ -568,8 +571,11 @@ struct BrainReaderContent: View {
                 return .handled
             case .discard:
                 return .discarded
-            case .system:
+            case .system where ExternalLinkPolicy.opensWithoutAsking(url):
                 return .systemAction
+            case .system:
+                pendingExternalLink = url
+                return .handled
             }
         }
     }
