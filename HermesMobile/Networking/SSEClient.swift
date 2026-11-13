@@ -108,11 +108,12 @@ enum StreamSession {
         return custom.merged(under: builtIns)
     }
 
-    /// A copy of `base` that sends the shared jar's cookies and refuses cross-origin
-    /// redirects (`StreamRedirectGuard`) ahead of `base`'s own protocol classes.
+    /// A copy of `base` that sends `WebUICookieJar`'s cookies, like `APIClient`, and
+    /// refuses cross-origin redirects (`StreamRedirectGuard`) ahead of `base`'s own
+    /// protocol classes.
     static func configuration(from base: URLSessionConfiguration) -> URLSessionConfiguration {
         let configuration = base.copy() as? URLSessionConfiguration ?? .default
-        configuration.httpCookieStorage = .shared
+        configuration.httpCookieStorage = WebUICookieJar.shared.storage
         configuration.httpCookieAcceptPolicy = .always
         configuration.httpShouldSetCookies = true
         configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData

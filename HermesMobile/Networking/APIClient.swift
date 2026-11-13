@@ -415,12 +415,12 @@ actor APIClient {
 
 extension APIClient {
     /// The default session every `APIClient` shares, so connections are pooled
-    /// across clients (#688). Cookie-bearing: the shared jar holds each server's
+    /// across clients (#688). Cookie-bearing: `WebUICookieJar` holds each server's
     /// auth cookie. No session delegate; redirects are guarded per task.
     /// Never invalidate it.
     static let sharedSession: URLSession = {
         let configuration = URLSessionConfiguration.default
-        configuration.httpCookieStorage = .shared
+        configuration.httpCookieStorage = WebUICookieJar.shared.storage
         configuration.httpCookieAcceptPolicy = .always
         configuration.httpShouldSetCookies = true
         return URLSession(configuration: configuration)

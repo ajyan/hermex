@@ -328,11 +328,12 @@ final class CustomHeaderSSEInjectionTests: XCTestCase {
         client.stop()
     }
 
-    /// SSE streams against `HTTPCookieStorage.shared`, the same jar as `APIClient`.
+    /// SSE streams against `WebUICookieJar`, the same jar as `APIClient`.
     /// Verify that jar only surfaces a server's own cookie for its stream URL, so
     /// domain isolation covers the SSE stream too (#16).
     func testSSESharedCookieJarIsDomainIsolatedPerStreamURL() throws {
-        let storage = HTTPCookieStorage.shared
+        let storage = WebUICookieJar.shared.storage
+        XCTAssertTrue(StreamSession.configuration(from: .ephemeral).httpCookieStorage === storage)
         storage.cookies?.forEach { storage.deleteCookie($0) }
         defer { storage.cookies?.forEach { storage.deleteCookie($0) } }
 
@@ -872,7 +873,7 @@ final class CrossOriginRedirectHeaderTests: XCTestCase {
         XCTAssertFalse(session === publicMediaSession)
         XCTAssertNil(session.delegate)
         XCTAssertNil(publicMediaSession.delegate)
-        XCTAssertTrue(session.configuration.httpCookieStorage === HTTPCookieStorage.shared)
+        XCTAssertTrue(session.configuration.httpCookieStorage === WebUICookieJar.shared.storage)
         XCTAssertNil(publicMediaSession.configuration.httpCookieStorage)
     }
 }

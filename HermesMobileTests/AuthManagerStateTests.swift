@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 @testable import HermesMobile
 
 @MainActor
@@ -7,7 +8,7 @@ final class AuthManagerStateTests: XCTestCase {
 
     private static let sessionExpiredMessage = "Your session expired. Sign in again."
 
-    // These tests assert against the global HTTPCookieStorage; reset it on both
+    // These tests assert against the process-wide `WebUICookieJar`; reset it on both
     // sides so pre-existing cookies or a mid-test failure can't leak across tests.
     nonisolated override func setUp() {
         super.setUp()
@@ -20,16 +21,15 @@ final class AuthManagerStateTests: XCTestCase {
     }
 
     private nonisolated static func clearSharedCookies() {
-        HTTPCookieStorage.shared.cookies?.forEach {
-            HTTPCookieStorage.shared.deleteCookie($0)
-        }
+        let storage = WebUICookieJar.shared.storage
+        storage.cookies?.forEach { storage.deleteCookie($0) }
     }
 
     func testUnauthorizedWhileLoggedInKeepsServerAndMovesToLoggedOut() async throws {
         let keychain = InMemoryKeychainStore()
         let manager = try await makeLoggedInManager(keychain: keychain, serverURLString: "https://example.test")
         let server = try XCTUnwrap(URL(string: "https://example.test"))
-        let cookieStorage = HTTPCookieStorage.shared
+        let cookieStorage = WebUICookieJar.shared.storage
         cookieStorage.setCookie(try makeSessionCookie(for: server))
 
         manager.handleAPIError(APIError.unauthorized)
@@ -145,11 +145,11 @@ final class AuthManagerStateTests: XCTestCase {
             serverURLString: "https://example.test",
             client: client
         )
-        HTTPCookieStorage.shared.setCookie(try makeSessionCookie(for: server))
+        WebUICookieJar.shared.storage.setCookie(try makeSessionCookie(for: server))
 
         await manager.signOut()
 
-        XCTAssertEqual(HTTPCookieStorage.shared.cookies?.isEmpty, true)
+        XCTAssertEqual(WebUICookieJar.shared.storage.cookies?.isEmpty, true)
         XCTAssertEqual(manager.state, .unconfigured)
     }
 
@@ -162,14 +162,14 @@ final class AuthManagerStateTests: XCTestCase {
         let manager = try await makeLoggedInManager(keychain: keychain, serverURLString: "https://a.test")
         // Both servers hold a session cookie in the shared jar (which both APIClient
         // and SSEClient stream against).
-        HTTPCookieStorage.shared.setCookie(try makeSessionCookie(for: serverA, value: "a-cookie"))
-        HTTPCookieStorage.shared.setCookie(try makeSessionCookie(for: serverB, value: "b-cookie"))
+        WebUICookieJar.shared.storage.setCookie(try makeSessionCookie(for: serverA, value: "a-cookie"))
+        WebUICookieJar.shared.storage.setCookie(try makeSessionCookie(for: serverB, value: "b-cookie"))
 
         await manager.signOut()
 
         // A's cookie is cleared; B (a different host) is untouched.
-        XCTAssertTrue(HTTPCookieStorage.shared.cookies(for: serverA)?.isEmpty ?? true)
-        XCTAssertEqual(HTTPCookieStorage.shared.cookies(for: serverB)?.map(\.value), ["b-cookie"])
+        XCTAssertTrue(WebUICookieJar.shared.storage.cookies(for: serverA)?.isEmpty ?? true)
+        XCTAssertEqual(WebUICookieJar.shared.storage.cookies(for: serverB)?.map(\.value), ["b-cookie"])
     }
 
     func testUnauthorizedClearsOnlyActiveServerCookies() async throws {
@@ -177,15 +177,15 @@ final class AuthManagerStateTests: XCTestCase {
         let serverA = try XCTUnwrap(URL(string: "https://a.test"))
         let serverB = try XCTUnwrap(URL(string: "https://b.test"))
         let manager = try await makeLoggedInManager(keychain: keychain, serverURLString: "https://a.test")
-        HTTPCookieStorage.shared.setCookie(try makeSessionCookie(for: serverA, value: "a-cookie"))
-        HTTPCookieStorage.shared.setCookie(try makeSessionCookie(for: serverB, value: "b-cookie"))
+        WebUICookieJar.shared.storage.setCookie(try makeSessionCookie(for: serverA, value: "a-cookie"))
+        WebUICookieJar.shared.storage.setCookie(try makeSessionCookie(for: serverB, value: "b-cookie"))
 
         manager.handleAPIError(APIError.unauthorized)
 
         // Only the active server's auth is affected by its 401.
         XCTAssertEqual(manager.state, .loggedOut(server: serverA))
-        XCTAssertTrue(HTTPCookieStorage.shared.cookies(for: serverA)?.isEmpty ?? true)
-        XCTAssertEqual(HTTPCookieStorage.shared.cookies(for: serverB)?.map(\.value), ["b-cookie"])
+        XCTAssertTrue(WebUICookieJar.shared.storage.cookies(for: serverA)?.isEmpty ?? true)
+        XCTAssertEqual(WebUICookieJar.shared.storage.cookies(for: serverB)?.map(\.value), ["b-cookie"])
     }
 
     func testSignOutLeavesOtherServerHeadersAndRegistryIntact() async throws {
@@ -298,13 +298,13 @@ final class AuthManagerStateTests: XCTestCase {
         let (manager, _, bAccount) = try await makeTwoServerManager(keychain: keychain, registry: registry)
         let serverA = try XCTUnwrap(URL(string: "https://a.test"))
         let serverB = try XCTUnwrap(URL(string: "https://b.test"))
-        HTTPCookieStorage.shared.setCookie(try makeSessionCookie(for: serverA, value: "a-cookie"))
-        HTTPCookieStorage.shared.setCookie(try makeSessionCookie(for: serverB, value: "b-cookie"))
+        WebUICookieJar.shared.storage.setCookie(try makeSessionCookie(for: serverA, value: "a-cookie"))
+        WebUICookieJar.shared.storage.setCookie(try makeSessionCookie(for: serverB, value: "b-cookie"))
 
         await manager.removeServer(bAccount)
 
-        XCTAssertEqual(HTTPCookieStorage.shared.cookies(for: serverA)?.map(\.value), ["a-cookie"])
-        XCTAssertTrue(HTTPCookieStorage.shared.cookies(for: serverB)?.isEmpty ?? true)
+        XCTAssertEqual(WebUICookieJar.shared.storage.cookies(for: serverA)?.map(\.value), ["a-cookie"])
+        XCTAssertTrue(WebUICookieJar.shared.storage.cookies(for: serverB)?.isEmpty ?? true)
     }
 
     func testRemovingAServerPurgesItsBotConnectionAvatars() async throws {
@@ -837,7 +837,7 @@ final class AuthManagerStateTests: XCTestCase {
         let manager = try await makeHermesManager(keychain: keychain)
         let side = BotConnection(id: UUID(), name: "Side", address: hermesServer, username: "me", password: "secret")
         try BotConnectionStore(keychain: keychain).save(side, server: webuiServer)
-        let cookies = HTTPCookieStorage.shared
+        let cookies = WebUICookieJar.shared.storage
         cookies.setCookie(try makeSessionCookie(for: webuiServer))
 
         await manager.signOut()
@@ -859,7 +859,7 @@ final class AuthManagerStateTests: XCTestCase {
         XCTAssertTrue(manager.addHermesServer(sameHost))
         let side = BotConnection(id: UUID(), name: "Side", address: hermesServer, username: "me", password: "secret")
         try BotConnectionStore(keychain: keychain).save(side, server: webuiServer)
-        let cookies = HTTPCookieStorage.shared
+        let cookies = WebUICookieJar.shared.storage
         cookies.setCookie(try makeSessionCookie(for: webuiServer))
         let account = try XCTUnwrap(manager.activeServer)
 
@@ -1121,5 +1121,123 @@ final class AuthManagerStateTests: XCTestCase {
                 .value: value,
             ])
         )
+    }
+}
+
+final class WebUICookieJarTests: XCTestCase {
+    private let server = URL(string: "https://a.test")!
+
+    /// Reads like the real Keychain before the device's first unlock while `locked`.
+    private final class LockableKeychain: KeychainStoring {
+        let base = InMemoryKeychainStore()
+        var locked = false
+        private struct Locked: Error {}
+
+        func save(_ value: String, forKey key: KeychainStore.Key) throws {
+            if locked { throw Locked() }
+            try base.save(value, forKey: key)
+        }
+        func load(_ key: KeychainStore.Key) throws -> String? {
+            if locked { throw Locked() }
+            return try base.load(key)
+        }
+        func delete(_ key: KeychainStore.Key) throws { try base.delete(key) }
+        func save(_ value: String, forKey key: KeychainStore.Key, scope: String) throws { try base.save(value, forKey: key, scope: scope) }
+        func load(_ key: KeychainStore.Key, scope: String) throws -> String? { try base.load(key, scope: scope) }
+        func delete(_ key: KeychainStore.Key, scope: String) throws { try base.delete(key, scope: scope) }
+    }
+
+    private func emptyJar() throws -> HTTPCookieStorage {
+        try XCTUnwrap(URLSessionConfiguration.ephemeral.httpCookieStorage)
+    }
+
+    private func cookie(_ name: String, value: String = "token", expires: Date? = Date().addingTimeInterval(86_400)) throws -> HTTPCookie {
+        var properties: [HTTPCookiePropertyKey: Any] = [.domain: "a.test", .path: "/", .name: name, .value: value]
+        if let expires { properties[.expires] = expires }
+        return try XCTUnwrap(HTTPCookie(properties: properties))
+    }
+
+    /// Changes the jar, then mirrors it as `AuthManager` does after a sign-in or clear.
+    private func change(_ jar: WebUICookieJar, _ body: (HTTPCookieStorage) -> Void) {
+        body(jar.storage)
+        jar.persist()
+    }
+
+    func testPersistentCookiesSurviveARelaunchAndARemovalIsMirrored() throws {
+        let keychain = InMemoryKeychainStore()
+        let first = WebUICookieJar(keychain: keychain, legacy: try emptyJar())
+        change(first) { $0.setCookie(try! cookie("hermes_session", value: "signed-in")) }
+        change(first) { $0.setCookie(try! cookie("scratch", expires: nil)) }
+        XCTAssertNotNil(keychain.savedValues[.webuiCookies])
+
+        let relaunched = WebUICookieJar(keychain: keychain, legacy: try emptyJar())
+        XCTAssertEqual(relaunched.storage.cookies(for: server)?.map(\.value), ["signed-in"],
+                       "Only the persistent cookie is kept, like the system jar")
+
+        change(relaunched) { storage in storage.cookies?.forEach(storage.deleteCookie) }
+        let signedOut = WebUICookieJar(keychain: keychain, legacy: try emptyJar())
+        XCTAssertEqual(signedOut.storage.cookies?.isEmpty, true, "Signing out clears the saved copy too")
+    }
+
+    func testMovingToTheBackgroundSavesCookiesSetSinceTheLastSave() throws {
+        let keychain = InMemoryKeychainStore()
+        let jar = WebUICookieJar(keychain: keychain, legacy: try emptyJar())
+        jar.storage.setCookie(try cookie("hermes_profile", value: "work"))
+        NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)
+        XCTAssertEqual(WebUICookieJar(keychain: keychain, legacy: try emptyJar()).storage.cookies(for: server)?.map(\.value),
+                       ["work"])
+    }
+
+    @MainActor
+    func testSigningOutClearsTheSavedCookieToo() async throws {
+        let server = try XCTUnwrap(URL(string: "https://jar-signout.test"))
+        let storage = WebUICookieJar.shared.storage
+        storage.setCookie(try XCTUnwrap(HTTPCookie(properties: [
+            .domain: "jar-signout.test", .path: "/", .name: "hermes_session", .value: "v",
+            .expires: Date().addingTimeInterval(86_400)
+        ])))
+        WebUICookieJar.shared.persist()
+        let manager = AuthManager(keychain: InMemoryKeychainStore(),
+                                  clientFactory: { _ in MockAuthAPIClient(authStatus: AuthStatusResponse(authEnabled: true, loggedIn: true)) },
+                                  serverRegistry: ServerRegistry.inMemory())
+        await manager.configure(serverURLString: server.absoluteString, password: "")
+        await manager.signOut()
+        XCTAssertTrue(storage.cookies(for: server)?.isEmpty ?? true)
+        let saved = try XCTUnwrap(try KeychainStore().load(.webuiCookies))
+        XCTAssertFalse(saved.isEmpty)
+        XCTAssertNil(WebUICookieJar(keychain: KeychainStore(), legacy: nil).storage.cookies(for: server)?.first,
+                     "The Keychain copy no longer holds the signed-out server's cookie")
+    }
+
+    func testTheFirstLaunchMovesTheSystemJarsCookiesOutOfIt() throws {
+        let keychain = InMemoryKeychainStore()
+        let legacy = try emptyJar()
+        legacy.setCookie(try cookie("hermes_session", value: "from-the-old-build"))
+
+        let jar = WebUICookieJar(keychain: keychain, legacy: legacy)
+
+        XCTAssertEqual(jar.storage.cookies(for: server)?.map(\.value), ["from-the-old-build"])
+        XCTAssertEqual(legacy.cookies?.isEmpty, true, "Nothing stays in the backed-up jar")
+        XCTAssertEqual(WebUICookieJar(keychain: keychain, legacy: try emptyJar()).storage.cookies(for: server)?.map(\.value),
+                       ["from-the-old-build"])
+    }
+
+    func testALockedKeychainNeverOverwritesTheSavedCookies() throws {
+        let keychain = LockableKeychain()
+        let writer = WebUICookieJar(keychain: keychain, legacy: try emptyJar())
+        change(writer) { $0.setCookie(try! cookie("hermes_session", value: "saved")) }
+        let saved = WebUICookieJar(keychain: keychain, legacy: try emptyJar())
+        XCTAssertEqual(saved.storage.cookies(for: server)?.map(\.value), ["saved"])
+
+        keychain.locked = true
+        let early = WebUICookieJar(keychain: keychain, legacy: try emptyJar())
+        XCTAssertEqual(early.storage.cookies?.isEmpty, true)
+        change(early) { $0.setCookie(try! cookie("other")) }
+
+        keychain.locked = false
+        early.restore()
+        XCTAssertEqual(Set(early.storage.cookies(for: server)?.map(\.name) ?? []), ["hermes_session", "other"])
+        XCTAssertEqual(Set(WebUICookieJar(keychain: keychain, legacy: try emptyJar()).storage.cookies(for: server)?.map(\.name) ?? []),
+                       ["hermes_session", "other"])
     }
 }

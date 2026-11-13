@@ -196,6 +196,7 @@ final class AuthManager {
                     lastErrorMessage = APIError.unauthorized.localizedDescription
                     return
                 }
+                WebUICookieJar.shared.persist()
             }
 
             // Persist only on success: the server URL and the headers that reached it.
@@ -278,6 +279,7 @@ final class AuthManager {
                     lastErrorMessage = APIError.unauthorized.localizedDescription
                     return .failed
                 }
+                WebUICookieJar.shared.persist()
             }
 
             // Commit only now that the add succeeded: the new server becomes
@@ -663,25 +665,26 @@ final class AuthManager {
         headerStore.replace(with: [CustomHeader].decodeFromStorage(stored))
     }
 
-    /// Deletes only the cookies that would be sent to `server` (matched by host,
-    /// path, and security via `HTTPCookieStorage.cookies(for:)`), so signing out of
-    /// or expiring one server leaves other servers' cookies intact (#16).
+    /// Deletes from `WebUICookieJar` only the cookies that would be sent to `server`
+    /// (matched by host, path, and security via `HTTPCookieStorage.cookies(for:)`), so
+    /// signing out of or expiring one server leaves other servers' cookies intact (#16).
     ///
     /// Different-host servers are fully isolated this way. Two servers that share a
     /// host but differ only by port still share a cookie jar (cookies aren't
     /// port-scoped) — a documented limitation; closing it would need the per-server
     /// cookie snapshot/restore deferred to the #17 switcher.
     private func clearSessionCookies(for server: URL) {
-        let storage = HTTPCookieStorage.shared
+        let storage = WebUICookieJar.shared.storage
         storage.cookies(for: server)?.forEach { storage.deleteCookie($0) }
+        WebUICookieJar.shared.persist()
     }
 
-    /// Clears the entire shared cookie jar. Used only as a fallback when there's no
+    /// Clears the entire webui cookie jar. Used only as a fallback when there's no
     /// active server to scope to (a 401 while unconfigured).
     private func clearAllSessionCookies() {
-        HTTPCookieStorage.shared.cookies?.forEach {
-            HTTPCookieStorage.shared.deleteCookie($0)
-        }
+        let storage = WebUICookieJar.shared.storage
+        storage.cookies?.forEach { storage.deleteCookie($0) }
+        WebUICookieJar.shared.persist()
     }
 
     private func restoreSavedServer() {
@@ -711,6 +714,7 @@ final class AuthManager {
     /// while its own record exists; without one its sign-in form shows (#899).
     private func enterActiveServer(_ server: URL) {
         guard kind(of: server) == .hermes else {
+            WebUICookieJar.shared.restore()
             hydrateCustomHeaders(for: server)
             state = .loggedIn(server: server)
             return
