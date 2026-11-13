@@ -12,6 +12,9 @@ struct CardStack<Page: Identifiable, Card: View, Edge: View>: View {
     /// The page animating out of the stack (Not for Me); nil otherwise.
     var droppingID: Page.ID? = nil
     let tilt: (Page) -> Double
+    /// Called again on every frame of a drag, with only `contentOpacity` changing (on the card under the
+    /// top one): keep what it returns cheap to rebuild, its words behind inputs that compare equal
+    /// (`DeckPageView` wraps them in an equatable view).
     @ViewBuilder let card: (Page, _ contentOpacity: Double) -> Card
     /// What a card far down the stack shows: its bare paper.
     @ViewBuilder let edge: (Page) -> Edge

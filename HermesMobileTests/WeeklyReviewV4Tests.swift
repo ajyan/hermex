@@ -68,10 +68,10 @@ final class WeeklyReviewV4Tests: XCTestCase {
 
     func testWeeklyCardsWearTheirPapersAndShowNoChapterLine() throws {
         let cards = try deck().cards
-        XCTAssertEqual(DeckPalette.of(cards[1]).colors, .notes)
-        XCTAssertEqual(DeckPalette.of(cards[3]).colors, .advisor)
+        XCTAssertEqual(DeckPalette.of(cards[1]).colors, .dusk)
+        XCTAssertEqual(DeckPalette.of(cards[3]).colors, .dusk)
         XCTAssertEqual(DeckPalette.of(cards[5]).colors, .dusk)
-        XCTAssertEqual(DeckPalette.of(cards[6]).colors, .dusk)
+        XCTAssertEqual(DeckPalette.of(cards[6]).colors, .advisor, "the letter is to a person")
         XCTAssertTrue(cards.allSatisfy { $0.chapterLabel == nil })
     }
 }
