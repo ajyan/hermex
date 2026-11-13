@@ -146,6 +146,7 @@ extension DeckCard {
             return ("Open Goals", .goals)
         case .dinner: return ("Open Meals", .meals)
         case .training: return ("Open Body", .body)
+        case .weekMoney: return ("Open Money", .money)
         default: return nil
         }
     }
