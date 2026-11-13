@@ -31,6 +31,60 @@ struct ChatKeyboardActions {
     }
 }
 
+extension View {
+    /// Publishes the open chat's keyboard commands. `stopResponse` may be rebuilt on
+    /// every pass (a chat re-renders on each stream tick); the published value changes
+    /// only when the stream starts, stops or starts cancelling, so the scene's commands
+    /// don't rebuild per tick.
+    func chatKeyboardActions(isStreaming: Bool, isCancellingStream: Bool, stopResponse: @escaping () -> Void) -> some View {
+        modifier(ChatKeyboardActionsPublisher(isStreaming: isStreaming, isCancellingStream: isCancellingStream))
+            .modifier(ChatKeyboardStopModifier(stopResponse: stopResponse))
+    }
+}
+
+/// Holds the latest stop handler behind one closure that never changes.
+private final class ChatKeyboardStop {
+    var handler: () -> Void = {}
+    private(set) lazy var stop: () -> Void = { [unowned self] in self.handler() }
+}
+
+private struct ChatKeyboardStopKey: EnvironmentKey {
+    static let defaultValue: ChatKeyboardStop? = nil
+}
+
+private extension EnvironmentValues {
+    var chatKeyboardStop: ChatKeyboardStop? {
+        get { self[ChatKeyboardStopKey.self] }
+        set { self[ChatKeyboardStopKey.self] = newValue }
+    }
+}
+
+/// Refreshes the handler on every pass and publishes only the stable reference.
+private struct ChatKeyboardStopModifier: ViewModifier {
+    let stopResponse: () -> Void
+    @State private var stop = ChatKeyboardStop()
+
+    func body(content: Content) -> some View {
+        stop.handler = stopResponse
+        return content.environment(\.chatKeyboardStop, stop)
+    }
+}
+
+/// Takes only values, so passes that leave them alone skip its body.
+private struct ChatKeyboardActionsPublisher: ViewModifier {
+    let isStreaming: Bool
+    let isCancellingStream: Bool
+    @Environment(\.chatKeyboardStop) private var stop
+
+    func body(content: Content) -> some View {
+        content.focusedSceneValue(\.chatKeyboardActions, ChatKeyboardActions(
+            isStreaming: isStreaming,
+            isCancellingStream: isCancellingStream,
+            stopResponse: stop?.stop ?? {}
+        ))
+    }
+}
+
 private struct ChatKeyboardActionsKey: FocusedValueKey {
     typealias Value = ChatKeyboardActions
 }
