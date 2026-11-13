@@ -563,7 +563,8 @@ struct ChatShellView: View {
                 draftStore: draftStore,
                 onSessionRenamed: { sessionID, title in
                     viewModel.applyConfirmedRename(sessionID: sessionID, title: title, modelContext: modelContext)
-                }
+                },
+                sessionMenu: { openChatSessionMenu(for: session) }
             )
             .id(session.id)
         case .newChat(let route):
@@ -994,6 +995,26 @@ struct ChatShellView: View {
             hasActiveRows: !activeSessions.isEmpty,
             isViewingCachedData: viewModel.isViewingCachedData,
             isDrawerOpen: navigation.isDrawerOpen
+        )
+    }
+
+    /// The drawer row's menu for the open chat, read from the live row so pin
+    /// and project state are current.
+    private func openChatSessionMenu(for session: SessionSummary) -> SessionRowContextMenu {
+        let current = viewModel.sessions.first { $0.sessionId == session.sessionId } ?? session
+        return SessionRowContextMenu(
+            session: current,
+            projects: viewModel.projects,
+            isViewingCachedData: viewModel.isViewingCachedData,
+            isRenamingSession: viewModel.isRenamingSession,
+            isCreatingProject: viewModel.isCreatingProject,
+            isMovingSession: viewModel.isMovingSession,
+            isLoadingProjects: viewModel.isLoadingProjects,
+            isMutating: viewModel.isMutating(current),
+            isUnread: false,
+            canToggleUnread: false,
+            actions: sessionRowActions(),
+            isInOpenChat: true
         )
     }
 

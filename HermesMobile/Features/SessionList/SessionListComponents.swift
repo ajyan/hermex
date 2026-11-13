@@ -212,7 +212,7 @@ struct SessionInteractiveRow: View {
             session.sessionId == selectedSessionID
                 ? Color.hxSurface
                 : Color.clear,
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
         )
         .transition(HXMotion.disclosureTransition(reduceMotion: reduceMotion))
         .swipeActions(edge: .leading, allowsFullSwipe: false) {
@@ -245,7 +245,7 @@ struct SessionInteractiveRow: View {
             Button {
                 actions.togglePinned(session)
             } label: {
-                Label(session.pinned == true ? "Unpin" : "Pin", systemImage: "pin")
+                Label(session.pinned == true ? "Unpin" : "Pin", systemImage: session.pinned == true ? "pin.slash" : "pin")
             }
             .disabled(viewModel.isMutating(session))
             .tint(.accentColor)
@@ -294,42 +294,49 @@ struct SessionRowContextMenu: View {
     let isUnread: Bool
     let canToggleUnread: Bool
     let actions: SessionListRowActions
+    /// Inside an open chat the title, read state, and rename already live in
+    /// the header, so the chat's More menu leaves them out.
+    var isInOpenChat = false
 
     var body: some View {
         let fullTitle = SessionRowView.displayTitle(for: session)
 
-        Section("Full Title") {
-            Text(fullTitle)
+        if !isInOpenChat {
+            Section("Full title") {
+                Text(fullTitle)
+
+                Button {
+                    UIPasteboard.general.string = fullTitle
+                    ChatHaptics.copied(isEnabled: isHapticsEnabled)
+                } label: {
+                    Label("Copy Full Title", systemImage: "doc.on.doc")
+                }
+            }
 
             Button {
-                UIPasteboard.general.string = fullTitle
-                ChatHaptics.copied(isEnabled: isHapticsEnabled)
+                actions.toggleUnread(session)
             } label: {
-                Label("Copy Full Title", systemImage: "doc.on.doc")
+                Label(isUnread ? "Mark as Read" : "Mark as Unread", systemImage: isUnread ? "envelope.open" : "envelope.badge")
             }
+            .disabled(!canToggleUnread)
         }
-
-        Button {
-            actions.toggleUnread(session)
-        } label: {
-            Label(isUnread ? "Mark as Read" : "Mark as Unread", systemImage: isUnread ? "envelope.open" : "envelope.badge")
-        }
-        .disabled(!canToggleUnread)
 
         if SessionRowActionPolicy.offersMutationActions(for: session) {
             Button {
                 actions.togglePinned(session)
             } label: {
-                Label(session.pinned == true ? "Unpin" : "Pin", systemImage: "pin")
+                Label(session.pinned == true ? "Unpin" : "Pin", systemImage: session.pinned == true ? "pin.slash" : "pin")
             }
             .disabled(!canShowSessionMutationActions || isMutating)
 
-            Button {
-                actions.rename(session)
-            } label: {
-                Label("Rename", systemImage: "pencil")
+            if !isInOpenChat {
+                Button {
+                    actions.rename(session)
+                } label: {
+                    Label("Rename", systemImage: "pencil")
+                }
+                .disabled(isViewingCachedData || isRenamingSession || !hasServerSessionID(session))
             }
-            .disabled(isViewingCachedData || isRenamingSession || !hasServerSessionID(session))
 
             if SessionRowActionPolicy.canDuplicate(session) {
                 Button {

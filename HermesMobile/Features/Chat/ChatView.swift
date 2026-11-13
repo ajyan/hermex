@@ -307,6 +307,9 @@ struct ChatView: View {
     /// Called with the session ID and stored title after the server confirms a
     /// rename from the chat title, so the session list can show it.
     let onSessionRenamed: (String, String) -> Void
+    /// The drawer row's session actions (pin, move, export, archive, delete),
+    /// shown in the More menu when the shell hosts this chat.
+    let sessionMenu: (() -> SessionRowContextMenu)?
     @Environment(\.openBrainRoute) private var openBrainRoute
 
     /// The composer's draft. Never read it in `body` or wrap it in a get/set
@@ -442,7 +445,8 @@ struct ChatView: View {
         draftAttachmentStore: (any ChatDraftAttachmentStoring)? = nil,
         restoresDraftSettings: Bool = false,
         onConversationStarted: @escaping () -> Void = {},
-        onSessionRenamed: @escaping (String, String) -> Void = { _, _ in }
+        onSessionRenamed: @escaping (String, String) -> Void = { _, _ in },
+        sessionMenu: (() -> SessionRowContextMenu)? = nil
     ) {
         self.session = session
         self.server = server
@@ -460,6 +464,7 @@ struct ChatView: View {
         self.restoresDraftSettings = restoresDraftSettings
         self.onConversationStarted = onConversationStarted
         self.onSessionRenamed = onSessionRenamed
+        self.sessionMenu = sessionMenu
         _draftMessage = State(initialValue: initialDraft)
         _draftQuotes = State(initialValue: initialQuotes)
         _initialAttachments = State(initialValue: initialAttachments)
@@ -1018,6 +1023,10 @@ struct ChatView: View {
                                 }
 
                                 FeedbackMenuItem()
+
+                                if let sessionMenu {
+                                    Section { sessionMenu() }
+                                }
                             } label: {
                                 Label("More", systemImage: "ellipsis")
                             }
