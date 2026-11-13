@@ -8,7 +8,7 @@ struct DeckStyleChipsSection: View {
 
     var body: some View {
         Section {
-            ChipFlow(spacing: 8) {
+            FlowRow(spacing: 8) {
                 ForEach(DeckStyleChip.allCases) { chip in
                     chipButton(chip)
                 }
@@ -27,15 +27,14 @@ struct DeckStyleChipsSection: View {
 
     private func chipButton(_ chip: DeckStyleChip) -> some View {
         let isSelected = viewModel.styleChips(on: card).contains(chip.rawValue)
+        let palette = DeckPalette.of(.card(card), inV2Weekly: viewModel.isSealedWeekly)
         return Button {
             viewModel.toggleStyle(chip, on: card)
         } label: {
-            Text(verbatim: chip.label)
-                .font(AppFont.subheadline(weight: .medium))
-                .padding(.horizontal, 12)
-                .frame(minHeight: 36)
-                .foregroundStyle(isSelected ? Color.hxOnAccent : Color.primary)
-                .background(isSelected ? Color.accentColor : Color.hxCanvas, in: Capsule())
+            // The card's chip; a chosen one carries a check. A neutral card's are plain: its amber means waiting on you.
+            HXChip(paper: palette.isNeutralCard ? .plain : palette.colors, symbol: isSelected ? "checkmark" : nil, label: chip.label)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
