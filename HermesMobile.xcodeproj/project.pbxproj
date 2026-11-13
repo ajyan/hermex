@@ -26,6 +26,9 @@
 		AEA15000000000000000000D /* MealsDishPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA15000000000000000000C /* MealsDishPicker.swift */; };
 		AEA15000000000000000000B /* MealsLogSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA15000000000000000000A /* MealsLogSheet.swift */; };
 		AEA150000000000000000009 /* MealsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000008 /* MealsHomeView.swift */; };
+		A7A750000000000000000002 /* AtlasStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7A750000000000000000001 /* AtlasStatus.swift */; };
+		A7A750000000000000000004 /* AtlasStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7A750000000000000000003 /* AtlasStatusView.swift */; };
+		A7A750000000000000000006 /* AtlasStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7A750000000000000000005 /* AtlasStatusTests.swift */; };
 		AEA150000000000000000007 /* MealsHomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000006 /* MealsHomeViewModel.swift */; };
 		AEA150000000000000000005 /* MealsScreenClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000004 /* MealsScreenClient.swift */; };
 		AEA150000000000000000003 /* MealsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA150000000000000000002 /* MealsModels.swift */; };
@@ -983,6 +986,9 @@
 		AEA15000000000000000000C /* MealsDishPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsDishPicker.swift; sourceTree = "<group>"; };
 		AEA15000000000000000000A /* MealsLogSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsLogSheet.swift; sourceTree = "<group>"; };
 		AEA150000000000000000008 /* MealsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsHomeView.swift; sourceTree = "<group>"; };
+		A7A750000000000000000001 /* AtlasStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasStatus.swift; sourceTree = "<group>"; };
+		A7A750000000000000000003 /* AtlasStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasStatusView.swift; sourceTree = "<group>"; };
+		A7A750000000000000000005 /* AtlasStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasStatusTests.swift; sourceTree = "<group>"; };
 		AEA150000000000000000006 /* MealsHomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsHomeViewModel.swift; sourceTree = "<group>"; };
 		AEA150000000000000000004 /* MealsScreenClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsScreenClient.swift; sourceTree = "<group>"; };
 		AEA150000000000000000002 /* MealsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsModels.swift; sourceTree = "<group>"; };
@@ -1932,6 +1938,15 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 			path = Money;
 			sourceTree = "<group>";
 		};
+		A7A750000000000000000000 /* Status */ = {
+			isa = PBXGroup;
+			children = (
+				A7A750000000000000000001 /* AtlasStatus.swift */,
+				A7A750000000000000000003 /* AtlasStatusView.swift */,
+			);
+			path = Status;
+			sourceTree = "<group>";
+		};
 		AEA150000000000000000000 /* Meals */ = {
 			isa = PBXGroup;
 			children = (
@@ -2285,6 +2300,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C03900000000000000000014 /* MessageActionContextTests.swift */,
 				C03900000000000000000015 /* SessionIdentityTests.swift */,
 				D0A7E5000000000000000003 /* DrawerNotesTests.swift */,
+				A7A750000000000000000005 /* AtlasStatusTests.swift */,
 				C03900000000000000000016 /* TranscriptDisplayModelTests.swift */,
 				C14300000000000000000004 /* StreamingMarkdownSupportTests.swift */,
 				C13000000000000000000002 /* ChatVerticalScrollAxisGuardTests.swift */,
@@ -2521,6 +2537,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				FEEDB0DE00000000000000A0 /* Feedback */,
 				B0D700000000000000000005 /* Body */,
 				AEA150000000000000000000 /* Meals */,
+				A7A750000000000000000000 /* Status */,
 				B1A1C0DE00000000000F0001 /* Goals */,
 				C0FFEE500000000000000001 /* Money */,
 				12A06408B1B8DA1A340CBD38 /* DailyDeck */,
@@ -3407,6 +3424,8 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				AEA15000000000000000000D /* MealsDishPicker.swift in Sources */,
 				AEA15000000000000000000B /* MealsLogSheet.swift in Sources */,
 				AEA150000000000000000009 /* MealsHomeView.swift in Sources */,
+				A7A750000000000000000002 /* AtlasStatus.swift in Sources */,
+				A7A750000000000000000004 /* AtlasStatusView.swift in Sources */,
 				AEA150000000000000000007 /* MealsHomeViewModel.swift in Sources */,
 				AEA150000000000000000005 /* MealsScreenClient.swift in Sources */,
 				AEA150000000000000000003 /* MealsModels.swift in Sources */,
@@ -4149,6 +4168,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				C03910000000000000000014 /* MessageActionContextTests.swift in Sources */,
 				C03910000000000000000015 /* SessionIdentityTests.swift in Sources */,
 				D0A7E5100000000000000003 /* DrawerNotesTests.swift in Sources */,
+				A7A750000000000000000006 /* AtlasStatusTests.swift in Sources */,
 				C03910000000000000000016 /* TranscriptDisplayModelTests.swift in Sources */,
 				C14300000000000000000003 /* StreamingMarkdownSupportTests.swift in Sources */,
 				C13000000000000000000001 /* ChatVerticalScrollAxisGuardTests.swift in Sources */,
