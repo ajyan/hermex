@@ -828,6 +828,7 @@
 		C09200000000000000000003 /* AppFont.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09200000000000000000002 /* AppFont.swift */; };
 		B1D0B70B0000000000000004 /* DeckJobParts.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D0B70B0000000000000003 /* DeckJobParts.swift */; };
 		B1D0B70B0000000000000002 /* DeckWeekGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D0B70B0000000000000001 /* DeckWeekGrid.swift */; };
+		C0FE0CA10000000000000002 /* DeckOpenerCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FE0CA10000000000000001 /* DeckOpenerCalendar.swift */; };
 		AE625BAC72CC28032AA09722 /* DeckAskCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20F34E30177D3A494A9742C3 /* DeckAskCard.swift */; };
 		AF6622CA57DD85E38D602DB0 /* DeckSearchCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50E35E4D9B9E28B04ED6E7F /* DeckSearchCard.swift */; };
 		900A2A32C06B243E5E952458 /* DailyAskModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE286E9D44D3D280A038AFAE /* DailyAskModel.swift */; };
@@ -1782,6 +1783,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		A0DE00FF71B0EBD4FA4E8F11 /* DeckDot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckDot.swift; sourceTree = "<group>"; };
 		B1D0B70B0000000000000003 /* DeckJobParts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckJobParts.swift; sourceTree = "<group>"; };
 		B1D0B70B0000000000000001 /* DeckWeekGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckWeekGrid.swift; sourceTree = "<group>"; };
+		C0FE0CA10000000000000001 /* DeckOpenerCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckOpenerCalendar.swift; sourceTree = "<group>"; };
 		20F34E30177D3A494A9742C3 /* DeckAskCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckAskCard.swift; sourceTree = "<group>"; };
 		C50E35E4D9B9E28B04ED6E7F /* DeckSearchCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckSearchCard.swift; sourceTree = "<group>"; };
 		EE286E9D44D3D280A038AFAE /* DailyAskModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyAskModel.swift; sourceTree = "<group>"; };
@@ -3105,6 +3107,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				A0DE00FF71B0EBD4FA4E8F11 /* DeckDot.swift */,
 				B1D0B70B0000000000000003 /* DeckJobParts.swift */,
 				B1D0B70B0000000000000001 /* DeckWeekGrid.swift */,
+				C0FE0CA10000000000000001 /* DeckOpenerCalendar.swift */,
 				20F34E30177D3A494A9742C3 /* DeckAskCard.swift */,
 				C50E35E4D9B9E28B04ED6E7F /* DeckSearchCard.swift */,
 				EE286E9D44D3D280A038AFAE /* DailyAskModel.swift */,
@@ -3459,6 +3462,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				A0DE00FF71B0EBD4FA4E8F12 /* DeckDot.swift in Sources */,
 				B1D0B70B0000000000000004 /* DeckJobParts.swift in Sources */,
 				B1D0B70B0000000000000002 /* DeckWeekGrid.swift in Sources */,
+				C0FE0CA10000000000000002 /* DeckOpenerCalendar.swift in Sources */,
 				AE625BAC72CC28032AA09722 /* DeckAskCard.swift in Sources */,
 				AF6622CA57DD85E38D602DB0 /* DeckSearchCard.swift in Sources */,
 				900A2A32C06B243E5E952458 /* DailyAskModel.swift in Sources */,
