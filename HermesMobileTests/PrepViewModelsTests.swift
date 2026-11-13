@@ -40,6 +40,9 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
     /// Same, for `home()`.
     var homeGate: (started: AsyncStream<Void>.Continuation, release: AsyncStream<Void>)?
 
+    /// Same, for `course()`.
+    var courseGate: (started: AsyncStream<Void>.Continuation, release: AsyncStream<Void>)?
+
     var log: [String] { lock.withLock { _log } }
     var attempts: [PrepAttemptRequest] { lock.withLock { _attempts } }
 
@@ -74,7 +77,13 @@ private final class FakePrepClient: PrepDataClient, @unchecked Sendable {
     func gaps() async throws -> [PrepGapSummary] { try next("gaps", &gapsResults) }
     func gap(id: String) async throws -> PrepGapDetail { try next("gap:\(id)", &gapResults) }
     func flag(item: String) async throws { try next("flag:\(item)", &flagResults) }
-    func course() async throws -> PrepCourse { try next("course", &courseResults) }
+    func course() async throws -> PrepCourse {
+        if let courseGate {
+            courseGate.started.yield()
+            for await _ in courseGate.release { break }
+        }
+        return try next("course", &courseResults)
+    }
     func lesson(id: String) async throws -> PrepLesson { try next("lesson:\(id)", &lessonResults) }
     func stories() async throws -> PrepStoryList {
         let gate = lock.withLock { () -> (started: AsyncStream<Void>.Continuation, release: AsyncStream<Void>)? in
@@ -411,13 +420,62 @@ final class PrepViewModelsTests: XCTestCase {
         XCTAssertEqual(home.streak.days, 3)
     }
 
-    func testHomeWithoutCourseSkipsCourseCall() async {
+    func testHomeWithoutCourseIgnoresTheCourse() async {
         let client = FakePrepClient()
         client.homeResults = [.success(decode(PrepHome.self, #"{"streak": {"days": 1, "freezes": 0}}"#))]
+        client.courseResults = [.success(decode(PrepCourse.self, #"{"xp": 5, "units": []}"#))]
         let vm = PrepHomeViewModel(client: client)
         await vm.load()
-        XCTAssertNil(vm.course)
-        XCTAssertFalse(client.log.contains("course"))
+        XCTAssertNil(vm.course)  // the course runs beside home, but only counts when home has one
+    }
+
+    /// The 121-lesson course used to wait for home; both are now in flight at once.
+    func testCourseLoadsAlongsideHome() async {
+        let client = FakePrepClient()
+        client.homeResults = [.success(courseHome(xp: 40))]
+        client.courseResults = [.success(decode(PrepCourse.self, #"{"xp": 40, "units": [{"id": "u1", "title": "One", "state": "current"}]}"#))]
+        let (homeStarted, homeStartedCont) = AsyncStream<Void>.makeStream()
+        let (homeRelease, homeReleaseCont) = AsyncStream<Void>.makeStream()
+        let (courseStarted, courseStartedCont) = AsyncStream<Void>.makeStream()
+        let (courseRelease, courseReleaseCont) = AsyncStream<Void>.makeStream()
+        client.homeGate = (homeStartedCont, homeRelease)
+        client.courseGate = (courseStartedCont, courseRelease)
+        let vm = PrepHomeViewModel(client: client)
+        let load = Task { await vm.load() }
+        for await _ in homeStarted { break }
+        for await _ in courseStarted { break }  // reached only while home is still held
+        homeReleaseCont.yield()
+        courseReleaseCont.yield()
+        await load.value
+        XCTAssertEqual(vm.course?.units.map(\.id), ["u1"])
+    }
+
+    func testAppearAfterAFreshLoadRefreshesOnlyHomeAndCourse() async {
+        let client = FakePrepClient()
+        client.homeResults = [.success(courseHome(xp: 40)), .success(courseHome(xp: 55))]
+        client.courseResults = [.success(decode(PrepCourse.self, #"{"xp": 40, "units": []}"#)),
+                                .success(decode(PrepCourse.self, #"{"xp": 55, "units": []}"#))]
+        client.gapsResults = [.success([])]
+        client.storiesResults = [.success(storyList())]
+        let vm = PrepHomeViewModel(client: client)
+        let start = Date(timeIntervalSince1970: 1_000_000)
+        XCTAssertTrue(vm.needsFullLoad(now: start), "the first appear loads everything")
+        await vm.load(now: start)
+        XCTAssertFalse(vm.needsFullLoad(now: start.addingTimeInterval(60)))
+        let before = client.log.count
+        await vm.refresh()
+        XCTAssertEqual(Set(client.log.dropFirst(before)), ["home", "course"])
+        XCTAssertEqual(vm.course?.xp, 55)
+        XCTAssertEqual(vm.stories?.readyCount, 1, "a light refresh keeps the stories it didn't fetch")
+        XCTAssertTrue(vm.needsFullLoad(now: start.addingTimeInterval(601)), "a stale home loads everything again")
+    }
+
+    func testAFailedFirstLoadStillNeedsAFullLoad() async {
+        let client = FakePrepClient()
+        client.homeResults = [.failure(http(500))]
+        let vm = PrepHomeViewModel(client: client)
+        await vm.load()
+        XCTAssertTrue(vm.needsFullLoad())
     }
 
     func testHomeFallsBackToHomeCourseWhenCourseFails() async {
@@ -1717,7 +1775,7 @@ final class PrepViewModelsTests: XCTestCase {
         let vm = PrepHomeViewModel(client: client)
         await vm.load()
         XCTAssertEqual(vm.gaps?.map(\.id), ["gap.a", "gap.b"])
-        XCTAssertEqual(Set(client.log), ["home", "gaps", "stories"])
+        XCTAssertEqual(Set(client.log), ["home", "course", "gaps", "stories"])
     }
 
     func testGapsFailureDoesNotFailHome() async {

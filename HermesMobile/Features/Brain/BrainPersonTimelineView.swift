@@ -638,8 +638,7 @@ struct BrainPersonLogSheet: View {
             }
             .padding(BrainStyle.l)
             .background(Color.hxCanvas.ignoresSafeArea())
-            .navigationTitle(Text(verbatim: "Log a catch-up"))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle("Log a catch-up")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button { dismiss() } label: { Text(verbatim: "Cancel") }

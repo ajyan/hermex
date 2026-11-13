@@ -35,8 +35,11 @@ struct PrepHomeView: View {
             .toolbar { ToolbarItem(placement: .topBarTrailing) { FeedbackMoreMenu() } }
             .feedbackContext(FeedbackContext(feature: "Prep", screen: "Home"))
             .background(Color.hxCanvas.ignoresSafeArea())
-            // Every appear refreshes quietly, so a finished run or graded mock shows on the way back.
-            .task { await load() }
+            // The first appear loads everything; coming back from a run refreshes home and the course only,
+            // until the last full load is ten minutes old. Pull to refresh always loads everything.
+            .task {
+                if viewModel.needsFullLoad() { await load() } else { await viewModel.refresh() }
+            }
     }
 
     private func load() async {

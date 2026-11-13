@@ -46,7 +46,7 @@ struct BotPlanRowView: View {
         ) {
             Image(systemName: "checklist")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.hxTextSecondary)
         } status: {
             EmptyView()
         } expandedBody: {
@@ -55,10 +55,10 @@ struct BotPlanRowView: View {
                     Label {
                         Text(item.content)
                             .strikethrough(item.isDone)
-                            .foregroundStyle(item.isDone ? .secondary : .primary)
+                            .foregroundStyle(item.isDone ? Color.hxTextSecondary : Color.hxTextPrimary)
                     } icon: {
                         Image(systemName: Self.symbol(for: item))
-                            .foregroundStyle(item.status == "in_progress" ? Color.accentColor : .secondary)
+                            .foregroundStyle(item.status == "in_progress" ? Color.accentColor : Color.hxTextSecondary)
                     }
                     .font(AppFont.caption())
                     .accessibilityLabel(Text("\(Self.stateLabel(for: item)): \(item.content)"))

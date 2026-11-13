@@ -46,11 +46,11 @@ import SwiftUI
                     } else { memberRow(member) }
                 }
             }
-            if reader.foreignAuthority { Text("Managed by another Hermes").font(.callout) }
-            if let message = reader.commandMessage { Text(message).font(.callout) }
-            if reader.finishingStop { Text("Finishing stop…").font(.callout) }
+            if reader.foreignAuthority { Text("Managed by another Hermes").font(AppFont.subheadline()) }
+            if let message = reader.commandMessage { Text(message).font(AppFont.subheadline()) }
+            if reader.finishingStop { Text("Finishing stop…").font(AppFont.subheadline()) }
             if reader.link == .stopped {
-                if let error = reader.errorMessage { Text(error).font(.callout) }
+                if let error = reader.errorMessage { Text(error).font(AppFont.subheadline()) }
                 // Reconnecting would only send the refused password again (#884).
                 if reader.needsSignIn {
                     Button("Update sign-in", action: onUpdateSignIn)

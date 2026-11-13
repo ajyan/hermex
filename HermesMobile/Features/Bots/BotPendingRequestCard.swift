@@ -67,8 +67,8 @@ struct BotPendingRequestCard: View {
             }
             if let resolution {
                 Text(resolution.message)
-                    .font(.caption)
-                    .foregroundStyle(resolution.outcome == .answered ? .secondary : Color.hxDanger)
+                    .font(AppFont.caption())
+                    .foregroundStyle(resolution.outcome == .answered ? RequestInk.secondary : Color.hxDanger)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -112,13 +112,13 @@ private struct BotApprovalRequestBody: View {
 
     var body: some View {
         BotRequestHeader(
-            systemImage: "exclamationmark.triangle.fill", tint: .hxWarning,
+            systemImage: "exclamationmark.triangle.fill",
             title: String(localized: "Approval required"), identity: identity
         )
         if let consequence = approval.consequence {
             Text(consequence)
-                .font(.subheadline)
-                .foregroundStyle(.primary)
+                .font(AppFont.subheadline())
+                .foregroundStyle(Color.hxTextPrimary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         if let command = approval.command {
@@ -126,15 +126,15 @@ private struct BotApprovalRequestBody: View {
             // readable in full before it is approved.
             ScrollView(.horizontal, showsIndicators: false) {
                 Text(command)
-                    .font(.system(.footnote, design: .monospaced))
+                    .font(AppFont.mono(style: .footnote))
                     .textSelection(.enabled)
             }
             .pendingRequestBlockSurface()
         }
         if let scope = approval.scopeLine {
             Text(scope)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(AppFont.caption())
+                .foregroundStyle(RequestInk.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         VStack(spacing: 8) {
@@ -227,7 +227,7 @@ private struct BotQuestionRequestBody: View {
 
     var body: some View {
         BotRequestHeader(
-            systemImage: "questionmark.circle", tint: .secondary,
+            systemImage: "questionmark.circle",
             title: question.questions.count > 1
                 ? String(localized: "\(question.questions.count) questions")
                 : String(localized: "Clarification Required"),
@@ -238,14 +238,14 @@ private struct BotQuestionRequestBody: View {
         ForEach(question.questions) { item in
             VStack(alignment: .leading, spacing: 10) {
                 Text(item.prompt)
-                    .font(.subheadline)
-                    .foregroundStyle(.primary)
+                    .font(AppFont.subheadline())
+                    .foregroundStyle(Color.hxTextPrimary)
                     .fixedSize(horizontal: false, vertical: true)
                     .pendingRequestBlockSurface()
                 if let locked = item.lockedAnswer {
                     Label(locked, systemImage: "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(AppFont.caption())
+                        .foregroundStyle(RequestInk.secondary)
                         .accessibilityLabel(Text("Already answered: \(locked)"))
                 } else {
                     ForEach(item.choices) { choice in
@@ -285,23 +285,23 @@ private struct BotQuestionRequestBody: View {
             HStack(spacing: 8) {
                 if !submitsOnTap {
                     Image(systemName: selectionSymbol(isPicked: isPicked, item: item))
-                        .foregroundStyle(isPicked ? Color.accentColor : .secondary)
+                        .foregroundStyle(isPicked ? Color.accentColor : RequestInk.secondary)
                         .accessibilityHidden(true)
                 }
                 Text(choice.label)
-                    .font(.callout.weight(.semibold))
+                    .font(AppFont.subheadline(weight: .semibold))
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
                 if choice.isRecommended {
                     Text("Recommended")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .font(AppFont.caption2(weight: .semibold))
+                        .foregroundStyle(RequestInk.secondary)
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .foregroundStyle(.primary)
+            .foregroundStyle(Color.hxTextPrimary)
             .pendingRequestChoiceSurface(reduceTransparency: reduceTransparency)
         }
         .buttonStyle(.chatTactile(.capsule))
@@ -396,17 +396,17 @@ private struct BotCredentialRequestBody: View {
     private var canEdit: Bool { isEnabled && !isAnswering }
 
     var body: some View {
-        BotRequestHeader(systemImage: symbol, tint: .secondary, title: credential.title, identity: identity)
+        BotRequestHeader(systemImage: symbol, title: credential.title, identity: identity)
         Text(credential.detail)
-            .font(.subheadline)
-            .foregroundStyle(.primary)
+            .font(AppFont.subheadline())
+            .foregroundStyle(Color.hxTextPrimary)
             .fixedSize(horizontal: false, vertical: true)
         // A secret's storage name, so the user knows which of their keys to
         // paste; or the origin a login is saved for, so they can check the
         // exact address before handing over a password.
         if let block = isSaveLogin ? credential.origin : credential.envVar {
             Text(verbatim: block)
-                .font(.system(.footnote, design: .monospaced))
+                .font(AppFont.mono(style: .footnote))
                 .textSelection(.enabled)
                 .pendingRequestBlockSurface()
         }
@@ -440,8 +440,8 @@ private struct BotCredentialRequestBody: View {
             }
         }
         Text(credential.handling)
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .font(AppFont.caption())
+            .foregroundStyle(RequestInk.secondary)
             .fixedSize(horizontal: false, vertical: true)
         Button { onCredential("") } label: {
             Text("Skip").frame(maxWidth: .infinity)
@@ -503,16 +503,16 @@ private struct BotDesktopTaskRequestBody: View {
 
     var body: some View {
         BotRequestHeader(
-            systemImage: "desktopcomputer", tint: .secondary,
+            systemImage: "desktopcomputer",
             title: String(localized: "Hermes Desktop is handling this"), identity: identity
         )
         Text(task.kind.title)
-            .font(.subheadline)
-            .foregroundStyle(.primary)
+            .font(AppFont.subheadline())
+            .foregroundStyle(Color.hxTextPrimary)
             .fixedSize(horizontal: false, vertical: true)
         Text(task.kind.detail)
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .font(AppFont.caption())
+            .foregroundStyle(RequestInk.secondary)
             .fixedSize(horizontal: false, vertical: true)
         Button(role: .destructive, action: onStop) {
             Label("Stop current work", systemImage: "stop.fill").frame(maxWidth: .infinity)
@@ -535,18 +535,18 @@ private struct BotConnectionRequestBody: View {
     let onConnection: (BotConnectionOperation.Answer) -> Void
 
     var body: some View {
-        BotRequestHeader(systemImage: "link", tint: .secondary, title: String(localized: "Connect apps"), identity: identity)
+        BotRequestHeader(systemImage: "link", title: String(localized: "Connect apps"), identity: identity)
         VStack(alignment: .leading, spacing: 4) {
             TimelineView(.everyMinute) { context in
                 let minutes = BotConnectionOperation.minutesLeft(until: operation.deadline, now: context.date)
                 // The system's own unit wording, so every language gets its plural right.
                 let left = Duration.seconds(minutes * 60).formatted(.units(allowed: [.minutes], width: .abbreviated))
                 Text("Waiting · \(left) left")
-                    .font(.subheadline.weight(.semibold))
+                    .font(AppFont.subheadline(weight: .semibold))
             }
             Text("The bot is paused until each app is connected or skipped.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(AppFont.subheadline())
+                .foregroundStyle(RequestInk.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         ForEach(operation.targets) { target in
@@ -559,8 +559,8 @@ private struct BotConnectionRequestBody: View {
         .buttonStyle(.chatDecision(.secondary))
         .disabled(!isEnabled || isAnswering)
         Text("Releases the bot now. Apps not connected stay off for this reply.")
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .font(AppFont.caption())
+            .foregroundStyle(RequestInk.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
 }
@@ -590,17 +590,17 @@ private struct BotConnectionTargetRow: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(target.name)
-                        .font(.callout.weight(.semibold))
+                        .font(AppFont.subheadline(weight: .semibold))
                         .fixedSize(horizontal: false, vertical: true)
-                    if let subtitle { Text(subtitle).font(.caption).foregroundStyle(.secondary) }
+                    if let subtitle { Text(subtitle).font(AppFont.caption()).foregroundStyle(RequestInk.secondary) }
                 }
                 Spacer(minLength: 8)
                 stateLabel
             }
             ForEach(notes, id: \.self) { note in
                 Text(note)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(AppFont.caption())
+                    .foregroundStyle(RequestInk.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             guidance
@@ -634,20 +634,20 @@ private struct BotConnectionTargetRow: View {
 
     private var stateLabel: some View {
         let (title, symbol, tint): (String, String?, Color) = switch target.state {
-        case .pending, .initiated: (String(localized: "Waiting"), nil, .secondary)
+        case .pending, .initiated: (String(localized: "Waiting"), nil, RequestInk.secondary)
         case .connected: (String(localized: "Connected"), "checkmark.circle.fill", .hxSuccess)
-        case .skipped: (String(localized: "Skipped"), nil, .secondary)
+        case .skipped: (String(localized: "Skipped"), nil, RequestInk.secondary)
         case .failed: (String(localized: "Failed"), "exclamationmark.circle.fill", .hxDanger)
         case .expired: (String(localized: "Expired"), "clock.badge.exclamationmark", .hxDanger)
-        case .notConnected: (String(localized: "Not connected"), nil, .secondary)
-        case .unavailable: (String(localized: "Unavailable"), nil, .secondary)
-        case nil: (String(localized: "Unknown"), nil, .secondary)
+        case .notConnected: (String(localized: "Not connected"), nil, RequestInk.secondary)
+        case .unavailable: (String(localized: "Unavailable"), nil, RequestInk.secondary)
+        case nil: (String(localized: "Unknown"), nil, RequestInk.secondary)
         }
         return HStack(spacing: 4) {
             if let symbol { Image(systemName: symbol).accessibilityHidden(true) }
             Text(title)
         }
-        .font(.caption.weight(.semibold))
+        .font(AppFont.caption(weight: .semibold))
         .foregroundStyle(tint)
         .fixedSize()
     }
@@ -656,22 +656,22 @@ private struct BotConnectionTargetRow: View {
     @ViewBuilder private var guidance: some View {
         if target.finishesOnTheMac {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Finish on the Mac.").font(.caption.weight(.semibold))
+                Text("Finish on the Mac.").font(AppFont.caption(weight: .semibold))
                 Text("This sign-in returns to a browser on the Mac, so it can’t complete on iPhone.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(AppFont.caption())
+                    .foregroundStyle(RequestInk.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         } else if target.linkToOpen != nil {
             Text("Opens in your browser. Hermes notices when you finish.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(AppFont.caption())
+                .foregroundStyle(RequestInk.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         } else if target.canSkip, !target.canConnect, target.state == .failed || target.state == .expired {
             // Trying again from here is deferred; asking the bot covers it.
             Text("Skip it and ask the bot to try again.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(AppFont.caption())
+                .foregroundStyle(RequestInk.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -717,18 +717,18 @@ private struct BotConnectionTargetRow: View {
         return VStack(alignment: .leading, spacing: 6) {
             header {
                 Text(verbatim: field.name)
-                    .font(.system(.caption, design: .monospaced))
+                    .font(AppFont.mono(style: .caption))
                     .textSelection(.enabled)
                 if field.isSecret {
-                    Text("secret").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                    Text("secret").font(AppFont.caption2(weight: .semibold)).foregroundStyle(RequestInk.secondary)
                 } else if !field.isRequired {
-                    Text("optional").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                    Text("optional").font(AppFont.caption2(weight: .semibold)).foregroundStyle(RequestInk.secondary)
                 }
             }
             if let prompt = field.prompt {
                 Text(prompt)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(AppFont.caption())
+                    .foregroundStyle(RequestInk.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Group {
@@ -762,20 +762,26 @@ private struct BotConnectionTargetRow: View {
     }
 }
 
+/// The request card's inks (DESIGN.md § Request cards): the title and symbol in the request glow, supporting text
+/// in the paper's secondary ink (never `hxTextSecondary` on the wash), body text in `hxTextPrimary`.
+private enum RequestInk {
+    static var glow: Color { HermexPaper.request.glow }
+    static var secondary: Color { HermexPaper.request.secondaryInk }
+}
+
 private struct BotRequestHeader: View {
     let systemImage: String
-    let tint: Color
     let title: String
     let identity: String
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Image(systemName: systemImage)
-                .foregroundStyle(tint)
+                .foregroundStyle(RequestInk.glow)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.headline)
-                Text(identity).font(.caption).foregroundStyle(.secondary)
+                Text(title).font(AppFont.headline()).foregroundStyle(RequestInk.glow)
+                Text(identity).font(AppFont.caption()).foregroundStyle(RequestInk.secondary)
             }
             Spacer(minLength: 8)
         }
@@ -790,8 +796,8 @@ struct BotRequestWithdrawalNote: View {
 
     var body: some View {
         Label(withdrawal.message, systemImage: withdrawal.systemImage)
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .font(AppFont.caption())
+            .foregroundStyle(Color.hxTextSecondary)
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
             .onChange(of: withdrawal, initial: true) {

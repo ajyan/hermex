@@ -72,6 +72,23 @@ final class ActivityViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.isLoadingMore)
     }
 
+    /// Days are grouped when events land (a page or the next one), not on every render.
+    @MainActor
+    func testEventDaysFollowTheEvents() async throws {
+        let firstPage = pageJSON(
+            events: [eventJSON(id: 3, summary: "Late", ts: "2026-10-03T12:00:00Z"),
+                     eventJSON(id: 2, summary: "Early", ts: "2026-10-01T12:00:00Z")],
+            nextBefore: 2
+        )
+        let secondPage = pageJSON(events: [eventJSON(id: 1, summary: "Same day", ts: "2026-10-01T11:00:00Z")], nextBefore: nil)
+        let viewModel = ActivityViewModel(client: ScriptedActivityClient(pages: [firstPage, secondPage]))
+        await viewModel.reload()
+        XCTAssertEqual(viewModel.eventDays.map { $0.items.map(\.id) }, [[3], [2]])
+        await viewModel.loadMore()
+        XCTAssertEqual(viewModel.eventDays.map { $0.items.map(\.id) }, [[3], [2, 1]])
+        XCTAssertGreaterThan(viewModel.eventDays[0].day, viewModel.eventDays[1].day)
+    }
+
     // MARK: - Filter changes
 
     @MainActor

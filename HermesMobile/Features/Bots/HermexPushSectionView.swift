@@ -27,24 +27,24 @@ import SwiftUI
         DisclosureGroup(isExpanded: $isExpanded) {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Push · Current server")
-                    .font(AppFont.caption()).foregroundStyle(.secondary)
+                    .font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
                 pushSettings
                 Divider()
                 Text("On this iPhone · All servers")
-                    .font(AppFont.caption()).foregroundStyle(.secondary)
+                    .font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
                 sharedSettings
             }
             .padding(.top, 12)
         } label: {
             HStack(spacing: 10) {
-                Image(systemName: "bell").foregroundStyle(Color.secondary)
+                Image(systemName: "bell").foregroundStyle(Color.hxTextSecondary)
                     .frame(width: 24).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Notifications").font(AppFont.subheadline(weight: .medium))
                     Text(provisioner.pairing == nil
                          ? String(localized: "Push off · Current server")
                          : String(localized: "Push on · Current server"))
-                        .font(AppFont.caption()).foregroundStyle(Color.secondary)
+                        .font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
                     if let card = provisioner.pluginCard { pluginLine(card) }
                 }
             }
@@ -100,7 +100,7 @@ import SwiftUI
         if let pairing = provisioner.pairing {
             if pairing.preferencesNeedSync == true {
                 Text("Preferences aren’t confirmed. Try again to sync this iPhone with the relay.")
-                    .font(AppFont.caption()).foregroundStyle(.secondary)
+                    .font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
                 Button("Try again.") {
                     preferenceTask = Task { await provisioner.updatePreferences(pairing.effectivePreferences) }
                 }
@@ -115,10 +115,10 @@ import SwiftUI
                 Divider()
                 preferenceToggle(String(localized: "Quiet the Open Chat"), keyPath: \.presenceSuppression)
                 Text("For this iPhone and the selected server. Quiet the Open Chat hides banners for the chat on screen, except approvals, questions and errors. Previews include message text; your iPhone’s notification settings still apply.")
-                    .font(AppFont.caption()).foregroundStyle(.secondary)
+                    .font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
             }
             if provisioner.phase == .savingPreferences {
-                Text("Saving…").font(AppFont.caption()).foregroundStyle(.secondary)
+                Text("Saving…").font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
             }
             testNotificationRows(pairing)
             LabeledContent(String(localized: "Relay"), value: pairing.relayURL.host ?? pairing.relayURL.absoluteString)
@@ -144,7 +144,7 @@ import SwiftUI
                 ForEach(HermexPushProvisioner.Step.allCases) { step in stepRow(step) }
             }
             Text("Atlas sets this Hermes host up for push and pairs this iPhone with its relay. Your host encrypts every notification’s text: the relay only ever sees ciphertext.")
-                .font(AppFont.caption()).foregroundStyle(.secondary)
+                .font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
         }
         // Also available after pairing, so an expired sign-in can be repaired
         // without searching through the server's detail screen.
@@ -155,7 +155,7 @@ import SwiftUI
                 Text(provisioner.connection == nil ? String(localized: "Connect Hermes…") : String(localized: "Hermes connection"))
                 Spacer()
                 Image(systemName: "chevron.forward")
-                    .foregroundStyle(Color.secondary).accessibilityHidden(true)
+                    .foregroundStyle(Color.hxTextSecondary).accessibilityHidden(true)
             }
             .font(AppFont.subheadline()).frame(minHeight: 44)
             .foregroundStyle(Color.primary)
@@ -196,10 +196,10 @@ import SwiftUI
         .disabled(!provisioner.canSendTest)
         .frame(minHeight: 44)
         Text("Sends one test through the relay to every iPhone paired with this Hermes host. It checks the relay, Apple and this iPhone, not your host’s connection to the relay.")
-            .font(AppFont.caption()).foregroundStyle(.secondary)
+            .font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
         if !pairing.effectivePreferences.replies {
             Text("Turn on Reply Notifications to send a test.")
-                .font(AppFont.caption()).foregroundStyle(.secondary)
+                .font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
         } else if provisioner.testDelivered {
             Label {
                 Text("Sent. Apple accepted the test; it should arrive in a few seconds.")
@@ -217,11 +217,11 @@ import SwiftUI
         let isRunning = provisioner.isRunning(step)
         return HStack(spacing: 10) {
             Image(systemName: isDone ? "checkmark.circle.fill" : (isRunning ? "circle.dashed" : "circle"))
-                .foregroundStyle(isDone ? Color.hxSuccess : .secondary)
+                .foregroundStyle(isDone ? Color.hxSuccess : Color.hxTextSecondary)
             Text(step.title).fontWeight(isRunning ? .semibold : .regular)
         }
         .font(AppFont.footnote())
-        .foregroundStyle(isDone || isRunning ? Color.primary : .secondary)
+        .foregroundStyle(isDone || isRunning ? Color.hxTextPrimary : Color.hxTextSecondary)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(isDone ? String(localized: "\(step.title): done")
                                  : (isRunning ? String(localized: "\(step.title): working")
@@ -234,10 +234,10 @@ import SwiftUI
         if let settingsURL = URL(string: UIApplication.openNotificationSettingsURLString) {
             Link(destination: settingsURL) {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Image(systemName: "bell.slash").foregroundStyle(.secondary).accessibilityHidden(true)
+                    Image(systemName: "bell.slash").foregroundStyle(Color.hxTextSecondary).accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         if let title { Text(title).fontWeight(.semibold).foregroundStyle(Color.primary) }
-                        Text(message).foregroundStyle(.secondary)
+                        Text(message).foregroundStyle(Color.hxTextSecondary)
                         Text("Open Settings").foregroundStyle(.tint).padding(.top, 2)
                     }
                     Spacer(minLength: 0)
@@ -262,7 +262,7 @@ import SwiftUI
                         ?? Text("Your Hermes host has an older hermex-push loaded. The newest is \(newest)."),
                     action: String(localized: "Update plugin…")) { isConfirmingUpdate = true }
         case .updating(let step):
-            callout("circle.dashed", tint: .secondary, title: Text("Updating the plugin…"), message: Text(step.progress))
+            callout("circle.dashed", tint: .hxTextSecondary, title: Text("Updating the plugin…"), message: Text(step.progress))
         case .status(.restartNeeded(let loaded)) where HermexPushPlugin.canRestart(loaded):
             // The loaded plugin has the restart route, so restarting is the card's one action.
             callout("arrow.clockwise.circle.fill", tint: .hxWarning, title: Text("Restart Hermes to finish"),
@@ -275,7 +275,7 @@ import SwiftUI
                 Task { await provisioner.checkPluginAgain() }
             }
         case .restarting:
-            callout("circle.dashed", tint: .secondary, title: Text("Restarting Hermes…"),
+            callout("circle.dashed", tint: .hxTextSecondary, title: Text("Restarting Hermes…"),
                     message: Text("Waiting for Hermes to come back"))
         case .status(.restartTimedOut):
             callout("exclamationmark.triangle.fill", tint: .hxDanger, title: Text("Hermes didn’t come back"),
@@ -314,7 +314,7 @@ import SwiftUI
             Image(systemName: symbol).foregroundStyle(tint).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 title.fontWeight(.semibold).foregroundStyle(Color.primary)
-                message.foregroundStyle(.secondary)
+                message.foregroundStyle(Color.hxTextSecondary)
                 if let action { Text(action).foregroundStyle(.tint).padding(.top, 2) }
             }
             Spacer(minLength: 0)
@@ -337,21 +337,21 @@ import SwiftUI
         switch card {
         case .failed(let failure) where failure.remedy == .retryRestart:
             captionLine("arrow.clockwise.circle.fill", tint: .hxWarning, text: String(localized: "Restart Hermes to finish"),
-                        textTint: .secondary)
+                        textTint: .hxTextSecondary)
         case .status(.available), .failed:
             captionLine("arrow.up.circle.fill", tint: Color.accentColor, text: String(localized: "Plugin update available"), textTint: Color.accentColor)
         case .updating:
-            captionLine("circle.dashed", tint: .secondary, text: String(localized: "Updating plugin…"), textTint: .secondary)
+            captionLine("circle.dashed", tint: .hxTextSecondary, text: String(localized: "Updating plugin…"), textTint: .hxTextSecondary)
         case .restarting:
-            captionLine("circle.dashed", tint: .secondary, text: String(localized: "Restarting Hermes…"), textTint: .secondary)
+            captionLine("circle.dashed", tint: .hxTextSecondary, text: String(localized: "Restarting Hermes…"), textTint: .hxTextSecondary)
         case .status(.restartNeeded):
             captionLine("arrow.clockwise.circle.fill", tint: .hxWarning, text: String(localized: "Restart Hermes to finish"),
-                        textTint: .secondary)
+                        textTint: .hxTextSecondary)
         case .status(.restartTimedOut):
             captionLine("exclamationmark.triangle.fill", tint: .hxDanger, text: String(localized: "Hermes didn’t come back"),
-                        textTint: .secondary)
+                        textTint: .hxTextSecondary)
         case .status(.checkFailed(let failure)):
-            captionLine("exclamationmark.triangle.fill", tint: .hxDanger, text: failure.title, textTint: .secondary)
+            captionLine("exclamationmark.triangle.fill", tint: .hxDanger, text: failure.title, textTint: .hxTextSecondary)
         case .status(.upToDate):
             EmptyView()
         }

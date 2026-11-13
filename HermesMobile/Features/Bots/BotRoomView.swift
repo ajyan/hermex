@@ -50,10 +50,10 @@ import SwiftUI
                                 .disabled(!hasHiddenEvents && (reader.loadingEarlier || reader.link != .live))
                         }
                         if reader.foreignAuthority {
-                            Text("Managed by another Hermes").font(AppFont.caption()).foregroundStyle(.secondary)
+                            Text("Managed by another Hermes").font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
                         }
                         if threadID != nil, reader.threads.first(where: { $0.id == threadID })?.root == nil {
-                            Text("Earlier messages not loaded").font(AppFont.caption()).foregroundStyle(.secondary)
+                            Text("Earlier messages not loaded").font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
                         }
                         let gapStarts = showsThreadOverview ? Set<Int>() : BotRoomEvent.gapStarts(in: transcriptEvents[start...])
                         let rows = Array(transcriptEvents[start...])
@@ -300,11 +300,11 @@ private struct BotRoomThreadPreview: View {
                 HStack { author; Spacer(); activity }
                 VStack(alignment: .leading) { author; activity }
             }
-            .font(AppFont.caption()).foregroundStyle(.secondary)
+            .font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
             if let root = thread.root {
                 Text(root.payload["text"].text ?? "").lineLimit(2)
             } else {
-                Text("Earlier messages not loaded").foregroundStyle(.secondary)
+                Text("Earlier messages not loaded").foregroundStyle(Color.hxTextSecondary)
             }
             HStack {
                 if thread.root == nil {
@@ -315,7 +315,7 @@ private struct BotRoomThreadPreview: View {
                 Spacer()
                 Image(systemName: "chevron.forward").accessibilityHidden(true)
             }
-            .font(AppFont.caption()).foregroundStyle(.secondary)
+            .font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
         }
         .padding(12).frame(maxWidth: .infinity, alignment: .leading)
         .hxCard(cornerRadius: HXRadius.md)
@@ -425,7 +425,7 @@ private struct BotRoomEventView: View {
                 HStack(alignment: .bottom, spacing: 8) {
                     BotRoomMemberAvatar(member: event.member(in: room), roster: roster, avatars: avatars, size: 26)
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(event.sender(in: room)).font(AppFont.caption()).foregroundStyle(.secondary)
+                        Text(event.sender(in: room)).font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
                         ResponseTextSelection(identity: messageText, collectsGlyphs: responseIsVisible) {
                             MarkdownRenderer(content: messageText)
                                 // The bubble's fill is translucent, so no solid fade matches it.
@@ -435,7 +435,7 @@ private struct BotRoomEventView: View {
                             guard let viewport = geometry.bounds(of: .scrollView(axis: .vertical)) else { return true }
                             return viewport.intersects(CGRect(origin: .zero, size: geometry.size))
                         } action: { responseIsVisible = $0 }
-                            .padding(12).background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 20))
+                            .padding(12).background(.fill.tertiary, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
                             .chatMessageContextMenu(actions, longPress: false)
                     }
                     Spacer(minLength: 20)
@@ -446,7 +446,7 @@ private struct BotRoomEventView: View {
                 footer.padding(.leading, 34)
             }
         } else {
-            Text(event.systemText).font(AppFont.caption()).foregroundStyle(.secondary)
+            Text(event.systemText).font(AppFont.caption()).foregroundStyle(Color.hxTextSecondary)
                 .frame(maxWidth: .infinity).multilineTextAlignment(.center)
         }
     }
@@ -538,7 +538,7 @@ struct BotRoomWelcomeView: View {
             }
             if showsPrompt {
                 Text("Say something to the group")
-                    .font(AppFont.subheadline()).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    .font(AppFont.subheadline()).foregroundStyle(Color.hxTextSecondary).multilineTextAlignment(.center)
             }
         }
         .frame(maxWidth: .infinity)
@@ -572,7 +572,7 @@ struct BotRoomInboxRow: View {
             Text(room.name).font(AppFont.headline())
             Spacer(minLength: 8)
             if let date = room.updatedAt {
-                Text(BotInboxDateLabel.text(for: date)).font(AppFont.subheadline()).foregroundStyle(.secondary)
+                Text(BotInboxDateLabel.text(for: date)).font(AppFont.subheadline()).foregroundStyle(Color.hxTextSecondary)
             }
         }
         .padding(.vertical, 12)

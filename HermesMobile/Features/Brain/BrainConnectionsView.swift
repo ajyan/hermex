@@ -368,8 +368,7 @@ struct BrainHubPagesSheet: View {
             }
             .scrollContentBackground(.hidden)
             .background(Color.hxCanvas.ignoresSafeArea())
-            .navigationTitle(Text(verbatim: hub.ref.title))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(hub.ref.title)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button { dismiss() } label: { Text(verbatim: "Done") }

@@ -440,7 +440,7 @@ struct PrepRunView: View {
                         isSubmitting: viewModel.isSubmitting,
                         dontKnow: { Task { await viewModel.dontKnow() } },
                         reread: viewModel.canReread ? {
-                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { viewModel.rereadLesson() }
+                            withAnimation(HXMotion.swap(reduceMotion: reduceMotion)) { viewModel.rereadLesson() }
                         } : nil
                     )
                     .transition(.opacity)

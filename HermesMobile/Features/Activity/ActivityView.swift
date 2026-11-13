@@ -46,13 +46,22 @@ struct ActivityView: View {
         case .notConsented:
             ContentUnavailableView("Approve Atlas Activity in the web UI under Settings → Extensions", systemImage: "lock")
         case .serviceDown where viewModel.events.isEmpty:
-            ContentUnavailableView("The activity service isn't running", systemImage: "bolt.slash")
+            pullToRetry { ContentUnavailableView("The activity service isn't running", systemImage: "bolt.slash") }
         case .failed(let message) where viewModel.events.isEmpty:
-            ContentUnavailableView("Couldn't load activity", systemImage: "exclamationmark.triangle", description: Text(message))
+            pullToRetry {
+                ContentUnavailableView("Couldn't load activity", systemImage: "exclamationmark.triangle", description: Text(message))
+            }
         case .idle, .loading where viewModel.events.isEmpty:
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         default:
             timeline
+        }
+    }
+
+    /// A screen-filling message inside a scroll view, so pull to refresh reaches it and retries.
+    private func pullToRetry<Message: View>(@ViewBuilder _ message: () -> Message) -> some View {
+        ScrollView {
+            message().containerRelativeFrame([.horizontal, .vertical])
         }
     }
 
@@ -74,9 +83,9 @@ struct ActivityView: View {
             if let rulesError = viewModel.rulesError {
                 banner(String(localized: "Rules file has an error; using the previous version"), detail: rulesError)
             }
-            ForEach(sections, id: \.day) { section in
+            ForEach(viewModel.eventDays, id: \.day) { section in
                 Section {
-                    ForEach(section.events) { event in
+                    ForEach(section.items) { event in
                         ActivityRow(event: event)
                             .onAppear {
                                 if event.id == viewModel.events.last?.id {
@@ -105,9 +114,9 @@ struct ActivityView: View {
             if let rulesError = viewModel.rulesError {
                 banner(String(localized: "Rules file has an error; using the previous version"), detail: rulesError)
             }
-            ForEach(episodeSections, id: \.day) { section in
+            ForEach(viewModel.episodeDays, id: \.day) { section in
                 Section {
-                    ForEach(section.episodes) { episode in
+                    ForEach(section.items) { episode in
                         EpisodeRow(episode: episode)
                             .onAppear {
                                 if episode.id == viewModel.episodes.last?.id {
@@ -126,18 +135,6 @@ struct ActivityView: View {
                 ContentUnavailableView("No activity yet", systemImage: "tray")
             }
         }
-    }
-
-    private var sections: [(day: Date, events: [AtlasActivityEvent])] {
-        let calendar = Calendar.current
-        let grouped = Dictionary(grouping: viewModel.events) { calendar.startOfDay(for: $0.ts) }
-        return grouped.keys.sorted(by: >).map { ($0, grouped[$0] ?? []) }
-    }
-
-    private var episodeSections: [(day: Date, episodes: [AtlasEpisode])] {
-        let calendar = Calendar.current
-        let grouped = Dictionary(grouping: viewModel.episodes) { calendar.startOfDay(for: $0.firstTs) }
-        return grouped.keys.sorted(by: >).map { ($0, grouped[$0] ?? []) }
     }
 
     /// A day's section title in sentence case (DESIGN.md § Section header).

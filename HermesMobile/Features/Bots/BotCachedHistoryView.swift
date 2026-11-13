@@ -18,9 +18,9 @@ struct BotCachedHistoryView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
                     Text("Messages saved on this iPhone")
-                        .font(AppFont.footnote()).foregroundStyle(.secondary)
+                        .font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
                     Text(hit.snapshot.savedAt, format: .dateTime.month().day().hour().minute())
-                        .font(AppFont.footnote()).foregroundStyle(.secondary)
+                        .font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
                     ForEach(hit.snapshot.messages) { message in
                         let chatMessage = ChatMessage(
                             role: message.role,
@@ -41,7 +41,7 @@ struct BotCachedHistoryView: View {
                         } else {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(message.role == "user" ? String(localized: "You") : profile.name)
-                                    .font(AppFont.subheadline(weight: .semibold)).foregroundStyle(.secondary)
+                                    .font(AppFont.subheadline(weight: .semibold)).foregroundStyle(Color.hxTextSecondary)
                                 Text(message.text).textSelection(.enabled)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
