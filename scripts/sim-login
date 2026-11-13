@@ -32,6 +32,21 @@ host="$(attribute hermex-webui acct)"
 [[ -n "$host" ]] || { echo "No hermex-webui Keychain item; see the header of this script." >&2; exit 1 }
 [[ "$host" == *://* ]] || host="https://$host"
 export SIMCTL_CHILD_HERMEX_DEV_SERVER_URL="$host"
+
+# A server on this Mac serves a self-signed certificate. A new or erased simulator does not
+# trust it, so the login fails on TLS and the app stays on the welcome screen. Trust it in
+# the simulator first; adding it again is harmless.
+if [[ "$host" == https://localhost* || "$host" == https://127.0.0.1* ]]; then
+  authority="${host#https://}"; authority="${authority%%/*}"
+  [[ "$authority" == *:* ]] || authority="$authority:443"
+  cert="$(mktemp)"
+  if openssl s_client -connect "$authority" -servername "${authority%%:*}" </dev/null 2>/dev/null | openssl x509 >"$cert" 2>/dev/null; then
+    xcrun simctl keychain "$udid" add-root-cert "$cert"
+  else
+    echo "Could not read the certificate from $authority; the login may fail on TLS." >&2
+  fi
+  rm -f "$cert"
+fi
 export SIMCTL_CHILD_HERMEX_DEV_PASSWORD="$(security find-generic-password -s hermex-webui -w)"
 
 if [[ -n "${HERMEX_BOT_ADDRESS:-}" && -n "${HERMEX_BOT_USERNAME:-}" && -n "${HERMEX_BOT_PASSWORD:-}" ]]; then
