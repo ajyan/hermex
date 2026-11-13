@@ -180,6 +180,52 @@ final class MealsHomeViewModelTests: XCTestCase {
         XCTAssertNil(vm.logDraft, "no sheet before the server has the night")
     }
 
+    func testNotEatenPostsAnEmptyLogForThatDayAndShowsTheServersWeek() async throws {
+        let home = try MealsModelsTests.home()
+        let unlogged = MealsHome(day: home.day, week: home.week,
+                                 days: home.days.map { MealsDay(day: $0.day, night: $0.night, logged: nil) },
+                                 tonight: home.tonight, tonightLogged: false, tomorrowPrep: home.tomorrowPrep)
+        let client = FakeMealsClient()
+        client.homeResults = [.success(home)]
+        client.writeResults = [.success(unlogged)]
+        let vm = viewModel(client)
+        await vm.load()
+        await vm.unlog("2026-11-02")
+        XCTAssertEqual(client.logRequests, [.notEaten(day: "2026-11-02", today: "2026-11-03")])
+        XCTAssertEqual(vm.state, .loaded(unlogged))
+        XCTAssertNil(vm.saveError)
+    }
+
+    func testNotEatenSkipsADayWithNothingLogged() async throws {
+        let client = FakeMealsClient()
+        client.homeResults = [.success(try MealsModelsTests.home())]
+        let vm = viewModel(client)
+        await vm.load()
+        await vm.unlog("2026-11-03")
+        XCTAssertTrue(client.logRequests.isEmpty)
+    }
+
+    func testNotEatenSendsNoDishesAndNoServings() throws {
+        let body = try JSONEncoder().encode(MealsLogRequest.notEaten(day: "2026-11-02", today: "2026-11-03"))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(json["day"] as? String, "2026-11-02")
+        XCTAssertEqual(json["today"] as? String, "2026-11-03")
+        XCTAssertEqual((json["dishes"] as? [Any])?.count, 0)
+        XCTAssertNil(json["servings"])
+    }
+
+    func testAFailedNotEatenKeepsTheLogAndSaysSo() async throws {
+        let home = try MealsModelsTests.home()
+        let client = FakeMealsClient()
+        client.homeResults = [.success(home)]
+        client.writeResults = [.failure(APIError.http(statusCode: 400, body: nil))]
+        let vm = viewModel(client)
+        await vm.load()
+        await vm.unlog("2026-11-02")
+        XCTAssertEqual(vm.state, .loaded(home))
+        XCTAssertEqual(vm.saveError, "Couldn't save that. Try again.")
+    }
+
     func testAnEditThatChangesNothingIsNotSent() async throws {
         let home = try MealsModelsTests.home()
         let client = FakeMealsClient()

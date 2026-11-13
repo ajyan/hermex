@@ -185,8 +185,16 @@ struct MealsNightBody: Encodable, Equatable {
 struct MealsLogRequest: Encodable, Equatable {
     let day: String
     let today: String
-    let servings: Int
+    /// Left out of the body when nil.
+    let servings: Int?
     let dishes: [MealsLogDish]
+
+    /// Not eaten after all: no dishes, so the server keeps nothing logged for `day`. The fork's
+    /// `vault_meals.log` must accept an empty `dishes` for this (it answers 400 until it does), and
+    /// `meals.log_night` then drops the day's non-estimated history rows, as logging again does.
+    static func notEaten(day: String, today: String) -> MealsLogRequest {
+        MealsLogRequest(day: day, today: today, servings: nil, dishes: [])
+    }
 }
 
 struct MealsLogDish: Encodable, Equatable {

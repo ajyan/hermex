@@ -167,17 +167,10 @@ struct MealsHomeView: View {
             }
             .tint(paper.glow)
         } else if home.tonightLogged {
-            HStack(spacing: 10) {
-                Label { Text(verbatim: "Logged") } icon: { Image(systemName: "checkmark.circle.fill") }
-                    .font(AppFont.subheadline(weight: .semibold))
-                    .foregroundStyle(paper.glow)
-                Spacer(minLength: 8)
-                Button { viewModel.rateTonight() } label: {
-                    Text(verbatim: "Rate and notes")
-                        .font(AppFont.subheadline(weight: .semibold))
-                        .frame(minHeight: 44)
-                }
-                .tint(paper.glow)
+            // Side by side when they fit; stacked at large text sizes.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 16) { loggedRow(home) }
+                VStack(alignment: .leading, spacing: 0) { loggedRow(home) }
             }
         } else {
             let others = home.days.filter { $0.day != home.day && $0.logged == nil }
@@ -192,6 +185,7 @@ struct MealsHomeView: View {
                 .buttonBorderShape(.capsule)
                 .controlSize(.large)
                 .tint(paper.glow)
+                .disabled(viewModel.isSaving)
                 .accessibilityHint(Text(verbatim: "Logs tonight's dinner"))
                 if !others.isEmpty {
                     Menu {
@@ -213,6 +207,28 @@ struct MealsHomeView: View {
                 }
             }
         }
+    }
+
+    /// Tonight once logged: Logged, then Not eaten (takes it back) and Rate and notes.
+    @ViewBuilder
+    private func loggedRow(_ home: MealsHome) -> some View {
+        Label { Text(verbatim: "Logged") } icon: { Image(systemName: "checkmark.circle.fill") }
+            .font(AppFont.subheadline(weight: .semibold))
+            .foregroundStyle(paper.glow)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        Button { Task { await viewModel.unlog(home.day) } } label: {
+            Text(verbatim: "Not eaten")
+                .font(AppFont.subheadline(weight: .semibold))
+                .frame(minHeight: 44)
+        }
+        .tint(paper.glow)
+        .accessibilityHint(Text(verbatim: "Takes back tonight's log"))
+        Button { viewModel.rateTonight() } label: {
+            Text(verbatim: "Rate and notes")
+                .font(AppFont.subheadline(weight: .semibold))
+                .frame(minHeight: 44)
+        }
+        .tint(paper.glow)
     }
 
     // MARK: Occasions and a year ago
@@ -316,6 +332,11 @@ struct MealsHomeView: View {
     private func dayMenu(_ day: MealsDay, home: MealsHome) -> some View {
         Button { pickingFor = PickerTarget(day: day.day) } label: {
             Label { Text(verbatim: "Add a dish") } icon: { Image(systemName: "plus") }
+        }
+        if day.logged != nil {
+            Button { Task { await viewModel.unlog(day.day) } } label: {
+                Label { Text(verbatim: "Not eaten") } icon: { Image(systemName: "arrow.uturn.backward") }
+            }
         }
         if let night = day.night {
             Menu {
