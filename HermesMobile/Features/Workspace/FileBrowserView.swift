@@ -208,7 +208,7 @@ private struct FileTreeRowView: View {
             HStack(spacing: 8) {
                 if node.isDirectory {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.forward")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold)) // design-drift: allow (sized to the 12 pt disclosure column that aligns rows)
                         .foregroundStyle(.tertiary)
                         .frame(width: 12)
                 } else {
@@ -268,7 +268,7 @@ private struct FileTreeRowView: View {
         Group {
             if node.isDirectory || node.isSymlink {
                 Image(systemName: node.isSymlink ? "link" : "folder")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 13, weight: .medium)) // design-drift: allow (SF Symbol sized to the 24 pt tile)
                     .foregroundStyle(HermexPaper.file.glow)
             } else {
                 FileIcon.resolve(node.name).image

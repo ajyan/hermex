@@ -353,7 +353,7 @@ private struct AgentRunStatusDot: View {
 
     var body: some View {
         Image(systemName: symbolName)
-            .font(.system(size: size * 0.46, weight: .bold))
+            .font(.system(size: size * 0.46, weight: .bold)) // design-drift: allow (SF Symbol sized to its dot)
             .foregroundStyle(color)
             .frame(width: size, height: size)
             .background(color.opacity(0.18), in: Circle())

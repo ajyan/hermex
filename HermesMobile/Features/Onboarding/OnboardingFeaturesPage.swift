@@ -54,7 +54,7 @@ struct OnboardingFeatureRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold)) // design-drift: allow (SF Symbol sized to the 40 pt tile)
                 .foregroundStyle(color)
                 .frame(width: 40, height: 40)
                 .background(

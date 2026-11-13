@@ -38,7 +38,7 @@ struct GitInlineCommitButton: View {
                         ProgressView().controlSize(.small)
                     } else {
                         Image(systemName: "arrow.up.doc")
-                            .font(.system(size: 15, weight: .regular))
+                            .font(.system(size: 15, weight: .regular)) // design-drift: allow (SF Symbol sized to the 18 pt slot the spinner shares)
                     }
                 }
                 .frame(width: 18, height: 18)
