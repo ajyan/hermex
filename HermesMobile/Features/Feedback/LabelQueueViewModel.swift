@@ -189,14 +189,10 @@ final class LabelQueueViewModel {
         }
     }
 
-    /// Today's Daily Deck session, else the newest stored one inside the window.
+    /// The Brief's reading session: one is kept and reused day after day (`DailyDeckStore.session`), so its age
+    /// doesn't matter; only a session the server lost sends him to open the Brief.
     private func storedSession() -> String? {
-        let today = DailyDeckPaths.day(now())
-        if let session = store.session(for: server, date: today) { return session }
-        guard let latest = store.latestSession(for: server),
-              Self.windowDates([latest.date], now: now()).isEmpty == false
-        else { return nil }
-        return latest.id
+        store.session(for: server, date: DailyDeckPaths.day(now()))
     }
 
     /// The morning decks for `dates`, in that order. A deck that doesn't decode is skipped; a

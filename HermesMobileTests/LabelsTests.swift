@@ -774,13 +774,15 @@ final class LabelQueueViewModelTests: XCTestCase {
         XCTAssertEqual(client.listedSessions, ["s-oct10"])
     }
 
-    func testASessionOlderThanTheWindowOrVanishedAsksToOpenTheBrief() async {
+    /// The Brief reuses one reading session day after day, so an old one still reads; a vanished one doesn't.
+    func testAnOldSessionStillReadsButAVanishedOneAsksToOpenTheBrief() async {
         openedBrief(session: "s-old", on: "2026-09-01")
         let old = ScriptedDailyDeckClient(workspaces: ["/brain"], names: Self.names, deck: "{}")
+        old.files = Self.files
         let oldQueue = makeQueue(old)
         await oldQueue.build()
-        XCTAssertEqual(oldQueue.state, .needsBrief)
-        XCTAssertTrue(old.listedSessions.isEmpty)
+        XCTAssertEqual(oldQueue.state, .ready)
+        XCTAssertEqual(old.listedSessions, ["s-old"])
 
         openedBrief(session: "s-gone")
         let vanished = ScriptedDailyDeckClient(workspaces: ["/brain"], names: Self.names, deck: "{}")
