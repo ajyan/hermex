@@ -419,6 +419,7 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertFalse(viewModel.hasChanges, "back to what was filed")
 
         viewModel.setText("Ship it today.", for: viewModel.cards[1])
+        viewModel.screenDisappeared()  // leaving writes the draft
         let reopened = makeViewModel(client)
         await reopened.load()
         XCTAssertEqual(reopened.answer(for: reopened.cards[1])?.text, "Ship it today.", "unsent edits win over the filed copy")
@@ -465,6 +466,7 @@ final class DailyDeckTests: XCTestCase {
         viewModel.choose(skip, for: decision)  // second tap clears it
         XCTAssertNil(viewModel.answer(for: decision))
         viewModel.setText("Still true.", for: viewModel.cards[3])
+        viewModel.screenDisappeared()  // leaving writes the draft
 
         let reopened = makeViewModel(client)
         await reopened.load()
@@ -2183,6 +2185,199 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertTrue(viewModel.cards.allSatisfy { viewModel.diagram(for: $0) == nil })
     }
 
+    // MARK: - Appearing again
+
+    /// Coming back from a Goal, Brain, Meals or Body page a card opened: the deck, its page and
+    /// its cards stay, and nothing is read again.
+    @MainActor
+    func testAppearingAgainKeepsTheDeckAndItsPage() async {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.deckJSON)
+        let clock = TestDeckClock(morning)
+        let viewModel = DailyDeckViewModel(server: server, client: client, store: store, now: { clock.now })
+        await viewModel.appeared()
+        XCTAssertEqual(viewModel.state, .ready)
+        viewModel.index = 2
+        let (reads, listings) = (client.readPaths.count, client.listedPaths.count)
+
+        clock.now = morning.addingTimeInterval(60)
+        await viewModel.appeared()
+
+        XCTAssertEqual(viewModel.state, .ready)
+        XCTAssertEqual(viewModel.index, 2, "still on the card it was on")
+        XCTAssertEqual(client.readPaths.count, reads, "a fresh deck isn't read again")
+        XCTAssertEqual(client.listedPaths.count, listings)
+    }
+
+    /// A deck on screen past `revalidateAfter` is read again without the spinner, and stays on its card
+    /// even when the deck changed on the server.
+    @MainActor
+    func testAStaleDeckIsReadAgainInPlace() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.deckJSON)
+        let clock = TestDeckClock(morning)
+        let viewModel = DailyDeckViewModel(server: server, client: client, store: store, now: { clock.now })
+        await viewModel.appeared()
+        viewModel.index = 3
+        let page = viewModel.currentPage?.id
+        viewModel.setText("Typed before leaving.", for: viewModel.cards[1])
+
+        client.files["briefs/2026-10-04.morning.json"] = Self.deckJSON.replacingOccurrences(of: "Sun, Oct 4", with: "Sunday")
+        let seen = StateLog()
+        client.readGate = { await MainActor.run { seen.states.append(viewModel.state) } }
+        clock.now = morning.addingTimeInterval(DailyDeckViewModel.revalidateAfter + 1)
+        await viewModel.appeared()
+
+        XCTAssertEqual(seen.states.first, .ready, "the deck stays up while it is read again")
+        XCTAssertEqual(viewModel.state, .ready)
+        XCTAssertEqual(viewModel.cards.first?.title, "Sunday", "the server's newer deck shows")
+        XCTAssertEqual(viewModel.currentPage?.id, page, "on the same card")
+        XCTAssertEqual(viewModel.answer(for: viewModel.cards[1])?.text, "Typed before leaving.")
+
+        // A read that fails keeps what's on screen.
+        client.readGate = nil
+        client.listingErrors[DailyDeckPaths.directory] = URLError(.notConnectedToInternet)
+        clock.now = clock.now.addingTimeInterval(DailyDeckViewModel.revalidateAfter + 1)
+        await viewModel.appeared()
+        XCTAssertEqual(viewModel.state, .ready)
+        XCTAssertFalse(viewModel.isOfflineCopy)
+        XCTAssertEqual(viewModel.currentPage?.id, page)
+    }
+
+    /// Back on a new day, a screen left on yesterday's brief opens today's from its first card.
+    @MainActor
+    func testAppearingOnANewDayLoadsItsBrief() async {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json", "2026-10-05.morning.json"], deck: Self.deckJSON)
+        let clock = TestDeckClock(morning)
+        let viewModel = DailyDeckViewModel(server: server, client: client, store: store, now: { clock.now })
+        await viewModel.appeared()
+        viewModel.index = 2
+
+        clock.now = morning.addingTimeInterval(24 * 60 * 60)
+        await viewModel.appeared()
+
+        XCTAssertEqual(viewModel.date, "2026-10-05")
+        XCTAssertEqual(viewModel.index, 0)
+        XCTAssertEqual(viewModel.state, .ready)
+        XCTAssertTrue(client.readPaths.contains("briefs/2026-10-05.morning.json"))
+    }
+
+    // MARK: - Drafts
+
+    /// Typing (and dictation's partials) changes `answers` at once; the store is written once it settles,
+    /// or right away when the screen leaves, the app backgrounds, or the deck is filed.
+    @MainActor
+    func testAnswersAreSavedOnceTypingSettlesOrTheScreenLeaves() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.deckJSON)
+        let now = morning
+        let held = DailyDeckViewModel(server: server, client: client, store: store, now: { now }, draftDelay: .seconds(3600))
+        await held.load()
+        let card = held.cards[1]
+
+        held.setText("S", for: card)
+        held.setText("Sh", for: card)
+        held.setText("Ship", for: card)
+        XCTAssertEqual(held.answer(for: card)?.text, "Ship")
+        XCTAssertTrue(store.answers(for: server, date: "2026-10-04", kind: "morning").isEmpty, "no write per keystroke")
+
+        held.screenAppeared()
+        held.screenDisappeared()
+        XCTAssertEqual(store.answers(for: server, date: "2026-10-04", kind: "morning")[card.id]?.text, "Ship")
+
+        held.setText("Ship it", for: card)
+        held.scenePhaseChanged(active: false)
+        XCTAssertEqual(store.answers(for: server, date: "2026-10-04", kind: "morning")[card.id]?.text, "Ship it")
+
+        let settles = DailyDeckViewModel(server: server, client: client, store: store, now: { now }, draftDelay: .zero)
+        await settles.load()
+        settles.setText("Ship it today", for: card)
+        await settles.draftSave?.value
+        XCTAssertEqual(store.answers(for: server, date: "2026-10-04", kind: "morning")[card.id]?.text, "Ship it today")
+    }
+
+    /// Filing sends what's typed even before it settles, and opening another day keeps it with its own deck.
+    @MainActor
+    func testFilingAndOpeningAnotherDaySaveTheDraftFirst() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json", "2026-10-03.morning.json"], deck: Self.deckJSON)
+        let now = morning
+        let viewModel = DailyDeckViewModel(server: server, client: client, store: store, now: { now }, draftDelay: .seconds(3600))
+        await viewModel.load()
+        let card = viewModel.cards[1]
+
+        viewModel.setText("Ship it.", for: card)
+        await viewModel.show(date: "2026-10-03")
+        XCTAssertEqual(store.answers(for: server, date: "2026-10-04", kind: "morning")[card.id]?.text, "Ship it.")
+        XCTAssertNil(viewModel.answer(for: card), "the other day's deck has its own answers")
+
+        await viewModel.show(date: "2026-10-04")
+        XCTAssertEqual(viewModel.answer(for: card)?.text, "Ship it.")
+        viewModel.setText("Ship it today.", for: card)
+        _ = await viewModel.file()
+        XCTAssertEqual(client.fileRequests.last?.answers.answers.first { $0.card == card.id }?.text, "Ship it today.")
+        XCTAssertTrue(store.answers(for: server, date: "2026-10-04", kind: "morning").isEmpty, "filed, so no draft is left")
+    }
+
+    /// The stack's pages hang on Not for Me and the week's question, never on the words being typed.
+    @MainActor
+    func testTypingAnAnswerDoesNotRedrawTheStack() async throws {
+        store.setWorkspace("/vault", for: server)
+        let viewModel = makeViewModel(ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.deckJSON))
+        await viewModel.load()
+        let card = viewModel.cards[1]
+
+        let typed = Flag()
+        withObservationTracking { _ = viewModel.visiblePages } onChange: { typed.value = true }
+        viewModel.setText("Typing away", for: card)
+        XCTAssertFalse(typed.value)
+
+        let skipped = Flag()
+        withObservationTracking { _ = viewModel.visiblePages } onChange: { skipped.value = true }
+        viewModel.dismiss(card, feedback: DeckFeedback(verdict: .skip, reasons: [], note: nil))
+        XCTAssertTrue(skipped.value)
+        XCTAssertFalse(viewModel.visiblePages.contains { $0.id == card.id })
+        XCTAssertEqual(viewModel.skippedCount, 1)
+    }
+
+    // MARK: - Side reads
+
+    /// The calendar lists a year's month folders once per screen; sleep is read once while fresh, and
+    /// Reload reads both again.
+    @MainActor
+    func testJournalListingAndSleepAreReadOncePerScreen() async throws {
+        store.setWorkspace("/vault", for: server)
+        let client = ScriptedDailyDeckClient(workspaces: [], names: ["2026-10-04.morning.json"], deck: Self.deckJSON)
+        client.listings["journal/2026"] = ["09-September", "10-October"]
+        client.listings["journal/2026/10-October"] = ["2026-10-04.md"]
+        client.listings["journal/2026/09-September"] = ["2026-09-30.md"]
+        client.files[SleepHistoryPaths.history] = "not json"
+        let viewModel = makeViewModel(client)
+        await viewModel.load()
+
+        _ = await viewModel.journalDays(year: 2026, month: 10)
+        _ = await viewModel.journalDays(year: 2026, month: 9)
+        _ = try await viewModel.journalEntry(for: "2026-10-04")
+        XCTAssertEqual(client.listedPaths.filter { $0 == "journal/2026" }.count, 1)
+
+        let sleepReads = { client.readPaths.filter { $0 == SleepHistoryPaths.history }.count }
+        _ = try? await viewModel.sleepHistory()
+        _ = try? await viewModel.sleepHistory()
+        XCTAssertEqual(sleepReads(), 2, "a read that fails isn't kept")
+        client.files[SleepHistoryPaths.history] = #"{"columns":["date","sleep_hours"],"nights":[["2026-10-03",7.5]],"stages":{}}"#
+        let history = try await viewModel.sleepHistory()
+        XCTAssertEqual(history?.nights.count, 1)
+        _ = try await viewModel.sleepHistory()
+        XCTAssertEqual(sleepReads(), 3, "a fresh read serves the next sheet")
+
+        await viewModel.reload()
+        _ = await viewModel.journalDays(year: 2026, month: 10)
+        _ = try await viewModel.sleepHistory()
+        XCTAssertEqual(client.listedPaths.filter { $0 == "journal/2026" }.count, 2, "Reload lists again")
+        XCTAssertEqual(sleepReads(), 4)
+    }
+
     // MARK: - Housekeeping
 
     @MainActor
@@ -2398,6 +2593,15 @@ actor DeckFeedbackStub: FeedbackDataClient {
     func isAvailable() async -> Bool { true }
 }
 
+@MainActor
+final class StateLog {
+    var states: [DailyDeckState] = []
+}
+
+final class Flag: @unchecked Sendable {
+    var value = false
+}
+
 final class TestDeckClock: @unchecked Sendable {
     var now: Date
     init(_ now: Date) { self.now = now }
@@ -2437,6 +2641,10 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     private(set) var renamed: [(String, String)] = []
     private(set) var listedSessions: [String] = []
     private(set) var readPaths: [String] = []
+    /// Every folder listed, `briefs/` and the rest, in order.
+    private(set) var listedPaths: [String] = []
+    /// Runs inside `fileContent` before it answers, to look at the screen mid-read.
+    var readGate: (@Sendable () async -> Void)?
     private let readLock = NSLock()
     private(set) var sent: [Sent] = []
     /// What `draftIntention` answers; an empty draft (the route's `{}`) by default.
@@ -2468,6 +2676,7 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     func renameSession(id: String, title: String) async throws { renamed.append((id, title)) }
 
     func entryNames(sessionID: String, path: String) async throws -> [String] {
+        readLock.withLock { listedPaths.append(path) }
         if let error = listingErrors[path] { throw error }
         if let listing = listings[path] { return listing }
         if path != DailyDeckPaths.directory { throw APIError.http(statusCode: 404, body: #"{"error": "Not a directory"}"#) }
@@ -2483,6 +2692,7 @@ final class ScriptedDailyDeckClient: DailyDeckDataClient, @unchecked Sendable {
     func fileContent(sessionID: String, path: String) async throws -> String {
         // Week records are read concurrently.
         readLock.withLock { readPaths.append(path) }
+        await readGate?()
         return files[path] ?? deck
     }
 

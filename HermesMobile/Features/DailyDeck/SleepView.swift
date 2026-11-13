@@ -234,11 +234,11 @@ private struct SleepKey: View {
             case .tick:
                 Capsule().fill(Color.hxTextPrimary).frame(width: 2, height: 10)
             case .range:
-                RoundedRectangle(cornerRadius: 2).fill(paper.glow.opacity(0.3)).frame(width: 12, height: 8)
+                RoundedRectangle(cornerRadius: 2).fill(paper.glow.opacity(0.3)).frame(width: 12, height: 8) // design-drift: allow (the hypnogram's own mark, in small)
             case .gap:
                 HStack(spacing: 2) {
-                    RoundedRectangle(cornerRadius: 1).fill(paper.glow).frame(width: 5, height: 8)
-                    RoundedRectangle(cornerRadius: 1).fill(paper.glow).frame(width: 5, height: 8)
+                    RoundedRectangle(cornerRadius: 1).fill(paper.glow).frame(width: 5, height: 8) // design-drift: allow
+                    RoundedRectangle(cornerRadius: 1).fill(paper.glow).frame(width: 5, height: 8) // design-drift: allow
                 }
             }
             Text(verbatim: text)
