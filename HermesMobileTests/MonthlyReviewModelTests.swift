@@ -78,9 +78,9 @@ final class MonthlyReviewModelTests: XCTestCase {
     func testMonthlyCardsWearTheirOwnPaperAndShowNoChapterLine() throws {
         let cards = try deck().cards
         XCTAssertEqual(DeckPalette.of(cards[0]).colors, .dusk)
-        XCTAssertEqual(DeckPalette.of(cards[3]).colors, .past)
-        XCTAssertEqual(DeckPalette.of(cards[4]).colors, .notes)
-        XCTAssertEqual(DeckPalette.of(cards[5]).colors, .training, "an older deck naming the teal body paper reads as Body's cyan")
+        XCTAssertEqual(DeckPalette.of(cards[3]).colors, .dusk, "a review is one place: the vault's color name is ignored")
+        XCTAssertEqual(DeckPalette.of(cards[4]).colors, .training, "the sleep card is Body's")
+        XCTAssertEqual(DeckPalette.of(cards[5]).colors, .dusk, "a value card wears the review's paper")
         XCTAssertEqual(DeckPalette.of(cards[6]).colors, .dusk)
         XCTAssertTrue(cards.allSatisfy { $0.chapterLabel == nil })
     }

@@ -1630,7 +1630,7 @@ final class DailyDeckTests: XCTestCase {
         XCTAssertTrue(future.isFuture && !future.isPast)
         XCTAssertTrue(past.takesText && future.takesText)
         XCTAssertEqual(DeckPalette.of(past).name, "Looking back")
-        XCTAssertEqual(DeckPalette.of(past).colors, HermexPaper.past)
+        XCTAssertEqual(DeckPalette.of(past).colors, HermexPaper.dusk)
         XCTAssertEqual(DeckPalette.of(future).name, "Looking ahead")
         XCTAssertEqual(DeckPalette.of(future).colors, HermexPaper.dusk)
         XCTAssertEqual(past.kindLabel(.of(past), advisor: "Coach"), "Looking back · Stony Brook",
