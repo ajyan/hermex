@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Body's landing screen: the next workout, Baki's card, the week, every lift, recent sessions,
-/// and last night's sleep. Pushed from the drawer as `.body`; workouts, lifts, and the plan push from here.
+/// Body's landing screen, in the module home order (DESIGN.md § Module home): the next workout,
+/// Baki's changes waiting on him, the week, then Baki's note, every lift, recent sessions, and
+/// last night's sleep. Pushed from the drawer as `.body`; workouts, lifts, and the plan push from here.
 struct BodyHomeView: View {
     @State private var viewModel: BodyHomeViewModel
     @State private var showsSleep = false
@@ -67,8 +68,9 @@ struct BodyHomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.l) {
                     upNext(home)
-                    bakiCard(home.proposals)
+                    needsYou(home.proposals)
                     thisWeek(home)
+                    bakiCard
                     if !home.lifts.isEmpty { lifts(home.lifts) }
                     if !home.sessions.isEmpty { sessions(home.sessions) }
                     if let sleep = home.sleep { sleepRow(sleep) }
@@ -82,9 +84,22 @@ struct BodyHomeView: View {
 
     // MARK: Baki
 
-    /// Baki's one place on Body home: his note on the newest workout, each change waiting for a
-    /// yes or no, and the way to ask him something.
-    private func bakiCard(_ proposals: [BodyProposal]) -> some View {
+    /// Each change Baki is waiting on, as a request card right under Up next: the same proposal,
+    /// words and actions as the finish screen's card, drawn compact.
+    @ViewBuilder
+    private func needsYou(_ proposals: [BodyProposal]) -> some View {
+        ForEach(proposals) { proposal in
+            HXNeedsYouCard(kicker: "Needs you · Baki", title: proposal.title) { proposalRows(proposal) }
+        }
+        if let error = viewModel.decideError {
+            Text(verbatim: error)
+                .font(AppFont.footnote())
+                .foregroundStyle(Color.hxDanger)
+        }
+    }
+
+    /// Baki's note on the newest workout, and the way to ask him something.
+    private var bakiCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             HXSectionHeader(title: "Baki")
             HXCard(.wash(paper), spacing: 10) {
@@ -92,20 +107,11 @@ struct BodyHomeView: View {
             } content: {
                 if let latest = viewModel.latestNote {
                     BakiNoteText(note: latest.note)
-                } else if proposals.isEmpty {
+                } else {
                     Text(verbatim: "Ask about a lift, your plan, or how you feel. His note on each workout lands here.")
                         .font(AppFont.subheadline())
                         .foregroundStyle(paper.secondaryInk)
                         .fixedSize(horizontal: false, vertical: true)
-                }
-                ForEach(proposals) { proposal in
-                    BakiRule()
-                    proposalRows(proposal)
-                }
-                if let error = viewModel.decideError {
-                    Text(verbatim: error)
-                        .font(AppFont.footnote())
-                        .foregroundStyle(Color.hxDanger)
                 }
             } footer: {
                 if openDraftChat.isAvailable {
@@ -116,11 +122,10 @@ struct BodyHomeView: View {
         }
     }
 
-    /// One change to approve, inside Baki's card: the same proposal, words and actions as the finish
-    /// screen's card, drawn compact.
     private func proposalRows(_ proposal: BodyProposal) -> some View {
         CoachProposalCard(
-            proposal: proposal, style: .compact, paper: paper, isBusy: viewModel.deciding.contains(proposal.id),
+            proposal: proposal, style: .compact, paper: .request, isBusy: viewModel.deciding.contains(proposal.id),
+            showsHeading: false,
             use: { Task { await viewModel.decide(proposal, accept: true) } },
             notNow: { Task { await viewModel.decide(proposal, accept: false) } },
             ask: openDraftChat.isAvailable ? { openDraftChat(BodyAskBaki.draft(about: proposal.title)) } : nil)

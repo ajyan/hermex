@@ -10,6 +10,7 @@ import Foundation
 /// - `HERMEX_DEV_SERVER_URL`, `HERMEX_DEV_PASSWORD`: the webui server.
 /// - `HERMEX_DEV_BOT_ADDRESS`, `HERMEX_DEV_BOT_USERNAME`, `HERMEX_DEV_BOT_PASSWORD`:
 ///   the Bot connection saved under that server. Also turns Bot Mode on.
+/// - `HERMEX_DEV_OPEN=brief|brain|goals|body|meals|money`: the screen to open once signed in.
 /// - `HERMEX_DEV_HERMES_SERVER=1` (`scripts/sim-login --hermes`): also adds a Hermes
 ///   server at the Bot address with the same sign-in, and opens it once per launch.
 @MainActor
@@ -21,6 +22,25 @@ enum DevAutoLogin {
     /// Set once this launch has opened the Hermes server, so switching away from it
     /// afterwards sticks.
     private static var didOpenHermesServer = false
+
+    private static var didOpenLaunchScreen = false
+
+    /// The module screen `HERMEX_DEV_OPEN` names, once per launch, so going back stays back.
+    static func launchScreen(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> ShellPushDestination? {
+        guard !didOpenLaunchScreen, let name = environment["HERMEX_DEV_OPEN"] else { return nil }
+        didOpenLaunchScreen = true
+        switch name {
+        case "brief": return .dailyDeck
+        case "brain": return .brain
+        case "goals": return .goals
+        case "body": return .body
+        case "meals": return .meals
+        case "money": return .money
+        default: return nil
+        }
+    }
 
     /// Called from the root view's `.task(id: authManager.state)`, so an expired
     /// session signs back in. Concurrent calls share one attempt. A failed login

@@ -134,6 +134,10 @@ struct ContentView: View {
             )
             .environment(\.dictationServer, server)
             .environment(\.transcriptServerOrigin, server)
+            #if DEBUG
+            // `HERMEX_DEV_OPEN` opens a module screen at launch, so a simulator check needs no taps.
+            .task { if let screen = DevAutoLogin.launchScreen() { pendingScreen = screen } }
+            #endif
             // Switching the active server keeps us in `.loggedIn`, so without a
             // per-server identity SwiftUI would reuse the same ChatShellView (and
             // its server-bound view model), leaving stale sessions/chat on screen.

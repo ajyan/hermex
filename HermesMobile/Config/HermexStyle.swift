@@ -279,6 +279,28 @@ extension HXCard where Kicker == EmptyView, Footer == EmptyView {
     }
 }
 
+/// The "Needs you" slot on a module home (DESIGN.md § Module home): one thing waiting on him, as a
+/// request card under the screen's Now card. `kicker` names who asks when it isn't Atlas
+/// ("Needs you · Baki"). Its buttons take the request paper through `\.hxPaper`.
+struct HXNeedsYouCard<Content: View>: View {
+    var kicker = "Needs you"
+    var title: String?
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        HXCard(.wash(.request), title: title, spacing: 8) {
+            Text(verbatim: kicker)
+                .font(AppFont.footnote(weight: .semibold))
+                .foregroundStyle(HermexPaper.request.glow)
+        } content: {
+            content
+        } footer: {
+            EmptyView()
+        }
+        .environment(\.hxPaper, .request)
+    }
+}
+
 /// The one header title (DESIGN.md § Header): centered, the rounded display voice, an optional
 /// subtitle under it. Sits in the toolbar's principal slot, between the leading glass circle
 /// and the trailing glass capsule.

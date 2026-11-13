@@ -135,7 +135,6 @@ struct GoalsHomeView: View {
     /// A goal's card, which opens the goal, with a line under it when the goal asks to be opened.
     private func goalRow(_ goal: GoalSummary, home: GoalsHome) -> some View {
         let checkIn = GoalHeroCheckIn(slug: goal.slug, home: home, model: viewModel)
-        let palette = GoalPaper.palette(for: goal)
         let open = { onOpen(.goal(goal.slug)) }
         // Not a NavigationLink: its label would swallow the dots' taps and hide them from
         // VoiceOver. The card opens on a tap anywhere else; VoiceOver reads it as one button
@@ -143,16 +142,12 @@ struct GoalsHomeView: View {
         return VStack(alignment: .leading, spacing: BrainStyle.s) {
             GoalHeroCard(goal: goal, isCompact: true, today: home.today, checkIn: checkIn)
                 .zoomSource(for: .goal(goal.slug), cornerRadius: HXRadius.xl)
+            // What the goal is waiting on sits right under its card, as every module home's
+            // Needs you card does (DESIGN.md § Module home).
             if goal.finishDue {
-                Text(verbatim: "Did you finish? Open to close it")
-                    .font(BrainStyle.meta)
-                    .foregroundStyle(palette.ink)
-                    .padding(.horizontal, BrainStyle.xs)
+                needsYou(title: "Did you finish?", line: "Open \(goal.title) to close it.", open: open)
             } else if !goal.flags.escalations.isEmpty {
-                Text(verbatim: "Needs attention: open to check in")
-                    .font(BrainStyle.meta)
-                    .foregroundStyle(palette.ink)
-                    .padding(.horizontal, BrainStyle.xs)
+                needsYou(title: "Needs attention", line: "Open \(goal.title) to check in.", open: open)
             }
         }
         .contentShape(Rectangle())
@@ -165,6 +160,20 @@ struct GoalsHomeView: View {
             ForEach(checkIn.actions(for: goal)) { action in
                 Button(action.label, action: action.run)
             }
+        }
+    }
+
+    private func needsYou(title: String, line: String, open: @escaping () -> Void) -> some View {
+        HXNeedsYouCard(title: title) {
+            Text(verbatim: line)
+                .font(AppFont.subheadline())
+                .foregroundStyle(Color.hxTextPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(action: open) {
+                Text(verbatim: "Open the goal").frame(maxWidth: .infinity, minHeight: 32)
+            }
+            .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
+            .padding(.top, 4)
         }
     }
 

@@ -35,6 +35,8 @@ struct CoachProposalCard: View {
     var paper: HermexPaper = .training
     var isBusy = false
     var canDecide = true
+    /// False inside a card that already names Baki and the change as its kicker and title (Needs you).
+    var showsHeading = true
     let use: () -> Void
     let notNow: () -> Void
     let ask: (() -> Void)?
@@ -71,14 +73,16 @@ struct CoachProposalCard: View {
 
     private var compact: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(verbatim: "Baki suggests")
-                .font(AppFont.caption(weight: .semibold))
-                .foregroundStyle(paper.glow)
-            Text(verbatim: proposal.title)
-                .font(AppFont.body(weight: .semibold))
-                .foregroundStyle(Color.hxTextPrimary)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityAddTraits(.isHeader)
+            if showsHeading {
+                Text(verbatim: "Baki suggests")
+                    .font(AppFont.caption(weight: .semibold))
+                    .foregroundStyle(paper.glow)
+                Text(verbatim: proposal.title)
+                    .font(AppFont.body(weight: .semibold))
+                    .foregroundStyle(Color.hxTextPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+            }
             ForEach(Array(proposal.why.enumerated()), id: \.offset) { _, reason in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(verbatim: "•").accessibilityHidden(true)

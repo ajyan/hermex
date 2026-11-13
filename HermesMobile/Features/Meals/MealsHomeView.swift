@@ -78,11 +78,18 @@ struct MealsHomeView: View {
                             .font(AppFont.footnote())
                             .foregroundStyle(Color.hxDanger)
                     }
+                    // The module home order (DESIGN.md § Module home): tonight, then the week
+                    // and its planner, then what's coming up and what he ate a year ago.
                     tonightCard(home)
-                    ForEach(home.occasions) { occasion in occasionCard(occasion, home: home) }
                     week(home)
-                    if !home.yearAgo.isEmpty { yearAgo(home.yearAgo) }
                     planButton
+                    if !home.occasions.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HXSectionHeader(title: "Coming up")
+                            ForEach(home.occasions) { occasion in occasionCard(occasion, home: home) }
+                        }
+                    }
+                    if !home.yearAgo.isEmpty { yearAgo(home.yearAgo) }
                 }
                 .padding(BrainStyle.l)
                 .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)

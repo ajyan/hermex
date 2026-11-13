@@ -95,63 +95,61 @@ struct MoneyView: View {
         }
     }
 
+    /// The module home order (DESIGN.md § Module home): net worth and its chart on Money's card,
+    /// then this week (why it moved, spending), then the accounts.
     private func ready(_ snapshot: MoneySnapshot) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: BrainStyle.l) {
                 if let refreshError = viewModel.refreshError {
                     HXFailedView(title: "Couldn't refresh", message: refreshError, style: .inline) {
                         Task { await viewModel.load() }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
                 }
-                MoneyHeadline(viewModel: viewModel)
-                    .padding(.horizontal, 16)
-                MoneyScrubChart(viewModel: viewModel)
-                    .frame(height: 190)
-                    .padding(.top, 12)
-                rangePicker
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
-                if let week = snapshot.week {
-                    whyCard(week)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 18)
+                VStack(alignment: .leading, spacing: 12) {
+                    MoneyHeadline(viewModel: viewModel)
+                    MoneyScrubChart(viewModel: viewModel)
+                        .frame(height: 170)
+                    rangePicker
                 }
-                if let spending = viewModel.spending, let month = spending.month {
+                .padding(BrainStyle.l)
+                .hxCardSurface(.glow(.money))
+                thisWeek(snapshot)
+                accounts(snapshot)
+            }
+            .padding(BrainStyle.l)
+            .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
+        }
+        .scrollDisabled(viewModel.isScrubbing)
+        .refreshable { await viewModel.load() }
+    }
+
+    /// Why net worth moved this week and the month's spending, under one header.
+    @ViewBuilder
+    private func thisWeek(_ snapshot: MoneySnapshot) -> some View {
+        let spending = viewModel.spending
+        if snapshot.week != nil || spending?.month != nil || viewModel.spendingError != nil || snapshot.holdingsMissing {
+            VStack(alignment: .leading, spacing: 8) {
+                HXSectionHeader(title: "This week")
+                if let week = snapshot.week { whyCard(week) }
+                if let spending, let month = spending.month {
                     spendingCard(spending, month)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
                     if viewModel.spendingError != nil {
                         Text(verbatim: "Couldn't refresh spending; showing the last read.")
                             .font(AppFont.caption())
                             .foregroundStyle(Color.hxTextSecondary)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 6)
                     }
                 } else if let spendingError = viewModel.spendingError {
                     HXFailedView(title: "Couldn't load spending", message: spendingError, style: .inline) {
                         Task { await viewModel.load() }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
                 }
                 if snapshot.holdingsMissing {
                     Text(verbatim: "Add finance/sync/holdings.yaml in your vault to split out the market.")
                         .font(AppFont.caption())
                         .foregroundStyle(Color.hxTextSecondary)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
                 }
-                accounts(snapshot)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 24)
             }
-            .padding(.vertical, 12)
-            .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
         }
-        .scrollDisabled(viewModel.isScrubbing)
-        .refreshable { await viewModel.load() }
     }
 
     // MARK: Range
@@ -193,11 +191,11 @@ struct MoneyView: View {
                 HStack {
                     Label { Text(verbatim: "Why it moved this week") } icon: { Image(systemName: "chart.line.uptrend.xyaxis") }
                         .font(AppFont.display(style: .subheadline, weight: .semibold))
-                        .foregroundStyle(HermexPaper.money.glow)
+                        .foregroundStyle(Color.hxTextPrimary)
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(AppFont.footnote(weight: .semibold))
-                        .foregroundStyle(HermexPaper.money.glow)
+                        .foregroundStyle(.hxSecondary)
                 }
                 MoneySplitBar(market: week.market, cashFlow: week.cashFlow)
                 HStack(spacing: 14) {
@@ -214,7 +212,7 @@ struct MoneyView: View {
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .hxCardSurface(.wash(.money))
+            .hxCardSurface(.neutral)
         }
         .buttonStyle(.plain)
         .accessibilityHint(Text(verbatim: "Opens the market card"))
@@ -237,11 +235,11 @@ struct MoneyView: View {
                 HStack {
                     Label { Text(verbatim: MoneySpendingCopy.monthTitle(month)) } icon: { Image(systemName: "cart") }
                         .font(AppFont.display(style: .subheadline, weight: .semibold))
-                        .foregroundStyle(HermexPaper.money.glow)
+                        .foregroundStyle(Color.hxTextPrimary)
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(AppFont.footnote(weight: .semibold))
-                        .foregroundStyle(HermexPaper.money.glow)
+                        .foregroundStyle(.hxSecondary)
                 }
                 Text(verbatim: MoneyFormat.amount(month.spent, hidden: viewModel.isHidden))
                     .font(AppFont.display(style: .title2, weight: .semibold))
@@ -262,7 +260,7 @@ struct MoneyView: View {
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .hxCardSurface(.wash(.money))
+            .hxCardSurface(.neutral)
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
@@ -377,8 +375,8 @@ private struct MoneyHeadline: View {
         let change = viewModel.change
         VStack(alignment: .leading, spacing: 2) {
             Text(verbatim: "Net worth")
-                .font(AppFont.footnote())
-                .foregroundStyle(Color.hxTextSecondary)
+                .font(AppFont.caption(weight: .semibold))
+                .foregroundStyle(HermexPaper.money.glow)
             // Not a button: a tap on the number is the first thing someone shown the phone does.
             Text(verbatim: MoneyFormat.amount(viewModel.displayedValue, hidden: viewModel.isHidden))
                 .font(AppFont.display(style: .largeTitle, weight: .semibold))
@@ -391,7 +389,7 @@ private struct MoneyHeadline: View {
                     .foregroundStyle(MoneyView.color(for: change.amount))
                     .monospacedDigit()
                 Text(verbatim: scrubLabel)
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(.hxSecondary)
             }
             .font(AppFont.subheadline(weight: .medium))
             if let warning = viewModel.trustWarning {

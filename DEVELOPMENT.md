@@ -282,7 +282,7 @@ Each simulator has its own Keychain, so a fresh or erased one starts logged out.
 scripts/sim-login <simulator-udid>
 ```
 
-When the server is on this Mac (`https://localhost…`), it first trusts the server's self-signed certificate in that simulator, since a new or erased simulator rejects it and the app would stay on the welcome screen. For a build with another bundle ID, set `HERMEX_BUNDLE_ID` (the main checkout's `Config/Local.xcconfig` builds `com.andrewjyan.hermex`). It relaunches the app with `HERMEX_DEV_*` environment variables read from the macOS Keychain; `DevAutoLogin.swift` (DEBUG builds only) signs in through the normal login paths. Nothing is printed and nothing is stored in the repo. One-time setup, prompting for each password:
+When the server is on this Mac (`https://localhost…`), it first trusts the server's self-signed certificate in that simulator, since a new or erased simulator rejects it and the app would stay on the welcome screen. For a build with another bundle ID, set `HERMEX_BUNDLE_ID` (the main checkout's `Config/Local.xcconfig` builds `com.andrewjyan.hermex`). To land on a module screen without tapping, set `SIMCTL_CHILD_HERMEX_DEV_OPEN` to `brief`, `brain`, `goals`, `body`, `meals` or `money` before running it (Money with `SIMCTL_CHILD_HERMEX_MONEY_FIXTURES=<folder>` shows synthetic data). It relaunches the app with `HERMEX_DEV_*` environment variables read from the macOS Keychain; `DevAutoLogin.swift` (DEBUG builds only) signs in through the normal login paths. Nothing is printed and nothing is stored in the repo. One-time setup, prompting for each password:
 
 ```zsh
 security add-generic-password -s hermex-webui -a <server-host> -w
