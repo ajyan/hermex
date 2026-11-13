@@ -765,17 +765,19 @@ final class AuthManager {
         return "http"
     }
 
+    /// A schemeless address uses HTTP only for loopback, so the password and session
+    /// cookie never cross a network in the clear unless the user typed `http://`.
     private nonisolated static func shouldDefaultToPlainHTTP(host: String) -> Bool {
-        if host == "localhost" || host == "127.0.0.1" {
+        if host == "localhost" || host.hasSuffix(".localhost") || host == "::1" || host == "[::1]" {
             return true
         }
 
-        let octets = host.split(separator: ".").compactMap { Int($0) }
+        let octets = host.split(separator: ".", omittingEmptySubsequences: false).compactMap { Int($0) }
         guard octets.count == 4, octets.allSatisfy({ (0...255).contains($0) }) else {
             return false
         }
 
-        return octets[0] == 100 && (64...127).contains(octets[1])
+        return octets[0] == 127
     }
 }
 
