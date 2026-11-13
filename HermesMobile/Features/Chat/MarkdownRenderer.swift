@@ -363,10 +363,10 @@ struct ChatCodeBlock: View {
             }
         }
         .background(codeBlockBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(SwiftUI.Color(.separator).opacity(0.35), lineWidth: 1)
+            RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous)
+                .strokeBorder(SwiftUI.Color.hxSeparator, lineWidth: 0.5)
         }
         .task(id: highlightRequest) {
             await updateHighlightedCode(for: highlightRequest)
