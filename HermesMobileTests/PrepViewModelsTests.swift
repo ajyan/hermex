@@ -1775,7 +1775,7 @@ final class PrepViewModelsTests: XCTestCase {
         let vm = PrepHomeViewModel(client: client)
         await vm.load()
         XCTAssertEqual(vm.gaps?.map(\.id), ["gap.a", "gap.b"])
-        XCTAssertEqual(Set(client.log), ["home", "gaps", "stories"])
+        XCTAssertEqual(Set(client.log), ["home", "course", "gaps", "stories"])
     }
 
     func testGapsFailureDoesNotFailHome() async {
