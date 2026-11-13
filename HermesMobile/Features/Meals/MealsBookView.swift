@@ -173,6 +173,7 @@ struct MealsBookView: View {
                         .font(AppFont.subheadline(weight: .semibold))
                         .frame(minHeight: 44)
                 }
+                .tint(paper.glow)
             }
         }
     }
@@ -227,8 +228,7 @@ struct MealsBookView: View {
                 Button { open(dish.slug) } label: {
                     BrainRow(
                         leading: {
-                            BrainModuleIcon(systemName: dish.isSide ? "leaf" : "fork.knife",
-                                            paper: dish.isWant ? nil : paper)
+                            BrainModuleIcon(systemName: dish.isSide ? "leaf" : "fork.knife", paper: paper)
                         },
                         title: dish.name,
                         subtitle: MealsCopy.bookLine(dish)

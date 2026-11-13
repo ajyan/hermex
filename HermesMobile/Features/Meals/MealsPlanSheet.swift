@@ -284,7 +284,7 @@ private struct MealsPlanReviewStep: View {
             Text(verbatim: dishes.count == 1 ? "A recipe change is waiting for you"
                  : "\(dishes.count) recipe changes are waiting for you")
                 .font(AppFont.subheadline(weight: .semibold))
-                .foregroundStyle(Color.hxTextPrimary)
+                .foregroundStyle(atlas.glow)
         } content: {
             ForEach(dishes) { dish in
                 Button { onOpen(MealsDishRoute(slug: dish.slug)) } label: {
@@ -298,7 +298,7 @@ private struct MealsPlanReviewStep: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(atlas.glow)
             }
         } footer: {
             EmptyView()
@@ -625,25 +625,15 @@ private struct MealsPlanFillStep: View {
                     HStack(spacing: 8) {
                         Button { Task { await model.week.add(pick.dish, to: day) } } label: {
                             Text(verbatim: "Add")
-                                .font(AppFont.subheadline(weight: .semibold))
-                                .foregroundStyle(paper.onGlow)
-                                .padding(.horizontal, 18)
-                                .frame(minHeight: 36)
-                                .background(paper.glow, in: Capsule())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
                         .accessibilityLabel(Text(verbatim: "Add \(pick.name) on \(MealsCopy.weekdayName(day))"))
                         Button { model.another(for: day, in: home) } label: {
                             Text(verbatim: "Another")
-                                .font(AppFont.subheadline(weight: .semibold))
-                                .foregroundStyle(paper.glow)
-                                .padding(.horizontal, 18)
-                                .frame(minHeight: 36)
-                                .background(paper.wash, in: Capsule())
-                                .overlay(Capsule().strokeBorder(paper.edge, lineWidth: 0.5))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
                     }
+                    .environment(\.hxPaper, paper)
                     .padding(.top, 2)
                 }
                 .padding(10)

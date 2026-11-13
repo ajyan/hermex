@@ -72,6 +72,7 @@ struct GoalCelebrationView: View {
             }
             .background(Color.hxCanvas.ignoresSafeArea())
             .scrollDismissesKeyboard(.interactively)
+            .hxNavigationTitle("Goal achieved")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(action: onSeeRecord) { Text(verbatim: "See the Record") }

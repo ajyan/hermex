@@ -83,7 +83,7 @@ struct OpenDiagramLabel: View {
         .foregroundStyle(paper.glow)
         .frame(maxWidth: .infinity, minHeight: 50)
         .background(paper.wash, in: Capsule())
-        .overlay(Capsule().strokeBorder(paper.edge, lineWidth: 1))
+        .overlay(Capsule().strokeBorder(paper.edge, lineWidth: 0.5))
         .contentShape(Capsule())
     }
 }
@@ -128,13 +128,8 @@ struct DiagramSheet: View {
                 source: fragment
             )
         } else if failed {
-            ContentUnavailableView {
-                Label { Text(verbatim: "Couldn't load the diagram") } icon: { Image(systemName: "exclamationmark.triangle") }
-            } description: {
-                Text(verbatim: "Check your connection to the server.")
-            } actions: {
-                Button { attempt += 1 } label: { Text(verbatim: "Try Again") }
-                    .buttonStyle(.bordered)
+            HXFailedView(title: "Couldn't load the diagram", message: "Check your connection to the server.") {
+                attempt += 1
             }
         } else {
             ProgressView()

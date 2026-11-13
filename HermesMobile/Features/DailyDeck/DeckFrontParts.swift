@@ -22,10 +22,10 @@ struct DeckFrontRow: Decodable, Equatable, Identifiable {
     var id: String { [goal, commitment, label].compactMap { $0 }.joined(separator: "/") }
 
     /// The paper the habit's dots wear on the close's tracker, so color means the kind of habit: the vault's
-    /// when it names one, else Sleep's and Mandarin's own, else its front's (the job search wears Prep's,
-    /// a letter to her the Dad card's, lifting Body's, people the person paper).
+    /// when it names one (never `opener`: amber means waiting on you), else Sleep's and Mandarin's own, else its
+    /// front's (the job search wears Prep's, a letter to her the Dad card's, lifting Body's, people the person paper).
     var habitPaper: HermexPaper {
-        if let named = HermexPaper.named(paper) { return named }
+        if let named = HermexPaper.named(paper), named != .opener { return named }
         let name = label.lowercased()
         if name.contains("sleep") { return DeckPalette.sleep.colors }
         if name.contains("mandarin") { return DeckPalette.mandarin.colors }
@@ -86,7 +86,9 @@ struct DeckFrontRowView: View {
     @Environment(GoalsHomeViewModel.self) private var model: GoalsHomeViewModel?
 
     var body: some View {
-        let checkIn = DeckRowCheckIn(row: row, ink: palette.ink, deckDate: deckDate, model: model)
+        // The dots wear the habit's paper, as on the close's tracker, never the divider's amber.
+        let ink = row.habitPaper.glow
+        let checkIn = DeckRowCheckIn(row: row, ink: ink, deckDate: deckDate, model: model)
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 Text(verbatim: row.label)
@@ -96,12 +98,12 @@ struct DeckFrontRowView: View {
                 Spacer(minLength: 8)
                 Text(verbatim: checkIn.countText)
                     .font(AppFont.caption())
-                    .foregroundStyle(palette.ink)
+                    .foregroundStyle(Color.hxTextSecondary)
                     .monospacedDigit()
             }
             switch row.kind {
             case .days: days(checkIn)
-            case .pips: pips(checkIn)
+            case .pips: pips(checkIn, ink: ink)
             }
         }
         .accessibilityElement(children: .contain)
@@ -118,7 +120,7 @@ struct DeckFrontRowView: View {
                     checkIn.dot(day)
                     Text(verbatim: DeckDots.weekdays[index])
                         .font(AppFont.caption2())
-                        .foregroundStyle(palette.ink)
+                        .foregroundStyle(Color.hxTextSecondary)
                         .frame(width: DeckDots.column)
                 }
             }
@@ -128,11 +130,11 @@ struct DeckFrontRowView: View {
         .accessibilityActions { checkIn.yesterdayActions }
     }
 
-    private func pips(_ checkIn: DeckRowCheckIn) -> some View {
+    private func pips(_ checkIn: DeckRowCheckIn, ink: Color) -> some View {
         let done = checkIn.pipsDone
         return HStack(spacing: 0) {
             ForEach(0..<max(row.target, done), id: \.self) { index in
-                DeckDot(state: index < done ? "done" : "missed", ink: palette.ink)
+                DeckDot(state: index < done ? "done" : "missed", ink: ink)
             }
             checkIn.addButton()
         }

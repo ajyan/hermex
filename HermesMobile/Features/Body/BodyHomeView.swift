@@ -305,7 +305,7 @@ struct BodyHomeView: View {
             HXSectionHeader(title: "Lifts")
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(BodyHomeCopy.liftGroups(lifts).enumerated()), id: \.element.id) { groupOffset, group in
-                    if groupOffset > 0 { Divider() }
+                    if groupOffset > 0 { PrepRowDivider() }
                     Text(verbatim: group.title)
                         .font(AppFont.caption(weight: .semibold))
                         .foregroundStyle(paper.glow)
@@ -314,7 +314,7 @@ struct BodyHomeView: View {
                         .padding(.bottom, 2)
                         .accessibilityAddTraits(.isHeader)
                     ForEach(Array(group.lifts.enumerated()), id: \.element.id) { offset, lift in
-                        if offset > 0 { Divider().padding(.leading, 14) }
+                        if offset > 0 { PrepRowDivider().padding(.leading, 14) }
                         NavigationLink(value: ShellPushDestination.bodyLift(lift.id)) {
                             liftRow(lift)
                         }
@@ -371,10 +371,9 @@ struct BodyHomeView: View {
 
     // MARK: Sessions
 
-    /// A lift that went up reads in the training glow; a rough night's note in the `notes` glow.
+    /// A lift that went up, or a rough night's trimmed session, reads in the training glow.
     private func detailColor(_ session: BodySessionSummary) -> Color {
-        if session.highlight != nil { return paper.glow }
-        return session.trimmed ? HermexPaper.notes.glow : Color.hxTextSecondary
+        session.highlight != nil || session.trimmed ? paper.glow : Color.hxTextSecondary
     }
 
     private func sessions(_ sessions: [BodySessionSummary]) -> some View {
@@ -382,7 +381,7 @@ struct BodyHomeView: View {
             HXSectionHeader(title: "Sessions")
             VStack(spacing: 0) {
                 ForEach(Array(sessions.prefix(5).enumerated()), id: \.element.id) { offset, session in
-                    if offset > 0 { Divider().padding(.leading, 14) }
+                    if offset > 0 { PrepRowDivider().padding(.leading, 14) }
                     NavigationLink(value: ShellPushDestination.bodySession(session.id)) {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 2) {

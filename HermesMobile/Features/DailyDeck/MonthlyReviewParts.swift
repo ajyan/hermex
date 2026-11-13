@@ -34,7 +34,7 @@ struct MonthSnippets: View {
                     if let line = Self.source(snippet) {
                         Text(verbatim: line)
                             .font(AppFont.caption(weight: .medium))
-                            .foregroundStyle(Color.hxTextSecondary)
+                            .foregroundStyle(palette.secondaryInk)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -143,7 +143,7 @@ struct MonthHighlights: View {
             if let day = tile.day {
                 Text(verbatim: day)
                     .font(AppFont.caption())
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(palette.secondaryInk)
             }
         }
         .padding(12)
@@ -263,7 +263,7 @@ struct MonthValueCard: View {
                         .foregroundStyle(palette.ink)
                     Text(verbatim: stat.label)
                         .font(AppFont.subheadline(weight: .medium))
-                        .foregroundStyle(Color.hxTextSecondary)
+                        .foregroundStyle(palette.secondaryInk)
                 }
                 .accessibilityElement(children: .combine)
                 .padding(.top, 14)
@@ -415,7 +415,7 @@ struct MonthSleepCard: View {
                 ForEach(Array(columnLetters.enumerated()), id: \.offset) { _, letter in
                     Text(verbatim: letter)
                         .font(AppFont.caption2(weight: .semibold))
-                        .foregroundStyle(Color.hxTextSecondary)
+                        .foregroundStyle(palette.secondaryInk)
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -442,7 +442,7 @@ struct MonthSleepCard: View {
                 legend("rough", "under 70")
             }
             .font(AppFont.caption(weight: .medium))
-            .foregroundStyle(Color.hxTextSecondary)
+            .foregroundStyle(palette.secondaryInk)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: "Nights: \(sleep.nights.filter { $0.tier == "good" }.count) scored 80 or more, "
@@ -483,14 +483,14 @@ struct MonthSleepCard: View {
                 Text(verbatim: stripEnds.1)
             }
             .font(AppFont.caption2(weight: .medium))
-            .foregroundStyle(Color.hxTextSecondary)
+            .foregroundStyle(palette.secondaryInk)
             HStack(spacing: 14) {
                 legend("good", "balanced")
                 legend("fair", "unbalanced")
                 legend("rough", "low")
             }
             .font(AppFont.caption(weight: .medium))
-            .foregroundStyle(Color.hxTextSecondary)
+            .foregroundStyle(palette.secondaryInk)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: "HRV: \(sleep.hrv.filter { $0.tier == "balanced" }.count) balanced nights"))
@@ -510,7 +510,7 @@ struct MonthSleepCard: View {
                     if let note = tile.note {
                         Text(verbatim: note)
                             .font(AppFont.caption())
-                            .foregroundStyle(Color.hxTextSecondary)
+                            .foregroundStyle(palette.secondaryInk)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -669,7 +669,7 @@ struct MonthCloseHero: View {
                     // A ring of weeks labels only the first week of each month.
                     Text(verbatim: String(item.month.prefix(month.months.count > 12 ? 3 : 1)))
                         .font(AppFont.caption2(weight: isCurrent ? .bold : .medium))
-                        .foregroundStyle(isCurrent ? palette.ink : Color.hxTextSecondary)
+                        .foregroundStyle(isCurrent ? palette.ink : palette.secondaryInk)
                         .offset(x: cos(angle.radians) * (r + 22), y: sin(angle.radians) * (r + 22))
                 }
                 VStack(spacing: 6) {
@@ -686,7 +686,7 @@ struct MonthCloseHero: View {
                         Text(verbatim: String(year))
                             .font(AppFont.footnote(weight: .semibold))
                             .monospacedDigit()
-                            .foregroundStyle(Color.hxTextSecondary)
+                            .foregroundStyle(palette.secondaryInk)
                     }
                 }
                 .frame(width: ring * 0.7)
@@ -698,7 +698,7 @@ struct MonthCloseHero: View {
             .accessibilityLabel(Text(verbatim: "\(month.name ?? "This month"), \(title ?? ""), in your year"))
             Text(verbatim: filed ? "Sealed. \(month.name ?? "This month") is part of your year now." : summary)
                 .font(AppFont.subheadline(weight: .medium))
-                .foregroundStyle(Color.hxTextSecondary)
+                .foregroundStyle(palette.secondaryInk)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)

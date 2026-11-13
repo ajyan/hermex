@@ -33,12 +33,8 @@ struct YearOfWeeksView: View {
                 // Until every folder has been read once, a tile can't tell a sealed week from a missed one.
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ContentUnavailableView {
-                    Label { Text(verbatim: "Couldn't read your weeks") } icon: { Image(systemName: "exclamationmark.triangle") }
-                } description: {
-                    Text(verbatim: "Check your connection and try again.")
-                } actions: {
-                    Button { Task { await load() } } label: { Text(verbatim: "Try again") }
+                HXFailedView(title: "Couldn't read your weeks", message: "Check your connection and try again.") {
+                    Task { await load() }
                 }
             }
         }
@@ -200,23 +196,27 @@ struct YearOfWeeksView: View {
     private var predictionsDue: some View {
         VStack(alignment: .leading, spacing: 0) {
             HXSectionHeader(title: "Predictions due")
-                .padding(.bottom, 6)
-            ForEach(Array(model.duePredictions.enumerated()), id: \.element.id) { index, prediction in
-                if index > 0 { WeekHairline(palette: palette) }
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text(verbatim: prediction.text)
-                        .font(AppFont.body())
-                        .foregroundStyle(Color.hxTextPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 8)
-                    Text(verbatim: "due \(DailyDeckPaths.label(prediction.due))")
-                        .font(AppFont.footnote())
-                        .foregroundStyle(palette.ink)
-                        .monospacedDigit()
+                .padding(.bottom, 8)
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(model.duePredictions.enumerated()), id: \.element.id) { index, prediction in
+                    if index > 0 { Rectangle().fill(Color.hxSeparator).frame(height: 0.5) }
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(verbatim: prediction.text)
+                            .font(AppFont.body())
+                            .foregroundStyle(Color.hxTextPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 8)
+                        Text(verbatim: "due \(DailyDeckPaths.label(prediction.due))")
+                            .font(AppFont.footnote())
+                            .foregroundStyle(palette.ink)
+                            .monospacedDigit()
+                    }
+                    .padding(.vertical, 10)
+                    .accessibilityElement(children: .combine)
                 }
-                .padding(.vertical, 10)
-                .accessibilityElement(children: .combine)
             }
+            .padding(.horizontal, 14)
+            .hxCard()
         }
     }
 }

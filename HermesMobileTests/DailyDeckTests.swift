@@ -2988,11 +2988,12 @@ final class DeckHabitTrackerTests: XCTestCase {
          {"label":"Prep practice","kind":"days","front":"ai","goal":"g","commitment":"prep"},
          {"label":"Applications","kind":"pips","front":"ai","target":5,"done":2},
          {"label":"Call a friend","kind":"days","front":"relationships"},{"label":"Read","kind":"days","paper":"book","front":"ai"},
-         {"label":"Unfiled","kind":"days"}]
+         {"label":"Unfiled","kind":"days"},{"label":"Stretch","kind":"days","paper":"opener","front":"living-well"}]
         """#)
         XCTAssertEqual(card.weekRows.map(\.habitPaper),
-                       [.video, .video, .mandarin, .advisor, .orchid, .orchid, BrainModuleID.people.paper, .book, .plain],
-                       "sleep, lifting, Mandarin, the letter and the job search each keep their kind's paper; the vault's name wins")
+                       [.video, .video, .mandarin, .advisor, .orchid, .orchid, BrainModuleID.people.paper, .book, .plain, .video],
+                       "sleep, lifting, Mandarin, the letter and the job search each keep their kind's paper; the vault's name "
+                       + "wins, except opener, which falls back to the habit's own paper")
         XCTAssertFalse(card.weekRows.contains { $0.habitPaper == .opener }, "amber means waiting on you, so no habit wears it")
     }
 

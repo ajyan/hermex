@@ -5,7 +5,6 @@ import SwiftUI
 /// weight as a step line, and every session with its weight and reps.
 struct LiftProgressView: View {
     @State private var viewModel: LiftProgressViewModel
-    @ScaledMetric(relativeTo: .caption) private var pipSize: CGFloat = 26
 
     init(id: String, server: URL, onAPIError: @escaping (Error) -> Void) {
         let client = APIClientBodyAdapter(apiClient: APIClient(baseURL: server))
@@ -106,13 +105,13 @@ struct LiftProgressView: View {
             AxisMarks(values: .automatic(desiredCount: 3)) { _ in
                 AxisValueLabel(format: .dateTime.month(.abbreviated).day())
                     .font(AppFont.caption2())
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(paper.secondaryInk)
             }
         }
         .chartYAxis {
             AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { _ in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [3, 4])).foregroundStyle(paper.edge)
-                AxisValueLabel().font(AppFont.caption2()).foregroundStyle(Color.hxTextSecondary)
+                AxisValueLabel().font(AppFont.caption2()).foregroundStyle(paper.secondaryInk)
             }
         }
         .frame(height: 150)
@@ -136,7 +135,7 @@ struct LiftProgressView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(lift.sessions.enumerated()), id: \.element.date) { offset, session in
-                        if offset > 0 { Divider().padding(.leading, 14) }
+                        if offset > 0 { PrepRowDivider().padding(.leading, 14) }
                         sessionRow(session)
                     }
                 }
@@ -162,13 +161,8 @@ struct LiftProgressView: View {
             FlowRow(spacing: 6) {
                 HXChip(paper: paper, label: session.weightLabel)
                 ForEach(Array(session.reps.enumerated()), id: \.offset) { _, reps in
-                    Text(verbatim: String(reps))
-                        .font(AppFont.caption(weight: .semibold))
+                    HXChip(paper: paper, label: String(reps))
                         .monospacedDigit()
-                        .foregroundStyle(Color.hxTextPrimary)
-                        .frame(minWidth: pipSize, minHeight: pipSize)
-                        .background(Color.hxCanvas, in: Capsule())
-                        .overlay(Capsule().strokeBorder(Color.hxSeparator, lineWidth: 0.5))
                 }
             }
         }

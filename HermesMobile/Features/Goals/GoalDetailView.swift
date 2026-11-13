@@ -77,7 +77,13 @@ struct GoalDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: BrainStyle.xl) {
                     if let error = viewModel.error, viewModel.errorRow == nil {
-                        GoalErrorLine(text: error)
+                        if error == GoalDetailViewModel.refreshFailed {
+                            HXFailedView(title: "Couldn't refresh this goal", style: .inline) {
+                                Task { await viewModel.load() }
+                            }
+                        } else {
+                            GoalErrorLine(text: error)
+                        }
                     }
                     if viewModel.asksToFinish {
                         GoalFinishPrompt(
@@ -116,7 +122,7 @@ struct GoalDetailView: View {
                     }
                     commitmentsSection(detail, tint: tint)
                     ForEach(detail.summary.dailyChecks) { check in
-                        checkSection(check, tint: tint)
+                        checkSection(check)
                     }
                     if !detail.milestones.isEmpty {
                         GoalMilestonesSection(milestones: detail.milestones, today: detail.today, tint: tint)
@@ -199,14 +205,13 @@ struct GoalDetailView: View {
         }
     }
 
-    private func checkSection(_ check: GoalDailyCheck, tint: GoalTint) -> some View {
+    private func checkSection(_ check: GoalDailyCheck) -> some View {
         VStack(alignment: .leading, spacing: BrainStyle.s) {
             BrainSectionHeader(title: GoalDetailCopy.checkTitle(check.question))
             SectionCard {
                 GoalChoiceRow(
                     options: check.options.map { ($0, $0.capitalized) },
                     selected: viewModel.day == .today ? check.today : check.yesterday,
-                    tint: tint,
                     isDisabled: viewModel.isPending(.check(check.id)),
                     accessibilityPrefix: check.question
                 ) { value in
@@ -249,7 +254,7 @@ struct GoalDetailView: View {
     }
 }
 
-/// A failed save or refresh, said where it happened.
+/// A save the server refused, said where it happened. A failed refresh is an `HXFailedView`.
 private struct GoalErrorLine: View {
     let text: String
 
@@ -319,13 +324,12 @@ struct GoalCheckCircle: View {
     }
 }
 
-/// A row of capsule choices, the selected one filled with the goal's tint. Wraps to two
-/// columns at accessibility text sizes.
+/// A row of capsule choices, controls on the app's own surface: the selected one filled Nous blue,
+/// the rest neutral (`ChatDecisionButtonStyle`). Wraps to two columns at accessibility text sizes.
 struct GoalChoiceRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let options: [(value: String, label: String)]
     let selected: String?
-    let tint: GoalTint
     let isDisabled: Bool
     let accessibilityPrefix: String
     let onSelect: (String) -> Void
@@ -339,16 +343,12 @@ struct GoalChoiceRow: View {
                 // Tapping the selected answer again clears it.
                 Button { onSelect(isSelected ? GoalCheckValue.clear : option.value) } label: {
                     Text(verbatim: option.label)
-                        .font(BrainStyle.rowSubtitle.weight(.medium))
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
-                        .foregroundStyle(isSelected ? tint.on : Color.hxTextPrimary)
-                        .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget - 8)
-                        .background(isSelected ? tint.fill : Color.hxSeparator.opacity(0.45), in: Capsule())
-                        .frame(minHeight: BrainStyle.minTapTarget)
-                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ChatDecisionButtonStyle(emphasis: isSelected ? .primary : .secondary))
+                .frame(minHeight: BrainStyle.minTapTarget)
+                .contentShape(Rectangle())
                 .disabled(isDisabled)
                 .accessibilityLabel(Text(verbatim: "\(accessibilityPrefix), \(option.label)"))
                 .accessibilityAddTraits(isSelected ? .isSelected : [])

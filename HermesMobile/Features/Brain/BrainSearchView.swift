@@ -24,7 +24,8 @@ struct BrainSearchView: View {
                 isSearching: viewModel.isSearching,
                 didFail: viewModel.didFail,
                 moduleTitles: [:],
-                showsSeeAll: false
+                showsSeeAll: false,
+                onRetry: { viewModel.resume() }
             )
         }
         .brainListStyle()
@@ -59,6 +60,8 @@ struct BrainSearchResults: View {
     /// Server-provided module titles; a missing one falls back to `defaultTitle`.
     let moduleTitles: [BrainModuleID: String]
     let showsSeeAll: Bool
+    /// Runs the failed search again.
+    let onRetry: () -> Void
 
     /// The query the view model actually searches for.
     static func trimmed(_ query: String) -> String {
@@ -73,9 +76,7 @@ struct BrainSearchResults: View {
     var body: some View {
         if Self.isActive(query) {
             if didFail {
-                Text(verbatim: "Couldn't search. Check your connection.")
-                    .brainText(.rowSubtitle)
-                    .frame(minHeight: BrainStyle.minTapTarget)
+                HXFailedView(title: "Couldn't search", message: "Check your connection.", style: .inline, retry: onRetry)
                     .brainListRow()
             } else if let result {
                 let groups = result.groups.filter { !$0.items.isEmpty }

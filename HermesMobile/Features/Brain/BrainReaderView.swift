@@ -59,10 +59,14 @@ enum BrainReaderLayout {
     }
 
     /// Further reading split as the server sends it: the page's sources (reason "source"),
-    /// then pages that share its tags (the reason names them, "#rome · #person").
+    /// then pages that share its tags (the reason names them, "#rome · #person"), at most
+    /// `furtherLimit` each.
     static func furtherGroups(_ refs: [BrainRef]) -> (sources: [BrainRef], tagged: [BrainRef]) {
-        (refs.filter { $0.reason == "source" }, refs.filter { $0.reason != "source" })
+        (Array(refs.filter { $0.reason == "source" }.prefix(furtherLimit)),
+         Array(refs.filter { $0.reason != "source" }.prefix(furtherLimit)))
     }
+
+    static let furtherLimit = 3
 
     /// Whether a page's tags open its module's list filtered to them: the lists with a tag bar.
     static func tagsFilter(_ module: BrainModuleID) -> Bool {
@@ -366,12 +370,8 @@ struct BrainReaderView: View {
                 Label { Text(verbatim: "This page moved or was removed") } icon: { Image(systemName: "doc.questionmark") }
             }
         case .failed(let message):
-            ContentUnavailableView {
-                Label { Text(verbatim: "Couldn't load this page") } icon: { Image(systemName: "exclamationmark.triangle") }
-            } description: {
-                Text(verbatim: message)
-            } actions: {
-                Button { Task { await viewModel.load() } } label: { Text(verbatim: "Try again") }
+            HXFailedView(title: "Couldn't load this page", message: message) {
+                Task { await viewModel.load() }
             }
         case .loaded(let page):
             BrainReaderContent(

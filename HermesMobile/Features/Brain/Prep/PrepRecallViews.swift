@@ -1,7 +1,7 @@
 import SwiftUI
 
 // The recall-first run's cards (spec 2026-10-14 prep-recall §7): every card in a run is a `.prep`
-// glow card, the primary buttons are Nous blue, missed key points are `hxWarning` with ◌, hits
+// wash card, the primary buttons are filled in the Prep glow, missed key points are `hxWarning` with ◌, hits
 // are `hxSuccess` with ✓, and only sample answers are serif.
 
 /// A run card: an `HXCard` in the Prep paper's wash, which floats its controls in the paper's tint.
@@ -50,7 +50,7 @@ struct PrepRecallCard: View {
         Button(action: dontKnow) {
             Text(verbatim: "I don't know, show me")
                 .font(BrainStyle.rowTitle)
-                .foregroundStyle(Color.hxTextSecondary)
+                .foregroundStyle(HermexPaper.prep.secondaryInk)
                 .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
         }
         .buttonStyle(.plain)
@@ -83,7 +83,8 @@ struct PrepRecallResultView: View {
     var overridingPoint: String?
     let overrideMissed: (String) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var shown = 0
+    /// Flips once the card is up; the key-point rows then arrive one after another (`HXMotion.reveal`).
+    @State private var revealed = false
     @State private var showsWorked = false
 
     private var hits: [String] { result.judgment?.pointsHit.map(\.pointID) ?? [] }
@@ -112,27 +113,19 @@ struct PrepRecallResultView: View {
                 if isQuestion {
                     Text(verbatim: "Key points")
                         .font(BrainStyle.meta)
-                        .foregroundStyle(Color.hxTextSecondary)
+                        .foregroundStyle(HermexPaper.prep.secondaryInk)
                 }
                 ForEach(Array(rows.enumerated()), id: \.element.id) { offset, row in
-                    if offset < shown {
-                        pointRow(row.id, hit: row.hit)
-                            .transition(.opacity)
-                    }
+                    pointRow(row.id, hit: row.hit)
+                        .opacity(revealed ? 1 : 0)
+                        .animation(HXMotion.reveal(reduceMotion: reduceMotion, delay: Double(offset) * HXMotion.rowStagger),
+                                   value: revealed)
                 }
             }
         }
         .onAppear { if Self.opensWorked(result) { showsWorked = true } }
-        .task(id: result.verdict + rows.map(\.id).joined()) {
-            if reduceMotion {
-                shown = rows.count
-                return
-            }
-            while shown < rows.count {
-                try? await Task.sleep(for: .milliseconds(120))
-                withAnimation(HXMotion.reveal(reduceMotion: reduceMotion)) { shown += 1 }
-            }
-        }
+        // Under Reduce Motion `reveal` is nil, so the rows simply appear.
+        .task { revealed = true }
         if isQuestion && !result.strongAnswer.isEmpty {
             VStack(alignment: .leading, spacing: BrainStyle.s) {
                 Button {

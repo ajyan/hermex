@@ -115,8 +115,6 @@ struct PlanEditView: View {
             .foregroundStyle(Color.hxDanger)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
-            .background(Color.hxDanger.opacity(0.10), in: RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous))
             .padding(.horizontal, BrainStyle.l)
             .padding(.top, 8)
             .accessibilityAddTraits(.isStaticText)

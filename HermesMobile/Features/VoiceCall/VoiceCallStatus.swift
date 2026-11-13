@@ -247,14 +247,15 @@ struct CallControl<Content: View>: View {
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
     }
 
-    /// Solid when it carries meaning (End, or a control that's on), glass otherwise.
+    /// Solid when it carries meaning (End, or a control that's on), glass otherwise. The call
+    /// screen is always dark, so primary text is the light face and the canvas the dark glyph.
     @ViewBuilder
     private var button: some View {
         let face = content
             .font(AppFont.title3())
-            .foregroundStyle(isOn ? Color.black : Color.white)
+            .foregroundStyle(isOn ? Color.hxCanvas : Color.hxTextPrimary)
             .frame(width: 60, height: 60)
-        if let solid = tint ?? (isOn ? Color.white : nil) {
+        if let solid = tint ?? (isOn ? Color.hxTextPrimary : nil) {
             face.background(solid, in: Circle())
         } else {
             face.adaptiveGlass(fallbackMaterial: .ultraThinMaterial, in: Circle())
@@ -266,8 +267,8 @@ struct CallControl<Content: View>: View {
 struct CallAudioRoutePicker: UIViewRepresentable {
     func makeUIView(context: Context) -> AVRoutePickerView {
         let picker = AVRoutePickerView()
-        picker.tintColor = .white
-        picker.activeTintColor = .white
+        picker.tintColor = UIColor(Color.hxTextPrimary)
+        picker.activeTintColor = UIColor(Color.hxTextPrimary)
         picker.prioritizesVideoDevices = false
         return picker
     }

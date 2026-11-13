@@ -165,8 +165,9 @@ enum GoalCalendar {
     }
 }
 
-/// A goal's accent on the app's own surfaces (rows, calendar, choices): its glow, which
-/// already adapts to the appearance; `on` is the text on it.
+/// A goal's own color on the app's own surfaces, for the marks that are the goal (dots, pips,
+/// the calendar, milestones): its glow, which already adapts to the appearance; `on` is the text
+/// on it. Controls on those surfaces (choices, links, Save) stay Nous blue (DESIGN.md § Buttons).
 struct GoalTint {
     let fill: Color
     let on: Color

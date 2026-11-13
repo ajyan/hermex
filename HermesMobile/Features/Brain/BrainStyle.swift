@@ -117,18 +117,30 @@ enum BrainStyle {
 
     // MARK: Cover palette
 
-    /// The 8 cover ramps, as `(background, mid, strong)` in `0xRRGGBB`, light then dark, drawn
-    /// from the shared papers (DESIGN.md § Color) so a cover's hue is the same one the Brief
-    /// and chat use. Light: the paper, its hue, its light glow. Dark: the hue faint and stronger
-    /// over the navy canvas, then its dark glow. Indices 0–5 are pinned to tags in
-    /// `BrainCoverSpec.tagRamps`.
-    static let coverPaletteValues: [(light: (UInt32, UInt32, UInt32), dark: (UInt32, UInt32, UInt32))] =
-        [HermexPaper.quote, .video, .wiki, .reading, .notes, .opener, .book, .plain].map { paper in
-            let v = paper.values
-            let canvas: UInt32 = 0x0D1117
-            return (light: (v.paper, HermexPaper.mix(v.hue, over: 0xFFFFFF, 0.55), v.glowLight),
-                    dark: (HermexPaper.mix(v.hue, over: canvas, 0.16), HermexPaper.mix(v.hue, over: canvas, 0.38), v.glowDark))
+    /// The 8 cover ramps, as `(background, mid, strong)` in `0xRRGGBB`, light then dark. Covers
+    /// sit on Brain items, so every ramp is the Brain's own paper (`.knowledge`, DESIGN.md
+    /// principle 2), told apart by lightness and the motif rather than by other modules' hues.
+    /// Light: the hue faint and stronger over white, then the light glow or ink. Dark: the hue
+    /// faint and stronger over the navy canvas, then the dark glow or a lighter glow. Indices
+    /// 0–5 are pinned to tags in `BrainCoverSpec.tagRamps`.
+    typealias CoverRampValues = (light: (UInt32, UInt32, UInt32), dark: (UInt32, UInt32, UInt32))
+
+    static let coverPaletteValues: [CoverRampValues] = {
+        let v = HermexPaper.knowledge.values
+        let white: UInt32 = 0xFFFFFF, canvas: UInt32 = 0x0D1117 // design-drift: allow (mix grounds: white, hxCanvas dark)
+        // (background strength, mid strength, deep accent) per ramp.
+        let steps: [(Double, Double, Bool)] = [
+            (0.22, 0.55, false), (0.10, 0.40, false), (0.30, 0.68, true), (0.15, 0.48, true),
+            (0.26, 0.60, false), (0.08, 0.34, true), (0.34, 0.75, false), (0.18, 0.52, true),
+        ]
+        return steps.map { step -> CoverRampValues in
+            let (background, mid, deep) = step
+            return (light: (HermexPaper.mix(v.hue, over: white, background), HermexPaper.mix(v.hue, over: white, mid),
+                     deep ? v.ink : v.glowLight),
+             dark: (HermexPaper.mix(v.hue, over: canvas, background * 0.7), HermexPaper.mix(v.hue, over: canvas, mid * 0.6),
+                    deep ? HermexPaper.mix(white, over: v.glowDark, 0.3) : v.glowDark))
         }
+    }()
 
 
     /// Built once: a fresh dynamic `UIColor` never equals another, so rebuilding per
@@ -310,6 +322,8 @@ struct BrainRow<Leading: View>: View {
     let trailingTint: Color?
     /// A trailing accent capsule (e.g. an upcoming birthday); read by VoiceOver.
     let badge: String?
+    /// The badge's paper: the module the row belongs to (a person's, Prep's).
+    let badgePaper: HermexPaper
     let subtitleLineLimit: Int
     /// Nil lets the title wrap in full (the card grows), for rows whose title is a sentence.
     let titleLineLimit: Int?
@@ -321,6 +335,7 @@ struct BrainRow<Leading: View>: View {
         trailing: String? = nil,
         trailingTint: Color? = nil,
         badge: String? = nil,
+        badgePaper: HermexPaper = .knowledge,
         subtitleLineLimit: Int = 2,
         titleLineLimit: Int? = 2
     ) {
@@ -330,6 +345,7 @@ struct BrainRow<Leading: View>: View {
         self.trailing = trailing
         self.trailingTint = trailingTint
         self.badge = badge
+        self.badgePaper = badgePaper
         self.subtitleLineLimit = subtitleLineLimit
         self.titleLineLimit = titleLineLimit
     }
@@ -350,7 +366,7 @@ struct BrainRow<Leading: View>: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if let badge, !badge.isEmpty {
-                BrainBadge(text: badge)
+                BrainBadge(text: badge, paper: badgePaper)
             }
             if let trailing, !trailing.isEmpty {
                 Text(verbatim: trailing)
@@ -368,12 +384,13 @@ struct BrainRow<Leading: View>: View {
     }
 }
 
-/// A small capsule in the Brain's glow and the `meta` role, for a row's trailing badge.
+/// A small capsule in a paper's glow (the Brain's by default) and the `meta` role, for a row's
+/// trailing badge.
 struct BrainBadge: View {
     let text: String
+    var paper: HermexPaper = .knowledge
 
     var body: some View {
-        let paper = HermexPaper.knowledge
         Text(verbatim: text)
             .font(BrainStyle.meta.weight(.semibold))
             .foregroundStyle(paper.glow)
@@ -388,9 +405,10 @@ struct BrainBadge: View {
 
 extension BrainRow where Leading == EmptyView {
     init(title: String, subtitle: String? = nil, trailing: String? = nil, badge: String? = nil,
-         subtitleLineLimit: Int = 2, titleLineLimit: Int? = 2) {
+         badgePaper: HermexPaper = .knowledge, subtitleLineLimit: Int = 2, titleLineLimit: Int? = 2) {
         self.init(leading: { EmptyView() }, title: title, subtitle: subtitle, trailing: trailing,
-                  badge: badge, subtitleLineLimit: subtitleLineLimit, titleLineLimit: titleLineLimit)
+                  badge: badge, badgePaper: badgePaper, subtitleLineLimit: subtitleLineLimit,
+                  titleLineLimit: titleLineLimit)
     }
 }
 

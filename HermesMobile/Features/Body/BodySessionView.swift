@@ -96,7 +96,7 @@ struct BodySessionView: View {
             HXSectionHeader(title: "Lifts")
             VStack(spacing: 0) {
                 ForEach(Array(session.exercises.enumerated()), id: \.element.id) { offset, lift in
-                    if offset > 0 { Divider().padding(.leading, 14) }
+                    if offset > 0 { PrepRowDivider().padding(.leading, 14) }
                     NavigationLink(value: ShellPushDestination.bodyLift(lift.id)) {
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 2) {

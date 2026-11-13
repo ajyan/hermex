@@ -75,7 +75,7 @@ struct JobApplicationView: View {
             if !detail.isEmpty {
                 Text(verbatim: detail.joined(separator: " · "))
                     .font(BrainStyle.meta)
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(HermexPaper.prep.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }, content: {

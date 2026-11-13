@@ -1197,10 +1197,10 @@ enum PrepCopy {
 
     static func runProgressLine(done: Int, total: Int) -> String { "Today's run · \(done) of \(total)" }
 
-    /// An open unit folded to one row: what waits in it. "4 missed last recall · boss back in a few days".
+    /// An open unit folded to one row: what waits in it. "4 in reviews · unit check back in a few days".
     static func foldedUnitLine(_ unit: PrepUnit) -> String {
         let reviewing = unit.lessons.filter { $0.state == .shaky }.count
-        var parts = reviewing > 0 ? ["\(reviewing) missed last recall"] : [readyLine(ready: unit.readyCount, total: unit.lessonsTotal)]
+        var parts = reviewing > 0 ? ["\(reviewing) in reviews"] : [readyLine(ready: unit.readyCount, total: unit.lessonsTotal)]
         switch unit.boss {
         case .ready: parts.append("unit check due")
         case .resting: parts.append("unit check \(backLine(unit.bossBack))")
@@ -1254,7 +1254,7 @@ enum PrepCopy {
     static func lessonStateWord(_ state: PrepLessonState) -> String {
         switch state {
         case .ready: "interview-ready"
-        case .shaky: "missed last recall"
+        case .shaky: "in reviews"
         case .learned: "learned"
         case .next: "next"
         case .locked, .unknown: "locked"
@@ -1428,10 +1428,10 @@ enum PrepCopy {
         }
     }
 
-    /// The weak spots' header count: "10 gaps · 3 missed lessons", "1 gap", "None open".
+    /// The weak spots' header count: "10 gaps · 3 lessons in reviews", "1 gap", "None open".
     static func weakSpotsHeader(gaps: Int, missed: Int) -> String {
         let parts = [gaps == 0 ? nil : gaps == 1 ? "1 gap" : "\(gaps) gaps",
-                     missed == 0 ? nil : missed == 1 ? "1 missed lesson" : "\(missed) missed lessons"].compactMap { $0 }
+                     missed == 0 ? nil : missed == 1 ? "1 lesson in reviews" : "\(missed) lessons in reviews"].compactMap { $0 }
         return parts.isEmpty ? "None open" : parts.joined(separator: " · ")
     }
 

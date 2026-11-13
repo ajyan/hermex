@@ -99,14 +99,9 @@ struct WeekPageView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 80)
         case .missing:
-            VStack(spacing: 12) {
-                Text(verbatim: "This week's record couldn't be read.")
-                    .font(AppFont.body())
-                    .foregroundStyle(Color.hxTextSecondary)
-                Button("Try Again") { Task { await load() } }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.top, 80)
+            HXFailedView(title: "Couldn't read this week's record") { Task { await load() } }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 80)
         case .ready(let record):
             page(record)
         }
@@ -244,9 +239,10 @@ struct WeekPageView: View {
             .clipShape(RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
             .overlay {
                 if isBusyWithPhoto {
-                    RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                        .overlay { ProgressView() }
+                    // The photo stays visible under an opaque spinner badge (no material over content).
+                    ProgressView()
+                        .padding(10)
+                        .background(Color.hxSurface, in: Circle())
                 }
             }
             .disabled(isBusyWithPhoto)
@@ -321,13 +317,14 @@ struct WeekPageView: View {
 
     // MARK: Sections
 
+    /// A section of the page: its header over its rows on one neutral card.
     func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(verbatim: title)
-                .font(AppFont.footnote(weight: .semibold))
-                .foregroundStyle(palette.ink)
-                .accessibilityAddTraits(.isHeader)
+        VStack(alignment: .leading, spacing: 8) {
+            HXSectionHeader(title: title)
             content()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(14)
+                .hxCard()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 28)
@@ -374,7 +371,7 @@ struct WeekPageView: View {
                         .foregroundStyle(Color.hxTextPrimary)
                     Text(verbatim: isOpen ? (opens.map { "Opened \($0)" } ?? "Opened") : "Sealed · opens \(opens ?? "")")
                         .font(AppFont.footnote())
-                        .foregroundStyle(Color.hxTextSecondary)
+                        .foregroundStyle(palette.secondaryInk)
                 }
                 Spacer(minLength: 0)
             }
@@ -382,7 +379,7 @@ struct WeekPageView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(RoundedRectangle(cornerRadius: HXRadius.md, style: .continuous).strokeBorder(palette.colors.edge, lineWidth: 1))
+        .hxCardSurface(.wash(palette.colors))
         .accessibilityElement(children: .combine)
     }
 
