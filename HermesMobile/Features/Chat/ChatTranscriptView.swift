@@ -379,6 +379,10 @@ struct ChatTranscriptView: View {
                     onCopy: onCopy
                 )
                 .equatable()
+                // Keep a modifier between `.equatable()` and `.transition`/`.id`: with them
+                // adjacent SwiftUI can stop consulting `==` and re-run every settled row on
+                // each stream tick (upstream #1516; ChatTranscriptRenderBudgetTests).
+                .modifier(TranscriptRowBoundary())
                 .transition(rowEntryTransition(for: transcriptMessage.message, now: now))
                 .id(transcriptMessage.renderID)
 
@@ -609,6 +613,12 @@ struct StreamingFollowTrigger: View {
         Color.clear
             .onChange(of: trigger()) { onFire() }
     }
+}
+
+/// Separates a transcript row's `.equatable()` from its `.transition` and `.id`; see
+/// `transcriptScrollContent`.
+private struct TranscriptRowBoundary: ViewModifier {
+    func body(content: Content) -> some View { content }
 }
 
 struct ChatTranscriptMessageBlock: View, Equatable {
