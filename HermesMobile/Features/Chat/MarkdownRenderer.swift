@@ -201,20 +201,58 @@ private struct ChatMarkdownView: View {
     let isStreaming: Bool
 
     var body: some View {
-        // Parsed here rather than inside `Markdown(_: String)` so the parse alone is timed.
-        let signpost = performanceSignposter.beginInterval("Markdown Parse")
-        let parsedContent = MarkdownContent(MarkdownTildeEscaping.escapingSingleTildes(in: content))
-        performanceSignposter.endInterval("Markdown Parse", signpost, "chars=\(content.count, privacy: .public)")
-
-        return Markdown(parsedContent)
-            .environment(\.containsInlineMath, content.contains(InlineMathSource.marker)
-                || MarkdownContentRenderingPolicy.hasTooManyInlineElements(content))
+        let parsed = ChatMarkdownParseCache.parsed(content, caches: !isStreaming)
+        return Markdown(parsed.content)
+            .environment(\.containsInlineMath, parsed.containsInlineMath)
             .markdownTheme(MarkdownUI.Theme.chat(colorScheme: colorScheme, isStreaming: isStreaming))
             .markdownTextStyle {
                 ForegroundColor(.primary)
                 BackgroundColor(nil)
             }
             .markdownCodeSyntaxHighlighter(.plainText)
+    }
+}
+
+/// Parsed markdown blocks, keyed by their exact text. A settled reply's body re-runs
+/// for reasons unrelated to its text (a sibling fold, a scroll flip, a rebuilt
+/// selection host), and each pass used to parse the block again. `NSCache` bounds
+/// the entries and evicts them under memory pressure.
+enum ChatMarkdownParseCache {
+    /// Larger blocks are still parsed, just not stored.
+    static let maxCachedCharacterCount = 100_000
+
+    final class Entry {
+        let content: MarkdownContent
+        /// Whether the block holds inline math images, or so many inline elements
+        /// that `Markdown` must lay its text out as one run.
+        let containsInlineMath: Bool
+
+        init(_ markdown: String) {
+            // Parsed here rather than inside `Markdown(_: String)` so the parse alone is timed.
+            let signpost = performanceSignposter.beginInterval("Markdown Parse")
+            content = MarkdownContent(MarkdownTildeEscaping.escapingSingleTildes(in: markdown))
+            performanceSignposter.endInterval("Markdown Parse", signpost, "chars=\(markdown.count, privacy: .public)")
+            containsInlineMath = markdown.contains(InlineMathSource.marker)
+                || MarkdownContentRenderingPolicy.hasTooManyInlineElements(markdown)
+        }
+    }
+
+    private static let storage: NSCache<NSString, Entry> = {
+        let cache = NSCache<NSString, Entry>()
+        cache.countLimit = 240
+        return cache
+    }()
+
+    /// The parsed `markdown`, from the cache when `caches` is true. The streaming
+    /// tail changes on every tick, so it passes false rather than churn the cache.
+    static func parsed(_ markdown: String, caches: Bool) -> Entry {
+        guard caches, markdown.utf8.count <= maxCachedCharacterCount else { return Entry(markdown) }
+
+        let key = markdown as NSString
+        if let cached = storage.object(forKey: key) { return cached }
+        let entry = Entry(markdown)
+        storage.setObject(entry, forKey: key)
+        return entry
     }
 }
 
