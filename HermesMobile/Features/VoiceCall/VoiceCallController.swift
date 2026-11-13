@@ -545,7 +545,7 @@ final class VoiceCallController {
         let text = !finals.isEmpty && Self.command(in: text) != nil ? "" : text
         if partialTranscript.isEmpty {
             let afterSpeech = turnStartedAt.map { String(format: " (%.2fs after speech started)", now() - $0) } ?? ""
-            log("first words: \"\(text)\"\(afterSpeech)")
+            log("first words: \(VoiceCallDiagnostics.size(text))\(afterSpeech)")
         }
         partial = text
         transcriptChangedAt = now()
@@ -561,7 +561,7 @@ final class VoiceCallController {
         guard isHearing, !discardFinals else { return }
         var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if !finals.isEmpty, Self.command(in: trimmed) != nil { trimmed = "" }
-        log("final: \"\(trimmed)\"\(awaitingFinalSince.map { String(format: " (%.2fs after end of turn)", now() - $0) } ?? "")")
+        log("final: \(VoiceCallDiagnostics.size(trimmed))\(awaitingFinalSince.map { String(format: " (%.2fs after end of turn)", now() - $0) } ?? "")")
         if !trimmed.isEmpty {
             finals.append(trimmed)
             waitingForMoreSince = nil
@@ -588,7 +588,7 @@ final class VoiceCallController {
         }
         let words = Self.words(in: heard)
         if !isReadBack, let speakingSince, now() - speakingSince < VoiceCallTiming.talkOverGrace {
-            log("speech from before the reply ignored: \"\(heard)\"")
+            log("speech from before the reply ignored: \(VoiceCallDiagnostics.size(heard))")
             ambientWords.formUnion(words)
             return true
         }
@@ -601,13 +601,13 @@ final class VoiceCallController {
         let carriesOver = words.contains { ambientWords.contains($0) }
         let needed = carriesOver ? 2 : VoiceCallTiming.bargeInNovelWords
         guard substantive.count >= needed || command != nil else {
-            log("echo ignored: \"\(heard)\"")
+            log("echo ignored: \(VoiceCallDiagnostics.size(heard))")
             metrics.echoIgnored += 1
             // A final ends the recognizer's segment; the next words over the reply are new speech.
             if isFinal { heardOverReplyAt = nil }
             return true
         }
-        log("talk-over: \"\(heard)\" novel=\(novel)")
+        log("talk-over: \(VoiceCallDiagnostics.size(heard)) novel=\(novel)")
         let detected = now()
         if !isReadBack { noteCutIn() }
         speaker.stopNow()
@@ -641,7 +641,7 @@ final class VoiceCallController {
         if !sentWords.isEmpty, words.starts(with: sentWords.prefix(2)) { return false }
         switch Self.command(in: heard) {
         case .stop:
-            log("turn dropped by voice: \"\(heard)\"")
+            log("turn dropped by voice: \(VoiceCallDiagnostics.size(heard))")
             cancelPendingRun()
             lastSentTurn = nil
             returnToListening()
@@ -682,7 +682,7 @@ final class VoiceCallController {
     }
 
     private func reopenTurn(_ sent: String, adding heard: String?) {
-        log("turn reopened: \"\(heard ?? "")\"")
+        log("turn reopened: \(VoiceCallDiagnostics.size(heard))")
         cutInNote = sentCutInNote
         cancelPendingRun()
         state = .listening
@@ -858,7 +858,7 @@ final class VoiceCallController {
         guard !text.isEmpty else { return }
         if Self.command(in: text) != nil {
             // "Stop" or "wait" with nothing else is for the call, not for Atlas.
-            log("not sent: \"\(text)\"")
+            log("not sent: \(VoiceCallDiagnostics.size(text))")
             heldMidThought = nil
             turnStartedAt = nil
             returnToListening()
@@ -916,7 +916,7 @@ final class VoiceCallController {
         let cutIn = cutInNote ?? ""
         sentCutInNote = cutInNote
         cutInNote = nil
-        log("send: \"\(cutIn)\(text)\"\(note)")
+        log("send: \(VoiceCallDiagnostics.size(text))\(cutIn.isEmpty ? "" : " after a cut-in")\(note)")
         // A cancel queued for the turn this one replaces must land first, or it stops this run.
         let previous = lastChatTask
         lastChatTask = Task { [weak self, chat] in
@@ -1099,7 +1099,7 @@ final class VoiceCallController {
             }
         }
         if runSeenStreaming, !isStreaming, !runFinished {
-            log("run finished \(since(sentAt)); text=\"\(streamingText ?? "nil")\"")
+            log("run finished \(since(sentAt)); text=\(VoiceCallDiagnostics.size(streamingText))")
             runFinished = true
             runFinishedAt = now()
             speak(shaper.finish())
@@ -1141,7 +1141,7 @@ final class VoiceCallController {
 
     /// Everything the call speaks goes through here, so its words are known.
     private func say(_ sentence: String, isReply: Bool = false) {
-        log("say: \"\(sentence)\"")
+        log("say: \(VoiceCallDiagnostics.size(sentence))")
         spokenWords.formUnion(Self.words(in: sentence))
         speaker.enqueue(sentence, isReply: isReply)
     }
@@ -1151,7 +1151,7 @@ final class VoiceCallController {
     private func noteCutIn() {
         guard replyActive, replyStarted else { return }
         cutInNote = VoiceCallPhrases.cutInNote(heard: speaker.heardText)
-        log("cut in: \(cutInNote ?? "")")
+        log("cut in: \(VoiceCallDiagnostics.size(speaker.heardText)) heard so far")
     }
 
     /// Logs the turn's end-of-speech-to-audible line once audio starts on its reply's first sentence.

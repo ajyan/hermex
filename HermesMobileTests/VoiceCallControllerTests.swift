@@ -548,7 +548,7 @@ final class VoiceCallControllerTests: XCTestCase {
         await controller.start()
         await say("hello", seconds: 1.0)
         let started = logLines.firstIndex { $0 == "turn started" }
-        let sent = logLines.firstIndex { $0.hasPrefix("send: \"hello\" (turn started ") }
+        let sent = logLines.firstIndex { $0.hasPrefix("send: 5 chars (turn started ") }
         XCTAssertNotNil(started)
         XCTAssertNotNil(sent)
         if let started, let sent { XCTAssertLessThan(started, sent) }
@@ -813,7 +813,7 @@ final class VoiceCallControllerTests: XCTestCase {
         listener.onFinal?(".")
         XCTAssertEqual(controller.state, .speaking)
         XCTAssertEqual(speaker.stopCount, 0)
-        XCTAssertTrue(logLines.contains("echo ignored: \".\""))
+        XCTAssertTrue(logLines.contains("echo ignored: 1 chars"))
     }
 
     // MARK: - Cut-in notes

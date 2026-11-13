@@ -4,7 +4,11 @@ import SwiftUI
 
 /// Debug builds append call events to Documents/voice-call.log for on-device diagnosis.
 /// Each line carries the wall time, seconds since the call began, and the audio route.
+/// Lines name events and lengths, never what was heard or said (`size`), and the file keeps
+/// only its newest `maximumBytes`.
 enum VoiceCallDiagnostics {
+    static let maximumBytes = 256 * 1024
+
     #if DEBUG
     private static let queue = DispatchQueue(label: "voice-call.log", qos: .utility)
     nonisolated(unsafe) private static var callStart = ProcessInfo.processInfo.systemUptime
@@ -30,15 +34,33 @@ enum VoiceCallDiagnostics {
                 .joined(separator: ",")
             let stamp = date.formatted(.iso8601.time(includingFractionalSeconds: true))
             let data = Data(String(format: "%@ +%7.3f [%@] %@\n", stamp, elapsed, route, line).utf8)
-            if let handle = try? FileHandle(forWritingTo: url) {
-                handle.seekToEndOfFile()
-                handle.write(data)
-                try? handle.close()
-            } else {
-                try? data.write(to: url)
-            }
+            append(data, to: url)
         }
         #endif
+    }
+
+    /// How a log line names speech: its length, not its words.
+    static func size(_ text: (some StringProtocol)?) -> String {
+        "\(text?.count ?? 0) chars"
+    }
+
+    /// Appends `data` to the log at `url`. Once the file would pass `limit`, it keeps only its
+    /// newest half before appending, so a long-running debug build never grows it without bound.
+    static func append(_ data: Data, to url: URL, limit: Int = maximumBytes) {
+        guard let handle = try? FileHandle(forUpdating: url) else {
+            try? data.write(to: url)
+            return
+        }
+        defer { try? handle.close() }
+        let size = Int((try? handle.seekToEnd()) ?? 0)
+        if size + data.count > limit {
+            let keep = min(size, limit / 2)
+            try? handle.seek(toOffset: UInt64(size - keep))
+            let tail = (try? handle.readToEnd()) ?? Data()
+            try? handle.truncate(atOffset: 0)
+            try? handle.write(contentsOf: tail)
+        }
+        try? handle.write(contentsOf: data)
     }
 }
 

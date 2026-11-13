@@ -77,4 +77,23 @@ final class VoiceCallChatSnapshotTests: XCTestCase {
             XCTAssertTrue(make([], recovery: state).isReconnecting)
         }
     }
+
+    // MARK: - Diagnostics log
+
+    func testTheLogNamesSpeechByLengthOnly() {
+        XCTAssertEqual(VoiceCallDiagnostics.size("send the email"), "14 chars")
+        XCTAssertEqual(VoiceCallDiagnostics.size(Optional<String>.none), "0 chars")
+    }
+
+    func testTheLogKeepsItsNewestHalfOncePastTheCap() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("voice-call-\(UUID().uuidString).log")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let line = Data(String(repeating: "x", count: 99).appending("\n").utf8)
+
+        for _ in 0..<25 { VoiceCallDiagnostics.append(line, to: url, limit: 1_000) }
+
+        let size = try XCTUnwrap(FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int)
+        XCTAssertLessThanOrEqual(size, 1_000)
+        XCTAssertGreaterThan(size, 0)
+    }
 }
