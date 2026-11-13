@@ -35,6 +35,12 @@ struct DeckPalette: Equatable {
         self.shortName = shortName
     }
 
+    /// This palette's symbol and names in another paper: a goal wears its own color (DESIGN.md §
+    /// Decisions, "A goal keeps its own color") though the Brief's Brain palettes all wear the Brain's.
+    func wearing(_ paper: HermexPaper) -> DeckPalette {
+        DeckPalette(paper, symbol: symbol, name: name, shortName: shortName, isNeutralCard: isNeutralCard)
+    }
+
     static let opener = DeckPalette(.opener, symbol: "sun.horizon", name: "Today", shortName: "Today", isNeutralCard: true)
     /// The "This week" divider: the opener's neutral paper, named for what it opens.
     static let section = DeckPalette(.opener, symbol: "calendar", name: "This week", shortName: "This week", isNeutralCard: true)

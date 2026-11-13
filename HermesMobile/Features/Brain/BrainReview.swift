@@ -280,6 +280,7 @@ struct BrainDeckCard<Content: View>: View {
             words
         } else {
             words
+                .tint(.accentColor) // design-drift: allow links in a bite stay Nous blue, as on the open card
                 .hxCardSurface(.glow(paper), clipsContent: true)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(Text(verbatim: accessibilityLabel))
