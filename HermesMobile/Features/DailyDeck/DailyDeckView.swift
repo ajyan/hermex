@@ -209,11 +209,11 @@ struct DailyDeckView: View {
         }
     }
 
+    /// Where you are in the deck is the header's "3 of 10", as on the Brain review; the stack itself
+    /// gives VoiceOver Next and Previous Card.
     private var deck: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            progress(count: viewModel.visiblePages.count)
-            DeckStackView(viewModel: viewModel, feedbackCard: $feedbackCard, file: file)
-        }
+        DeckStackView(viewModel: viewModel, feedbackCard: $feedbackCard, file: file)
+            .padding(.top, 8)
     }
 
     /// "Oct 9 · 3 of 10 · Filed": which day (when it isn't today), where you are, and whether
@@ -230,32 +230,6 @@ struct DailyDeckView: View {
         if viewModel.isFiled { parts.append(DeckCopy.filedStatus(seal: viewModel.isSealedWeekly, edited: viewModel.hasChanges)) }
         if viewModel.isOfflineCopy { parts.append("Offline copy") }
         return parts.joined(separator: " · ")
-    }
-
-    private func progress(count: Int) -> some View {
-        VStack(spacing: 6) {
-            ProgressView(value: Double(viewModel.index + 1), total: Double(max(count, 1)))
-                .tint(viewModel.currentPage.map { DeckPalette.of($0, inV2Weekly: viewModel.isSealedWeekly).ink } ?? .secondary)
-                .accessibilityValue(Text(verbatim: progressSubtitle))
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
-        .animation(HXMotion.swap(reduceMotion: reduceMotion), value: viewModel.index)
-        .animation(HXMotion.swap(reduceMotion: reduceMotion), value: count)
-        .accessibilityElement(children: .combine)
-        // Swipe up or down on the counter to move through the deck.
-        .accessibilityAdjustableAction { direction in
-            switch direction {
-            case .increment: step(1)
-            case .decrement: step(-1)
-            @unknown default: break
-            }
-        }
-    }
-
-    private func step(_ delta: Int) {
-        let target = min(max(viewModel.index + delta, 0), max(viewModel.visiblePages.count - 1, 0))
-        withAnimation(HXMotion.card(reduceMotion: reduceMotion)) { viewModel.index = target }
     }
 
     private func file() {
