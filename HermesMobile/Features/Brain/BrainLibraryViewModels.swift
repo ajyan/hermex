@@ -430,10 +430,14 @@ final class BrainPageViewModel {
     let hub: String?
     private(set) var state: BrainLoadState<BrainPage> = .loading
     private(set) var page: BrainPage? {
-        // A person page is laid out and parsed here, once per load, not on every reader render.
-        didSet { person = page.flatMap { page in page.person.map { BrainPersonPage(page: page, person: $0, today: Date()) } } }
+        // A page is laid out and parsed here, once per load, not on every reader render.
+        didSet {
+            person = page.flatMap { page in page.person.map { BrainPersonPage(page: page, person: $0, today: Date()) } }
+            readerLayout = page.map { BrainReaderPageLayout(page: $0, person: person) }
+        }
     }
     private(set) var person: BrainPersonPage?
+    private(set) var readerLayout: BrainReaderPageLayout?
     private(set) var isShowingCachedCopy = false
     private(set) var isMissing = false
 
