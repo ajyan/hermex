@@ -51,27 +51,31 @@ final class PrepHomeViewModel {
         self.onAPIError = onAPIError
     }
 
-    func load() async {
+    /// When the last full load landed. Prep home's appear runs a full load only when this is missing or old.
+    @ObservationIgnored private(set) var lastFullLoad: Date?
+
+    /// Whether Prep home's appear needs everything (the first load, or the last full one is `maxAge` old) rather
+    /// than `refresh()`'s home and course.
+    func needsFullLoad(now: Date = .now, maxAge: TimeInterval = 600) -> Bool {
+        guard let lastFullLoad, case .loaded = state else { return true }
+        return now.timeIntervalSince(lastFullLoad) >= maxAge
+    }
+
+    /// Everything home shows: home and the course together, the gaps beside them, then the stories.
+    func load(now: Date = .now) async {
         generation += 1
         let token = generation
         async let gapsLoad = try? await client.gaps()
         do {
-            let home = try await client.home()
-            var course: PrepCourse?
-            if let summary = home.course {
-                course = (try? await client.course()) ?? summary
-            }
+            let (home, course) = try await fetchHomeAndCourse()
             let gaps = await gapsLoad
             guard token == generation, !Task.isCancelled else { return }
             self.gaps = gaps
             self.course = course
             state = .loaded(home)
+            lastFullLoad = now
         } catch {
-            guard token == generation, !prepIsCancellation(error) else { return }
-            onAPIError(error)
-            // A failed quiet refresh keeps what is on screen; only a first load shows the failure.
-            if case .loaded = state { return }
-            state = prepFailureState(error)
+            fail(error, token: token)
             return
         }
         // Stories trail home's first paint: a slow or failed call never delays or fails it.
@@ -80,6 +84,38 @@ final class PrepHomeViewModel {
         let loaded = try? await client.stories()
         guard token == generation, storiesToken == storiesGeneration, !Task.isCancelled else { return }
         stories = loaded
+    }
+
+    /// Only what a run moves: home (the streak, today's run, readiness) and the course path. Prep home's appear
+    /// calls this on the way back from a run or a lesson while the last full load is fresh.
+    func refresh() async {
+        generation += 1
+        let token = generation
+        do {
+            let (home, course) = try await fetchHomeAndCourse()
+            guard token == generation, !Task.isCancelled else { return }
+            self.course = course
+            state = .loaded(home)
+        } catch {
+            fail(error, token: token)
+        }
+    }
+
+    /// Home and the full course in parallel. The course only counts when home says the server has one; when the
+    /// full path fails, home's summary (units without lessons) stands in.
+    private func fetchHomeAndCourse() async throws -> (PrepHome, PrepCourse?) {
+        async let courseLoad = try? await client.course()
+        let home = try await client.home()
+        let full = await courseLoad
+        return (home, home.course.map { full ?? $0 })
+    }
+
+    private func fail(_ error: Error, token: Int) {
+        guard token == generation, !prepIsCancellation(error) else { return }
+        onAPIError(error)
+        // A failed quiet refresh keeps what is on screen; only a first load shows the failure.
+        if case .loaded = state { return }
+        state = prepFailureState(error)
     }
 
     func isActing(on candidateID: String) -> Bool {
