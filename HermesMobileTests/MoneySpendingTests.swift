@@ -363,6 +363,7 @@ final class MoneySpendingTests: XCTestCase {
             ("oct12-light-revealed", "2026-10-12", .light, true),
             ("oct12-dark-hidden", "2026-10-12", .dark, false),
             ("oct5-light-revealed", "2026-10-05", .light, true),
+            ("oct5-dark-revealed", "2026-10-05", .dark, true),
         ]
         for (name, start, style, revealed) in cases {
             let card = try XCTUnwrap(try DailyDeck.decode(#"{"date": "2026-10-18", "kind": "weekly", "cards": [{"id": "money", "type": "week_money", "title": "Your week in money", "week_start": "\#(start)"}]}"#).cards.first)
@@ -374,7 +375,6 @@ final class MoneySpendingTests: XCTestCase {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .background(DeckPalette.money.paper, in: RoundedRectangle(cornerRadius: HXRadius.xl))
-                .environment(\.colorScheme, .light)
                 .padding(12)
                 .background(Color.hxCanvas)
                 .onAppear(perform: appeared)

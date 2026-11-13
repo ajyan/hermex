@@ -182,6 +182,8 @@ struct MoneyWeekTrendChart: View {
     let trend: [MoneySpending.TrendWeek]
     let usual: Double?
     let hidden: Bool
+    /// Labels and the usual line: the paper's `secondaryInk` on the review card.
+    var secondary: Color = .hxTextSecondary
 
     /// The scale's lines: $0 and two round steps up to the top, so the line reads as dollars.
     static func ticks(top: Double) -> [Double] {
@@ -203,7 +205,7 @@ struct MoneyWeekTrendChart: View {
             }
             if let usual {
                 RuleMark(y: .value("Usual", usual))
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(secondary)
                     .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [1, 4]))
             }
             ForEach(Array(trend.enumerated()), id: \.offset) { index, week in
@@ -233,7 +235,7 @@ struct MoneyWeekTrendChart: View {
                         if !label.isEmpty, let x = proxy.position(forX: index) {
                             Text(verbatim: label)
                                 .font(AppFont.caption2())
-                                .foregroundStyle(Color.hxTextSecondary)
+                                .foregroundStyle(secondary)
                                 .fixedSize()
                                 .position(x: plot.minX + x, y: plot.maxY + 14)
                         }
@@ -243,13 +245,13 @@ struct MoneyWeekTrendChart: View {
                         ForEach(ticks, id: \.self) { tick in
                             if let y = proxy.position(forY: tick), usualY.map({ abs($0 - y) > 18 }) ?? true {
                                 gutter(MoneyFormat.amount(tick, hidden: false), y: plot.minY + y, plot: plot)
-                                    .foregroundStyle(Color.hxTextSecondary)
+                                    .foregroundStyle(secondary)
                             }
                         }
                         if let usual, let y = usualY {
                             gutter(MoneyFormat.amount(usual, hidden: false), y: plot.minY + y, plot: plot)
                                 .fontWeight(.semibold)
-                                .foregroundStyle(Color.hxTextSecondary)
+                                .foregroundStyle(secondary)
                         }
                         if trend.indices.contains(last), let x = proxy.position(forX: last),
                            let y = proxy.position(forY: trend[last].spent) {
