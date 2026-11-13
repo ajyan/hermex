@@ -1767,9 +1767,9 @@ struct ChatView: View {
             guard callReceipt != nil, undoing.isEmpty, !isVoiceCallPresented else { return }
             callReceipt = CallReceipt(messages: viewModel.messages, before: receiptIDsBeforeCall)
         }
-        .environment(\.filingReceiptActions, FilingReceiptActions(undoingIDs: viewModel.undoingFilingReceiptIDs) { message in
+        .filingReceiptActions(undoingIDs: viewModel.undoingFilingReceiptIDs) { message in
             Task { await viewModel.undoFiling(for: message) }
-        })
+        }
         // Off the main body chain, which is at the type-checker's limit.
         .onChange(of: viewModel.latestRunOutcome) {
             handleLatestRunOutcomeChange(viewModel.latestRunOutcome)
