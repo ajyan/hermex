@@ -96,7 +96,7 @@ struct DeckCalendarView: View {
                     weekdayHeader
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 6) {
                         ForEach(Array(DailyDeckJournal.grid(year: year, month: month).enumerated()), id: \.offset) { _, day in
-                            if let day { dayCell(day) } else { Color.clear.frame(height: 48) }
+                            if let day { dayCell(day) } else { Color.clear.frame(height: BrainStyle.minTapTarget) }
                         }
                     }
                     legend
@@ -105,8 +105,7 @@ struct DeckCalendarView: View {
                 .padding(16)
             }
             .background(Color.hxCanvas.ignoresSafeArea())
-            .navigationTitle(Text(verbatim: "Journal"))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle("Journal")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button { dismiss() } label: { Text(verbatim: "Done") }
@@ -174,23 +173,13 @@ struct DeckCalendarView: View {
         let hasDeck = viewModel.availableDates.contains(key)
         let isToday = key == viewModel.today
         return NavigationLink(value: key) {
-            VStack(spacing: 3) {
-                Text(verbatim: "\(day)")
-                    .font(AppFont.body(weight: isToday ? .semibold : nil))
-                    .foregroundStyle(hasEntry ? Color.hxTextPrimary : Color.hxTextSecondary)
+            JournalDayCell(day: day, hasEntry: hasEntry, isToday: isToday) {
                 // Filed is an outcome, so the dot is the done color; Nous blue is for controls.
                 Circle()
                     .strokeBorder(viewModel.filedDates.contains(key) ? Color.hxSuccess : Color.hxTextSecondary, lineWidth: hasDeck ? 1.2 : 0)
                     .background(Circle().fill(viewModel.filedDates.contains(key) ? Color.hxSuccess : .clear))
                     .frame(width: 6, height: 6)
                     .opacity(hasDeck ? 1 : 0)
-            }
-            .frame(maxWidth: .infinity, minHeight: 48)
-            .background(hasEntry ? Color.hxSurface : Color.clear, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
-            .overlay {
-                if isToday {
-                    RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous).strokeBorder(Color.accentColor, lineWidth: 1.5)
-                }
             }
         }
         .buttonStyle(.plain)
@@ -347,8 +336,7 @@ private struct DayLogView: View {
 
     var body: some View {
         content
-            .navigationTitle(Text(verbatim: DailyDeckPaths.label(day)))
-            .navigationBarTitleDisplayMode(.inline)
+            .hxNavigationTitle(DailyDeckPaths.label(day))
             .background(Color.hxCanvas.ignoresSafeArea())
             .toolbar {
                 if viewModel.availableDates.contains(day) {

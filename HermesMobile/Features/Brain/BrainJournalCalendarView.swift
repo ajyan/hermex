@@ -276,42 +276,73 @@ struct BrainJournalMonthView: View {
         let key = BrainJournalCalendarLayout.key(year: month.year, month: month.month, day: day)
         if let item = entries[key] {
             NavigationLink(value: ShellPushDestination.brainRoute(.page(item.module, item.id))) {
-                BrainJournalDay(day: day, hasEntry: true, isToday: key == todayKey)
+                JournalDayCell(day: day, hasEntry: true, isToday: key == todayKey)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Text(verbatim: "\(BrainJournalCalendarLayout.spokenDate(key)), journal entry"))
         } else {
-            BrainJournalDay(day: day, hasEntry: false, isToday: key == todayKey)
+            JournalDayCell(day: day, hasEntry: false, isToday: key == todayKey)
                 .accessibilityHidden(true)
         }
     }
 }
 
-/// One day's number: on a wash of the journal's paper when it has an entry, plain otherwise,
-/// and underlined with a dot when it's today.
-struct BrainJournalDay: View {
+/// One day on a journal calendar, the Brain's and the Brief's: the number on the journal's wash and in its glow
+/// when the day has an entry (a journal day wears the Brain's paper everywhere), plain otherwise, and today
+/// ringed by `JournalTodayMark`. `mark` fills the small slot under the number: the Brief's brief dot, nothing on
+/// the Brain.
+struct JournalDayCell<Mark: View>: View {
     let day: Int
     let hasEntry: Bool
     let isToday: Bool
+    @ViewBuilder let mark: () -> Mark
+
+    init(day: Int, hasEntry: Bool, isToday: Bool, @ViewBuilder mark: @escaping () -> Mark) {
+        self.day = day
+        self.hasEntry = hasEntry
+        self.isToday = isToday
+        self.mark = mark
+    }
+
+    static var shape: RoundedRectangle { RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous) }
 
     var body: some View {
         let paper = BrainModuleID.journal.paper
-        let shape = RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
-        VStack(spacing: 2) {
+        VStack(spacing: 3) {
             Text(verbatim: "\(day)")
                 .font(AppFont.subheadline(weight: hasEntry || isToday ? .semibold : .regular))
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
                 .foregroundStyle(hasEntry ? paper.glow : (isToday ? Color.hxTextPrimary : Color.hxTextSecondary))
-            Circle()
-                .fill(isToday ? (hasEntry ? paper.glow : Color.hxTextPrimary) : Color.clear)
-                .frame(width: 4, height: 4)
+            mark().frame(height: 6)
         }
         .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
-        .background(hasEntry ? paper.wash : Color.clear, in: shape)
-        .overlay { if hasEntry { shape.strokeBorder(paper.edge, lineWidth: 0.5) } }
-        .contentShape(shape)
+        .background(hasEntry ? paper.wash : Color.clear, in: Self.shape)
+        .overlay {
+            if isToday {
+                JournalTodayMark()
+            } else if hasEntry {
+                Self.shape.strokeBorder(paper.edge, lineWidth: 0.5)
+            }
+        }
+        .contentShape(Self.shape)
+    }
+}
+
+extension JournalDayCell where Mark == EmptyView {
+    init(day: Int, hasEntry: Bool, isToday: Bool) {
+        self.init(day: day, hasEntry: hasEntry, isToday: isToday) { EmptyView() }
+    }
+}
+
+/// Today on a journal calendar: a ring in primary ink around the day. Today is a state, not a control, so it is
+/// never Nous blue; and a ring leaves the slot under the number free for the Brief's brief dot.
+struct JournalTodayMark: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous)
+            .strokeBorder(Color.hxTextPrimary, lineWidth: 1.5)
+            .accessibilityHidden(true)
     }
 }
 
