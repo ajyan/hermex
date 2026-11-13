@@ -255,7 +255,7 @@ struct ChatView: View {
     private let bottomAnchorID = "chat-bottom-anchor"
     private let transcriptSpacing: CGFloat = 8
     private let composerAccessoryVerticalSpacing: CGFloat = 8
-    private let approvalBypassStatusSpacerHeight: CGFloat = 38
+    private let approvalBypassStatusSpacerHeight: CGFloat = 44
     /// The composer and its status stack keep 16 pt side insets of their own;
     /// this cap lines those insets up with the transcript's reading column.
     private let composerMaximumWidth = ChatReadingWidth.maximumWidth(horizontalPadding: 16)
@@ -370,6 +370,7 @@ struct ChatView: View {
     @State private var pendingClearConfirmation: PendingClearConfirmation?
     @State private var goalDraft = ""
     @State private var showsGoalSheet = false
+    @State private var isTurningOffApprovalBypass = false
     @State private var activeGitSheet: ActiveGitSheet?
     @State private var turnDiffPresentation: TurnDiffPresentation?
     @State private var viewModel: ChatViewModel
@@ -1595,6 +1596,7 @@ struct ChatView: View {
                         } action: { height in
                             pinnedNoticeStackHeight = height
                         }
+                        .allowsHitTesting(false)
                         .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
                 }
 
@@ -1605,18 +1607,24 @@ struct ChatView: View {
                         } action: { height in
                             activeRunStatusHeight = height
                         }
+                        .allowsHitTesting(false)
                         .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
                 }
 
                 if showsApprovalBypassStatus {
-                    ApprovalBypassStatusPill()
-                        .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
+                    ApprovalBypassStatusPill(isTurningOff: isTurningOffApprovalBypass) {
+                        isTurningOffApprovalBypass = true
+                        Task {
+                            await viewModel.disableApprovalBypassForCurrentSession()
+                            isTurningOffApprovalBypass = false
+                        }
+                    }
+                    .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
                 }
             }
             .padding(.horizontal)
             .frame(maxWidth: composerMaximumWidth)
             .padding(.bottom, composerHeight + 8 + clarificationFootprintHeight)
-            .allowsHitTesting(false)
             .zIndex(8)
             .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: composerAccessoryVisibleItemCount)
             .animation(HXMotion.quickState(reduceMotion: reduceMotion), value: activeRunStatusPresentation)

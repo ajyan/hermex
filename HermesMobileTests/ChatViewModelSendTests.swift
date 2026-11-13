@@ -2881,6 +2881,80 @@ final class ChatViewModelSendTests: XCTestCase {
     }
 
     @MainActor
+    func testTurningOffApprovalBypassSendsDisabledAndClearsStateOnSuccess() async throws {
+        let approvalStreamClient = SpySSEStreamingClient()
+        var yoloBodies: [[String: Any]] = []
+        let viewModel = try makeViewModel(
+            streamClient: SpySSEStreamingClient(),
+            approvalStreamClient: approvalStreamClient
+        ) { request in
+            switch request.url?.path {
+            case "/api/chat/start":
+                return apiTestJSONResponse(#"{"session_id": "session-abc", "stream_id": "stream-123"}"#, for: request)
+            case "/api/session/yolo":
+                let body = try XCTUnwrap(apiTestJSONBody(from: request))
+                yoloBodies.append(body)
+                let enabled = body["enabled"] as? Bool ?? true
+                return apiTestJSONResponse(#"{"ok": true, "yolo_enabled": \#(enabled)}"#, for: request)
+            default:
+                XCTFail("Unexpected request path: \(request.url?.path ?? "nil")")
+                throw URLError(.badURL)
+            }
+        }
+
+        _ = await viewModel.sendMessage("Run setup")
+        approvalStreamClient.emit(.approvalPending(ApprovalPendingResponse(
+            pending: PendingApproval(approvalId: "approval-1", command: "make install", description: "Install", patternKey: "install"),
+            pendingCount: 1
+        )))
+        await viewModel.skipApprovalsForCurrentSession()
+        XCTAssertTrue(viewModel.isSessionApprovalBypassEnabled)
+
+        let didTurnOff = await viewModel.disableApprovalBypassForCurrentSession()
+
+        XCTAssertTrue(didTurnOff)
+        XCTAssertEqual(yoloBodies.last?["session_id"] as? String, "session-abc")
+        XCTAssertEqual(yoloBodies.last?["enabled"] as? Bool, false)
+        XCTAssertFalse(viewModel.isSessionApprovalBypassEnabled)
+    }
+
+    @MainActor
+    func testTurningOffApprovalBypassKeepsItOnAndReportsWhenTheServerFails() async throws {
+        let approvalStreamClient = SpySSEStreamingClient()
+        let viewModel = try makeViewModel(
+            streamClient: SpySSEStreamingClient(),
+            approvalStreamClient: approvalStreamClient
+        ) { request in
+            switch request.url?.path {
+            case "/api/chat/start":
+                return apiTestJSONResponse(#"{"session_id": "session-abc", "stream_id": "stream-123"}"#, for: request)
+            case "/api/session/yolo":
+                let body = try XCTUnwrap(apiTestJSONBody(from: request))
+                if body["enabled"] as? Bool == false {
+                    return apiTestJSONResponse(#"{"error": "boom"}"#, for: request, status: 500)
+                }
+                return apiTestJSONResponse(#"{"ok": true, "yolo_enabled": true}"#, for: request)
+            default:
+                XCTFail("Unexpected request path: \(request.url?.path ?? "nil")")
+                throw URLError(.badURL)
+            }
+        }
+
+        _ = await viewModel.sendMessage("Run setup")
+        approvalStreamClient.emit(.approvalPending(ApprovalPendingResponse(
+            pending: PendingApproval(approvalId: "approval-1", command: "make install", description: "Install", patternKey: "install"),
+            pendingCount: 1
+        )))
+        await viewModel.skipApprovalsForCurrentSession()
+
+        let didTurnOff = await viewModel.disableApprovalBypassForCurrentSession()
+
+        XCTAssertFalse(didTurnOff)
+        XCTAssertTrue(viewModel.isSessionApprovalBypassEnabled)
+        XCTAssertNotNil(viewModel.sendErrorMessage)
+    }
+
+    @MainActor
     func testLiveStreamEventsUpdateTranscriptBeforeCompletion() async throws {
         let streamClient = SpySSEStreamingClient()
         let viewModel = try makeViewModel(streamClient: streamClient) { request in
