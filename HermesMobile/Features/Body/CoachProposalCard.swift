@@ -1,19 +1,54 @@
 import SwiftUI
 
-/// Baki's suggestion (board 8): a training-paper card with the change as its title, the reasons as
-/// a Why list, the rule that raised it, and Use, Not now and Ask. It takes the proposal and the
-/// three actions, so Body home, the finish screen and a chat's app card all draw the same card.
-/// `ask` is nil where there is no chat to open, which hides the Ask button.
+/// Baki's suggestion, drawn the same wherever one waits for an answer, with the same three actions:
+/// Use, Not now, and Ask (a new chat about it). `.card` is the training-paper card on the finish
+/// screen (`BodyProposalCards`): the change as its title, a Why list, and the rule that raised it.
+/// `.compact` sits inside another card (Baki's card on Body home, the Sunday review's training card):
+/// the change and its reasons, in that card's `paper`. `ask` is nil where no chat can open, which
+/// hides Ask; `canDecide` false (a review without the Body API) leaves the buttons off.
 struct CoachProposalCard: View {
+    enum Style { case card, compact }
+
+    /// The buttons, in order. Use is the primary.
+    enum Action: Hashable {
+        case use, notNow, ask
+
+        var label: String {
+            switch self {
+            case .use: "Use"
+            case .notNow: "Not now"
+            case .ask: "Ask"
+            }
+        }
+
+        func accessibilityLabel(_ title: String) -> String {
+            self == .ask ? "Ask Baki about: \(title)" : "\(label): \(title)"
+        }
+    }
+
+    static func actions(canDecide: Bool, canAsk: Bool) -> [Action] {
+        (canDecide ? [.use, .notNow] : []) + (canAsk ? [.ask] : [])
+    }
+
     let proposal: BodyProposal
+    var style: Style = .card
+    var paper: HermexPaper = .training
     var isBusy = false
+    var canDecide = true
     let use: () -> Void
     let notNow: () -> Void
     let ask: (() -> Void)?
 
-    private var paper: HermexPaper { .training }
+    private var actions: [Action] { Self.actions(canDecide: canDecide, canAsk: ask != nil) }
 
     var body: some View {
+        switch style {
+        case .card: card
+        case .compact: compact
+        }
+    }
+
+    private var card: some View {
         HXCard(.glow(paper), spacing: 10) {
             BodyCoachKicker(text: "Baki suggests")
         } content: {
@@ -31,6 +66,28 @@ struct CoachProposalCard: View {
             }
         } footer: {
             buttons.padding(.top, 4)
+        }
+    }
+
+    private var compact: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(verbatim: "Baki suggests")
+                .font(AppFont.caption(weight: .semibold))
+                .foregroundStyle(paper.glow)
+            Text(verbatim: proposal.title)
+                .font(AppFont.body(weight: .semibold))
+                .foregroundStyle(Color.hxTextPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            ForEach(Array(proposal.why.enumerated()), id: \.offset) { _, reason in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(verbatim: "•").accessibilityHidden(true)
+                    Text(verbatim: reason).fixedSize(horizontal: false, vertical: true)
+                }
+                .font(AppFont.footnote())
+                .foregroundStyle(paper.secondaryInk)
+            }
+            if !actions.isEmpty { buttons.padding(.top, 4) }
         }
     }
 
@@ -60,18 +117,19 @@ struct CoachProposalCard: View {
         .disabled(isBusy)
     }
 
-    @ViewBuilder
     private var actionButtons: some View {
-        Button(action: use) { Text(verbatim: "Use").bodyTapHeight() }
-            .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
-            .accessibilityLabel(Text(verbatim: "Use: \(proposal.title)"))
-        Button(action: notNow) { Text(verbatim: "Not now").bodyTapHeight() }
-            .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
-            .accessibilityLabel(Text(verbatim: "Not now: \(proposal.title)"))
-        if let ask {
-            Button(action: ask) { Text(verbatim: "Ask").bodyTapHeight() }
-                .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
-                .accessibilityLabel(Text(verbatim: "Ask Baki about: \(proposal.title)"))
+        ForEach(actions, id: \.self) { action in
+            Button { perform(action) } label: { Text(verbatim: action.label).bodyTapHeight() }
+                .buttonStyle(ChatDecisionButtonStyle(emphasis: action == .use ? .primary : .secondary))
+                .accessibilityLabel(Text(verbatim: action.accessibilityLabel(proposal.title)))
+        }
+    }
+
+    private func perform(_ action: Action) {
+        switch action {
+        case .use: use()
+        case .notNow: notNow()
+        case .ask: ask?()
         }
     }
 }

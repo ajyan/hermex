@@ -116,36 +116,14 @@ struct BodyHomeView: View {
         }
     }
 
-    /// One change to approve, inside Baki's card: what changes, why, and Accept or Skip.
+    /// One change to approve, inside Baki's card: the same proposal, words and actions as the finish
+    /// screen's card, drawn compact.
     private func proposalRows(_ proposal: BodyProposal) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(verbatim: "A change to approve")
-                .font(AppFont.caption(weight: .semibold))
-                .foregroundStyle(paper.glow)
-            Text(verbatim: proposal.title)
-                .font(AppFont.body(weight: .semibold))
-                .foregroundStyle(Color.hxTextPrimary)
-            ForEach(Array(proposal.why.enumerated()), id: \.offset) { _, reason in
-                Text(verbatim: reason)
-                    .font(AppFont.footnote())
-                    .foregroundStyle(paper.secondaryInk)
-            }
-            HStack(spacing: 8) {
-                Button { Task { await viewModel.decide(proposal, accept: true) } } label: {
-                    Text(verbatim: "Accept").bodyTapHeight()
-                }
-                .buttonStyle(ChatDecisionButtonStyle(emphasis: .primary))
-                .accessibilityLabel(Text(verbatim: "Accept: \(proposal.title)"))
-                Button { Task { await viewModel.decide(proposal, accept: false) } } label: {
-                    Text(verbatim: "Skip").bodyTapHeight()
-                }
-                .buttonStyle(ChatDecisionButtonStyle(emphasis: .secondary))
-                .accessibilityLabel(Text(verbatim: "Skip: \(proposal.title)"))
-            }
-            .disabled(viewModel.deciding.contains(proposal.id))
-            .padding(.top, 4)
-        }
-        .fixedSize(horizontal: false, vertical: true)
+        CoachProposalCard(
+            proposal: proposal, style: .compact, paper: paper, isBusy: viewModel.deciding.contains(proposal.id),
+            use: { Task { await viewModel.decide(proposal, accept: true) } },
+            notNow: { Task { await viewModel.decide(proposal, accept: false) } },
+            ask: openDraftChat.isAvailable ? { openDraftChat(BodyAskBaki.draft(about: proposal.title)) } : nil)
     }
 
     // MARK: Up next
