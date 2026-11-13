@@ -149,13 +149,13 @@ private struct DailyAskForm: View {
             ForEach(Array((ask.elsewhere ?? []).enumerated()), id: \.offset) { index, logged in
                 Text(verbatim: DailyAskBody.loggedLine(logged))
                     .font(AppFont.subheadline())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DeckPalette.ask.secondaryInk)
                     .padding(.top, index == 0 ? 16 : 4)
             }
             if let steer = ask.steer {
                 Text(verbatim: "Steering toward: \(steer)")
                     .font(AppFont.subheadline())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DeckPalette.ask.secondaryInk)
                     .padding(.top, 12)
             }
             moreActions.padding(.top, 20)
@@ -185,13 +185,13 @@ private struct DailyAskForm: View {
                         Text(verbatim: role.title).font(AppFont.subheadline())
                         let detail = [role.location, role.bandLabel].compactMap { $0 }.joined(separator: " · ")
                         if !detail.isEmpty {
-                            Text(verbatim: detail).font(AppFont.caption()).foregroundStyle(.secondary).lineLimit(2)
+                            Text(verbatim: detail).font(AppFont.caption()).foregroundStyle(DeckPalette.ask.secondaryInk).lineLimit(2)
                         }
                     }
                     Spacer(minLength: 8)
                     Image(systemName: isOpen ? "chevron.up" : "chevron.down")
                         .font(AppFont.caption(weight: .semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DeckPalette.ask.secondaryInk)
                         .accessibilityHidden(true)
                 }
                 .padding(.vertical, 8)
@@ -257,7 +257,7 @@ private struct DailyAskForm: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(verbatim: heading)
                 .font(AppFont.caption(weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DeckPalette.ask.secondaryInk)
             Text(verbatim: text).font(AppFont.body()).textSelection(.enabled)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -277,12 +277,12 @@ private struct DailyAskForm: View {
                 .accessibilityLabel(Text(verbatim: "Copy \(heading.lowercased())"))
             }
             .font(AppFont.caption(weight: .semibold))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.hxTextSecondary)
             Text(verbatim: text).font(AppFont.body()).textSelection(.enabled)
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
     }
 
     private enum Panel { case skip, elsewhere, steer }
@@ -335,11 +335,11 @@ private struct DailyAskForm: View {
                 field("Words in the titles you want, e.g. AI engineer, forward deployed", text: $steerNote, minLines: 3)
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(verbatim: "Roles with these words in their titles move up on the next Ask. Separate titles with commas.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DeckPalette.ask.secondaryInk)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Text(verbatim: "\(count)/\(DailyAskBody.steerLimit)")
                         .monospacedDigit()
-                        .foregroundStyle(tooLong ? Color.hxWarning : Color.secondary)
+                        .foregroundStyle(tooLong ? Color.hxWarning : DeckPalette.ask.secondaryInk)
                         .accessibilityLabel(Text(verbatim: tooLong
                             ? "\(count - DailyAskBody.steerLimit) characters over the limit"
                             : "\(DailyAskBody.steerLimit - count) characters left"))
@@ -421,7 +421,7 @@ private struct DailyAskPassSheet: View {
                     .font(AppFont.body())
                     .padding(10)
                     .withDictation($reason)
-                    .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.sm, style: .continuous))
                 Text(verbatim: "What was wrong").font(AppFont.subheadline(weight: .semibold))
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 8)], alignment: .leading, spacing: 8) {
                     ForEach(Self.rules, id: \.id) { option in
@@ -429,7 +429,7 @@ private struct DailyAskPassSheet: View {
                     }
                 }
                 Text(verbatim: "Company and Title stop roles like this from coming back.")
-                    .font(AppFont.footnote()).foregroundStyle(.secondary)
+                    .font(AppFont.footnote()).foregroundStyle(Color.hxTextSecondary)
                 if let error = model.error {
                     Text(verbatim: error).font(AppFont.footnote()).foregroundStyle(Color.hxDanger)
                 }

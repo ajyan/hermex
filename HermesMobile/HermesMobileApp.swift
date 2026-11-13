@@ -9,6 +9,30 @@ struct HermexSceneActions {
     let openChat: (_ position: Int) -> Void
     /// Opens the chat `offset` rows from the selected one, wrapping at the ends.
     let openAdjacentChat: (_ offset: Int) -> Void
+    /// True while the drawer covers the chat, so Esc closes it instead of
+    /// stopping the chat's response.
+    var isDrawerOpen = false
+    /// Archives the open chat, with the drawer row's rules (`SessionRowActionPolicy`).
+    var canArchiveChat = false
+    var archiveChat: () -> Void = {}
+}
+
+/// The open chat's keyboard commands, published by `ChatView`.
+struct ChatKeyboardActions {
+    let isStreaming: Bool
+    let isCancellingStream: Bool
+    let stopResponse: () -> Void
+
+    var canStopResponse: Bool { isStreaming && !isCancellingStream }
+
+    /// Esc stops only a chat on screen: with the drawer open it closes the drawer.
+    func canStopWithEscape(isDrawerOpen: Bool) -> Bool {
+        canStopResponse && !isDrawerOpen
+    }
+}
+
+private struct ChatKeyboardActionsKey: FocusedValueKey {
+    typealias Value = ChatKeyboardActions
 }
 
 private struct HermexSceneActionsKey: FocusedValueKey {
@@ -20,15 +44,25 @@ extension FocusedValues {
         get { self[HermexSceneActionsKey.self] }
         set { self[HermexSceneActionsKey.self] = newValue }
     }
+
+    var chatKeyboardActions: ChatKeyboardActions? {
+        get { self[ChatKeyboardActionsKey.self] }
+        set { self[ChatKeyboardActionsKey.self] = newValue }
+    }
 }
 
 struct HermexCommands: Commands {
     @FocusedValue(\.hermexSceneActions) private var focusedActions
+    @FocusedValue(\.chatKeyboardActions) private var focusedChatActions
 
     /// Every command is off while the app lock is up (#885). Read live, so a stale
     /// menu can't act either.
     @MainActor private var actions: HermexSceneActions? {
         AppLock.shared.isLocked ? nil : focusedActions
+    }
+
+    @MainActor private var chatActions: ChatKeyboardActions? {
+        AppLock.shared.isLocked ? nil : focusedChatActions
     }
 
     var body: some Commands {
@@ -46,6 +80,26 @@ struct HermexCommands: Commands {
             }
             .keyboardShortcut("f", modifiers: .command)
             .disabled(actions == nil)
+
+            Divider()
+
+            Button("Stop Response") {
+                chatActions?.stopResponse()
+            }
+            .keyboardShortcut(".", modifiers: .command)
+            .disabled(chatActions?.canStopResponse != true)
+
+            Button("Stop Response") {
+                chatActions?.stopResponse()
+            }
+            .keyboardShortcut(.escape, modifiers: [])
+            .disabled(chatActions?.canStopWithEscape(isDrawerOpen: actions?.isDrawerOpen ?? false) != true)
+
+            Button("Archive Chat") {
+                actions?.archiveChat()
+            }
+            .keyboardShortcut("a", modifiers: [.command, .shift])
+            .disabled(actions?.canArchiveChat != true)
         }
 
         // View menu, beside Toggle Sidebar. ⌘⇧] and ⌘⇧[ back up ⌃Tab in case

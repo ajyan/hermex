@@ -66,7 +66,7 @@ struct DeckSearchCard: View {
             if m.quiet > 0 {
                 Text(verbatim: "Follow up or close: \(m.quietNames.joined(separator: ", ")).")
                     .font(AppFont.subheadline())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.secondaryInk)
                     .padding(.top, 12)
             }
         }
@@ -75,7 +75,7 @@ struct DeckSearchCard: View {
     private func heading(_ title: String) -> some View {
         Text(verbatim: title)
             .font(AppFont.caption(weight: .semibold))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(palette.secondaryInk)
             .padding(.top, 20)
             .padding(.bottom, 8)
     }

@@ -289,7 +289,7 @@ private struct GitCommitFileRow: View {
         Button(action: onTap) {
             HStack(spacing: 12) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 20))
+                    .font(AppFont.title3())
                     .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
 
                 VStack(alignment: .leading, spacing: 3) {

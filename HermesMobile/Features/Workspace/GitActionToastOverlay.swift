@@ -84,7 +84,7 @@ struct GitActionToastOverlay: View {
                     isDismissable: true
                 ) {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 22, weight: .semibold))
+                        .font(AppFont.title2(weight: .semibold))
                         .foregroundStyle(.white, Color.hxSuccess)
                         .symbolRenderingMode(.palette)
                 }

@@ -119,7 +119,7 @@ struct DeckStackView: View {
     private var toast: some View {
         if let dismissal = viewModel.lastDismissal {
             HStack(spacing: 8) {
-                Image(systemName: "hand.thumbsdown").foregroundStyle(.secondary)
+                Image(systemName: "hand.thumbsdown").foregroundStyle(Color.hxTextSecondary)
                 let title = dismissal.card.title ?? "this card"
                 Text(verbatim: viewModel.answer(for: dismissal.card)?.feedback?.verdict == .less
                      ? "Less like this: \(title)" : "Skipped: \(title)")

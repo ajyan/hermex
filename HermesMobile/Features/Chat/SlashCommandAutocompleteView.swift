@@ -50,7 +50,7 @@ struct SlashCommandAutocompleteView: View {
             in: RoundedRectangle(cornerRadius: ChatComposerMetrics.cardCornerRadius, style: .continuous)
         )
         .clipShape(RoundedRectangle(cornerRadius: ChatComposerMetrics.cardCornerRadius, style: .continuous))
-        .shadow(color: Color.black.opacity(0.15), radius: 12, y: 4)
+        .hxShadow(.float)
         .frame(height: panelHeight(for: results, parsed: parsed))
         .task(id: rankingInput) {
             let ranked = await rankingInput.rankedResults()

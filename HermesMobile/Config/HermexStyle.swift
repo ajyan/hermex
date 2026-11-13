@@ -77,18 +77,16 @@ extension HermexPaper {
     static let knowledge = HermexPaper.wiki
     /// A file read, written, listed, or searched (grep, find).
     static let file = HermexPaper.notes
-    /// A web search or fetch.
-    static let web = HermexPaper.video
     /// Memory and skills: what Atlas knows about itself.
     static let recall = HermexPaper.advisor
     /// Shell, code, and everything without a kind of its own.
     static let tool = HermexPaper.plain
-    /// Money: net worth, accounts, and the market card.
-    static let money = HermexPaper.ledger
+    /// Money: net worth, accounts, the market card and spending. Gold, so the Brain is the only green.
+    static let money = HermexPaper.past
     /// The in-app feedback inbox and its drawer row.
     static let feedback = HermexPaper.notes
     /// Meals: the Daily Brief's dinner and week-of-dinners cards.
-    static let meal = HermexPaper.kitchen
+    static let meal = HermexPaper.reading
     /// Body: workouts, lifts, Baki's notes and proposals, and the Body value on the reviews. Cyan,
     /// since a teal read as Brain's mint beside it in the drawer.
     static let training = HermexPaper.video
@@ -100,12 +98,8 @@ extension HermexPaper {
     static let prep = HermexPaper.orchid
 
     static func forTool(_ kind: ToolCallSummaryFormatter.Kind) -> HermexPaper {
-        switch kind {
-        case .read, .write, .list, .search: .file
-        case .web: .web
-        case .skill, .memory: .recall
-        case .shell, .delegate, .unknown: .tool
-        }
+        // Every tool step is Atlas's own machinery, so all wear one paper; the chip's symbol and label say what ran.
+        .tool
     }
 }
 
@@ -322,6 +316,21 @@ extension View {
                 Button { HXKeyboard.dismiss() } label: { Text(verbatim: "Done") }
             }
         }
+    }
+
+    /// Keeps an editor sheet from losing work. With unsaved changes a swipe down
+    /// is blocked, and Cancel sets `isConfirmingDiscard` to ask before
+    /// `onDiscard` closes the sheet.
+    func hxDiscardChangesGuard(
+        hasChanges: Bool,
+        isConfirmingDiscard: Binding<Bool>,
+        onDiscard: @escaping () -> Void
+    ) -> some View {
+        interactiveDismissDisabled(hasChanges)
+            .confirmationDialog("Discard changes?", isPresented: isConfirmingDiscard, titleVisibility: .visible) {
+                Button("Discard changes", role: .destructive, action: onDiscard)
+                Button("Keep editing", role: .cancel) {}
+            }
     }
 }
 

@@ -94,7 +94,7 @@ private struct AtlasAskMediumView: View {
 
             Link(destination: HermesDeepLink.newChatVoiceURL ?? Self.fallbackURL) {
                 Image(systemName: "mic")
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: 15, weight: .medium)) // design-drift: allow (SF Symbol in a fixed-size control)
                     .frame(width: 32, height: 32)
                     .background(Color.primary.opacity(0.1), in: Circle())
             }
@@ -119,7 +119,7 @@ private struct AtlasRecentRow: View {
             ?? AtlasAskMediumView.fallbackURL) {
             HStack(spacing: 8) {
                 Image(systemName: "bubble.left")
-                    .font(.system(size: 12))
+                    .font(AppFont.caption())
                     .foregroundStyle(.tertiary)
                 Text(session.title)
                     .font(.subheadline)
@@ -156,7 +156,7 @@ private struct AtlasActionChip: View {
     var body: some View {
         Link(destination: url ?? AtlasAskMediumView.fallbackURL) {
             Image(systemName: symbol)
-                .font(.system(size: 16, weight: .medium))
+                .font(.system(size: 16, weight: .medium)) // design-drift: allow (SF Symbol in a fixed-height control)
                 .frame(maxWidth: .infinity)
                 .frame(height: 36)
                 .background(Color.primary.opacity(0.1), in: Capsule())

@@ -40,24 +40,33 @@ struct ComposerWorkspacePickerSheet: View {
                 }
 
                 if let effectiveSelectedWorkspacePath, !effectiveSelectedWorkspacePath.isEmpty {
-                    Section("Current") {
+                    Section {
                         workspaceButton(path: effectiveSelectedWorkspacePath, name: String(localized: "Current Workspace"))
+                    } header: {
+                        HXSectionHeader(title: String(localized: "Current"))
+                            .textCase(nil)
                     }
                 }
 
                 if !savedWorkspaceRows.isEmpty {
-                    Section("Saved Workspaces") {
+                    Section {
                         ForEach(savedWorkspaceRows) { row in
                             workspaceButton(path: row.path, name: row.name)
                         }
+                    } header: {
+                        HXSectionHeader(title: String(localized: "Saved workspaces"))
+                            .textCase(nil)
                     }
                 }
 
                 if !suggestionRows.isEmpty {
-                    Section("Suggestions") {
+                    Section {
                         ForEach(suggestionRows, id: \.self) { path in
                             workspaceButton(path: path, name: nil)
                         }
+                    } header: {
+                        HXSectionHeader(title: String(localized: "Suggestions"))
+                            .textCase(nil)
                     }
                 }
 

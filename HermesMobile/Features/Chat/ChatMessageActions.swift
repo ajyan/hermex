@@ -236,10 +236,13 @@ struct SelectableTextView: UIViewRepresentable {
 
 struct EditMessageSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @State private var isConfirmingDiscard = false
 
     let originalText: String
     @Binding var editDraft: String
     let onSubmit: () -> Void
+
+    private var hasChanges: Bool { editDraft != originalText }
 
     var body: some View {
         NavigationStack {
@@ -254,7 +257,11 @@ struct EditMessageSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        dismiss()
+                        if hasChanges {
+                            isConfirmingDiscard = true
+                        } else {
+                            dismiss()
+                        }
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -265,6 +272,11 @@ struct EditMessageSheet: View {
                     .disabled(editDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
+            .hxDiscardChangesGuard(
+                hasChanges: hasChanges,
+                isConfirmingDiscard: $isConfirmingDiscard,
+                onDiscard: { dismiss() }
+            )
         }
         .presentationDetents([.medium, .large])
         .adaptiveFormPresentation()

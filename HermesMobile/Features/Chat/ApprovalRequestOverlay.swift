@@ -8,6 +8,12 @@ struct ApprovalRequestOverlay: View {
     let onChoice: (ApprovalChoice) -> Void
     let onSkipAll: () -> Void
 
+    @AppStorage(Self.alwaysAllowExplainedKey) private var hasConfirmedAlwaysAllow = false
+    @State private var isConfirmingSkipAll = false
+    @State private var isConfirmingAlwaysAllow = false
+
+    static let alwaysAllowExplainedKey = "approvals.alwaysAllowExplained"
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.38)
@@ -23,6 +29,21 @@ struct ApprovalRequestOverlay: View {
             }
         }
         .accessibilityElement(children: .contain)
+        .alert("Skip approvals for this session?", isPresented: $isConfirmingSkipAll) {
+            Button("Skip approvals", role: .destructive) { onSkipAll() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Every command in this session runs without asking you first, including this one. Turn it off from the Approval bypass pill above the composer.")
+        }
+        .alert("Always allow this command?", isPresented: $isConfirmingAlwaysAllow) {
+            Button("Always allow") {
+                hasConfirmedAlwaysAllow = true
+                onChoice(.always)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This is saved on your server and applies to every session, not just this one. To revoke it, remove the entry from command_allowlist in the Hermes config.yaml on your server.")
+        }
     }
 
     private var card: some View {
@@ -43,15 +64,9 @@ struct ApprovalRequestOverlay: View {
             Image(systemName: "hand.raised.fill")
                 .foregroundStyle(HermexPaper.request.glow)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Approval required")
-                    .font(.headline)
-                    .foregroundStyle(HermexPaper.request.glow)
-
-                Text("Pending approvals: \(prompt.pendingCount)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            Text("Approval required")
+                .font(.headline)
+                .foregroundStyle(HermexPaper.request.glow)
         }
     }
 
@@ -78,14 +93,14 @@ struct ApprovalRequestOverlay: View {
             if let scope = prompt.scopeLine {
                 Text(scope)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(HermexPaper.request.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             if prompt.pendingCount > 1 {
                 Text("1 of \(prompt.pendingCount) pending")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(HermexPaper.request.secondaryInk)
             }
 
             if let errorMessage = nonEmpty(errorMessage) {
@@ -109,7 +124,7 @@ struct ApprovalRequestOverlay: View {
             }
 
             Button {
-                onSkipAll()
+                isConfirmingSkipAll = true
             } label: {
                 Label("Skip all this session", systemImage: "bolt.slash")
                     .frame(maxWidth: .infinity)
@@ -129,7 +144,7 @@ struct ApprovalRequestOverlay: View {
     ) -> some View {
         if prominent {
             Button(role: role) {
-                onChoice(choice)
+                choose(choice)
             } label: {
                 Label(title, systemImage: systemImage)
                     .frame(maxWidth: .infinity)
@@ -138,7 +153,7 @@ struct ApprovalRequestOverlay: View {
             .disabled(isResponding)
         } else {
             Button(role: role) {
-                onChoice(choice)
+                choose(choice)
             } label: {
                 Label(title, systemImage: systemImage)
                     .frame(maxWidth: .infinity)
@@ -148,15 +163,40 @@ struct ApprovalRequestOverlay: View {
         }
     }
 
+    /// "Always allow" writes a permanent server rule, so the first one asks.
+    private func choose(_ choice: ApprovalChoice) {
+        if choice == .always, !hasConfirmedAlwaysAllow {
+            isConfirmingAlwaysAllow = true
+        } else {
+            onChoice(choice)
+        }
+    }
+
     private func nonEmpty(_ value: String?) -> String? {
         let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed?.isEmpty == false ? trimmed : nil
     }
 }
 
+/// Shown above the composer while the session skips approvals. Tapping it turns
+/// the bypass off; the pill stays until the server confirms.
 struct ApprovalBypassStatusPill: View {
+    let isTurningOff: Bool
+    let onTurnOff: () -> Void
+
     var body: some View {
-        Label("Approval bypass active", systemImage: "bolt.slash.fill")
+        Button(action: onTurnOff) {
+            HStack(spacing: 8) {
+                Label("Approval bypass active", systemImage: "bolt.slash.fill")
+                    .foregroundStyle(Color.hxTextPrimary)
+                if isTurningOff {
+                    ProgressView()
+                        .controlSize(.mini)
+                } else {
+                    Text("Turn off")
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
             .font(.caption.weight(.semibold))
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -165,6 +205,15 @@ struct ApprovalBypassStatusPill: View {
                 Capsule()
                     .stroke(.primary.opacity(0.10), lineWidth: 1)
             )
-            .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 4)
+            .hxShadow(.float)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isTurningOff)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Approval bypass active"))
+        .accessibilityHint(Text("Turns approval bypass off, so commands in this session ask again"))
+        .accessibilityAddTraits(.isButton)
     }
 }

@@ -25,15 +25,11 @@ struct DeckPageView: View {
 
     var body: some View {
         let palette = DeckPalette.of(page, inV2Weekly: viewModel.isSealedWeekly)
-        let words = Group {
-            switch page {
-            case .card(let card):
-                DeckCardView(card: card, palette: palette, viewModel: viewModel, file: file, feedback: feedback, isOpen: isOpen)
-            case .followUps(let cards):
-                FollowUpsPage(cards: cards, viewModel: viewModel, feedback: feedback)
-            }
-        }
-        .opacity(contentOpacity)
+        // A swipe changes only `contentOpacity`, so the words compare equal and don't redraw each frame.
+        let words = DeckPageWords(page: page, palette: palette, viewModel: viewModel, file: file,
+                                  feedback: feedback, isOpen: isOpen)
+            .equatable()
+            .opacity(contentOpacity)
         if isOpen {
             words
         } else {
@@ -82,6 +78,32 @@ struct DeckPageView: View {
         return HXCardAction(title: DeckCard.openTitle(for: route)) {
             deck.opened("source", on: card.id)
             open(route)
+        }
+    }
+}
+
+/// A page's words without its surface. Equal while the page, its palette and the deck are, whatever
+/// closures it was handed: the stack rebuilds those on every frame of a swipe. What the words read
+/// from the deck redraws them through observation, as before.
+private struct DeckPageWords: View, Equatable {
+    let page: DeckPage
+    let palette: DeckPalette
+    let viewModel: DailyDeckViewModel
+    let file: () -> Void
+    let feedback: (() -> Void)?
+    let isOpen: Bool
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.page == rhs.page && lhs.palette == rhs.palette && lhs.viewModel === rhs.viewModel
+            && lhs.isOpen == rhs.isOpen && (lhs.feedback == nil) == (rhs.feedback == nil)
+    }
+
+    var body: some View {
+        switch page {
+        case .card(let card):
+            DeckCardView(card: card, palette: palette, viewModel: viewModel, file: file, feedback: feedback, isOpen: isOpen)
+        case .followUps(let cards):
+            FollowUpsPage(cards: cards, viewModel: viewModel, feedback: feedback)
         }
     }
 }
@@ -233,7 +255,7 @@ struct DeckCardView: View {
                              answered: viewModel.answer(for: card)?.text, onAnswer: answerMandarin)
         }
         if !card.isMandarin, let lead = text.lead {
-            Text(inlineMarkdown(lead))
+            Text(card.markdown(lead))
                 .font(DeckCardText.leadFont(for: card, lead: lead))
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
@@ -248,7 +270,7 @@ struct DeckCardView: View {
         }
         diagramButtons
         if !card.isMandarin, let detail = text.detail {
-            Text(inlineMarkdown(detail))
+            Text(card.markdown(detail))
                 .font(AppFont.body())
                 .lineSpacing(4)
                 .foregroundStyle(Color.hxTextPrimary)
@@ -311,7 +333,7 @@ struct DeckCardView: View {
         let idea = DeckIdea(card, palette: palette)
         DeckKindLabel(symbol: palette.symbol, text: idea.kindLine, ink: palette.secondaryInk)
         if let sentence = idea.sentence {
-            Text(inlineMarkdown(sentence))
+            Text(card.markdown(sentence))
                 .font(AppFont.display(style: .title2, weight: .bold))
                 .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -319,7 +341,7 @@ struct DeckCardView: View {
                 .textSelection(.enabled)
                 .accessibilityAddTraits(.isHeader)
         }
-        DeckIdeaBody(idea: idea, palette: palette)
+        DeckIdeaBody(idea: idea, palette: palette, markdown: card.markdown)
         diagramButtons
         if let question = viewModel.question(for: card) {
             Text(verbatim: question)
@@ -378,7 +400,7 @@ struct DeckCardView: View {
         let title = card.asksInTitle ? (viewModel.question(for: card) ?? text.lead)
             : isYearAgo ? (card.title ?? text.lead) : text.lead
         if let title {
-            Text(inlineMarkdown(title))
+            Text(card.markdown(title))
                 .font(isYearAgo ? AppFont.serif(style: .title2) : AppFont.display(style: .title2, weight: .bold))
                 .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -450,7 +472,7 @@ struct DeckCardView: View {
                             .font(AppFont.footnote(weight: .semibold))
                             .foregroundStyle(palette.secondaryInk)
                     }
-                    Text(inlineMarkdown(context))
+                    Text(card.markdown(context))
                         .font(AppFont.body())
                         .lineSpacing(3)
                         .foregroundStyle(Color.hxTextPrimary)
@@ -465,7 +487,7 @@ struct DeckCardView: View {
                     Text(verbatim: "That day")
                         .font(AppFont.footnote(weight: .semibold))
                         .foregroundStyle(palette.secondaryInk)
-                    Text(inlineMarkdown(later))
+                    Text(card.markdown(later))
                         .font(AppFont.serif(style: .body))
                         .lineSpacing(3)
                         .foregroundStyle(Color.hxTextPrimary)
@@ -482,7 +504,7 @@ struct DeckCardView: View {
                     .padding(.top, 6)
             }
             if let detail = text.detail {
-                Text(inlineMarkdown(detail))
+                Text(card.markdown(detail))
                     .font(AppFont.body())
                     .lineSpacing(3)
                     .foregroundStyle(Color.hxTextPrimary)
@@ -1296,7 +1318,8 @@ private struct MoodChart: View {
     }
 }
 
-/// A goals card's week: each commitment under its goal, with how many of its target you hit.
+/// A goals card's week: each commitment under its goal, with a pip per unit of its target, filled for
+/// each one hit, in the close tracker's columns (`DeckWeekGridLayout`). Numbers are pips, never a bar or a count.
 private struct GoalMeters: View {
     let meters: [DeckMeter]
     let palette: DeckPalette
@@ -1310,25 +1333,26 @@ private struct GoalMeters: View {
                         .foregroundStyle(palette.secondaryInk)
                         .padding(.top, index == 0 ? 0 : 6)
                 }
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(verbatim: meter.label).font(AppFont.body())
-                        Spacer(minLength: 8)
-                        Text(verbatim: "\(meter.done) of \(meter.target)")
-                            .font(AppFont.subheadline(weight: .semibold))
-                            .monospacedDigit()
-                    }
-                    Capsule()
-                        .fill(palette.ink.opacity(0.12))
-                        .frame(height: 8)
-                        .overlay(alignment: .leading) {
-                            GeometryReader { proxy in
-                                Capsule().fill(palette.ink).frame(width: proxy.size.width * meter.fraction)
-                            }
-                        }
-                        .accessibilityHidden(true)
+                HStack(alignment: .center, spacing: 8) {
+                    Text(verbatim: meter.label)
+                        .font(AppFont.body())
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    pips(meter)
                 }
-                .accessibilityElement(children: .combine)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text(verbatim: "\(meter.label), \(meter.done) of \(meter.target)"))
+            }
+        }
+    }
+
+    private func pips(_ meter: DeckMeter) -> some View {
+        let count = max(meter.target, meter.done)
+        let column = DeckWeekGridLayout.pipColumn(pips: count, addsOne: false)
+        return HStack(spacing: 0) {
+            ForEach(0..<count, id: \.self) { index in
+                DeckDot(state: index < meter.done ? "done" : "missed", ink: palette.ink, column: column,
+                        size: min(DeckDots.dot, column - 4))
             }
         }
     }
@@ -1458,7 +1482,7 @@ private struct FollowUpRow: View {
         VStack(alignment: .leading, spacing: 8) {
             // The Sunday view-take card: its kicker, the week's answers, and what you said last time.
             ForEach(Array(card.lines.enumerated()), id: \.offset) { _, line in
-                Text(verbatim: line).font(AppFont.footnote()).foregroundStyle(isPage ? palette.ink : .secondary)
+                Text(verbatim: line).font(AppFont.footnote()).foregroundStyle(isPage ? palette.ink : palette.secondaryInk)
             }
             Text(verbatim: card.title ?? (isPage ? palette.name : "Follow-up"))
                 .font(isPage ? AppFont.display(style: .title2, weight: .semibold) : AppFont.headline())
@@ -1467,13 +1491,13 @@ private struct FollowUpRow: View {
                 .padding(.bottom, isPage ? 6 : 0)
                 .accessibilityAddTraits(isPage ? .isHeader : [])
             if let body = card.decisionBody {
-                Text(verbatim: body).font(AppFont.subheadline()).foregroundStyle(.secondary)
+                Text(verbatim: body).font(AppFont.subheadline()).foregroundStyle(palette.secondaryInk)
             }
             if !card.entries.isEmpty {
                 RecapList(entries: card.entries, palette: palette).padding(.vertical, 6)
             }
             if let context = card.context {
-                Text(verbatim: context).font(AppFont.subheadline()).foregroundStyle(.secondary)
+                Text(verbatim: context).font(AppFont.subheadline()).foregroundStyle(palette.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let preview = draftPreview {
@@ -1486,7 +1510,7 @@ private struct FollowUpRow: View {
                         }
                     }
                     .font(AppFont.caption(weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.hxTextSecondary)
                     if preview.editable {
                         // The words Text sends: tap to change them before Messages opens.
                         let message = Binding(get: { editedText ?? preview.text }, set: { editedText = $0 })

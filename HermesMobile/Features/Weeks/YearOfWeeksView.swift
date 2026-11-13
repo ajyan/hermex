@@ -9,6 +9,8 @@ struct YearOfWeeksView: View {
     let open: (String) -> Void
 
     @State private var year: Int
+    /// A read of the folders is in flight.
+    @State private var isLoading = false
 
     private let palette = DeckPalette.week
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 8)
@@ -24,12 +26,35 @@ struct YearOfWeeksView: View {
     }
 
     var body: some View {
+        Group {
+            if model.isLoaded {
+                grid
+            } else if isLoading || model.loadError == nil {
+                // Until every folder has been read once, a tile can't tell a sealed week from a missed one.
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ContentUnavailableView {
+                    Label { Text(verbatim: "Couldn't read your weeks") } icon: { Image(systemName: "exclamationmark.triangle") }
+                } description: {
+                    Text(verbatim: "Check your connection and try again.")
+                } actions: {
+                    Button { Task { await load() } } label: { Text(verbatim: "Try again") }
+                }
+            }
+        }
+        .background(Color.hxCanvas.ignoresSafeArea())
+        .hxNavigationTitle("Your year in weeks")
+        .task { await load() }
+    }
+
+    private var grid: some View {
         let tiles = tiles
-        ScrollView {
+        return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header(reviewed: tiles.filter { if case .reviewed = $0.state { true } else { false } }.count, total: tiles.count)
                 if let loadError = model.loadError {
-                    HXFailedView(title: loadError, style: .inline) { Task { await model.load() } }
+                    // The tiles show the last good read; a later one failed.
+                    HXFailedView(title: loadError, style: .inline) { Task { await load() } }
                         .padding(.top, 8)
                 }
                 LazyVGrid(columns: columns, spacing: 4) {
@@ -46,12 +71,15 @@ struct YearOfWeeksView: View {
             .padding(.top, 8)
             .padding(.bottom, 40)
         }
-        .background(Color.hxCanvas.ignoresSafeArea())
-        .hxNavigationTitle("Your year in weeks")
-        .task {
-            await model.load()
-            await model.loadDuePredictions()
-        }
+        .refreshable { await load() }
+    }
+
+    /// Lists the weeks, then reads the records for the predictions now due. Cancelled with the screen.
+    private func load() async {
+        isLoading = true
+        await model.load()
+        isLoading = false
+        await model.loadDuePredictions()
     }
 
     // MARK: Header

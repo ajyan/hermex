@@ -65,7 +65,13 @@ final class DailyDeckViewModel {
     private(set) var deck: DailyDeck?
     /// What each swipe shows; set with the deck.
     private(set) var pages: [DeckPage] = []
-    private(set) var answers: [String: DeckAnswer] = [:]
+    /// What he's answered, kept here as he types; `store` gets it `draftDelay` after the last change
+    /// (`saveDraft()` writes it at once).
+    private(set) var answers: [String: DeckAnswer] = [:] {
+        didSet { syncVisibility() }
+    }
+    /// What decides which pages show, apart from `answers`, so typing an answer never redraws the stack.
+    private(set) var visibility = DeckVisibility()
     private(set) var filing: DailyDeckFilingState = .idle
     private(set) var sessionID: String?
     /// The deck on screen is this device's saved copy, shown because the server couldn't be reached.
@@ -125,10 +131,13 @@ final class DailyDeckViewModel {
     /// Starts a chat with these words, from a card that asks Atlas (the money card's rows); nil does nothing.
     @ObservationIgnored var askAtlas: ((String) -> Void)?
     private let now: () -> Date
+    /// How long after the last change an answer is written to `store`.
+    private let draftDelay: Duration
 
     init(server: URL, client: any DailyDeckDataClient, store: DailyDeckStore = DailyDeckStore(),
          feedback: (any FeedbackDataClient)? = nil, mandarin: (any MandarinPracticeClient)? = nil,
-         body: (any BodyDataClient)? = nil, now: @escaping () -> Date = Date.init) {
+         body: (any BodyDataClient)? = nil, now: @escaping () -> Date = Date.init,
+         draftDelay: Duration = .milliseconds(500)) {
         self.training = WeekTrainingModel(client: body)
         self.server = server
         self.client = client
@@ -136,6 +145,7 @@ final class DailyDeckViewModel {
         self.feedback = feedback
         self.mandarin = mandarin
         self.now = now
+        self.draftDelay = draftDelay
         let today = DailyDeckPaths.day(now())
         self.today = today
         self.date = today
@@ -174,17 +184,31 @@ final class DailyDeckViewModel {
 
     /// What the deck shows: every page but cards marked "Not for Me". `index` counts these.
     var visiblePages: [DeckPage] {
-        let variant = Self.shownWeekVariant(cards: cards, answers: answers)
+        let visibility = visibility
         return pages.filter { page in
             guard case .card(let card) = page else { return true }
-            if Self.isHiddenWeekCard(card, shownVariant: variant) { return false }
-            return answers[card.id]?.feedback == nil
+            if Self.isHiddenWeekCard(card, shownVariant: visibility.weekVariant) { return false }
+            return !visibility.dismissed.contains(card.id)
         }
+    }
+
+    /// The cards marked "Not for Me" and the week divider's question, read from `answers`.
+    struct DeckVisibility: Equatable {
+        var dismissed: Set<String> = []
+        /// `shownWeekVariant`: nil when the deck has no divider.
+        var weekVariant: Int?
+    }
+
+    /// Updates `visibility` only when it changes, so its readers redraw only then.
+    private func syncVisibility() {
+        let next = DeckVisibility(dismissed: Set(answers.compactMap { $0.value.feedback == nil ? nil : $0.key }),
+                                  weekVariant: Self.shownWeekVariant(cards: cards, answers: answers))
+        if next != visibility { visibility = next }
     }
 
     /// Which of the week's drafted questions is on the divider: its place among the question and
     /// the alternatives, 0 when the deck has no divider.
-    var weekVariant: Int { Self.shownWeekVariant(cards: cards, answers: answers) ?? 0 }
+    var weekVariant: Int { visibility.weekVariant ?? 0 }
 
     /// The variant the deck's week divider shows, given the deck's answers (filed or unsent): the
     /// divider's answered question's place among its question and alternatives, 0 when it names
@@ -250,7 +274,7 @@ final class DailyDeckViewModel {
     }
 
     /// Cards on this deck marked "Not for Me".
-    var skippedCount: Int { cards.filter { answers[$0.id]?.feedback != nil }.count }
+    var skippedCount: Int { cards.filter { visibility.dismissed.contains($0.id) }.count }
 
     /// Counts the cover photo's successful uploads; the photo view reloads when it changes.
     private(set) var weekPhotoVersion = 0
@@ -341,10 +365,44 @@ final class DailyDeckViewModel {
 
     // MARK: Loading
 
+    /// When the deck on screen was last read from the server; nil before that, and for an offline copy.
+    @ObservationIgnored private var lastRead: Date?
+    /// The deck and answers files behind the deck on screen, so a revalidation that finds them unchanged
+    /// leaves the screen alone.
+    @ObservationIgnored private var shownFiles: (deck: String, answers: String?)?
+    /// How long a deck on screen is trusted before the screen appearing reads it again.
+    nonisolated static let revalidateAfter: TimeInterval = 5 * 60
+
+    /// The screen appeared: the first time, coming back from a page pushed over it, or the app coming
+    /// back. The first appear loads; later ones keep the deck, its page and its cards as they are,
+    /// move to a new day's brief, and read the deck again in place once it is `revalidateAfter` old.
+    func appeared() async {
+        guard state == .ready else { return await load() }
+        if await refreshDay() { return }
+        guard filing != .filing, lastRead.map({ now().timeIntervalSince($0) >= Self.revalidateAfter }) ?? true else { return }
+        await read(inPlace: true)
+    }
+
     /// Finds the brief's folder, then opens the deck for `date` (today on first load).
     func load() async {
-        state = .loading
-        isOfflineCopy = false
+        await read(inPlace: false)
+    }
+
+    /// Reload from the menu: reads everything again, the journal, sleep and spending too.
+    func reload() async {
+        clearReadCaches()
+        await load()
+    }
+
+    /// Reads the deck for `date`. A load shows the spinner and falls back to the offline copy; `inPlace`
+    /// keeps what's on screen while it reads, and on any failure.
+    private func read(inPlace: Bool) async {
+        saveDraft()
+        if !inPlace {
+            state = .loading
+            isOfflineCopy = false
+        }
+        let (date, kind) = (date, kind)
         do {
             guard let workspace = try await resolveWorkspace() else { return }
             self.workspace = workspace
@@ -353,11 +411,20 @@ final class DailyDeckViewModel {
             availableDates = Self.deckDates(in: names ?? [], kind: "morning")
             filedDates = Self.filedDates(in: names ?? [], kind: "morning")
             reviews = DeckReview.all(in: names ?? [])
-            try await openDeck(names: names ?? [], sessionID: sessionID)
+            let opened = try await readDeck(names: names ?? [], sessionID: sessionID, date: date, kind: kind)
+            // Another deck was opened while this one was read: it owns the screen.
+            guard date == self.date, kind == self.kind else { return }
+            if inPlace, isOfflineCopy == false, let opened, let shownFiles,
+               shownFiles.deck == opened.deck, shownFiles.answers == opened.answers {
+                lastRead = now()
+            } else {
+                open(opened, inPlace: inPlace)
+            }
             await loadDiagrams(sessionID: sessionID)
         } catch is CancellationError {
             // A newer load owns the state.
         } catch {
+            if inPlace { return }
             if !openOfflineCopy() { state = .failed(error.localizedDescription) }
         }
     }
@@ -372,42 +439,59 @@ final class DailyDeckViewModel {
         filedSignals = copy.answers.map(DeckAnswersFile.decodeSignals) ?? DeckSignals()
         filedNote = nil
         hasWeekRecord = false
-        show(decoded)
+        shownFiles = nil
+        lastRead = nil
+        show(decoded, inPlace: false)
         isOfflineCopy = true
         return true
     }
 
-    /// Puts a decoded deck on screen with this device's unsent answers over the filed ones.
-    private func show(_ decoded: DailyDeck) {
+    /// Puts a decoded deck on screen with this device's unsent answers over the filed ones. `inPlace`
+    /// (the same deck read again) stays on the page that was showing and keeps the intention draft.
+    private func show(_ decoded: DailyDeck, inPlace: Bool) {
+        saveDraft()
+        let anchor = inPlace ? currentPage?.id : nil
         deck = decoded
         pages = DeckPage.pages(for: decoded.cards)
         let draft = store.answers(for: server, date: date, kind: kind)
         answers = draft.isEmpty ? (filedAnswers ?? [:]) : draft
         let drafted = store.signals(for: server, date: date, kind: kind)
         signals = drafted.isEmpty ? filedSignals : drafted
-        index = min(index, max(visiblePages.count - 1, 0))
-        lastDismissal = nil
-        resetIntention()
+        if let anchor, let position = visiblePages.firstIndex(where: { $0.id == anchor }) {
+            index = position
+        } else {
+            index = min(index, max(visiblePages.count - 1, 0))
+        }
+        if !inPlace {
+            lastDismissal = nil
+            resetIntention()
+        }
         state = .ready
     }
 
     /// Rolls `today` forward when the app comes back on a new day. A screen left on the old
-    /// today's brief moves to the new one; a past day or review the user opened stays.
-    func refreshDay() async {
+    /// today's brief moves to the new one; a past day or review the user opened stays. Returns
+    /// whether it loaded the new day's brief.
+    @discardableResult
+    func refreshDay() async -> Bool {
         let day = DailyDeckPaths.day(now())
-        guard day != today else { return }
+        guard day != today else { return false }
         let wasOnToday = date == today && kind == "morning"
         today = day
-        guard wasOnToday else { return }
+        clearReadCaches()  // a new day can bring a new journal month and another night's sleep
+        guard wasOnToday else { return false }
+        saveDraft()
         showCard(nil)
         date = day
         index = 0
         await load()
+        return true
     }
 
     /// Opens another deck: a past day's brief to reread or edit, or a review.
     func show(date: String, kind: String = "morning") async {
         if date != self.date || kind != self.kind || state != .ready {
+            saveDraft()
             showCard(nil)  // the card leaving keeps its time on the deck it belongs to
             self.date = date
             self.kind = kind
@@ -417,38 +501,70 @@ final class DailyDeckViewModel {
         }
     }
 
-    /// Loads the deck and, when it was filed, the filed answers. Unsent edits on this
-    /// device win over the filed copy, so leaving mid-edit loses nothing.
-    private func openDeck(names: [String], sessionID: String) async throws {
-        deck = nil
-        pages = []
-        filedAnswers = nil
-        signals = DeckSignals()
-        filedSignals = DeckSignals()
-        filedNote = nil
-        hasWeekRecord = false
+    /// A deck as read from the server: its file, its decode, the filed answers file when there is
+    /// one, and whether a sealed weekly's record exists.
+    private struct ReadDeck {
+        let deck: String
+        let decoded: DailyDeck
+        let answers: String?
+        let hasWeekRecord: Bool
+    }
+
+    /// Reads the deck and, when it was filed, the filed answers, both at once; nil when the day has
+    /// no deck. Changes nothing on screen.
+    private func readDeck(names: [String], sessionID: String, date: String, kind: String) async throws -> ReadDeck? {
+        guard names.contains(fileName(DailyDeckPaths.deck(date: date, kind: kind))) else { return nil }
+        let client = client
+        let filed = names.contains(fileName(DailyDeckPaths.answers(date: date, kind: kind)))
+        async let deckFile = client.fileContent(sessionID: sessionID, path: DailyDeckPaths.deck(date: date, kind: kind))
+        async let answersFile = Self.fileContent(filed ? DailyDeckPaths.answers(date: date, kind: kind) : nil,
+                                                 sessionID: sessionID, client: client)
+        let content = try await deckFile
+        let decoded = try DailyDeck.decode(content)
+        let answers = try await answersFile
+        var hasWeekRecord = false
+        if answers != nil, kind == "weekly", (decoded.version ?? 0) >= 2 {
+            // An unreadable folder reads as unsealed: sealing again replaces the week whole.
+            let records = try? await client.entryNames(sessionID: sessionID, path: WeeksModel.directory)
+            hasWeekRecord = records?.contains(fileName(WeeksModel.recordPath(date))) ?? false
+        }
+        return ReadDeck(deck: content, decoded: decoded, answers: answers, hasWeekRecord: hasWeekRecord)
+    }
+
+    /// The file at `path`, or nil without a path.
+    nonisolated private static func fileContent(_ path: String?, sessionID: String,
+                                                client: any DailyDeckDataClient) async throws -> String? {
+        guard let path else { return nil }
+        return try await client.fileContent(sessionID: sessionID, path: path)
+    }
+
+    /// Puts a deck read from the server on screen, or `.noDeck` when there was none. Unsent edits on
+    /// this device win over the filed copy, so leaving mid-edit loses nothing.
+    private func open(_ read: ReadDeck?, inPlace: Bool) {
         isOfflineCopy = false
-        guard names.contains(fileName(DailyDeckPaths.deck(date: date, kind: kind))) else {
+        lastRead = now()
+        guard let read else {
+            deck = nil
+            pages = []
+            filedAnswers = nil
+            signals = DeckSignals()
+            filedSignals = DeckSignals()
+            filedNote = nil
+            hasWeekRecord = false
+            shownFiles = nil
             state = .noDeck
             return
         }
-        let content = try await client.fileContent(sessionID: sessionID, path: DailyDeckPaths.deck(date: date, kind: kind))
-        let decoded = try DailyDeck.decode(content)
-        var copy = DailyDeckStore.SavedDeck(date: date, kind: kind, deck: content, answers: nil)
-        if names.contains(fileName(DailyDeckPaths.answers(date: date, kind: kind))) {
-            let filed = try await client.fileContent(sessionID: sessionID, path: DailyDeckPaths.answers(date: date, kind: kind))
-            copy.answers = filed
-            filedAnswers = DeckAnswersFile.decodeAnswers(filed)
-            filedSignals = DeckAnswersFile.decodeSignals(filed)
-            if kind == "weekly", (decoded.version ?? 0) >= 2 {
-                // An unreadable folder reads as unsealed: sealing again replaces the week whole.
-                let records = try? await client.entryNames(sessionID: sessionID, path: WeeksModel.directory)
-                hasWeekRecord = records?.contains(fileName(WeeksModel.recordPath(date))) ?? false
-            }
-        }
+        filedAnswers = read.answers.map(DeckAnswersFile.decodeAnswers)
+        filedSignals = read.answers.map(DeckAnswersFile.decodeSignals) ?? DeckSignals()
+        if !inPlace { filedNote = nil }
+        hasWeekRecord = read.hasWeekRecord
+        shownFiles = (read.deck, read.answers)
         // Today's brief is the one worth rereading without the server.
-        if date == today, kind == "morning" { store.setDeckCopy(copy, for: server) }
-        show(decoded)
+        if date == today, kind == "morning" {
+            store.setDeckCopy(DailyDeckStore.SavedDeck(date: date, kind: kind, deck: read.deck, answers: read.answers), for: server)
+        }
+        show(read.decoded, inPlace: inPlace)
     }
 
     // MARK: Diagrams
@@ -577,33 +693,62 @@ final class DailyDeckViewModel {
         return DailyDeckJournal.readable(text)
     }
 
+    /// How long a read of spending or sleep serves the sheets that open from the deck.
+    nonisolated static let sideReadLifetime: TimeInterval = 2 * 60
+    /// `journal/<year>`'s month folders, listed once per screen (until Reload or a new day).
+    @ObservationIgnored private var journalMonths: [Int: [String]] = [:]
+    @ObservationIgnored private var spendingRead: (at: Date, value: MoneySpending?)?
+    @ObservationIgnored private var sleepRead: (at: Date, value: SleepHistory?)?
+
+    private func clearReadCaches() {
+        journalMonths = [:]
+        spendingRead = nil
+        sleepRead = nil
+    }
+
+    private func isFresh(_ at: Date) -> Bool { now().timeIntervalSince(at) < Self.sideReadLifetime }
+
     /// The money run's spending (`finance/data/money/spending.json`), or nil before Money is set up.
     func spending() async throws -> MoneySpending? {
         guard let sessionID else { return nil }
+        if let spendingRead, isFresh(spendingRead.at) { return spendingRead.value }
+        let value: MoneySpending?
         do {
             let text = try await client.fileContent(sessionID: sessionID, path: MoneyPaths.spending)
-            return try MoneySpending.decode(Data(text.utf8))
+            value = try MoneySpending.decode(Data(text.utf8))
         } catch let error as APIError where error.isNotFound {
-            return nil
+            value = nil
         }
+        spendingRead = (now(), value)
+        return value
     }
 
     /// Every night's sleep numbers (`data/sleep/history.json`), or nil before the vault has written it.
     func sleepHistory() async throws -> SleepHistory? {
         guard let sessionID else { return nil }
+        if let sleepRead, isFresh(sleepRead.at) { return sleepRead.value }
+        let value: SleepHistory?
         do {
             let text = try await client.fileContent(sessionID: sessionID, path: SleepHistoryPaths.history)
-            return try SleepHistory.decode(Data(text.utf8))
+            value = try SleepHistory.decode(Data(text.utf8))
         } catch let error as APIError where error.isNotFound {
-            return nil
+            value = nil
         }
+        sleepRead = (now(), value)
+        return value
     }
 
     private func monthFolder(year: Int, month: Int, sessionID: String) async -> String? {
         let base = "journal/\(year)"
-        guard let names = try? await client.entryNames(sessionID: sessionID, path: base),
-              let folder = names.first(where: { $0.hasPrefix(String(format: "%02d-", month)) })
-        else { return nil }
+        let names: [String]
+        if let listed = journalMonths[year] {
+            names = listed
+        } else {
+            guard let listed = try? await client.entryNames(sessionID: sessionID, path: base) else { return nil }
+            journalMonths[year] = listed
+            names = listed
+        }
+        guard let folder = names.first(where: { $0.hasPrefix(String(format: "%02d-", month)) }) else { return nil }
         return "\(base)/\(folder)"
     }
 
@@ -793,7 +938,33 @@ final class DailyDeckViewModel {
         var answer = answers[card.id] ?? DeckAnswer(card: card.id)
         change(&answer)
         answers[card.id] = answer.isEmpty ? nil : answer
-        store.setAnswers(answers, for: server, date: date, kind: kind)
+        scheduleDraftSave()
+    }
+
+    /// The answers waiting to be written, with the deck they belong to.
+    @ObservationIgnored private var pendingDraft: (date: String, kind: String, answers: [String: DeckAnswer])?
+    /// Writes `pendingDraft` once the typing pauses for `draftDelay`.
+    @ObservationIgnored private(set) var draftSave: Task<Void, Never>?
+
+    /// Each keystroke and dictated word lands in `answers` at once; the store is written once it settles.
+    private func scheduleDraftSave() {
+        pendingDraft = (date, kind, answers)
+        draftSave?.cancel()
+        draftSave = Task { [weak self, draftDelay] in
+            try? await Task.sleep(for: draftDelay)
+            guard !Task.isCancelled else { return }
+            self?.saveDraft()
+        }
+    }
+
+    /// Writes the unsaved answers now: the screen is leaving or backgrounding, the deck is being
+    /// filed, or another deck is opening.
+    func saveDraft() {
+        draftSave?.cancel()
+        draftSave = nil
+        guard let pending = pendingDraft else { return }
+        pendingDraft = nil
+        store.setAnswers(pending.answers, for: server, date: pending.date, kind: pending.kind)
     }
 
     // MARK: The v3 weekly review
@@ -1083,6 +1254,7 @@ final class DailyDeckViewModel {
     /// The app became active or left the foreground: only time in the foreground counts.
     func scenePhaseChanged(active: Bool) {
         sceneActive = active
+        if !active { saveDraft() }
         syncClock()
     }
 
@@ -1095,6 +1267,7 @@ final class DailyDeckViewModel {
 
     func screenDisappeared() {
         screensShowing = max(0, screensShowing - 1)
+        saveDraft()
         syncClock()
     }
 
@@ -1173,6 +1346,7 @@ final class DailyDeckViewModel {
     func file() async -> DailyDeckFilingResult? {
         guard let deck, let workspace, filing != .filing else { return nil }
         filing = .filing
+        saveDraft()
         // What is sent: the user can type or open another day while it's in flight.
         if !signals.usage.isEmpty {  // each read card's answer length, as filed
             updateSignals { signals in
@@ -1234,6 +1408,7 @@ final class DailyDeckViewModel {
     /// made while filing stay unsent; another deck on screen is left alone.
     private func markFiled(_ sent: [String: DeckAnswer], _ sentSignals: DeckSignals, date: String, kind: String,
                            confirmed: Bool, note: DailyDeckFiledNote?) {
+        saveDraft()  // edits made while filing count as unsent
         if store.answers(for: server, date: date, kind: kind) == sent {
             store.setAnswers([:], for: server, date: date, kind: kind)
         }
