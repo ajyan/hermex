@@ -88,12 +88,19 @@ struct LabelQueueView: View {
                             .adaptiveReadableContent(maxWidth: AdaptiveReadableContentWidth.secondaryDestination)
                     }
                     .id(item.id)
+                    // Wears the card's colors as the deck's own Next does: filled once rated,
+                    // the card's lighter wash while it's a Skip.
+                    let palette = DeckPalette.of(item.card)
+                    let labeled = viewModel.isLabeled(item)
                     Button { viewModel.next() } label: {
-                        Text(verbatim: viewModel.isLabeled(item) ? "Next" : "Skip")
+                        Text(verbatim: labeled ? "Next" : "Skip")
                             .font(AppFont.body(weight: .semibold))
-                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .foregroundStyle(labeled ? palette.onInk : palette.ink)
+                            .frame(maxWidth: .infinity, minHeight: 50)
+                            .background(labeled ? palette.ink : palette.colors.wash, in: Capsule())
+                            .overlay(Capsule().strokeBorder(labeled ? Color.clear : palette.edge, lineWidth: 0.5))
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.plain)
                     .padding(.horizontal, 16)
                     .padding(.bottom, 8)
                 }

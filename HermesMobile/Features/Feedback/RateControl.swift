@@ -3,7 +3,8 @@ import SwiftUI
 /// ✓ and ✗ for one label: marks generated content good or not good. Tapping the chosen
 /// verdict again clears it. ✗ asks for an optional note first. Saving is non-optimistic: the
 /// tapped button shows a spinner until the server answers, and a failure leaves the previous
-/// label with an inline error. Neutral until chosen; the chosen verdict wears the accent.
+/// label with an inline error. Neutral until chosen; the chosen verdict wears the tint: the
+/// accent, or on a Daily Brief card its ink, as the deck's own controls do.
 /// A confirmed ✗ on a Daily Deck label adds a row of optional reason chips under it.
 /// English-only copy (personal fork).
 struct RateControl: View {
@@ -17,6 +18,9 @@ struct RateControl: View {
     var ink: Color = .hxTextSecondary
     /// On a glow card, its paper: unselected reason chips wear it. Nil draws them neutral.
     var paper: HermexPaper?
+    /// The chosen verdict's and chosen reason's color, and the text on a chosen reason.
+    var tint: Color = .accentColor
+    var onTint: Color = .hxOnAccent
 
     @State private var isAskingNote = false
     @State private var note = ""
@@ -38,7 +42,7 @@ struct RateControl: View {
                         .foregroundStyle(ink)
                         .padding(.top, 2)
                 }
-                LabelReasonChips(key: key, title: title, labels: labels, paper: paper)
+                LabelReasonChips(key: key, title: title, labels: labels, paper: paper, tint: tint, onTint: onTint)
             }
             if let error = labels.error(for: key) {
                 Text(verbatim: error)
@@ -77,7 +81,7 @@ struct RateControl: View {
                 } else {
                     Image(systemName: isSelected ? "\(symbol).fill" : symbol)
                         .font(AppFont.title3())
-                        .foregroundStyle(isSelected ? Color.accentColor : ink)
+                        .foregroundStyle(isSelected ? tint : ink)
                 }
             }
             .frame(minWidth: 44, minHeight: 44)
@@ -97,13 +101,15 @@ struct RateControl: View {
 
 /// Why a ✗ is bad, as a wrapping row of chips: one tap saves the label again with that reason,
 /// and tapping the chosen one clears it. A chip shows chosen once the server has it, in the
-/// accent since it's a control; until then it spins. Unchosen chips wear the card's glow, or
-/// stay neutral off a card. Each keeps a 44 pt hit row.
+/// tint since it's a control (on a card, the card's ink); until then it spins. Unchosen chips
+/// wear the card's glow, or stay neutral off a card. Each keeps a 44 pt hit row.
 private struct LabelReasonChips: View {
     let key: LabelKey
     let title: String?
     let labels: LabelsViewModel
     let paper: HermexPaper?
+    let tint: Color
+    let onTint: Color
 
     var body: some View {
         // No spacing between rows: each chip's 44 pt hit row already sets them apart.
@@ -139,7 +145,7 @@ private struct LabelReasonChips: View {
                 if spins { ProgressView().controlSize(.mini) }
             }
         } else {
-            // HXChip's capsule, filled with the accent when chosen and neutral otherwise.
+            // HXChip's capsule, filled with the tint when chosen and neutral otherwise.
             HStack(spacing: 5) {
                 if isSelected {
                     Image(systemName: "checkmark")
@@ -152,10 +158,10 @@ private struct LabelReasonChips: View {
                     .truncationMode(.middle)
                 if spins { ProgressView().controlSize(.mini) }
             }
-            .foregroundStyle(isSelected ? Color.hxOnAccent : Color.hxTextPrimary)
+            .foregroundStyle(isSelected ? onTint : Color.hxTextPrimary)
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
-            .background(isSelected ? Color.accentColor : Color.hxCanvas, in: Capsule())
+            .background(isSelected ? tint : Color.hxCanvas, in: Capsule())
             .overlay(Capsule().strokeBorder(isSelected ? Color.clear : Color.hxSeparator, lineWidth: 0.5))
         }
     }
@@ -196,7 +202,7 @@ struct DeckRateRows: View {
             Rectangle().fill(palette.edge).frame(height: 0.5).accessibilityHidden(true)
             ForEach(FeedbackRating.deck(card: card, date: date, kind: kind, showsQuestion: showsQuestion)) { rating in
                 RateControl(label: rating.label, key: rating.key, title: rating.title, labels: labels,
-                            ink: palette.ink, paper: palette.colors)
+                            ink: palette.ink, paper: palette.colors, tint: palette.ink, onTint: palette.onInk)
             }
         }
     }
