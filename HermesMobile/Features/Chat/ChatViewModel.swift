@@ -2777,8 +2777,9 @@ final class ChatViewModel {
             attachments: messageAttachments.isEmpty ? nil : messageAttachments
         )
         messages.append(optimisticMessage)
-
-        cacheCurrentMessages(sessionID: sessionID, modelContext: modelContext)
+        let optimisticSortIndex = messages.count - 1
+        // Only the new row: the window write and trim run when the turn settles.
+        cacheOptimisticMessage(optimisticMessage, at: optimisticSortIndex, sessionID: sessionID, modelContext: modelContext)
 
         do {
             #if DEBUG
@@ -2802,7 +2803,7 @@ final class ChatViewModel {
 
             guard let streamID = response.streamId else {
                 rollbackOptimisticMessage(id: localMessageID)
-                cacheCurrentMessages(sessionID: sessionID, modelContext: modelContext)
+                uncacheOptimisticMessage(optimisticMessage, at: optimisticSortIndex, sessionID: sessionID, modelContext: modelContext)
                 restorePendingAttachments(attachmentsToRestoreOnFailure)
                 if allowsCompressionContinuation {
                     drafts.retainRejectedAttachments(attachmentsToRestoreOnFailure.map(ChatDraftAttachment.init(pending:)),
@@ -2824,7 +2825,7 @@ final class ChatViewModel {
             // Submission-owned cleanup survives navigation/cancellation. Roll
             // back only this message and merge attachments with newer work.
             rollbackOptimisticMessage(id: localMessageID)
-            cacheCurrentMessages(sessionID: sessionID, modelContext: modelContext)
+            uncacheOptimisticMessage(optimisticMessage, at: optimisticSortIndex, sessionID: sessionID, modelContext: modelContext)
             restorePendingAttachments(attachmentsToRestoreOnFailure)
             if allowsCompressionContinuation {
                 drafts.retainRejectedAttachments(attachmentsToRestoreOnFailure.map(ChatDraftAttachment.init(pending:)),
@@ -3015,6 +3016,26 @@ final class ChatViewModel {
 
         do {
             try CacheStore.cacheMessages(messages, serverURL: server, sessionID: sessionID, in: modelContext)
+        } catch {
+            cacheErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func cacheOptimisticMessage(_ message: ChatMessage, at sortIndex: Int, sessionID: String, modelContext: ModelContext?) {
+        guard let modelContext else { return }
+
+        do {
+            try CacheStore.cacheMessage(message, at: sortIndex, serverURL: server, sessionID: sessionID, in: modelContext)
+        } catch {
+            cacheErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func uncacheOptimisticMessage(_ message: ChatMessage, at sortIndex: Int, sessionID: String, modelContext: ModelContext?) {
+        guard let modelContext else { return }
+
+        do {
+            try CacheStore.removeCachedMessage(message, at: sortIndex, serverURL: server, sessionID: sessionID, in: modelContext)
         } catch {
             cacheErrorMessage = error.localizedDescription
         }

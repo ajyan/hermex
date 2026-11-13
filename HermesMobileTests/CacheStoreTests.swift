@@ -245,6 +245,28 @@ final class CacheStoreTests: XCTestCase {
         XCTAssertEqual(updatedMessage.expiresAt, secondCachedAt.addingTimeInterval(CachePolicy.ttl))
     }
 
+    func testCacheMessageUpsertsOneRowAndRemoveCachedMessageDeletesOnlyIt() throws {
+        let context = try makeContext()
+        let serverURL = URL(string: "https://example.test")!
+        let window = [
+            ChatMessage(role: "user", content: "Hello", timestamp: 1, messageId: "m1"),
+            ChatMessage(role: "assistant", content: "Hi", timestamp: 2, messageId: "m2")
+        ]
+        try CacheStore.cacheMessages(window, serverURL: serverURL, sessionID: "abc123", in: context)
+        let prompt = ChatMessage(role: "user", content: "Next", timestamp: 3, messageId: "local-1")
+
+        try CacheStore.cacheMessage(prompt, at: 2, serverURL: serverURL, sessionID: "abc123", in: context)
+        try CacheStore.cacheMessage(prompt, at: 2, serverURL: serverURL, sessionID: "abc123", in: context)
+
+        var cached = try CacheStore.cachedMessages(serverURL: serverURL, sessionID: "abc123", in: context)
+        XCTAssertEqual(cached.compactMap(\.messageId), ["m1", "m2", "local-1"])
+
+        try CacheStore.removeCachedMessage(prompt, at: 2, serverURL: serverURL, sessionID: "abc123", in: context)
+
+        cached = try CacheStore.cachedMessages(serverURL: serverURL, sessionID: "abc123", in: context)
+        XCTAssertEqual(cached.compactMap(\.messageId), ["m1", "m2"])
+    }
+
     func testCacheSessionUpsertsOneSessionWithoutRemovingExistingSessions() throws {
         let context = try makeContext()
         let serverURL = URL(string: "https://example.test")!
