@@ -1,6 +1,7 @@
 import Foundation
 import Security
 import XCTest
+@testable import HermesMobile
 
 /// Keeps a test run from signing the simulator's Hermex out. The tests run inside the app as
 /// their host, so a test that reaches the real Keychain, cookie jar or standard defaults changes
@@ -21,11 +22,17 @@ final class TestHostStateGuard: NSObject, XCTestObservation {
 
     func testBundleWillStart(_ testBundle: Bundle) {
         keychainItems = Self.genericPasswords(returningData: true)
-        cookies = HTTPCookieStorage.shared.cookies ?? []
+        cookies = WebUICookieJar.shared.storage.cookies ?? []
         defaults = Bundle.main.bundleIdentifier.flatMap(UserDefaults.standard.persistentDomain(forName:))
     }
 
     func testBundleDidFinish(_ testBundle: Bundle) {
+        // The jar mirrors itself to the Keychain, so it goes back first and the
+        // Keychain restore below has the last word.
+        let jar = WebUICookieJar.shared.storage
+        jar.cookies?.forEach(jar.deleteCookie)
+        cookies.forEach(jar.setCookie)
+
         if let keychainItems, let current = Self.genericPasswords(returningData: false) {
             for item in current {
                 SecItemDelete(Self.identity(of: item) as CFDictionary)
@@ -37,8 +44,6 @@ final class TestHostStateGuard: NSObject, XCTestObservation {
             }
         }
 
-        HTTPCookieStorage.shared.cookies?.forEach(HTTPCookieStorage.shared.deleteCookie)
-        cookies.forEach(HTTPCookieStorage.shared.setCookie)
 
         guard let bundleID = Bundle.main.bundleIdentifier else { return }
         if let defaults {

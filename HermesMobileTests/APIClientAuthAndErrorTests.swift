@@ -44,7 +44,7 @@ final class APIClientAuthAndErrorTests: APIClientTestCase {
             serverRegistry: ServerRegistry.inMemory()
         )
 
-        await manager.configure(serverURLString: "100.96.12.34:9119", password: "")
+        await manager.configure(serverURLString: "http://100.96.12.34:9119", password: "")
 
         let expectedURL = try XCTUnwrap(URL(string: "http://100.96.12.34:9119"))
         XCTAssertEqual(requestedURLs, [expectedURL])
@@ -52,6 +52,26 @@ final class APIClientAuthAndErrorTests: APIClientTestCase {
         XCTAssertEqual(keychain.savedValues[.serverURL], expectedURL.absoluteString)
         XCTAssertEqual(manager.state, .loggedIn(server: expectedURL))
         XCTAssertNil(manager.lastErrorMessage)
+    }
+
+    func testSchemelessServerURLUsesHTTPOnlyForLoopback() throws {
+        let cases = [
+            "localhost:8787": "http://localhost:8787",
+            "127.0.0.1:8787": "http://127.0.0.1:8787",
+            "127.4.5.6": "http://127.4.5.6",
+            "[::1]:8787": "http://[::1]:8787",
+            "100.96.12.34:9119": "https://100.96.12.34:9119",
+            "192.168.1.4:8787": "https://192.168.1.4:8787",
+            "10.0.0.2": "https://10.0.0.2",
+            "mac.local:8787": "https://mac.local:8787",
+            "mac:8787": "https://mac:8787",
+            "machine.tail123.ts.net": "https://machine.tail123.ts.net",
+            "http://192.168.1.4:8787": "http://192.168.1.4:8787",
+            "http://100.96.12.34:9119": "http://100.96.12.34:9119"
+        ]
+        for (input, expected) in cases {
+            XCTAssertEqual(try AuthManager.normalizedServerURL(from: input).absoluteString, expected, input)
+        }
     }
 
     func testServerURLNormalizationDropsAccidentalWWWBeforeWebUISubdomain() throws {

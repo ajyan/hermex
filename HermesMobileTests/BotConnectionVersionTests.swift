@@ -102,29 +102,32 @@ final class BotConnectionVersionTests: XCTestCase {
         }
     }
 
-    func testAddressDefaultsHonorLocalNetworksAndExplicitSchemes() throws {
+    func testAddressDefaultsToHTTPOnlyForLoopbackAndHonorsExplicitSchemes() throws {
         let cases = [
             "hermes.example.com": "https://hermes.example.com",
             "machine.tail123.ts.net:443": "https://machine.tail123.ts.net:443",
             "8.8.8.8:9119": "https://8.8.8.8:9119",
             "localhost:9119": "http://localhost:9119",
-            "hermes.local:9119": "http://hermes.local:9119",
-            "hermes:9119": "http://hermes:9119",
-            "10.1.2.3:9119": "http://10.1.2.3:9119",
-            "172.16.0.1": "http://172.16.0.1",
+            "hermes.local:9119": "https://hermes.local:9119",
+            "hermes:9119": "https://hermes:9119",
+            "10.1.2.3:9119": "https://10.1.2.3:9119",
+            "172.16.0.1": "https://172.16.0.1",
             "172.32.0.1": "https://172.32.0.1",
-            "192.168.1.4": "http://192.168.1.4",
-            "169.254.1.4": "http://169.254.1.4",
+            "192.168.1.4": "https://192.168.1.4",
+            "169.254.1.4": "https://169.254.1.4",
             "127.0.0.2": "http://127.0.0.2",
-            "100.64.0.1": "http://100.64.0.1",
+            "100.64.0.1": "https://100.64.0.1",
             "100.128.0.1": "https://100.128.0.1",
             "[::1]:9119": "http://[::1]:9119",
-            "fd7a:115c:a1e0::1": "http://[fd7a:115c:a1e0::1]",
-            "[fe80::1]:9119": "http://[fe80::1]:9119",
+            "fd7a:115c:a1e0::1": "https://[fd7a:115c:a1e0::1]",
+            "[fe80::1]:9119": "https://[fe80::1]:9119",
             "[2001:4860::1]:9119": "https://[2001:4860::1]:9119",
             " HTTPS://HERMES.LOCAL:9119/ ": "https://hermes.local:9119",
             "http://public.example": "http://public.example",
-            "192.168.1.5:9119": "http://192.168.1.5:9119",
+            "192.168.1.5:9119": "https://192.168.1.5:9119",
+            "http://192.168.1.5:9119": "http://192.168.1.5:9119",
+            "app.localhost": "http://app.localhost",
+            "[::ffff:127.0.0.1]": "http://[::ffff:127.0.0.1]",
             // Links copied from a browser, a config file or a curl command.
             "https://hermes.example.com/sessions": "https://hermes.example.com",
             "https://hermes.example.com/login?next=%2F": "https://hermes.example.com",
@@ -134,8 +137,8 @@ final class BotConnectionVersionTests: XCTestCase {
             "WS://192.168.1.5:9119/api/ws": "http://192.168.1.5:9119",
             "http://192.168.1.5:9119/chat/": "http://192.168.1.5:9119",
             "hermes.example.com/Sessions/abc#top": "https://hermes.example.com",
-            "host?key=x": "http://host",
-            "host#fragment": "http://host"
+            "host?key=x": "https://host",
+            "host#fragment": "https://host"
         ]
         for (input, expected) in cases {
             XCTAssertEqual(try BotConnection.address(input).absoluteString, expected, input)

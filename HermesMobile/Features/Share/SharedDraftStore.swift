@@ -683,8 +683,11 @@ enum HermesShareDraft {
         return "\(UUID().uuidString).\(fileExtension)"
     }
 
-    private static func isSafeStoredFileName(_ filename: String) -> Bool {
-        !filename.isEmpty && URL(fileURLWithPath: filename).lastPathComponent == filename
+    /// True for a single file name inside the attachments directory: never empty, a
+    /// path, or `.`/`..`, which would name the directory itself or its parent.
+    static func isSafeStoredFileName(_ filename: String) -> Bool {
+        !filename.isEmpty && filename != "." && filename != ".."
+            && URL(fileURLWithPath: filename).lastPathComponent == filename
     }
 
     private static func inboxRootURL(in directory: URL) -> URL {
