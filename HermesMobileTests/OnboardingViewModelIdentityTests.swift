@@ -490,14 +490,15 @@ final class OnboardingViewModelIdentityTests: XCTestCase {
         let replies: [HermesHostFixture.Reply] = [
             .json(401, .object(["error": .string("Authentication required")])),
             .json(404, .object(["error": .string("Not found")])),
-            // The probe's plain HTTP reached a webui's TLS port, which the webui path reads over https.
+            // A plain-HTTP answer on a TLS port: the webui path still reads it over https.
             .json(400, .string("The plain HTTP request was sent to HTTPS port"))
         ]
         for reply in replies {
             let (gatekeeper, manager) = makeOpenWebui()
             let (form, _) = makeHermesForm { $0.url?.path == "/api/status" ? reply : nil }
             form.serverURLString = "192.168.1.5:8787"
-            XCTAssertEqual(form.addressPreview?.absoluteString, "http://192.168.1.5:8787", "Before anything answers")
+            XCTAssertEqual(form.addressPreview?.absoluteString, "https://192.168.1.5:8787",
+                           "Before anything answers: only loopback defaults to plain HTTP")
 
             await form.testConnection(authManager: manager)
 

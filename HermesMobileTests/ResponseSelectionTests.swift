@@ -441,6 +441,8 @@ private struct MediaTranscriptView: View {
             }
             .padding(12)
         }
+        // The probes are the server's own media; another origin waits for a tap (#274).
+        .environment(\.transcriptServerOrigin, URL(string: "https://cdn.example"))
     }
 
     private func bubble(_ message: ChatMessage) -> MessageBubbleView {
