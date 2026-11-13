@@ -51,6 +51,8 @@ struct VoiceCallSourcesSheet: View {
                     row(source)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Color.hxCanvas.ignoresSafeArea())
             .hxNavigationTitle(String(localized: "Sources"))
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

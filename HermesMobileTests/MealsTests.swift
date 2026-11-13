@@ -86,10 +86,13 @@ final class MealsModelsTests: XCTestCase {
     func testDaysDrawAsDeckDots() throws {
         let home = try Self.home()
         let dots = home.days.map { MealsCopy.dayDot($0, today: home.day) }
-        // Mon logged, Tue tonight, Wed planned ahead, the rest open (a plus, not a dot).
-        XCTAssertEqual(dots, ["done", "today", "ahead", nil, nil, nil, nil])
+        // Mon logged, Tue tonight, Wed planned ahead, the rest open (the off mark, beside a plus).
+        XCTAssertEqual(dots, ["done", "today", "ahead", "off", "off", "off", "off"])
+        // A past night planned but never logged needs a look: the planner's heavy ring, never missed.
         let pastPlan = MealsDay(day: "2026-11-02", night: home.days[1].night, logged: nil)
-        XCTAssertEqual(MealsCopy.dayDot(pastPlan, today: "2026-11-03"), "missed")
+        XCTAssertEqual(MealsCopy.dayDot(pastPlan, today: "2026-11-03"), "today")
+        XCTAssertEqual(MealsCopy.dayDotLabel(pastPlan, today: "2026-11-03"), "Needs a look")
+        XCTAssertEqual(MealsCopy.dayDotLabel(home.days[1], today: home.day), "Tonight")
         XCTAssertEqual(["logged", "out", "open", "skipped", "ahead", "none"].map(MealsCopy.reviewDot),
                        ["done", "done", "today", "skip", "ahead", "off"])
     }

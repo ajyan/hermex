@@ -59,15 +59,7 @@ struct PrepPipelineSection: View {
             }
             .sheet(isPresented: $adding) { JobAddSheet(model: model) }
         } else if model.loadFailed {
-            Button { Task { await model.load() } } label: {
-                Label { Text(verbatim: "Couldn't load your pipeline · Try again") } icon: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .font(BrainStyle.rowSubtitle)
-                .foregroundStyle(Color.accentColor)
-                .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget, alignment: .leading)
-            }
-            .buttonStyle(.plain)
+            HXFailedView(title: "Couldn't load your pipeline", style: .inline) { Task { await model.load() } }
         }
     }
 }
@@ -189,7 +181,7 @@ struct JobNextInterviewCard: View {
                spacing: BrainStyle.s, kicker: {
             Text(verbatim: "Next interview · \(JobCopy.when(inDays: slot.inDays))")
                 .font(BrainStyle.meta)
-                .foregroundStyle(Color.hxTextSecondary)
+                .foregroundStyle(HermexPaper.prep.secondaryInk)
         }, content: {
             Text(verbatim: [JobCopy.day(slot.on), slot.time, slot.role].compactMap { $0 }.joined(separator: " · "))
                 .font(BrainStyle.rowSubtitle)
@@ -257,7 +249,8 @@ struct JobCountPips: View {
                 DeckDot(state: index < count.done ? "done" : "missed", ink: ink, column: column, size: size)
             }
             if count.overflows {
-                Text(verbatim: count.spoken).font(AppFont.caption()).foregroundStyle(.secondary).padding(.leading, 6)
+                // The label's color, which the caller sets for its surface (secondary ink on a card).
+                Text(verbatim: count.spoken).font(AppFont.caption()).padding(.leading, 6)
             }
         }
     }

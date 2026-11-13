@@ -117,12 +117,7 @@ struct BrainHighlightsView: View {
             if viewModel.isLoadingMore {
                 ProgressView()
             } else if viewModel.loadMoreFailed {
-                VStack(spacing: BrainStyle.s) {
-                    Text(verbatim: "Couldn't load more.")
-                        .brainText(.rowSubtitle)
-                    Button(action: loadMore) { Text(verbatim: "Try again") }
-                        .buttonStyle(.borderless)
-                }
+                HXFailedView(title: "Couldn't load more", style: .inline, retry: loadMore)
             } else if viewModel.isShowingCachedCopy, viewModel.list?.nextCursor != nil {
                 // The saved copy is only the first page; this segment may start on a later one.
                 Text(verbatim: "Offline. More are on the server.")
@@ -183,12 +178,8 @@ struct BrainHighlightsBookView: View {
                 Label { Text(verbatim: "No Brain on this server") } icon: { Image(systemName: "brain") }
             }
         case .failed(let message):
-            ContentUnavailableView {
-                Label { Text(verbatim: "Couldn't load this book") } icon: { Image(systemName: "exclamationmark.triangle") }
-            } description: {
-                Text(verbatim: message)
-            } actions: {
-                Button { Task { await viewModel.load() } } label: { Text(verbatim: "Try again") }
+            HXFailedView(title: "Couldn't load this book", message: message) {
+                Task { await viewModel.load() }
             }
         case .loaded(let page):
             BrainHighlightsBookContent(page: page, isShowingCachedCopy: viewModel.isShowingCachedCopy)

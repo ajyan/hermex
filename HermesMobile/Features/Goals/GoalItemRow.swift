@@ -97,7 +97,7 @@ struct GoalItemRow: View {
                 }
                 Group {
                     if recentDate != nil, draft == nil {
-                        GoalItemOffer(tint: tint, isPending: isPending, actions: actions, compact: true) { draft = $0 }
+                        GoalItemOffer(isPending: isPending, actions: actions, compact: true) { draft = $0 }
                     } else {
                         plusOne
                     }
@@ -105,7 +105,7 @@ struct GoalItemRow: View {
                 .transition(.opacity)
             }
             if draft != nil {
-                GoalItemNoteField(draft: $draft, tint: tint, isPending: isPending, actions: actions)
+                GoalItemNoteField(draft: $draft, isPending: isPending, actions: actions)
                     .transition(.opacity)
             }
         }
@@ -142,15 +142,16 @@ struct GoalItemNoteDraft: Equatable {
     var text = ""
 }
 
-/// Add note and Undo for the +1 just counted, each a 44 pt link in the goal's glow. `compact` drops
-/// the leading label for the +1's own slot; `onNote` opens the field for the item's day.
+/// Add note and Undo for the +1 just counted, each a 44 pt link: Nous blue on the app's own
+/// surfaces, the card's glow on a Brief card (`\.hxPaper`). `compact` drops the leading label for
+/// the +1's own slot; `onNote` opens the field for the item's day.
 private struct GoalItemOffer: View {
     var label: String?
-    let tint: GoalTint
     let isPending: Bool
     let actions: GoalItemActions
     var compact = false
     let onNote: (GoalItemNoteDraft) -> Void
+    @Environment(\.hxPaper) private var paper
 
     var body: some View {
         HStack(spacing: BrainStyle.s) {
@@ -173,7 +174,7 @@ private struct GoalItemOffer: View {
         Button(action: action) {
             Text(verbatim: title)
                 .font(BrainStyle.rowSubtitle.weight(.semibold))
-                .foregroundStyle(tint.fill)
+                .foregroundStyle(paper?.glow ?? Color.accentColor)
                 .frame(minHeight: BrainStyle.minTapTarget)
                 .contentShape(Rectangle())
         }
@@ -186,11 +187,12 @@ private struct GoalItemOffer: View {
 /// noted copy landing, saving again counts it anew with the note. Leaving it empty closes it.
 private struct GoalItemNoteField: View {
     @Binding var draft: GoalItemNoteDraft?
-    let tint: GoalTint
     let isPending: Bool
     let actions: GoalItemActions
 
     @FocusState private var focused: Bool
+    /// The card's paper on a Brief card; nil on the app's own surfaces, where Save is Nous blue.
+    @Environment(\.hxPaper) private var paper
 
     var body: some View {
         HStack(spacing: BrainStyle.s) {
@@ -203,13 +205,14 @@ private struct GoalItemNoteField: View {
                 .padding(.horizontal, BrainStyle.m)
                 .frame(minHeight: BrainStyle.minTapTarget - 8)
                 .background(Color.hxSeparator.opacity(0.45), in: RoundedRectangle(cornerRadius: HXRadius.sm))
+            let colors = ChatDecisionButtonStyle.primaryColors(on: paper)
             Button(action: save) {
                 Text(verbatim: draft?.date == nil ? "Add" : "Save")
                     .font(BrainStyle.rowSubtitle.weight(.semibold))
-                    .foregroundStyle(tint.on)
+                    .foregroundStyle(colors.text)
                     .padding(.horizontal, BrainStyle.l)
                     .frame(minHeight: BrainStyle.minTapTarget - 8)
-                    .background(tint.fill, in: Capsule())
+                    .background(colors.fill, in: Capsule())
                     .frame(minHeight: BrainStyle.minTapTarget)
                     .contentShape(Rectangle())
             }
@@ -253,7 +256,6 @@ private struct GoalItemNoteField: View {
 struct GoalItemFollowUp: View {
     /// Leads the offer: "Outreach counted".
     let label: String
-    let tint: GoalTint
     let isPending: Bool
     let recentDate: String?
     let actions: GoalItemActions
@@ -264,9 +266,9 @@ struct GoalItemFollowUp: View {
     var body: some View {
         Group {
             if draft != nil {
-                bar { GoalItemNoteField(draft: $draft, tint: tint, isPending: isPending, actions: actions) }
+                bar { GoalItemNoteField(draft: $draft, isPending: isPending, actions: actions) }
             } else if recentDate != nil {
-                bar { GoalItemOffer(label: label, tint: tint, isPending: isPending, actions: actions) { draft = $0 } }
+                bar { GoalItemOffer(label: label, isPending: isPending, actions: actions) { draft = $0 } }
             }
         }
         .animation(HXMotion.panel(reduceMotion: reduceMotion), value: recentDate != nil)
@@ -278,8 +280,7 @@ struct GoalItemFollowUp: View {
         content()
             .padding(.horizontal, BrainStyle.l)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.hxSurface, in: RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: HXRadius.lg, style: .continuous).strokeBorder(Color.hxSeparator, lineWidth: 0.5))
+            .hxCard()
             .hxShadow(.float)
             .transition(HXMotion.bottomOverlayTransition(reduceMotion: reduceMotion))
     }

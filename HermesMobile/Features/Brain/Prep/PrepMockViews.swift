@@ -287,7 +287,7 @@ struct PrepMockResultView: View {
             if unsent == nil {
                 Text(verbatim: PrepMockCopy.notSentNoRequest)
                     .font(BrainStyle.rowSubtitle)
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(HermexPaper.prep.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let unsent {
@@ -326,7 +326,7 @@ struct PrepMockResultView: View {
             if let detail {
                 Text(verbatim: detail)
                     .font(BrainStyle.meta)
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(HermexPaper.prep.secondaryInk)
             }
         }
     }

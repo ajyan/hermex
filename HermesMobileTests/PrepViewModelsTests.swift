@@ -1079,7 +1079,7 @@ final class PrepViewModelsTests: XCTestCase {
     }
 
     func testWeakSpotsCountGapsAndMissedLessons() {
-        XCTAssertEqual(PrepCopy.weakSpotsHeader(gaps: 10, missed: 3), "10 gaps · 3 missed lessons")
+        XCTAssertEqual(PrepCopy.weakSpotsHeader(gaps: 10, missed: 3), "10 gaps · 3 lessons in reviews")
         XCTAssertEqual(PrepCopy.weakSpotsHeader(gaps: 1, missed: 0), "1 gap")
         XCTAssertEqual(PrepCopy.weakSpotsHeader(gaps: 0, missed: 0), "None open")
     }

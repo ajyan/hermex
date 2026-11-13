@@ -156,16 +156,17 @@ struct PrepTodayCard: View {
             if run.catchingUp && action != .done {
                 Text(verbatim: PrepCopy.catchUpLine(reviewsDue: run.reviewsDue, hold: run.reviewHold))
                     .font(BrainStyle.meta)
-                    .foregroundStyle(Color.hxTextSecondary)
+                    .foregroundStyle(HermexPaper.prep.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Label {
                 Text(verbatim: PrepCopy.speakingStreak(days: streakDays))
             } icon: {
-                Image(systemName: "flame").foregroundStyle(HermexPaper.prep.glow)
+                // Reward gold: a mark, not an object.
+                Image(systemName: "flame").foregroundStyle(HermexPaper.opener.glow)
             }
             .font(BrainStyle.meta)
-            .foregroundStyle(Color.hxTextSecondary)
+            .foregroundStyle(HermexPaper.prep.secondaryInk)
         }, footer: {
             VStack(spacing: BrainStyle.m) {
                 // Once started: how far it got. Before, the size line above already says it.
@@ -423,7 +424,7 @@ private struct PrepPathRow<Content: View>: View {
 }
 
 /// A node's disc. Ready is filled glow with ✓; learned is a glow ring; a lesson back in reviews is a
-/// neutral ring with ◌ (it rejoins reviews, it didn't fail); next is larger with a heavy glow ring (it's
+/// neutral ring with ◌ (it rejoins reviews, it didn't fail); next is a heavy glow ring with no glyph (it's
 /// in today's run, not a control); locked is neutral; the boss is a gold crown.
 private struct PrepNodeDisc: View {
     enum Kind { case ready, learned, shaky, next, locked, boss }
@@ -432,7 +433,6 @@ private struct PrepNodeDisc: View {
 
     var body: some View {
         let paper = HermexPaper.prep
-        let size = kind == .next ? side * 1.2 : side
         ZStack {
             switch kind {
             case .ready:
@@ -448,8 +448,7 @@ private struct PrepNodeDisc: View {
                 symbol("circle.dashed", weight: .semibold, color: .hxTextSecondary)
             case .next:
                 Circle().fill(paper.wash)
-                Circle().strokeBorder(paper.glow, lineWidth: 4)
-                symbol("arrow.forward", weight: .bold, color: paper.glow)
+                Circle().strokeBorder(paper.glow, lineWidth: 5)
             case .locked:
                 Circle().fill(Color.hxSurface)
                 Circle().strokeBorder(Color.hxSeparator, lineWidth: 0.5)
@@ -460,7 +459,7 @@ private struct PrepNodeDisc: View {
                 symbol("crown", weight: .semibold, color: HermexPaper.opener.glow)
             }
         }
-        .frame(width: size, height: size)
+        .frame(width: side, height: side)
         .accessibilityHidden(true)
     }
 
@@ -514,7 +513,7 @@ private struct PrepLessonNodeLink: View {
                     .foregroundStyle(kind == .locked ? Color.hxTextSecondary : Color.hxTextPrimary)
                     .lineLimit(2)
                 if kind == .shaky {
-                    Text(verbatim: "Missed last recall").font(BrainStyle.meta).foregroundStyle(Color.hxTextSecondary)
+                    Text(verbatim: "In reviews").font(BrainStyle.meta).foregroundStyle(Color.hxTextSecondary)
                 } else if kind == .next {
                     Text(verbatim: PrepCopy.nextLessonLine(catchingUp: catchingUp)).font(BrainStyle.meta)
                         .foregroundStyle(HermexPaper.prep.glow)

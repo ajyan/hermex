@@ -5,11 +5,21 @@ struct AtlasRulesView: View {
     let server: URL
 
     @State private var rules: [AtlasRule] = []
+    /// What the server says is wrong with the rules file.
     @State private var errorMessage: String?
+    /// Why the last load failed; the rules already shown stay.
+    @State private var loadError: String?
     @State private var isLoaded = false
 
     var body: some View {
         List {
+            if let loadError, !rules.isEmpty {
+                HXFailedView(title: String(localized: "Couldn't load rules"), message: loadError, style: .inline) {
+                    Task { await load() }
+                }
+                .buttonStyle(.borderless)
+                .listRowBackground(Color.hxSurface)
+            }
             if let errorMessage {
                 Text(errorMessage).foregroundStyle(.hxWarning)
                     .listRowBackground(Color.hxSurface)
@@ -20,11 +30,7 @@ struct AtlasRulesView: View {
                         Text(rule.id).font(AppFont.subheadline(weight: .semibold))
                             .foregroundStyle(Color.hxTextPrimary)
                         Spacer()
-                        Text(rule.action.capitalized)
-                            .font(AppFont.caption(weight: .semibold))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .background(.hxSeparator.opacity(0.4), in: Capsule())
+                        HXChip(paper: .tool, label: rule.action.capitalized)
                     }
                     Text(rule.description)
                         .font(AppFont.footnote())
@@ -37,8 +43,14 @@ struct AtlasRulesView: View {
         .scrollContentBackground(.hidden)
         .background(Color.hxCanvas.ignoresSafeArea())
         .overlay {
-            if isLoaded, rules.isEmpty, errorMessage == nil {
-                ContentUnavailableView("No rules", systemImage: "list.bullet.clipboard")
+            if isLoaded, rules.isEmpty {
+                if let loadError {
+                    HXFailedView(title: String(localized: "Couldn't load rules"), message: loadError) {
+                        Task { await load() }
+                    }
+                } else if errorMessage == nil {
+                    ContentUnavailableView("No rules", systemImage: "list.bullet.clipboard")
+                }
             }
         }
         .hxNavigationTitle(String(localized: "Rules"))
@@ -51,10 +63,11 @@ struct AtlasRulesView: View {
             let snapshot = try await APIClient(baseURL: server).atlasRules()
             rules = snapshot.rules
             errorMessage = snapshot.error
+            loadError = nil
         } catch is CancellationError {
             return
         } catch {
-            errorMessage = error.localizedDescription
+            loadError = error.localizedDescription
         }
         isLoaded = true
     }

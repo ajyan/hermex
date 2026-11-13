@@ -388,6 +388,14 @@ final class BrainConnectionsTests: XCTestCase {
         XCTAssertEqual(groups.tagged.map(\.id), ["t", "old"], "an older server's reasons still land in Also tagged")
     }
 
+    func testFurtherReadingShowsAtMostThreeOfEach() {
+        let refs = (0..<5).map { BrainRef(module: .wiki, id: "s\($0)", reason: "source") }
+            + (0..<5).map { BrainRef(module: .wiki, id: "t\($0)", reason: "#rome") }
+        let groups = BrainReaderLayout.furtherGroups(refs)
+        XCTAssertEqual(groups.sources.map(\.id), ["s0", "s1", "s2"])
+        XCTAssertEqual(groups.tagged.map(\.id), ["t0", "t1", "t2"])
+    }
+
     func testTagsLinkToTheListsThatFilterByTag() {
         XCTAssertTrue(BrainReaderLayout.tagsFilter(.wiki))
         XCTAssertTrue(BrainReaderLayout.tagsFilter(.articles))

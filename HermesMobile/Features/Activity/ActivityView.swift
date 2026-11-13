@@ -49,7 +49,9 @@ struct ActivityView: View {
             pullToRetry { ContentUnavailableView("The activity service isn't running", systemImage: "bolt.slash") }
         case .failed(let message) where viewModel.events.isEmpty:
             pullToRetry {
-                ContentUnavailableView("Couldn't load activity", systemImage: "exclamationmark.triangle", description: Text(message))
+                HXFailedView(title: String(localized: "Couldn't load activity"), message: message) {
+                    Task { await viewModel.reload() }
+                }
             }
         case .idle, .loading where viewModel.events.isEmpty:
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -168,15 +170,27 @@ struct ActivityView: View {
     }
 }
 
+/// A tool step's icon on a 20 pt tile in the tool paper, as chat's tool log rows draw it.
+private struct ActivityToolTile: View {
+    let symbol: String
+
+    var body: some View {
+        let paper = HermexPaper.tool
+        Image(systemName: symbol)
+            .font(AppFont.caption2(weight: .semibold))
+            .foregroundStyle(paper.glow)
+            .frame(width: 20, height: 20)
+            .background(paper.wash, in: RoundedRectangle(cornerRadius: HXRadius.xs, style: .continuous))
+            .accessibilityHidden(true)
+    }
+}
+
 private struct ActivityRow: View {
     let event: AtlasActivityEvent
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: ActivityPresentation.symbol(forTool: event.toolName))
-                .frame(width: 24)
-                .foregroundStyle(.hxTextSecondary)
-                .accessibilityHidden(true)
+            ActivityToolTile(symbol: ActivityPresentation.symbol(forTool: event.toolName))
             VStack(alignment: .leading, spacing: 4) {
                 Text(ActivityPresentation.toolTitle(event.toolName))
                     .font(AppFont.subheadline(weight: .semibold))
@@ -234,10 +248,7 @@ private struct EpisodeRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: ActivityPresentation.symbol(forTool: episode.tools.first ?? ""))
-                .frame(width: 24)
-                .foregroundStyle(.hxTextSecondary)
-                .accessibilityHidden(true)
+            ActivityToolTile(symbol: ActivityPresentation.symbol(forTool: episode.tools.first ?? ""))
             VStack(alignment: .leading, spacing: 4) {
                 Text(ActivityPresentation.episodeTitle(rulePlain: episode.rulePlain))
                     .font(AppFont.subheadline(weight: .semibold))

@@ -74,7 +74,7 @@ struct WeekWordsBox: View {
                 }
                 Text(verbatim: words.isEmpty ? placeholder : words)
                     .font(AppFont.serif(style: .subheadline))
-                    .foregroundStyle(words.isEmpty ? Color.hxTextSecondary : Color.hxTextPrimary)
+                    .foregroundStyle(words.isEmpty ? palette.secondaryInk : Color.hxTextPrimary)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -155,8 +155,8 @@ struct WeekHairline: View {
     }
 }
 
-/// A choice in the week's paper: the wash until chosen, then filled with the glow. The weekly
-/// cards keep Nous blue for Begin, Seal, and Confirm, so their choices wear the card's hue.
+/// A choice in the week's paper: the wash until chosen, then filled with the glow, like every
+/// control on the week's glow cards (Seal the week, Accept).
 struct WeekChoiceChip: View {
     let title: String
     var symbol: String?
@@ -280,7 +280,7 @@ struct WeekEditorSheet: View {
                     if let subtitle {
                         Text(verbatim: subtitle)
                             .font(AppFont.subheadline())
-                            .foregroundStyle(Color.hxTextSecondary)
+                            .foregroundStyle(palette.secondaryInk)
                     }
                 }
                 .fixedSize(horizontal: false, vertical: true)
@@ -295,7 +295,7 @@ struct WeekEditorSheet: View {
                         if text.isEmpty {
                             Text(verbatim: placeholder)
                                 .font(serif ? AppFont.serif(style: .body) : AppFont.body())
-                                .foregroundStyle(Color.hxTextSecondary)
+                                .foregroundStyle(palette.secondaryInk)
                                 .padding(.top, 8)
                                 .padding(.leading, 5)
                                 .allowsHitTesting(false)
