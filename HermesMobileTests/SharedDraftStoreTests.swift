@@ -403,6 +403,13 @@ final class SharedDraftStoreTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: legacyAttachmentsURL.path))
     }
 
+    func testStoredFileNamesMustNameOneFileInTheAttachmentsDirectory() {
+        XCTAssertTrue(HermesShareDraft.isSafeStoredFileName("2F1C.png"))
+        for unsafe in ["", ".", "..", "../payload.json", "a/b", "/etc/hosts"] {
+            XCTAssertFalse(HermesShareDraft.isSafeStoredFileName(unsafe), unsafe)
+        }
+    }
+
     func testEmptyPendingDraftIsNotWritten() throws {
         let directory = try temporaryDirectory()
 
