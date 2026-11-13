@@ -1482,7 +1482,7 @@ private struct FollowUpRow: View {
         VStack(alignment: .leading, spacing: 8) {
             // The Sunday view-take card: its kicker, the week's answers, and what you said last time.
             ForEach(Array(card.lines.enumerated()), id: \.offset) { _, line in
-                Text(verbatim: line).font(AppFont.footnote()).foregroundStyle(isPage ? palette.ink : .secondary)
+                Text(verbatim: line).font(AppFont.footnote()).foregroundStyle(isPage ? palette.ink : palette.secondaryInk)
             }
             Text(verbatim: card.title ?? (isPage ? palette.name : "Follow-up"))
                 .font(isPage ? AppFont.display(style: .title2, weight: .semibold) : AppFont.headline())
@@ -1491,13 +1491,13 @@ private struct FollowUpRow: View {
                 .padding(.bottom, isPage ? 6 : 0)
                 .accessibilityAddTraits(isPage ? .isHeader : [])
             if let body = card.decisionBody {
-                Text(verbatim: body).font(AppFont.subheadline()).foregroundStyle(.secondary)
+                Text(verbatim: body).font(AppFont.subheadline()).foregroundStyle(palette.secondaryInk)
             }
             if !card.entries.isEmpty {
                 RecapList(entries: card.entries, palette: palette).padding(.vertical, 6)
             }
             if let context = card.context {
-                Text(verbatim: context).font(AppFont.subheadline()).foregroundStyle(.secondary)
+                Text(verbatim: context).font(AppFont.subheadline()).foregroundStyle(palette.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let preview = draftPreview {
@@ -1510,7 +1510,7 @@ private struct FollowUpRow: View {
                         }
                     }
                     .font(AppFont.caption(weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.hxTextSecondary)
                     if preview.editable {
                         // The words Text sends: tap to change them before Messages opens.
                         let message = Binding(get: { editedText ?? preview.text }, set: { editedText = $0 })
