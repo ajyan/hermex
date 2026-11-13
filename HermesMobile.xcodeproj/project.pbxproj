@@ -592,6 +592,7 @@
 		1A2B3C4D5E6F700000000102 /* AppThemeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F700000000103 /* AppThemeTests.swift */; };
 		8C3A97D597D2A395D84CD232 /* HermexColorsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CAE7665F6FE8B55B3DBAAF0 /* HermexColorsTests.swift */; };
 		D35A00000000000000000003 /* DesignSystemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D35A00000000000000000004 /* DesignSystemTests.swift */; };
+		0B1EC7EE0000000000000001 /* ObjectKeyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1EC7EE0000000000000002 /* ObjectKeyTests.swift */; };
 		863000000000000000000003 /* NotificationOfferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 863000000000000000000004 /* NotificationOfferTests.swift */; };
 		C012400000000000000006 /* AppIconChoiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C012400000000000000005 /* AppIconChoiceTests.swift */; };
 		1A2B3C4D5E6F70000000110 /* ArchivedSessionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F70000000111 /* ArchivedSessionsView.swift */; };
@@ -1528,6 +1529,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 		1A2B3C4D5E6F700000000103 /* AppThemeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppThemeTests.swift; sourceTree = "<group>"; };
 		2CAE7665F6FE8B55B3DBAAF0 /* HermexColorsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermexColorsTests.swift; sourceTree = "<group>"; };
 		D35A00000000000000000004 /* DesignSystemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystemTests.swift; sourceTree = "<group>"; };
+		0B1EC7EE0000000000000002 /* ObjectKeyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectKeyTests.swift; sourceTree = "<group>"; };
 		863000000000000000000004 /* NotificationOfferTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationOfferTests.swift; sourceTree = "<group>"; };
 		C012400000000000000005 /* AppIconChoiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconChoiceTests.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F70000000111 /* ArchivedSessionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchivedSessionsView.swift; sourceTree = "<group>"; };
@@ -2336,6 +2338,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				1A2B3C4D5E6F700000000103 /* AppThemeTests.swift */,
 				2CAE7665F6FE8B55B3DBAAF0 /* HermexColorsTests.swift */,
 				D35A00000000000000000004 /* DesignSystemTests.swift */,
+				0B1EC7EE0000000000000002 /* ObjectKeyTests.swift */,
 				863000000000000000000004 /* NotificationOfferTests.swift */,
 				C012400000000000000005 /* AppIconChoiceTests.swift */,
 				C03120000000000000F006 /* APIClientGitTests.swift */,
@@ -4206,6 +4209,7 @@ AB95FB3D3F6A66DA3E53066D /* GoalRecordView.swift */ = {isa = PBXFileReference; l
 				1A2B3C4D5E6F700000000102 /* AppThemeTests.swift in Sources */,
 				8C3A97D597D2A395D84CD232 /* HermexColorsTests.swift in Sources */,
 				D35A00000000000000000003 /* DesignSystemTests.swift in Sources */,
+				0B1EC7EE0000000000000001 /* ObjectKeyTests.swift in Sources */,
 				863000000000000000000003 /* NotificationOfferTests.swift in Sources */,
 				C012400000000000000006 /* AppIconChoiceTests.swift in Sources */,
 				C03120000000000000B006 /* APIClientGitTests.swift in Sources */,

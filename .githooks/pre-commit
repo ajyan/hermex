@@ -1,0 +1,5 @@
+#!/bin/sh
+# Blocks a commit whose added Swift lines bypass DESIGN.md (scripts/check-design-drift --staged).
+# Turned on with `git config core.hooksPath .githooks`; bypass once with `git commit --no-verify`.
+git diff --cached --quiet -- 'HermesMobile/*.swift' && exit 0
+exec scripts/check-design-drift --staged

@@ -322,7 +322,7 @@ struct PrepStoryPageView: View {
         case .failed(let message):
             // A server without the story page can still drill the story.
             ContentUnavailableView {
-                Label { Text(verbatim: "Couldn't load this story") } icon: { Image(systemName: "exclamationmark.triangle") }
+                Label { Text(verbatim: "Couldn't load this story") } icon: { Image(systemName: "exclamationmark.triangle") } // design-drift: allow a second action (Drill it) HXFailedView has no slot for
             } description: {
                 Text(verbatim: message)
             } actions: {

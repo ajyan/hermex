@@ -6,7 +6,9 @@ import SwiftUI
 enum GoalPaper {
     /// The papers a goal can take, and their names in the goal file (`color:`). The widget reads the
     /// name back (`AtlasWidgetGoals.paper(named:)`).
-    static let choices: [DeckPalette] = [.wiki, .quote, .book, .reading, .notes, .video, .past]
+    /// Each wears the paper it's named for, not the Brief palette's (those are all the Brain's green).
+    static let choices: [DeckPalette] = zip([DeckPalette.wiki, .quote, .book, .reading, .notes, .video, .past], names)
+        .map { palette, name in palette.wearing(HermexPaper.named(name) ?? .knowledge) }
     static let names = ["wiki", "quote", "book", "reading", "notes", "video", "past"]
 
     /// Where an amber name lands: `reading`, the nearest warm hue that isn't amber, so a goal its

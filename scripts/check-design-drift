@@ -1,61 +1,216 @@
-#!/usr/bin/env bash
-# Reports Swift code that bypasses the design system (DESIGN.md): fixed font sizes, one-off
-# corner radii, raw materials, raw colors, and raw animation curves outside Config/. A warning, never a gate, like
-# check-swift-file-sizes. A line that is a documented exception (DESIGN.md § Decisions and
-# exceptions, or an SF Symbol in a fixed-size control) can end with `// design-drift: allow`.
-set -euo pipefail
+#!/usr/bin/env python3
+"""Reports Swift code that bypasses the design system (DESIGN.md).
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-scan_root="$repo_root/HermesMobile"
+    scripts/check-design-drift              every warning in HermesMobile/ (exit 0; fix what you touch)
+    scripts/check-design-drift --staged     only lines added in the index; exit 1 on any (the pre-commit hook)
+    scripts/check-design-drift --changed [BASE]
+                                            only lines added since BASE (default: the merge-base with
+                                            origin/master), working tree included; exit 1 on any
 
-warning_count=0
+The whole-tree report checks the rules marked `everywhere`. A gated run also checks the rules for new
+code, which would drown the whole-tree report in old lines but should never be written again.
 
-# report <title> <hint> <extended regex> [exclude path regex]
-report() {
-  local title="$1" hint="$2" pattern="$3" exclude="${4:-^$}"
-  local count=0
-  while IFS= read -r match; do
-    local file="${match%%:*}" rest="${match#*:}"
-    local line="${rest%%:*}"
-    local relative_path="${file#"$repo_root/"}"
-    [[ "$relative_path" =~ $exclude ]] && continue
-    [[ "$rest" == *"design-drift: allow"* ]] && continue
-    count=$((count + 1))
-    if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
-      printf "::warning file=%s,line=%s,title=Design drift::%s. %s\n" "$relative_path" "$line" "$title" "$hint"
-    fi
-    printf "warning: %s:%s: %s\n" "$relative_path" "$line" "$title"
-  done < <(grep -rnE --include='*.swift' "$pattern" "$scan_root" | sort -t: -k1,1 -k2,2n || true)
-  if (( count > 0 )); then
-    printf "  %d × %s: %s\n\n" "$count" "$title" "$hint"
-  fi
-  warning_count=$((warning_count + count))
-}
+A line that is a documented exception (DESIGN.md § Decisions and exceptions, an SF Symbol in a
+fixed-size control, a control on a neutral surface spelled out on purpose) ends with
+`// design-drift: allow <why>`.
+"""
 
-report ".system(size:)" \
-  "use AppFont (Dynamic Type); a fixed size is only for an SF Symbol in a fixed-size control" \
-  '\.system\(size:'
+from __future__ import annotations
 
-report "numeric cornerRadius" \
-  "use HXRadius (xs 6, sm 10, md 14, lg 18, xl 28) or HXCardRole.shape" \
-  'cornerRadius: *[0-9]'
+import argparse
+import os
+import re
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
 
-report "raw material" \
-  "content cards are opaque (hxCard, HXCard); floating controls use .glassEffect" \
-  '\.(ultraThin|thin|regular|thick|ultraThick)Material\b'
+ALLOW = "design-drift: allow"
+SCAN_ROOT = "HermesMobile"
 
-report "raw color outside Config/" \
-  "use the hx* neutrals or a HermexPaper; new tokens go in Config/" \
-  'Color\(red:|Color\(hex|UIColor\(red:|"#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?"|0x[0-9A-Fa-f]{6}\b' \
-  '^HermesMobile/Config/'
 
-report "raw animation curve" \
-  "use an HXMotion curve (DESIGN.md § Motion), which also honors Reduce Motion" \
-  '(\.(spring|snappy|smooth|bouncy|easeIn|easeOut|easeInOut|linear)\(|withAnimation *\{|withAnimation\(\.(spring|snappy|smooth|bouncy|easeIn|easeOut|easeInOut|linear|default)\b)' \
-  '^HermesMobile/Config/'
+@dataclass(frozen=True)
+class Rule:
+    title: str
+    hint: str
+    pattern: re.Pattern[str]
+    exclude: re.Pattern[str] | None = None
+    everywhere: bool = True
 
-if (( warning_count == 0 )); then
-  echo "No design drift found."
-else
-  echo "$warning_count design drift warning(s). Not a gate: fix what you touch."
-fi
+    def applies(self, path: str, text: str) -> bool:
+        if self.exclude and self.exclude.search(path):
+            return False
+        return bool(self.pattern.search(text))
+
+
+CONFIG = re.compile(r"^HermesMobile/Config/")
+
+RULES: list[Rule] = [
+    Rule(".system(size:)",
+         "use AppFont (Dynamic Type); a fixed size is only for an SF Symbol in a fixed-size control",
+         re.compile(r"\.system\(size:")),
+    Rule("numeric cornerRadius",
+         "use HXRadius (xs 6, sm 10, md 14, lg 18, xl 28) or HXCardRole.shape",
+         re.compile(r"cornerRadius: *[0-9]")),
+    Rule("raw material",
+         "content cards are opaque (hxCard, HXCard); floating controls use .glassEffect",
+         re.compile(r"\.(ultraThin|thin|regular|thick|ultraThick)Material\b")),
+    Rule("raw color outside Config/",
+         "use the hx* neutrals or a HermexPaper; new tokens go in Config/",
+         re.compile(r'Color\(red:|Color\(hex|UIColor\(red:|"#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?"|0x[0-9A-Fa-f]{6}\b'),
+         CONFIG),
+    Rule("raw animation curve",
+         "use an HXMotion curve (DESIGN.md § Motion), which also honors Reduce Motion",
+         re.compile(r"(\.(spring|snappy|smooth|bouncy|easeIn|easeOut|easeInOut|linear)\(|withAnimation *\{|"
+                    r"withAnimation\(\.(spring|snappy|smooth|bouncy|easeIn|easeOut|easeInOut|linear|default)\b)"),
+         CONFIG),
+    Rule("retry copy",
+         'a failure offers "Try again" through HXFailedView (DESIGN.md § Failed state)',
+         re.compile(r'"(Retry|Try Again)"')),
+    Rule("hand-built failure",
+         "use HXFailedView (full screen, or style: .inline over older content)",
+         re.compile(r'ContentUnavailableView\(\s*"Couldn|Label *\{ *Text\((verbatim: *)?"Couldn')),
+    Rule("retired paper",
+         "ledger and kitchen are retired (2026-11-13); wear the place's paper (DESIGN.md § The object key)",
+         re.compile(r"HermexPaper\.(ledger|kitchen)\b"),
+         re.compile(r"^HermesMobile/Config/HermexColors\.swift$")),
+    # New code only.
+    Rule("hxTextSecondary as a text color",
+         "use .foregroundStyle(.hxSecondary): the card's secondaryInk on a glow or wash card, hxTextSecondary elsewhere",
+         re.compile(r"\.foreground(Style|Color)\((Color)?\.hxTextSecondary\)"),
+         CONFIG, everywhere=False),
+    Rule("Nous blue spelled out",
+         "controls already take Nous blue on the app's surfaces and the card's hue on a glow or wash card; "
+         "naming accentColor overrides the card (principle 5). On a neutral surface on purpose, allow it",
+         re.compile(r"\.tint\((Color)?\.accentColor\)|\.(foregroundStyle|background|fill)\((Color)?\.accentColor\b"),
+         CONFIG, everywhere=False),
+    Rule("system text style",
+         "use hxTextPrimary or .hxSecondary, not .primary/.secondary/.tertiary",
+         re.compile(r"\.foreground(Style|Color)\(\.(primary|secondary|tertiary)\)"),
+         CONFIG, everywhere=False),
+    Rule("raw white or black",
+         "use the hx* tokens (hxOnAccent on a Nous-blue fill, a paper's onGlow on its glow)",
+         re.compile(r"\b(Color|UIColor)\.(white|black)\b|\.foregroundStyle\(\.(white|black)\)"),
+         CONFIG, everywhere=False),
+    Rule("system Divider",
+         "use an hxSeparator hairline (PrepRowDivider) inside cards",
+         re.compile(r"(^|[^A-Za-z])Divider\(\)"),
+         CONFIG, everywhere=False),
+    Rule("bar chart",
+         "numbers are dots and pips (DeckDot, DeckDots), never bars; bars only in Sleep trends and race day",
+         re.compile(r"\b(BarMark|RectangleMark)\("),
+         everywhere=False),
+    Rule("faded glow",
+         "text and controls in a hue are never faded (principle 4); fade only decorative marks",
+         re.compile(r"\b(glow|ink)\.opacity\("),
+         CONFIG, everywhere=False),
+    Rule("system navigation title",
+         "every screen uses the shared header: .hxNavigationTitle",
+         re.compile(r"\.navigationTitle\("),
+         everywhere=False),
+    Rule("uppercase",
+         "section headers are sentence case (HXSectionHeader), never uppercase",
+         re.compile(r"\.textCase\(\.uppercase\)"),
+         everywhere=False),
+]
+
+
+def repo_root() -> Path:
+    out = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=True)
+    return Path(out.stdout.strip())
+
+
+def whole_tree(root: Path) -> list[tuple[str, int, str]]:
+    lines = []
+    for path in sorted((root / SCAN_ROOT).rglob("*.swift")):
+        relative = path.relative_to(root).as_posix()
+        for number, text in enumerate(path.read_text(errors="replace").splitlines(), 1):
+            lines.append((relative, number, text))
+    return lines
+
+
+HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+
+
+def added_lines(diff: str) -> list[tuple[str, int, str]]:
+    """The added lines of a `git diff -U0`, as (path, new line number, text)."""
+    lines, path, number = [], None, 0
+    for raw in diff.splitlines():
+        if raw.startswith("+++ "):
+            target = raw[4:]
+            path = target[2:] if target.startswith("b/") else None
+        elif raw.startswith("@@"):
+            match = HUNK.match(raw)
+            number = int(match.group(1)) if match else 0
+        elif raw.startswith("+") and path:
+            lines.append((path, number, raw[1:]))
+            number += 1
+    return lines
+
+
+def git_diff(args: list[str]) -> str:
+    command = ["git", "diff", "-U0", "--no-color", "--no-ext-diff", *args, "--", f"{SCAN_ROOT}/*.swift"]
+    return subprocess.run(command, capture_output=True, text=True, check=True).stdout
+
+
+def default_base() -> str:
+    out = subprocess.run(["git", "merge-base", "HEAD", "origin/master"], capture_output=True, text=True)
+    return out.stdout.strip() or "HEAD"
+
+
+def findings(lines: list[tuple[str, int, str]], gated: bool) -> list[tuple[Rule, str, int]]:
+    found = []
+    for rule in RULES:
+        if not (rule.everywhere or gated):
+            continue
+        for path, number, text in lines:
+            if not path.endswith(".swift") or ALLOW in text:
+                continue
+            if rule.applies(path, text):
+                found.append((rule, path, number))
+    return found
+
+
+def report(found: list[tuple[Rule, str, int]]) -> None:
+    github = os.environ.get("GITHUB_ACTIONS") == "true"
+    for rule in RULES:
+        hits = [(path, number) for r, path, number in found if r is rule]
+        for path, number in hits:
+            if github:
+                print(f"::warning file={path},line={number},title=Design drift::{rule.title}. {rule.hint}")
+            print(f"warning: {path}:{number}: {rule.title}")
+        if hits:
+            print(f"  {len(hits)} × {rule.title}: {rule.hint}\n")
+
+
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Report Swift code that bypasses DESIGN.md.")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--staged", action="store_true", help="check lines added in the index; exit 1 on any")
+    mode.add_argument("--changed", nargs="?", const="", metavar="BASE",
+                      help="check lines added since BASE (default: merge-base with origin/master); exit 1 on any")
+    args = parser.parse_args(argv)
+
+    root = repo_root()
+    os.chdir(root)
+    if args.staged:
+        found = findings(added_lines(git_diff(["--cached"])), gated=True)
+    elif args.changed is not None:
+        found = findings(added_lines(git_diff([args.changed or default_base()])), gated=True)
+    else:
+        found = findings(whole_tree(root), gated=False)
+        report(found)
+        print("No design drift found." if not found
+              else f"{len(found)} design drift warning(s). Not a gate: fix what you touch.")
+        return 0
+
+    report(found)
+    if not found:
+        return 0
+    print(f"{len(found)} new design drift warning(s) in the lines you changed (DESIGN.md).")
+    print("Fix them, or end a line that is a documented exception with `// design-drift: allow <why>`.")
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

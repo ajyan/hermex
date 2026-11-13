@@ -45,10 +45,12 @@ struct BrainCatchUpCard: View {
                     .font(AppFont.body())
                     .foregroundStyle(Color.hxTextPrimary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .tint(.accentColor) // design-drift: allow links in the recap stay Nous blue on the glow card
             }
             if !lines.isEmpty {
                 BrainBulletList(lines: lines, marker: "·", markerColor: paper.glow, textColor: paper.glow,
                                 font: AppFont.subheadline(weight: .medium))
+                    .tint(.accentColor) // design-drift: allow links in the open threads stay Nous blue
             }
         }
     }
