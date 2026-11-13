@@ -1318,7 +1318,8 @@ private struct MoodChart: View {
     }
 }
 
-/// A goals card's week: each commitment under its goal, with how many of its target you hit.
+/// A goals card's week: each commitment under its goal, with a pip per unit of its target, filled for
+/// each one hit, in the close tracker's columns (`DeckWeekGridLayout`). Numbers are pips, never a bar or a count.
 private struct GoalMeters: View {
     let meters: [DeckMeter]
     let palette: DeckPalette
@@ -1332,25 +1333,26 @@ private struct GoalMeters: View {
                         .foregroundStyle(palette.secondaryInk)
                         .padding(.top, index == 0 ? 0 : 6)
                 }
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(verbatim: meter.label).font(AppFont.body())
-                        Spacer(minLength: 8)
-                        Text(verbatim: "\(meter.done) of \(meter.target)")
-                            .font(AppFont.subheadline(weight: .semibold))
-                            .monospacedDigit()
-                    }
-                    Capsule()
-                        .fill(palette.ink.opacity(0.12))
-                        .frame(height: 8)
-                        .overlay(alignment: .leading) {
-                            GeometryReader { proxy in
-                                Capsule().fill(palette.ink).frame(width: proxy.size.width * meter.fraction)
-                            }
-                        }
-                        .accessibilityHidden(true)
+                HStack(alignment: .center, spacing: 8) {
+                    Text(verbatim: meter.label)
+                        .font(AppFont.body())
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    pips(meter)
                 }
-                .accessibilityElement(children: .combine)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text(verbatim: "\(meter.label), \(meter.done) of \(meter.target)"))
+            }
+        }
+    }
+
+    private func pips(_ meter: DeckMeter) -> some View {
+        let count = max(meter.target, meter.done)
+        let column = DeckWeekGridLayout.pipColumn(pips: count, addsOne: false)
+        return HStack(spacing: 0) {
+            ForEach(0..<count, id: \.self) { index in
+                DeckDot(state: index < meter.done ? "done" : "missed", ink: palette.ink, column: column,
+                        size: min(DeckDots.dot, column - 4))
             }
         }
     }
