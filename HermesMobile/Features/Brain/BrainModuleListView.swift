@@ -230,19 +230,17 @@ struct BrainModuleListView: View {
         if module == .journal {
             BrainListStateView(viewModel: viewModel) { list in
                 BrainJournalCalendarView(
-                    list: list,
+                    index: viewModel.journal,
                     isLoadingOlder: list.nextCursor != nil && !viewModel.loadMoreFailed && !viewModel.isShowingCachedCopy,
                     loadOlderFailed: viewModel.loadMoreFailed,
                     isShowingCachedCopy: viewModel.isShowingCachedCopy,
-                    onRetry: { loadMore() }
+                    // Keyed by the load too: a refresh drops the page in flight and lands on the same cursor, so
+                    // paging starts again from there.
+                    pageKey: "\(list.nextCursor ?? -1)-\(viewModel.loads)",
+                    onRetry: { loadMore() },
+                    loadOlder: { await viewModel.loadMore() }
                 )
                 .refreshable { await viewModel.load() }
-                // Older pages load one after another so earlier months fill in. Keyed by the load
-                // too: a refresh drops the page in flight and lands on the same cursor, so paging
-                // starts again from there.
-                .task(id: "\(list.nextCursor ?? -1)-\(viewModel.loads)") {
-                    if list.nextCursor != nil { await viewModel.loadMore() }
-                }
             }
         } else if hasChipBar, !chipTags.isEmpty {
             // The chip bar stays put while a tag reloads; the state shows beneath it.

@@ -216,7 +216,21 @@ final class BrainHomeViewModel {
 final class BrainListViewModel {
     let module: BrainModuleID
     private(set) var state: BrainLoadState<BrainList> = .loading
-    private(set) var list: BrainList?
+    private(set) var list: BrainList? {
+        didSet {
+            revision += 1
+            guard module == .people else { return }
+            everyone = BrainListLayout.uniqueItems(list?.items ?? [])
+            peopleRelationships = BrainPeopleLayout.relationships(everyone)
+        }
+    }
+    /// Bumped whenever `list` changes, so views can keep what they derive from it until it moves.
+    private(set) var revision = 0
+    /// People only: the list's people, each once, and their relationship types with counts, built once per page.
+    private(set) var everyone: [BrainItem] = []
+    private(set) var peopleRelationships: [BrainPeopleLayout.Relationship] = []
+    /// Journal only: the calendar's days, grown as each older page lands.
+    private(set) var journal = BrainJournalIndex()
     private(set) var isShowingCachedCopy = false
     private(set) var isLoadingMore = false
     /// True while a first-page load is in flight; `loadMore` waits it out.
@@ -312,6 +326,7 @@ final class BrainListViewModel {
             let page = try await client.list(module: module, tag: selectedTag, cursor: cursor)
             guard !Task.isCancelled, token == generation, let current = list else { return }
             let merged = Self.merge(current, page)
+            if module == .journal { journal.add(page.items) }
             list = merged
             state = .loaded(merged)
         } catch {
@@ -322,6 +337,7 @@ final class BrainListViewModel {
     }
 
     private func apply(_ value: BrainList, cached: Bool) {
+        if module == .journal { journal = BrainJournalIndex(items: value.items) }
         list = value
         state = .loaded(value)
         isShowingCachedCopy = cached

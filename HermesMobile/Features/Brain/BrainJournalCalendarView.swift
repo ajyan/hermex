@@ -52,8 +52,16 @@ enum BrainJournalCalendarLayout {
     /// continuously.
     static func months(for keys: some Collection<String>, today: Date = .now, calendar: Calendar = calendar(),
                        local: Calendar = .current) -> [Month] {
-        let dates = keys.compactMap { date(fromKey: $0) }
-        guard let oldest = dates.min(), let newest = dates.max() else { return [] }
+        // Keys are yyyy-MM-dd, so the earliest and latest strings are the earliest and latest days.
+        let days = keys.filter { date(fromKey: $0) != nil }
+        return months(oldest: days.min(), newest: days.max(), today: today, calendar: calendar, local: local)
+    }
+
+    /// The same months from the oldest and newest day keys alone, which `BrainJournalIndex` keeps as pages land.
+    static func months(oldest oldestKey: String?, newest newestKey: String?, today: Date = .now,
+                       calendar: Calendar = calendar(), local: Calendar = .current) -> [Month] {
+        guard let oldestKey, let newestKey, let oldest = date(fromKey: oldestKey), let newest = date(fromKey: newestKey)
+        else { return [] }
         let localToday = date(fromKey: todayKey(today, local: local)) ?? today
         let top = month(of: max(newest, localToday), calendar: calendar)
         let bottom = month(of: oldest, calendar: calendar)
@@ -134,32 +142,61 @@ enum BrainJournalCalendarLayout {
     }
 }
 
-/// The journal as a calendar: months newest first, each day with an entry filled in the
-/// journal's paper and opening that day. Older pages of the list load in the background
-/// so earlier months fill in.
+/// The journal list as the calendar reads it: entries by day (the first item for a day wins), entries per month,
+/// and the oldest and newest days. `BrainListViewModel` grows it as each older page lands instead of rebuilding
+/// it from every item.
+struct BrainJournalIndex {
+    private(set) var entries: [String: BrainItem] = [:]
+    /// Entries per month ("2026-10").
+    private(set) var monthCounts: [String: Int] = [:]
+    private(set) var oldest: String?
+    private(set) var newest: String?
+
+    init(items: [BrainItem] = []) {
+        add(items)
+    }
+
+    mutating func add(_ items: [BrainItem]) {
+        for item in items {
+            guard let key = BrainJournalCalendarLayout.dayKey(of: item), entries[key] == nil else { continue }
+            entries[key] = item
+            monthCounts[String(key.prefix(7)), default: 0] += 1
+            if oldest.map({ key < $0 }) ?? true { oldest = key }
+            if newest.map({ key > $0 }) ?? true { newest = key }
+        }
+    }
+}
+
+/// The journal as a calendar: months newest first, each day with an entry on the journal's wash and opening that
+/// day. The next older page loads when the foot of the calendar scrolls into view, so earlier months fill in as
+/// the reader goes back, never all of history at once.
 struct BrainJournalCalendarView: View {
     let isLoadingOlder: Bool
     let loadOlderFailed: Bool
     /// Offline with the saved first page: older days can't load until the next refresh.
     let isShowingCachedCopy: Bool
     let onRetry: () -> Void
-    /// Built once per list, never in `body`.
+    /// Loads the next older page; the calendar's foot calls it while it is on screen.
+    let loadOlder: () async -> Void
+    /// Changes with each page (and reload), so the foot asks again while it stays on screen.
+    let pageKey: String
     private let entries: [String: BrainItem]
     private let months: [BrainJournalCalendarLayout.Month]
-    /// Entries per month ("2026-10"), counted once rather than per month per render.
     private let monthCounts: [String: Int]
     private let todayKey: String
 
-    init(list: BrainList, isLoadingOlder: Bool, loadOlderFailed: Bool, isShowingCachedCopy: Bool = false,
-         onRetry: @escaping () -> Void, today: Date = .now) {
+    init(index: BrainJournalIndex, isLoadingOlder: Bool, loadOlderFailed: Bool, isShowingCachedCopy: Bool = false,
+         pageKey: String = "", onRetry: @escaping () -> Void, loadOlder: @escaping () async -> Void = {},
+         today: Date = .now) {
         self.isLoadingOlder = isLoadingOlder
         self.loadOlderFailed = loadOlderFailed
         self.isShowingCachedCopy = isShowingCachedCopy
+        self.pageKey = pageKey
         self.onRetry = onRetry
-        let entries = BrainJournalCalendarLayout.entries(list.items)
-        self.entries = entries
-        self.months = BrainJournalCalendarLayout.months(for: entries.keys, today: today)
-        self.monthCounts = Dictionary(grouping: entries.keys, by: { String($0.prefix(7)) }).mapValues(\.count)
+        self.loadOlder = loadOlder
+        self.entries = index.entries
+        self.months = BrainJournalCalendarLayout.months(oldest: index.oldest, newest: index.newest, today: today)
+        self.monthCounts = index.monthCounts
         self.todayKey = BrainJournalCalendarLayout.todayKey(today)
     }
 
@@ -195,6 +232,9 @@ struct BrainJournalCalendarView: View {
             ProgressView()
                 .frame(maxWidth: .infinity, minHeight: BrainStyle.minTapTarget)
                 .accessibilityLabel(Text(verbatim: "Loading older days"))
+                // The lazy stack builds the foot only once it nears the screen; while it stays there, each page
+                // that lands asks for the next.
+                .task(id: pageKey) { await loadOlder() }
         }
     }
 }
@@ -281,7 +321,8 @@ struct BrainJournalDay: View {
         BrainItem(module: .journal, id: "journal/2026/\($0).md", title: $0, date: $0)
     }
     return NavigationStack {
-        BrainJournalCalendarView(list: BrainList(items: items), isLoadingOlder: true, loadOlderFailed: false, onRetry: {})
+        BrainJournalCalendarView(index: BrainJournalIndex(items: items), isLoadingOlder: true, loadOlderFailed: false,
+                                 onRetry: {})
             .background(Color.hxCanvas)
     }
 }
