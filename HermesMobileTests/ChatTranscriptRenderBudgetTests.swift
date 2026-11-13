@@ -56,6 +56,14 @@ final class ChatTranscriptRenderBudgetTests: XCTestCase {
         // means SwiftUI never consulted `==`; comparisons without unequal ones mean a
         // settled row re-ran on a dependency of its own. Host passes count the ticks
         // that reached the transcript through its parent.
+        // Settled replies render inside their own selection hosts, which an environment
+        // value rebuilt per pass (ChatView's filing receipt actions) reached directly.
+        print("Render budget over 30 ticks: \(RenderProbe.snapshot.sorted { $0.key < $1.key })")
+        XCTAssertEqual(
+            RenderProbe.count(.responseSelectionRebuild), 0,
+            "Text-only ticks rebuilt settled replies' selection hosts "
+                + "(host updates: \(RenderProbe.count(.responseSelectionUpdate)))"
+        )
         XCTAssertEqual(
             settledEvaluations, 0,
             "Text-only ticks re-rendered \(settledRowsRendered) of \(settledRenderIDs.count) settled rows "
@@ -232,5 +240,7 @@ private struct BudgetTranscriptHost: View {
             onFork: { _ in },
             onCopy: { _ in }
         )
+        // As ChatView publishes Undo for filing receipts, rebuilding the closure per pass.
+        .filingReceiptActions(undoingIDs: []) { _ in _ = viewModel.messages.count }
     }
 }

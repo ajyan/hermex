@@ -24,6 +24,8 @@ enum RenderProbe {
         case toolActivityGroup = "ToolActivityGroupView"
         case reasoningBlock = "ReasoningBlockView"
         case responseSelectionUpdate = "ResponseTextSelection.update"
+        /// A `ResponseTextSelection` update that rebuilt its hosted content.
+        case responseSelectionRebuild = "ResponseTextSelection.rebuild"
     }
 
     #if DEBUG
