@@ -145,9 +145,19 @@ struct DuePrediction: Identifiable, Equatable {
         duePredictions = Self.duePredictions(in: Array(records.values), today: today)
     }
 
-    /// Reads every listed record not read yet, once at a time across callers.
+    /// Reads every listed record not read yet, once at a time across callers. The read lives as long as
+    /// its callers: a caller cancelled (its screen gone) cancels it, and a caller still waiting starts
+    /// it again for the records it didn't get to.
     private func loadAllRecords() async {
-        if let allRecordsLoad { return await allRecordsLoad.value }
+        while !Task.isCancelled {
+            let task = allRecordsLoad ?? startAllRecordsLoad()
+            await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
+            if allRecordsLoad == task { allRecordsLoad = nil }
+            if !task.isCancelled { return }
+        }
+    }
+
+    private func startAllRecordsLoad() -> Task<Void, Never> {
         let missing = recordDates.subtracting(records.keys)
         let client = client, sessionID = sessionID
         let task = Task { @MainActor in
@@ -155,7 +165,7 @@ struct DuePrediction: Identifiable, Equatable {
                 // A few at a time, so a year of records doesn't flood the server.
                 var pending = missing.makeIterator()
                 func addNext() {
-                    guard let week = pending.next() else { return }
+                    guard !Task.isCancelled, let week = pending.next() else { return }
                     group.addTask { (week, try? await client.fileContent(sessionID: sessionID, path: Self.recordPath(week))) }
                 }
                 for _ in 0..<Self.recordReadsAtOnce { addNext() }
@@ -171,8 +181,7 @@ struct DuePrediction: Identifiable, Equatable {
             }
         }
         allRecordsLoad = task
-        await task.value
-        allRecordsLoad = nil
+        return task
     }
 
     /// Predictions due on or before `today` that no record has graded.
