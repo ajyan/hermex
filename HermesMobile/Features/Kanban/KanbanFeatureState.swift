@@ -337,6 +337,12 @@ enum KanbanBoardPreference {
 /// Server-bound Kanban browsing state. Each instance owns one server's Board
 /// choice, filters, selection, and snapshots; nothing is shared across servers.
 /// Only the browsed Board slug outlives the instance, via `KanbanBoardPreference`.
+/// The Cards a Board search matches, with their count per Status.
+struct KanbanSearchMatches {
+    let cards: [KanbanCard]
+    let countsByStatus: [String: Int]
+}
+
 @MainActor
 @Observable
 final class KanbanFeatureState {
@@ -348,7 +354,14 @@ final class KanbanFeatureState {
     private(set) var report: KanbanCompatibilityReport?
     private(set) var configuration: KanbanConfiguration?
     private(set) var boards: [KanbanBoard] = []
-    private(set) var snapshot: KanbanBoardSnapshot?
+    private(set) var snapshot: KanbanBoardSnapshot? {
+        didSet { snapshotRevision &+= 1 }
+    }
+    /// Bumped on every snapshot change so `searchMatches` can reuse its result without
+    /// comparing Boards. Observed, so a memo hit still makes the reader depend on it.
+    private var snapshotRevision = 0
+    /// The last search pass and its per-Status counts, for one snapshot and query.
+    @ObservationIgnored private var searchMatchMemo: (revision: Int, query: String, matches: KanbanSearchMatches)?
     private(set) var stats: KanbanStats?
     private(set) var assigneeHistory: KanbanAssigneeHistory?
     private(set) var capabilityWarnings: Set<KanbanReadCapabilityWarning> = []
@@ -662,8 +675,9 @@ final class KanbanFeatureState {
         searchMatchedCards.filter { $0.status?.rawValue == selectedStatus }
     }
 
-    var groupedVisibleCards: [(profile: String?, cards: [KanbanCard])] {
-        let groups = Dictionary(grouping: visibleCards, by: { normalized($0.assignee) })
+    /// `cards` (normally `visibleCards`) in one section per assignee, Unassigned first.
+    func groupedByProfile(_ cards: [KanbanCard]) -> [(profile: String?, cards: [KanbanCard])] {
+        let groups = Dictionary(grouping: cards, by: { normalized($0.assignee) })
         return groups
             .map { (profile: $0.key, cards: $0.value) }
             .sorted {
@@ -677,7 +691,7 @@ final class KanbanFeatureState {
     }
 
     func statusCount(_ status: String) -> Int {
-        searchMatchedCards.count { $0.status?.rawValue == status }
+        searchMatches.countsByStatus[status] ?? 0
     }
 
     /// A cold load lands on the first Status that has Cards, so the Board never opens
@@ -2374,14 +2388,29 @@ final class KanbanFeatureState {
         return value?.isEmpty == false ? value : nil
     }
 
-    private var searchMatchedCards: [KanbanCard] {
+    private var searchMatchedCards: [KanbanCard] { searchMatches.cards }
+
+    /// The Cards matching the search and their count per Status, worked out once per
+    /// snapshot and query: the Status bar asks for every Status's count on each update.
+    private var searchMatches: KanbanSearchMatches {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !query.isEmpty else { return allCards }
-        return allCards.filter { card in
+        if let memo = searchMatchMemo, memo.revision == snapshotRevision, memo.query == query {
+            return memo.matches
+        }
+
+        let cards = query.isEmpty ? allCards : allCards.filter { card in
             [card.cardID, card.title, card.body, card.assignee, card.tenant]
                 .compactMap { $0?.lowercased() }
                 .contains { $0.contains(query) }
         }
+        let matches = KanbanSearchMatches(
+            cards: cards,
+            countsByStatus: cards.reduce(into: [:]) { counts, card in
+                if let status = card.status?.rawValue { counts[status, default: 0] += 1 }
+            }
+        )
+        searchMatchMemo = (snapshotRevision, query, matches)
+        return matches
     }
 
     /// Refetches the selected Board. A cursor refresh (`usingCursor`) sends the snapshot's

@@ -421,6 +421,22 @@ final class ChatTranscriptEnvironmentStabilityTests: XCTestCase {
         XCTAssertEqual(probe.handledTick, 3)
     }
 
+    /// ChatView publishes Undo for filing receipts above every row and re-runs per
+    /// stream tick; a fresh closure each pass re-ran every row reading it, and through
+    /// `ResponseTextSelection`'s whole-environment read, rebuilt every settled reply.
+    func testFilingReceiptReadersSkipOwnerPassesAndUndoThroughTheLatestHandler() throws {
+        let probe = EnvironmentStabilityProbe()
+        let window = host(FilingReceiptOwner(probe: probe))
+        defer { window.isHidden = true; window.rootViewController = nil }
+
+        advance(probe, window: window, passes: 3)
+
+        XCTAssertEqual(probe.ownerPasses, 4, "The owner must re-run on each tick for this to test anything")
+        XCTAssertLessThanOrEqual(probe.readerPasses, 2)
+        try XCTUnwrap(probe.filingUndo).handler(ChatMessage(role: "assistant", content: "Filed", timestamp: nil, messageId: "filed"))
+        XCTAssertEqual(probe.handledTick, 3)
+    }
+
     /// Typing while a reply streams. On iOS 26 with the keyboard up, an `openURL`
     /// re-written by a modifier whose body re-runs each pass re-ran every link reader.
     func testLinkReadersSkipOwnerPassesWhileTheKeyboardIsUp() throws {
@@ -486,6 +502,7 @@ private final class EnvironmentStabilityProbe {
     @ObservationIgnored var handledTick: Int?
     @ObservationIgnored var disclosure: ChatDisclosureToggleAction?
     @ObservationIgnored var openURL: OpenURLAction?
+    @ObservationIgnored var filingUndo: FilingReceiptUndoAction?
 }
 
 /// Rebuilds its disclosure closure on every tick, as the transcript does per stream tick.
@@ -518,6 +535,40 @@ private struct LinkOwner: View {
             probe.handledTick = tick
             return .handled
         }
+    }
+}
+
+/// Rebuilds its Undo closure on every tick, as ChatView does per stream tick.
+private struct FilingReceiptOwner: View {
+    let probe: EnvironmentStabilityProbe
+
+    var body: some View {
+        let tick = probe.tick
+        probe.ownerPasses += 1
+        return VStack {
+            Text("\(tick)")
+            FilingReceiptSettledRow(probe: probe)
+        }
+        .filingReceiptActions(undoingIDs: []) { _ in probe.handledTick = tick }
+    }
+}
+
+private struct FilingReceiptSettledRow: View {
+    let probe: EnvironmentStabilityProbe
+
+    var body: some View {
+        FilingReceiptReader(probe: probe)
+    }
+}
+
+private struct FilingReceiptReader: View {
+    let probe: EnvironmentStabilityProbe
+    @Environment(\.filingReceiptActions) private var actions
+
+    var body: some View {
+        probe.readerPasses += 1
+        probe.filingUndo = actions.undo
+        return Color.clear.frame(width: 1, height: 1)
     }
 }
 

@@ -379,6 +379,10 @@ struct ChatTranscriptView: View {
                     onCopy: onCopy
                 )
                 .equatable()
+                // Keep a modifier between `.equatable()` and `.transition`/`.id`: with them
+                // adjacent SwiftUI can stop consulting `==` and re-run every settled row on
+                // each stream tick (upstream #1516; ChatTranscriptRenderBudgetTests).
+                .modifier(TranscriptRowBoundary())
                 .transition(rowEntryTransition(for: transcriptMessage.message, now: now))
                 .id(transcriptMessage.renderID)
 
@@ -611,6 +615,12 @@ struct StreamingFollowTrigger: View {
     }
 }
 
+/// Separates a transcript row's `.equatable()` from its `.transition` and `.id`; see
+/// `transcriptScrollContent`.
+private struct TranscriptRowBoundary: ViewModifier {
+    func body(content: Content) -> some View { content }
+}
+
 struct ChatTranscriptMessageBlock: View, Equatable {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -663,7 +673,7 @@ struct ChatTranscriptMessageBlock: View, Equatable {
     // This lets `.equatable()` skip re-evaluating rows whose data is unchanged
     // even though their closure props are recreated on every parent body pass.
     static func == (lhs: ChatTranscriptMessageBlock, rhs: ChatTranscriptMessageBlock) -> Bool {
-        lhs.transcriptMessage == rhs.transcriptMessage &&
+        let isEqual = lhs.transcriptMessage == rhs.transcriptMessage &&
             lhs.transcriptSpacing == rhs.transcriptSpacing &&
             lhs.showsThinkingAndToolCards == rhs.showsThinkingAndToolCards &&
             lhs.foldState == rhs.foldState &&
@@ -686,9 +696,15 @@ struct ChatTranscriptMessageBlock: View, Equatable {
             lhs.isEditingMessage == rhs.isEditingMessage &&
             lhs.isForkingMessage == rhs.isForkingMessage &&
             lhs.transcriptMediaCacheNamespace == rhs.transcriptMediaCacheNamespace
+        RenderProbe.hit(.transcriptMessageBlockCompared)
+        if !isEqual {
+            RenderProbe.hit(.transcriptMessageBlockUnequal)
+        }
+        return isEqual
     }
 
     var body: some View {
+        let _ = RenderProbe.hit(.transcriptMessageBlock, renderID: transcriptMessage.renderID)
         let foldedQuestions = Self.foldedQuestionLines(
             in: toolCallGroups,
             foldState: foldState,

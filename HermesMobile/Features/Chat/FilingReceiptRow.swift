@@ -1,11 +1,25 @@
 import SwiftUI
 
-/// What the transcript can do with a filing receipt. `ChatView` supplies it; a host that
-/// doesn't (Bots, previews) shows the receipt without Undo.
-struct FilingReceiptActions {
+/// What the transcript can do with a filing receipt. `ChatView` supplies it through
+/// `filingReceiptActions(undoingIDs:perform:)`; a host that doesn't (Bots, previews)
+/// shows the receipt without Undo.
+///
+/// Compared by value: `undo` is a reference that keeps one instance across passes, as
+/// `ChatDisclosureToggleAction` does, so a closure rebuilt on every stream tick never
+/// changes the environment value every row sits under.
+struct FilingReceiptActions: Equatable {
     /// Receipts whose Undo is in flight, by receipt id.
     var undoingIDs: Set<String> = []
-    var undo: ((ChatMessage) -> Void)?
+    var undo: FilingReceiptUndoAction?
+}
+
+/// The screen's Undo handler for filing receipts, refreshed in place on every pass.
+final class FilingReceiptUndoAction: Equatable {
+    var handler: (ChatMessage) -> Void = { _ in }
+
+    func callAsFunction(_ message: ChatMessage) { handler(message) }
+
+    static func == (lhs: FilingReceiptUndoAction, rhs: FilingReceiptUndoAction) -> Bool { lhs === rhs }
 }
 
 private struct FilingReceiptActionsKey: EnvironmentKey {
@@ -16,6 +30,52 @@ extension EnvironmentValues {
     var filingReceiptActions: FilingReceiptActions {
         get { self[FilingReceiptActionsKey.self] }
         set { self[FilingReceiptActionsKey.self] = newValue }
+    }
+}
+
+extension View {
+    /// Offers Undo on the filing receipts below this view, routed to `handler`, without
+    /// invalidating them when the caller rebuilds the closure.
+    func filingReceiptActions(undoingIDs: Set<String>, perform handler: @escaping (ChatMessage) -> Void) -> some View {
+        modifier(FilingReceiptActionsModifier(undoingIDs: undoingIDs))
+            .modifier(FilingReceiptUndoHandlerModifier(handler: handler))
+    }
+}
+
+/// Holds the one Undo action in its own state, not the caller's, so a handler that
+/// captures the calling view can't keep it alive, and refreshes its handler on every
+/// pass. It publishes only that reference, never the receipts' value.
+private struct FilingReceiptUndoHandlerModifier: ViewModifier {
+    let handler: (ChatMessage) -> Void
+    @State private var undo = FilingReceiptUndoAction()
+
+    func body(content: Content) -> some View {
+        undo.handler = handler
+        return content.environment(\.filingReceiptUndoAction, undo)
+    }
+}
+
+/// Publishes `filingReceiptActions`. Its inputs compare by value, so caller passes that
+/// leave `undoingIDs` alone skip its body and the value is not written again: re-written
+/// on every pass, iOS 26 can treat it as changed and re-run every reader below, as with
+/// `transcriptLinks` (ChatTranscriptEnvironmentStabilityTests).
+private struct FilingReceiptActionsModifier: ViewModifier {
+    let undoingIDs: Set<String>
+    @Environment(\.filingReceiptUndoAction) private var undo
+
+    func body(content: Content) -> some View {
+        content.environment(\.filingReceiptActions, FilingReceiptActions(undoingIDs: undoingIDs, undo: undo))
+    }
+}
+
+private struct FilingReceiptUndoActionKey: EnvironmentKey {
+    static let defaultValue: FilingReceiptUndoAction? = nil
+}
+
+private extension EnvironmentValues {
+    var filingReceiptUndoAction: FilingReceiptUndoAction? {
+        get { self[FilingReceiptUndoActionKey.self] }
+        set { self[FilingReceiptUndoActionKey.self] = newValue }
     }
 }
 
@@ -57,7 +117,7 @@ struct FilingReceiptRow: View {
 
     private var undoButton: some View {
         Button {
-            actions.undo?(message)
+            actions.undo?.handler(message)
         } label: {
             HStack(spacing: 4) {
                 if isUndoing {

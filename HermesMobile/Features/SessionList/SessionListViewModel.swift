@@ -28,8 +28,18 @@ enum ActiveSessionStateRefreshResult: Equatable {
 @Observable
 final class SessionListViewModel {
     private(set) var sessions: [SessionSummary] = [] {
-        didSet { updateAvailableRecentsFilters() }
+        didSet {
+            sessionsRevision &+= 1
+            updateAvailableRecentsFilters()
+        }
     }
+    /// Bumped on every change to `sessions`, so `visibleSessions` can tell a new list
+    /// from the same one without comparing rows. Observed, so a memo hit still makes
+    /// the reading view depend on the rows.
+    private var sessionsRevision = 0
+    /// The last `visibleSessions(searchText:…)` result. The drawer asks on every shell
+    /// body pass (the active-row poll, a stream's badge) while the rows rarely change.
+    @ObservationIgnored private var visibleSessionsMemo: (key: VisibleSessionsKey, sessions: [SessionSummary])?
     /// The Settings visibility toggles, so the drawer never offers a kind they hide.
     var recentsVisibility: AutomatedSessionVisibility = .showAll {
         didSet { if recentsVisibility != oldValue { updateAvailableRecentsFilters() } }
@@ -191,13 +201,37 @@ final class SessionListViewModel {
         automatedVisibility: AutomatedSessionVisibility = .showAll,
         filter: RecentsFilter = .all
     ) -> [SessionSummary] {
-        visibleSessions(
+        let key = VisibleSessionsKey(
+            sessionsRevision: sessionsRevision,
+            searchText: searchText,
+            selectedProjectID: selectedProjectID,
+            automatedVisibility: automatedVisibility,
+            filter: filter,
+            remoteSearchQuery: activeRemoteSearchQuery,
+            remoteMatchIDs: remoteContentSearchSessionIDs
+        )
+        if let visibleSessionsMemo, visibleSessionsMemo.key == key { return visibleSessionsMemo.sessions }
+
+        let visible = visibleSessions(
             among: sessions,
             searchText: searchText,
             selectedProjectID: selectedProjectID,
             automatedVisibility: automatedVisibility,
             filter: filter
         )
+        visibleSessionsMemo = (key, visible)
+        return visible
+    }
+
+    /// Everything `visibleSessions(searchText:…)` reads.
+    private struct VisibleSessionsKey: Equatable {
+        let sessionsRevision: Int
+        let searchText: String
+        let selectedProjectID: String?
+        let automatedVisibility: AutomatedSessionVisibility
+        let filter: RecentsFilter
+        let remoteSearchQuery: String?
+        let remoteMatchIDs: [String]
     }
 
     /// The visible rows that are still streaming, for the list's active-row

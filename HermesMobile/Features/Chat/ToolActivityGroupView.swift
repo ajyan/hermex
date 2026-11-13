@@ -101,6 +101,7 @@ struct ToolActivityGroupView: View {
 
     @ViewBuilder
     var body: some View {
+        let _ = RenderProbe.hit(.toolActivityGroup)
         let entries = ToolCallSummaryFormatter.entries(for: group.toolCalls, isLive: isLive)
 
         if !entries.isEmpty {

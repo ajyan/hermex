@@ -2577,6 +2577,30 @@ final class SessionListMutationTests: XCTestCase {
         )
     }
 
+
+    /// `visibleSessions` keeps its last result for the drawer's repeated reads; a new
+    /// list of rows must still replace it.
+    @MainActor
+    func testVisibleSessionsFollowTheRowsAfterAnEarlierRead() async throws {
+        var titles = ["First"]
+        let viewModel = try makeViewModel { request in
+            XCTAssertEqual(request.url?.path, "/api/sessions")
+            let rows = titles.enumerated().map { index, title in
+                #"{"session_id": "s\#(index)", "title": "\#(title)", "updated_at": \#(1_770_000_000 + index), "archived": false}"#
+            }
+            return apiTestJSONResponse(#"{"sessions": ["# + rows.joined(separator: ",") + "]}", for: request)
+        }
+
+        await viewModel.load()
+        XCTAssertEqual(viewModel.visibleSessions(searchText: "", selectedProjectID: nil).compactMap(\.title), ["First"])
+        XCTAssertEqual(viewModel.visibleSessions(searchText: "", selectedProjectID: nil).compactMap(\.title), ["First"])
+
+        titles = ["First", "Second"]
+        await viewModel.load()
+
+        XCTAssertEqual(viewModel.visibleSessions(searchText: "", selectedProjectID: nil).compactMap(\.title), ["Second", "First"])
+        XCTAssertEqual(viewModel.visibleSessions(searchText: "sec", selectedProjectID: nil).compactMap(\.title), ["Second"])
+    }
     @MainActor
     func testRemoteSessionSearchIgnoresStaleResultsWhenQueryChanges() async throws {
         let oldSearchStarted = expectation(description: "old search started")

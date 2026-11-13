@@ -52,6 +52,37 @@ final class ChatViewModelSendTests: XCTestCase {
         XCTAssertNil(viewModel.sendErrorMessage)
     }
 
+    /// The send path writes only the optimistic prompt before the request: no window
+    /// diff and no store-wide maintenance on the main actor. The settled turn's write
+    /// (`cacheCompletedResponse`) still trims.
+    @MainActor
+    func testSendCachesOnlyThePromptAndLeavesMaintenanceToTheSettledTurn() async throws {
+        let context = try makeContext()
+        let server = try XCTUnwrap(URL(string: "https://example.test"))
+        let longAgo = Date().addingTimeInterval(-2 * CachePolicy.ttl)
+        try CacheStore.cacheMessages(
+            [ChatMessage(role: "user", content: "Old", timestamp: 1, messageId: "old")],
+            serverURL: server,
+            sessionID: "other-session",
+            in: context,
+            cachedAt: longAgo
+        )
+        let viewModel = try makeViewModel { request in
+            XCTAssertEqual(request.url?.path, "/api/chat/start")
+            return apiTestJSONResponse(#"{"session_id": "session-abc", "stream_id": "stream-123"}"#, for: request)
+        }
+
+        let didStart = await viewModel.sendMessage("Hello", modelContext: context)
+
+        XCTAssertTrue(didStart)
+        let cached = try CacheStore.cachedMessages(serverURL: server, sessionID: "session-abc", in: context)
+        XCTAssertEqual(cached.map(\.content), ["Hello"])
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CachedMessage>()), 2, "The send must not run cache maintenance")
+
+        viewModel.cacheCompletedResponse(modelContext: context)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CachedMessage>()), 1, "The settled turn's write trims expired rows")
+    }
+
     @MainActor
     func testRecoveryConfirmationDoesNotClearLaterComposerError() throws {
         let viewModel = try makeViewModel { request in

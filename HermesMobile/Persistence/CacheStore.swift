@@ -222,6 +222,64 @@ enum CacheStore {
         try saveAndTrim(context, now: cachedAt)
     }
 
+    /// Upserts one message at `sortIndex` and saves, without reading the session's
+    /// other rows or running maintenance. The send path uses it so the optimistic
+    /// prompt is on disk before the request goes out; the window write and trim
+    /// (`cacheMessages`) wait for the turn to settle.
+    @MainActor
+    static func cacheMessage(
+        _ message: ChatMessage,
+        at sortIndex: Int,
+        serverURL: URL,
+        sessionID: String,
+        in context: ModelContext,
+        cachedAt: Date = Date()
+    ) throws {
+        let signpost = performanceSignposter.beginInterval("Cache Write")
+        defer { performanceSignposter.endInterval("Cache Write", signpost, "rows=1") }
+
+        let serverURLString = serverURL.absoluteString
+        let cacheKey = CachedMessage.cacheKey(
+            serverURLString: serverURLString,
+            sessionID: sessionID,
+            message: message,
+            sortIndex: sortIndex
+        )
+        if let cachedMessage = try cachedMessage(cacheKey: cacheKey, in: context) {
+            cachedMessage.refresh(from: message, sortIndex: sortIndex, cachedAt: cachedAt)
+        } else {
+            context.insert(CachedMessage(
+                serverURLString: serverURLString,
+                sessionID: sessionID,
+                message: message,
+                sortIndex: sortIndex,
+                cachedAt: cachedAt
+            ))
+        }
+        try context.save()
+    }
+
+    /// Deletes the one cached row `cacheMessage` wrote for `message`, as when a send
+    /// fails and its optimistic prompt is rolled back.
+    @MainActor
+    static func removeCachedMessage(
+        _ message: ChatMessage,
+        at sortIndex: Int,
+        serverURL: URL,
+        sessionID: String,
+        in context: ModelContext
+    ) throws {
+        let cacheKey = CachedMessage.cacheKey(
+            serverURLString: serverURL.absoluteString,
+            sessionID: sessionID,
+            message: message,
+            sortIndex: sortIndex
+        )
+        guard let cachedMessage = try cachedMessage(cacheKey: cacheKey, in: context) else { return }
+        context.delete(cachedMessage)
+        try context.save()
+    }
+
     /// Deletes only the cached sessions and messages belonging to `serverURL`,
     /// leaving every other configured server's offline data intact (#18). Backs
     /// the Settings "Clear Offline Cache" action (active server) and the purge
@@ -291,6 +349,17 @@ enum CacheStore {
         for message in try context.fetch(descriptor) {
             context.delete(message)
         }
+    }
+
+    @MainActor
+    private static func cachedMessage(cacheKey: String, in context: ModelContext) throws -> CachedMessage? {
+        var descriptor = FetchDescriptor<CachedMessage>(
+            predicate: #Predicate { cachedMessage in
+                cachedMessage.cacheKey == cacheKey
+            }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
     }
 
     @MainActor

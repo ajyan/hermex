@@ -55,10 +55,10 @@ struct FilingReceiptLab: View {
             .padding(16)
         }
         .background(Color.hxCanvas)
-        .environment(\.filingReceiptActions, FilingReceiptActions(undoingIDs: undoing) { message in
+        .filingReceiptActions(undoingIDs: undoing) { message in
             guard let id = message.filed?.id else { return }
             undone.insert(id)
-        })
+        }
         .environment(\.openBrainRoute, Self.opener)
     }
 
