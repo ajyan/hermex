@@ -279,7 +279,7 @@ struct KanbanStatusFocusView: View {
             }
         }
         .alert(
-            "Leave Running?",
+            "Leave running?",
             isPresented: Binding(
                 get: { pendingRunningAction != nil },
                 set: { if !$0 { pendingRunningAction = nil } }
@@ -294,7 +294,7 @@ struct KanbanStatusFocusView: View {
         } message: { _ in
             Text("Leaving Running may clear the Card's claim and worker state.")
         }
-        .alert("Archive Cards", isPresented: $confirmsBulkArchive) {
+        .alert("Archive Cards?", isPresented: $confirmsBulkArchive) {
             Button("Cancel", role: .cancel) {
                 selectionControlsAreFocused = true
             }
@@ -388,7 +388,7 @@ struct KanbanStatusFocusView: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .alert("Run Dispatcher", isPresented: $confirmsRunDispatcher) {
+        .alert("Run the Dispatcher?", isPresented: $confirmsRunDispatcher) {
             Button("Cancel", role: .cancel) {}
             Button("Run Dispatcher", role: .destructive) {
                 Task { await model.runDispatcher() }
@@ -1584,7 +1584,7 @@ private struct KanbanBoardManagementView: View {
             Text("Atlas cannot restore an archived Board in-app.")
         }
         .alert(
-            "Make Active Board",
+            "Make active Board?",
             isPresented: Binding(
                 get: { pendingActivation != nil },
                 set: { if !$0 { pendingActivation = nil } }

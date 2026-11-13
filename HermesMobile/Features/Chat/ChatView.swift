@@ -1146,7 +1146,7 @@ struct ChatView: View {
                 }
                 // On the sheet: an alert on the chat cannot present over it.
                 .alert(
-                    String(localized: "Session Action Failed"),
+                    String(localized: "Session action failed"),
                     isPresented: Binding(
                         get: { titleRenameAlertMessage != nil },
                         set: { if !$0 { titleRenameAlertMessage = nil } }
@@ -1182,7 +1182,7 @@ struct ChatView: View {
                 Text(editDiscardWarningMessage)
             }
             .alert(
-                "Discard Later Messages?",
+                "Discard later messages?",
                 isPresented: $showRegenerateDiscardConfirmation
             ) {
                 Button("Cancel", role: .cancel) {
@@ -1198,13 +1198,13 @@ struct ChatView: View {
                 Text(regenerateDiscardWarningMessage)
             }
             .alert(
-                "Start New Session?",
+                "Start a new chat?",
                 isPresented: $showProfileNewSessionConfirmation
             ) {
                 Button("Cancel", role: .cancel) {
                     pendingProfileSelection = nil
                 }
-                Button("Start New Session") {
+                Button("Start new chat") {
                     if let profile = pendingProfileSelection {
                         Task { await switchProfile(profile, startNewSession: true) }
                     }
@@ -1221,7 +1221,7 @@ struct ChatView: View {
             )
             .notificationOfferAlert($pendingNotificationOffer)
             .alert(
-                "Message Action Failed",
+                "Message action failed",
                 isPresented: Binding(
                     get: { viewModel.messageActionErrorMessage != nil },
                     set: { isPresented in
@@ -3720,7 +3720,7 @@ private struct ClearConversationAlertModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content.alert(
-            "Clear Conversation?",
+            "Clear conversation?",
             isPresented: Binding(
                 get: { pending != nil },
                 set: { isPresented in

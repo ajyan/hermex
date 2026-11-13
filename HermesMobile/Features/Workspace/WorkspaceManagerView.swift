@@ -111,7 +111,7 @@ struct WorkspaceManagerView: View {
                 WorkspaceAddSheet(viewModel: viewModel)
             }
             .alert(
-                "Rename Workspace",
+                "Rename workspace",
                 isPresented: renameAlertBinding
             ) {
                 TextField("Workspace name", text: $renameText)
@@ -129,7 +129,7 @@ struct WorkspaceManagerView: View {
                 }
             }
             .confirmationDialog(
-                "Remove Workspace?",
+                "Remove workspace?",
                 isPresented: removalDialogBinding,
                 titleVisibility: .visible,
                 presenting: viewModel.pendingRemoval

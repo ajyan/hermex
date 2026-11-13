@@ -11,7 +11,7 @@ struct SessionActionConfirmations: ViewModifier {
     func body(content: Content) -> some View {
         content
             .alert(
-                "Session Action Failed",
+                "Session action failed",
                 isPresented: Binding(
                     get: { viewModel.actionErrorMessage != nil },
                     set: { isPresented in
@@ -28,7 +28,7 @@ struct SessionActionConfirmations: ViewModifier {
                 Text(viewModel.actionErrorMessage ?? "")
             }
             .alert(
-                "Delete Session?",
+                Self.deleteTitle(for: sessionPendingDeletion),
                 isPresented: Binding(
                     get: { sessionPendingDeletion != nil },
                     set: { isPresented in
@@ -51,10 +51,10 @@ struct SessionActionConfirmations: ViewModifier {
                     }
                 }
             } message: {
-                Text("This removes the session from the Hermes server. Use this only on a session you no longer need.")
+                Text("This removes the chat from the Hermes server for good. It can't be restored from Archived.")
             }
             .alert(
-                "Delete Project?",
+                projectPendingDeletion.map { String(localized: "Delete \"\($0.displayName)\"?") } ?? String(localized: "Delete project?"),
                 isPresented: Binding(
                     get: { projectPendingDeletion != nil },
                     set: { isPresented in
@@ -79,5 +79,11 @@ struct SessionActionConfirmations: ViewModifier {
             } message: {
                 Text("Sessions in this project will be moved to No project. The sessions themselves will not be deleted.")
             }
+    }
+
+    /// Names the chat so a delete from a menu can't hit the wrong one.
+    static func deleteTitle(for session: SessionSummary?) -> String {
+        guard let session else { return String(localized: "Delete chat?") }
+        return String(localized: "Delete \"\(SessionRowView.displayTitle(for: session))\"?")
     }
 }

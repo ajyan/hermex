@@ -772,7 +772,7 @@ struct MessageComposerView: View {
             }
         }
         .alert(
-            "Composer Option",
+            "Composer option",
             isPresented: Binding(
                 get: { noticeMessage != nil },
                 set: { isPresented in

@@ -35,7 +35,7 @@ struct ArchivedSessionsView: View {
                 await load()
             }
             .alert(
-                "Action Failed",
+                "Action failed",
                 isPresented: Binding(
                     get: { viewModel.actionErrorMessage != nil },
                     set: { isPresented in
@@ -69,11 +69,11 @@ struct ArchivedSessionsView: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(3)
 
-                        Button("Try Again") {
+                        Button("Try again") {
                             Task { await load() }
                         }
                         .font(AppFont.subheadline(weight: .medium))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.accentColor)
                     }
                     .padding(.horizontal, 24)
                 } else if viewModel.sessions.isEmpty {

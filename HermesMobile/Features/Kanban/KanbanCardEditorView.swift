@@ -50,7 +50,7 @@ struct KanbanCardEditorView: View {
             } message: {
                 Text("The Dispatcher skips Ready Cards without an Assigned Profile.")
             }
-            .alert("Reload Server Version?", isPresented: $showsReloadConfirmation) {
+            .alert("Reload the server version?", isPresented: $showsReloadConfirmation) {
                 Button("Cancel", role: .cancel) {}
                 Button("Reload", role: .destructive) { state.reloadServerVersion() }
             } message: {

@@ -247,7 +247,7 @@ struct ChatShellView: View {
                 }
                 .presentationDetents([.height(180), .medium])
             }
-            .alert("Session Action Failed", isPresented: sessionOpenErrorIsPresented) {
+            .alert("Session action failed", isPresented: sessionOpenErrorIsPresented) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(sessionOpenErrorMessage ?? "")
@@ -1355,7 +1355,7 @@ struct ChatShellView: View {
     }
 
     /// Restores the session in place. It does not reopen a chat the archive
-    /// closed; a failure shows the "Session Action Failed" alert.
+    /// closed; a failure shows the "Session action failed" alert.
     private func undoArchive(_ session: SessionSummary) async {
         let didUnarchive = await viewModel.unarchive(
             session,
