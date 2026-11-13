@@ -77,6 +77,21 @@ final class MealsModelsTests: XCTestCase {
         // 11 pm in New York is already the next day in UTC: the phone's day wins.
         let late = ISO8601DateFormatter().date(from: "2026-11-04T04:00:00Z")!
         XCTAssertEqual(MealsCopy.localDay(late, calendar: calendar), "2026-11-03")
+        XCTAssertEqual(MealsCopy.dayNumber("2026-11-03"), "3")
+        XCTAssertEqual(MealsCopy.weekdayName("2026-11-03"), "Tuesday")
+        XCTAssertEqual(MealsCopy.monthDay("2026-10-31"), "Oct 31")
+    }
+
+    /// The week rows and the planner's review draw days as `DeckDot`s, like the season page.
+    func testDaysDrawAsDeckDots() throws {
+        let home = try Self.home()
+        let dots = home.days.map { MealsCopy.dayDot($0, today: home.day) }
+        // Mon logged, Tue tonight, Wed planned ahead, the rest open (a plus, not a dot).
+        XCTAssertEqual(dots, ["done", "today", "ahead", nil, nil, nil, nil])
+        let pastPlan = MealsDay(day: "2026-11-02", night: home.days[1].night, logged: nil)
+        XCTAssertEqual(MealsCopy.dayDot(pastPlan, today: "2026-11-03"), "missed")
+        XCTAssertEqual(["logged", "out", "open", "skipped", "ahead", "none"].map(MealsCopy.reviewDot),
+                       ["done", "done", "today", "skip", "ahead", "off"])
     }
 }
 

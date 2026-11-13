@@ -85,7 +85,7 @@ struct MealsBookView: View {
     private var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.hxTextSecondary)
                 .accessibilityHidden(true)
             TextField(text: $viewModel.query) { Text(verbatim: "Search recipes") }
                 .textInputAutocapitalization(.never)
@@ -93,7 +93,7 @@ struct MealsBookView: View {
                 .submitLabel(.search)
             if !viewModel.query.isEmpty {
                 Button { viewModel.query = "" } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(Color.hxTextSecondary)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text(verbatim: "Clear search"))
